@@ -424,6 +424,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "bcc-relay":
+				{
+					BccRelay(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #809's generalisation: every codec against every captured record of the type it declares, over all
 				// the dumps. Parse then re-Build, byte-compared.
 				case "codec-sweep":

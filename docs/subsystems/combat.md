@@ -1096,9 +1096,30 @@ other-player handles (the `0x01316xxx` char-id range, distinct from the `0x000xx
 body** the actor's own client receives, only the frame receiver differs. Two relays run off the interest
 `Known` set (so a still-loading viewer is never sent an action for a handle it hasn't built — the `#245`
 invariant):
-- **The cast/attack GESTURE** — the `BehaviorControlCenter` animation (`#48`, `BroadcastBehaviorToViewers`),
-  fired for `BehaviorId.CombatMelee` / `CombatUnarmed` / `MagicAttack` (and the mounted jump's `BccAction`) in
-  `GameServerListener.Inbound.cs`.
+- **The behaviour GESTURE** — the `BehaviorControlCenter` animation (`#48`, `BroadcastBehaviorToViewers`) in
+  `GameServerListener.Inbound.cs`. ⭐ **Relayed by DEFAULT since #912**, which is a change of shape, not of
+  contents. It used to be a five-id allowlist that grew once per discovery — #48 the combat behaviours, #428 the
+  mounted jump, #403's sibling `Equip` — each time with the same symptom (an action visible only to the actor).
+  `/sit` was the next instance: it arrives as `BehaviorId.Transition`, which was not in the list.
+
+  `--report bcc-relay` settles it off the corpus. Split every s2c BCC by whether its actor is the **recipient**
+  (the recipient's own handle being the modal actor over that capture's c2s records) and retail relays a foreign
+  actor's behaviour on **19 of the 23 ids the corpus carries** — `Transition` 1,233 relayed records across 81
+  captures against 719 echo-acks, `Emote` 24,764 across 88. Five of nineteen was never going to converge by
+  discovery.
+
+  ⚠️ Exactly one id is excluded: **`Mount`**, 100 s2c records every one an echo-ack, over 25 captures that all
+  carried foreign BCC actors — *a miss needs that control*, because a zero is otherwise just "nobody else did it
+  nearby". It has a mechanism too: the viewer's mount visual is the ride buff + `StatUpd(Mount, MountSpeed)` that
+  `MountService.SeatAndPersist` already broadcasts, so relaying the BCC would double-send it.
+
+  ⚠️ `Search` (n=4), `Climbing` (4) and `Tradeskill` (2) are zero-relay as well and are deliberately **not**
+  excluded: at that n a zero is not a rule, and the base rate among ids with a real opportunity is 19 of 19.
+
+  ⚠️ The corpus is single-client, so "relayed" here means *the client is asked to render this behaviour for a
+  handle that is not its own* — mostly NPCs. It does not by itself prove retail relays a **player's** instance to
+  another player. What it does establish is the client-side half, which is the one that matters: nothing
+  downstream of the record knows whether the foreign handle is an NPC or a player.
 - **The spell EFFECT** — the `ApplySpell` (`0x6B87E316`) itself (`BroadcastSpellToViewers`, from
   `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture.
 - **The buff's END** — the rank-1 end twin (`SendBuffRemoval`) relays the same way. A buff other clients were told

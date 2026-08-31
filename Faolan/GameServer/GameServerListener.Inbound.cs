@@ -2065,6 +2065,10 @@ namespace Faolan.GameServer
 				// Whatever the command form left over, decoded per actionType below (ground-target vec3, equip handle, ...).
 				var actionTrailer = body.ReadRemainingArray();
 
+				// Set by the one branch that ABSORBS a record rather than acting on it (the seated sit re-send); an
+				// absorbed record is a client artefact, so there is nothing for a viewer to render either.
+				var absorbed = false;
+
 				switch (actionType)
 				{
 					case BehaviorId.Mount:
@@ -2132,6 +2136,10 @@ namespace Faolan.GameServer
 
 					case BehaviorId.Emote:
 					{
+						// Nothing to resolve server-side - an emote is pure animation. It is NOT a dead end though:
+						// the relay below is what other players see, and before #912 there was none, so this case
+						// really did end here. Retail relays Emote heavily (24,764 foreign-actor records across 88
+						// captures - `--report bcc-relay`), which is mostly NPC ambient barks arriving at the player.
 						Logger.LogInformation($"Emote: {args}");
 
 						break;
@@ -2198,6 +2206,7 @@ namespace Faolan.GameServer
 						if (actionType == BehaviorId.ObjectInteraction && client.Session.SeatedOnHandle is not null)
 						{
 							Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
+							absorbed = true;
 
 							break;
 						}
@@ -2213,18 +2222,32 @@ namespace Faolan.GameServer
 					}
 				}
 
-				// #48: the combat responses above are framed to the ACTOR only - so the swing/cast was invisible
-				// to other players. Relay the actor's behavior (the BCC animation) to nearby viewers so the attack
-				// renders on their clients too (retail relays this exact echo body, only the frame receiver
-				// differs - other-players-visible capture). The cross-player render channel is the BCC command replication
-				// (Ghidra FUN_005e1c70), so it also carries the APPEARANCE-changing behaviors: equipping/unequipping an item
-				// (#400 sibling - a new chestpiece/weapon on another player) rides the same relay; the weapon-SET switch is
-				// relayed in its own branch above. NEEDS in-client verification for the equip case (no multiplayer capture
-				// contains a remote player equipping - single-player traces only).
-				// PlayAnimation (#428): the mounted jump. A standing jump moves the character nowhere, so there is
-				// no CharDCMove for the relay to carry - the client asks for the animation over this channel
-				// instead, and without it in this list the actor animated on their own screen only.
-				if (actionType is BehaviorId.CombatMelee or BehaviorId.CombatUnarmed or BehaviorId.MagicAttack or BehaviorId.Equip or BehaviorId.BccAction)
+				// ⭐ RELAY BY DEFAULT (#912). The cross-player render channel is the BCC command replication (Ghidra
+				// FUN_005e1c70): the actor's behaviour record, re-framed to each nearby viewer, is what makes an action
+				// visible to anyone but the actor. #48 introduced it for the combat swing/cast ("invisible to other
+				// players"), and it was an explicit ALLOWLIST that then grew once per discovery - #428 the mounted jump,
+				// #403's sibling `Equip`. `/sit` was the next instance of the same bug: it arrives as
+				// `BehaviorId.Transition`, which was not in the list, so the emote played on the actor's screen and
+				// nowhere else.
+				//
+				// ⭐ The corpus says the SHAPE was wrong, not merely the contents (`--report bcc-relay`). Split every
+				// s2c BCC by whether its actor is the RECIPIENT - the recipient's own handle being the modal actor over
+				// that capture's c2s records - and retail relays a foreign actor's behaviour on **19 of the 23 ids the
+				// corpus carries**, including both ids this ticket is about: `Transition` 1,233 relayed records across
+				// 81 captures (against 719 echo-acks) and `Emote` 24,764 across 88. Five of nineteen was never going to
+				// converge by discovery, so the list inverts: everything relays unless the corpus says otherwise.
+				//
+				// ⚠️ Exactly ONE id earns the exclusion. `Mount` is 100 s2c records, every one an echo-ack, over 25
+				// captures that ALL carried foreign BCC actors - and a miss needs that control, because a zero is
+				// otherwise just "nobody else did it nearby". It also has a mechanism: the viewer's mount visual is the
+				// ride buff + StatUpd(Mount, MountSpeed) that `MountService.SeatAndPersist` already broadcasts, so
+				// relaying the BCC as well would double-send it.
+				//
+				// ⚠️ `Search` (n=4), `Climbing` (4) and `Tradeskill` (2) are zero-relay too and are deliberately NOT
+				// excluded: at that n a zero is not a rule, and the base rate among ids that had a real opportunity is
+				// 19 of 19. They are recorded in the report rather than encoded here. (`Tradeskill` never reaches this
+				// block anyway - it has its own branch above, as does the weapon-set switch, which relays itself.)
+				if (!absorbed && actionType is not BehaviorId.Mount)
 				{
 					var behaviorRelay = BehaviorAcks.Relay(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
 					if (behaviorRelay != null)

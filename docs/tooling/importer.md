@@ -562,6 +562,13 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`bcc-relay` (#912: for each `BehaviorId`, does retail send a client a record for somebody ELSE'S actor handle?
+⭐ It needs no multi-client capture, which is what made the question look blocked: it needs the recipient's own
+handle, and every capture states that — the client sends its own actions, so the modal actor over the c2s records
+IS the player, and an s2c record naming anyone else is a relay. Answer: **19 of the 23 ids the corpus carries**,
+which is what inverted the relay allowlist into a relay-by-default rule. ⚠️ It also prints the CONTROL for the
+zero-relay ids — how many of the captures where the player did it had any foreign BCC actor at all — because a
+zero without that is just "nobody else did it nearby"),
 `quest-xp` (#820: what retail PAYS for a quest. Every completion in the corpus with the experience readings either
 side of it, with the kill-completed ones held apart — their delta is the kill's. Its real finding is a CONTROL: Exp
 never appears in a stat block at all (0 of 20,213 records over 33 stat ids, from 10,016 parsed blocks), so its only
