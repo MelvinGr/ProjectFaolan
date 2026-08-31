@@ -93,8 +93,6 @@ namespace Faolan.GameServer
 			new("setregionscript", GmPrivileges.Developer, "scriptid", "Sets the scriptgroup on the pf", "region scripts (#356)"),
 			new("setregionvar", GmPrivileges.Developer, "ID Variable-name Variable-value", "Sets a region script variable", "region script variables (#356)"),
 			new("setscriptgroup", GmPrivileges.SetStats, "scriptgroupid scriptgroupparams", "Sets the scriptgroup on the target", "script groups (#356)"),
-			new("settimescale", GmPrivileges.Developer, "value", "Set time scale on the current client and server", "a client+server time SCALE distinct from /gametime\u0027s rate"),
-			new("showclassstatadjustments", GmPrivileges.Developer, "", "Gets a list of stat adjustments.", "the NPC class stat-adjustment table (#471)"),
 			new("showerrors", GmPrivileges.Developer, "id", "Sets the displaying of visual debug output", "client-side visual debug output"),
 			new("simpledynel", GmPrivileges.Developer, "create createdestructible initdestructible inflict", "Simple dynel command", "simple dynels - destructible props the world model does not carry"),
 			new("simpledyneldebug", GmPrivileges.Developer, "hide | disarm | disarmfail | lockpick | lockpickfail | canuse state | canuse state", "debug commands on simpledynel", "simple dynels - destructible props the world model does not carry"),
@@ -113,7 +111,6 @@ namespace Faolan.GameServer
 			new("togglespellrecharge", GmPrivileges.Developer, "", "Toggle spell recharge", "server-side cast cooldowns - nothing gates a cast yet (#271)"),
 			new("token", GmPrivileges.SetStats, "list | get [token] | change [token", "List, get, change or reimburse tokens.", "tokens (#899)"),
 			new("tracescripts", GmPrivileges.Developer, "help", "Usage: /tracescripts [help] [client/both] [stop] [group=x] [script=x] [maxcmds=x] [maxthreads=x] [follow] [anypf] [notarget] [_target_] Any param is optitional. Order of params is not important. Server is default. [_target_] is you whatever you've targeted. Don't use spaces before/after = . Default 100 cmds per thread. 10 threads.", "script tracing (#356)"),
-			new("update", GmPrivileges.Developer, "", "Updates the Attackrating for your target", "an attack-rating recompute hook on the target"),
 		];
 	}
 }

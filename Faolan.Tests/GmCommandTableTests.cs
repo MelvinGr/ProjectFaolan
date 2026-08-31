@@ -39,7 +39,9 @@ namespace Faolan.Tests
 			// #914 batch C2 (`.removeitem` retired into `inventory delete`)
 			"getfaction", "setfaction", "magic", "inventory",
 			// #914 batch C3
-			"gethash", "quest"
+			"gethash", "quest",
+			// #914 batch C4
+			"settimescale", "showclassstatadjustments", "update"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

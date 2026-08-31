@@ -1317,5 +1317,87 @@ namespace Faolan.GameServer
 					return;
 			}
 		}
+
+		// /settimescale <value>  - "Set time scale on the current client and server", parameter help "Float: Time
+		// scale (default is 1)".
+		//
+		// ⭐ The distinction from /gametime is worth keeping straight, because both drive the same field: /gametime
+		// MULTIPLIES the current rate (`* 2` then `* 2` gives 4), while /settimescale ASSIGNS it. Retail ships both,
+		// so it wants both spellings, and running them through one stored rate keeps them consistent with each other.
+		private async Task SetTimeScaleCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length > 0)
+			{
+				if (!float.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale) || scale <= 0f)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .settimescale <value>   (a positive float; retail's default is 1)");
+					return;
+				}
+
+				_gameTimeRate = scale;
+			}
+
+			await client.SendAsync(BuildGameTime(client));
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Time scale {_gameTimeRate:0.###} - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _gameTimeRate:0.##} real hours.");
+		}
+
+		// /showclassstatadjustments  - "Get the list of npc class stat adjustments for the target npc." No parameters.
+		//
+		// ⭐ What retail calls a class stat adjustment is what we import as the class/level attribute BASE (#444) - the
+		// per-(class, level) table the client otherwise computes locally off its own feat templates. So the answer is
+		// the target's ClassBase map, which is exactly the population #471 wanted to compare against.
+		private async Task ShowClassStatAdjustmentsCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var subject = TryResolveTarget(client, out var target, out _) ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			if (subject.ClassBase.Count == 0)
+			{
+				// ⚠️ An empty table is a real, informative answer here - it means we have not decoded a base for this
+				// (class, level), which is the shortfall AttributeScore documents rather than a zero base.
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"'{subject.Name}' ({subject.CharacterClass}, level {subject.Level}) has NO decoded class stat adjustments - attribute-driven formulas fall back to gear + buffs and read low.");
+				return;
+			}
+
+			var lines = new List<string> { $"'{subject.Name}' ({subject.CharacterClass}, level {subject.Level}) class stat adjustments - {subject.ClassBase.Count} entries:" };
+			lines.AddRange(subject.ClassBase
+				.OrderBy(kv => (uint)kv.Key)
+				.Take(24)
+				.Select(kv => $"  {kv.Key} ({(uint)kv.Key}): {kv.Value} raw = {kv.Value / (int)kv.Key.GetScale()} at scale {kv.Key.GetScale()}"));
+			if (subject.ClassBase.Count > 24)
+				lines.Add($"  ... and {subject.ClassBase.Count - 24} more");
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. lines]));
+		}
+
+		// /update  - "Updates the Attackrating for your target." No parameters.
+		//
+		// ⚠️ Ours recomputes the caller's OWN derived stats, not an arbitrary target's: the reseed runs off a
+		// connected client's gear and buffs, and an NPC has no client to reseed from. Said in the reply rather than
+		// silently doing the wrong entity.
+		private async Task UpdateRatingCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			if (_simulation.PlayerWorldEntity(client) == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var vitals = await _combat.ReseedFromMaxStats(client);
+			await SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Recomputed your derived stats from gear and buffs: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}."
+				+ " (Retail aims this at your target; ours reseeds the caller, since the reseed runs off a connected client.)");
+		}
 	}
 }
