@@ -190,26 +190,70 @@ namespace Faolan.GameServer.World
 		// falls back to a random point when they're all occupied.
 		private static Vector3 FreePoint(AmbientPool pool, IReadOnlyList<WorldEntity> live)
 		{
-			foreach (var pt in pool.Points)
+			var occupied = new Vector3[live.Count];
+			for (var i = 0; i < live.Count; i++)
+				occupied[i] = live[i].Position;
+
+			return FreePoint(pool.Points, occupied);
+		}
+
+		/// <summary>
+		///     Where the next pool member goes: the first point with full clearance, else the LEAST-CROWDED one.
+		/// </summary>
+		/// <remarks>
+		///     Split from its <c>AmbientPool</c> caller because the rule is pure geometry - it needs the points and
+		///     where the live members stand, and none of the pool's creature data.
+		/// </remarks>
+		internal static Vector3 FreePoint(IReadOnlyList<Vector3> points, IReadOnlyList<Vector3> live)
+		{
+			// The LEAST-CROWDED point, not a random one, when nothing has full clearance (#906). Creatures were
+			// standing inside each other at byte-identical coordinates - nine pairs at EXACTLY 0.000u in one map-4020
+			// dump - because this ended in `pool.Points[Random.Shared.Next(...)]`, which drops the spacing rule
+			// entirely and can hand back the very point a live member is standing on.
+			//
+			// ⭐ Picking the point whose nearest live member is FURTHEST makes that collision impossible while the pool
+			// is under strength, which is the only time anything is spawned. A point with somebody standing exactly on
+			// it scores 0, and a point with nobody on it scores more - so an exact-coordinate point can only win if
+			// EVERY point is exactly occupied, which needs as many members as points. `MaxCount` equals the point
+			// count on all 3,970 shipped areas, so a pool at that population is not topped up at all.
+			//
+			// ⚠️ Why the fallback fires is worth recording, because the obvious suspect is innocent. It is NOT
+			// over-subscription: measured over the shipped data, `MaxCount` equals the point count EXACTLY on every
+			// one of the 3,970 areas - not one is over-subscribed, so the target population is not the defect. It is
+			// that the client's own points can sit closer TOGETHER than this spacing radius: 91 areas (2.3%) contain
+			// 244 such pairs, and in exactly those 91 the greedy walk runs out of clear points 195 spawns before
+			// MaxCount. Retail placed those points that close on purpose, so the right answer is to crowd rather than
+			// to refuse - the spacing radius is our heuristic, and the point list is the client's data.
+			var best = points[0];
+			var bestGap = -1f;
+
+			foreach (var pt in points)
 			{
-				var occupied = false;
+				var nearest = float.MaxValue;
 				foreach (var e in live)
 				{
-					var dx = e.Position.X - pt.X;
-					var dz = e.Position.Z - pt.Z;
-					if (dx * dx + dz * dz < 4f)
-					{
-						occupied = true;
-						break;
-					}
+					var dx = e.X - pt.X;
+					var dz = e.Z - pt.Z;
+					nearest = MathF.Min(nearest, dx * dx + dz * dz);
 				}
 
-				if (!occupied)
+				// Fully clear: take it, exactly as before - the common path is unchanged.
+				if (nearest >= AmbientSpacingSquared)
 					return pt;
+
+				if (nearest > bestGap)
+				{
+					bestGap = nearest;
+					best = pt;
+				}
 			}
 
-			return pool.Points[Random.Shared.Next(pool.Points.Length)];
+			return best;
 		}
+
+		// How much clearance a spawn point wants from a live pool member, squared (2u). Ours, not the client's - see
+		// FreePoint for why it cannot always be honoured.
+		private const float AmbientSpacingSquared = 4f;
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
 		// Label is the dev nameplate tag (SpawnAreaLabels.FormatAreaLabel), applied to members when the GM's

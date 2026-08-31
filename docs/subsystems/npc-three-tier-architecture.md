@@ -124,6 +124,26 @@ is exactly what retail re-rolls per spawn (level, the morph table, all seven equ
 `AmbientPoolService` stands up ONE entity per pool, drawing which row it renders as at random (streamed by
 `NpcBroadcaster.MaintainAmbientPools`).
 
+### ⭐ Where a pool member STANDS - and why the fallback mattered (#906)
+
+`AmbientPoolService.FreePoint` walks the area's points for one with 2u of clearance from the live members. When
+none had it, it used to end in `pool.Points[Random.Shared.Next(...)]` — which drops the spacing rule entirely and
+can hand back the very point somebody is standing on. In-client that was **nine pairs of creatures at exactly
+0.000u** in one map-4020 dump, every one in the ambient handle range.
+
+⚠️ **The obvious suspect is innocent.** It is not over-subscription: measured over the shipped data, `MaxCount`
+equals the point count **exactly on all 3,970 areas** — not one is over-subscribed, so the target population is
+not the defect. It fires because **the client's own points can sit closer together than our spacing radius**: 91
+areas (2.3%) contain 244 such pairs, and in exactly those 91 the greedy walk runs out of clear points **195
+spawns short** of `MaxCount`. Retail placed those points that close on purpose, so the answer is to crowd rather
+than to refuse — the radius is our heuristic, the point list is the client's data.
+
+The fallback is now the **least-crowded** point (the one whose nearest live member is furthest), which turns the
+guarantee from probabilistic into structural: a point with somebody standing exactly on it scores 0 and a point
+with nobody on it scores more, so an exactly-occupied point can only win when *every* point is exactly occupied —
+which needs as many members as points, and a pool at that population is not topped up at all. The clearance path
+is unchanged, so the common case still fills points in order. Gated by `AmbientSpawnPlacementTests`.
+
 ### ⚠️ The class both mechanisms are BLIND to: cross-map duplicates (#728)
 
 Both key on `MapId`, so **two records of one NPC filed under two map ids are never compared** — and a map's
