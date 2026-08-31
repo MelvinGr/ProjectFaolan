@@ -364,6 +364,10 @@ namespace Faolan.GameServer
 				["assist"] = AssistCommand,
 				["falldamage"] = FallDamageCommand,
 				["cash"] = CashCommand,
+				// Wave B2 - the combat levers.
+				["inflict"] = InflictCommand,
+				["areaknockback"] = AreaKnockbackCommand,
+				["resurrect"] = ResurrectCommand,
 				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand,
 				["waypoint"] = WayPointCommand,
@@ -412,6 +416,10 @@ namespace Faolan.GameServer
 			["unsummon"] = GmPrivileges.TeleportDynels,
 			["falldamage"] = GmPrivileges.PlayerDamage,
 			["cash"] = GmPrivileges.SetStats,
+			// Wave B2: /inflict /areaknockback = PlayerDamage 0x10, /resurrect = AcgSpawn 0x1000.
+			["inflict"] = GmPrivileges.PlayerDamage,
+			["areaknockback"] = GmPrivileges.PlayerDamage,
+			["resurrect"] = GmPrivileges.AcgSpawn,
 			["tradeskill"] = GmPrivileges.Developer,
 			["teleport"] = GmPrivileges.TeleportSelf,
 			["teleportself"] = GmPrivileges.TeleportSelf,

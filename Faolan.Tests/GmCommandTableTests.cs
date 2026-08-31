@@ -27,7 +27,9 @@ namespace Faolan.Tests
 			// #914 Wave A
 			"settime", "gametime", "distance", "whereis", "playfieldinfo", "playfieldinstancelock", "ghost", "system", "hatedbylist",
 			// #914 Wave B1
-			"summon", "unsummon", "assist", "falldamage", "cash"
+			"summon", "unsummon", "assist", "falldamage", "cash",
+			// #914 Wave B2
+			"inflict", "areaknockback", "resurrect"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

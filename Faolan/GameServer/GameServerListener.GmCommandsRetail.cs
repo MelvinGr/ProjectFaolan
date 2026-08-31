@@ -26,6 +26,11 @@ namespace Faolan.GameServer
 	// manipulates FRAME times; the time-of-day setter is `/settime`).
 	public partial class GameServerListener
 	{
+		// The spell id a GM /resurrect offer is filed under. Self-resurrection offers are keyed by (character, spell)
+		// so that declining one potion's offer cannot drop another's; a GM offer needs an id of its own for the same
+		// reason, and 0 is the one value no real resurrection spell uses.
+		private const uint GmResurrectionSpellId = 0;
+
 		// The target a GM command acts on. Most of retail's observability verbs are written as "... for your target"
 		// and declare no parameters at all, so this is the single most reused step in the whole family.
 		private bool TryResolveTarget(INetworkClient client, out WorldEntity target, out string failure)
@@ -507,6 +512,115 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Cash: {character.Money} tin.");
+		}
+
+		// /inflict <damage>  - "Inflicts damage of the specified damage type on your target."
+		//
+		// ⚠️ Not a duplicate of our `.hurt`, and neither is removed: `.hurt [percent]` lowers YOUR OWN three pools by
+		// a proportion, while /inflict deals a flat amount to your TARGET. Same subsystem, opposite ends of it.
+		private async Task InflictCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (!int.TryParse(arg, NumberStyles.Integer, CultureInfo.InvariantCulture, out var damage) || damage <= 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inflict <damage>  (a positive amount, dealt to your target)");
+				return;
+			}
+
+			var me = _simulation.PlayerWorldEntity(client);
+			if (me == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			if (!TryResolveTarget(client, out var target, out var failure))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, failure);
+				return;
+			}
+
+			await _combat.ApplyGmDamage(client, target.Handle, damage, me.Handle);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Inflicted {damage} on '{target.Name}'.");
+		}
+
+		// /areaknockback <distance>  - "Performs an area knockback on everybody within the distance parameter of your
+		// target".
+		//
+		// ⚠️ Retail's own two descriptions of the single parameter CONTRADICT each other: the summary calls it the
+		// radius ("everybody within the distance parameter of your target") while the parameter's own help calls it
+		// the force ("How far targets will be knocked back"), and the sibling /knockback uses the identical parameter
+		// purely as force. We follow the parameter help - one value, the FORCE, matching /knockback - and take the
+		// area from the same aggro radius the rest of the simulation uses, because a command whose single number
+		// silently meant something different from its singular twin would be the worse surprise.
+		private async Task AreaKnockbackCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (!float.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out var distance) || distance <= 0f)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .areaknockback <distance>  (the force, as .knockback - everyone around your target is shoved)");
+				return;
+			}
+
+			var subject = TryResolveTarget(client, out var target, out _) ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var zone = _simulation.World.ZoneForEntity(subject);
+			if (zone == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"'{subject.Name}' has no live zone.");
+				return;
+			}
+
+			// Everyone around the epicentre is pushed AWAY from it, so the source is the subject's own position.
+			var knocked = 0;
+			foreach (var victim in zone.EntitiesInRange(subject.Position, WorldState.NpcAggroRange, subject.Handle).ToArray())
+			{
+				if (await _knockback.Knock(victim, subject.Position, distance))
+					knocked++;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Area knockback {distance:0.##} around '{subject.Name}': {knocked} entity(s) shoved.");
+		}
+
+		// /resurrect <strength>  - "Resurrects the character with a strength between 1 and 100."
+		//
+		// ⭐ Strength maps exactly onto the restore PERCENTAGE our resurrection offers already carry (a Potion
+		// restores 100, a Minor Elixir 25), so this arms the same self-resurrection path a consumable does rather
+		// than inventing a second revive. The player still takes the offer, which is what keeps the revive on the one
+		// code path that knows how to put a dead character back on its feet.
+		private async Task ResurrectCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (!uint.TryParse(arg, out var strength) || strength is 0 or > 100)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .resurrect <strength 1-100>  (percent of each pool restored)");
+				return;
+			}
+
+			// The target when it is a player, else the caller - retail's class is "resurrects the character", and the
+			// character in question is whoever is dead and selected.
+			var subject = TryResolveTarget(client, out var target, out _) && target.IsPlayer ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var subjectId = subject.Client.Session.Character.Id;
+			_playerDeaths.ArmSelfResurrection(subjectId, GmResurrectionSpellId, strength);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Armed a {strength}% resurrection for '{subject.Name}' - they accept it from the death screen.");
+			if (subjectId != characterId)
+				await _agentServerDispatcher.SendSystemMessage(subjectId, $"A resurrection ({strength}%) has been offered to you.");
 		}
 	}
 }

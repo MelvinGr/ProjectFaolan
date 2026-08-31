@@ -508,6 +508,19 @@ namespace Faolan.GameServer.Combat
 		//
 		// A positive delta (a heal-over-time) is a no-op here: NPC pools have no heal path, and quietly re-using the
 		// damage one with a flipped sign would resurrect a corpse mid-lifecycle.
+		// /inflict <damage> (#914). Retail's own direct-damage lever: "inflicts damage of the specified damage type on
+		// your target". Routed through the SAME ApplyDamage a cast or a DoT uses, so a GM blow that finishes the mob
+		// runs the whole kill lifecycle - XP, corpse and loot, kill-quest credit - rather than leaving a 0hp entity
+		// standing. Works on a player target too, via ApplyDamage's own player branch.
+		public async Task ApplyGmDamage(INetworkClient client, uint targetHandle, int damage, uint casterHandle)
+		{
+			if (damage <= 0)
+				return;
+
+			await ApplyDamage(client, targetHandle, damage, $"GM /inflict from 0x{casterHandle:X8}",
+				() => SendDamageNumber(client, targetHandle, casterHandle, (uint)damage));
+		}
+
 		public async Task ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId)
 		{
 			if (delta >= 0)
