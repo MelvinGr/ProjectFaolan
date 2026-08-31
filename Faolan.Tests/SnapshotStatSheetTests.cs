@@ -41,7 +41,10 @@ namespace Faolan.Tests
 			var sheet = SnapshotStatSheet.For(Char80(AccountType.Administrator), 0x0802ABCD, imported ? Captured() : null);
 
 			Assert.Equal(0x0802ABCDu, Value(sheet, CharacterStatId.PlayfieldToken));
-			Assert.Equal(GmRoles.All, Value(sheet, CharacterStatId.GmLevel));
+			// ⛔ WITHOUT the GodMode bit: an Administrator gets every privilege the client names EXCEPT client-side
+			// invulnerability, which follows `Account.GmGodMode` rather than the account type (#902 - with it set the
+			// client discards every server-driven health decrease and the bar never moves). See GmPrivilegeTests.
+			Assert.Equal(GmRoles.All & ~(uint)GmPrivileges.GodMode, Value(sheet, CharacterStatId.GmLevel));
 			Assert.Equal(80u, Value(sheet, CharacterStatId.Level));
 			// The XP triple is retail's CUMULATIVE form (#297): the row's 4242 is within-level progress and rides on
 			// level 80's own threshold, which is also the base the client subtracts to fill the bar.

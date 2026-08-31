@@ -12,11 +12,32 @@ namespace Faolan.Core.Enums
 		// (kick, cloak, GM chat and tag, broadcast, name/nick changes, teleports, god mode) without the Developer bit,
 		// which is what gates the ~90 debug commands (/consumememory, /memoryprofile, /fakeevent, ...). Those are
 		// client-side development tooling rather than GM powers, so they stay behind Administrator.
-		public static uint ToClientGmLevel(this AccountType type) => type switch
+		// ⛔ `GmPrivileges.GodMode` (0x200) is NOT a UI permission and must not ride along with the role. It is
+		// CLIENT-SIDE INVULNERABILITY: the client's own HealthCurrent handler opens with
+		//
+		//     GetStat(0xD7); if (gmLevel & 0x200) { if (newValue < oldValue) return; }   // FUN_010fd220 @010fde3a
+		//
+		// so with the bit set the client DISCARDS every server-driven health decrease. Damage still lands
+		// server-side and the character still dies - the bar just never moves, which is exactly what #902 was.
+		// Proven in-client 2026-08-31 with Frida on the local player's stat setter: the write arrives carrying our
+		// value and the stored health is unchanged, and clearing stat 215 makes the very next decrease apply
+		// (`CMsg_StatChange()..(27 9999 old:25000)`).
+		//
+		// The bit therefore follows the SERVER's own `.godmode` toggle (`Account.GmGodMode`), which is the
+		// authoritative one the simulation already honours - not the account TYPE. A GM who has not switched god
+		// mode on takes damage on screen like anybody else.
+		public static uint ToClientGmLevel(this AccountType type, bool godMode = false)
 		{
-			AccountType.Administrator => GmRoles.All,
-			AccountType.GameMaster => GmRoles.Support2,
-			_ => 0
-		};
+			var role = type switch
+			{
+				AccountType.Administrator => GmRoles.All,
+				AccountType.GameMaster => GmRoles.Support2,
+				_ => 0u
+			};
+
+			return godMode
+				? role
+				: role & ~(uint)GmPrivileges.GodMode;
+		}
 	}
 }

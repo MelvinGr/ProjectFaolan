@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// The GM privilege MASK from the account type (#449) - see GmPrivileges; 0 for a normal account, and for a
 			// character whose Account navigation is not loaded (create-editor / broadcast).
-			yield return (CharacterStatId.GmLevel, character?.Account?.Type.ToClientGmLevel() ?? 0);
+			yield return (CharacterStatId.GmLevel, character?.Account?.Type.ToClientGmLevel(character.Account.GmGodMode) ?? 0);
 
 			if (character == null)
 				yield break;
