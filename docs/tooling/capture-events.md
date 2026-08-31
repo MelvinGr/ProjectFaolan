@@ -114,6 +114,38 @@ leaving the playfield drops it.
 
 ⚠️ **No capture performs a tombstone RECOVERY**, so what the pickup sends is not known. Open work: Gitea #868.
 
+### ⭐ The pin's ICON is not in the message (#911)
+
+All six captured `DispatchAddWayPoint` frames are tombstones in every field at once — `i_cID`'s class is
+`EntityClass.TombStone`, `i_nLabel` is *"Tombstone"*, `i_nToolTip` is the death-penalty line — so the corpus
+cannot say which one picks the map icon. It was carried as a `[V0]` with two candidates. **The client says
+neither**, which also means the proposed in-client A/B would have come back negative on both arms.
+
+The receive chain is `GameCharInterfaceDispatch_t::DispatchAddWayPoint` (`FUN_004c9860`, which reads exactly the
+nine u32s the codec builds — an independent confirmation of the 36-byte grammar) → vtable `+0x1ec` →
+`FUN_0139c1f0` (`GamecodeClient_t`) → `FUN_01398160` → `FUN_013a18f0` (`GUI\MapWaypointHandler.cpp`) →
+`FUN_0139f520`, the add. In it:
+
+- **`i_nLabel` is the pin's TITLE TEXT and `i_nToolTip` its TOOLTIP TEXT.** Each goes through
+  `FUN_0060f190(100, id, 0)` — the LDB text resolver, category 100, the same call shape that resolves a respawn
+  point's name out of category 270 — and the two resulting *strings* are what reach the add. A text lookup cannot
+  select a bitmap.
+- **`i_cID` never reaches the add.** `FUN_0139f520` is `RET 0x20` = exactly eight stack arguments, and all eight
+  are accounted for at the call site: (handler, `i_cPos`, `i_vRadius`, title, tooltip, const, record, const).
+  `i_cID` stays what #868 showed it to be — the marker KEY, which is what `DispatchRemoveWayPoint` addresses.
+
+The look comes from a waypoint **TYPE** the client keeps in that record struct, and the server does not send one:
+`FUN_013a18f0` explicitly zeroes the record's three words, so every server-planted pin gets the same default. The
+client's own creators do set it — `FUN_013a2f80` writes **7** for a resurrection point and **0x1C** for a murder
+resurrection point, clearing those two types first — and there is a named enum behind it (`ParseWPType`,
+`FUN_0139e6f0`: names include `destination`, `dungeon`, `custom`; the inverse `FUN_0139e8d0` returns strings for
+8, 9, 0x0D, 0x15, 0x16 and defaults to `custom`), plus per-playfield definitions in
+`Gui/Default/Waypoints/PF%u.xml` carrying `tooltip_title`, `tooltip_text`, `min_level`, `max_level`,
+`tooltip_image`, `normal_bitmap`, `inactive_bitmap`, `dir_arrow`, `dir_arrow_inactive`.
+
+⇒ `.waypoint` takes optional `<labelId> <tooltipId>` arguments, because the TEXT is the only thing about the pin
+this message can vary. A non-tombstone icon needs a different mechanism, not a different field.
+
 ### Blablabla — create, combat, levelup, questcomplete
 `...create-random-actions-combat-levelup-questcomplete.json`
 - **Quest dialogue tree** (the beach Casilda/combat NPC): `4A3D899A` 12493→12490→20018→20019→20020→19919→

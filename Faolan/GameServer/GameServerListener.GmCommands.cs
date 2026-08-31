@@ -753,7 +753,8 @@ namespace Faolan.GameServer
 				add ? $"Resistance to metatype {metaType} set to {percentage}%." : $"Resistance to metatype {metaType} removed.");
 		}
 
-		// .waypoint [off]  - plant a map marker at the player's current position, or take it down (#868).
+		// .waypoint [off] | [<labelId> [<tooltipId>]]  - plant a map marker at the player's current position, or take
+		// it down (#868).
 		//
 		// The retail trigger is a DEATH: every captured `DispatchAddWayPoint` is a TOMBSTONE pin, labelled
 		// *"Tombstone"* / *"Locate your Tombstone to reduce death penalty!"* and addressed at an `EntityClass.TombStone`
@@ -763,6 +764,13 @@ namespace Faolan.GameServer
 		// The marker id is the player's own handle under the tombstone class. That is a stand-in for the corpse's id,
 		// and it is honest about being one: what matters for the in-client check is that the pin appears on the map at
 		// the right place with the right label, and that the remove takes it down again.
+		//
+		// ⚠️ **The pin's ICON is not selectable from this message** (#911, recovered from the client - see
+		// `WayPointCodec`'s remark). `i_nLabel` and `i_nToolTip` are LDB category-100 TEXT lookups (the title and the
+		// tooltip), and `i_cID` never reaches the client's waypoint-add at all - it is the marker KEY the remove
+		// addresses. The look comes from a waypoint TYPE the client keeps in its own record, and the server-driven
+		// path zeroes it. So the two optional arguments here change what the pin SAYS, which is the only thing about
+		// it this message can vary; "it should not look like a tombstone" cannot be answered from here.
 		private async Task WayPointCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -777,10 +785,19 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await SendAddWayPoint(client, character.Id, mapId, pos.X, pos.Y, pos.Z);
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			var label = tokens.Length > 0 && uint.TryParse(tokens[0], out var statedLabel)
+				? statedLabel
+				: WayPointCodec.TombstoneLabel;
+			var toolTip = tokens.Length > 1 && uint.TryParse(tokens[1], out var statedToolTip)
+				? statedToolTip
+				: WayPointCodec.TombstoneToolTip;
+
+			await SendAddWayPoint(client, character.Id, mapId, pos.X, pos.Y, pos.Z, label, toolTip);
 			await _agentServerDispatcher.SendSystemMessage(character.Id,
 				$"Waypoint planted on map {mapId} at {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} "
-				+ $"{pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}. Use .waypoint off to remove it.");
+				+ $"{pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}"
+				+ $" (label {label}, tooltip {toolTip} - LDB category 100). Use .waypoint off to remove it.");
 		}
 
 		private Task PositionCommand(INetworkClient client)

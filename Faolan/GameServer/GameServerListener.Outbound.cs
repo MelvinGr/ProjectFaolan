@@ -612,10 +612,11 @@ namespace Faolan.GameServer
 		// `DispatchAddWayPoint` / `DispatchRemoveWayPoint` on GameCharInterface. The endpoint pair is the ordinary
 		// GameCharAgent -> GameCharInterface one every other per-character dispatch uses; the captured sender
 		// instances (0x57 / 0x59 / 0x5A) are the per-session conversation ids, not a distinct conversation.
-		private static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z)
+		private static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z,
+			uint label = WayPointCodec.TombstoneLabel, uint toolTip = WayPointCodec.TombstoneToolTip)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z)));
+				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z, label, toolTip)));
 		}
 
 		private static Task SendRemoveWayPoint(INetworkClient client, EntityId id, uint playfieldId)
