@@ -324,7 +324,13 @@ namespace Faolan.GameServer
 				["travel"] = TravelCommand,
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
-				["feat"] = _feats.FeatCommand,
+				// ⚠️ `feat` is retail's READ-ONLY lister (mask GetStats, on your target); the manipulator is `feats`
+				// (mask SetStats). Ours was the manipulator wearing the reader's name and mask - the same mismatch
+				// `.time` had (#914 rule 1), so it moved to `feats` and `feat` now does what retail's does.
+				["feat"] = (client, _) => FeatListCommand(client),
+				["feats"] = _feats.FeatCommand,
+				["char"] = (client, _) => CharLogCommand(client),
+				["kickban"] = KickBanCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["delete"] = DeleteCommand,
 				["kill"] = KillCommand,
@@ -452,6 +458,9 @@ namespace Faolan.GameServer
 			["tp"] = GmPrivileges.TeleportSelf,
 			["knockback"] = GmPrivileges.PlayerDamage,
 			["feat"] = GmPrivileges.GetStats,
+			["feats"] = GmPrivileges.SetStats,
+			["char"] = GmPrivileges.Developer,
+			["kickban"] = GmPrivileges.CanKick,
 			["level"] = GmPrivileges.SetStats,
 			["kill"] = GmPrivileges.NpcCommands,
 

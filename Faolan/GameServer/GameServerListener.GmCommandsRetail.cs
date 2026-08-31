@@ -974,5 +974,129 @@ namespace Faolan.GameServer
 				? $"'{subject.Name}' is now {ChatMarkup.Color("lime", "INVISIBLE")} to monsters - NPCs won't aggro."
 				: $"'{subject.Name}' is {ChatMarkup.Color("red", "VISIBLE")} to monsters again."));
 		}
+
+		// /char  - "Flags the character so all IIRs will be logged." Declares no parameters, so it is a toggle on the
+		// caller's own session. ⭐ The point is SCOPE, not volume: one flagged character logs at information level
+		// while everyone else stays at debug, which is what makes a trace usable on a populated server.
+		private async Task CharLogCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			client.Session.LogAllIirs = !client.Session.LogAllIirs;
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw(client.Session.LogAllIirs
+				? $"IIR logging {ChatMarkup.Color("lime", "ON")} for this character - every inbound packet goes to faolan.log."
+				: $"IIR logging {ChatMarkup.Color("red", "OFF")} for this character."));
+		}
+
+		// /feat  - "Lists all the feats on your target." READ-ONLY, mask GetStats.
+		//
+		// ⚠️ This is a second name/meaning mismatch of the `.time` kind, and it is why our `.feat` was renamed:
+		// retail's `/feat` only LISTS, and does so for your TARGET; the manipulation verb is `/feats` (mask SetStats).
+		// Ours was the manipulator wearing the reader's name and mask.
+		private async Task FeatListCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var subject = TryResolveTarget(client, out var target, out _) && target.IsPlayer ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var feats = await Database.GetCharacterFeats(subject.Client.Session.Character.Id);
+			await _agentServerDispatcher.SendSystemMessage(characterId, feats.Length == 0
+				? $"'{subject.Name}' has no trained feats."
+				: $"'{subject.Name}' has {feats.Length} feat(s): {string.Join(", ", feats)}");
+		}
+
+		// /kickban [Character Name] minutes  - "Kicks a player for the specified amount of time (minutes)."
+		//
+		// ⚠️ NOT a duplicate of our `.ban`, so that one stays: `.ban` is indefinite and account-wide until someone
+		// runs `.unban`, while this is a TIMED kick that lifts itself.
+		// ⚠️ The lift is in-process and NOT persisted, so a server restart inside the window leaves the account
+		// banned - the reply says so rather than letting a GM assume it expires regardless.
+		private async Task KickBanCommand(INetworkClient client, string arguments)
+		{
+			var gmId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+			// The name is OPTIONAL in retail's grammar (`[Character Name] minutes`), so with one token it is the
+			// duration and the subject is your target.
+			string? name = null;
+			int minutes;
+			if (tokens.Length == 1 && int.TryParse(tokens[0], out minutes))
+			{
+				if (!TryResolveTarget(client, out var target, out var failure) || !target.IsPlayer)
+				{
+					await _agentServerDispatcher.SendSystemMessage(gmId, tokens.Length == 1 ? failure : "Target a player, or name one.");
+					return;
+				}
+
+				name = target.Name;
+			}
+			else if (tokens.Length >= 2 && int.TryParse(tokens[^1], out minutes))
+			{
+				name = string.Join(' ', tokens[..^1]);
+			}
+			else
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, "Usage: .kickban [<character name>] <minutes>");
+				return;
+			}
+
+			if (minutes <= 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, "Minutes must be positive - use .ban for an indefinite ban.");
+				return;
+			}
+
+			var character = await Database.GetCharacterByName(name, client.Session.Character.RealmId);
+			var account = character == null ? null : await Database.GetAccount(character.AccountId);
+			if (account == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", $"No character named '{name}' on this realm."));
+				return;
+			}
+
+			if (account.Id == client.Session.Account.Id)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "You can't kickban your own account."));
+				return;
+			}
+
+			if (!await Database.SetAccountState(account.Id, AccountState.Banned))
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "Error changing account state."));
+				return;
+			}
+
+			var kicked = 0;
+			foreach (var c in NetworkClients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
+			{
+				if (c.Session.Character?.Id is { } cid)
+					await _agentServerDispatcher.SendSystemMessage(cid, ChatMarkup.Color("red", $"You have been kicked by a GM for {minutes} minute(s)."));
+				c.Stop();
+				kicked++;
+			}
+
+			var accountId = account.Id;
+			var userName = account.UserName;
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(TimeSpan.FromMinutes(minutes));
+					await Database.SetAccountState(accountId, AccountState.Active);
+					Logger.LogInformation("GM .kickban on '{Account}' expired after {Minutes} minute(s).", userName, minutes);
+				}
+				catch (Exception e)
+				{
+					Logger.LogWarning(e, "GM .kickban lift for '{Account}' failed - the account stays banned until .unban.", userName);
+				}
+			});
+
+			await _agentServerDispatcher.SendSystemMessage(gmId,
+				$"Kickbanned '{name}' (account '{userName}') for {minutes} minute(s){(kicked > 0 ? $", {kicked} live session(s) dropped" : "")}."
+				+ " The lift is in-process only - a restart inside the window leaves it banned, so use .unban then.");
+		}
 	}
 }

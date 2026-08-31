@@ -287,6 +287,8 @@ namespace Faolan.Core.Network
 		// The entity the player last clicked (LookAt / SelectDeselect), or null when nothing is selected.
 		uint? SelectedTargetHandle { get; set; }
 
+		bool LogAllIirs { get; set; }
+
 		// The base id of the Shield of the Risen protection buff currently shown to this client (#221), or null if
 		// none. Tracked so a playfield change removes the prior shield's icon (retail keeps exactly one active at a
 		// time) before applying the new one. Session-only (client buff state resets on relog).
@@ -360,6 +362,11 @@ namespace Faolan.Core.Network
 		public bool TryClaimEnterWorldHandoff() => Interlocked.CompareExchange(ref _enterWorldHandoff, HandoffSent, HandoffArmed) == HandoffArmed;
 
 		public void ResetEnterWorldHandoff() => Volatile.Write(ref _enterWorldHandoff, HandoffIdle);
+
+		// /char (#914) - "flags the character so all IIRs will be logged". Retail's own per-character packet trace:
+		// with it on, the world listener logs every inbound IIR for THIS session at information level instead of the
+		// usual debug, so one character can be traced on a busy server without turning the log up for everyone.
+		public bool LogAllIirs { get; set; }
 
 		public bool EnergyLoopActive { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }

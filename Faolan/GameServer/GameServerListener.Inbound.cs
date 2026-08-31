@@ -47,6 +47,13 @@ namespace Faolan.GameServer
 			var iirLength = body.ReadUInt32();
 			var iirType = body.ReadUInt32<IirTypes>();
 
+			// /char (#914): retail's per-character packet trace. One flagged character is logged at information
+			// level while everyone else stays at debug, which is what makes it usable on a populated server - the
+			// alternative is raising the whole log and drowning in it.
+			if (client.Session.LogAllIirs)
+				Logger.LogInformation("GameServer [.char] {Character:X8} <- {Iir} ({Length} bytes) raw={Raw}",
+					client.Session.Character?.Id ?? 0, iirType, rawPayload.Length, Convert.ToHexString(rawPayload));
+
 			switch (iirType)
 			{
 				case IirTypes.CombatReactiveIIR:
