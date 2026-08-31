@@ -210,6 +210,28 @@ it is available to anyone. That is what makes it the way in: it is the command t
 
 ### Which of them we implement
 
+**Every one of the 133 answers.** 47 are implemented; the other 86 are *catalogued*
+(`Faolan/GameServer/RetailCommandCatalog.cs`) — registered with retail's own mask and recovered usage line, and
+answering one prints the grammar, the privilege it needs, and what it would take to back it:
+
+```
+'spawnpoints' is a retail client command this server does not implement yet.
+  retail: Clear or respawn the guru spawnpoints of the current playfield
+  usage:  .spawnpoints clear | respawn | overridetimer | time
+  needs:  guru spawn points (#363)
+```
+
+⭐ **Why register a command we cannot perform.** The client's hidden GM affordances only ever emit verbs from its
+own registry, and an unregistered verb comes back as "no such command" — which reads as *this build is broken*
+rather than *that subsystem does not exist here*. ⚠️ These are not stubs that pretend to work: nothing is
+toggled, nothing is written, and the reply says so. A verb graduates out of the catalogue the moment it gets a
+real handler — `BuildGmCommands` throws if a verb is in both tables, since which one won would otherwise depend
+on insertion order.
+
+Three gates keep it honest: `EveryRetailVerb_IsEitherImplementedOrCatalogued` (completeness over the recovered
+registry), `CataloguedVerbs_CarryRetailsOwnMask` (a placeholder reply is still gated on retail's real bit, and
+every entry must say what it needs), and `NoVerb_IsBothImplementedAndCatalogued`.
+
 Implementation is tracked in Gitea #914, wave by wave. Two rules govern it:
 
 * **Retail's `/` verb wins.** Where one of our invented `.` verbs does the same job as a retail verb, ours is
@@ -218,6 +240,16 @@ Implementation is tracked in Gitea #914, wave by wave. Two rules govern it:
   nothing becomes less discoverable.
 * **Retail's grammar and retail's mask**, both pinned by tests (`GmCommandArgumentGrammarTests`,
   `GmCommandTableTests`).
+
+⭐ **When retail ships two similarly-named verbs, the shorter is usually the READER and the longer the WRITER,
+and their masks differ accordingly.** `/feat` lists your target's feats (`GetStats`); `/feats` manipulates them
+(`SetStats`). Ours was the manipulator under the reader's name *and* the reader's lower mask, so it was gated one
+privilege too loosely. A single verb of ours covering both jobs lands on the wrong one about half the time.
+
+⭐ **Retail's description of a command describes retail's implementation.** `/unsummon` "dismisses a character to
+the last saved location" — which works for them because their `/summon` presumably does not save. Ours does, so
+following the sentence literally reproduced the words and lost the behaviour (the return point is now captured at
+summon time). Where our internals differ, the sentence is a clue, not a specification.
 
 ⚠️ **A matching NAME does not mean a matching JOB.** Retail's `/time` manipulates *frame* times — "speeds up or
 slows the deltatimer system on server and client". The time-of-day setter is `/settime`, and that is what our
