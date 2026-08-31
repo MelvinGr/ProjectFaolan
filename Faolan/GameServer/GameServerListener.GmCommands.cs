@@ -249,11 +249,23 @@ namespace Faolan.GameServer
 				arguments = commandText[(spaceIndex + 1)..];
 			}
 
-			if (_gmCommandsDict.ContainsKey(command))
+			if (_gmCommandsDict.TryGetValue(command, out var entry))
 			{
+				// Per-command privilege gate (#904): retail gates each command against the gm_level BITMASK, not a
+				// boolean, so the per-bit admin UI has to bite here too - un-checking NPCCommands must stop `.kill`.
+				// ⚠️ RequiredMask == None means UNRESTRICTED (any GM), the client's own convention (FUN_006c86b0);
+				// getting that backwards would lock every GM out of every unmasked command. The outer IsGm gates on
+				// the callers still stand - this is the per-command refinement inside them.
+				if (entry.RequiredMask != GmPrivileges.None && client.Session.Account?.HasGmPrivilege(entry.RequiredMask) != true)
+				{
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+						ChatMarkup.Color("red", $"'{command}' requires the {entry.RequiredMask} privilege."));
+					return;
+				}
+
 				try
 				{
-					await _gmCommandsDict[command].Invoke(client, arguments!);
+					await entry.Handler.Invoke(client, arguments!);
 				}
 				catch (Exception e)
 				{
@@ -293,10 +305,10 @@ namespace Faolan.GameServer
 
 		private void InitGmCommands()
 		{
-			_gmCommandsDict = new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
+			_gmCommandsDict = BuildGmCommands(new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
 				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
-				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
+				["help"] = (client, _) => SendGmHelpText(client),
 				["maps"] = (client, arguments) => SendListAllMaps(client.Session.Character.Id, arguments),
 				["teleport"] = TeleportCommand,
 				// The retail client's own verbs for the same thing, so a GM's muscle memory works: the client
@@ -343,8 +355,81 @@ namespace Faolan.GameServer
 				["matchstart"] = (client, _) => MatchStartCommand(client),
 				// #146: the end half - stop the caller's started match now instead of waiting out its time limit.
 				["matchstop"] = MatchStopCommand
-			};
+			});
 		}
+
+		// The gm_level bit each verb requires (#904), joined with the handler table at construction. Two
+		// provenances, kept visibly apart:
+		//   * RETAIL - the verb exists in the client's own command registry (docs/re/gm-command-registry.tsv) and
+		//     the mask is retail's, reused exactly;
+		//   * OURS - retail has no such verb (.additem, .ah, ...), so the bit is a CHOICE by family, not a
+		//     recovered fact. Do not cite these as decoded.
+		// None = unrestricted (any GM), the client's own convention for an unmasked command (FUN_006c86b0), and a
+		// multi-bit mask would pass on ANY set bit - the client's `(level & mask) != 0` test.
+		internal static readonly Dictionary<string, GmPrivileges> GmCommandMasks = new Dictionary<string, GmPrivileges>(StringComparer.OrdinalIgnoreCase)
+		{
+			// RETAIL, from the registry: /save /time /tradeskill = Developer 0x1, the /teleport family =
+			// TeleportSelf 0x4, /knockback = PlayerDamage 0x10, /feat = GetStats 0x20, /level = SetStats 0x40,
+			// /kill = NpcCommands 0x80000.
+			["save"] = GmPrivileges.Developer,
+			["time"] = GmPrivileges.Developer,
+			["tradeskill"] = GmPrivileges.Developer,
+			["teleport"] = GmPrivileges.TeleportSelf,
+			["teleportself"] = GmPrivileges.TeleportSelf,
+			["tp"] = GmPrivileges.TeleportSelf,
+			["knockback"] = GmPrivileges.PlayerDamage,
+			["feat"] = GmPrivileges.GetStats,
+			["level"] = GmPrivileges.SetStats,
+			["kill"] = GmPrivileges.NpcCommands,
+
+			// OURS - family choices. `help` is unrestricted and lists only what the caller may run.
+			["help"] = GmPrivileges.None,
+			["maps"] = GmPrivileges.Developer,
+			["position"] = GmPrivileges.Developer,
+			["recall"] = GmPrivileges.TeleportSelf,
+			["recallhome"] = GmPrivileges.TeleportSelf,
+			["travel"] = GmPrivileges.TeleportSelf,
+			["criminal"] = GmPrivileges.SetStats,
+			["heroicmode"] = GmPrivileges.Developer,
+			["godmode"] = GmPrivileges.SetStats,
+			["invisible"] = GmPrivileges.SetStats,
+			["delete"] = GmPrivileges.NpcCommands,
+			["hurt"] = GmPrivileges.PlayerDamage,
+			["additem"] = GmPrivileges.AcgSpawn,
+			["removeitem"] = GmPrivileges.AcgSpawn,
+			["tag"] = GmPrivileges.Developer,
+			["claim"] = GmPrivileges.Developer,
+			["syschat"] = GmPrivileges.Broadcast,
+			["toast"] = GmPrivileges.Broadcast,
+			["ah"] = GmPrivileges.Developer,
+			["ban"] = GmPrivileges.CanKick,
+			["unban"] = GmPrivileges.CanKick,
+			["setnpcgroup"] = GmPrivileges.NpcCommands,
+			["target"] = GmPrivileges.GetStats,
+			["togglenpcgroup"] = GmPrivileges.NpcCommands,
+			["graduatenpcgroup"] = GmPrivileges.NpcCommands,
+			["weaponset"] = GmPrivileges.Developer,
+			["setstat"] = GmPrivileges.SetStats,
+			["waypoint"] = GmPrivileges.Developer,
+			["resist"] = GmPrivileges.SetStats,
+			["matchstart"] = GmPrivileges.Developer,
+			["matchstop"] = GmPrivileges.Developer
+		};
+
+		// Joins the handler table with GmCommandMasks, refusing to come up on ANY asymmetry - a verb with a handler
+		// but no mask would otherwise dispatch ungated (or a mask with no handler would rot silently), and a loud
+		// boot failure is the cheapest place to catch both. GmCommandTableTests pins the retail half of the masks.
+		internal static Dictionary<string, GmCommandEntry> BuildGmCommands(Dictionary<string, GmCommandDelegate> handlers)
+		{
+			var noMask = handlers.Keys.Where(v => !GmCommandMasks.ContainsKey(v)).ToList();
+			var noHandler = GmCommandMasks.Keys.Where(v => !handlers.ContainsKey(v)).ToList();
+			if (noMask.Count > 0 || noHandler.Count > 0)
+				throw new InvalidOperationException(
+					$"GM command tables disagree - no mask: [{noMask.JoinAsString(", ")}], no handler: [{noHandler.JoinAsString(", ")}].");
+
+			return handlers.ToDictionary(kv => kv.Key, kv => new GmCommandEntry(kv.Value, GmCommandMasks[kv.Key]), StringComparer.OrdinalIgnoreCase);
+		}
+
 
 		// .time [<hh:mm> | reset]  - report or set the world time of day, then resend the clock so the change shows
 		// without a relog. The clock runs live off the wall clock at 5 game seconds per real second (#351), so a game day
@@ -822,9 +907,17 @@ namespace Faolan.GameServer
 			return bank.Items.Count;
 		}
 
-		private Task SendGmHelpText(uint characterId)
+		// Lists only the commands the CALLER's privilege mask passes - the same per-bit filtering the client's own
+		// /help applies to the retail command set (#904).
+		private Task SendGmHelpText(INetworkClient client)
 		{
-			return _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw($"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}"));
+			var account = client.Session.Account;
+			var available = _gmCommandsDict
+				.Where(e => e.Value.RequiredMask == GmPrivileges.None || account?.HasGmPrivilege(e.Value.RequiredMask) == true)
+				.Select(e => e.Key)
+				.Order(StringComparer.OrdinalIgnoreCase);
+
+			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Raw($"Available Commands:<br />{available.JoinAsString("<br />")}"));
 		}
 
 		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist, 		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
@@ -1349,6 +1442,11 @@ namespace Faolan.GameServer
 				: name;
 		}
 
-		private delegate Task GmCommandDelegate(INetworkClient client, string arguments);
+		internal delegate Task GmCommandDelegate(INetworkClient client, string arguments);
+
+		// A registered GM command: its handler and the gm_level bit(s) it requires. None = unrestricted (any GM),
+		// the client's own convention for an unmasked command; a multi-bit mask passes on ANY set bit, the client's
+		// `(level & mask) != 0` test (#904).
+		internal sealed record GmCommandEntry(GmCommandDelegate Handler, GmPrivileges RequiredMask);
 	}
 }

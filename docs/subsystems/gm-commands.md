@@ -114,6 +114,16 @@ roles below are offered as presets — `support2` is the widest of the
 shipped non-developer roles, carrying the moderation set without the `Developer` bit that gates the ~85 debug
 commands.
 
+## Server-side gating (#904)
+
+The bits bite server-side, not only in the client's `/help`: every entry in our command table
+(`GameServerListener.GmCommands.cs`) carries the gm_level bit it requires (`GmCommandMasks`), and the dispatcher
+refuses a verb whose mask the caller's `Account.GmLevel` does not contain — `mask == None` means UNRESTRICTED
+(any GM), the client's own convention. The ten verbs that are also retail verbs reuse retail's mask exactly
+(pinned against [`gm-command-registry.tsv`](../re/gm-command-registry.tsv) by `GmCommandTableTests`); the rest
+are our own verbs, so their bit is a family CHOICE, commented as such in the table, not a recovered fact. Our
+`.help` lists only what the caller's mask passes, like the client's own filter.
+
 ## The command catalog
 
 133 commands, all registered by one function (`FUN_0064e2d0`) as 12-byte records — `[0] vftable, [4] 0,

@@ -101,7 +101,7 @@ namespace Faolan.GameServer
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
-		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict = null!;
+		private static Dictionary<string, GmCommandEntry> _gmCommandsDict = null!;
 
 		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
 
