@@ -562,6 +562,10 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`npc-debuff` (#907: when a MOB lands a spell on the PLAYER, does retail re-send the `MagicBuffIIR` per swing, and
+does it send the END twin? Answer: **applies once and closes it** - 87 distinct (player, mob, spell) pairings, a
+MEDIAN OF ONE apply each and never more than four, with the end twin arriving on 86 of the 87. So a per-swing
+re-emission is not retail behaviour and a stranded 0s icon is not either),
 `melee-crowd` (#908: when several retail mobs are on one player at once, how are they arranged? Its finding is that
 they take slots on a RING of about 1-1.5u around the target, established by dividing each crowd's closest walking
 pair by the ring factor `2*R*sin(pi/N)` - the implied radius is FLAT across crowd sizes (1.05, 1.03, 1.06, 0.96,

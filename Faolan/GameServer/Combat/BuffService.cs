@@ -405,7 +405,15 @@ namespace Faolan.GameServer.Combat
 			// assumes: at most one live instance per spell id. Clearing the old icon first means a refresh looks like a
 			// refresh - one icon with a restarted countdown - and there is never an orphan to strand. Retail's own NPC
 			// debuff cadence agrees: it re-applies only AFTER the previous one has ended (#274).
-			if (applyTo == applyFrom && _sim.PlayerWorldEntity(client) is { } live && live.Handle == applyTo && live.ActiveBuffs.TryRemove(spellId, out var previous))
+			// ⚠️ The subject test is "is this the client's OWN player", NOT "is the subject the caster" (#907). It used
+			// to be `applyTo == applyFrom`, which reads as a correctness guard and is really a SCOPE restriction - the
+			// shape `two_buff_registries` warns about. It excluded every record landing on the player from someone
+			// ELSE, so an aura or a targeted cast from a MOB got no dedup, no registry entry, no expiry and no end
+			// twin: the icon counted to 0 and stuck there.
+			//
+			// ⚠️ It is NOT what stranded the reported `Butcher` icon - that arrives by `NpcCombatService.ApplyNpcCast`,
+			// which never calls this method and keeps its own registry write. See #907 for what actually strands it.
+			if (_sim.PlayerWorldEntity(client) is { } live && live.Handle == applyTo && live.ActiveBuffs.TryRemove(spellId, out var previous))
 			{
 				await SendBuffRemoval(client, applyTo, previous.CasterHandle, spellId);
 				_logger.LogDebug("Buff 0x{Buff:X8} re-applied to {Target:X8} - cleared the previous instance first so the client shows one icon, not a stack.", spellId, applyTo);
@@ -423,10 +431,18 @@ namespace Faolan.GameServer.Combat
 			// offensive casts, framed to our endpoint). Reframe the same body to each viewer who already sees the caster.
 			await _broadcaster.BroadcastSpellToViewers(client, body);
 
-			if (applyTo != applyFrom)
-				return;
+			// ⭐ No `applyTo != applyFrom` bail here any more (#907). The registry lives on the PLAYER's entity, so
+			// what decides whether a record belongs in it is whose bar it lands on - which the `entity.Handle !=
+			// applyTo` check below already asks. A buff landing on a MOB still falls out there, because the entity
+			// resolved is the client's player and its handle is not the mob's; the world tick owns a mob's registry
+			// (`WorldSimulation.ApplyEffectToEntity`), and that is unchanged.
+			//
+			// Measured before changing it (`--report npc-debuff`): across the corpus retail's mob-onto-player records
+			// are 87 distinct (player, mob, spell) pairings, MEDIAN ONE apply each and never more than four, with the
+			// END twin arriving on 86 of the 87. So retail applies once and closes it, which is exactly what a
+			// registry entry plus the expiry tick produce.
 
-			// #371: only a TIMED self-buff is tracked. A zero-duration spell is an INSTANT effect (the RDB leads:
+			// #371: only a TIMED buff is tracked. A zero-duration spell is an INSTANT effect (the RDB leads:
 			// field 0x008 absent == "no duration"), not a permanent buff - it has nothing for TickBuffExpiry to
 			// expire, renders no icon, and registering it would leak a never-expiring ActiveBuffs entry that also
 			// persists (ExpiresAt NULL) and re-applies on every login.

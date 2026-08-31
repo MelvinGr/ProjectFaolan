@@ -718,6 +718,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "npc-debuff":
+				{
+					NpcDebuff(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "melee-crowd":
 				{
 					MeleeCrowd(NamedCapture.LoadAll(capturesDir));
