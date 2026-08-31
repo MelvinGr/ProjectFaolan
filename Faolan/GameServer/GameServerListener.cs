@@ -126,6 +126,9 @@ namespace Faolan.GameServer
 		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
 		private long _gameTimeOffset;
 
+		// The game clock's speed multiplier, driven by `/gametime * f | / f | reset` and sent on the wire (#914).
+		private float _gameTimeRate = 1.0f;
+
 		// #637: hands out the cookie of each travel confirmation box. Retail's is a script-context pointer; ours only
 		// has to be unique among the boxes a client might have outstanding, which a listener-wide counter is.
 		private long _travelConfirmCookie;

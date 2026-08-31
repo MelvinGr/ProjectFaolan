@@ -31,10 +31,13 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// dayTime is passed in rather than read from the clock so a golden test can rebuild a captured record exactly:
 		// the time of day is server state (like a position), while the record's LAYOUT is what the capture pins.
-		public static byte[] Build(float dayTimeSeconds, DateTimeOffset now)
+		// `rate` is the trailing f32 the client feeds straight into its own clock multiplier (GameTime_t +0xD4), so a
+		// GM speeding the day up is a WIRE change the client follows rather than a server-side fudge it drifts against.
+		// Defaulted, so every existing caller - and the golden test that rebuilds a captured record - is unaffected.
+		public static byte[] Build(float dayTimeSeconds, DateTimeOffset now, float rate = 1.0f)
 		{
 			var (gameDay, unixSeconds) = GameClock.ResyncAnchor(now);
-			return Build(new GameTimeIIR(dayTimeSeconds, UnappliedWord, gameDay, unixSeconds));
+			return Build(new GameTimeIIR(dayTimeSeconds, UnappliedWord, gameDay, unixSeconds, Rate: rate));
 		}
 
 		public static byte[] Build(DateTimeOffset now, long offsetGameSeconds = 0)

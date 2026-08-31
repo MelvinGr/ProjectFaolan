@@ -306,19 +306,19 @@ namespace Faolan.GameServer
 		// for where those come from). `_gameTimeOffset` shifts the phase for the `.time` GM command.
 		internal Rpc BuildGameTime(INetworkClient client)
 		{
-			return BuildGameTime(client, DateTimeOffset.UtcNow, _gameTimeOffset);
+			return BuildGameTime(client, DateTimeOffset.UtcNow, _gameTimeOffset, _gameTimeRate);
 		}
 
 		// `now` and the offset are parameters so a golden test can feed the capturing instant and the captured dayTime
 		// and get the captured bytes back.
-		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now, long offsetGameSeconds)
+		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now, long offsetGameSeconds, float rate = 1.0f)
 		{
-			return BuildGameTime(client, GameClock.TimeOfDay(now, offsetGameSeconds), now);
+			return BuildGameTime(client, GameClock.TimeOfDay(now, offsetGameSeconds), now, rate);
 		}
 
-		internal static Rpc BuildGameTime(INetworkClient client, float dayTimeSeconds, DateTimeOffset now)
+		internal static Rpc BuildGameTime(INetworkClient client, float dayTimeSeconds, DateTimeOffset now, float rate = 1.0f)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now)));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now, rate)));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildUpdateCodec) on the world conversation: [RpcHeader][DispatchPassBlob]

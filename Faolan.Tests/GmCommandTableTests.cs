@@ -18,8 +18,15 @@ namespace Faolan.Tests
 		// Every verb of ours that retail's client also registers. The mask for these is a recovered fact; the rest
 		// of GmCommandMasks is our own family choice and is deliberately NOT pinned (changing a choice is not a
 		// regression).
+		// ⚠️ `time` is deliberately NOT here. Retail's `/time` manipulates FRAME times (the deltatimer system) - the
+		// time-of-day setter is `/settime`, which is what our `.time` actually did, so it was renamed (#914 rule 1).
+		// We do not implement retail's `/time`, so pinning its mask would assert against a verb we do not have.
 		private static readonly string[] RetailVerbs =
-			["save", "time", "tradeskill", "teleport", "teleportself", "tp", "knockback", "feat", "level", "kill"];
+		[
+			"save", "tradeskill", "teleport", "teleportself", "tp", "knockback", "feat", "level", "kill",
+			// #914 Wave A
+			"settime", "gametime", "distance", "whereis", "playfieldinfo", "playfieldinstancelock", "ghost", "system", "hatedbylist"
+		];
 
 		private static Dictionary<string, uint> RegistryMasks()
 		{
@@ -41,14 +48,16 @@ namespace Faolan.Tests
 			}
 		}
 
-		// None = unrestricted is the client's own convention for an unmasked command, and `help` is the one verb we
-		// deliberately leave unmasked (it filters its listing per caller instead). Everything else must carry a bit:
-		// an accidentally-None entry would silently open that command to every GM.
+		// None = unrestricted is the client's own convention for an unmasked command. Exactly two verbs are unmasked:
+		// our `.help` (it filters its listing per caller instead) and `/system`, which RETAIL itself registers at mask
+		// 0x0 - so leaving it unmasked is matching retail, not an oversight, and `RetailVerbs_CarryRetailsOwnMask`
+		// independently pins it to the registry's own value. Everything else must carry a bit: an accidentally-None
+		// entry would silently open that command to every GM.
 		[Fact]
-		public void OnlyHelp_IsUnrestricted()
+		public void OnlyHelpAndSystem_AreUnrestricted()
 		{
-			var unmasked = GameServerListener.GmCommandMasks.Where(kv => kv.Value == GmPrivileges.None).Select(kv => kv.Key).ToList();
-			Assert.Equal(["help"], unmasked);
+			var unmasked = GameServerListener.GmCommandMasks.Where(kv => kv.Value == GmPrivileges.None).Select(kv => kv.Key).Order(StringComparer.Ordinal).ToList();
+			Assert.Equal(["help", "system"], unmasked);
 		}
 
 		// The join refuses to come up on any asymmetry between the handler table and the mask table - a handler

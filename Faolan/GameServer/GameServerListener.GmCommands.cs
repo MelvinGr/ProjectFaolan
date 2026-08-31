@@ -344,7 +344,20 @@ namespace Faolan.GameServer
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
-				["time"] = TimeCommand,
+				// #914 Wave A - the retail client's own observability verbs, on the grammar recovered in #913.
+				// ⚠️ `time` is NOT here on purpose. Retail's own `/time` manipulates FRAME times (the deltatimer system);
+				// the time-of-day setter is `/settime`, which is what our `.time` actually was. Keeping ours under `time`
+				// would be retail's name over someone else's meaning, so it moved (#914 rule 1) and `/gametime` took the
+				// `reset` form, where retail puts it.
+				["settime"] = SetTimeCommand,
+				["gametime"] = GameTimeCommand,
+				["distance"] = (client, _) => DistanceCommand(client),
+				["whereis"] = WhereIsCommand,
+				["playfieldinfo"] = (client, _) => PlayfieldInfoCommand(client),
+				["playfieldinstancelock"] = (client, _) => PlayfieldInstanceLockCommand(client),
+				["ghost"] = GhostCommand,
+				["system"] = (client, _) => SystemInfoCommand(client),
+				["hatedbylist"] = (client, _) => HatedByListCommand(client),
 				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand,
 				["waypoint"] = WayPointCommand,
@@ -372,7 +385,20 @@ namespace Faolan.GameServer
 			// TeleportSelf 0x4, /knockback = PlayerDamage 0x10, /feat = GetStats 0x20, /level = SetStats 0x40,
 			// /kill = NpcCommands 0x80000.
 			["save"] = GmPrivileges.Developer,
-			["time"] = GmPrivileges.Developer,
+			// #914 Wave A - RETAIL's own masks, from the registry: /settime /gametime /ghost /hatedbylist /system are
+			// Developer 0x1 (except /system, see below), /whereis /playfieldinfo /playfieldinstancelock = TeleportDynels
+			// 0x8, /distance = GetStats 0x20.
+			["settime"] = GmPrivileges.Developer,
+			["gametime"] = GmPrivileges.Developer,
+			["ghost"] = GmPrivileges.Developer,
+			["hatedbylist"] = GmPrivileges.Developer,
+			["whereis"] = GmPrivileges.TeleportDynels,
+			["playfieldinfo"] = GmPrivileges.TeleportDynels,
+			["playfieldinstancelock"] = GmPrivileges.TeleportDynels,
+			["distance"] = GmPrivileges.GetStats,
+			// ⚠️ Retail registers /system at mask 0x0 - UNRESTRICTED - and we match retail rather than inventing a bit.
+			// It is the only verb besides our own `.help` that is unmasked.
+			["system"] = GmPrivileges.None,
 			["tradeskill"] = GmPrivileges.Developer,
 			["teleport"] = GmPrivileges.TeleportSelf,
 			["teleportself"] = GmPrivileges.TeleportSelf,
@@ -483,33 +509,6 @@ namespace Faolan.GameServer
 			return ok;
 		}
 
-		private async Task TimeCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var arg = (arguments ?? "").Trim();
-
-			if (arg.Equals("reset", StringComparison.OrdinalIgnoreCase))
-				_gameTimeOffset = 0;
-			else if (arg.Length > 0)
-			{
-				var parts = arg.Split(':', StringSplitOptions.TrimEntries);
-				if (parts.Length != 2 || !uint.TryParse(parts[0], out var hours) || hours > 23 || !uint.TryParse(parts[1], out var minutes) || minutes > 59)
-				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [<hh:mm> | reset]  (no argument reports the current time)");
-					return;
-				}
-
-				// Shift the phase so the CURRENT instant reads as the requested time of day.
-				var wanted = (long)(hours * 3600 + minutes * 60);
-				_gameTimeOffset = (_gameTimeOffset + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
-			}
-
-			await client.SendAsync(BuildGameTime(client));
-
-			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameClock.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_gameTimeOffset}s)");
-		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
 		// given handle, or self. An NPC runs the full combat death lifecycle (vitals push, despawn/corpse-loot, XP, 		// kill-quest advance); self drops the player's vitals to 0 and the world tick respawns them at the nearest

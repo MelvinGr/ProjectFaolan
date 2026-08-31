@@ -208,6 +208,29 @@ the recovered facts the parser is built on, as `GmCommandTableTests` pins the ma
 `/gm` itself is `FanaticGMLevelCommand_c`, registered ahead of all of these and **without** a permission record — so
 it is available to anyone. That is what makes it the way in: it is the command that reads and sets the mask.
 
+### Which of them we implement
+
+Implementation is tracked in Gitea #914, wave by wave. Two rules govern it:
+
+* **Retail's `/` verb wins.** Where one of our invented `.` verbs does the same job as a retail verb, ours is
+  removed rather than kept as an alias — the client's own UI can only ever emit registry verbs, so a second name
+  for the same job is a name nothing can call. `.help` still lists the whole table the caller's mask passes, so
+  nothing becomes less discoverable.
+* **Retail's grammar and retail's mask**, both pinned by tests (`GmCommandArgumentGrammarTests`,
+  `GmCommandTableTests`).
+
+⚠️ **A matching NAME does not mean a matching JOB.** Retail's `/time` manipulates *frame* times — "speeds up or
+slows the deltatimer system on server and client". The time-of-day setter is `/settime`, and that is what our
+`.time` actually was, so it was renamed; `reset` moved to `/gametime`, where retail puts it. We do not implement
+retail's `/time`. Check the recovered long description before assuming two same-named verbs agree.
+
+`/gametime * <factor> | / <factor> | reset` rides a real wire field: `GameTimeIIR`'s trailing f32 `rate` feeds the
+client clock's own multiplier (`GameTime_t` +0xD4), so the client speeds its day/night cycle to match instead of
+drifting against the server's.
+
+⚠️ `/system` is registered by retail at mask `0x0` — **unrestricted** — and we match that rather than inventing a
+bit for it. It and `.help` are the only two unmasked verbs.
+
 ## What the client sends
 
 Executing a GM command emits `FanaticCommandIIR_t` (`0xEE4AA85C`) — `[u32 command][u32 targetA][u32 targetB][string
