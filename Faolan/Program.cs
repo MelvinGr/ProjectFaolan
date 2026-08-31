@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -206,8 +207,28 @@ namespace Faolan
 			if (builder is WebApplicationBuilder webBuilder)
 			{
 				var app = webBuilder.Build();
-				app.MapFaolanMcp();
-				await app.RunAsync();
+
+				// The MCP port is per-realm (#910): `Mcp:Port` is one global key and MCP only runs in a realm host, so
+				// without the offset every realm process bound the same port and the second one died on
+				// `address already in use` - naming a port the operator never set for it.
+				var mcpPort = FaolanMcpServiceCollectionExtensions.McpPortFor(builder.Configuration.McpPort, hostRealm!.Id);
+				app.MapFaolanMcp(hostRealm.Id);
+				Console.WriteLine($"[mcp] http://127.0.0.1:{mcpPort}/mcp (realm {hostRealm.Id})");
+
+				try
+				{
+					await app.RunAsync();
+				}
+				catch (IOException ex) when (ex.Message.Contains($":{mcpPort}", StringComparison.Ordinal))
+				{
+					// Kestrel's bind error names a port nobody configured for THIS process and says nothing about MCP,
+					// which is what made the original failure opaque. Say what it is and how to get past it.
+					await Console.Error.WriteLineAsync(
+						$"[mcp] FATAL: could not bind the MCP endpoint on port {mcpPort}. Something else holds it - "
+						+ $"another Faolan process hosting realm {hostRealm.Id}, or an unrelated program. "
+						+ "Start this process with --Mcp:Enabled false, or move it with --Mcp:Port <port>.");
+					throw;
+				}
 			}
 			else
 			{

@@ -55,7 +55,10 @@
 	"Mcp": {
 		// Host the in-process MCP endpoint: database queries, live-session inspection and GM commands.
 		"Enabled": false,
-		// The port that MCP endpoint binds. Loopback only, so there is no address to configure.
+		// The BASE port the MCP endpoint binds. Loopback only, so there is no address to configure.
+		// A realm host binds this plus its realm's offset from the first realm, so realm 1 is 7099, realm 2 is 7100
+		// and so on - without that, every realm process in a multi-realm run binds the same port and all but the
+		// first dies on "address already in use" (#910). Set it per process to override.
 		"Port": 7099
 	},
 

@@ -44,7 +44,9 @@ namespace Faolan.Core.Cli
 			Setting(Keys.LogFile, "Where the server writes its log, alongside the console.", "faolan.log"),
 			Setting(Keys.LogPacketBytes, "Add the raw byte dump to every packet log line. Verbose - for protocol work.", false),
 			Setting(Keys.McpEnabled, "Host the in-process MCP endpoint: database queries, live-session inspection and GM commands.", false),
-			Setting<ushort>(Keys.McpPort, "The port that MCP endpoint binds. Loopback only, so there is no address to configure.", 7099),
+			Setting<ushort>(Keys.McpPort,
+				"The BASE port the MCP endpoint binds. Loopback only, so there is no address to configure. A realm host adds its realm's offset from the first realm (realm 1 = this port, realm 2 = +1, ...), so a multi-realm run does not collide - #910.",
+				7099),
 			Setting(Keys.ServerListenAddress, "The interface the server BINDS. Not an address to dial - that is Server:PublicAddress.", "0.0.0.0"),
 			Setting<ushort>(Keys.ServerPlayerAgentPort, "The port the PlayerAgent binds - the tier the UniverseAgent hands a client on to.", 7011),
 			Optional<string>(Keys.ServerPrivateKey, $"The login DH private key, {ClientLoginEncryption.PrivateHexLength} hex characters - generate one with --generate-login-key. Unset, no password is ever checked; set, every client must be patched (Faolan.ClientLauncher --patch-login) or it is refused."),
@@ -91,6 +93,10 @@ namespace Faolan.Core.Cli
 
 			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 			public ushort McpPort => Value<ushort>(config, Keys.McpPort);
+			// ⚠️ The BASE port, so this is the FIRST realm's endpoint. A realm host adds its offset (#910,
+			// `FaolanMcpServiceCollectionExtensions.McpPortFor`), so in a multi-realm run this URL reaches realm 1 only.
+			// That is right for Faolan.Web, which is not realm-aware; anything that needs another realm's endpoint has
+			// to derive it the same way the host does.
 			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
 
 			public IPAddress ServerListenAddress => IPAddress.Parse(config[Keys.ServerListenAddress]!);

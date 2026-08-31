@@ -49,6 +49,32 @@ So `Program.cs` gains a **role**: `--role login` (or default) runs the router ti
 host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), but at most one realm role per process
 (co-hosting realms would share chat/session state across them). One login process + N realm processes, shared DB.
 
+### Ports: everything a realm host binds is per-realm
+
+A realm's world / chat / cs ports come off its own `Realm` row, so two realm processes never collide. The one
+exception was the **MCP endpoint** (#910): `Mcp:Port` is a single global key and MCP runs only in a realm host, so
+every realm process bound the same 7099 and the second died on `address already in use` — naming a port the
+operator never set for that process, after it had already logged that it was hosting realm 2.
+
+A realm host now binds `Mcp:Port` **plus its realm's offset from the first realm**:
+
+| realm | MCP endpoint |
+|---:|---|
+| 1 | `http://127.0.0.1:7099/mcp` |
+| 2 | `http://127.0.0.1:7100/mcp` |
+| 3 | `http://127.0.0.1:7101/mcp` |
+
+The offset rather than the raw id is deliberate — realm 1 keeps the configured port exactly, so every existing
+single-realm setup still answers on 7099 and no `claude mcp add` has to change. The process prints its own endpoint
+at startup (`[mcp] http://127.0.0.1:<port>/mcp (realm <id>)`), and a bind failure now says it is the MCP port and
+suggests `--Mcp:Enabled false` / `--Mcp:Port <port>` instead of leaving a bare Kestrel error.
+
+⚠️ Realm ids are not promised to be small or contiguous; an id far enough out to run a `ushort` past its end falls
+back to the base port rather than wrapping into a port that means something else. Set `Mcp:Port` per process there.
+
+⚠️ `Configuration.McpUrl` is derived from the BASE port, so it is the FIRST realm's endpoint. That is right for
+`Faolan.Web`, which is not realm-aware; anything wanting another realm's endpoint has to derive it the same way.
+
 ## How it works
 
 - **Realm-routed handoff + realm-scoped char list.**
