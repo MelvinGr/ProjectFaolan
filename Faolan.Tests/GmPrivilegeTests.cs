@@ -44,16 +44,22 @@ namespace Faolan.Tests
 			Assert.NotEqual(0u, observed & (uint)GmPrivileges.TeleportDynels); // /whereis: would have been offered
 		}
 
-		// A GM must be able to moderate (kick, cloak, GM chat and tag) without the Developer bit, which is what gates
-
-		// ⛔ THE ONE BIT THAT IS NOT A UI PERMISSION. `GodMode` (0x200) is CLIENT-SIDE INVULNERABILITY: the client's
-		// HealthCurrent handler opens with `GetStat(0xD7); if (gmLevel & 0x200) { if (new < old) return; }`
-		// (`FUN_010fd220` @010fde3a), so with it set the client DISCARDS every server-driven health decrease - damage
-		// lands, the character dies, and the bar never moves. That was #902, and it made every GM permanently
-		// invulnerable ON SCREEN regardless of the server's own `.godmode` toggle.
+		// ⛔ THE ONE BIT THAT IS NOT A UI PERMISSION, and the reason a role is never applied to an account
+		// silently. `GodMode` (0x200) is CLIENT-SIDE INVULNERABILITY: the local player's stat setter opens with
+		// `GetStat(0xD7); if (gmLevel & 0x200) { if (new < old) return; }` (`FUN_010fd220` @010fde41, and the same gate
+		// again for stamina and mana), so with it set the client DISCARDS every server-driven decrease - damage lands,
+		// the character dies, and the bar never moves. That was #902, proven in-client with Frida on that setter.
 		//
-		// So the bit follows `Account.GmGodMode`, the authoritative flag the simulation already honours, and never the
-		// account TYPE. Proven in-client with Frida on the local player's stat setter: with the bit set the write
-		// arrives carrying our value and the stored health does not move; cleared, the next decrease applies
+		// Both shipped roles carry it AND `InvisibleToMonsters`, so "give this account support2" is also "make them
+		// invulnerable on screen and unaggroable". That is why `Account.GmLevel` is set explicitly and why the migration
+		// that introduced it does not backfill a role. docs/subsystems/gm-commands.md has the disassembly.
+		[Fact]
+		public void BothRolesCarryGodModeAndInvisible_SoARoleIsNeverAppliedSilently()
+		{
+			Assert.NotEqual(0u, GmRoles.All & (uint)GmPrivileges.GodMode);
+			Assert.NotEqual(0u, GmRoles.Support2 & (uint)GmPrivileges.GodMode);
+			Assert.NotEqual(0u, GmRoles.All & (uint)GmPrivileges.InvisibleToMonsters);
+			Assert.NotEqual(0u, GmRoles.Support2 & (uint)GmPrivileges.InvisibleToMonsters);
+		}
 	}
 }
