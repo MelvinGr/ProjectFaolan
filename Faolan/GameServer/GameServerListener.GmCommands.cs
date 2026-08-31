@@ -305,7 +305,7 @@ namespace Faolan.GameServer
 
 		private void InitGmCommands()
 		{
-			_gmCommandsDict = BuildGmCommands(new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
+			_gmCommandsDict = BuildGmCommands(unbackedReply: u => (client, _) => SendUnbackedVerbReply(client, u), handlers: new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
 				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
 				["help"] = (client, _) => SendGmHelpText(client),
@@ -490,7 +490,11 @@ namespace Faolan.GameServer
 		// Joins the handler table with GmCommandMasks, refusing to come up on ANY asymmetry - a verb with a handler
 		// but no mask would otherwise dispatch ungated (or a mask with no handler would rot silently), and a loud
 		// boot failure is the cheapest place to catch both. GmCommandTableTests pins the retail half of the masks.
-		internal static Dictionary<string, GmCommandEntry> BuildGmCommands(Dictionary<string, GmCommandDelegate> handlers)
+		// `unbackedReply` builds the handler for a catalog verb. It is a parameter rather than a direct call because
+		// this join is static and the reply needs the listener's chat dispatcher; a null one (the tests' path) still
+		// registers every catalog verb, so the table's SHAPE is identical either way.
+		internal static Dictionary<string, GmCommandEntry> BuildGmCommands(Dictionary<string, GmCommandDelegate> handlers,
+			Func<RetailCommandCatalog.Unbacked, GmCommandDelegate>? unbackedReply = null)
 		{
 			var noMask = handlers.Keys.Where(v => !GmCommandMasks.ContainsKey(v)).ToList();
 			var noHandler = GmCommandMasks.Keys.Where(v => !handlers.ContainsKey(v)).ToList();
@@ -498,7 +502,22 @@ namespace Faolan.GameServer
 				throw new InvalidOperationException(
 					$"GM command tables disagree - no mask: [{noMask.JoinAsString(", ")}], no handler: [{noHandler.JoinAsString(", ")}].");
 
-			return handlers.ToDictionary(kv => kv.Key, kv => new GmCommandEntry(kv.Value, GmCommandMasks[kv.Key]), StringComparer.OrdinalIgnoreCase);
+			// ⚠️ A verb cannot be in both tables. The catalog is what we do NOT back yet, so a verb appearing there
+			// AND in the handler table means an implementation landed without its catalog row being removed - and
+			// the unbacked reply would shadow it or the other way round, depending on insertion order. Refuse.
+			var doubleBooked = RetailCommandCatalog.Verbs.Where(u => handlers.ContainsKey(u.Verb)).Select(u => u.Verb).ToList();
+			if (doubleBooked.Count > 0)
+				throw new InvalidOperationException(
+					$"These verbs are implemented AND still listed as unbacked in RetailCommandCatalog: [{doubleBooked.JoinAsString(", ")}].");
+
+			var table = handlers.ToDictionary(kv => kv.Key, kv => new GmCommandEntry(kv.Value, GmCommandMasks[kv.Key]), StringComparer.OrdinalIgnoreCase);
+
+			// The rest of the client's registry, registered so a GM who presses one of the client's own affordances
+			// gets the grammar and the reason rather than "no such command".
+			foreach (var unbacked in RetailCommandCatalog.Verbs)
+				table[unbacked.Verb] = new GmCommandEntry(unbackedReply?.Invoke(unbacked) ?? ((_, _) => Task.CompletedTask), unbacked.Mask);
+
+			return table;
 		}
 
 
@@ -912,12 +931,30 @@ namespace Faolan.GameServer
 
 		// Lists only the commands the CALLER's privilege mask passes - the same per-bit filtering the client's own
 		// /help applies to the retail command set (#904).
+		// What a verb the client registers but we do not back yet answers with: retail's own usage line and what it
+		// would take. ⚠️ Deliberately not a silent no-op and not an error - the command EXISTS in the client, so
+		// "unknown command" would be a lie about the client and a shrug about us.
+		private Task SendUnbackedVerbReply(INetworkClient client, RetailCommandCatalog.Unbacked unbacked)
+		{
+			var usage = string.IsNullOrEmpty(unbacked.Usage) ? "(takes no arguments)" : $".{unbacked.Verb} {unbacked.Usage}";
+			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Lines([
+				ChatMarkup.Color("orange", $"'{unbacked.Verb}' is a retail client command this server does not implement yet."),
+				string.IsNullOrEmpty(unbacked.Description) ? "" : $"  retail: {unbacked.Description}",
+				$"  usage:  {usage}",
+				$"  needs:  {unbacked.Needs}"
+			]));
+		}
+
+		// ⚠️ Lists EVERY verb the caller's mask passes, backed or not (the dev's standing rule) - the client's whole command
+		// surface is discoverable from in-game rather than only by reading a TSV. Unbacked ones are marked so the
+		// listing does not promise more than it delivers.
 		private Task SendGmHelpText(INetworkClient client)
 		{
 			var account = client.Session.Account;
+			var unbacked = RetailCommandCatalog.Verbs.Select(u => u.Verb).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var available = _gmCommandsDict
 				.Where(e => e.Value.RequiredMask == GmPrivileges.None || account?.HasGmPrivilege(e.Value.RequiredMask) == true)
-				.Select(e => e.Key)
+				.Select(e => unbacked.Contains(e.Key) ? $"{e.Key} {ChatMarkup.Color("gray", "(not implemented)")}" : e.Key)
 				.Order(StringComparer.OrdinalIgnoreCase);
 
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Raw($"Available Commands:<br />{available.JoinAsString("<br />")}"));
