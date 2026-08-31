@@ -49,6 +49,34 @@ So `Program.cs` gains a **role**: `--role login` (or default) runs the router ti
 host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), but at most one realm role per process
 (co-hosting realms would share chat/session state across them). One login process + N realm processes, shared DB.
 
+### `OnlineStatus` means SERVING, not "began starting" (#909)
+
+The login tier's realm list is driven by `Realm.OnlineStatus`, so a wrong value points players at a realm that
+is not there. Two bugs made that the default outcome:
+
+1. the flip was in `RealmStatusService.StartAsync`, i.e. before the host was known to be up — a realm process
+   logged *"Realm 2 marked Online"*, then died on a bind with its ports never listening;
+2. only `StopAsync` flipped it back, and a crash, a `kill -9`, an unhandled exception or a bind failure all skip
+   it — so the row stayed Online indefinitely, including across a reboot.
+
+Both are fixed by moving the two writes to the moments that actually mean something:
+
+- **`StartAsync` CLAIMS the row**, writing Offline. That is what clears a stale Online left by this realm's own
+  previous life. ⚠️ It is safe because owning the row means owning the PORTS: the listeners create their sockets
+  in their constructors, and hosted services are constructed before the first `StartAsync` runs, so by then this
+  process has bound the realm's world/chat/cs ports and no other process can be serving that realm. Any Online it
+  finds is stale by construction, not a rival host.
+- **`IHostApplicationLifetime.ApplicationStarted` flips it Online**, which fires only once every hosted service
+  has started *and* the web host (when there is one) has bound.
+
+Verified end to end: realm 2 was `kill -9`'d (leaving its row Online), then restarted into an occupied MCP port —
+it claimed the row, failed the bind, and the row read **Offline** with nothing listening, where before it read
+Online. Gated by `RealmStatusServiceTests`.
+
+⚠️ **What this does not fix:** a realm that crashes and is never restarted still reads Online, because nothing
+else re-reconciles it. Closing that needs a liveness marker (heartbeat / owning process) rather than a bare
+boolean — a schema question, since `CK_Realm_OnlineStatus` constrains the column to two values today.
+
 ### Ports: everything a realm host binds is per-realm
 
 A realm's world / chat / cs ports come off its own `Realm` row, so two realm processes never collide. The one
