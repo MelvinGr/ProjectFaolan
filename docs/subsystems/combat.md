@@ -1634,9 +1634,29 @@ narrowing: the period is what separates two mechanics stated on one stat (`Dagga
 67.5 HP every second), **726** shipped spells state both, and every one of them was having its ticks applied as
 extra instant magnitude at the moment it landed. The ticking half is `Spell.DotDelta` / `DotIntervalMs`.
 
-Corroboration from the corpus, at the one point the two meet: a level-80 character's outgoing hit on a level-46
-`Vanir Archer` measured **304 displayed** (30,400 on the wire). A level-80 caster's stated hits land in that
-region, where the old flat placeholder answered 420 for every spell in the book regardless.
+### ⭐ The stated hits reproduce retail at Tortage levels, to within 1%
+
+`StatDamageIIR` names the spell that caused it (`spellBaseId`, the third tail word), so the corpus can be joined
+to the catalog per SPELL rather than per damage school. Two spells carry enough player→NPC hits to have a median,
+and both land on the number the template states for the caster's own level — **unmitigated**:
+
+| spell | ramp | our mid-roll at the caster's level | retail median | n |
+|---|---|---:|---:|---:|
+| `Flesh to Worms (Rank 1)` | 480→1530 over levels 2-24 | **720** (level 5-6) | **723** | 233 |
+| `Ice Strike (Rank 1)` | 3330→4100 over levels 7-19 | **3780** (level 9-10) | **3752** | 201 |
+
+Both casters' levels are independently known from the same sessions, so the level is not fitted. The stated
+minimum shows up too: `Flesh to Worms`'s smallest observed hit is **489** against the 480 its level-2 endpoint
+states.
+
+⚠️ **The same join says the model is INCOMPLETE at level 80.** Five spells cast by the level-80 necromancer all
+land at a consistent **≈4.7×** their stated hit — `Ice Strike (Rank 6)` 4.1, `Pestilential Blast (Rank 6)` 4.7,
+`Gangrenous Stench` 4.9, `Deathly Blizzard (Rank 5)` 5.0, `Flesh to Worms (Rank 5)` 5.2 — against base
+magnitudes that differ by 3×. A constant *additive* term would not do that (the implied addend ranges 23k-66k);
+a per-CASTER multiplier does, and the spread is what a roll across each spell's own stated range produces. So
+there is a gear/level-driven multiplier on top of the stated hit that we model as a flat addend
+(`ResolveMagicDamage`), and it is worth ~4.7× to a geared level-80 and ~1.0× to a Tortage character. Open work
+tracked in Gitea #924.
 
 ## Where the combat numbers come from (2026-07-28)
 
