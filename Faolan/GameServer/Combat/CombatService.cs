@@ -80,11 +80,17 @@ namespace Faolan.GameServer.Combat
 		// client whose action caused them. See WorldBroadcaster.BroadcastEntityRecords for the measurement behind that.
 		private readonly WorldBroadcaster _outbound;
 
+		// #395: the spell's OWN stated hit, so a cast's damage is the spell's rather than the level's. Same catalog
+		// the self-heal path reads (`BuffService`) - a heal and a nuke are one mechanism with opposite signs.
+		private readonly SpellPoolEffects _poolEffects;
+
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent, bool killStreaks)
+			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent,
+			SpellPoolEffects poolEffects, bool killStreaks)
 		{
+			_poolEffects = poolEffects;
 			_csPlayerAgent = csPlayerAgent;
 			_outbound = outbound;
 			_killStreaks = killStreaks;
@@ -97,6 +103,50 @@ namespace Faolan.GameServer.Combat
 			_levelUp = levelUp;
 		}
 
+
+		/// <summary>
+		///     The damage the spell's OWN template states, in DISPLAY units, or 0 where it states none (#395).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ This is what makes one spell differ from another: `Ice Strike (Rank 6)` states -16300..-18950 on
+		///     health, which is the <i>163-189.5 points of Health</i> the client's own tooltip renders, while
+		///     `Ice Strike (Rank 2)` states -4300..-5000. 2,149 shipped spells carry such a row. `SpellPoolEffects`
+		///     resolves the level BAND and then the ramp inside it, so a level-80 caster gets the level-80 number.
+		///     <para />
+		///     ⚠️ NEGATIVE is damage - the template states a pool MOVE, and the same table's positive rows are the
+		///     heals `BuffService` applies to the caster. A spell whose health row is positive is a heal and deals no
+		///     damage here, which is why the sign is filtered rather than taken as an absolute value.
+		///     <para />
+		///     The roll runs the stated range end to end, like a weapon's min..max in <c>ResolveMeleeDamage</c>.
+		/// </remarks>
+		private async Task<int> SpellStatedHit(uint spellId, uint casterLevel, int rollPercent)
+		{
+			return StatedHit(await _poolEffects.ForSpellBase(spellId, casterLevel), casterLevel, rollPercent);
+		}
+
+		/// <summary>
+		///     The damage-half of a spell's stated pool effects, as a pure function of them - split from its caller so
+		///     the rule is testable against the shipped catalog without a world, a client or a database.
+		/// </summary>
+		internal static int StatedHit(IReadOnlyList<SpellPoolEffects.PoolEffect> effects, uint casterLevel, int rollPercent)
+		{
+			var total = 0;
+			foreach (var effect in effects)
+			{
+				// `max` only matters to a PERCENT-of-pool effect, and a percent of the TARGET's pool is not a number
+				// this path can know before it has a target - so a percent row states nothing here and falls through
+				// to the placeholder rather than resolving against 0.
+				if (effect.Pool != CharacterStatId.HealthCurrent || effect.IsPercent)
+					continue;
+
+				var rolled = effect.Rolled(0, casterLevel, rollPercent);
+				if (rolled < 0)
+					total += -rolled;
+			}
+
+			return total;
+		}
+
 		// Channeled ground AoE (#349): ticks damage over the cast/channel duration so the client sees a floating number
 		// each tick - retail's Deathly Blizzard ticks each NPC repeatedly over its ~10.5s channel (casting-combat
 		// capture: DamageResultIIR 0xFEC4158A per target, ~1-2s apart), where we used to apply one silent hit at the
@@ -107,7 +157,7 @@ namespace Faolan.GameServer.Combat
 		{
 			var casterLevel = client.Session.Character.Level;
 			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamageFor(spellId) ?? 0,
-				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0);
+				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0, await SpellStatedHit(spellId, casterLevel, Random.Shared.Next(101)));
 
 			// The client STATES the cadence: RDB field 447 `ChannelingInterval` (#349). Corroborated where the two
 			// sources overlap - Deathly Blizzard's 2,500 ms, Waves of Flame's 1,000 and Resting's 500 are each exactly
@@ -194,7 +244,7 @@ namespace Faolan.GameServer.Combat
 		{
 			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamageFor(spellId) ?? 0,
-				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0);
+				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0, await SpellStatedHit(spellId, casterLevel, Random.Shared.Next(101)));
 			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
 			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
 		}
@@ -212,7 +262,8 @@ namespace Faolan.GameServer.Combat
 			var caster = _sim.PlayerWorldEntity(client);
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, (caster?.SpellBoost(spellId) ?? 0) + extraPercentHundredths);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, (caster?.SpellBoost(spellId) ?? 0) + extraPercentHundredths,
+				await SpellStatedHit(spellId, casterLevel, Random.Shared.Next(101)));
 
 			// #633: a spell can CRIT, which it could not before - the client's own catalog states a per-spell chance
 			// and a per-spell damage bonus (RDB 147/129) on ~1,225 records each, and the caster's Critical Rating adds
@@ -460,7 +511,8 @@ namespace Faolan.GameServer.Combat
 				return [];
 
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(effectSpellId, casterLevel, player.MagicDamageFor(effectSpellId), player.SpellBoost(effectSpellId));
+			var damage = CombatResolver.ResolveSpellDamage(effectSpellId, casterLevel, player.MagicDamageFor(effectSpellId), player.SpellBoost(effectSpellId),
+				await SpellStatedHit(effectSpellId, casterLevel, Random.Shared.Next(101)));
 
 			// The area radiates from whoever HOLDS it, and that is not always the player: the #776 chain re-emits an
 			// area from the INFECTED MOB (Gangrenous Stench's 221069 spreads 221068 to everything within 4 m of the

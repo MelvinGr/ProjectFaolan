@@ -1604,6 +1604,40 @@ reason is that the 28-byte struct above is the IN-MEMORY form; the parser may ex
 matching the file by this stride was never guaranteed. Next: decode `ArmorMitigation_c`'s own read method, or read
 the vector by following the table singleton (`FUN_0113d9a0`) rather than by scanning for a pattern. Gitea #401.
 
+## A cast's damage is the SPELL's, not the level's (#395)
+
+`CombatResolver.ResolveSpellDamage` was `20 + level*5` and ignored its `spellId` outright, so every spell a
+character owned hit for the same number and the only thing that could separate two of them was the caster's gear.
+The per-spell power was never missing from the data — it is the **health magnitude the spell's own RDB template
+states**, the same rows `SpellStatEffect` already carried for heals, with the sign the other way round:
+
+| spell | stored on stat 27 | at the vitals ÷100 scale |
+|---|---|---|
+| `Ice Strike (Rank 2)` | `-4300 .. -5000`, ramping to `-7100 .. -8260` over levels 20-34 | 43-50 → 71-82 |
+| `Ice Strike (Rank 6)` | `-16300 .. -18950`, ramping over levels 80-100 | **163-189.5** |
+
+⭐ **The client itself renders the second row verbatim** — `--report spell-tooltip --report-arg 144315@80` prints
+*"163-189.5 points of Health"* from our own decode — so the number is retail's, not a curve fitted to it. **2,149**
+shipped spells carry one, which is what makes this per-spell rather than per-rank-of-one-spell.
+
+`CombatService.StatedHit` resolves it (level BAND, then the ramp inside the band, then a roll across the stated
+range like a weapon's min..max) and hands it to `ResolveSpellDamage` as the base term. Magic Damage (#399) still
+adds flat on top and the spell-line feat boost (#590) still scales the finished number — the stated hit replaces
+the level curve, it does not bypass the rest of the pipeline.
+
+⚠️ **The placeholder stays** for a spell that states nothing, and that is still most casts in practice — an
+unarmed swing's ability id, an NPC cast, any spell with no template row. A stated hit of 0 means "this spell says
+nothing", not "this spell does nothing".
+
+⚠️ **A PERIODIC row is the DoT engine's**, and excluding it from the instant path was a fix rather than a
+narrowing: the period is what separates two mechanics stated on one stat (`Daggamalt`'s 405 HP at once against its
+67.5 HP every second), **726** shipped spells state both, and every one of them was having its ticks applied as
+extra instant magnitude at the moment it landed. The ticking half is `Spell.DotDelta` / `DotIntervalMs`.
+
+Corroboration from the corpus, at the one point the two meet: a level-80 character's outgoing hit on a level-46
+`Vanir Archer` measured **304 displayed** (30,400 on the wire). A level-80 caster's stated hits land in that
+region, where the old flat placeholder answered 420 for every spell in the book regardless.
+
 ## Where the combat numbers come from (2026-07-28)
 
 The damage constants in `CombatResolver` are labelled **MEASURED** or **PROVISIONAL**, and the class header

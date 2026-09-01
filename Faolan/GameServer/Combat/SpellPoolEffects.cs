@@ -92,10 +92,18 @@ namespace Faolan.GameServer.Combat
 		// `BuffStatEffects.Classify` is: the imported-vs-applied census (`--report spell-effect-gap`) has to ask both
 		// engines whether a row lands anywhere, and a census that copies the rule instead of calling it drifts away
 		// from it - which is exactly how #701's count came to be four times the real one.
+		//
+		// ⚠️ `PeriodCentiseconds == 0` is a FIX rather than a narrowing. The period is what separates two mechanics
+		// stated on one stat - `Daggamalt`'s 405 HP instantly against its 67.5 HP every 100 cs - and 726 shipped
+		// spells state BOTH. Every one of them had its ticks applied as extra instant magnitude the moment it landed,
+		// on top of the instant row: the same shape of error as #783's dropped bands, a number wrong for a reason
+		// nothing downstream can see. The ticking half is the DoT engine's (`Spell.DotDelta` / `DotIntervalMs`),
+		// which reads its own columns off the spell row.
 		public static bool Applies(SpellStatEffect row)
 		{
 			return (row.EffectKind == PercentKind || FlatKinds.Contains(row.EffectKind))
 			       && Pools.Contains(row.StatId)
+			       && row.PeriodCentiseconds == 0
 			       && row.Amount != 0
 			       && Math.Abs(row.Amount) < DrainSentinel;
 		}
@@ -118,8 +126,16 @@ namespace Faolan.GameServer.Combat
 					? new LevelRamp(row.Amount, high, low, top)
 					: (LevelRamp?)null;
 
+				// The range's UPPER endpoint and its own ramp (#783 carried both; only the lower one was read here).
+				// A damaging spell states a min and a max - `Ice Strike (Rank 6)` is -16300..-18950, the 163-189.5 the
+				// client's own tooltip renders - and picking one end silently would make every cast a floor or a
+				// ceiling.
+				var maxRamp = row is { MaxAmount: { } maxLow, MaxHighAmount: { } maxHigh, LowLevel: { } mlow, HighLevel: { } mtop }
+					? new LevelRamp(maxLow, maxHigh, mlow, mtop)
+					: (LevelRamp?)null;
+
 				(bySpell.TryGetValue(row.SpellId, out var list) ? list : bySpell[row.SpellId] = [])
-					.Add(new PoolEffect(row.StatId, row.Amount, ramp, row.EffectKind == PercentKind));
+					.Add(new PoolEffect(row.StatId, row.Amount, ramp, row.EffectKind == PercentKind, row.MaxAmount, maxRamp));
 			}
 
 			return bySpell.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
@@ -163,7 +179,8 @@ namespace Faolan.GameServer.Combat
 		///         number (#783).
 		///     </para>
 		/// </remarks>
-		public readonly record struct PoolEffect(CharacterStatId Pool, int Amount, LevelRamp? Ramp, bool IsPercent)
+		public readonly record struct PoolEffect(CharacterStatId Pool, int Amount, LevelRamp? Ramp, bool IsPercent,
+			int? MaxAmount = null, LevelRamp? MaxRamp = null)
 		{
 			// The LEVEL BAND this effect states its numbers for, or null when it is level-independent. It is the ramp's
 			// own two levels - a record that bands its magnitudes bands them by ramping each band separately.
@@ -171,7 +188,32 @@ namespace Faolan.GameServer.Combat
 
 			public int For(uint max, uint level)
 			{
-				var amount = Ramp?.ValueAt(level) ?? Amount;
+				return Resolve(Ramp?.ValueAt(level) ?? Amount, max);
+			}
+
+			/// <summary>
+			///     The move at the UPPER end of the effect's stated range, or <see cref="For" /> where it states one
+			///     number.
+			/// </summary>
+			public int MaxFor(uint max, uint level)
+			{
+				return MaxAmount is { } top ? Resolve(MaxRamp?.ValueAt(level) ?? top, max) : For(max, level);
+			}
+
+			/// <summary>
+			///     A point in the effect's stated range: <paramref name="rollPercent" /> 0 is its low end, 100 its
+			///     high one, interpolated linearly the way <c>CombatResolver.ResolveMeleeDamage</c> rolls a weapon.
+			/// </summary>
+			public int Rolled(uint max, uint level, int rollPercent)
+			{
+				var low = For(max, level);
+				var high = MaxFor(max, level);
+
+				return low + (high - low) * Math.Clamp(rollPercent, 0, 100) / 100;
+			}
+
+			private int Resolve(int amount, uint max)
+			{
 				return IsPercent
 					? (int)((long)max * amount / 100)
 					: amount / VitalsScale;

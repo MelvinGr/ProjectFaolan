@@ -153,7 +153,8 @@ namespace Faolan.GameServer
 				var combat = new CombatService(sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<IDatabaseRepository>(),
 					sp.GetRequiredService<QuestProgressionService>(), sp.GetRequiredService<ILogger>(), sp.GetRequiredService<LevelUpService>(),
 					sp.GetRequiredService<FatalityService>(), sp.GetRequiredService<FactionService>(), sp.GetRequiredService<WorldBroadcaster>(),
-					sp.GetRequiredService<ICsPlayerAgentDispatcher>(), sp.GetRequiredService<IConfiguration>().ContentKillStreaks);
+					sp.GetRequiredService<ICsPlayerAgentDispatcher>(), sp.GetRequiredService<SpellPoolEffects>(),
+					sp.GetRequiredService<IConfiguration>().ContentKillStreaks);
 				sp.GetRequiredService<LevelUpOutbound>().BindReseed(combat.ReseedFromMaxStats);
 				return combat;
 			});

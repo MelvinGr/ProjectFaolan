@@ -601,20 +601,37 @@ namespace Faolan.GameServer.Combat
 		// The floor, from gap 7 down: 0.10-0.14 over 39 hits and six templates from gap 7 to gap 21.
 		private const uint FarBelowPercent = 11;
 
-		// Spell damage: the level-scaled base plus the caster's aggregated Magic Damage rating (#399), added flat like
-		// retail's spell-damage bonus. magicDamage is 0 for NPC casts / callers without gear. Per-spell power isn't
-		// decoded (every spell shares the base), so this is still provisional; Magic Damage at least makes geared
-		// casters hit harder.
-		// `spellLinePercentHundredths` is the caster's FEAT boost for this spell's line (#590) - 3500 = +35%, which is
-		// what `Decomposition` rank 5 grants every rank of Flesh to Worms. It scales the whole result, Magic Damage
-		// included, because the client's own wording is "Increase to damage or healing on <spell>" rather than a
-		// bonus to one term. Applied last so the percent is over the finished number.
-		public static int ResolveSpellDamage(uint spellId, ushort casterLevel, uint magicDamage = 0, int spellLinePercentHundredths = 0)
+		/// <summary>
+		///     Spell damage: the spell's OWN stated hit where it has one, plus the caster's aggregated Magic Damage
+		///     rating (#399) added flat like retail's spell-damage bonus, all scaled by the caster's feat boost for
+		///     this spell's line.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ <paramref name="spellHit" /> is the per-spell power this used to lack (#395), in DISPLAY units: the
+		///     magnitude the spell's own template states on health, rolled within its stated range at the caster's
+		///     level. `Ice Strike (Rank 6)` states -16300..-18950 on stat 27, which is the <i>163-189.5 points of
+		///     Health</i> the client's own tooltip renders - so the number is the client's, not a curve fitted to it.
+		///     <c>SpellPoolEffects</c> resolves it (level band, then the ramp inside the band); 2,149 spells carry one.
+		///     <para />
+		///     ⚠️ Zero means "this spell states no hit", and the flat <c>20 + level*5</c> placeholder is what answers
+		///     then. That is still most CASTS in practice - an ability with no template row, an NPC cast - so the
+		///     placeholder is narrowed rather than removed, and a spell that states nothing must not fall to 0 damage.
+		///     <para />
+		///     <paramref name="spellLinePercentHundredths" /> is the caster's FEAT boost for this spell's line (#590) -
+		///     3500 = +35%, what `Decomposition` rank 5 grants every rank of Flesh to Worms. It scales the whole
+		///     result, Magic Damage included, because the client's own wording is "Increase to damage or healing on
+		///     &lt;spell&gt;" rather than a bonus to one term. Applied last, so the percent is over the finished number.
+		/// </remarks>
+		public static int ResolveSpellDamage(uint spellId, ushort casterLevel, uint magicDamage = 0, int spellLinePercentHundredths = 0, int spellHit = 0)
 		{
 			var level = casterLevel == 0
 				? (ushort)1
 				: casterLevel;
-			return ApplyPercentBonus(20 + level * 5 + (int)magicDamage, spellLinePercentHundredths);
+			var b = spellHit > 0
+				? spellHit
+				: 20 + level * 5;
+
+			return ApplyPercentBonus(b + (int)magicDamage, spellLinePercentHundredths);
 		}
 
 		// A percent bonus stored x100, applied over a FINISHED damage number. Shared by the spell-line feat boost
