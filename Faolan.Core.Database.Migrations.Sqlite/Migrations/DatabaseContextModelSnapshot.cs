@@ -50,6 +50,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("AuthStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTimeOffset?>("BanExpiresAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("ClaimsAvailable")
                         .HasColumnType("INTEGER");
 

@@ -21,6 +21,15 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge);
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
+
+		/// <summary>Bans an account until <paramref name="expiresAt" />, in one write (#918).</summary>
+		Task<bool> BanUntil(uint accountId, DateTimeOffset expiresAt);
+
+		/// <summary>
+		///     Lifts a TIMED ban whose moment has passed; true when one actually lifted. An indefinite ban
+		///     (<c>BanExpiresAt</c> NULL) is never touched.
+		/// </summary>
+		Task<bool> ClearExpiredBan(uint accountId, DateTimeOffset now);
 		Task SetAccountSubscriptionSettings(uint accountId, byte[] settings);
 	}
 
@@ -118,10 +127,52 @@ namespace Faolan.Core.Database.Repositories
 			       1;
 		}
 
+		// ⚠️ Clears any timed-ban expiry alongside the state (#918). Every state change is a decision that supersedes
+		// a pending lift: `.unban` obviously, but `.ban` too - an indefinite ban must not inherit a `.kickban`'s
+		// leftover expiry and silently lift itself. `BanUntil` is the ONE path that sets one.
 		public async Task<bool> SetAccountState(uint accountId, AccountState state)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.State, state)) == 1;
+			return await ctx.Accounts.Where(a => a.Id == accountId)
+				.ExecuteUpdateAsync(s => s.SetProperty(a => a.State, state).SetProperty(a => a.BanExpiresAt, (DateTimeOffset?)null)) == 1;
+		}
+
+		// A TIMED ban: banned now, lifting itself at `expiresAt` (#918). One write, so the state and its expiry can
+		// never disagree.
+		public async Task<bool> BanUntil(uint accountId, DateTimeOffset expiresAt)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Accounts.Where(a => a.Id == accountId)
+				.ExecuteUpdateAsync(s => s.SetProperty(a => a.State, AccountState.Banned).SetProperty(a => a.BanExpiresAt, expiresAt)) == 1;
+		}
+
+		// Lifts a timed ban whose moment has passed. Returns true when it actually lifted one, so the caller can log
+		// the transition rather than guess at it.
+		//
+		// ⭐ This is what makes the lift survive a restart in BOTH directions - a server that was down through the
+		// whole window lifts on the next login attempt, and one that comes back inside the window still holds the ban.
+		// Scoped to `Banned` rows with an expiry that has elapsed, so an indefinite ban (`BanExpiresAt` NULL) can
+		// never be caught by it.
+		public async Task<bool> ClearExpiredBan(uint accountId, DateTimeOffset now)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			// ⚠️ The expiry is compared HERE rather than in the Where clause, and that is a provider limit rather than
+			// a preference: SQLite cannot translate a `DateTimeOffset` ORDERING (it stores one as text), so
+			// `a.BanExpiresAt <= now` inside `ExecuteUpdate` throws "could not be translated" at runtime - a failure
+			// that only appears when the path is actually taken. Reading the row first costs one query on a path that
+			// already loads the account, and keeps the column the same `DateTimeOffset?` as its neighbours.
+			var expiry = await ctx.Accounts.Where(a => a.Id == accountId && a.State == AccountState.Banned)
+				.Select(a => a.BanExpiresAt)
+				.FirstOrDefaultAsync();
+			if (expiry == null || expiry > now)
+				return false;
+
+			// Still scoped to Banned rows carrying an expiry, so a state change that landed between the read and this
+			// write cannot be undone by it.
+			return await ctx.Accounts
+				.Where(a => a.Id == accountId && a.State == AccountState.Banned && a.BanExpiresAt != null)
+				.ExecuteUpdateAsync(s => s.SetProperty(a => a.State, AccountState.Active).SetProperty(a => a.BanExpiresAt, (DateTimeOffset?)null)) == 1;
 		}
 	}
 }

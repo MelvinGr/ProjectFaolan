@@ -1037,9 +1037,10 @@ namespace Faolan.GameServer
 		//
 		// ⚠️ NOT a duplicate of our `.ban`, so that one stays: `.ban` is indefinite and account-wide until someone
 		// runs `.unban`, while this is a TIMED kick that lifts itself.
-		// ⚠️ The lift is in-process and NOT persisted, so a server restart inside the window leaves the account
-		// banned - the reply says so rather than letting a GM assume it expires regardless. #918 makes it a DB
-		// property (a BanExpiresAt column) so the lift survives a restart in both directions.
+		// ⭐ The lift is a DB property, not a background task (#918): `Account.BanExpiresAt` is written with the state
+		// in one go, and the next login attempt lifts it if the moment has passed (`ClearExpiredBan`, called from the
+		// UniverseAgent's login gate). So a restart inside the window still holds the ban, and one that spans the whole
+		// window releases it - both of which the old in-process `Task.Delay` got wrong in one direction each.
 		private async Task KickBanCommand(INetworkClient client, string arguments)
 		{
 			var gmId = client.Session.Character.Id;
@@ -1089,7 +1090,8 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (!await Database.SetAccountState(account.Id, AccountState.Banned))
+			var expiresAt = DateTimeOffset.UtcNow.AddMinutes(minutes);
+			if (!await Database.BanUntil(account.Id, expiresAt))
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "Error changing account state."));
 				return;
@@ -1104,25 +1106,9 @@ namespace Faolan.GameServer
 				kicked++;
 			}
 
-			var accountId = account.Id;
-			var userName = account.UserName;
-			_ = Task.Run(async () =>
-			{
-				try
-				{
-					await Task.Delay(TimeSpan.FromMinutes(minutes));
-					await Database.SetAccountState(accountId, AccountState.Active);
-					Logger.LogInformation("GM .kickban on '{Account}' expired after {Minutes} minute(s).", userName, minutes);
-				}
-				catch (Exception e)
-				{
-					Logger.LogWarning(e, "GM .kickban lift for '{Account}' failed - the account stays banned until .unban.", userName);
-				}
-			});
-
 			await _agentServerDispatcher.SendSystemMessage(gmId,
-				$"Kickbanned '{name}' (account '{userName}') for {minutes} minute(s){(kicked > 0 ? $", {kicked} live session(s) dropped" : "")}."
-				+ " The lift is in-process only - a restart inside the window leaves it banned, so use .unban then (#918).");
+				$"Kickbanned '{name}' (account '{account.UserName}') for {minutes} minute(s){(kicked > 0 ? $", {kicked} live session(s) dropped" : "")}."
+				+ $" Lifts at {expiresAt:u} on their next login attempt; .unban ends it sooner.");
 		}
 
 		// /getfaction <faction id>  - "Get the faction points for the player with the specified faction id."

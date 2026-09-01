@@ -23,6 +23,19 @@ namespace Faolan.Core.Database.Tables
 		public DateTimeOffset CreationDate { get; set; } = DateTimeOffset.UtcNow;
 		public DateTimeOffset? LastConnection { get; set; }
 
+		// ⭐ When a TIMED ban lifts itself (#918). NULL for an indefinite ban (`.ban`) and for an account that is not
+		// banned at all; a time in the past means the ban has expired and the next login clears it.
+		//
+		// The lift is a property of the DATA rather than of a running process, which is the whole point: `.kickban`
+		// used to schedule it with an in-process `Task.Delay`, so a restart inside the window left the account banned
+		// until someone ran `.unban` by hand - and the reverse, a restart could not shorten it either.
+		//
+		// ⚠️ It is deliberately NOT a second source of truth for "is this account banned". `State` remains that; this
+		// only says when the state should stop applying. A row with `State = Banned` and an elapsed `BanExpiresAt` is
+		// still banned until something reads it - `IDatabaseRepository.ClearExpiredBan` at login is what makes it so,
+		// and it is the one place that transition happens.
+		public DateTimeOffset? BanExpiresAt { get; set; }
+
 		// Whether the account has UNSEEN claims - drives the "new claims available" glow on the client's claims button
 		// (CoreClaimIIR sub 0x0009). Set true when a claim is added; cleared when the player opens the Claims window
 		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.

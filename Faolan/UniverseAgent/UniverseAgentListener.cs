@@ -102,6 +102,16 @@ namespace Faolan.UniverseAgent
 						break;
 					}
 
+					// A TIMED ban lifts itself here (#918), not on a background timer: the expiry is a column, so a
+					// restart inside the window still holds the ban and one that spanned the whole window releases it.
+					// This is the ONE place that transition happens, which is why it sits before the state check
+					// rather than beside it.
+					if (await Database.ClearExpiredBan(account.Id, DateTimeOffset.UtcNow))
+					{
+						Logger.LogInformation("UniverseAgent login: timed ban on '{UserName}' had expired - lifted.", account.UserName);
+						account.State = AccountState.Active;
+					}
+
 					if (account.State != AccountState.Active)
 					{
 						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.AccountFrozen);
