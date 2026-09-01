@@ -162,7 +162,7 @@ All 133 verbs come out with something usable:
 ⚠️ **A `noargs` row means the verb declares no parameters, not that it accepts none** — `/lua` and
 `/setlookspackage` plainly take an argument each and parse it ad hoc. The declaration is what is recovered.
 
-**Five classes serve more than one verb**, and the record's mode byte at `[0xC]` is what separates them —
+**Five classes serve more than one verb**, and the record's variant selector at `[0xC]` is what separates them —
 `0` is the target/server form and `1` the self/local one:
 
 | class | mode 0 | mode 1 |
@@ -171,11 +171,35 @@ All 133 verbs come out with something usable:
 | `FanaticSetCommand_c` | `/set` | `/setlocal` |
 | `FanaticSetnameCommand_c` | `/setname` | `/setnick` |
 | `FanaticReloadCommand_c` | `/reload` | `/lazyreload` |
-| `FanaticBroadcastCommand_c` | `/broadcast` `/servcast` `/sitecast` | — |
+| `FanaticBroadcastCommand_c` | see below — a **word**, not a byte | |
 
-⚠️ The broadcast trio is the one family the byte does **not** separate — all three are mode 0 and the class reads
-the verb text itself, so their relative SCOPE is not recovered. `GmCommandArgumentGrammarTests` names it as the
-known exception rather than letting it fail the rule silently.
+### ⭐ The selector is a WORD, and that is why the broadcast trio looked identical (#919)
+
+The trio was long recorded as "the one family the byte does not separate — all three are mode 0". They are
+separated; the DUMP was reading a byte where the registration writes a **16-bit** value, which truncated the
+discriminator away. The three registration sites write `word [obj+0xC]` distinctly:
+
+| verb | mask `[8]` | word `[0xC]` | `[0xC]` | `[0xD]` |
+|---|---|---:|---:|---:|
+| `/servcast` | `0x400` | `0x0000` | 0 | 0 |
+| `/broadcast` | `0x400` | `0x0100` | 0 | 1 |
+| `/sitecast` | `0x800` | `0x0001` | 1 | 0 |
+
+And the class's own description getter (`FUN_00637270`) branches on the two bytes and **names each scope**:
+
+```
+[0xC]=0 [0xD]=0  ->  "Broadcasts a message to the server"
+[0xC]=0 [0xD]=1  ->  "Broadcasts a message to the playfield"
+[0xC]=1 [0xD]=0  ->  "Broadcasts a message to the dimension"
+anything else    ->  "ERROR, impossible combination of flags"
+```
+
+So the hierarchy is **playfield ⊂ server ⊂ dimension**, and `/broadcast` — the one that sounds widest — is the
+**narrowest**. A single-verb class writes nothing at `[0xC]` at all (checked on the knockback pair), so the
+selector exists only where a class has verbs to tell apart, which is what the rule always said.
+
+⚠️ `/sitecast`'s dimension is wider than one realm and a realm host holds only its own players (#324), so ours
+reaches this realm and says so rather than implying a cross-realm fanout that does not exist.
 
 The teleport family — one class, `FanaticTeleportCommand_c`, serving all four verbs:
 

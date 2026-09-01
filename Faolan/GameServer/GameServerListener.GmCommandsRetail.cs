@@ -588,10 +588,17 @@ namespace Faolan.GameServer
 		//
 		// ⚠️ Retail's own two descriptions of the single parameter CONTRADICT each other: the summary calls it the
 		// radius ("everybody within the distance parameter of your target") while the parameter's own help calls it
-		// the force ("How far targets will be knocked back"), and the sibling /knockback uses the identical parameter
-		// purely as force. We follow the parameter help - one value, the FORCE, matching /knockback - and take the
-		// area from the same aggro radius the rest of the simulation uses, because a command whose single number
-		// silently meant something different from its singular twin would be the worse surprise. #919 settles it.
+		// the force ("How far targets will be knocked back").
+		//
+		// ⭐ SETTLED from the client (#919), and the parameter help wins. `FanaticAreaKnockbackCommand_c`'s parameter
+		// descriptor (vftable 0x1fba5c4 slot 5, `FUN_00626e60`) declares exactly ONE parameter -
+		//     name "distance", help "Float: How far targets will be knocked back"
+		// - and the sibling `FanaticKnockbackCommand_c` (`FUN_00626bb0`) declares the identical one, differing only in
+		// "target" vs "targets". So there is no radius parameter to have meant: both verbs take one FORCE, and the
+		// summary's "within the distance parameter" is the loose half of retail's own text.
+		//
+		// The AREA therefore has to come from somewhere else, and it takes the same aggro radius the rest of the
+		// simulation uses.
 		private async Task AreaKnockbackCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -894,12 +901,24 @@ namespace Faolan.GameServer
 
 		// /broadcast, /servcast and /sitecast: `[duration pause] message`
 		//
-		// ⚠️ All three are ONE class at mode 0, so - unlike /set vs /setlocal - the recovered record does NOT tell
-		// them apart; the class reads the verb text itself. Their SCOPE is therefore not recovered, and the one
-		// signal we do have is the mask: /broadcast and /servcast share Broadcast (0x400) while /sitecast sits alone
-		// on Sitecast (0x800). So the first two reach this realm and /sitecast is the wider form - which, with one
-		// realm per process, is the same audience here. The reply states the scope it actually reached rather than
-		// implying a fanout we do not have. #919 decompiles the class to recover what actually separates the three.
+		// ⭐ THE THREE SCOPES, in the client's own words (#919). All three are one class, and the registry dump
+		// records "mode 0" for each - but that dump reads a BYTE and the field is a WORD, so it truncated the
+		// discriminator away. The registration sites write `word [obj+0xC]` distinctly:
+		//
+		//     /servcast   0x0000     /broadcast  0x0100     /sitecast  0x0001
+		//
+		// and `FUN_00637270` (the class's own description getter) branches on the two bytes and names each one:
+		//
+		//     [0xC]=0 [0xD]=0  ->  "Broadcasts a message to the server"
+		//     [0xC]=0 [0xD]=1  ->  "Broadcasts a message to the playfield"
+		//     [0xC]=1 [0xD]=0  ->  "Broadcasts a message to the dimension"
+		//     anything else    ->  "ERROR, impossible combination of flags"
+		//
+		// So the hierarchy is PLAYFIELD < SERVER < DIMENSION, and `/broadcast` - which we treated as the widest - is
+		// the NARROWEST of the three.
+		//
+		// ⚠️ `/sitecast`'s dimension is wider than one realm, and a realm host only holds its own players (#324), so
+		// it reaches this realm and says so rather than implying a cross-realm fanout that does not exist.
 		private async Task BroadcastCommand(INetworkClient client, string arguments, string verb)
 		{
 			var characterId = client.Session.Character.Id;
@@ -925,9 +944,17 @@ namespace Faolan.GameServer
 			var repeats = pause > 0 ? Math.Min(MaxBroadcastRepeats, duration / pause) : 0;
 			var announcement = ChatMarkup.Color("yellow", message);
 
-			var reached = await FanOutBroadcast(announcement);
+			// The recovered scope of THIS verb (see the remark above).
+			var playfieldOnly = verb.Equals("broadcast", StringComparison.OrdinalIgnoreCase);
+			var scope = playfieldOnly
+				? "in this playfield"
+				: "on this realm";
+
+			var reached = await FanOutBroadcast(announcement, playfieldOnly ? client : null);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$".{verb} -> {reached} player(s) on this realm{(repeats > 0 ? $", repeating every {pause}s for {duration}s ({repeats} more)" : "")}.");
+				$".{verb} -> {reached} player(s) {scope}"
+				+ (verb.Equals("sitecast", StringComparison.OrdinalIgnoreCase) ? " (retail's DIMENSION is wider than one realm; this host holds only its own - #324)" : "")
+				+ $"{(repeats > 0 ? $", repeating every {pause}s for {duration}s ({repeats} more)" : "")}.");
 
 			if (repeats <= 0)
 				return;
@@ -941,7 +968,7 @@ namespace Faolan.GameServer
 					for (var i = 0; i < repeats; i++)
 					{
 						await Task.Delay(TimeSpan.FromSeconds(pause));
-						await FanOutBroadcast(announcement);
+						await FanOutBroadcast(announcement, playfieldOnly ? client : null);
 					}
 				}
 				catch (Exception e)
@@ -951,13 +978,26 @@ namespace Faolan.GameServer
 			});
 		}
 
-		private async Task<int> FanOutBroadcast(ChatMarkup announcement)
+		// `inPlayfieldOf` non-null narrows the fan-out to that client's own playfield - `/broadcast`'s recovered
+		// scope (#919). Null is the realm, which is `/servcast` and as much of `/sitecast`'s dimension as a realm
+		// host can reach.
+		private async Task<int> FanOutBroadcast(ChatMarkup announcement, INetworkClient? inPlayfieldOf = null)
 		{
-			var recipients = _simulation.Players.Values.Where(p => p.IsPlayer).ToArray();
+			var recipients = _simulation.Players.Values.Where(p => p.IsPlayer).ToList();
+			if (inPlayfieldOf != null)
+			{
+				// The playfield is the (map, instance) pair, not the map alone - two copies of one zone are different
+				// playfields and a message to one must not reach the other.
+				var here = _simulation.PlayerWorldEntity(inPlayfieldOf);
+				recipients = here == null
+					? []
+					: recipients.Where(p => p.MapId == here.MapId && p.InstanceId == here.InstanceId).ToList();
+			}
+
 			foreach (var player in recipients)
 				await _agentServerDispatcher.SendSystemMessage(player.Client.Session.Character.Id, announcement);
 
-			return recipients.Length;
+			return recipients.Count;
 		}
 
 		// /mobs off | on [id | name]  - "Enables/disables InvisibleToMonsters".

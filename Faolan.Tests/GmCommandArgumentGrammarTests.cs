@@ -85,9 +85,14 @@ namespace Faolan.Tests
 				Assert.Equal(mode, cmd.Mode);
 			}
 
-			// Every verb sharing a class with another must be distinguishable from it. ⚠️ The broadcast trio is the
-			// one family the byte does NOT separate - /broadcast, /servcast and /sitecast are all mode 0 and are told
-			// apart inside the class by the verb text - so it is named here rather than silently failing the rule.
+			// Every verb sharing a class with another must be distinguishable from it.
+			//
+			// ⚠️ The broadcast trio is skipped because the DUMP cannot see its selector, not because the client lacks
+			// one (#919). The registration writes a 16-BIT value at [0xC] and `DumpCommandArgs` reads a byte, so
+			// /servcast 0x0000 and /broadcast 0x0100 both truncate to 0. The real values are 0x0000 / 0x0100 / 0x0001,
+			// and the class's own description getter names each scope: server / playfield / dimension. Regenerating
+			// the dump as a word would let this family join the rule; until then it is named rather than silently
+			// failing it.
 			var byClass = ArgTable().GroupBy(c => c.Class).Where(g => g.Count() > 1);
 			foreach (var family in byClass)
 			{
