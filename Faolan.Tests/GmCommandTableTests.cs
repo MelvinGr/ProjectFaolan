@@ -111,6 +111,36 @@ namespace Faolan.Tests
 			}
 		}
 
+		// ⭐ The TRANSCRIPTION gate. The catalog's Usage and Description are copies of a recovered RE artifact, and
+		// the risk they carry is drift: someone "tidies" a line that looks broken and the catalog quietly stops
+		// describing the client. So both are pinned to docs/re/gm-command-args.tsv.
+		// ⛔ Deliberately NOT a bracket-balance check. Eight of retail's own usage lines are unbalanced - two
+		// because the closing bracket is inside Funcom's HELP string ("Literal: Clears 1 death effect]") - so
+		// asserting balance would fail on a FAITHFUL recovery and reward corrupting it. See RetailCommandCatalog.
+		[Fact]
+		public void CataloguedVerbs_MatchTheRecoveredGrammar()
+		{
+			var grammar = File.ReadAllLines(TestPaths.Repo("docs", "re", "gm-command-args.tsv"))
+				.Skip(1)
+				.Select(l => l.Split('\t'))
+				.Where(f => f.Length >= 9)
+				.ToDictionary(f => f[0].TrimStart('/'), f => (Usage: f[6], Short: f[7], Long: f[8]), StringComparer.OrdinalIgnoreCase);
+
+			foreach (var unbacked in RetailCommandCatalog.Verbs)
+			{
+				Assert.True(grammar.TryGetValue(unbacked.Verb, out var recovered), $"'{unbacked.Verb}' is catalogued but has no recovered grammar.");
+				Assert.Equal(recovered.Usage, unbacked.Usage);
+
+				// The client's own description, verbatim - falling back to the long form for the one class that
+				// declares no short one (/lua). The TSV cannot hold a newline, so compare it flattened the way
+				// DumpCommandArgs.flatten() does: /tracescripts' description really is two lines.
+				var expected = recovered.Short.Length > 0 ? recovered.Short : recovered.Long;
+				Assert.Equal(expected, Flatten(unbacked.Description));
+			}
+		}
+
+		private static string Flatten(string s) => System.Text.RegularExpressions.Regex.Replace(s, "[\u0000-\u001f]+", " ").Trim();
+
 		// A verb cannot be implemented AND catalogued - the join refuses to come up on it, because whichever wins
 		// would depend on insertion order.
 		[Fact]

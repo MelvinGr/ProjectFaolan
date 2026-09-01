@@ -166,6 +166,54 @@ All 133 verbs come out with something usable:
 ⚠️ **A `noargs` row means the verb declares no parameters, not that it accepts none** — `/lua` and
 `/setlookspackage` plainly take an argument each and parse it ad hoc. The declaration is what is recovered.
 
+⚠️ **`/lua`'s description is its LONG one.** `FanaticLuaCommand` declares no short description at all, so the
+catalog falls back to the long form ("Run Lua script on both client and server."). It is the only class in the
+133 where that fallback applies.
+
+### ⭐ Three verbs carry another command's description — and it is retail's bug, not the dumper's
+
+`/jumpspeed` documents itself as *"Command for overriding the jump height."*, with the parameter
+`Integer: The new height cap for jumping`. That reads like a misattribution in our recovery. It is not: Funcom
+cloned the class and left the strings pointing at the original.
+
+The test that separates the two explanations is **how many code sites PUSH the string**. One command class's
+constructor pushes its short and long description ~`0x33` apart, so a string pushed at two sites is used by two
+different classes, while a string pushed once is shared by whatever verbs that ONE class registers under:
+
+| string | push sites | reading |
+|---|---:|---|
+| `Command for overriding the jump height.` | 2 | `FanaticJumpHeightCommand_c` **and** `FanaticJumpSpeedCommand_c` — two classes |
+| `Commands for pet control.` | 2 | `FanaticPetCommand_c` **and** `FanaticGameTweaksCommand_c` |
+| `Gives the target a temporary ress point.` | 4 | `FanaticRessCommand_c` + `FanaticConsumeMemoryCommand_c`, each pushing it as short *and* long |
+| `Teleports a dynel` | 1 | ONE class (`FanaticTeleportCommand_c`) under four verb names — an alias, not a clone |
+| `Not allowed to change/set this stat with /set` | 1 | `FanaticSetCommand_c` → `/set` + `/setlocal` |
+| `Reload some or all of the tables` | 1 | `FanaticReloadCommand_c` → `/reload` + `/lazyreload` |
+
+Corroborating the clone reading: `Command for overriding the jump height.` occurs **once** in the whole binary and
+there is no "jump speed" description anywhere; and `FanaticGameTweaksCommand_c` has its own long description
+(`Commands for game tweaks `, with the `set`/`get`/`reload`/`list` lines) while borrowing the pet short one.
+
+⛔ **Do not "correct" these three.** `CataloguedVerbs_MatchTheRecoveredGrammar` pins them, and it is mutation-checked
+in both directions (editing a description or a usage line fails it).
+
+### The reconstruction is complete, not truncated
+
+Eight usage lines come out with unbalanced brackets, which invites the conclusion that the walk is dropping
+appends. It is not. Two independent checks:
+
+* **The append stream divides evenly.** For six of the eight, `(appends − 2) % 4 == 0` — every four-append
+  parameter tuple is whole. Only `/spawn` (2 over) and `/token` (1 over) end ragged, which is what `partial:n`
+  already reports.
+* **The call sites are all accounted for.** Disassembling the two ragged classes and counting `CALL 0x40ec10`
+  (the append helper) gives **44 sites for `/spawn` and 44 recovered; 27 for `/token` and 27 recovered.**
+
+So the unbalanced lines are retail's grammar. Two are the `]`-inside-the-help-text typo above; the rest
+(`/pet`, `/space`, `/token`, `/spawn`, `/dataset`, `/resurrectionpoint`) simply never append a closing literal —
+`/dataset` renders `client|server|[setdataset]` because the `set` parameter's suffix and the `dataset`
+parameter's prefix are both empty, so the two names abut.
+
+⛔ **Do not add a "usage brackets balance" gate.** It would fail on a faithful recovery and reward corrupting it.
+
 **Five classes serve more than one verb**, and the record's variant selector at `[0xC]` is what separates them —
 `0` is the target/server form and `1` the self/local one:
 

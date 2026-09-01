@@ -19,6 +19,33 @@ namespace Faolan.GameServer
 	//
 	// The usage lines are recovered, not invented - docs/re/gm-command-args.tsv, produced by
 	// tools/ghidra/DumpCommandArgs.java. An empty usage means the class declares no parameters.
+	//
+	// ⛔ SOME OF THESE STRINGS LOOK WRONG AND ARE RETAIL'S OWN. Do not "correct" them - they were re-derived from
+	// AgeOfConan.exe directly (not from the TSV, which shares the dumper's blind spot), and the client shows the
+	// same text. Each was settled by counting how many code sites PUSH the string: one class's constructor pushes
+	// its shortdesc and longdesc ~0x33 apart, so a string pushed at two sites is used by two different classes.
+	//
+	//   * Three verbs carry a description copy-pasted from a DIFFERENT command, because Funcom cloned the class:
+	//       jumpspeed     <- jumpheight's ("Command for overriding the jump height.", param "height")
+	//       gametweaks    <- pet's        ("Commands for pet control.")
+	//       consumememory <- grantress's  ("Gives the target a temporary ress point.")
+	//     Each pair is two DISTINCT classes (FanaticJumpSpeedCommand_c vs FanaticJumpHeightCommand_c, ...), and the
+	//     shared string has one push site per class. There is no "jump speed" description anywhere in the binary.
+	//     ⚠️ Contrast the verbs that share a description because they ARE one class under several names -
+	//     tp/teleport/teleportself/teleporttarget, set/setlocal, reload/lazyreload - one vftable, ONE push site.
+	//
+	//   * Eight usage lines have unbalanced brackets. That is retail's grammar, not a truncated recovery: the
+	//     append stream for each is a clean multiple of four, and the count of append() call sites in the class
+	//     equals the count recovered (spawn 44/44, token 27/27). Two of them are a Funcom TYPO - the closing
+	//     bracket is inside the HELP string, which is NUL-terminated right after it:
+	//       "Literal: Clears 1 death effect]"      -> /respawn   renders `clear[`
+	//       "Integer: Normalset id to change to]"  -> /normalset renders `change[normalset`
+	//     The others (pet, space, token, spawn, dataset, resurrectionpoint) simply never append a closer.
+	//     ⛔ So do NOT add a "usage brackets balance" test - it would fail on a FAITHFUL recovery. The gate that
+	//     belongs here is the transcription one: CataloguedVerbs_MatchTheRecoveredGrammar.
+	//
+	//   * /lua's Description is its LONGdesc: FanaticLuaCommand declares no shortdesc at all. It is the only entry
+	//     where that fallback applies, and the gate encodes it rather than leaving it as a one-off.
 	internal static class RetailCommandCatalog
 	{
 		internal sealed record Unbacked(string Verb, GmPrivileges Mask, string Usage, string Description, string Needs);
@@ -110,7 +137,7 @@ namespace Faolan.GameServer
 			new("time", GmPrivileges.Developer, "* factor | / factor | fps factor | reset | step deltatime |", "Manipulates frametimes", "FRAME-time manipulation (the deltatimer system) - deliberately not built; the time-of-day setter is .settime"),
 			new("togglespellrecharge", GmPrivileges.Developer, "", "Toggle spell recharge", "server-side cast cooldowns - nothing gates a cast yet (#271)"),
 			new("token", GmPrivileges.SetStats, "list | get [token] | change [token", "List, get, change or reimburse tokens.", "tokens (#899)"),
-			new("tracescripts", GmPrivileges.Developer, "help", "Usage: /tracescripts [help] [client/both] [stop] [group=x] [script=x] [maxcmds=x] [maxthreads=x] [follow] [anypf] [notarget] [_target_] Any param is optitional. Order of params is not important. Server is default. [_target_] is you whatever you've targeted. Don't use spaces before/after = . Default 100 cmds per thread. 10 threads.", "script tracing (#356)"),
+			new("tracescripts", GmPrivileges.Developer, "help", "Usage: /tracescripts [help] [client/both] [stop] [group=x] [script=x] [maxcmds=x] [maxthreads=x] [follow] [anypf] [notarget] [_target_]\nAny param is optitional. Order of params is not important. Server is default. [_target_] is you whatever you've targeted. Don't use spaces before/after = . Default 100 cmds per thread. 10 threads.", "script tracing (#356)"),
 		];
 	}
 }
