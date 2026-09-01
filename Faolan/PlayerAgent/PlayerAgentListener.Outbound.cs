@@ -169,6 +169,11 @@ namespace Faolan.PlayerAgent
 		private async Task SendRealmList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realms = await Database.GetRealms();
+			// #922: the stored flag says a host CLAIMED to be serving; the heartbeat says whether it still is. A realm
+			// that crashed and was never restarted keeps its Online for ever, and advertising it hands players to a
+			// host that is not there - so the list shows the EFFECTIVE status, Online only while the stamp is fresh.
+			// Read here rather than filtered in the query: a down realm still belongs on the select screen, greyed.
+			var now = DateTimeOffset.UtcNow;
 
 			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SetDimensionList, b =>
 			{
@@ -176,7 +181,7 @@ namespace Faolan.PlayerAgent
 				foreach (var realm in realms)
 				{
 					b.WriteUInt32(realm.Id);
-					b.WriteUInt32(realm.OnlineStatus);
+					b.WriteUInt32((uint)RealmLiveness.Effective(realm.OnlineStatus, realm.LastSeenUtc, now));
 					b.WriteString(realm.Name);
 					b.WriteUInt32(0x00000001); //u2
 					b.WriteUInt32(0x00000000); //u3

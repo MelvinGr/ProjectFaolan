@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
@@ -31,15 +32,26 @@ namespace Faolan
 	// the time this executes, this process has already bound the realm's world/chat/cs ports and no other process can
 	// be serving that realm. Any Online it finds is therefore stale by construction, not a rival host.
 	//
-	// ⚠️ What this does NOT fix: a realm that crashes and is never restarted still reads Online, because nothing else
-	// re-reconciles it. Closing that needs a liveness marker (heartbeat / owning process) rather than a bare boolean -
-	// a schema question, since `CK_Realm_OnlineStatus` constrains the column to two values today. Tracked separately.
+	// ⭐ And it HEARTBEATS while it serves (#922). The flag alone cannot express "this host died and nobody restarted
+	// it": the claim above only fixes a realm's OWN restart, so a crash with no restart left the row Online for ever
+	// and the login tier kept handing clients to a host that was not there. A two-value column cannot decay on its
+	// own - somebody has to observe the absence - so this stamps `Realm.LastSeenUtc` every
+	// `RealmLiveness.HeartbeatInterval` and a reader treats Online-but-stale as Offline (`RealmLiveness.IsServing`).
+	//
+	// ⚠️ A stamp rather than a lease or a reaper, deliberately, because it keeps the invariant above UNCHANGED: this
+	// process writes only its own row, and no process writes another's. The login tier only reads.
 	public sealed class RealmStatusService : IHostedService
 	{
 		private readonly IRealmRepository _database;
 		private readonly ILogger<RealmStatusService> _logger;
 		private readonly uint _realmId;
 		private readonly IHostApplicationLifetime _lifetime;
+
+		// The heartbeat loop, started when the host begins SERVING and stopped on shutdown. Its own CTS rather than
+		// StopAsync's token: the token passed to StopAsync is a shutdown TIMEOUT, and cancelling on it would leave the
+		// loop running past a slow shutdown.
+		private readonly CancellationTokenSource _stopping = new CancellationTokenSource();
+		private Task? _heartbeat;
 
 		public RealmStatusService(IRealmRepository database, ILogger<RealmStatusService> logger, HostRealm realm, IHostApplicationLifetime lifetime)
 		{
@@ -62,8 +74,45 @@ namespace Faolan
 
 		public async Task StopAsync(CancellationToken cancellationToken)
 		{
+			await _stopping.CancelAsync();
+			if (_heartbeat != null)
+				await _heartbeat; // it swallows its own cancellation, so this cannot throw the shutdown down
+
 			if (await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Offline))
 				_logger.LogInformation("Realm {RealmId} marked Offline.", _realmId);
+		}
+
+		/// <summary>
+		///     Stamps <c>Realm.LastSeenUtc</c> while this host serves, so a reader can tell a live realm from one that
+		///     crashed and was never restarted (#922).
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ A failed stamp is logged and the loop CONTINUES. A database blip must not stop the heartbeat: the
+		///     realm is still serving, and the consequence of giving up would be to take a healthy realm out of the
+		///     list at the next TTL - failing in the direction this ticket exists to avoid, just the other way round.
+		///     The TTL's own margin (four intervals) is what absorbs a blip that lasts.
+		/// </remarks>
+		private async Task Heartbeat()
+		{
+			using var timer = new PeriodicTimer(RealmLiveness.HeartbeatInterval);
+			try
+			{
+				while (await timer.WaitForNextTickAsync(_stopping.Token))
+				{
+					try
+					{
+						await _database.TouchRealm(_realmId);
+					}
+					catch (System.Exception ex)
+					{
+						_logger.LogWarning(ex, "Realm {RealmId} heartbeat failed; it reads as down if this persists past {Stale}.", _realmId, RealmLiveness.StaleAfter);
+					}
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				// shutting down
+			}
 		}
 
 		private async Task MarkOnline()
@@ -72,6 +121,10 @@ namespace Faolan
 			{
 				if (await _database.SetRealmOnlineStatus(_realmId, RealmOnlineStatus.Online))
 					_logger.LogInformation("Realm {RealmId} marked Online.", _realmId);
+
+				// Started only once the flip SUCCEEDED - a realm that could not mark itself Online is not serving as
+				// far as any reader is concerned, and heartbeating a row that says Offline would say nothing.
+				_heartbeat = Heartbeat();
 			}
 			catch (System.Exception ex)
 			{

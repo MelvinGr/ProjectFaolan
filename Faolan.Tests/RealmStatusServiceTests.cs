@@ -118,8 +118,21 @@ namespace Faolan.Tests
 			}
 
 			public List<RealmOnlineStatus> Writes { get; } = [];
+
+			// #922: the heartbeat's stamps. Counted rather than timed - the interval is two minutes' worth of ticks
+			// and a test that waited for one would be a two-minute test.
+			public int Touches { get; private set; }
+
 			public List<uint> Ids { get; } = [];
 			public RealmOnlineStatus Status { get; private set; }
+
+			public Task<bool> TouchRealm(uint realmId)
+			{
+				Ids.Add(realmId);
+				Touches++;
+
+				return Task.FromResult(true);
+			}
 
 			public Task<bool> SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status)
 			{

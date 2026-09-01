@@ -3500,6 +3500,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("LastSeenUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<byte>("LoadStatus")
                         .HasColumnType("INTEGER");
 

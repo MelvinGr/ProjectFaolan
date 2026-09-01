@@ -61,5 +61,23 @@ namespace Faolan.Core.Database.Tables
 
 		// The realm's GameServer (world) port - advertised to the client in the EnterWorld handoff (SendGameServer).
 		public ushort Port { get; set; }
+
+		/// <summary>
+		///     When this realm's host last said it was still serving - the LIVENESS half of <see cref="OnlineStatus" />
+		///     (#922). NULL means it has never heartbeated.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <c>OnlineStatus</c> on its own cannot express "this host died and nobody restarted it". #909 made
+		///     the flag mean SERVING and made a realm's own restart clear its stale Online, but a crash with no
+		///     restart leaves the row Online for ever - the login tier keeps advertising a host that is not there,
+		///     which is the same quiet, wrong-direction failure on a longer timescale.
+		///     <para />
+		///     A two-value flag cannot decay on its own; somebody has to observe the ABSENCE. This column is that
+		///     observation: the realm host stamps it on a timer, and a reader treats Online-but-stale as Offline
+		///     (<c>RealmLiveness.IsServing</c>). ⭐ Deliberately a stamp rather than a lease or a reaper, because it
+		///     preserves #909's invariant unchanged - <b>a realm process only ever writes its own row</b>, and no
+		///     process writes another's. The login tier only READS.
+		/// </remarks>
+		public DateTimeOffset? LastSeenUtc { get; set; }
 	}
 }

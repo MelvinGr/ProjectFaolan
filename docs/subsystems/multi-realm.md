@@ -177,9 +177,22 @@ back to the base port rather than wrapping into a port that means something else
   `IDatabaseRepository.SetRealmOnlineStatus(realmId, status)` (updates by id, so hosts on a shared DB never touch
   each other's rows). Registered last in the `runRealm` block, so it comes up after the listeners bind and — hosted
   services stopping in reverse — flips Offline first as shutdown begins. The login tier's `SendRealmList` already
-  reads `OnlineStatus`, so this is what makes the realm list reflect reality. **Caveat:** a hard crash / SIGKILL
-  skips `StopAsync`, leaving the row stale-`Online`; a heartbeat/last-seen TTL is the robust follow-up if that
-  becomes a problem in practice. (Committed `faolan.db` carries the stopped-state default, `Offline`.)
+  reads `OnlineStatus`, so this is what makes the realm list reflect reality. (Committed `faolan.db` carries the
+  stopped-state default, `Offline`.)
+
+  ⭐ **And a crashed realm decays out of the list (#922).** A hard crash / SIGKILL skips `StopAsync`, and #909's
+  claim-on-start only clears the stale `Online` a realm's OWN restart leaves — with no restart the row said
+  `Online` for ever, including across a reboot, and the login tier kept handing clients to a host that was not
+  there. A two-value column cannot decay on its own; the ABSENCE has to be observed. So `Realm.LastSeenUtc` is
+  stamped by the serving host every `RealmLiveness.HeartbeatInterval` (30 s) and every reader takes the pair
+  through `RealmLiveness.Effective`, which reads `Online`-but-stale as `Offline` after `StaleAfter` (2 minutes —
+  four intervals, so three missed stamps do not take a healthy realm down).
+
+  ⚠️ A stamp rather than a lease or a reaper, deliberately: it leaves the invariant above **unchanged** — a realm
+  process writes only its own row, and the login tier only READS. A `NULL` stamp is not serving even with the flag
+  set (a row that predates the heartbeat, or one set by hand, is not evidence that anything is listening), and a
+  stamp in the future is accepted, since the two processes may be on different machines and a little clock skew
+  must not take a live realm down.
 
 - **Per-realm DBs (a later option).** If shared-DB contention or stronger isolation warrants it, give each realm
   process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
