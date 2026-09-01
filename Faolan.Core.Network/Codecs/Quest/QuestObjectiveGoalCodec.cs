@@ -64,7 +64,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//     custom)", "Name of marker", "Position of marker", **"Radius of marker"**, and its handler
 	//     (`FUN_00a12680`) calls `FUN_0139f520` - the same function that writes +0x28.
 	//
-	// +0x6d and +0x70 are stored and 0 on every captured goal. Open work tracked in Gitea #464.
+	// ⛔ +0x6d and +0x70 have NO CONSUMER in the image, and that is now a measured result rather than an absence of
+	// looking (2026-09-01). +0x6d is the distinctive one - a byte at an ODD offset - so a co-offset scan on
+	// `(0x6d, 0x70)` within 80 instructions is specific where the earlier `(0x6c, 0x70)` was not: 53 functions,
+	// against 1,238 for the aligned pair. Exactly three of the 53 are this object's:
+	//   * `FUN_00925dd0` - the READER, which is where they came from;
+	//   * `FUN_00925390` - the constructor, which zeroes +0x6d;
+	//   * `FUN_00925800` - the WRITER, the serializer twin of the reader: it emits +0x6d through the same
+	//     `FUN_00cba060(buf, size)` byte-swap-and-append every other field goes through.
+	// The other 50 are unrelated structs that happen to share the offsets. So the pair is read, stored and
+	// re-serialized and nothing else in the client touches it - the same "propagated, no found consumer" class as
+	// `QuestJournalAreaCodec.Unknown`, and a fourth round of offset scanning will not change that.
+	//
+	// They are stored and 0 on every captured goal. Open work tracked in Gitea #464.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.
