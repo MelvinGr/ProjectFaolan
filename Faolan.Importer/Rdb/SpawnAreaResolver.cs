@@ -384,6 +384,18 @@ namespace Faolan.Importer.Rdb
 
 		// Links captured NpcSpawns to the resolved area whose creature + bounds they match. Resets links on the touched
 		// maps first (idempotent), so a re-resolve reflects the current creature assignments.
+		//
+		// ⭐ This is #363's "match capture-derived NPCs to the RDB spawn points", done the guesswork-free way: same
+		// map, same RESOLVED template, position inside the area's padded bounds. No template is inferred and no
+		// position is snapped - the curated burst-truth position is left exactly as captured, and the only thing
+		// written is a nullable FK the runtime already knows what to do with (`ZonePopulationLoader`: the spawn
+		// becomes a POOL MEMBER, rendering with its captured appearance while the pool owns its respawn and it counts
+		// toward MaxCount, so captured and ambient never double-populate).
+		//
+		// ⚠️ **The link is a downstream STAMP, and `--only npcs` wipes it** - the `only_npcs_drops_stamps` class: the
+		// npc harvest delete+reinserts NpcSpawns, the FK comes back NULL, and row COUNTS are unchanged so a --dry-run
+		// delta shows nothing. It is idempotently wrong. After any change to the spawn harvest run the FULL import,
+		// or re-run `--only rdb-npc-spawns --mode overwrite` afterwards to restore it.
 		private static async Task<int> LinkCapturedSpawns(DatabaseContext db, List<NpcSpawnArea> areas)
 		{
 			const float pad = 5f;
