@@ -1363,6 +1363,11 @@ namespace Faolan.Core.Enums
 		TrackFrostDamage = 0xA6,
 		Attackable = 0xA8,
 		MinCastingTimeForExecute = 0xAB,
+		// ⭐ On a DYNEL this stat IS the map pin (#921): the client's stat-apply `FUN_0080acd0` places a typed
+		// waypoint when it is set non-zero and removes it when it is set to 0, with no waypoint MESSAGE involved at
+		// any point. Retail pushes it 672 times across the corpus, values 0x0F-0x12 / 0x1B / 0x1D - the same set the
+		// placer accepts, complaining "The waypoint type stat has a strange value." about anything else. See
+		// docs/re/waypoint-type-stat.md.
 		WaypointType = 0xAC,
 		AutoLockTimeDefault = 0xAF,
 		AutoUnlockTimeDefault = 0xB0,
