@@ -2203,6 +2203,33 @@ one 15-minute capture — mostly alone in their own packets, so it is event-driv
 recompute is the obvious candidate. The value is settled, the cadence is not.]
 
 
+## A live buff survives a ZONE CHANGE, because its entity does not (#907)
+
+`PlayerRegistry` is keyed by **connection**, and a map change tears the world connection down
+(`ClientDisconnected` → `RemovePlayer`). So the re-entry builds a brand-new `WorldEntity` and everything the old
+one held that is not persisted is dropped.
+
+⚠️ For a debuff that is not cosmetic. With no `ActiveBuff` entry left there is nothing for `TickBuffExpiry` to
+expire, so its removal twin is never sent — and the client keeps its own icon list across a map change, so the
+icon sits at **0s for ever**. The reported symptom is exactly that shape: one stuck `Butcher`, the one live at
+the instant of the teleport, with every earlier one having expired normally.
+
+⭐ **Retail carries live effects across the change rather than ending them at the door.** In
+`xxx_mage-necromancer_login_play3`, `RequestACGTeleport` (frame 4732) is followed at 4749 by five apply-form
+`MagicBuffIIR` records re-stating the character's live buffs on the far side. So carrying is the retail-shaped
+fix; ending them at the boundary would not be.
+
+`CarriedBuffHold` (World/, owned by `TeleportService`) holds them by **character id** — the same reason
+`PlayerDeathService`'s self-resurrection offer is keyed that way: the state has to outlive the connection that
+owned it. The tear-down carries only on `Session.IsTeleportingOut`, so a real logout still ends its buffs and
+the client rebuilds its icon list from the next login's snapshot; the world entry restores them with `TryAdd`,
+so an entry burst that re-applies a buff of its own wins over the staler carried copy. Not persisted — a server
+restart drops them, the same narrowing the resurrection offer has.
+
+⛔ Already-expired buffs are dropped rather than carried: the tick removes an expired buff and sends its twin, so
+one still present at tear-down is one the tick has not reached yet, and carrying a dead one would re-arm an icon
+the client has already been told about.
+
 ## An observer learns a streamed-in entity's buffs from the SPAWN (#677)
 
 There is no fan-out to design. The spawn's post-IIR carries a count-framed `BuffRecords` list, decoded and

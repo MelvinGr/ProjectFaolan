@@ -514,6 +514,14 @@ namespace Faolan.GameServer
 				// Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
 				// zone, so ResolveRemove still sees the leaver's viewers - now awaited (ClientDisconnected is a Task), 				// so the despawn deterministically lands before RemovePlayer instead of racing it.
 				await _broadcaster.BroadcastPlayerDespawn(entity);
+				// #907: a zone change tears this connection down and the re-entry builds a NEW entity (PlayerRegistry
+				// is keyed by connection), so hold the live buffs over the handoff. Without it a debuff live at the
+				// moment of the teleport has nothing left to expire it, and the client - which keeps its own icon
+				// list across a map change - shows it at 0s for ever. Only on a teleport-out: on a real logout the
+				// buffs are meant to end, and the client rebuilds its icon list from the next login's snapshot.
+				if (client.Session.IsTeleportingOut)
+					_teleport.CarryBuffs(entity.Handle, entity.ActiveBuffs);
+
 				_simulation.RemovePlayer(client, out _);
 				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
 				// loses where they were. EXCEPT on a teleport-out: DoTeleport already saved the destination, and this

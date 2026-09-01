@@ -617,6 +617,23 @@ namespace Faolan.GameServer
 			var pvpMatch = _csPlayerAgentDispatcher.PvpMatchEntryOf(client.Session.Character.Id, map.Id);
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
 				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry, pvpMatch?.MatchId);
+
+			// #907: the buffs held over the zone-change handoff, onto the entity the registration just built. The
+			// entity is NEW on every map change (PlayerRegistry is keyed by connection), so anything the old one held
+			// and nothing persists - a live NPC debuff above all - is otherwise dropped, leaving the client's icon
+			// stuck at 0s with no removal twin ever coming. Restoring them puts the tick back in charge of the
+			// expiry, so the twin reaches the connection that is actually listening.
+			//
+			// ⚠️ TryAdd, not an assignment: the entry burst can re-apply a buff of its own before this runs, and the
+			// carried copy is the STALER of the two - it was applied on the far side of the door.
+			var carried = _teleport.ConsumeCarriedBuffs(character.Id);
+			if (carried.Count > 0 && _simulation.PlayerWorldEntity(client) is { } entered)
+			{
+				foreach (var (buffId, buff) in carried)
+					entered.ActiveBuffs.TryAdd(buffId, buff);
+
+				Logger.LogInformation("World entry: carried {Count} live buff(s) across the zone change for {Name} (#907).", carried.Count, character.Name);
+			}
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 
 			// #305: the playfield-instance token is sourced PER-MAP (Map.PlayfieldToken), falling back to the beach

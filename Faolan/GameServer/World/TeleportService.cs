@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -32,6 +35,9 @@ namespace Faolan.GameServer.World
 		// mark below, consumed by the reconnect's world entry - the difficulty must survive the handoff because the
 		// entry happens on a NEW connection. Absent = normal, so nothing is stored for the common case.
 		private readonly ConcurrentDictionary<uint, byte> _pendingEpicEntry = new ConcurrentDictionary<uint, byte>();
+
+		// The live BUFFS of characters mid-handoff (#907) - see CarriedBuffHold for what it is and why.
+		private readonly CarriedBuffHold _carriedBuffs = new CarriedBuffHold();
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
@@ -177,6 +183,77 @@ namespace Faolan.GameServer.World
 		public bool ConsumeEpicEntry(uint characterId)
 		{
 			return _pendingEpicEntry.TryRemove(characterId, out _);
+		}
+
+		/// <summary>
+		///     Hold a character's live buffs over a zone change, so the entity the re-entry builds inherits them
+		///     (#907). Called at the world connection's tear-down, and only when it IS a teleport-out.
+		/// </summary>
+		public void CarryBuffs(uint characterId, ICollection<KeyValuePair<uint, ActiveBuff>> buffs)
+		{
+			_carriedBuffs.Carry(characterId, buffs, DateTimeOffset.UtcNow);
+		}
+
+		/// <summary>The buffs held over a zone change, removed from the hold. Empty when there are none.</summary>
+		public IReadOnlyList<KeyValuePair<uint, ActiveBuff>> ConsumeCarriedBuffs(uint characterId)
+		{
+			return _carriedBuffs.Consume(characterId);
+		}
+	}
+
+	/// <summary>
+	///     Live buffs held across a zone-change handoff, keyed by CHARACTER id (#907).
+	/// </summary>
+	/// <remarks>
+	///     A zone change destroys the world connection, and <c>PlayerRegistry</c> is keyed BY CONNECTION - so the
+	///     re-entry builds a brand new <c>WorldEntity</c> and everything the old one held that is not persisted is
+	///     dropped.
+	///     <para />
+	///     ⚠️ That is not cosmetic for a debuff. A live NPC-applied debuff whose entry dies with the entity has
+	///     nothing left to expire it, so <c>TickBuffExpiry</c> never sends its removal twin and the client - which
+	///     keeps its own icon list across a map change - shows it at 0s for ever. Exactly one `Butcher` stuck that
+	///     way in the reported session: the one live at the instant of the teleport, every earlier one having
+	///     expired normally.
+	///     <para />
+	///     ⭐ Retail carries live effects ACROSS the change rather than ending them at the door. In
+	///     <c>xxx_mage-necromancer_login_play3</c>, <c>RequestACGTeleport</c> at frame 4732 is followed at 4749 by
+	///     five apply-form <c>MagicBuffIIR</c> records re-stating the character's live buffs on the far side. So
+	///     carrying is the retail-shaped fix and ending them at the boundary would not be.
+	///     <para />
+	///     Keyed by character id for the same reason <c>PlayerDeathService</c>'s self-resurrection offer is: the
+	///     state has to outlive the connection that owned it. Not persisted, so a server restart drops it - the same
+	///     narrowing the offer next door has.
+	/// </remarks>
+	public sealed class CarriedBuffHold
+	{
+		private readonly ConcurrentDictionary<uint, IReadOnlyList<KeyValuePair<uint, ActiveBuff>>> _held =
+			new ConcurrentDictionary<uint, IReadOnlyList<KeyValuePair<uint, ActiveBuff>>>();
+
+		/// <summary>
+		///     Hold this character's still-LIVE buffs, replacing anything held before.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ An already-EXPIRED buff is dropped rather than carried. The tick removes an expired buff and sends
+		///     its twin, so one still in the map at tear-down is one the tick has not reached yet; carrying a dead
+		///     one would re-arm an icon the client has already been told about.
+		/// </remarks>
+		public void Carry(uint characterId, ICollection<KeyValuePair<uint, ActiveBuff>> buffs, DateTimeOffset now)
+		{
+			var live = buffs.Where(b => !b.Value.Expired(now)).ToArray();
+			if (live.Length == 0)
+			{
+				_held.TryRemove(characterId, out _);
+
+				return;
+			}
+
+			_held[characterId] = live;
+		}
+
+		/// <summary>What is held for this character, REMOVED from the hold - so a second entry cannot re-arm them.</summary>
+		public IReadOnlyList<KeyValuePair<uint, ActiveBuff>> Consume(uint characterId)
+		{
+			return _held.TryRemove(characterId, out var buffs) ? buffs : [];
 		}
 	}
 }
