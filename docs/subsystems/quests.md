@@ -16,6 +16,32 @@ and `QuestObjectiveRegion` / `QuestProgress` — and the per-chain content notes
 A quest completes when **every** goal reaches its `RequiredCount`; completing a stage supersedes it with
 `NextQuestId`. `QuestProgressionService` owns all of that, and every trigger funnels through its one `Advance`.
 
+### ⭐ Two tiers, and the second one is a last resort
+
+A quest is **data** — `QuestGoalDefinition` rows the generic engine walks. That is the default and covers
+kill/collect/talk/escort chains outright, which is what keeps the quest count (5,048) from becoming a code count.
+The only other tier is **bespoke C#** for an emulation-gap set piece: `TortageIntroService` — the Kalanthes
+create-cutscene walk-up, and Casilda's invisible chain-wall and captive/freed poses. ⛔ Do not grow it per quest;
+a new quest that needs code is a signal that a goal TYPE or a column is missing from the data engine.
+
+⛔ **There is no script tier, and there cannot be one from the shipped client.** The design once had a middle tier
+that would run the client's own RDB `LuaArchive` (1010223) scripts — `player:HasTag(n)` conditions, `AddTag` /
+`SolveGoal` effects — so branching came from Funcom's content rather than from us. A MoonSharp VM for it was built
+and then removed (2026-07-21), and the reason is a property of the DATA, not a change of mind:
+
+* the scripts are shipped, but **nothing says which script belongs to which node**. All 195 RDB types were
+  inventoried and there is no conversation/quest/knubot definition type — the tree was server-authoritative and
+  never shipped ([`../rdb/rdb-extraction.md`](../rdb/rdb-extraction.md)).
+* the quest catalog's own script pointers are **empty**: `MainQuest.condition_script_id` and
+  `Quest.start_scry_script_id` are the only two catalog fields never emitted on any row
+  ([`../rdb/quest-catalog-1000104.md`](../rdb/quest-catalog-1000104.md)).
+* ~59% of the 1,992 scripts are a one-line `player:AddTag(n)`; the rest are shop upsells, PvP-saga and event cruft.
+
+So the VM could run any script and never know which one retail ran. What replaced it is structured columns —
+`ConversationNode.ConditionQuestId` + `ConditionQuestState`, which express the three gates the Casilda scripts
+actually used — plus the capture-derived conversation graph. The `CharacterTag` store is kept, because the tag
+mechanism itself is real and tag-gated content will want it.
+
 ## Goal types and what fires them
 
 `QuestGoalType` selects which server event matches a goal; the wire output is identical for all of them.
