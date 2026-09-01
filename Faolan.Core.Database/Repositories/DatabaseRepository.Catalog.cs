@@ -345,6 +345,10 @@ namespace Faolan.Core.Database.Repositories
 			if (item is { SearchCategory: > 0 })
 				return item.SearchCategory;
 
+			// ⛔ Deliberately NOT realm-scoped, unlike every other read of this table (#324). An item's SEARCH CATEGORY
+			// is a property of the CATALOG, not of a realm's auction house - this only reaches for the listings because
+			// the captured rows are where an unimported category is legible. Filtering by realm would narrow the
+			// evidence for a global fact and make the answer depend on which realm asked.
 			var categories = await ctx.TradepostListings.Where(l => l.Template == template && l.ItemId != l.Template).Select(l => l.ItemId).ToListAsync();
 			if (categories.Count == 0)
 				return null;

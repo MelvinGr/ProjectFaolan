@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.CommandLine;
+using System.Globalization;
 using System.Text;
 using Faolan.Core;
 using Faolan.Core.Cli;
@@ -18,11 +20,95 @@ namespace Faolan
 	// LAST value of a repeated key.
 	public static class ServerCommand
 	{
-		private static readonly Option<string[]> Role = new Option<string[]>("--role")
+		private static readonly Option<string[]> Role = BuildRoleOption();
+
+		private static Option<string[]> BuildRoleOption()
 		{
-			Description = "login | realm | realm=<id>. Repeatable: `--role login --role realm=2`. Omitted = all-in-one (login + the first realm).",
-			AllowMultipleArgumentsPerToken = false
-		};
+			var option = new Option<string[]>("--role")
+			{
+				Description = "login | realm | realm=<id>. Repeatable: `--role login --role realm=2`. Omitted = all-in-one (login + the first realm).",
+				AllowMultipleArgumentsPerToken = false
+			};
+
+			// A bad role set is a COMMAND-LINE error, reported like any other bad option (usage + a non-zero exit),
+			// not an unhandled exception. It used to be two bare `throw new Exception`s in Program, so mistyping a
+			// role - or the one thing the rule below exists to forbid - answered with a stack trace and a SIGABRT
+			// (#324). The validator and the reader share `TryParseRoles`, so what --help promises and what the process
+			// runs cannot drift apart.
+			option.Validators.Add(result =>
+			{
+				if (!TryParseRoles(result.GetValueOrDefault<string[]>() ?? [], out _, out _, out _, out var error))
+					result.AddError($"--role: {error}");
+			});
+
+			return option;
+		}
+
+		/// <summary>
+		///     Reads the process ROLE set (multi-realm / process-per-realm, #324). <c>--role</c> is REPEATABLE, so one
+		///     process can compose roles (<c>--role login --role realm=2</c> = login + realm 2 in one process):
+		///     <list type="bullet">
+		///         <item><description><c>--role login</c> - the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.</description></item>
+		///         <item><description><c>--role realm=&lt;id&gt;</c> - a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that realm's ports; the login tier routes players to it.</description></item>
+		///         <item><description><c>--role realm</c> - the same, for the first realm (id omitted).</description></item>
+		///         <item><description>no <c>--role</c> - all-in-one: login + a game host for the first realm (the historical dev run).</description></item>
+		///     </list>
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ At most ONE realm role per process: co-hosting several realms in one process would share the
+		///     chat/world dispatchers and the session aggregation across realms - a cross-realm leak, and one that
+		///     fails QUIETLY, which is why it is refused at the command line before anything is constructed or bound.
+		/// </remarks>
+		internal static bool TryParseRoles(IReadOnlyList<string> roles, out bool runLogin, out bool runRealm, out uint? realmId, out string? error)
+		{
+			runLogin = runRealm = false;
+			realmId = null;
+			error = null;
+
+			if (roles.Count == 0)
+			{
+				runLogin = runRealm = true; // default: all-in-one (dev)
+
+				return true;
+			}
+
+			foreach (var role in roles)
+			{
+				if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
+					runLogin = true;
+				else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
+				{
+					if (runRealm)
+					{
+						error = "at most one 'realm' role per process - run one process per realm (co-hosting realms would leak chat and session state across them).";
+
+						return false;
+					}
+
+					runRealm = true;
+					var eq = role.IndexOf('=');
+					if (eq < 0)
+						continue;
+
+					if (!uint.TryParse(role[(eq + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+					{
+						error = $"'{role}' - a realm id must be a number, as in 'realm=2'.";
+
+						return false;
+					}
+
+					realmId = id;
+				}
+				else
+				{
+					error = $"must be 'login' or 'realm[=<id>]', got '{role}'.";
+
+					return false;
+				}
+			}
+
+			return true;
+		}
 
 		// Configuration keys - the option name IS the config path, so it is spelled the same here, in faolan.json
 		// and (with __) in the environment. The description and the DEFAULT come from FaolanSettings, the one catalog,
@@ -90,7 +176,12 @@ namespace Faolan
 				return null;
 			}
 
-			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Build(result, ConfigOptions));
+			// The roles are already VALIDATED by the option's own validator, which is what turned a bad set into a
+			// parse error above - so this cannot fail, and the parse lives in one place rather than being repeated
+			// by the caller.
+			TryParseRoles(result.GetValue(Role) ?? [], out var runLogin, out var runRealm, out var realmId, out _);
+
+			return new ServerOptions(runLogin, runRealm, realmId, FaolanCommandLine.Build(result, ConfigOptions));
 		}
 
 		// BOTH halves are printed, the private one included. That reverses the old rule here ("a secret does not
@@ -124,5 +215,5 @@ namespace Faolan
 
 	// The command line, resolved: the roles this process runs, and the CONFIGURATION its options contributed to - built
 	// once here rather than handed on as an override layer for each consumer to re-resolve.
-	public sealed record ServerOptions(string[] Roles, IConfiguration Configuration);
+	public sealed record ServerOptions(bool RunLogin, bool RunRealm, uint? RealmId, IConfiguration Configuration);
 }

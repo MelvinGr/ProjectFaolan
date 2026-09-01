@@ -121,11 +121,19 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "list_tradepost_listings"),
 		 Description(
-			 "Browse auction-house (Tradepost) listings from faolan.db, cheapest first. Filter by itemId (the search/category id rows are filed under) and/or sellerName; both optional. Read-only. Note: a listing's ItemId is the search category and its Template is the actual item delivered.")]
+			 "Browse auction-house (Tradepost) listings from faolan.db, cheapest first. Filter by itemId (the search/category id rows are filed under), sellerName and/or realmId; all optional. Read-only. Note: a listing's ItemId is the search category and its Template is the actual item delivered.")]
 		public async Task<string> ListTradepostListings([Description("Optional: only listings filed under this itemId (0 = any)")] uint itemId = 0,
-			[Description("Optional: only listings by this exact seller name")] string? sellerName = null, [Description("Max results (default 25)")] int limit = 25)
+			[Description("Optional: only listings by this exact seller name")] string? sellerName = null,
+			[Description("Optional: only listings in this realm (0 = every realm)")] uint realmId = 0,
+			[Description("Max results (default 25)")] int limit = 25)
 		{
-			var rows = await _db.Query(ctx => ctx.TradepostListings.Where(l => (itemId == 0 || l.ItemId == itemId) && (sellerName == null || l.SellerName == sellerName)).Take(1000).ToListAsync());
+			// ⚠️ An auction house is REALM-SCOPED (#324), and every in-game read of it filters on the realm - so a
+			// cross-realm listing here is an inspection convenience, not the player's view. Sale ids are unique per
+			// realm rather than globally, so `RealmId` rides on every row: without it two realms' sale id 1 are
+			// indistinguishable in this output.
+			var rows = await _db.Query(ctx => ctx.TradepostListings
+				.Where(l => (itemId == 0 || l.ItemId == itemId) && (sellerName == null || l.SellerName == sellerName) && (realmId == 0 || l.RealmId == realmId))
+				.Take(1000).ToListAsync());
 
 			var listings = rows
 				.OrderBy(l => l.Price)
@@ -133,6 +141,7 @@ namespace Faolan.Mcp.Tools
 				.Select(l => new
 				{
 					SaleId = "0x" + l.SaleId.ToString("X16"),
+					l.RealmId,
 					l.SellerName,
 					PriceTin = l.Price,
 					l.Quantity,

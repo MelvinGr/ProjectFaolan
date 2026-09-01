@@ -47,7 +47,16 @@ namespace Faolan
 
 			Console.WriteLine(Global.StartupBanner);
 
-			var (realmId, runLogin, runRealm, runMcp) = GetRunInfo(options);
+			// The process ROLE set is parsed and validated by the command line itself (ServerCommand.TryParseRoles), so
+			// an impossible combination has already been reported as a CLI error and this can only see a legal one.
+			var (runLogin, runRealm, realmId) = (options.RunLogin, options.RunRealm, options.RealmId);
+
+			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
+			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
+			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so
+			// the tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain
+			// generic host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port).
+			var runMcp = runRealm && options.Configuration.McpEnabled;
 
 			IHostApplicationBuilder builder = runMcp
 				? WebApplication.CreateBuilder(args)
@@ -235,59 +244,6 @@ namespace Faolan
 				var app = ((HostApplicationBuilder)builder).Build();
 				await app.RunAsync();
 			}
-		}
-
-		private static (uint? realmId, bool runLogin, bool runRealm, bool runMcp) GetRunInfo(ServerOptions options)
-		{
-			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
-			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
-			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
-			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
-			//                         realm's ports; the login tier routes players to it (SendGameServer/ChatServer/CsPlayerAgent).
-			//   --role realm       -> the same, for the first realm (id omitted).
-			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
-			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
-			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
-			// Parsed from argv up front (before the host is built) because the host SHAPE depends on it - see runMcp below.
-
-			// The option is REPEATABLE, which the parser handles (ServerCommand) - a configuration binder could not,
-			// since it keeps only the LAST value of a repeated key.
-			var roles = options.Roles;
-
-			uint? selectedRealmId = null;
-			bool runLogin = false, runRealm = false;
-			if (roles.Length == 0)
-				runLogin = runRealm = true; // default: all-in-one (dev)
-			else
-			{
-				foreach (var role in roles)
-				{
-					if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
-						runLogin = true;
-					else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
-					{
-						if (runRealm)
-							throw new Exception("At most one 'realm' role per process!");
-
-						runRealm = true;
-						var eq = role.IndexOf('=');
-						if (eq >= 0)
-							selectedRealmId = uint.Parse(role[(eq + 1)..], CultureInfo.InvariantCulture);
-					}
-					else
-						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
-				}
-			}
-
-			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
-			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
-			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so the
-			// tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain generic
-			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). Reading
-			// McpEnabled here needs no config of its own: the parse already resolved the stack, and it is the same
-			// instance the host builder gets below - it used to build a throwaway one from the override layer.
-			var runMcp = runRealm && options.Configuration.McpEnabled;
-			return (selectedRealmId, runLogin, runRealm, runMcp);
 		}
 	}
 }

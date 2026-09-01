@@ -152,6 +152,22 @@ back to the base port rather than wrapping into a port that means something else
   or realm-agnostic static metadata (the AH item-search-category inference). Runtime isolation also holds by
   construction: a realm process only holds its own connected sessions/zones (P2).
 
+  ⭐ **That audit is now a GATE, not a reading.** `Faolan.Tests/RealmIsolationTests` seeds two realms whose rows
+  COLLIDE on everything except the realm — the same guild name, the same sale id, the same seller and bank slot,
+  the same mail recipient, the same character name — and then asks each realm's own reader for its own. A missing
+  `WHERE` fails quietly (realm B's guilds simply appear in realm A), so it is checked the way the leak would look:
+  each assertion reads back a value that differs per realm rather than a count. Mutation-checked — dropping the
+  filter from `GetGuildByName`, `GetGuilds` or `DeleteTradepostListing` fails it. The two deliberate exceptions
+  above are asserted as such rather than left silent: `GetCharactersByAccount` must SPAN realms (the selection
+  screen's wire row carries `character.RealmId` per entry), and `GetItemSearchCategory` reads the catalog fact
+  across realms by design.
+
+  **Role validation is a command-line error, not a crash.** `--role` is parsed and validated by the command line
+  itself (`ServerCommand.TryParseRoles`, shared by the option's validator and its reader), so `--role realm=1
+  --role realm=2`, `--role realm=abc` and a plain typo each answer with one line plus usage and exit 1. It used to
+  be two bare `throw new Exception`s in `Program` — reached *after* the command line had already accepted the
+  string — so a typo produced a stack trace and a SIGABRT.
+
   **Fleet compose:** verified 1 login + 2 realm processes run concurrently against the shared DB, each
   binding its own realm's ports from its `Realm` row (login 7010/7011; realm 2 → 7014/7012/7001; realm 3 →
   7024/7022/7021), no collisions. So the process-per-realm topology composes.

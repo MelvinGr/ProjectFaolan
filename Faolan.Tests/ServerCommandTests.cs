@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Linq;
 using Faolan.Core.Cli;
 using Xunit;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
@@ -22,7 +23,9 @@ namespace Faolan.Tests
 
 			Assert.NotNull(options); // ...not "the parser handled it itself and the process should exit"
 			Assert.Equal(0, exitCode);
-			Assert.Empty(options.Roles); // no --role = all-in-one (login + the first realm)
+			Assert.True(options.RunLogin); // no --role = all-in-one (login + the first realm)
+			Assert.True(options.RunRealm);
+			Assert.Null(options.RealmId);
 			Assert.NotNull(options.Configuration); // the whole stack, resolved once, at the parse
 		}
 
@@ -46,7 +49,48 @@ namespace Faolan.Tests
 
 			Assert.NotNull(options);
 			Assert.Equal(0, exitCode);
-			Assert.Equal(["login", "realm=2"], options.Roles);
+			Assert.True(options.RunLogin);
+			Assert.True(options.RunRealm);
+			Assert.Equal(2u, options.RealmId);
+		}
+
+
+		// ⭐ A bad role set is a COMMAND-LINE error, not a crash. Every one of these used to reach the process as an
+		// unhandled exception - a stack trace and a SIGABRT for a typo (#324) - because the parse lived in Program
+		// AFTER the command line had already accepted the string. Parse returning null with a non-zero exit is the
+		// same channel `--Mcp:Port banana` uses, which is the whole point: one way for a bad option to be wrong.
+		[Theory]
+		[InlineData("realm=1", "realm=2")] // the invariant: co-hosting realms would leak chat/session state
+		[InlineData("realm", "realm")]
+		[InlineData("realm=abc", null)] // an id that is not a number
+		[InlineData("wharf", null)] // not a role at all
+		public void ABadRoleSet_IsAParseErrorAndNotACrash(string first, string? second)
+		{
+			string[] args = second == null ? ["--role", first] : ["--role", first, "--role", second];
+
+			Assert.Null(ServerCommand.Parse(args, out var exitCode));
+			Assert.NotEqual(0, exitCode);
+		}
+
+		// The legal sets, so the validator cannot be tightened into refusing a deployment that has to work: the login
+		// tier alone, one realm alone, and the two co-hosted (which is a legal single process - the rule forbids two
+		// REALMS, not a realm beside the router tier).
+		[Theory]
+		[InlineData(new[] { "login" }, true, false, null)]
+		[InlineData(new[] { "realm" }, false, true, null)]
+		[InlineData(new[] { "realm=7" }, false, true, 7u)]
+		[InlineData(new[] { "login", "realm=7" }, true, true, 7u)]
+		public void TheLegalRoleSets_Parse(string[] roles, bool runLogin, bool runRealm, uint? realmId)
+		{
+			var args = roles.SelectMany(r => new[] { "--role", r }).ToArray();
+
+			var options = ServerCommand.Parse(args, out var exitCode);
+
+			Assert.NotNull(options);
+			Assert.Equal(0, exitCode);
+			Assert.Equal(runLogin, options.RunLogin);
+			Assert.Equal(runRealm, options.RunRealm);
+			Assert.Equal(realmId, options.RealmId);
 		}
 
 		// A flag that makes the process print something and exit returns null - the caller exits with `exitCode`. This
