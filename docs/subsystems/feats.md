@@ -512,6 +512,30 @@ So naming it needs the client rather than the data: hover a proc feat with GM Le
 feat's wire ids and the client's own text in the tooltip. **Nothing should fire a proc until it is named**: a
 proc on the wrong event is worse than a proc that does not exist, because it looks like it works.
 
+## An untrain takes back the spell the feat TAUGHT (#920)
+
+`GrantSpellsTaughtBy` hands a spell over when a feat that teaches one is trained (#847). The reverse now runs on
+the untrain-all: `ResetFeats` reads the held set **before** clearing it, and revokes what those feats taught —
+`RemoveCharacterSpell` plus a `DispatchForgetSpell` (0x200B) per spell, the primitive #915 built. Without it a
+tree-bought spell survived the untrain for ever, because world entry re-grants the whole `CharacterSpells` set.
+
+⚠️ **A spell the character's LEVEL also grants is kept.** Retail's untrain-all refunds spent points; it does not
+un-grant what levelling handed over, and the two paths can name the same spell. The guard asks
+`GetClassSpellsUnlockedBetween(class, 0, level)` — the very query the ding path teaches from, so it cannot drift
+from what the next ding would do.
+
+⛔ The blocker this was filed under — *"`ClearCharacterFeats` wipes every feat row including the AUTOMATIC ones,
+so revoking every feat-taught spell would strip the level-earned ones too"* — is answered twice over, which is
+why no untrain-path change was needed first:
+
+1. since #862 an auto-trained feat is **never written to `CharacterFeat` at all** (0 of the 56 rows in the
+   shipped database are autotrained), so "every feat row" and "every purchased feat" are already the same set;
+2. and `GetSpellsTaughtByFeats` excludes `Feat.AutomaticUnlockCategory` grants in its own `where` — **798 of the
+   1,548** grants are automatic, so a query that had forgotten the filter would be visibly wrong.
+
+The level check is therefore not that guard restated: it covers the *other* overlap, a tree feat teaching a spell
+the class ladder hands out anyway.
+
 ## Why a learned spell may still refuse to cast — the feat criterion
 
 ⚠️ **This is not a reason for the server to grant a feat** (#862). The criterion runs against the client's own

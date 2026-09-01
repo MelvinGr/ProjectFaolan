@@ -34,22 +34,31 @@ namespace Faolan.GameServer.Feats
 	{
 		private readonly Func<uint, uint, Vector3?, Task> _teleport;
 		private readonly ICharacterRepository _database;
+
+		// The CATALOG half, for one question: what the character's LEVEL grants, which is the guard on the untrain's
+		// spell revoke (#920). A second narrow interface rather than widening `_database` to `IDatabaseRepository` -
+		// the question genuinely belongs to the catalog, and the same instance answers both.
+		private readonly ICatalogRepository _catalog;
 		private readonly IChatServerDispatcher _chat;
 		private readonly ILogger _logger;
 
-		// Teaching a spell live (DispatchLearnSpell 0x200A) is the listener's op - the same one `ILevelUpOutbound`
-		// exposes for the ding. It arrives as a delegate rather than that port because this service needs exactly the
-		// one operation off it, which is the seam CLAUDE.md prescribes until a second op joins it.
+		// The two halves of the live SPELLBOOK - teach (DispatchLearnSpell 0x200A) and revoke (DispatchForgetSpell
+		// 0x200B) - are the listener's ops, the same pair `ILevelUpOutbound` exposes for the ding and `/magic forget`
+		// uses (#915). They arrive as delegates rather than a port because this service needs exactly these two, and
+		// they are one cluster: a feat that teaches a spell has to be able to take it back (#920).
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+		private readonly Func<INetworkClient, uint, Task> _forgetSpell;
 
-		public FeatService(ICharacterRepository database, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
-			Func<INetworkClient, uint, Task> learnSpell)
+		public FeatService(ICharacterRepository database, ICatalogRepository catalog, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
+			Func<INetworkClient, uint, Task> learnSpell, Func<INetworkClient, uint, Task> forgetSpell)
 		{
 			_database = database;
+			_catalog = catalog;
 			_logger = logger;
 			_chat = chat;
 			_teleport = teleport;
 			_learnSpell = learnSpell;
+			_forgetSpell = forgetSpell;
 		}
 
 		// .feat list | .feat train <id> [<id>...] | .feat reset  - the test bootstrap for the feat subsystem (the retail
@@ -214,10 +223,72 @@ namespace Faolan.GameServer.Feats
 		// (the "loading screen" the retail untrain triggers). Shared by the confirm-dialog answer and the .feat GM reset.
 		private async Task ResetFeats(INetworkClient client, Character character)
 		{
+			// Read the set BEFORE clearing it - it is what says which spells to take back (#920).
+			var held = await _database.GetCharacterFeats(character.Id);
 			var cleared = await _database.ClearCharacterFeats(character.Id);
 			_logger.LogInformation("Character {CharacterId} reset {Cleared} feat(s).", character.Id, cleared);
-			if (cleared > 0)
-				await _teleport(character.Id, character.MapId, character.Position);
+			if (cleared == 0)
+				return;
+
+			await RevokeSpellsTaughtBy(client, character, held);
+			await _teleport(character.Id, character.MapId, character.Position);
+		}
+
+		/// <summary>
+		///     Takes back the spells the untrained feats had TAUGHT (#920) - the mirror of
+		///     <see cref="GrantSpellsTaughtBy" />, which is what made this a one-way door: a spell a feat handed over
+		///     survived the untrain of that feat for ever, because world entry re-grants the whole
+		///     <c>CharacterSpells</c> set.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <b>A spell the character's LEVEL also grants is kept.</b> Retail's untrain-all refunds spent points;
+		///     it does not un-grant what levelling handed over, and the two paths overlap - the tree and the
+		///     level ladder can name the same spell. `GetClassSpellsUnlockedBetween(class, 0, level)` is what the ding
+		///     path itself teaches from, so asking it is asking the same question the next ding would answer, rather
+		///     than a second rule that could drift from it.
+		///     <para />
+		///     ⛔ The ticket's stated blocker - <i>"ClearCharacterFeats wipes every feat row including the AUTOMATIC
+		///     ones, so revoking every feat-taught spell would strip the character's level-earned spells too"</i> -
+		///     is answered TWICE over, which is why the revoke is safe off the cleared set:
+		///     <list type="number">
+		///         <item><description>since #862 an auto-trained feat is never written to <c>CharacterFeat</c> at all
+		///         (0 of the 56 rows in the shipped database are autotrained), so "every feat row" and "every
+		///         purchased feat" are already the same set;</description></item>
+		///         <item><description>and <c>GetSpellsTaughtByFeats</c> excludes
+		///         <c>Feat.AutomaticUnlockCategory</c> grants in its own <c>where</c>, so even a stored automatic feat
+		///         could not contribute a spell here.</description></item>
+		///     </list>
+		///     The level check above is therefore not that guard restated - it covers the OTHER overlap, a tree feat
+		///     teaching a spell the class's level ladder also hands out.
+		/// </remarks>
+		private async Task RevokeSpellsTaughtBy(INetworkClient client, Character character, IReadOnlyList<uint> featIds)
+		{
+			if (featIds.Count == 0)
+				return;
+
+			var taught = await _database.GetSpellsTaughtByFeats(featIds);
+			if (taught.Length == 0)
+				return;
+
+			var byLevel = (await _catalog.GetClassSpellsUnlockedBetween(character.Class, 0, character.Level)).ToHashSet();
+			foreach (var spellId in SpellsToRevoke(taught, byLevel))
+			{
+				if (!await _database.RemoveCharacterSpell(character.Id, spellId))
+					continue; // the character did not hold it (a feat can teach a spell it never actually handed over)
+
+				await _forgetSpell(client, spellId);
+				_logger.LogInformation("Character {CharacterId} lost spell {SpellId} with the feat that taught it.", character.Id, spellId);
+			}
+		}
+
+		/// <summary>
+		///     Which of the spells the untrained feats taught actually come back: everything the character's LEVEL
+		///     does not also grant. A pure function of the two sets, split from its caller so the rule is testable
+		///     without a world, a client or a database.
+		/// </summary>
+		internal static IEnumerable<uint> SpellsToRevoke(IReadOnlyList<uint> taughtByUntrainedFeats, IReadOnlySet<uint> grantedByLevel)
+		{
+			return taughtByUntrainedFeats.Where(spellId => !grantedByLevel.Contains(spellId));
 		}
 
 		// Trains `requested` onto the character iff the resulting feat set is legal: within the feat-point budget AND

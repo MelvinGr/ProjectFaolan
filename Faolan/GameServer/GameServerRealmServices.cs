@@ -190,8 +190,9 @@ namespace Faolan.GameServer
 			services.AddSingleton<TradeskillService>();
 			services.AddSingleton<ClaimService>();
 			// Two single-op seams: a feat's world reload is a teleport, and a feat that TEACHES grants a spell.
-			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<ILogger>(),
-				sp.GetRequiredService<IChatServerDispatcher>(), (id, map, pos) => sp.GetRequiredService<TeleportService>().DoTeleport(id, map, pos), GameServerListener.SendLearnSpell));
+			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<ILogger>(),
+				sp.GetRequiredService<IChatServerDispatcher>(), (id, map, pos) => sp.GetRequiredService<TeleportService>().DoTeleport(id, map, pos),
+				GameServerListener.SendLearnSpell, GameServerListener.SendForgetSpell));
 			services.AddSingleton<SkillPointService>();
 
 			// --- mounts + the environment -----------------------------------------------------------------------
