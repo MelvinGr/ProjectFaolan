@@ -133,6 +133,29 @@ playfields with territories and no spawn areas were a missing RECORD or a DROPPE
 So the coverage question is eight playfields wide, not forty-seven, and the 384 are a decode question about what
 the high id space means rather than an import gap. Open work tracked in Gitea #886.
 
+## How a CAPTURED spawn relates to an area (#363, closed)
+
+A capture-derived `NpcSpawn` is LINKED to an area — `NpcSpawn.NpcSpawnAreaId`, a nullable FK — when it is on the
+same map, resolves to the same template, and stands inside the area's padded bounds. 200 spawns across 12 maps
+link that way today. A linked spawn is then a member of that area's POOL: it renders with its captured
+appearance, the pool owns its respawn, and it counts toward `MaxCount` so the pool tops up only the deficit. That
+is what stops a captured NPC and an ambient one of the same creature standing in the same spot.
+
+⛔ **Two things it deliberately does NOT do**, so nobody re-derives them as gaps:
+
+* **It does not SNAP.** Nothing rewrites a captured position onto the RDB point. The captured coordinate is
+  burst truth; the RDB point is where retail's ambient spawner would have put *an* instance of that group. Moving
+  the one onto the other trades evidence for tidiness, and the pool behaviour above needs no such move.
+* **It does not copy a `(playfield, group, index)` id onto the spawn.** It does not need to: `(MapId,
+  GroupOrdinal)` is `NpcSpawnArea`'s own unique key, so the FK already *is* the stable id, reachable by one join
+  and unable to drift from it. A per-POINT id has no reader either — `AmbientPoolService.FreePoint` scores points
+  against where live members actually stand, and a linked captured spawn is one of those live members, so its
+  occupancy is already counted by position.
+
+⚠️ The link is a downstream STAMP: `--only npcs` delete+reinserts `NpcSpawns` and the FK comes back NULL with the
+row COUNTS unchanged, so a `--dry-run` delta shows nothing. After a spawn-harvest change run the full import, or
+`--only rdb-npc-spawns --mode overwrite`.
+
 ## Limits (why this doesn't fix every missing NPC)
 
 - **Empty for scripted/instanced playfields.** The Castle of King Conan (map 2040) and the Tortage interiors are
@@ -142,7 +165,7 @@ the high id space means rather than an import gap. Open work tracked in Gitea #8
   spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
   absent from every other resource. So the creature is inferred (`SpawnAreaResolver`: name / gated containment /
   guarded id-propagation / the group's declared race), which resolves **790 of the 3,970 areas**; the rest await
-  captures or a manual pass. See #363 and #518.
+  captures or a manual pass. See #518.
 
   ⭐ **And for the `Name` groups the TEMPLATE ID is in the client too** (#684) — one lookup away, not
   capture-bound. `LDB[51000]` (`npc_template.name`) is **keyed by the NPC template id**, so the creature name a
