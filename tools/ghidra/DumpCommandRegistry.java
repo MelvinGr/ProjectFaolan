@@ -1,5 +1,5 @@
 // The client's chat-command REGISTRY: one function constructs every command as a 16-byte record
-//     [0] <Command>::vftable   [4] u32   [8] u32 permission mask   [0xC] u8 mode
+//     [0] <Command>::vftable   [4] u32   [8] u32 permission mask   [0xC] u16 mode (a WORD - #923)
 // ⚠️ It was long read as TWELVE bytes; `PUSH 0x10` allocates it, and the trailing byte is a variant selector that
 // is the only thing separating verbs which share a class (0 = the target/server form, 1 = self/local). This script
 // does not emit it - DumpCommandArgs.java does, alongside the argument grammar.

@@ -127,9 +127,13 @@ are our own verbs, so their bit is a family CHOICE, commented as such in the tab
 ## The command catalog
 
 133 commands, all registered by one function (`FUN_0064e2d0`) as **16-byte** records — `[0] vftable, [4] 0,
-[8] requiredMask, [0xC] mode` — pushed into the interpreter's list. ⚠️ The record was long documented as 12
-bytes, which is what the allocation (`PUSH 0x10`) refutes: the trailing byte at `[0xC]` is a **variant selector**
-and is the only thing telling apart verbs that share a class (see [the argument grammar](#the-argument-grammar)). Recovered with
+[8] requiredMask, [0xC] u16 mode` — pushed into the interpreter's list. ⚠️ The record was long documented as 12
+bytes, which is what the allocation (`PUSH 0x10`) refutes: the **u16** at `[0xC]` is a **variant selector**
+and is the only thing telling apart verbs that share a class (see [the argument grammar](#the-argument-grammar)).
+⚠️ It is a **WORD, not a byte** (#923) — the registration writes `MOV word ptr [EAX + 0xc], …`, and reading it a
+byte wide truncates `/broadcast`'s `0x0100` to `0` and misses a word-write of `1` altogether. That failure is the
+dangerous kind: it does not error, it produces a plausible value, and the value it produces is exactly what a
+class with no selector legitimately has. Recovered with
 `tools/ghidra/DumpCommandRegistry.java`; re-run it to regenerate this table. The raw dump, with each command's
 implementing class and its registration address, is [`docs/re/gm-command-registry.tsv`](../re/gm-command-registry.tsv).
 
@@ -177,7 +181,12 @@ All 133 verbs come out with something usable:
 
 The trio was long recorded as "the one family the byte does not separate — all three are mode 0". They are
 separated; the DUMP was reading a byte where the registration writes a **16-bit** value, which truncated the
-discriminator away. The three registration sites write `word [obj+0xC]` distinctly:
+discriminator away. ✅ **`DumpCommandArgs` reads it as a word since #923**, so
+[`gm-command-args.tsv`](../re/gm-command-args.tsv) now carries `256 / 0 / 1` for the three and
+`GmCommandArgumentGrammarTests` gates the whole catalog with no family excused. The other four multi-verb
+classes were re-checked in the same regeneration and none moved, so `/sitecast` — whose `word`-write the byte
+filter had missed entirely, leaving it at the previous record's 0 — was the only other casualty. The three
+registration sites write `word [obj+0xC]` distinctly:
 
 | verb | mask `[8]` | word `[0xC]` | `[0xC]` | `[0xD]` |
 |---|---|---:|---:|---:|

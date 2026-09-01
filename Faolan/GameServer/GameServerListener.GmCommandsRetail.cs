@@ -737,7 +737,7 @@ namespace Faolan.GameServer
 
 		// /set and /setlocal: `statid | statname [+ | - | t | c | s]value`
 		//
-		// ⭐ The two are ONE class in the client, told apart by the registry record's mode byte (0 = /set, 1 =
+		// ⭐ The two are ONE class in the client, told apart by the registry record's mode WORD at [0xC] (0 = /set, 1 =
 		// /setlocal) - see docs/re/gm-command-args.tsv. So they are one implementation with a flag here too.
 		//
 		// ⭐⭐ `t`, `c` and `s` are BIT operations - toggle, clear and set a flag on the stat. That is worth noticing
@@ -825,7 +825,7 @@ namespace Faolan.GameServer
 		}
 
 		// /teleporttarget <posx> <posz> [y <posy>] [<playfield>]  - the same grammar as the rest of the family, on the
-		// TARGET instead of yourself. ⭐ It is the mode byte in the registry record that says so: /teleporttarget is
+		// TARGET instead of yourself. ⭐ It is the mode WORD in the registry record that says so: /teleporttarget is
 		// mode 0 while /teleport, /teleportself and /tp are all mode 1.
 		//
 		// Retail's own description says the family teleports "self or another DYNEL", so the target may be an NPC.

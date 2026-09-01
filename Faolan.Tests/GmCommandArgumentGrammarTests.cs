@@ -85,22 +85,22 @@ namespace Faolan.Tests
 				Assert.Equal(mode, cmd.Mode);
 			}
 
-			// Every verb sharing a class with another must be distinguishable from it.
+			// Every verb sharing a class with another must be distinguishable from it - with NO exceptions (#923).
 			//
-			// ⚠️ The broadcast trio is skipped because the DUMP cannot see its selector, not because the client lacks
-			// one (#919). The registration writes a 16-BIT value at [0xC] and `DumpCommandArgs` reads a byte, so
-			// /servcast 0x0000 and /broadcast 0x0100 both truncate to 0. The real values are 0x0000 / 0x0100 / 0x0001,
-			// and the class's own description getter names each scope: server / playfield / dimension. Regenerating
-			// the dump as a word would let this family join the rule; until then it is named rather than silently
-			// failing it.
-			var byClass = ArgTable().GroupBy(c => c.Class).Where(g => g.Count() > 1);
-			foreach (var family in byClass)
+			// ⚠️ The broadcast trio used to be skipped here, on the reading that the dump could not see its selector.
+			// That was true and the cause was a defect in the dump rather than in the client: the registration writes
+			// a 16-BIT value at [0xC] and `DumpCommandArgs` matched only `byte ptr`, so /broadcast's 0x0100 truncated
+			// to 0 and /sitecast's word-write was missed entirely, leaving it at the previous record's 0. Reading the
+			// selector as a word gives 0x0000 / 0x0100 / 0x0001 - three distinct values - and the family joins the
+			// rule like every other.
+			//
+			// ⭐ Keeping the skip OUT is the point. A truncating read merges verbs silently, and the merged value
+			// (0) is exactly what a class with no selector legitimately has - so the only thing that can catch the
+			// next one is this assertion with nothing excused from it.
+			foreach (var family in ArgTable().GroupBy(c => c.Class).Where(g => g.Count() > 1))
 			{
-				if (family.Key == "FanaticBroadcastCommand_c")
-					continue;
-
 				Assert.True(family.Select(c => c.Mode).Distinct().Count() > 1,
-					$"'{family.Key}' serves {family.Count()} verbs that the mode byte does not separate.");
+					$"'{family.Key}' serves {family.Count()} verbs that the mode word does not separate.");
 			}
 		}
 

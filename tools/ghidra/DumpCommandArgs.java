@@ -77,12 +77,19 @@ public class DumpCommandArgs extends GhidraScript {
 
             String dst = insn.getDefaultOperandRepresentation(0);
             Long imm = immediateOf(insn, 1);
-            // ⭐ The record is SIXTEEN bytes, not twelve: `PUSH 0x10` allocates it, and past the mask at [8] sits a
-            // MODE BYTE at [0xC]. That byte is what distinguishes verbs sharing one class - /set writes BL (0) and
-            // /setlocal writes 1, so 0 is the server form and 1 the local one. Without it a shared class looks like
-            // one command wearing several names.
-            if (dst.contains("byte ptr [EAX + 0xc]"))
-                mode = imm == null ? 0L : imm; // a register operand is BL, and EBX is zeroed throughout
+            // ⭐ The record is SIXTEEN bytes, not twelve: `PUSH 0x10` allocates it, and past the mask at [8] sits the
+            // MODE at [0xC]. It is what distinguishes verbs sharing one class - /set writes BL (0) and /setlocal
+            // writes 1, so 0 is the server form and 1 the local one. Without it a shared class looks like one
+            // command wearing several names.
+            //
+            // ⚠️ It is a WORD, not a byte (#923). The registration writes `MOV word ptr [EAX + 0xc], ...` and the
+            // broadcast trio uses the HIGH half to separate itself: /servcast 0x0000, /sitecast 0x0001,
+            // /broadcast 0x0100. Read as a byte, 0x0100 truncates to 0 and /broadcast becomes indistinguishable
+            // from /servcast - a plausible wrong value, and one that happens to equal what a class with no
+            // selector legitimately has, which is why it stood in the docs and in a test's skip list until #919
+            // read the registration sites. Match either width so a genuine byte write is still picked up.
+            if (dst.contains("[EAX + 0xc]") && (dst.startsWith("word ptr") || dst.startsWith("byte ptr")))
+                mode = imm == null ? 0L : imm; // a register operand is BX/BL, and EBX is zeroed throughout
             else if (dst.contains("[EAX + 0x4]"))
                 f4 = imm == null ? 0L : imm;
             else if (dst.contains("[EAX + 0x8]"))

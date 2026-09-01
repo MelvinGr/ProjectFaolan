@@ -385,7 +385,7 @@ namespace Faolan.GameServer
 				["resurrect"] = ResurrectCommand,
 				// Wave B3 - the stat family. ⚠️ `setstat` is GONE (#914 rule 1): it pushed a raw stat to the CLIENT
 				// without touching server state, which is precisely retail's `/setlocal`, not its `/set`. The two verbs
-				// are one class in the client, separated by the registry record's mode byte, so they are one method here.
+				// are one class in the client, separated by the registry record's mode WORD at [0xC] (#923), so they are one method here.
 				["get"] = GetStatCommand,
 				["set"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: false),
 				["setlocal"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: true),
