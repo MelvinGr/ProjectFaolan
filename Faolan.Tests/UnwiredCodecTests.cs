@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
 			["RequestGetEffectCodec"] = "all eight captured frames ask for effect 0, so what to ask FOR is unknown (#874)",
 			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363",
-			["UpdateTokenAmountCodec"] = "we model no token pool at all - the 29 pools the client names (TokenPool, RDB 1000520) are all unimplemented content, and the AA three are #150 (#870)"
+			["UpdateTokenAmountCodec"] = "we model no token pool at all - the 29 pools the client names (TokenPool, RDB 1000520) are all unimplemented content, and the AA three are #150, whose grant rule the corpus refutes rather than states (#870)"
 		};
 
 		// BattleKeepInfoCodec came OFF the list with #147: CSPlayerAgentListener now answers 0x2042

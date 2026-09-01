@@ -8,10 +8,15 @@ namespace Faolan.Core.Enums
 	// id byte takes 29 distinct values across the 29 entries, which is what identifies it as the id rather than one
 	// of the other fixed bytes (`docs/re/token-pool-ids.tsv`). The block is sparse: 1..17, 19, 30..36, 50, 60..62.
 	//
-	// Four are corroborated on the wire, and they read the way the names promise: a brand-new character is told
-	// `VeteranPoints` 0/0 at its first world entry, a Destiny quest completion credits
-	// `AltAdvancementGeneralToken`, and a login-reward claim credits `TeleportCoins` or `LotteryToken`.
-	// The other 25 are named by the client and unobserved.
+	// Four are seen on the wire, and they read the way the names promise: a brand-new character is told
+	// `VeteranPoints` 0/0 at its first world entry, a login-reward claim credits `TeleportCoins` or
+	// `LotteryToken`, and `AltAdvancementGeneralToken` runs 1 -> 2 for one character. The other 25 are named by
+	// the client and unobserved.
+	//
+	// ⛔ The AA one used to say "a Destiny quest completion credits it". Measured with a control that is wrong:
+	// the corpus holds 32 quest completions (26 of them Destiny steps, 13 on the two lines that DID pay) and
+	// exactly 2 paid, with no property of the quest, the line, the level-up or the daily counter separating
+	// them - see docs/re/alternate-advancement-perks.md. The grant rule is server-side and unrecovered (#150).
 	public enum TokenPool : byte
 	{
 		VeteranPoints = 1,

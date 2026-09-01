@@ -16,8 +16,12 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//
 	// The pool an id names comes from the client's own table, RDB 1000520 - see `TokenPool`. The send is
 	// event-driven, one frame per event: `VeteranPoints` 0/0 at a new character's first world entry,
-	// `AltAdvancementGeneralToken` running 1 -> 2 for one character over two Destiny quest completions, and
-	// `TeleportCoins` / `LotteryToken` on a login-reward claim. So `gained` is a lifetime TOTAL, not a delta.
+	// `TeleportCoins` / `LotteryToken` on a login-reward claim, and `AltAdvancementGeneralToken` running
+	// 1 -> 2 for one character. So `gained` is a lifetime TOTAL, not a delta.
+	//
+	// ⛔ The AA pair was recorded here as "over two Destiny quest completions", which read as a RULE and is
+	// refuted by its own control: 32 quest completions in the corpus, 26 of them Destiny steps, 2 paid. Nothing
+	// we hold separates the two - docs/re/alternate-advancement-perks.md, Gitea #150.
 	// The server never sends this today - we model no token pool - so the codec exists to write the decode down
 	// where the next caller looks.
 	public static class UpdateTokenAmountCodec

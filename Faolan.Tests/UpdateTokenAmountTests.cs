@@ -15,9 +15,11 @@ namespace Faolan.Tests
 		{
 			// five *-create captures, at first world entry, right after N3Teleport
 			{ "010000000000000000000000000000000000", TokenPool.VeteranPoints, 0 },
-			// xxx_mage-necromancer_login_play3 - completing Destiny quest 10915 "Nadini"
+			// xxx_mage-necromancer_login_play3 - in the turn-in burst of quest 10915 "Nadini"
 			{ "040000000000000001000000000000000000", TokenPool.AltAdvancementGeneralToken, 1 },
-			// xxx_mage-necromancer_login_play4 - same character, completing quest 10830 "Rescue Arias"
+			// xxx_mage-necromancer_login_play4 - same character, in the burst of quest 10830 "Rescue Arias".
+			// ⛔ "a Destiny quest completion credits this" is NOT the rule these two frames establish - 32
+			// completions in the corpus, 2 paid, and nothing separates them (docs/re/alternate-advancement-perks.md).
 			{ "040000000000000002000000000000000000", TokenPool.AltAdvancementGeneralToken, 2 },
 			// NecroL80_..._group-finder-dungeon - a login-reward claim (CoreClaimIIR "login counter 120"), like Hoxxling's
 			{ "200000000000000002000000000000000000", TokenPool.LotteryToken, 2 },

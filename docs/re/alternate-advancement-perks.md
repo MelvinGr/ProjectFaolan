@@ -181,6 +181,48 @@ The purchase side is likewise only unexercised, not undecoded: it arrives as an 
 (see above), and what it needs is for `TrainWithinBudget` to charge the perk's `FeatPerkCost` against the token
 pool instead of the class feat-point budget.
 
+## ⛔ "A Destiny quest completion credits a General token" is REFUTED
+
+`UpdateTokenAmountCodec`, `TokenPool` and `UpdateTokenAmountTests` all recorded the rule that way, from the two
+`AltAdvancementGeneralToken` frames the corpus carries (running 1 then 2 for one character). Read with a
+control, the corpus says the opposite: **almost every Destiny quest completion pays nothing.**
+
+Swept over all 138 dumps — every `QuestIIR` (0x97E02314) transition to state 4, every `NewLevelIIR`
+(0x6D314743), every `DispatchUpdateTokenAmount` (0x204D):
+
+| population | count | paid a General token |
+|---|---:|---:|
+| quest completions | **32**, over 21 distinct quests | **2** |
+| …of them Destiny-line steps (lines 241 / 386 / 1054) | 26 | 2 |
+| …on the two paying lines themselves (241, 386) | 13 | 2 |
+| level-ups | 12 (levels 2–8) | 2 |
+| completions that also dinged the character | 10 | 2 |
+
+The two payers are `10915` *Nadini* (line 241, the ding to 6) and `10830` *Rescue Arias* (line 386, the ding to
+7). Every candidate rule that would separate them from the other thirty was measured and misses:
+
+* **not the line** — 10238 / 12369 / 12373 / 10320 / 12371 / 10286 / 10287 are line 241's other steps and
+  10928 / 10831 are line 386's, all completed in the corpus, none paid;
+* **not completing a line** — 10915 is line 241's `LastQuestId`, but 10830 sits at sequence 2 of a 7-step line
+  whose last step is 10836;
+* **not the level-up** — seven completions of 13479 dinged a character to 2 and paid nothing, a completion of
+  10238 dinged to 5 and paid nothing, and Hoxxling's kill-ding to 8 paid nothing;
+* **not `DailyQuestsCompleted`** (stat 1000072) — it goes to 1 on completing 12407 in three separate captures
+  and on 14158 for Hakotep, all without a token, and the play4 payer pushes it not at all;
+* **not a quest property we hold** — the client's catalog (RDB 1000104) has no token field at all, and
+  `QuestRewardOption` carries item templates only;
+* **not a conversation script command** — the turn-in's Knubot text runs `{resolvegoal}` / `{spawn}` /
+  `{social}` / `{camera}` / `{turn}` and nothing else in the whole capture.
+
+The AA XP pool cannot be the source either: that character's `AAPvEXP` is a flat **15,000** (one item
+redemption) for the whole of both sessions, nowhere near the 1,000,000 `XPCap` a give-away needs, and no
+`AAPvEXP` push accompanies either token.
+
+⚠️ So the grant rule is **server-side and not recoverable from what we hold** — two positives with no
+discriminating feature against thirty controls. ⛔ Do not implement "a Destiny step pays a token": it would
+mint ~16x what retail did across the same play. What settles it is a capture of an endgame or mid-level
+character receiving one where the surrounding event is unambiguous.
+
 ## The rest of the surface, for whoever picks this up
 
 * Veteran currency is three named stats — `VeteranMonths`, `VeteranCurrency`, `VeteranCurrencySpent`.
