@@ -50,6 +50,11 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		public virtual Task SendQuestLogRemove(INetworkClient client, uint questLineId)
+		{
+			return Task.CompletedTask;
+		}
+
 		public virtual Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			return Task.CompletedTask;

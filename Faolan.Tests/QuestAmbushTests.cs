@@ -136,6 +136,8 @@ namespace Faolan.Tests
 			public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null) => Task.CompletedTask;
 			public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update) => Task.CompletedTask;
 			public Task SendQuestIir(INetworkClient client, uint questId, uint state) => Task.CompletedTask;
+			public Task SendQuestLogRemove(INetworkClient client, uint questLineId) => Task.CompletedTask;
+
 			public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds) => Task.CompletedTask;
 			public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options) => Task.CompletedTask;
 			public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index) => Task.CompletedTask;

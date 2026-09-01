@@ -333,6 +333,8 @@ namespace Faolan.Tests
 		{
 			public List<string> Calls { get; } = [];
 
+			public Task SendQuestLogRemove(INetworkClient client, uint questLineId) => Task.CompletedTask;
+
 			public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 			{
 				Calls.Add("log-list");

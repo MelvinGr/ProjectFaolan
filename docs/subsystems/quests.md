@@ -833,6 +833,36 @@ owe.
 `--report ldb-quest-text <questId>` prints every slot for a quest, which is how to settle "should there be text
 here" before treating a blank as a defect.
 
+## Dropping a quest sends THREE packets, and the third is not a second grammar (#482)
+
+Retail answers a `QuestIIR` (DeleteQuest) with the record echoed back byte for byte, and then a
+**`MainQuestUpdateIIR` (0x504B7924)** refreshing the J-panel. That third packet was read as *"a SHORTER variant we
+cannot build"* from its two captured instances — 41 bytes of body where the full list writes far more, with the
+word after the marker reading as a KIND discriminator (1 on every full list, 2 on both of these).
+
+⭐ **It is the ordinary record with `Operation = Remove` and nothing in it.** Two independent lines settle that:
+
+- **The client's reader has no branch on that word.** `FUN_00918560` reads three scalars (`operation`, `areaId`,
+  `trackedQuestId`), a `count`, that many `[ordinal][questId]` pairs, the title string and the trailers —
+  unconditionally. There is no second path for it to take, so there cannot be a second grammar. #545 had already
+  reached the same place from the other end when it identified the "leading constant 1" as the **operation** and
+  noted it is 2 on every captured empty list.
+- **There are six samples, not two.** `--report iir-bodies --report-arg MainQuestUpdate` groups every captured
+  body of an IIR type by shape; the Remove form appears **6 times across 5 captures**, byte-identical but for the
+  handle and the line id:
+
+  ```
+  504b7924 0000c350 <handle> 01 00000002 <lineId> + 24 zero bytes      (45 bytes)
+  ```
+
+  which is exactly what the codec writes for `Remove`: operation(4) + line(4) + tracked `0`(4) + count `0`(4) +
+  empty title string(2) + three zero trailers(12) + `leavingMissionArea`(2). Byte-exact in `QuestTests`.
+
+⚠️ **Sent only when the dropped quest was the LAST active one in its line.** All six captured Removes name a line
+whose section is going away — two are the deletes, the rest a zone change out of the area — so "the line still has
+quests" is a case the corpus does not cover. Guessing there risks hiding entries that should still show, which is
+worse than the stale panel it replaces; the journal is correct on the next login either way.
+
 ## ReachArea: the marker is a pin, the region is the trigger
 
 A `ReachArea` goal carries a map marker, and the marker is what the client draws — not what retail triggers on.

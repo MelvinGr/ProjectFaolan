@@ -774,6 +774,31 @@ namespace Faolan.Tests
 			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], parsedLog.Entries.Select(e => e.QuestId));
 			Assert.Equal(MainQuestUpdateOp.Add, parsedLog.Operation);
 
+			// ⭐ The J-panel REMOVE (#482), byte-exact against retail. Its body was read as "a SHORTER variant we
+			// cannot build" from two samples; `--report iir-bodies --report-arg MainQuestUpdate` finds SIX across five
+			// captures, byte-identical but for the handle and the line id, and they are this very record with
+			// `Operation = Remove` and nothing in it. The client's reader agrees - `FUN_00918560` has no branch on the
+			// operation word at all, so there is only ever one grammar.
+			//
+			// The two hexes below are the deletes of Hakotep_hox_login_gameplay_untrain-feats-..._delete-quests frames
+			// 3938 and 3976, verbatim.
+			var removeA = MainQuestUpdateCodec.Build(new MainQuestUpdateIIR(0x1101B4F5, MainQuestUpdateOp.Remove, 0x7C4, 0, [], ""));
+			var removeB = MainQuestUpdateCodec.Build(new MainQuestUpdateIIR(0x1101B4F5, MainQuestUpdateOp.Remove, 0x7FB, 0, [], ""));
+
+			Assert.Equal("504b79240000c3501101b4f50100000002000007c4000000000000000000000000000000000000000000000000",
+				Convert.ToHexString(removeA).ToLowerInvariant());
+			Assert.Equal("504b79240000c3501101b4f50100000002000007fb000000000000000000000000000000000000000000000000",
+				Convert.ToHexString(removeB).ToLowerInvariant());
+			Assert.Equal(45, removeA.Length);
+
+			// ...and it round-trips, so the empty list is a real parse rather than a length coincidence.
+			var parsedRemove = MainQuestUpdateCodec.Parse(removeA);
+			Assert.Equal(MainQuestUpdateOp.Remove, parsedRemove.Operation);
+			Assert.Equal(0x7C4u, parsedRemove.QuestLineId);
+			Assert.Empty(parsedRemove.Entries);
+			Assert.Equal(0u, parsedRemove.TrackedQuestId);
+			Assert.Equal(removeA, MainQuestUpdateCodec.Build(parsedRemove));
+
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (the conqueror's 13479
 			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)

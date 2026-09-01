@@ -48,6 +48,10 @@ namespace Faolan.GameServer.Quest
 		// SendQuestFullUpdate on a grant - the detail alone leaves the log empty.
 		Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds);
 
+		// #482: the J-panel REMOVE - the same record with `Operation = Remove` and an empty list, naming only the line
+		// whose section goes away. The third packet of a quest drop.
+		Task SendQuestLogRemove(INetworkClient client, uint questLineId);
+
 		// QuestGoal (0x0774C8C1): tell the client what just happened to `goalId` - met, partially advanced, or closed
 		// so the quest can move to its next goal. It carries no running count; the journal holds that (#525).
 		Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update);

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -449,15 +450,24 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
 
-					// ⚠️ Retail sends a THIRD packet in the same frame: a MainQuestUpdateIIR (0x504B7924) refreshing the
-					// J-panel. We do NOT, because its body is a SHORTER variant than BuildQuestLogList writes and the
-					// two captured instances are not enough to pin it. Both are 41 bytes:
-					//   [u32 c350][u32 handle][01][u32 2][u32 areaId][24 zero bytes]
-					// where the full list carries [01][u32 1][u32 areaId][u32 trackedQuestId][u32 count][entries]
-					// [areaTitle][u32 1][10 zeros]. The word after the marker is 1 on every captured full list and 2 on
-					// both of these, so it reads as a KIND rather than a constant - but the tail does not line up with
-					// the builder's, and a malformed list is the #408 failure mode. Tracked as Gitea #482. The journal
-					// is correct on the next login either way; what is missing is the live J-panel refresh.
+					// ⭐ Retail's THIRD packet in the same frame: a MainQuestUpdateIIR (0x504B7924) refreshing the
+					// J-panel (#482). It is NOT the "shorter variant we cannot build" it was read as from two samples -
+					// it is the ordinary record with `Operation = Remove` and an empty list, which
+					// `MainQuestUpdateCodec` already writes byte-for-byte (see `SendQuestLogRemove`).
+					//
+					// ⚠️ Sent only when the dropped quest was the LAST active one in its line. Every one of the six
+					// captured Removes names a line whose section is going away - two are these deletes, and the rest
+					// are a zone change out of the area - so "the line still has quests" is a case the corpus does not
+					// cover. Guessing there risks hiding entries that should still show, which is worse than the stale
+					// panel this replaces; the journal is correct on the next login either way.
+					var droppedDef = await Database.GetQuestDefinition(questId);
+					if (droppedDef != null)
+					{
+						var remaining = await Database.GetCharacterQuestsWithDefinitions(client.Session.Character.Id, QuestState.Active);
+						if (remaining.All(q => q.Definition.QuestLineId != droppedDef.QuestLineId))
+							await _questBroadcaster.SendQuestLogRemove(client, droppedDef.QuestLineId);
+					}
+
 					break;
 				}
 

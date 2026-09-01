@@ -55,6 +55,11 @@ namespace Faolan.GameServer.Quest
 			return _quests.SendQuestLogList(client, trackedDef, activeQuestIds);
 		}
 
+		public Task SendQuestLogRemove(INetworkClient client, uint questLineId)
+		{
+			return _quests.SendQuestLogRemove(client, questLineId);
+		}
+
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			return _quests.SendQuestGoal(client, questId, goalId, update);

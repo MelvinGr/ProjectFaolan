@@ -562,6 +562,12 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`iir-bodies` (`--report-arg <IirTypeNameSubstring>`: every captured body of one IIR type, grouped by a SHAPE
+signature - length plus the words where a discriminator sits - so a VARIANT stands out instead of drowning in
+near-identical rows, and a shape with few members prints all of them, since that is exactly what a grammar must not
+be guessed from. Its `method-bodies` sibling filters by RPC METHOD and cannot reach these: an IIR rides inside
+`PassBlob`, so its type is the sub-opcode at the front of the body. #482 is what it was written for - the
+"two samples of one variant" that blocked that ticket turned out to be six),
 `npc-debuff` (#907: when a MOB lands a spell on the PLAYER, does retail re-send the `MagicBuffIIR` per swing, and
 does it send the END twin? Answer: **applies once and closes it** - 87 distinct (player, mob, spell) pairings, a
 MEDIAN OF ONE apply each and never more than four, with the end twin arriving on 86 of the 87. So a per-swing

@@ -238,6 +238,29 @@ namespace Faolan.GameServer.Quest
 				s => s.WriteArrayUInt32Length(body)));
 		}
 
+		// ⭐ The J-panel REMOVE (#482): the same `MainQuestUpdateIIR` with `Operation = Remove`, naming only the line
+		// whose section is going away. Retail sends it as the third packet of a quest drop, and its body is not a
+		// "shorter variant we cannot build" - which is how #482 read it from two samples - but this very record with
+		// an empty list.
+		//
+		// `--report iir-bodies --report-arg MainQuestUpdate` finds SIX of them across five captures, and they are
+		// byte-identical but for the handle and the line id:
+		//
+		//   504b7924 0000c350 <handle> 01 00000002 <lineId> + 24 zero bytes      (45 bytes)
+		//
+		// Which is exactly what `MainQuestUpdateCodec` writes for `Remove` with no entries, no title and zero
+		// trailers: operation(4) + line(4) + tracked 0(4) + count 0(4) + empty string(2) + three trailers(12) +
+		// leaving(2). The client's own reader settles it too - `FUN_00918560` has NO branch on the operation word: it
+		// reads three scalars, a count, that many pairs, the title string and the trailers, unconditionally. So there
+		// was never a second grammar; #545 had already found the same thing from the other end when it identified the
+		// "leading constant 1" as the OPERATION and noted it is 2 on every captured empty list.
+		public Task SendQuestLogRemove(INetworkClient client, uint questLineId)
+		{
+			var body = MainQuestUpdateCodec.Build(new MainQuestUpdateIIR(client.Session.Character.Id, MainQuestUpdateOp.Remove, questLineId, 0, [], ""));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
+		}
+
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
 		// (same framing as the static create-editor marker burst).
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)

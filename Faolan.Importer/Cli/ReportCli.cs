@@ -535,6 +535,12 @@ namespace Faolan.Importer.Cli
 				}
 
 				// The body dump behind every "decode this message" ticket - the companion to method-census.
+				case "iir-bodies":
+				{
+					IirBodies(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "method-bodies":
 				{
 					MethodBodies(NamedCapture.LoadAll(capturesDir), arg);
