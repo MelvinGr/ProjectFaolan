@@ -36,6 +36,10 @@ namespace Faolan.Importer.Rdb
 
 		private const uint TemplateType = 1000020;
 
+		// The LDB category that names feats (`docs/rdb/ldb-string-index.md` measures it over every row: 50220 names
+		// 19,163 of the feats and none of the items).
+		private const uint FeatDisplayNameCategory = 50220;
+
 		// The client's own feat TABLE: FeatTable_t::LoadStaticData reads this resource and its entries carry the
 		// wire-id -> template-id pair (#467).
 		private const uint FeatTableId = 1;
@@ -64,6 +68,14 @@ namespace Faolan.Importer.Rdb
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
+
+			// #925: the template's inline name is an AUTHORING name; the client draws the feat from LDB category
+			// 50220, keyed by the same template id. They agree on most feats and diverge on 983 rows - see
+			// `--report feat-name-check`, which is the measurement this rule is derived from and the check on it.
+			var displayNames = new Dictionary<uint, string>();
+			foreach (var ((category, id), text) in LdbStringIndex.EnglishPlaintext(rdb))
+				if (category == FeatDisplayNameCategory)
+					displayNames[id] = text;
 
 			// Read the client's feat TABLE first: it gates the sweep below. A template the table POINTS AT is a feat by
 			// definition, which is a far better test than the Flags heuristic - Hakotep's Hellfire (3187268) carries
@@ -112,7 +124,10 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
+				// ⚠️ ParseName stays on the AUTHORING name: Tree/Group/BaseName/Rank are derived from its `:` and
+				// rank-suffix structure, which the displayed name does not always carry. Only `Name` is corrected.
 				var parsed = ParseName(name);
+				var displayed = PreferDisplayName(name, displayNames.GetValueOrDefault(e.Id));
 				var effects = ParseEffects(body);
 				featEffects[e.Id] = effects;
 				featSpellMods[e.Id] = ParseSpellModifiers(body);
@@ -125,7 +140,7 @@ namespace Faolan.Importer.Rdb
 				found.Add(new Feat
 				{
 					Id = e.Id,
-					Name = name,
+					Name = displayed,
 					Flags = Word(body, 44),
 					TemplateCategory = Word(body, 28),
 					Tree = parsed.Tree,
@@ -427,6 +442,59 @@ namespace Faolan.Importer.Rdb
 		//   "Light Blade Training 1"                       -> (null, null, Light Blade Training, 1)
 		// A name that fits none of it keeps BaseName = the whole name and Rank = 0, so nothing is lost to a parse that
 		// did not apply.
+		// #925: adopt the client's displayed name only where it is provably the SAME name, better spelled.
+		//
+		// ⛔ Deliberately NOT a blanket "prefer the LDB string". Measured over the 983 rows where the two differ,
+		// only 41 of the 814 distinct pairs are safe; the rest would make the data worse:
+		//   * 88 pairs - the LDB entry is TRUNCATED. Feat 780269 is `Spell - Dark Hand`; its other ranks are
+		//     `Spell - Dark Han`. Ours is the correct string there and adopting theirs would break it.
+		//   * 685 pairs - the two names are DISJOINT (`Basic Riding` vs `Advanced Riding`), cause unexplained.
+		//     Neither side is known to be right, so neither is imposed.
+		// So the rule is a containment test, not a preference: take theirs when ours is a strict STEM of it, or
+		// when the two differ only by the kind prefix. Both directions of that test are what makes it safe.
+		internal static string PreferDisplayName(string authoring, string? displayed)
+		{
+			if (string.IsNullOrEmpty(displayed) || displayed == authoring)
+				return authoring;
+
+			// The rank number rides on OUR name and not on the displayed one (`HP 20-40 1` vs `HP 20-40`); it is
+			// what ParseName reads Rank from, so it is stripped for the comparison and put back on the result.
+			var stem = StripRankSuffix(authoring, out var rankSuffix);
+			var ours = StripKindPrefix(stem);
+			var theirs = StripKindPrefix(displayed);
+
+			var sameName = string.Equals(ours, theirs, StringComparison.Ordinal)
+				|| (theirs.StartsWith(ours, StringComparison.Ordinal) && theirs.Length > ours.Length);
+
+			return sameName ? displayed + rankSuffix : authoring;
+		}
+
+		private static string StripKindPrefix(string name)
+		{
+			foreach (var kind in KindPrefixes)
+				if (name.StartsWith(kind, StringComparison.Ordinal))
+					return name[kind.Length..];
+
+			return name;
+		}
+
+		private static readonly string[] KindPrefixes = ["Spell - ", "Ability - ", "Combo - ", "Spell- "];
+
+		private static string StripRankSuffix(string name, out string suffix)
+		{
+			suffix = "";
+			var i = name.LastIndexOf(' ');
+			if (i <= 0 || i == name.Length - 1)
+				return name;
+
+			for (var k = i + 1; k < name.Length; k++)
+				if (!char.IsAsciiDigit(name[k]))
+					return name;
+
+			suffix = name[i..];
+			return name[..i];
+		}
+
 		public static Parsed ParseName(string name)
 		{
 			var parts = name.Split(':', StringSplitOptions.TrimEntries).Where(p => p.Length > 0).ToArray();

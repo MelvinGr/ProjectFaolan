@@ -74,15 +74,56 @@ namespace Faolan.Importer.Cli
 				.ToList();
 			Console.WriteLine($"  ...distinct (ours -> theirs)   {distinct.Count,7}");
 
-			foreach (var g in distinct.Take(40))
-				Console.WriteLine($"      {g.Count(),4} rank(s)  {g.Key.Ours,-42} -> {g.Key.Theirs}");
+			// ⭐ The 983 are not one phenomenon, and only ONE of the four is safe to adopt. Classified on the pair
+			// itself rather than by eye: strip the kind prefix both sides may carry (`Spell - `, `Ability - `,
+			// `Combo - `) and ask which string contains which.
+			var buckets = new Dictionary<string, List<(string Ours, string Theirs, int Ranks)>>();
+			foreach (var g in distinct)
+			{
+				var ours = StripRankSuffix(g.Key.Ours);
+				var (ourCore, theirCore) = (StripKind(ours), StripKind(g.Key.Theirs));
+				var bucket =
+					theirCore.StartsWith(ourCore, StringComparison.Ordinal) && theirCore.Length > ourCore.Length
+						? "ours is a STEM of theirs      - adopt theirs"
+						: ourCore.StartsWith(theirCore, StringComparison.Ordinal) && ourCore.Length > theirCore.Length
+							? "theirs is SHORTER than ours   - LDB truncated, keep ours"
+							: string.Equals(ourCore, theirCore, StringComparison.Ordinal)
+								? "same but for the kind prefix  - adopt theirs"
+								: "DISJOINT                      - unexplained, leave alone";
 
-			if (distinct.Count > 40)
-				Console.WriteLine($"      ... and {distinct.Count - 40} more");
+				if (!buckets.TryGetValue(bucket, out var list))
+					buckets[bucket] = list = [];
 
-			// A feat whose displayed name we do not reproduce is a defect in shipped data, in the one direction that
-			// cannot be explained by the corpus growing.
-			return differing.Count == 0 ? 0 : 1;
+				list.Add((g.Key.Ours, g.Key.Theirs, g.Count()));
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("  the distinct pairs, classified:");
+			foreach (var (bucket, list) in buckets.OrderByDescending(b => b.Value.Count))
+			{
+				Console.WriteLine($"    {list.Count,5} pair(s) / {list.Sum(x => x.Ranks),5} row(s)  {bucket}");
+				foreach (var x in list.Take(6))
+					Console.WriteLine($"          {x.Ours,-40} -> {x.Theirs}");
+
+				if (list.Count > 6)
+					Console.WriteLine($"          ... and {list.Count - 6} more");
+			}
+
+			// ⚠️ The exit code tracks the ADOPTABLE population, not the differing one. Most of what is left is not a
+			// defect: 88 pairs are an LDB entry that is truncated where ours is right, and 685 are disjoint with
+			// neither side established. Returning non-zero on those would make this permanently red and therefore
+			// ignorable. It goes red when a name we could safely correct is not corrected - i.e. when
+			// RdbFeatImporter.PreferDisplayName has not been run over the current RDB.
+			var adoptable = buckets
+				.Where(b => b.Key.EndsWith("adopt theirs", StringComparison.Ordinal))
+				.Sum(b => b.Value.Sum(x => x.Ranks));
+
+			Console.WriteLine();
+			Console.WriteLine(adoptable == 0
+				? "  nothing safely adoptable is unadopted - the shipped names are current."
+				: $"  {adoptable} row(s) could be safely corrected and are not - re-run `--only rdb-feats`.");
+
+			return adoptable == 0 ? 0 : 1;
 		}
 
 		// ⚠️ Our `Name` keeps the RANK NUMBER the authoring name ends with (`HP 20-40 1`..`13`); the displayed name
@@ -90,6 +131,17 @@ namespace Faolan.Importer.Cli
 		// template id, `ParseName` derives the `Rank` column from exactly that suffix, and adopting the displayed
 		// string verbatim would give all thirteen ranks one name. So the suffix is normalised away before comparing,
 		// and only what still differs is the #925 defect.
+		// The client's own kind prefixes. They are part of the displayed name, but they are not what distinguishes
+		// one feat from another, so a comparison that keeps them calls `Dark Hand` and `Spell - Dark Hand` disjoint.
+		private static string StripKind(string name)
+		{
+			foreach (var kind in (string[])["Spell - ", "Ability - ", "Combo - ", "Spell- ", "Equip: "])
+				if (name.StartsWith(kind, StringComparison.Ordinal))
+					return name[kind.Length..];
+
+			return name;
+		}
+
 		private static string StripRankSuffix(string name)
 		{
 			var i = name.LastIndexOf(' ');
