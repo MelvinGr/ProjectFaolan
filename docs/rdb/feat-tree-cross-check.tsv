@@ -1,0 +1,711 @@
+wire_feat_id	base_index	template_id	planner_name	our_name	name	planner_tree	planner_max_rank	planner_level	our_level	planner_col1	our_tree_column	planner_tier1	our_tier	planner_points	our_points	structure
+190200	1902	3185356	Spiritual Vigor	Spiritual Vigor	same	divinity_1	5	10	10	1	1	1	1	0	0	match
+190000	1900	3185336	Spell - Lance of Mitra	Spell - Lance of Mitra	same	divinity_1	5	15	15	2	2	2	2	5	5	match
+190300	1903	3185361	Holy Accession	Holy Accession	same	divinity_1	5	15	15	5	5	2	2	5	5	match
+190100	1901	3185341	Divine Lance	Divine Lance	same	divinity_1	5	20	20	2	2	3	3	10	10	match
+191500	1915	3185522	Spell - Clarity of Mind	Spell - Clarity of Mind	same	divinity_1	1	20	20	4	4	3	3	10	10	match
+190400	1904	3185382	Spiritual Feedback	Spiritual Feedback	same	divinity_1	5	20	20	5	5	3	3	10	10	match
+190500	1905	3185393	Divine Intervention	Divine Intervention	same	divinity_1	3	25	25	2	2	4	4	15	15	match
+190700	1907	3185409	Wrath of Mitra	Wrath of Mitra	same	divinity_1	5	25	25	5	5	4	4	15	15	match
+190600	1906	3185398	Blistering Radiance	Blistering Radiance	same	divinity_1	2	30	30	1	1	5	5	20	20	match
+190900	1909	3185453	Spell - Light of Mitra	Spell - Light of Mitra	same	divinity_1	1	30	30	2	2	5	5	20	20	match
+191800	1918	3185550	Improved Rejuvenation	Improved Rejuvenation	same	divinity_1	2	30	30	3	3	5	5	20	20	match
+191600	1916	3185529	Force of Will	Force of Will	same	divinity_1	3	30	30	4	4	5	5	20	20	match
+190800	1908	3185428	Spell - Condemnation	Spell - Condemnation	same	divinity_1	1	30	30	5	5	5	5	20	20	match
+191400	1914	3185520	Empowered Repulse	Empowered Repulse	same	divinity_1	2	40	40	1	1	6	6	25	25	match
+191700	1917	3185538	Blessed Armor of Faith	Blessed Armor of Faith	same	divinity_1	5	40	40	2	2	6	6	25	25	match
+191200	1912	3185515	Vengeful Blessing	Vengeful Blessing	same	divinity_1	2	40	40	4	4	6	6	25	25	match
+191000	1910	3185485	Spell - Blessing of Mitra	Spell - Blessing of Mitra	same	divinity_1	1	40	40	5	5	6	6	25	25	match
+191900	1919	3185557	Divine Halo	Divine Halo	same	divinity_1	5	50	50	2	2	7	7	30	30	match
+191100	1911	3185504	Holy Conviction	Holy Conviction	same	divinity_1	5	50	50	5	5	7	7	30	30	match
+192400	1924	3185667	Spell - Exorcism	Spell - Exorcism	same	divinity_1	1	50	50	6	6	7	7	30	30	match
+192100	1921	3185586	Divine Salvation	Divine Salvation	same	divinity_1	5	60	60	2	2	8	8	35	35	match
+192200	1922	3185605	Holy Surge	Holy Surge	same	divinity_1	5	60	60	5	5	8	8	35	35	match
+192500	1925	3185673	Spiritual Warding	Spiritual Warding	same	divinity_1	3	60	60	6	6	8	8	35	35	match
+192000	1920	3185575	Spell - Holy Cleansing	Spell - Holy Cleansing	same	divinity_1	1	70	70	2	2	9	9	40	40	match
+192300	1923	3185666	Spell - Avatar of Mitra	Spell - Avatar of Mitra	same	divinity_1	1	70	70	5	5	9	9	40	40	match
+192600	1926	3185684	Improved Smite	Improved Smite	same	vengeance_1	5	10	10	1	1	1	1	0	0	match
+192700	1927	3185702	Holy Vengeance	Holy Vengeance	same	vengeance_1	5	15	15	2	2	2	2	5	5	match
+193000	1930	3185744	Spell - Cleansing Fire	Spell - Cleansing Fire	same	vengeance_1	5	15	15	5	5	2	2	5	5	match
+192900	1929	3185724	Crucify	Crucify	same	vengeance_1	2	20	20	1	1	3	3	10	10	match
+193500	1935	3185841	Prolific Strikes	Prolific Strikes	same	vengeance_1	3	20	20	2	2	3	3	10	10	match
+193100	1931	3185751	Sacred Fire	Sacred Fire	same	vengeance_1	3	20	20	5	5	3	3	10	10	match
+193200	1932	3185772	Glowing Radiance	Glowing Radiance	same	vengeance_1	3	25	25	2	2	4	4	15	15	match
+193300	1933	3185794	Inspiring Light	Inspiring Light	same	vengeance_1	2	25	25	3	3	4	4	15	15	match
+194800	1948	3248577	Eye of Penance	Eye of Penance	same	vengeance_1	3	25	25	4	4	4	4	15	15	match
+194000	1940	3186020	Spell - Mitra's Searing Eye	Spell - Mitra	differs	vengeance_1	1	25	25	5	5	4	4	15	15	match
+193600	1936	3185866	Revivication	Revivication	same	vengeance_1	3	25	25	6	6	4	4	15	15	match
+193400	1934	3185817	Searing Light	Searing Light	same	vengeance_1	1	30	30	1	1	5	5	20	20	match
+193800	1938	3185920	Spell - Purification of Mitra	Spell - Purification of Mitra	same	vengeance_1	1	30	30	2	2	5	5	20	20	match
+193900	1939	3186001	Improved Purification	Improved Purification	same	vengeance_1	3	30	30	3	3	5	5	20	20	match
+194500	1945	3186114	Sacred Smite	Sacred Smite	same	vengeance_1	1	30	30	5	5	5	5	20	20	match
+194200	1942	3186044	Empowered Hand of Mitra	Empowered Hand of Mitra	same	vengeance_1	2	40	40	1	1	6	6	25	25	match
+194100	1941	3186023	Guiding Hand of Mitra	Guiding Hand of Mitra	same	vengeance_1	3	40	40	2	2	6	6	25	25	match
+194900	1949	3248580	Relentless Faith	Relentless Faith	same	vengeance_1	2	40	40	4	4	6	6	25	25	match
+195100	1951	3248611	Revelation	Revelation	same	vengeance_1	5	40	40	5	5	6	6	25	25	match
+193700	1937	3185887	The Light Within	The Light Within	same	vengeance_1	1	40	40	6	6	6	6	25	25	match
+194300	1943	3186058	Spell - Guardian Spirit	Spell - Guardian Spirit	same	vengeance_1	5	50	50	2	2	7	7	30	30	match
+195200	1952	3248631	Undying Belief	Undying Belief	same	vengeance_1	3	50	50	4	4	7	7	30	30	match
+195000	1950	3248591	Ruthless Glare	Ruthless Glare	same	vengeance_1	5	50	50	5	5	7	7	30	30	match
+194400	1944	3186092	Vengeful Devotion	Vengeful Devotion	same	vengeance_1	5	60	60	2	2	8	8	35	35	match
+192800	1928	3185710	Unyielding Wrath	Unyielding Wrath	same	vengeance_1	5	60	60	5	5	8	8	35	35	match
+194600	1946	3186130	Spell - Manifestation of Mitra	Spell - Manifestation of Mitra	same	vengeance_1	1	70	70	2	2	9	9	40	40	match
+194700	1947	3186134	Spell - Immortal Wrath	Spell - Immortal Wrath	same	vengeance_1	1	70	70	5	5	9	9	40	40	match
+80000	800	1173623	Decomposition	Decomposition	same	reanimation_1	5	10	10	1	1	1	1	0	0	match
+80100	801	1173630	Unholy Power	Unholy Power	same	reanimation_1	5	15	15	2	2	2	2	5	5	match
+80200	802	1173635	Silence of the Dead	Silence of the Dead	same	reanimation_1	1	15	15	3	3	2	2	5	5	match
+81600	816	1173667	Infestation	Infestation	same	reanimation_1	5	15	15	5	5	2	2	5	5	match
+80300	803	1173636	Grim Corruptor	Grim Corruptor	same	reanimation_1	3	20	20	2	2	3	3	10	10	match
+81900	819	1173680	Deathly Resilience	Deathly Resilience	same	reanimation_1	3	20	20	4	4	3	3	10	10	match
+81800	818	1173675	Unholy Fortitude	Unholy Fortitude	same	reanimation_1	5	20	20	5	5	3	3	10	10	match
+85500	855	3594281	Spell - Netherworld Deception	Spell - Netherworld Deception	same	reanimation_1	1	20	20	6	6	3	3	10	10	match
+80500	805	1173641	Dread Blight	Dread Blight	same	reanimation_1	2	25	25	1	1	4	4	15	15	match
+80400	804	1173639	Ruined Blight	Ruined Blight	same	reanimation_1	2	25	25	2	2	4	4	15	15	match
+85100	851	1173771	Improved Parasitic Souls	Improved Parasitic Souls	same	reanimation_1	2	25	25	3	3	4	4	15	15	match
+81700	817	1173672	Grim Hunger	Grim Hunger	same	reanimation_1	3	25	25	5	5	4	4	15	15	match
+85300	853	3594279	Spell - Void	Spell - Void	same	reanimation_1	1	25	25	6	6	4	4	15	15	match
+80600	806	1173644	Spell - One with Death	Spell - One with Death	same	reanimation_1	1	30	30	2	2	5	5	20	20	match
+82000	820	1173684	Unnatural Dexterity	Unnatural Dexterity	same	reanimation_1	3	30	30	4	4	5	5	20	20	match
+82100	821	1173687	Spell - Unholy Hands	Spell - Unholy Hands	same	reanimation_1	1	30	30	5	5	5	5	20	20	match
+81400	814	1173663	Bone Horde	Bone Horde	same	reanimation_1	5	40	40	1	1	6	6	25	25	match
+80800	808	1173650	Necrotic Pustule	Necrotic Pustule	same	reanimation_1	1	40	40	2	2	6	6	25	25	match
+80900	809	1173651	Bursting Bomb	Bursting Bomb	same	reanimation_1	3	40	40	3	3	6	6	25	25	match
+82200	822	1173689	Spell - No Rest for the Dead	Spell - No Rest for the Dead	same	reanimation_1	3	40	40	5	5	6	6	25	25	match
+81100	811	1173656	Life Leeches	Life Leeches	same	reanimation_1	2	50	50	1	1	7	7	30	30	match
+86100	861	3594274	Spell - Curse of Pain	Spell - Curse of Pain	same	reanimation_1	5	50	50	2	2	7	7	30	30	match
+81000	810	1173654	Night of the Harvester	Night of the Harvester	same	reanimation_1	2	50	50	3	3	7	7	30	30	match
+82300	823	1173690	Cabal	Cabal	same	reanimation_1	5	50	50	5	5	7	7	30	30	match
+85400	854	3594280	Spell - Ancient Soul	Spell - Ancient Soul	same	reanimation_1	1	50	50	6	6	7	7	30	30	match
+81300	813	1173661	Gluttonous Reaper	Gluttonous Reaper	same	reanimation_1	2	60	60	1	1	8	8	35	35	match
+81200	812	1173660	Spell - Walk with Death	Spell - Walk with Death	same	reanimation_1	5	60	60	2	2	8	8	35	35	match
+82500	825	1173696	Master of the Dead	Master of the Dead	same	reanimation_1	1	60	60	4	4	8	8	35	35	match
+80700	807	1173645	Empower Archmagus	Empower Archmagus	same	reanimation_1	5	60	60	5	5	8	8	35	35	match
+82600	826	1173697	Spell - Undead Champion: Slaughter Wraith	Spell - Undead Champion: Slaughter Wraith	same	reanimation_1	1	70	70	2	2	9	9	40	40	match
+81500	815	1173666	Spell - General of the Dead	Spell - General of the Dead	same	reanimation_1	1	70	70	5	5	9	9	40	40	match
+82700	827	1173698	Brutal Death	Brutal Death	same	nightfall_1	5	10	10	1	1	1	1	0	0	match
+84000	840	1173733	Frozen Body	Frozen Body	same	nightfall_1	5	15	15	2	2	2	2	5	5	match
+84100	841	1173738	Corrupted Soul	Corrupted Soul	same	nightfall_1	5	15	15	5	5	2	2	5	5	match
+83100	831	1173714	Flash Freeze	Flash Freeze	same	nightfall_1	3	20	20	1	1	3	3	10	10	match
+82800	828	1173703	Ice Shards	Ice Shards	same	nightfall_1	2	20	20	2	2	3	3	10	10	match
+83300	833	1173718	Spell - Despoil the Soul	Spell - Despoil the Soul	same	nightfall_1	1	20	20	5	5	3	3	10	10	match
+84300	843	1173750	Spell - Flesh of the Wight	Spell - Flesh of the Wight	same	nightfall_1	1	20	20	6	6	3	3	10	10	match
+85600	856	3594282	Spell - Sacrifice	Spell - Sacrifice	same	nightfall_1	1	25	25	2	2	4	4	15	15	match
+82900	829	1173705	Piercing Corruption	Piercing Corruption	same	nightfall_1	5	25	25	3	3	4	4	15	15	match
+83400	834	1173720	Spell - Cannibalism	Spell - Cannibalism	same	nightfall_1	2	25	25	4	4	4	4	15	15	match
+85700	857	3594262	Spell - Mark of the Devourer	Spell - Mark of the Devourer	same	nightfall_1	5	25	25	5	5	4	4	15	15	match
+84500	845	1173753	Spell - Death Eater	Spell - Death Eater	same	nightfall_1	1	30	30	1	1	5	5	20	20	match
+85800	858	3595568	Spell - Soul Frost	Spell - Soul Frost	same	nightfall_1	1	30	30	2	2	5	5	20	20	match
+83200	832	1173717	Spell - Decay	Spell - Decay	same	nightfall_1	1	30	30	5	5	5	5	20	20	match
+84800	848	1173759	Blasphemed Flesh	Blasphemed Flesh	same	nightfall_1	2	30	30	6	6	5	5	20	20	match
+84900	849	1173762	Frost Reach	Frost Reach	same	nightfall_1	3	40	40	2	2	6	6	25	25	match
+83000	830	1173712	Withered Soul	Withered Soul	same	nightfall_1	2	40	40	3	3	6	6	25	25	match
+85900	859	3595569	Ravenous Souls	Ravenous Souls	same	nightfall_1	2	40	40	4	4	6	6	25	25	match
+84200	842	1173747	Unholy Inspiration	Unholy Inspiration	same	nightfall_1	3	40	40	5	5	6	6	25	25	match
+83600	836	1173726	Touch of Winter	Touch of Winter	same	nightfall_1	1	50	50	1	1	7	7	30	30	match
+83500	835	1173722	Bones of Frost	Bones of Frost	same	nightfall_1	5	50	50	2	2	7	7	30	30	match
+86400	864	4063946	Worm Swarm	Worm Swarm	same	nightfall_1	3	50	50	3	3	7	7	30	30	match
+84400	844	1173751	Spell - Soul Absorption	Spell - Soul Absorption	same	nightfall_1	2	50	50	4	4	7	7	30	30	match
+86000	860	3594269	Embrace Death	Embrace Death	same	nightfall_1	5	50	50	5	5	7	7	30	30	match
+84700	847	1173757	Spell - Grip of Death	Spell - Grip of Death	same	nightfall_1	5	60	60	2	2	8	8	35	35	match
+86300	863	4063945	Spell - Plague Swarm	Spell - Plague Swarm	same	nightfall_1	1	60	60	3	3	8	8	35	35	match
+84600	846	1173754	The Devourer	The Devourer	same	nightfall_1	3	60	60	4	4	8	8	35	35	match
+83700	837	1173728	Spell - Plagued Heart Curse	Spell - Plagued Heart Curse	same	nightfall_1	5	60	60	5	5	8	8	35	35	match
+83800	838	1173729	Wretched Heart Curse	Wretched Heart Curse	same	nightfall_1	3	60	60	6	6	8	8	35	35	match
+83900	839	1173732	Spell - Shatter	Spell - Shatter	same	nightfall_1	1	70	70	2	2	9	9	40	40	match
+85000	850	1173773	Spell - Ritual of the Lich	Spell - Ritual of the Lich	same	nightfall_1	1	70	70	5	5	9	9	40	40	match
+102400	1024	1107741	Spell - Circle of Magic	Spell - Circle of Magic	same	havoc_1	5	10	10	1	1	1	1	0	0	match
+102500	1025	1107732	Discharge Shockstrike	Discharge Shockstrike	same	havoc_1	5	15	15	2	2	2	2	5	5	match
+103600	1036	1107777	Natural Conductor	Natural Conductor	same	havoc_1	5	15	15	5	5	2	2	5	5	match
+102600	1026	1107749	Overload	Overload	same	havoc_1	5	20	20	1	1	3	3	10	10	match
+102700	1027	1107751	Demonic Power	Demonic Power	same	havoc_1	2	20	20	3	3	3	3	10	10	match
+103700	1037	1107782	Rapid Recharge	Rapid Recharge	same	havoc_1	5	20	20	5	5	3	3	10	10	match
+102800	1028	1107753	Earth Recharge	Earth Recharge	same	havoc_1	5	25	25	2	2	4	4	15	15	match
+103800	1038	1107787	Bombardment	Bombardment	same	havoc_1	5	25	25	5	5	4	4	15	15	match
+105500	1055	3771932	Soul Resonance	Soul Resonance	same	havoc_1	1	30	30	2	2	5	5	20	20	match
+102900	1029	1107758	Spell - Agonizing Jolts	Spell - Agonizing Jolts	same	havoc_1	1	30	30	3	3	5	5	20	20	match
+103900	1039	1107790	Spell - Living Thunderstorm	Spell - Living Thunderstorm	same	havoc_1	1	30	30	5	5	5	5	20	20	match
+103100	1031	1107762	Charged Storm Chains	Charged Storm Chains	same	havoc_1	1	40	40	1	1	6	6	25	25	match
+103000	1030	1107759	Copper Strom Chains	Copper Storm Chains	differs	havoc_1	3	40	40	2	2	6	6	25	25	match
+104000	1040	1107791	Chained Shockstrike	Chained Shockstrike	same	havoc_1	3	40	40	5	5	6	6	25	25	match
+104300	1043	1107800	Fury of the Underworld	Fury of the Underworld	same	havoc_1	5	40	40	6	6	6	6	25	25	match
+103200	1032	1107763	Overloaded Shockblast	Overloaded Shockblast	same	havoc_1	3	50	50	1	1	7	7	30	30	match
+105000	1050	3770889	Spell - Shock Lance	Spell - Shock Lance	same	havoc_1	5	50	50	2	2	7	7	30	30	match
+103300	1033	1107746	Demon Heart of Chatha	Demon Heart of Chatha	same	havoc_1	3	50	50	3	3	7	7	30	30	match
+103400	1034	1107771	Hell's Embrace	Hell’s Embrace	differs	havoc_1	2	50	50	4	4	7	7	30	30	match
+104200	1042	1107795	Spell - Wicked Bolt	Spell - Wicked Bolt	same	havoc_1	5	50	50	5	5	7	7	30	30	match
+104900	1049	3770884	Pact of Dread	Pact of Dread	same	havoc_1	5	60	60	2	2	8	8	35	35	match
+104100	1041	1107794	Spell - Possession	Spell - Possession	same	havoc_1	2	60	60	3	3	8	8	35	35	match
+104400	1044	1107802	Spell - Thunderclap	Spell - Thunderclap	same	havoc_1	5	60	60	5	5	8	8	35	35	match
+103500	1035	1107776	Pact of Earthwalking	Spell - Pact of Earth Walking	differs	havoc_1	1	70	70	2	2	9	9	40	40	match
+105600	1056	3771933	Spell - Lore of Skelos	Spell - Lore of Skelos	same	havoc_1	1	70	70	5	5	9	9	40	40	match
+100000	1000	1107678	Deeper Fires	Deeper Fires	same	conflagration_1	5	10	10	1	1	1	1	0	0	match
+100100	1001	1107683	Pyromancer	Pyromancer	same	conflagration_1	5	15	15	2	2	2	2	5	5	match
+101300	1013	1107712	Fluidic Fires	Fluidic Fires	same	conflagration_1	5	15	15	5	5	2	2	5	5	match
+100300	1003	1107691	Lingering Flames	Lingering Flames	same	conflagration_1	5	20	20	2	2	3	3	10	10	match
+105700	1057	3888883	Scorch	Scorch	same	conflagration_1	1	20	20	3	3	3	3	10	10	match
+105100	1051	3770897	Blazing Fire	Blazing Fire	same	conflagration_1	3	20	20	4	4	3	3	10	10	match
+101500	1015	1107725	Amassed Flames	Amassed Flames	same	conflagration_1	2	20	20	5	5	3	3	10	10	match
+100400	1004	1107773	Spell - Consume Flames	Spell - Consume Flames	same	conflagration_1	3	25	25	1	1	4	4	15	15	match
+100200	1002	1107688	Field of Fires	Field of Fires	same	conflagration_1	3	25	25	2	2	4	4	15	15	match
+101000	1010	1107708	Devouring Flames	Devouring Flames	same	conflagration_1	1	25	25	3	3	4	4	15	15	match
+101600	1016	1107727	Spell - Demonic War	Spell - Demonic War	same	conflagration_1	2	25	25	5	5	4	4	15	15	match
+101700	1017	1107729	Spell - Unholy Hate	Spell - Unholy Hate	same	conflagration_1	1	25	25	6	6	4	4	15	15	match
+100500	1005	1107697	Spell - Living Firestorm	Spell - Living Firestorm	same	conflagration_1	1	30	30	2	2	5	5	20	20	match
+101400	1014	1107722	Backdraft	Backdraft	same	conflagration_1	3	30	30	4	4	5	5	20	20	match
+101800	1018	1107730	Spell - Detonation	Spell - Detonation	same	conflagration_1	1	30	30	5	5	5	5	20	20	match
+104800	1048	3770873	Improved Waves of Flame	Improved Waves of Flame	same	conflagration_1	5	40	40	2	2	6	6	25	25	match
+105400	1054	3771930	Hellwave	Hellwave	same	conflagration_1	1	40	40	3	3	6	6	25	25	match
+105300	1053	3770906	Combustion	Combustion	same	conflagration_1	2	40	40	5	5	6	6	25	25	match
+102100	1021	1107737	Black Ashes	Black Ashes	same	conflagration_1	2	40	40	6	6	6	6	25	25	match
+102200	1022	1107739	Hell's Pavise	Hell’s Pavise	differs	conflagration_1	5	50	50	1	1	7	7	30	30	match
+104700	1047	3770868	Blessing of Amher	Blessing of Amher	same	conflagration_1	5	50	50	2	2	7	7	30	30	match
+100600	1006	1107698	Spell - Greater Flames	Spell - Greater Flames	same	conflagration_1	1	50	50	3	3	7	7	30	30	match
+102000	1020	1107717	Spell - Flame Body	Spell - Flame Body	same	conflagration_1	5	50	50	5	5	7	7	30	30	match
+105200	1052	3770901	Agonizing Fiery Torment	Agonizing Fiery Torment	same	conflagration_1	3	50	50	6	6	7	7	30	30	match
+101100	1011	1107709	Hell's Blood	Hell’s Blood	differs	conflagration_1	2	60	60	1	1	8	8	35	35	match
+101900	1019	1107731	Spell - Gate of Hell	Spell - Gate of Hell	same	conflagration_1	5	60	60	2	2	8	8	35	35	match
+100900	1009	1107706	Phase Out	Phase Out	same	conflagration_1	2	60	60	4	4	8	8	35	35	match
+100700	1007	1107699	Set's Chosen	Set’s Chosen	differs	conflagration_1	5	60	60	5	5	8	8	35	35	match
+100800	1008	1107704	Empowered Pacts	Empowered Pacts	same	conflagration_1	2	60	60	6	6	8	8	35	35	match
+101200	1012	1107711	Spell - Impish Horde	Spell - Impish Horde	same	conflagration_1	1	70	70	2	2	9	9	40	40	match
+102300	1023	1107696	Spell - Let Them Burn	Spell - Let Them Burn	same	conflagration_1	1	70	70	5	5	9	9	40	40	match
+160100	1601	3074203	Lotus Blades	Lotus Blades	same	lotus_1	5	10	10	1	1	1	1	0	0	match
+162500	1625	3074330	Swift Ending	Swift Ending	same	lotus_1	5	15	15	2	2	2	2	5	5	match
+162100	1621	3074315	Flurry of Blows	Flurry of Blows	same	lotus_1	5	15	15	5	5	2	2	5	5	match
+161900	1619	3074304	Ability - Cat's Paw	Ability - Cat	differs	lotus_1	5	20	20	2	2	3	3	10	10	match
+162300	1623	3074322	Ability - Miasma: Lotus-Coated Dart	Ability - Miasma: Lotus-Coated Dart	same	lotus_1	1	20	20	4	4	3	3	10	10	match
+160800	1608	3074267	Deft Blades	Deft Blades	same	lotus_1	5	20	20	5	5	3	3	10	10	match
+161000	1610	3074277	Necrosis	Necrosis	same	lotus_1	3	25	25	2	2	4	4	15	15	match
+160200	1602	3074223	Flesh Rot	Flesh Rot	same	lotus_1	5	25	25	3	3	4	4	15	15	match
+161100	1611	3074280	Ability - Dull Pain	Ability - Dull Pain	same	lotus_1	3	25	25	5	5	4	4	15	15	match
+161300	1613	3074285	Lotus Tainted Blood	Lotus Tainted Blood	same	lotus_1	3	30	30	1	1	5	5	20	20	match
+161400	1614	3074294	Ability - Crystallized Lotus Extract	Ability - Crystallized Lotus Extract	same	lotus_1	1	30	30	2	2	5	5	20	20	match
+161500	1615	3074295	Combo - Snap Kick	Combo - Snap Kick	same	lotus_1	1	30	30	5	5	5	5	20	20	match
+161600	1616	3074296	Lotus Overload	Lotus Overload	same	lotus_1	1	40	40	1	1	6	6	25	25	match
+165100	1651	3074439	Impede Essence	Impede Essence	same	lotus_1	5	40	40	2	2	6	6	25	25	match
+162000	1620	3074310	Lotus Weapon	Lotus Weapon	same	lotus_1	5	40	40	3	3	6	6	25	25	match
+162200	1622	3074321	Ability - Opportunistic Strike	Ability - Opportunistic Strike	same	lotus_1	1	40	40	5	5	6	6	25	25	match
+160700	1607	3074260	Combo - Grave's Blossom	Combo - Grave	differs	lotus_1	5	50	50	2	2	7	7	30	30	match
+162600	1626	3074335	Corrupted Body	Corrupted Body	same	lotus_1	3	50	50	4	4	7	7	30	30	match
+160900	1609	3074272	Steeped Lotus Extract	Steeped Lotus Extract	same	lotus_1	5	50	50	5	5	7	7	30	30	match
+165500	1655	3074461	Arcane Backlash	Arcane Backlash	same	lotus_1	3	60	60	1	1	8	8	35	35	match
+160600	1606	3074240	Baneful Venom	Baneful Venom	same	lotus_1	5	60	60	2	2	8	8	35	35	match
+162400	1624	3074325	Crippling Weakness	Crippling Weakness	same	lotus_1	5	60	60	5	5	8	8	35	35	match
+162700	1627	3074338	Ability - Kidney Shots	Ability - Kidney Shots	same	lotus_1	1	60	60	6	6	8	8	35	35	match
+162800	1628	3074339	Ability - Lotus Overdose	Ability - Lotus Overdose	same	lotus_1	1	70	70	2	2	9	9	40	40	match
+162900	1629	3074340	Ability - Curse of the Lotus	Ability - Curse of the Lotus	same	lotus_1	1	70	70	5	5	9	9	40	40	match
+163000	1630	3074341	Corrupted Blades	Corrupted Blades	same	corruption_1	5	10	10	1	1	1	1	0	0	match
+164400	1644	3074404	Sense Weakness	Sense Weakness	same	corruption_1	5	15	15	2	2	2	2	5	5	match
+163200	1632	3074352	Corrupting Strikes	Corrupting Strikes	same	corruption_1	5	15	15	5	5	2	2	5	5	match
+161200	1612	3074283	Combo - Atrophy	Combo - Atrophy	same	corruption_1	2	20	20	1	1	3	3	10	10	match
+163300	1633	3074357	Unholy Strength	Unholy Strength	same	corruption_1	5	20	20	2	2	3	3	10	10	match
+165200	1652	3074458	Ability - Miasma: Soul Strike	Ability - Miasma: Soul Strike	same	corruption_1	1	20	20	4	4	3	3	10	10	match
+163500	1635	3074372	Ability - Spirit of Nightfall	Ability - Spirit of Nightfall	same	corruption_1	3	20	20	5	5	3	3	10	10	match
+163400	1634	3074362	Ability - Accelerated	Ability - Accelerated	same	corruption_1	3	25	25	2	2	4	4	15	15	match
+163800	1638	3074386	Dark Weapon	Dark Weapon	same	corruption_1	5	25	25	3	3	4	4	15	15	match
+164000	1640	3074396	Precise Strikes	Precise Strikes	same	corruption_1	5	25	25	5	5	4	4	15	15	match
+163700	1637	3074385	Relish in Death	Relish in Death	same	corruption_1	1	30	30	1	1	5	5	20	20	match
+164100	1641	3074401	Ability - Necrotic Empowerement	Ability - Necrotic Empowerment	differs	corruption_1	1	30	30	2	2	5	5	20	20	match
+165300	1653	3074459	Ability - From the Darkness	Ability - From the Darkness	same	corruption_1	1	30	30	5	5	5	5	20	20	match
+164500	1645	3074409	Unholy Stabs	Unholy Stabs	same	corruption_1	3	30	30	6	6	5	5	20	20	match
+163600	1636	3074381	Poisoned Blades	Poisoned Blades	same	corruption_1	2	40	40	1	1	6	6	25	25	match
+164300	1643	3074403	Ability - Death's Gaze	Ability - Death	differs	corruption_1	1	40	40	2	2	6	6	25	25	match
+163900	1639	3074391	Dread Weapon	Dread Weapon	same	corruption_1	5	40	40	3	3	6	6	25	25	match
+161800	1618	3074301	Bewilder	Bewilder	same	corruption_1	2	40	40	4	4	6	6	25	25	match
+161700	1617	3074298	Combo - Blindside	Combo - Blindside	same	corruption_1	3	40	40	5	5	6	6	25	25	match
+164700	1647	3074416	Soul Destruction	Soul Destruction	same	corruption_1	5	50	50	2	2	7	7	30	30	match
+165000	1650	3074436	Burden to Bear	Burden to Bear	same	corruption_1	3	50	50	4	4	7	7	30	30	match
+164800	1648	3074421	Combo - Death Whirlwind	Combo - Death Whirlwind	same	corruption_1	5	50	50	5	5	7	7	30	30	match
+164600	1646	3074412	Soul Corruption	Soul Corruption	same	corruption_1	3	60	60	1	1	8	8	35	35	match
+164900	1649	3074430	Corrupted Poison	Corrupted Poison	same	corruption_1	5	60	60	2	2	8	8	35	35	match
+163100	1631	3074346	Vile Corruption	Vile Corruption	same	corruption_1	5	60	60	5	5	8	8	35	35	match
+164200	1642	3074402	Ability - Vampiric Nature	Ability - Vampyric Nature	differs	corruption_1	1	70	70	2	2	9	9	40	40	match
+165400	1654	3074460	Ability - Avatar of Death	Ability - Avatar of Death	same	corruption_1	1	70	70	5	5	9	9	40	40	match
+170000	1700	3096459	Puncture	Puncture	same	waylayer_1	5	10	10	1	1	1	1	0	0	match
+170100	1701	3096464	Ability - Concussive Blast	Ability - Concussive Blast	same	waylayer_1	5	15	15	2	2	2	2	5	5	match
+171100	1711	3096494	Scatter Shots	Scatter Shots	same	waylayer_1	5	15	15	5	5	2	2	5	5	match
+172100	1721	3096532	Rapid Stabs	Rapid Stabs	same	waylayer_1	3	20	20	2	2	3	3	10	10	match
+174500	1745	3489518	Close Quarters Combat	Close Quarters Combat	same	waylayer_1	5	20	20	3	3	3	3	10	10	match
+171200	1712	3096499	Furtive Attacks	Furtive Attacks	same	waylayer_1	3	20	20	5	5	3	3	10	10	match
+174600	1746	3489527	Ability - Evasive Action	Ability - Evasive Action	same	waylayer_1	3	20	20	6	6	3	3	10	10	match
+170400	1704	3096475	Piercing Wounds	Piercing Wounds	same	waylayer_1	2	25	25	1	1	4	4	15	15	match
+170300	1703	3096472	Barbed Arrows	Barbed Arrows	same	waylayer_1	3	25	25	2	2	4	4	15	15	match
+174400	1744	3489511	Ability - Booby Trap	Ability - Booby Trap	same	waylayer_1	3	25	25	3	3	4	4	15	15	match
+172200	1722	3096535	Quick Shots	Quick Shots	same	waylayer_1	5	25	25	5	5	4	4	15	15	match
+170500	1705	3096477	Ability - Advantage: Shattering Attack	Ability - Advantage: Shattering Attack	same	waylayer_1	1	30	30	2	2	5	5	20	20	match
+171800	1718	3096521	Ability - Advantage: Absolute Precision	Ability - Advantage: Absolute Precision	same	waylayer_1	1	30	30	5	5	5	5	20	20	match
+174700	1747	3489558	Improved Evasive Action	Improved Evasive Action	same	waylayer_1	2	30	30	6	6	5	5	20	20	match
+170800	1708	3096483	Ability - Advantage: Recuperation	Ability - Advantage: Recuperation	same	waylayer_1	5	40	40	1	1	6	6	25	25	match
+170700	1707	3096481	Ability - Pitch Pot	Ability - Pitch Pot	same	waylayer_1	1	40	40	2	2	6	6	25	25	match
+170600	1706	3096478	Rapid Trapping	Rapid Trapping	same	waylayer_1	3	40	40	4	4	6	6	25	25	match
+171500	1715	3096508	Heavy Shots	Heavy Shots	same	waylayer_1	3	40	40	5	5	6	6	25	25	match
+174200	1742	3489457	Rending Strikes	Rending Strikes	same	waylayer_1	5	50	50	2	2	7	7	30	30	match
+174300	1743	3489495	Exhausting Traps	Exhausting Traps	same	waylayer_1	3	50	50	3	3	7	7	30	30	match
+173400	1734	3096569	Ability - Marked Target	Ability - Marked Target	same	waylayer_1	5	50	50	5	5	7	7	30	30	match
+170900	1709	3096488	Adaptability	Adaptability	same	waylayer_1	5	60	60	2	2	8	8	35	35	match
+171700	1717	3096516	Survivalist	Survivalist	same	waylayer_1	5	60	60	5	5	8	8	35	35	match
+171000	1710	3096493	Combo - Linebreaker	Combo - Linebreaker	same	waylayer_1	1	70	70	2	2	9	9	40	40	match
+171400	1714	3096507	Combo - Immolation	Combo - Immolation	same	waylayer_1	1	70	70	5	5	9	9	40	40	match
+172000	1720	3096527	Weapon Specialization	Weapon Specialization	same	sharpshooter_1	5	10	10	1	1	1	1	0	0	match
+171900	1719	3096522	Inner Focus	Inner Focus	same	sharpshooter_1	5	15	15	2	2	2	2	5	5	match
+172700	1727	3096548	Eagle Eye	Eagle Eye	same	sharpshooter_1	5	15	15	5	5	2	2	5	5	match
+170200	1702	3096469	Combo - Shield Bash	Combo - Shield Bash	same	sharpshooter_1	3	20	20	2	2	3	3	10	10	match
+173900	1739	3489447	Stealthy Strikes	Stealthy Strikes	same	sharpshooter_1	3	20	20	3	3	3	3	10	10	match
+172800	1728	3096553	Vigor	Vigor	same	sharpshooter_1	3	20	20	5	5	3	3	10	10	match
+172900	1729	3096556	Master Trapper	Master Trapper	same	sharpshooter_1	5	20	20	6	6	3	3	10	10	match
+171300	1713	3096502	Master Sniper	Master Sniper	same	sharpshooter_1	5	25	25	2	2	4	4	15	15	match
+174800	1748	3489336	Ability - Leghold Trap	Ability - Leghold Trap	same	sharpshooter_1	3	25	25	3	3	4	4	15	15	match
+173100	1731	3096560	Fancy Footwork	Fancy Footwork	same	sharpshooter_1	5	25	25	5	5	4	4	15	15	match
+172300	1723	3096540	Ability - Advantage: Fire Attack	Ability - Advantage: Fire Attack	same	sharpshooter_1	1	30	30	2	2	5	5	20	20	match
+173200	1732	3096565	Ability - Advantage: Sharpened Weapons	Ability - Advantage: Sharpened Weapons	same	sharpshooter_1	1	30	30	5	5	5	5	20	20	match
+173000	1730	3096558	Precision	Precision	same	sharpshooter_1	2	30	30	6	6	5	5	20	20	match
+172500	1725	3096542	Ability - Advantage: Misdirection	Ability - Advantage: Misdirection	same	sharpshooter_1	5	40	40	1	1	6	6	25	25	match
+172400	1724	3096541	Ability - Sulfurous Burst	Ability - Sulfurous Burst	same	sharpshooter_1	1	40	40	2	2	6	6	25	25	match
+174000	1740	3489450	Clever Trapping	Clever Trapping	same	sharpshooter_1	3	40	40	4	4	6	6	25	25	match
+173300	1733	3096566	Deadeye	Deadeye	same	sharpshooter_1	3	40	40	5	5	6	6	25	25	match
+173800	1738	3489437	Shred Armor	Shred Armor	same	sharpshooter_1	5	50	50	2	2	7	7	30	30	match
+174100	1741	3489453	Swift Stride	Swift Stride	same	sharpshooter_1	3	50	50	3	3	7	7	30	30	match
+173500	1735	3096574	Ability - Marked for Death	Ability - Marked for Death	same	sharpshooter_1	5	50	50	5	5	7	7	30	30	match
+173700	1737	3487886	Double Attack	Double Attack	same	sharpshooter_1	5	60	60	2	2	8	8	35	35	match
+171600	1716	3096511	Agile	Agile	same	sharpshooter_1	5	60	60	5	5	8	8	35	35	match
+172600	1726	3096547	Combo - Flame Barrage	Combo - Flame Barrage	same	sharpshooter_1	1	70	70	2	2	9	9	40	40	match
+173600	1736	3096579	Combo - Incendiary Shot	Combo - Incendiary Shot	same	sharpshooter_1	1	70	70	5	5	9	9	40	40	match
+70000	700	780194	Devouring Touch	Devouring Touch	same	depravity_1	5	10	10	1	1	1	1	0	0	match
+70400	704	780215	Crystallized Ether	Crystallized Ether	same	depravity_1	5	15	15	2	2	2	2	5	5	match
+72900	729	780404	Consuming Bulwark	Consuming Bulwark	same	depravity_1	3	15	15	4	4	2	2	5	5	match
+71300	713	780304	Vigor Leech	Vigor Leech	same	depravity_1	5	15	15	5	5	2	2	5	5	match
+72600	726	780379	Devourer's Might	Devourer	differs	depravity_1	5	20	20	2	2	3	3	10	10	match
+71600	716	780312	Improved Martyrdom	Improved Martyrdom	same	depravity_1	5	20	20	3	3	3	3	10	10	match
+70100	701	780200	Ether Leech	Ether Leech	same	depravity_1	1	20	20	5	5	3	3	10	10	match
+70900	709	780269	Spell - Dark Hand	Spell - Dark Hand	same	depravity_1	5	25	25	1	1	4	4	15	15	match
+73300	733	780419	Incinerate Ether	Incinerate Ether	same	depravity_1	1	25	25	4	4	4	4	15	15	match
+73200	732	780416	Dissipate Ether	Dissipate Ether	same	depravity_1	3	25	25	5	5	4	4	15	15	match
+73100	731	780411	Ability - Soul Barrier	Ability - Soul Barrier	same	depravity_1	3	25	25	6	6	4	4	15	15	match
+71000	710	780281	Spell - Seal of Chaos	Spell - Seal of Chaos	same	depravity_1	1	30	30	2	2	5	5	20	20	match
+72700	727	780384	Ether Reap	Ether Reap	same	depravity_1	5	30	30	4	4	5	5	20	20	match
+72400	724	780373	Spell - Hex Marked Soul	Spell - Hex Marked Soul	same	depravity_1	1	30	30	5	5	5	5	20	20	match
+74500	745	784029	Soul Infusion	Soul Infusion	same	depravity_1	1	30	30	6	6	5	5	20	20	match
+73600	736	780819	Fiendish Hand	Fiendish Hand	same	depravity_1	1	40	40	1	1	6	6	25	25	match
+71700	717	780317	Invulnerable Soul	Invulnerable Soul	same	depravity_1	5	40	40	2	2	6	6	25	25	match
+72200	722	780354	Solid Pestilence	Solid Pestilence	same	depravity_1	5	40	40	5	5	6	6	25	25	match
+73000	730	780410	Improved Infusion	Improved Infusion	same	depravity_1	5	50	50	2	2	7	7	30	30	match
+75300	753	3247213	Ability - Curse of Gwahlur	Ability - Curse of Gwahlur	same	depravity_1	1	50	50	3	3	7	7	30	30	match
+75400	754	3247218	Vile Gluttony	Vile Gluttony	same	depravity_1	1	50	50	4	4	7	7	30	30	match
+74700	747	872724	Cabalistic Hunger	Cabalistic Hunger	same	depravity_1	5	50	50	5	5	7	7	30	30	match
+72000	720	780329	Masochism	Masochism	same	depravity_1	5	60	60	2	2	8	8	35	35	match
+73500	735	780193	Combo - Mind Shatter	Combo - Mind Shatter	same	depravity_1	1	60	60	3	3	8	8	35	35	match
+71800	718	780322	Improved Blood Pact	Improved Blood Pact	same	depravity_1	5	60	60	5	5	8	8	35	35	match
+74400	744	784020	Drain Strength	Drain Strength	same	depravity_1	1	60	60	6	6	8	8	35	35	match
+70600	706	780231	Combo - Warped Dread	Combo - Warped Dread	same	depravity_1	1	70	70	2	2	9	9	40	40	match
+71500	715	780311	Spell - Dread Shadow	Spell - Dread Shadow	same	depravity_1	1	70	70	5	5	9	9	40	40	match
+70700	707	780234	Blighted Touch	Blighted Touch	same	desecration_1	5	10	10	1	1	1	1	0	0	match
+70800	708	780251	Blighted Soul	Blighted Soul	same	desecration_1	5	15	15	2	2	2	2	5	5	match
+72800	728	780396	Devouring Blood Frenzy	Devouring Blood Frenzy	same	desecration_1	3	15	15	4	4	2	2	5	5	match
+74800	748	872729	Spell - Covenant of Arms	Spell - Covenant of Arms	same	desecration_1	5	15	15	5	5	2	2	5	5	match
+75500	755	3247208	Ability - Pact of Malacodor	Ability - Pact of Malacodor	same	desecration_1	5	20	20	1	1	3	3	10	10	match
+72500	725	780374	Hexer's Might	Hexer	differs	desecration_1	5	20	20	3	3	3	3	10	10	match
+74900	749	872734	Approach of Death	Approach of Death	same	desecration_1	1	20	20	5	5	3	3	10	10	match
+70500	705	780224	Sacrificial Fury	Sacrificial Fury	same	desecration_1	1	25	25	2	2	4	4	15	15	match
+71200	712	214117	Talisman Mastery	Talisman Mastery	same	desecration_1	5	25	25	4	4	4	4	15	15	match
+73800	738	782619	Corrupt Weapon	Corrupt Weapon	same	desecration_1	2	25	25	6	6	4	4	15	15	match
+75900	759	3247207	Reaper of Malacodor	Reaper of Malacodor	same	desecration_1	1	30	30	1	1	5	5	20	20	match
+70200	702	780208	Improved Soul Covenants	Improved Soul Covenants	same	desecration_1	1	30	30	2	2	5	5	20	20	match
+74000	740	784008	Spell - Dark Burden	Spell - Dark Burden	same	desecration_1	2	30	30	3	3	5	5	20	20	match
+71400	714	780310	Dread Lord	Dread Lord	same	desecration_1	1	30	30	5	5	5	5	20	20	match
+73700	737	782616	Improved Dread Fury	Improved Dread Fury	same	desecration_1	5	40	40	3	3	6	6	25	25	match
+72100	721	780336	Shadowed Blade	Shadowed Blade	same	desecration_1	5	40	40	4	4	6	6	25	25	match
+76000	760	4189505	Blooded Weapons	Blooded Weapons	same	desecration_1	5	50	50	2	2	7	7	30	30	match
+71900	719	780325	Desecrated Blood	Desecrated Blood	same	desecration_1	3	50	50	3	3	7	7	30	30	match
+74100	741	784009	Touch of Death	Touch of Death	same	desecration_1	5	50	50	5	5	7	7	30	30	match
+74200	742	784014	Air of Death	Air of Death	same	desecration_1	1	50	50	6	6	7	7	30	30	match
+75000	750	872735	Unholy Empowerment	Unholy Empowerment	same	desecration_1	5	60	60	2	2	8	8	35	35	match
+73900	739	784007	Ability - Ritualistic Bloodshed	Ability - Ritualistic Bloodshed	same	desecration_1	2	60	60	3	3	8	8	35	35	match
+75100	751	872740	Spreading Shadows	Spreading Shadows	same	desecration_1	1	60	60	4	4	8	8	35	35	match
+74300	743	784015	Unholy Strength	Unholy Strength	same	desecration_1	5	60	60	5	5	8	8	35	35	match
+70300	703	780213	Combo - Dooming Presence	Combo - Dooming Presence	same	desecration_1	1	70	70	2	2	9	9	40	40	match
+71100	711	780282	Ability - Shadowed Soul	Ability - Shadowed Soul	same	desecration_1	1	70	70	5	5	9	9	40	40	match
+420600	4206	1379203	Rejuvenanting Spirit	Rejuvenating Spirit	differs	priest_1	5	10	10	1	1	1	1	0	0	match
+420000	4200	3021898	Ether Discharge	Ether Discharge	same	priest_1	5	15	15	2	2	2	2	5	5	match
+421200	4212	3022141	Ether Flow	Ether Flow	same	priest_1	3	15	15	3	3	2	2	5	5	match
+420700	4207	3022119	Far-Reaching Spirit	Far-Reaching Spirit	same	priest_1	2	15	15	4	4	2	2	5	5	match
+421100	4211	3022135	Grace	Grace	same	priest_1	5	15	15	5	5	2	2	5	5	match
+421600	4216	3022216	Spirit Aegis	Spirit Aegis	same	priest_1	5	15	15	6	6	2	2	5	5	match
+421500	4215	3022213	Saintly Warrior	Saintly Warrior	same	priest_1	3	20	20	1	1	3	3	10	10	match
+420200	4202	3021844	Guiding Spirit	Guiding Spirit	same	priest_1	3	20	20	2	2	3	3	10	10	match
+420800	4208	3022121	All-Encompassing Spirit	All-Encompassing Spirit	same	priest_1	2	20	20	3	3	3	3	10	10	match
+420100	4201	3095848	Presence of Mind	Presence of Mind	same	priest_1	3	20	20	4	4	3	3	10	10	match
+420500	4205	3021941	Vindicator	Vindicator	same	priest_1	2	20	20	5	5	3	3	10	10	match
+421700	4217	3022221	Saintly Martyr	Saintly Martyr	same	priest_1	3	20	20	6	6	3	3	10	10	match
+420300	4203	3021847	Exemplar	Exemplar	same	priest_1	5	25	25	2	2	4	4	15	15	match
+432000	4320	4927400	Healing Spirit	Healing Spirit	same	priest_1	5	25	25	4	4	4	4	15	15	match
+421300	4213	3022146	Spell - Shroud of the Gods	Spell - Shroud of the Gods	same	priest_1	1	25	25	5	5	4	4	15	15	match
+420400	4204	3021907	Spell - Vengeance of the Gods	Spell - Vengeance of the Gods	same	priest_1	1	30	30	2	2	5	5	20	20	match
+420900	4209	3022128	Spirit of Vitality	Spirit of Vitality	same	priest_1	1	30	30	4	4	5	5	20	20	match
+431400	4314	1360406	Quick Recovery	Quick Recovery	same	rogue_1	5	10	10	1	1	1	1	0	0	match
+431000	4310	1360392	Natural Protection	Natural Protection	same	rogue_1	5	15	15	1	1	2	2	5	5	match
+430000	4300	1358829	Subtlety	Subtlety	same	rogue_1	3	15	15	2	2	2	2	5	5	match
+431600	4316	1360412	Ability - Second Wind	Ability - Second Wind	same	rogue_1	1	15	15	3	3	2	2	5	5	match
+430900	4309	1360287	Keen Senses	Keen Senses	same	rogue_1	1	15	15	4	4	2	2	5	5	match
+431500	4315	1360411	Ability - Excellent Balance	Ability - Excellent Balance	same	rogue_1	1	15	15	5	5	2	2	5	5	match
+430100	4301	1358835	Toughness	Toughness	same	rogue_1	5	15	15	6	6	2	2	5	5	match
+430300	4303	1358840	Acrobat	Acrobat	same	rogue_1	3	20	20	1	1	3	3	10	10	match
+431700	4317	1360413	Endurance	Endurance	same	rogue_1	5	20	20	3	3	3	3	10	10	match
+431800	4318	1360418	Ability - Escape Artist	Ability - Escape Artist	same	rogue_1	3	20	20	4	4	3	3	10	10	match
+431200	4312	1360399	Swift Shadows	Swift Shadows	same	rogue_1	3	20	20	5	5	3	3	10	10	match
+431100	4311	1360397	Lethality	Lethality	same	rogue_1	5	20	20	6	6	3	3	10	10	match
+430200	4302	1358833	Mountaineer	Mountaineer	same	rogue_1	2	25	25	1	1	4	4	15	15	match
+430500	4305	1358844	Ability - Wiles	Ability - Wiles	same	rogue_1	1	25	25	2	2	4	4	15	15	match
+431300	4313	1360402	Distraction	Distraction	same	rogue_1	3	25	25	3	3	4	4	15	15	match
+430600	4306	1358871	Ability - Agile Mind	Ability - Agile Mind	same	rogue_1	3	25	25	4	4	4	4	15	15	match
+430400	4304	1358843	Ability - Ambush	Ability - Ambush	same	rogue_1	1	25	25	5	5	4	4	15	15	match
+430700	4307	1359596	Ability - Brutality	Ability - Brutality	same	rogue_1	3	25	25	6	6	4	4	15	15	match
+430800	4308	1360070	Ability - Trickery	Ability - Trickery	same	rogue_1	1	30	30	2	2	5	5	20	20	match
+431900	4319	1360421	Cheat the Reaper	Cheat the Reaper	same	rogue_1	2	30	30	5	5	5	5	20	20	match
+400000	4000	780510	Recovery	Recovery	same	soldier_1	5	10	10	1	1	1	1	0	0	match
+400200	4002	780520	Stone Skin	Stone Skin	same	soldier_1	5	15	15	1	1	2	2	5	5	match
+401000	4010	780561	Improved Frenzy Stance	Improved Frenzy Stance	same	soldier_1	5	15	15	2	2	2	2	5	5	match
+401600	4016	785558	Ability - Hateful Strikes	Ability - Hateful Strikes	same	soldier_1	3	15	15	3	3	2	2	5	5	match
+400600	4006	780546	Ability - Goad	Ability - Goad	same	soldier_1	1	15	15	4	4	2	2	5	5	match
+400500	4005	780535	Improved Defensive Stance	Improved Defensive Stance	same	soldier_1	5	15	15	5	5	2	2	5	5	match
+400100	4001	780515	Iron Skin	Iron Skin	same	soldier_1	5	15	15	6	6	2	2	5	5	match
+400400	4004	780528	Burning Vigor	Burning Vigor	same	soldier_1	3	20	20	1	1	3	3	10	10	match
+401200	4012	780572	Sustained Rage	Sustained Rage	same	soldier_1	5	20	20	3	3	3	3	10	10	match
+400800	4008	780552	Counterstrike Stance	Counterstrike Stance	same	soldier_1	3	20	20	4	4	3	3	10	10	match
+400300	4003	780525	Surging Health	Surging Health	same	soldier_1	3	20	20	6	6	3	3	10	10	match
+401100	4011	780569	Guarded Frenzy	Guarded Frenzy	same	soldier_1	3	25	25	2	2	4	4	15	15	match
+401500	4015	785557	Ability - Cunning Deflection	Ability - Cunning Deflection	same	soldier_1	1	25	25	3	3	4	4	15	15	match
+401700	4017	785561	Anticipation	Anticipation	same	soldier_1	1	25	25	4	4	4	4	15	15	match
+400700	4007	780548	Lifesaver	Lifesaver	same	soldier_1	3	25	25	5	5	4	4	15	15	match
+401300	4013	780578	Ability - Volcanic Rage	Ability - Volcanic Rage	same	soldier_1	1	30	30	2	2	5	5	20	20	match
+400900	4009	780558	Improved Goad Mob	Improved Goad Mob	same	soldier_1	1	30	30	4	4	5	5	20	20	match
+401400	4014	785556	Ability - Goad Mob	Ability - Goad Mob	same	soldier_1	1	30	30	5	5	5	5	20	20	match
+410600	4106	1151141	Mage Blood	Mage Blood	same	mage_1	5	10	10	1	1	1	1	0	0	match
+410000	4100	1151414	Spiritual Armament	Spiritual Armament	same	mage_1	5	15	15	2	2	2	2	5	5	match
+410200	4102	1151165	Mind Phase	Mind Phase	same	mage_1	5	15	15	3	3	2	2	5	5	match
+411500	4115	1151133	Archmage	Archmage	same	mage_1	5	15	15	4	4	2	2	5	5	match
+410300	4103	1151170	Spiritual Aegis	Spiritual Aegis	same	mage_1	5	15	15	5	5	2	2	5	5	match
+411600	4116	1151185	Spell - Dark Meditation	Spell- Dark Meditation	differs	mage_1	1	15	15	6	6	2	2	5	5	match
+410400	4104	1151138	Crimson Shield	Crimson Shield	same	mage_1	3	20	20	1	1	3	3	10	10	match
+410100	4101	1151186	Mystical Attunement	Mystical Attunement	same	mage_1	5	20	20	4	4	3	3	10	10	match
+411100	4111	1151146	Mirrored Iron	Mirrored Iron	same	mage_1	3	20	20	5	5	3	3	10	10	match
+410700	4107	1151149	Quickened Iron	Quickened Iron	same	mage_1	3	20	20	6	6	3	3	10	10	match
+410800	4108	1151152	Spell - Purge	Spell - Purge	same	mage_1	1	25	25	1	1	4	4	15	15	match
+411200	4112	1151157	Malefic Chant	Malefic Chant	same	mage_1	5	25	25	2	2	4	4	15	15	match
+410900	4109	1151153	Spell - Misdirection	Spell - Misdirection	same	mage_1	2	25	25	3	3	4	4	15	15	match
+411300	4113	1151162	Blood Hunger	Blood Hunger	same	mage_1	3	25	25	4	4	4	4	15	15	match
+411400	4114	1151179	Specter Chant	Specter Chant	same	mage_1	5	25	25	5	5	4	4	15	15	match
+411000	4110	1151155	Unleashed Power	Unleashed Power	same	mage_1	2	25	25	6	6	4	4	15	15	match
+410500	4105	1151176	Ability - Tome of Erlik	Ability - Tome of Erlik	same	mage_1	3	30	30	2	2	5	5	20	20	match
+50000	500	871375	Lacerate	Lacerate	same	carnage_2	5	10	10	1	1	1	1	0	0	match
+50800	508	873147	Improved Bloody Hack	Improved Bloody Hack	same	carnage_2	5	15	15	2	2	2	2	5	5	match
+55200	552	3275196	Ability - Annihilate	Ability - Annihilate	same	carnage_2	3	15	15	4	4	2	2	5	5	match
+51300	513	873159	Fierce Opening	Fierce Opening	same	carnage_2	3	15	15	5	5	2	2	5	5	match
+50200	502	873114	Offhand Precision	Offhand Precision	same	carnage_2	5	20	20	2	2	3	3	10	10	match
+51400	514	873162	Improved Discipline	Improved Fire Weave	differs	carnage_2	5	20	20	5	5	3	3	10	10	match
+51500	515	873167	Fierce Inspirations	Fierce Inspirations	same	carnage_2	1	20	20	6	6	3	3	10	10	match
+50400	504	873124	Improved Defiance	Improved Defiance	same	carnage_2	3	25	25	1	1	4	4	15	15	match
+50300	503	873119	Ability - Defiance	Ability - Defiance	same	carnage_2	5	25	25	2	2	4	4	15	15	match
+50500	505	873128	Rend and Tear	Rend and Tear	same	carnage_2	5	25	25	3	3	4	4	15	15	match
+51600	516	873168	War Lord	War Lord	same	carnage_2	1	25	25	5	5	4	4	15	15	match
+50900	509	873153	Crippling Bloody Hack	Crippling Bloody Hack	same	carnage_2	1	30	30	2	2	5	5	20	20	match
+53000	530	873216	Deep Wounds	Deep Wounds	same	carnage_2	5	30	30	4	4	5	5	20	20	match
+51800	518	873174	Bloodlust	Bloodlust	same	carnage_2	1	30	30	5	5	5	5	20	20	match
+50700	507	873134	Resolute Advance	Resolute Advance	same	carnage_2	3	40	40	2	2	6	6	25	25	match
+52300	523	873187	Fleet of Foot	Fleet of Foot	same	carnage_2	1	40	40	4	4	6	6	25	25	match
+51900	519	873175	Ability - Rend Flesh	Ability - Rend Flesh	same	carnage_2	3	40	40	5	5	6	6	25	25	match
+52000	520	873178	Improved Rend	Improved Rend	same	carnage_2	5	40	40	6	6	6	6	25	25	match
+50600	506	873133	Ability - Bladeweave	Ability - Bladeweave	same	carnage_2	1	50	50	1	1	7	7	30	30	match
+50100	501	871400	Berserk Inspiration	Berserk Inspiration	same	carnage_2	5	50	50	2	2	7	7	30	30	match
+52100	521	873181	Ability - Cunning	Ability - Cunning	same	carnage_2	2	50	50	4	4	7	7	30	30	match
+55400	554	3275191	Lightning Steel	Lightning Steel	same	carnage_2	5	50	50	5	5	7	7	30	30	match
+53400	534	873241	Art of War	Art of War	same	carnage_2	5	60	60	2	2	8	8	35	35	match
+55500	555	3275199	Hemorrhage	Hemorrhage	same	carnage_2	2	60	60	3	3	8	8	35	35	match
+52200	522	873184	Grievous Wounds	Grievous Wounds	same	carnage_2	5	60	60	5	5	8	8	35	35	match
+51200	512	873157	Reaping Blade	Reaping Blade	same	carnage_2	1	60	60	6	6	8	8	35	35	match
+51000	510	873154	Ability - Flashing Defense	Ability - Flashing Defense	same	carnage_2	1	70	70	2	2	9	9	40	40	match
+52400	524	873188	Combo - Whirlwind	Combo - Whirlwind	same	carnage_2	1	70	70	5	5	9	9	40	40	match
+52500	525	873190	Blessed Blade	Blessed Blade	same	brute_2	5	10	10	1	1	1	1	0	0	match
+52600	526	873195	Ruthless Assault	Ruthless Assault	same	brute_2	5	15	15	2	2	2	2	5	5	match
+53600	536	873247	Ability - Lumbering Hulk	Ability - Lumbering Hulk	same	brute_2	3	15	15	4	4	2	2	5	5	match
+57800	578	4037923	Ability - Retaliation	Ability - Retaliation	same	brute_2	2	15	15	5	5	2	2	5	5	match
+53800	538	873255	Devastate	Devastate	same	brute_2	5	20	20	2	2	3	3	10	10	match
+53300	533	873235	Improved Retaliation	Improved Retaliation	same	brute_2	5	20	20	5	5	3	3	10	10	match
+54600	546	873307	Combo - Throat Slash	Combo - Throat Slash	same	brute_2	1	25	25	1	1	4	4	15	15	match
+53700	537	873250	Power Feint	Power Feint	same	brute_2	5	25	25	3	3	4	4	15	15	match
+54700	547	873308	Improved Lumbering Hulk	Improved Lumbering Hulk	same	brute_2	3	25	25	4	4	4	4	15	15	match
+54000	540	873295	Ability - Burst of Aggression	Ability - Burst of Aggression	same	brute_2	1	25	25	5	5	4	4	15	15	match
+53100	531	873231	Ability - Crushing Onslaught	Ability - Crushing Onslaught	same	brute_2	1	30	30	2	2	5	5	20	20	match
+55100	551	3275212	Ability - Heroic Call	Ability - Heroic Call	same	brute_2	1	30	30	4	4	5	5	20	20	match
+54100	541	873296	Remorseless Aggression	Remorseless Aggression	same	brute_2	1	30	30	5	5	5	5	20	20	match
+53200	532	873232	Improved Throat Slash	Improved Throat Slash	same	brute_2	3	40	40	1	1	6	6	25	25	match
+52800	528	873210	Furious Strikes	Furious Strikes	same	brute_2	5	40	40	2	2	6	6	25	25	match
+54200	542	873297	Legendary Heroic Call	Legendary Heroic Call	same	brute_2	3	40	40	4	4	6	6	25	25	match
+53900	539	873290	Improved Furious Inspiration	Improved Furious Inspiration	same	brute_2	5	40	40	5	5	6	6	25	25	match
+52700	527	873207	Improved Formations	Improved Retribution	differs	brute_2	5	50	50	2	2	7	7	30	30	match
+52900	529	873215	Scourge	Scourge	same	brute_2	1	50	50	3	3	7	7	30	30	match
+54400	544	873303	Mocking Sneer	Mocking Sneer	same	brute_2	5	50	50	5	5	7	7	30	30	match
+54500	545	873306	Angel of Fury	Angel of Fury	same	brute_2	1	25	25	6	6	4	4	15	15	match
+51100	511	873155	Improved Dancing Steel	Improved Dancing Steel	same	brute_2	5	60	60	2	2	8	8	35	35	match
+55600	556	3275210	Impervious Defense	Impervious Defense	same	brute_2	2	60	60	3	3	8	8	35	35	match
+54300	543	873300	At Death's Door	At Death	differs	brute_2	3	60	60	4	4	8	8	35	35	match
+55300	553	3275181	Colossus of War	Colossus of War	same	brute_2	5	60	60	5	5	8	8	35	35	match
+53500	535	873246	Ability - Overcome the Odds	Ability - Overcome the Odds	same	brute_2	1	70	70	2	2	9	9	40	40	match
+54800	548	873311	Ability - Blessed Conquest	Ability - Blessed Conquest	same	brute_2	1	70	70	5	5	9	9	40	40	match
+421400	4214	3022148	Spirit Armor	Spirit Armor	same	priest_1	5	15	15	1	1	2	2	5	5	match
+240000	2400	1102574	Blood Warrior	Blood Warrior	same	spirit_2	5	10	10	1	1	1	1	0	0	match
+243500	2435	1102689	Balance of Nature	Balance of Nature	same	spirit_2	5	15	15	2	2	2	2	5	5	match
+244600	2446	3667036	Slaughter	Slaughter	same	spirit_2	5	50	50	5	5	7	7	30	30	match
+242600	2426	1102660	Untamed Strikes	Untamed Strikes	same	spirit_2	3	20	20	2	2	3	3	10	10	match
+241200	2412	1102614	Endurance of the Bear	Endurance of the Bear	same	spirit_2	5	20	20	5	5	3	3	10	10	match
+241500	2415	1102623	Spell - Grace of Nature	Spell - Grace of Nature	same	spirit_2	1	25	25	1	1	4	4	15	15	match
+240300	2403	1102587	Blood Champion	Blood Champion	same	spirit_2	5	25	25	2	2	4	4	15	15	match
+240800	2408	1102604	Combo - Ether Theft	Combo - Ether Theft	same	spirit_2	1	25	25	3	3	4	4	15	15	match
+241000	2410	1102610	Ursine Spirit	Ursine Spirit	same	spirit_2	3	25	25	5	5	4	4	15	15	match
+241300	2413	1102619	Spell - Rune of Aggression	Spell - Rune of Aggression	same	spirit_2	1	30	30	2	2	5	5	20	20	match
+244200	2442	1102714	Improved Ether Theft	Improved Ether Theft	same	spirit_2	2	30	30	3	3	5	5	20	20	match
+244700	2447	3667041	Spell - Rune of Grounding	Spell - Rune of Grounding	same	spirit_2	1	30	30	5	5	5	5	20	20	match
+241700	2417	1102631	Brutal Walker	Brutal Walker	same	spirit_2	3	30	30	6	6	5	5	20	20	match
+241800	2418	1102634	Circling Wolves	Circling Wolves	same	spirit_2	3	40	40	1	1	6	6	25	25	match
+241900	2419	1102639	Spell - Manifestation of Regrowth	Spell - Manifestation of Regrowth	same	spirit_2	1	40	40	2	2	6	6	25	25	match
+240200	2402	1102584	Deft Renewal	Deft Renewal	same	spirit_2	3	40	40	4	4	6	6	25	25	match
+243700	2437	1102697	Spell - Manifestation of the Sun	Spell - Manifestation of the Sun	same	spirit_2	1	40	40	5	5	6	6	25	25	match
+240100	2401	1102579	Empowered Renewal	Empowered Renewal	same	spirit_2	5	15	15	5	5	2	2	5	5	match
+240900	2409	1102605	Spell - Claws of Life	Spell - Claws of Life	same	spirit_2	5	50	50	2	2	7	7	30	30	match
+240600	2406	1102596	Fierce Healing	Fierce Healing	same	spirit_2	2	60	60	1	1	8	8	35	35	match
+241600	2416	1102624	Blood Healing	Blood Healing	same	spirit_2	5	60	60	2	2	8	8	35	35	match
+248600	2486	4188720	Companion Spirit	Companion Spirit	same	spirit_2	5	60	60	5	5	8	8	35	35	match
+241100	2411	1102613	Spell - Iron Hide	Spell - Iron Hide	same	spirit_2	1	70	70	2	2	9	9	40	40	match
+242100	2421	1102645	Spell - Booming Roar	Spell - Booming Roar	same	spirit_2	1	70	70	5	5	9	9	40	40	match
+242200	2422	1102646	Nature's Wrath	Nature	differs	wrath_2	5	10	10	1	1	1	1	0	0	match
+242300	2423	1102651	Ursine Onslaught	Ursine Onslaught	same	wrath_2	5	15	15	2	2	2	2	5	5	match
+243100	2431	1102675	Animalistic Fury	Animalistic Fury	same	wrath_2	5	15	15	5	5	2	2	5	5	match
+240400	2404	1102592	Ursinity	Ursinity	same	wrath_2	1	20	20	1	1	3	3	10	10	match
+244800	2448	3667028	Ability - Ursine Rush	Ability - Ursine Rush	same	wrath_2	1	20	20	2	2	3	3	10	10	match
+243200	2432	1102680	Crushed Bones	Crushed Bones	same	wrath_2	5	20	20	5	5	3	3	10	10	match
+248700	2487	4188749	Ursine Fury	Ursine Fury	same	wrath_2	3	20	20	6	6	3	3	10	10	match
+242400	2424	1102656	Scarred Hide	Scarred Hide	same	wrath_2	3	25	25	2	2	4	4	15	15	match
+242000	2420	1102642	Poisoned Hide	Poisoned Hide	same	wrath_2	3	25	25	3	3	4	4	15	15	match
+243300	2433	1102685	Crushed Organs	Crushed Organs	same	wrath_2	3	25	25	5	5	4	4	15	15	match
+248800	2488	4188752	Rampaging Crush	Rampaging Crush	same	wrath_2	2	30	30	1	1	5	5	20	20	match
+242500	2425	1102659	Battle Roar	Battle Roar	same	wrath_2	1	30	30	2	2	5	5	20	20	match
+243400	2434	1102688	Rupture	Rupture	same	wrath_2	1	30	30	5	5	5	5	20	20	match
+244100	2441	1102711	Winter's Bite	Winter's Bite	same	wrath_2	3	30	35	6	6	5	5	20	20	differs
+243600	2436	1102694	Blood Fever	Blood Fever	same	wrath_2	3	40	40	2	2	6	6	25	25	match
+242700	2427	1102663	Spell - Stone Hide	Spell - Stone Hide	same	wrath_2	3	40	40	3	3	6	6	25	25	match
+241400	2414	1102620	Gangrene	Gangrene	same	wrath_2	3	40	40	4	4	6	6	25	25	match
+242800	2428	1102666	Spell - Manifestation of Forest	Spell - Manifestation of the Forest	differs	wrath_2	1	40	40	5	5	6	6	25	25	match
+242900	2429	1102671	Rampage	Rampage	same	wrath_2	5	50	50	2	2	7	7	30	30	match
+243800	2438	1102702	Spell - Claws of the Reaper	Spell - Claws of the Reaper	same	wrath_2	5	50	50	5	5	7	7	30	30	match
+244500	2445	3667034	Weight of the World	Weight of the World	same	wrath_2	1	50	50	6	6	7	7	30	30	match
+243900	2439	1102705	Combo - Bloodthirst	Combo - Bloodthirst	same	wrath_2	5	60	60	2	2	8	8	35	35	match
+240700	2407	1102599	Mutilation	Mutilation	same	wrath_2	5	60	60	5	5	8	8	35	35	match
+243000	2430	1102674	Nature's Revenge	Nature's Revenge	same	wrath_2	1	70	70	2	2	9	9	40	40	match
+244000	2440	1102710	Combo - Bewilder	Combo - Bewilder	same	wrath_2	1	70	70	5	5	9	9	40	40	match
+110000	1100	3186482	Fiery Weapons	Fiery Weapons	same	avatar_3	5	10	10	1	1	1	1	0	0	match
+110100	1101	3186499	Improved Fiery Weapons	Improved Fiery Weapons	same	avatar_3	5	15	15	2	2	2	2	5	5	match
+111300	1113	3186846	Spreading Flames	Spreading Flames	same	avatar_3	5	15	15	5	5	2	2	5	5	match
+110200	1102	3186530	Spell - Demonic Fortitude	Spell - Demonic Fortitude	same	avatar_3	2	20	20	2	2	3	3	10	10	match
+110300	1103	3186541	Demonic Leech	Demonic Leech	same	avatar_3	5	20	20	3	3	3	3	10	10	match
+111400	1114	3186876	Rage of Xotli	Rage of Xotli	same	avatar_3	3	20	20	5	5	3	3	10	10	match
+115400	1154	3510370	Demonic Strength	Demonic Strength	same	avatar_3	3	25	25	1	1	4	4	15	15	match
+110400	1104	3186546	Flame of Xotli	Flame of Xotli	same	avatar_3	3	25	25	2	2	4	4	15	15	match
+111500	1115	3186903	Reaching Flames	Reaching Flames	same	avatar_3	2	25	25	5	5	4	4	15	15	match
+115100	1151	3510365	Spell - Demonic Supplication	Spell - Demonic Supplication	same	avatar_3	3	25	25	6	6	4	4	15	15	match
+110500	1105	3186549	Blood Pit	Blood Pit	same	avatar_3	1	30	30	2	2	5	5	20	20	match
+110700	1107	3186579	Ether Thirst	Ether Thirst	same	avatar_3	3	30	30	3	3	5	5	20	20	match
+111600	1116	3186928	Combo - Fire Lance	Combo - Fire Lance	same	avatar_3	1	30	30	5	5	5	5	20	20	match
+111800	1118	3186952	Butcher	Butcher	same	avatar_3	5	40	40	2	2	6	6	25	25	match
+111900	1119	3186970	Flaming Hatred	Flaming Hatred	same	avatar_3	5	40	40	4	4	6	6	25	25	match
+111000	1110	3186600	Wrath of Xotli	Wrath of Xotli	same	avatar_3	2	40	40	5	5	6	6	25	25	match
+111100	1111	3186602	Damning Eloquence	Damning Eloquence	same	avatar_3	3	50	50	1	1	7	7	30	30	match
+110800	1108	3186585	Searing Curses	Searing Curses	same	avatar_3	5	50	50	2	2	7	7	30	30	match
+110600	1106	3186558	Improved Burning Skull	Improved Burning Skull	same	avatar_3	1	50	50	3	3	7	7	30	30	match
+112000	1120	3186972	Demon Within	Demon Within	same	avatar_3	5	50	50	5	5	7	7	30	30	match
+110900	1109	3186598	Burning Hex	Burning Hex	same	avatar_3	2	60	60	1	1	8	8	35	35	match
+111700	1117	3186929	Flame Cleave	Flame Cleave	same	avatar_3	5	60	60	2	2	8	8	35	35	match
+112200	1122	3186990	Searing Hatred	Searing Hatred	same	avatar_3	1	60	60	4	4	8	8	35	35	match
+112100	1121	3186977	Desecreation	Desecration	differs	avatar_3	5	60	60	5	5	8	8	35	35	match
+112400	1124	3187195	Hellfire Feast	Hellfire Feast	same	avatar_3	2	60	60	6	6	8	8	35	35	match
+113700	1137	3187409	Spell - Hell on Earth	Spell - Hell on Earth	same	avatar_3	1	70	70	2	2	9	9	40	40	match
+112300	1123	3187005	Spell - Avatar of Xotli	Spell - Avatar of Xotli	same	avatar_3	1	70	70	5	5	9	9	40	40	match
+112700	1127	3187268	Hellfire	Hellfire	same	possession_3	5	10	10	1	1	1	1	0	0	match
+112600	1126	3187258	Flame Tongue	Flame Tongue	same	possession_3	5	15	15	2	2	2	2	5	5	match
+112500	1125	3187238	Xotli's Vengeance	Xotli	differs	possession_3	5	15	15	3	3	2	2	5	5	match
+113800	1138	3187426	Spell - Spitfire	Spell - Spitfire	same	possession_3	5	15	15	5	5	2	2	5	5	match
+115500	1155	3510353	Lingering Hell	Lingering Hell	same	possession_3	5	20	20	1	1	3	3	10	10	match
+112800	1128	3187281	Improved Word of Command	Improved Word of Command	same	possession_3	2	20	20	3	3	3	3	10	10	match
+113900	1139	3187438	Demonic Link	Demonic Link	same	possession_3	3	20	20	5	5	3	3	10	10	match
+112900	1129	3187286	Fury of Xotli	Fury of Xotli	same	possession_3	3	25	25	2	2	4	4	15	15	match
+114000	1140	3187464	Spell - Flame Lash	Spell - Flame Lash	same	possession_3	5	25	25	4	4	4	4	15	15	match
+113000	1130	3187334	Roots of Hell	Roots of Hell	same	possession_3	3	25	25	6	6	4	4	15	15	match
+115200	1152	3510256	Touch of Hell	Touch of Hell	same	possession_3	1	30	30	1	1	5	5	20	20	match
+113100	1131	3187347	Spell - Undying Glory of Xotli	Spell - Undying Glory of Xotli	same	possession_3	1	30	30	2	2	5	5	20	20	match
+115300	1153	3510257	Thundering Flames	Thundering Flames	same	possession_3	1	30	30	3	3	5	5	20	20	match
+114100	1141	3187478	Glorious Exultation of Xotli	Glorious Exultation of Xotli	same	possession_3	1	30	30	5	5	5	5	20	20	match
+113300	1133	3187357	Improved Phoenix Cloak	Improved Phoenix Cloak	same	possession_3	5	40	40	1	1	6	6	25	25	match
+113200	1132	3187351	Phoenix Wings	Phoenix Wings	same	possession_3	3	40	40	2	2	6	6	25	25	match
+114500	1145	3187621	Spell - Inferno	Spell - Inferno	same	possession_3	1	40	40	4	4	6	6	25	25	match
+114200	1142	3187614	Horrible Visage of Xotli	Horrible Visage of Xotli	same	possession_3	3	40	40	5	5	6	6	25	25	match
+113400	1134	3187362	Knowledge of the Underworld	Knowledge of the Underworld	same	possession_3	5	50	50	2	2	7	7	30	30	match
+115000	1150	3510358	Burning Words	Burning Words	same	possession_3	3	50	50	3	3	7	7	30	30	match
+114400	1144	3187619	Insanity of Xotli	Insanity of Xotli	same	possession_3	2	50	50	5	5	7	7	30	30	match
+114300	1143	3187617	Spell - Molten Flesh	Spell - Molten Flesh	same	possession_3	2	50	50	6	6	7	7	30	30	match
+113600	1136	3187391	Hatred of the Living	Hatred of the Living	same	possession_3	5	60	60	2	2	8	8	35	35	match
+113500	1135	3187373	Clarity of the Mad	Clarity of the Mad	same	possession_3	3	60	60	3	3	8	8	35	35	match
+114600	1146	3187629	Dark Blessing of Xotli	Dark Blessing of Xotli	same	possession_3	5	60	60	5	5	8	8	35	35	match
+111200	1112	3186616	Spell - Tongue of Xotli	Spell - Tongue of Xotli	same	possession_3	1	70	70	2	2	9	9	40	40	match
+114700	1147	3187637	Spell - Chains of Anguish	Spell - Chains of Anguish	same	possession_3	1	70	70	5	5	9	9	40	40	match
+122300	1223	1083877	Physique	Physique	same	berserker_2	5	10	10	1	1	1	1	0	0	match
+122400	1224	1083884	Atrocity	Atrocity	same	berserker_2	5	15	15	2	2	2	2	5	5	match
+123400	1234	1083915	Devastation	Devastation	same	berserker_2	5	15	15	5	5	2	2	5	5	match
+124200	1242	1083951	Shock and Awe	Shock and Awe	same	berserker_2	3	20	20	1	1	3	3	10	10	match
+122500	1225	1083889	Staggering Punch	Staggering Punch	same	berserker_2	3	20	20	2	2	3	3	10	10	match
+124100	1241	1083945	Reverse Swing	Reverse Swing	same	berserker_2	5	20	20	5	5	3	3	10	10	match
+123500	1235	1083920	Paralysis	Paralysis	same	berserker_2	1	20	20	6	6	3	3	10	10	match
+122600	1226	1083892	Ability - Eyes of Madness	Ability - Eyes of Madness	same	berserker_2	3	25	25	2	2	4	4	15	15	match
+122900	1229	1083901	Insanity	Insanity	same	berserker_2	3	25	25	3	3	4	4	15	15	match
+123600	1236	1083921	Grisly Wounds	Grisly Wounds	same	berserker_2	5	25	25	5	5	4	4	15	15	match
+123300	1233	1083914	Ability - No Escape	Ability - No Escape	same	berserker_2	1	30	30	2	2	5	5	20	20	match
+123800	1238	1083929	Combo - Earth Shatter	Combo - Earth Shatter	same	berserker_2	1	30	30	5	5	5	5	20	20	match
+123700	1237	1083926	Ability - Finishing Blow	Ability - Finishing Blow	same	berserker_2	3	30	30	6	6	5	5	20	20	match
+124500	1245	3514767	Arcane Marauder	Arcane Marauder	same	berserker_2	5	40	40	2	2	6	6	25	25	match
+122700	1227	1083897	Ability - Blood Fury	Ability - Blood Fury	same	berserker_2	1	40	40	3	3	6	6	25	25	match
+124600	1246	3514788	Ability - Swarm Fighter	Ability - Swarm Fighter	same	berserker_2	5	40	40	5	5	6	6	25	25	match
+123000	1230	1083906	Hammer and Anvil	Hammer and Anvil	same	berserker_2	5	50	50	1	1	7	7	30	30	match
+124800	1248	3514847	Rampage	Rampage	same	berserker_2	5	50	50	2	2	7	7	30	30	match
+123200	1232	1083913	Ability - Rampaging Horde	Ability - Rampaging Horde	same	berserker_2	5	50	50	5	5	7	7	30	30	match
+123100	1231	1083911	Comatose	Comatose	same	berserker_2	2	60	60	1	1	8	8	35	35	match
+124700	1247	3514820	Unstoppable	Unstoppable	same	berserker_2	5	60	60	2	2	8	8	35	35	match
+125100	1251	3514942	Blood Frenzy	Blood Frenzy	same	berserker_2	2	60	60	3	3	8	8	35	35	match
+123900	1239	1083930	Combo - Scatter Foes	Combo - Scatter Foes	same	berserker_2	3	60	60	4	4	8	8	35	35	match
+124000	1240	1083944	Combo - Decapitation	Combo - Decapitation	same	berserker_2	5	60	60	5	5	8	8	35	35	match
+122800	1228	1083900	Welcoming Death	Welcoming Death	same	berserker_2	1	70	70	2	2	9	9	40	40	match
+124300	1243	1083954	Ability - Thirst for Blood	Ability - Thirst for Blood	same	berserker_2	1	70	70	5	5	9	9	40	40	match
+120000	1200	1083604	Reave	Reave	same	reaver_2	5	10	10	1	1	1	1	0	0	match
+120100	1201	1083610	Ability - Blitz	Ability - Blitz	same	reaver_2	5	15	15	2	2	2	2	5	5	match
+121200	1212	1083836	Ambidextrous	Ambidextrous	same	reaver_2	5	15	15	5	5	2	2	5	5	match
+120200	1202	1083615	Sever	Sever	same	reaver_2	5	20	20	2	2	3	3	10	10	match
+121400	1214	1083850	Brutal Cyclone	Brutal Cyclone	same	reaver_2	2	20	20	4	4	3	3	10	10	match
+121300	1213	1083847	Smash 'n Crush	Smash 	differs	reaver_2	3	20	20	5	5	3	3	10	10	match
+121600	1216	1083860	Ability - Predatory Instincts	Ability - Predatory Instincts	same	reaver_2	5	25	25	2	2	4	4	15	15	match
+120300	1203	1083621	Ferocity	Ferocity	same	reaver_2	3	25	25	3	3	4	4	15	15	match
+121500	1215	1083851	Tempered Steel	Tempered Steel	same	reaver_2	5	25	25	5	5	4	4	15	15	match
+120500	1205	1083625	Ability - Haste	Ability - Haste	same	reaver_2	1	30	30	2	2	5	5	20	20	match
+121700	1217	1083865	Ability - Too Many to Count	Ability - Too Many To Count	differs	reaver_2	1	30	30	4	4	5	5	20	20	match
+121900	1219	1083868	Ability - Savage Fury	Ability - Savage Fury	same	reaver_2	1	30	30	5	5	5	5	20	20	match
+122000	1220	1083869	Endless Fury	Endless Fury	same	reaver_2	2	30	30	6	6	5	5	20	20	match
+120600	1206	1083820	Jagged Weapons	Jagged Weapons	same	reaver_2	3	40	40	1	1	6	6	25	25	match
+120700	1207	1083823	Cyclone of Razors	Cyclone of Razors	same	reaver_2	5	40	40	2	2	6	6	25	25	match
+120400	1204	1083624	Spirit of the Panther	Spirit of the Panther	same	reaver_2	3	40	40	3	3	6	6	25	25	match
+121800	1218	1083866	Boiling Blood	Boiling Blood	same	reaver_2	3	40	40	5	5	6	6	25	25	match
+125000	1250	3514919	Lashing Swords	Lashing Swords	same	reaver_2	5	50	50	2	2	7	7	30	30	match
+125200	1252	3514944	Don't Fear the Reaver	Don	differs	reaver_2	2	50	50	3	3	7	7	30	30	match
+120800	1208	1083828	Ability - Back in the Fray	Ability - Back in the Fray	same	reaver_2	1	50	50	4	4	7	7	30	30	match
+124900	1249	3514869	Ability - Overpower	Ability - Overpower	same	reaver_2	5	50	50	5	5	7	7	30	30	match
+121000	1210	1083834	Rupture Armor	Rupture Armor	same	reaver_2	1	60	60	1	1	8	8	35	35	match
+120900	1209	1083829	Shrapnel	Shrapnel	same	reaver_2	5	60	60	2	2	8	8	35	35	match
+125300	1253	4106524	Ability - Unstable Mind	Ability - Unstable Mind	same	reaver_2	1	60	60	3	3	8	8	35	35	match
+122100	1221	1083871	Ability - Impale	Ability - Impale	same	reaver_2	5	60	60	5	5	8	8	35	35	match
+121100	1211	1083835	Ability - Dance of Death	Ability - Dance of Death	same	reaver_2	1	70	70	2	2	9	9	40	40	match
+122200	1222	1083876	Ability - Armageddon Falls	Ability - Armageddon Falls	same	reaver_2	1	70	70	5	5	9	9	40	40	match
+20000	200	813303	Toughness	Toughness	same	juggernaut_2	5	10	10	1	1	1	1	0	0	match
+20100	201	813415	Ability - Cry of Havoc	Ability - Cry of Havoc	same	juggernaut_2	5	15	15	2	2	2	2	5	5	match
+21700	217	871195	Prowess	Prowess	same	juggernaut_2	5	15	15	5	5	2	2	5	5	match
+21300	213	871182	Ability - Battle Cry	Ability - Battle Cry	same	juggernaut_2	3	20	20	2	2	3	3	10	10	match
+21400	214	871185	Ardent Battle Cry	Ardent Battle Cry	same	juggernaut_2	3	20	20	3	3	3	3	10	10	match
+20200	202	813420	Savage Counterstrike	Savage Counterstrike	same	juggernaut_2	5	20	20	5	5	3	3	10	10	match
+21500	215	871188	Morale Boost	Morale Boost	same	juggernaut_2	5	25	25	2	2	4	4	15	15	match
+25300	253	3478197	Momentum	Momentum	same	juggernaut_2	5	25	25	3	3	4	4	15	15	match
+20400	204	813430	Enraged Spirit	Enraged Spirit	same	juggernaut_2	5	25	15	5	5	4	4	15	15	differs
+21600	216	871194	Readiness	Readiness	same	juggernaut_2	1	30	30	2	2	5	5	20	20	match
+20600	206	871170	Ability - Stunning Charge	Ability - Stunning Charge	same	juggernaut_2	1	30	30	5	5	5	5	20	20	match
+20500	205	813435	Improved Shield Bash	Improved Shield Bash	same	juggernaut_2	2	30	30	6	6	5	5	20	20	match
+21800	218	871201	Brutal Blows	Brutal Blows	same	juggernaut_2	1	40	40	1	1	6	6	25	25	match
+20300	203	813425	Savage Strikes	Savage Strikes	same	juggernaut_2	5	40	40	2	2	6	6	25	25	match
+21000	210	871178	Shield Mastery	Shield Mastery	same	juggernaut_2	1	40	40	4	4	6	6	25	25	match
+20800	208	871174	Ability - Stand Your Ground	Ability - Stand Your Ground	same	juggernaut_2	1	40	40	5	5	6	6	25	25	match
+20700	207	871171	Improved Dulling Blow	Improved Dulling Blow	same	juggernaut_2	5	40	40	6	6	6	6	25	25	match
+22000	220	871206	Brutal Destroyer	Brutal Destroyer	same	juggernaut_2	5	50	50	2	2	7	7	30	30	match
+20900	209	871176	Improved Shield Mastery	Improved Shield Mastery	same	juggernaut_2	2	50	50	4	4	7	7	30	30	match
+21900	219	871203	Ability - Call to Arms	Ability - Call to Arms	same	juggernaut_2	5	50	50	5	5	7	7	30	30	match
+22100	221	871211	Retribution	Retribution	same	juggernaut_2	5	60	60	2	2	8	8	35	35	match
+25800	258	4725658	Combo - Titanic Smash	Combo - Titanic Smash	same	juggernaut_2	1	60	60	3	3	8	8	35	35	match
+21100	211	871179	Combo - Strike and Guard	Combo - Strike and Guard	same	juggernaut_2	5	60	60	5	5	8	8	35	35	match
+25100	251	3457455	Ability - Powerhouse	Ability - Powerhouse	same	juggernaut_2	1	70	70	2	2	9	9	40	40	match
+21200	212	871180	Ability - Juggernaut	Ability - Juggernaut	same	juggernaut_2	1	70	70	5	5	9	9	40	40	match
+22300	223	871217	Storm Blade	Storm Blade	same	tempest_2	5	10	10	1	1	1	1	0	0	match
+22400	224	871222	Relentless	Relentless	same	tempest_2	5	15	15	2	2	2	2	5	5	match
+23500	235	871255	Revenge	Revenge	same	tempest_2	5	15	15	5	5	2	2	5	5	match
+22500	225	871227	Power Sweeps	Power Sweeps	same	tempest_2	5	20	20	2	2	3	3	10	10	match
+22700	227	871237	Brutal Sweeps	Brutal Sweeps	same	tempest_2	1	20	20	3	3	3	3	10	10	match
+23600	236	871260	Ability - Intimidating Shout	Ability - Intimidating Shout	same	tempest_2	5	20	20	5	5	3	3	10	10	match
+22600	226	871232	Stalwart	Stalwart	same	tempest_2	5	25	25	2	2	4	4	15	15	match
+22900	229	871239	Ability - Disarming Aggression	Ability - Disarming Aggression	same	tempest_2	3	25	25	3	3	4	4	15	15	match
+25400	254	3478203	Redoubt	Redoubt	same	tempest_2	5	25	25	5	5	4	4	15	15	match
+23000	230	871242	Relentless Assault	Relentless Assault	same	tempest_2	1	30	30	2	2	5	5	20	20	match
+23700	237	871265	Ability - Impale	Ability - Impale	same	tempest_2	1	30	30	5	5	5	5	20	20	match
+23900	239	871273	Sweep the Field	Sweep the Field	same	tempest_2	2	30	30	6	6	5	5	20	20	match
+23100	231	871243	Precise Attacks	Precise Attacks	same	tempest_2	5	40	40	2	2	6	6	25	25	match
+23300	233	871251	Combo - Skewer	Combo - Skewer	same	tempest_2	3	40	40	3	3	6	6	25	25	match
+22800	228	871238	Brutal Maiming	Brutal Maiming	same	tempest_2	1	40	40	4	4	6	6	25	25	match
+23800	238	871267	Master Pikeman	Master Pikeman	same	tempest_2	5	40	40	5	5	6	6	25	25	match
+24000	240	871278	Crippling Thrusts	Crippling Thrusts	same	tempest_2	3	40	40	6	6	6	6	25	25	match
+24900	249	3457443	Fortitude	Fortitude	same	tempest_2	5	50	50	2	2	7	7	30	30	match
+25700	257	4725458	Combo - Riposte	Combo - Riposte	same	tempest_2	1	50	50	3	3	7	7	30	30	match
+23200	232	871248	Hateful Vengeance	Hateful Vengeance	same	tempest_2	5	50	50	5	5	7	7	30	30	match
+24100	241	871281	Subterfuge	Subterfuge	same	tempest_2	5	60	60	2	2	8	8	35	35	match
+25500	255	3477200	Defiance	Defiance	same	tempest_2	1	60	60	3	3	8	8	35	35	match
+25000	250	3457449	Vengeance is Mine	Vengeance is Mine	same	tempest_2	5	60	60	5	5	8	8	35	35	match
+23400	234	871254	Ability - Lightning Reflexes	Ability - Lightning Reflexes	same	tempest_2	1	70	70	2	2	9	9	40	40	match
+24200	242	871286	Combo - Storm Strike	Combo - Storm Strike	same	tempest_2	1	70	70	5	5	9	9	40	40	match
+230000	2300	3067683	Growing Storm	Growing Storm	same	thunder_2	5	10	10	1	1	1	1	0	0	match
+230100	2301	3067688	Spell - Storm Crown	Spell - Storm Crown	same	thunder_2	3	15	15	2	2	2	2	5	5	match
+421000	4210	3022117	Storm Throne	Storm Throne	same	thunder_2	2	15	15	3	3	2	2	5	5	match
+231200	2312	3067717	Spell - Power of the Serpent Ring	Spell - Power of the Serpent Ring	same	thunder_2	3	15	15	5	5	2	2	5	5	match
+232300	2323	3067748	Serpent's Twist	Serpent's Twist	same	thunder_2	2	15	15	6	6	2	2	5	5	match
+235400	2354	4927458	Faithful of Set	Faithful of Set	same	thunder_2	4	20	20	2	2	3	3	10	10	match
+230900	2309	3067710	Storm Regalia	Storm Regalia	same	thunder_2	1	20	20	3	3	3	3	10	10	match
+235100	2351	3534849	Wrath of the Serpent Ring	Wrath of the Serpent Ring	same	thunder_2	5	20	20	5	5	3	3	10	10	match
+230300	2303	3067694	Spell - Static Blood	Spell - Static Blood	same	thunder_2	5	25	25	2	2	4	4	15	15	match
+230800	2308	3067707	Spell - Idol of Set	Spell - Idol of Set	same	thunder_2	3	25	25	5	5	4	4	15	15	match
+234300	2343	3067811	Idol of Set's Power	Idol of Set	differs	thunder_2	2	25	25	6	6	4	4	15	15	match
+231500	2315	3067726	Spell - Set's Life Spark	Spell - Set	differs	thunder_2	1	30	30	2	2	5	5	20	20	match
+230600	2306	3067705	Empowered Life of Set	Empowered Life of Set	same	thunder_2	1	30	30	3	3	5	5	20	20	match
+235000	2350	3534838	Symbiotic Idol of Set	Symbiotic Idol of Set	same	thunder_2	5	30	30	5	5	5	5	20	20	match
+233700	2337	3067796	Titanic Storm	Titanic Storm	same	thunder_2	2	40	40	1	1	6	6	25	25	match
+231700	2317	3067728	Thunder Storm	Thunder Storm	same	thunder_2	5	40	40	2	2	6	6	25	25	match
+231100	2311	3067716	Spell - Thundering Voice	Spell - Thundering Voice	same	thunder_2	1	40	40	4	4	6	6	25	25	match
+231400	2314	3067725	Spell - Storm Blood	Spell - Storm Blood	same	thunder_2	1	40	40	5	5	6	6	25	25	match
+234500	2345	3067818	Idol of Set's Supremacy	Idol of Set	differs	thunder_2	1	40	40	6	6	6	6	25	25	match
+231000	2310	3067711	Spell - Triumphant Life of Set	Spell - Triumphant Life of Set	same	thunder_2	5	50	50	2	2	7	7	30	30	match
+230700	2307	3067706	Spell - Vital Shock	Spell - Vital Shock	same	thunder_2	5	50	50	5	5	7	7	30	30	match
+233500	2335	4287117	Set's Brutal Storm	Set's Brutal Storm	same	thunder_2	5	60	60	2	2	8	8	35	35	match
+235200	2352	3534855	Staggering Voice	Staggering Voice	same	thunder_2	1	60	60	4	4	8	8	35	35	match
+231300	2313	3067720	Vitality of Set	Vitality of Set	same	thunder_2	5	60	60	5	5	8	8	35	35	match
+231600	2316	3067727	Spell - Summon Aura of Nebthu	Spell - Summon Aura of Nebthu	same	thunder_2	1	70	70	2	2	9	9	40	40	match
+231800	2318	3067731	Spell - Serpent Transmutation	Spell - Serpent Transmutation	same	thunder_2	1	70	70	5	5	9	9	40	40	match
+231900	2319	3067732	Arcing Charged Blast	Arcing Charged Blast	same	lightning_2	5	10	10	1	1	1	1	0	0	match
+232000	2320	3067737	Improved Lightning Strike	Improved Lightning Strike	same	lightning_2	5	15	15	2	2	2	2	5	5	match
+233000	2330	3067776	Set's Empowerment	Set's Empowerment	same	lightning_2	5	15	15	5	5	2	2	5	5	match
+233800	2338	3067798	Spell - Rousing Shock	Ability - Rousing Shock	differs	lightning_2	1	15	15	6	6	2	2	5	5	match
+234900	2349	3534793	Spark Storm	Spark Storm	same	lightning_2	3	20	20	2	2	3	3	10	10	match
+230500	2305	3067702	Set's Entrapment	Set's Entrapment	same	lightning_2	3	20	20	3	3	3	3	10	10	match
+234000	2340	3067800	Static Charge	Static Charge	same	lightning_2	5	20	20	5	5	3	3	10	10	match
+232200	2322	3067747	Spell - Inner Charge	Spell - Inner Charge	same	lightning_2	1	25	25	1	1	4	4	15	15	match
+232100	2321	3067742	Brutal Lightning	Brutal Lightning	same	lightning_2	5	25	25	2	2	4	4	15	15	match
+233200	2332	3067784	Spell - Blood Mana	Spell - Blood Mana	same	lightning_2	1	25	25	4	4	4	4	15	15	match
+233300	2333	3067785	Ether Absorption	Ether Absorption	same	lightning_2	3	25	25	5	5	4	4	15	15	match
+234100	2341	3067805	Coalesce Ether	Coalesce Ether	same	lightning_2	3	25	25	6	6	4	4	15	15	match
+233400	2334	3067790	Spell - Elemental Fury	Spell - Elemental Fury	same	lightning_2	1	30	30	2	2	5	5	20	20	match
+232400	2324	3067751	Spell - Force of Lightning	Spell - Force of Lightning	same	lightning_2	1	30	30	5	5	5	5	20	20	match
+232600	2326	3067753	Fury of the Storm	Fury of the Storm	same	lightning_2	5	40	40	1	1	6	6	25	25	match
+232500	2325	3067752	Spell - Column Lightning	Spell - Column Lightning	same	lightning_2	1	40	40	2	2	6	6	25	25	match
+234700	2347	3532747	Lightning Arc	Lightning Arc	same	lightning_2	3	40	40	3	3	6	6	25	25	match
+230400	2304	3067699	Spell - Lightning Cast	Spell - Lightning Cast	same	lightning_2	2	40	40	4	4	6	6	25	25	match
+235300	2353	3534863	Improved Call Lightning	Improved Call Lightning	same	lightning_2	5	40	40	5	5	6	6	25	25	match
+232700	2327	3067766	Jurisdiction of Set	Jurisdiction of Set	same	lightning_2	5	50	50	2	2	7	7	30	30	match
+234800	2348	3534776	Spell - Fangs of Set	Spell - Fangs of Set	same	lightning_2	5	50	50	5	5	7	7	30	30	match
+232800	2328	7373	Lightning Storm Nimbus	Lightning Storm Nimbus	same	lightning_2	5	60	60	2	2	8	8	35	35	match
+234400	2344	3067813	Spell - Slip Free	Spell - Slip Free	same	lightning_2	5	60	60	5	5	8	8	35	35	match
+232900	2329	3067775	Spell - Cyclone of Set	Spell - Cyclone of Set	same	lightning_2	1	70	70	2	2	9	9	40	40	match
+233900	2339	3067799	Spell - Puppets of Set	Spell - Puppets of Set	same	lightning_2	1	70	70	5	5	9	9	40	40	match
