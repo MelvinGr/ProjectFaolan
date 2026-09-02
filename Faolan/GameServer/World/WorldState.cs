@@ -971,6 +971,19 @@ namespace Faolan.GameServer.World
 			return steps;
 		}
 
+		// #921: the harvest nodes whose gathering-pin window ran out this tick, with the zone each one lives in.
+		public IReadOnlyList<(Zone Zone, LiveWorldObject Node)> TickGatheringPins(double deltaSeconds)
+		{
+			List<(Zone, LiveWorldObject)> due = [];
+			foreach (var zone in _zones.Values)
+			{
+				foreach (var node in zone.TickGatheringPins(deltaSeconds))
+					due.Add((zone, node));
+			}
+
+			return due;
+		}
+
 		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
 		public bool TryGetZone(uint mapId, [MaybeNullWhen(false)] out Zone zone)
 		{

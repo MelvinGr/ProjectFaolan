@@ -88,6 +88,9 @@ namespace Faolan.GameServer.World
 		// regrowth) to everyone who can see it. The tick owns the TIMING; this is the wire side.
 		Task PlayDynelVisualStep(DueDynelVisualStep step);
 
+		// #921: a harvest node's gathering-pin window ran out - put its own map-pin kind back (WaypointType, 0xAC).
+		Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node);
+
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
 

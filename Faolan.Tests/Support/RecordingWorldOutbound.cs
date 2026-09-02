@@ -158,6 +158,11 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		public Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
+		{
+			return Task.CompletedTask;
+		}
+
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
 			return Task.CompletedTask;

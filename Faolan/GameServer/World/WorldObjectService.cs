@@ -373,6 +373,46 @@ namespace Faolan.GameServer.World
 			return BroadcastToViewers(_sim.World.ZoneForEntity(player), node, StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.HealthCurrent, health)));
 		}
 
+		// #921: a swing landed, so the node's map pin becomes the "being gathered" icon. The pin IS a stat on the dynel
+		// - `WaypointType` (0xAC), which the client's stat-apply turns straight into a minimap icon - and retail moves
+		// it in two pushes per bout: `ResourceGatheringActive` beside the first swing's health drop, and the node's
+		// own kind (the same value its spawn carries) 10-15 s after the last swing. Nothing goes out for a swing that
+		// lands inside the window; the zone's countdown just restarts.
+		//
+		// ⚠️ The gathering push is sent TWICE, back to back, because that is what retail does: every one of the 672
+		// captured WaypointType pushes is a doubled frame (336 pairs), while the HealthCurrent push beside it is single.
+		// A node whose row holds no WaypointType never had a pin and gets nothing - there is no kind to come back to.
+		// [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json dynel 0x4D0: health 351 -> 251, 0xAC = 0x1D x2, 0xAC = 0x11 x2 ten seconds later]
+		public async Task BroadcastGatheringPin(INetworkClient client, LiveWorldObject node)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || node.Row.WaypointType is null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(player);
+			if (!zone.MarkGathering(node))
+				return;
+
+			await BroadcastWaypointType(zone, node, WaypointType.ResourceGatheringActive);
+		}
+
+		// The gathering window ran out (the tick's call): put the node's own kind back on its pin.
+		public Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
+		{
+			return node.Row.WaypointType is { } kind
+				? BroadcastWaypointType(zone, node, (WaypointType)kind)
+				: Task.CompletedTask;
+		}
+
+		private static async Task BroadcastWaypointType(Zone zone, LiveWorldObject node, WaypointType type)
+		{
+			var typeTag = WorldObjectColumns.TypeTagForClass(node.SubOpcode);
+			var body = StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.WaypointType, (uint)type));
+
+			for (var i = 0; i < 2; i++) // doubled, as retail sends it (see BroadcastGatheringPin)
+				await BroadcastToViewers(zone, node, body);
+		}
+
 		// #678: one due step of a harvested object's staged visual sequence, put on the wire for everyone who can see
 		// it. Each step is exactly what retail sends at that moment:
 		//

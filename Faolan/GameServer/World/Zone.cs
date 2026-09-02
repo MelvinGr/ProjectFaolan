@@ -83,6 +83,44 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// #921: how long a harvest node keeps its "being gathered" map pin after the LAST swing on it. Retail restores
+		// the node's own kind 10-15 s after the last health drop of a bout (10 s on 7 of 16 bouts, never sooner),
+		// counted from the last swing, not the first - a bout of four swings holds the pin for ~40 s.
+		public const double GatheringPinSeconds = 10.0;
+
+		// The harvest nodes currently showing the gathering pin, each with the seconds it has left before its own
+		// kind comes back. Keyed by handle, like the visual sequences, so every swing RESETS the countdown rather than
+		// queueing a second one.
+		private readonly ConcurrentDictionary<uint, (LiveWorldObject Node, double SecondsLeft)> _gatheringPins = new ConcurrentDictionary<uint, (LiveWorldObject, double)>();
+
+		// A swing landed on `node`: start (or extend) its gathering pin. Returns true when the node was NOT already
+		// showing it - the one case the pin has to go on the wire; a further swing inside the window only restarts
+		// the countdown and sends nothing, which is what retail does (23 of 23 un-flagged swings in the corpus landed
+		// on a node already at ResourceGatheringActive).
+		public bool MarkGathering(LiveWorldObject node)
+		{
+			var isNew = !_gatheringPins.ContainsKey(node.Handle);
+			_gatheringPins[node.Handle] = (node, GatheringPinSeconds);
+			return isNew;
+		}
+
+		// Counts every gathering pin down by `deltaSeconds` and yields the nodes whose window ran out, removing them.
+		public IEnumerable<LiveWorldObject> TickGatheringPins(double deltaSeconds)
+		{
+			foreach (var (handle, (node, left)) in _gatheringPins)
+			{
+				var remaining = left - deltaSeconds;
+				if (remaining > 0)
+				{
+					_gatheringPins[handle] = (node, remaining);
+					continue;
+				}
+
+				if (_gatheringPins.TryRemove(handle, out _))
+					yield return node;
+			}
+		}
+
 		// The static world objects within `range` of `position` - the interest query for streaming props as a player
 		// walks. Same linear scan as the entity queries above, and the same note applies: fine at map scale, a grid is
 		// the optimisation when it stops being.

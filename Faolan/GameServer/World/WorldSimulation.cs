@@ -755,6 +755,10 @@ namespace Faolan.GameServer.World
 						foreach (var step in World.TickVisualSequences(dt))
 							await _output.PlayDynelVisualStep(step);
 
+						// #921: a harvest node shows the "being gathered" pin until 10 s after its last swing.
+						foreach (var (zone, node) in World.TickGatheringPins(dt))
+							await _output.RestoreNodeWaypointType(zone, node);
+
 						// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
 						await _playerDeaths.TickPlayerDeaths();
 						await TickKillChains();

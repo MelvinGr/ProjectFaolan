@@ -165,6 +165,11 @@ namespace Faolan.GameServer.World
 			return _worldObjects.PlayDynelVisualStep(step);
 		}
 
+		public Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
+		{
+			return _worldObjects.RestoreNodeWaypointType(zone, node);
+		}
+
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
 			// #586: every caller of this - the regen tick, fall damage, lava, drowning - moves a CURRENT and nothing

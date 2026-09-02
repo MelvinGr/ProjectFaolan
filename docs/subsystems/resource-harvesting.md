@@ -53,6 +53,12 @@ NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json].
   matching `SetKDTree` (that manifest's `<CollisionMesh2 file>`) and, in one case, a particle puff. It is the
   same `SimpleDynelVisualChangeIIR` sequence the quest-item pickups play, on the destructible class.
 
+**The node's MAP PIN tracks the bout** (#921): a harvest node's minimap icon is `WaypointType` (0xAC) on the dynel —
+its resource kind's icon (`WaypointType.StoneNode` / `WoodNode` / `GoldNode` / `IronNode` / `ClothNode`, carried by
+the spawn) — and retail flips it to `ResourceGatheringActive` beside the first swing of a bout, restoring the kind
+10 s after the last swing. `WorldObjectService.BroadcastGatheringPin` sends the flip (doubled, as retail does) and
+the world tick restores it (`Zone.TickGatheringPins`); the decode is in `docs/re/waypoint-type-stat.md`.
+
 **Depletion is modelled** (#732): one interaction is one swing, taking 100 health and granting 1 unit, with the
 new health broadcast on that same `StatIIR` so the health bar moves. A node is exhausted only when it can no
 longer pay for a swing, and only then does it despawn and come back through `DynelVisualSequence`. **Regrowth in

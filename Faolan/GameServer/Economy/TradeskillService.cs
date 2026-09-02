@@ -525,6 +525,7 @@ namespace Faolan.GameServer.Economy
 			node.Health = after;
 			await SendItemLootChatMessage(client, resourceId, (uint)((await _database.GetItem(resourceId))?.Level ?? 0));
 			await _worldObjects.BroadcastNodeHealth(client, node, after);
+			await _worldObjects.BroadcastGatheringPin(client, node); // #921: the map pin flips to "being gathered"
 
 			// Exhausted only when it can no longer pay for a swing. Until then the node stays in the world with its
 			// health bar down, which is what the player sees in retail.

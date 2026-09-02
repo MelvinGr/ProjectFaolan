@@ -62,13 +62,65 @@ The field is on the dynel base, and six classes share the two vtable slots that 
 a gate. `FUN_0080acd0`'s `0xAC` branch is the single writer, which is what makes the stat the whole story rather
 than one route among several.
 
-## What is still open
+## ⭐ What each value means — the client's own type table
 
-**What each value MEANS.** The six observed values are per-playfield appearance keys, resolved against
-`Gui/Default/Waypoints/PF%u.xml` (`tooltip_title`, `tooltip_text`, `min_level`, `max_level`, `tooltip_image`,
-`normal_bitmap`, `inactive_bitmap`, `dir_arrow`, `dir_arrow_inactive`) — so the name of a type is *client
-content per playfield*, not a global enum. ⚠️ They are a different set from `ParseWPType`'s (`8`, `9`, `0x0D`,
-`0x15`, `0x16`, default `custom`), which belongs to the script-command path, so the two must not be conflated.
-Reading the `PF%u.xml` files for the playfields the 672 records were captured on is what would name them.
+The six observed values are not per-playfield keys after all. `Gui/Default/Waypoints/PF%u.xml` carries type
+NAMES (`destination` ×351, `region` ×79, `dungeon` ×41 — the `ParseWPType` path, `FUN_0139e6f0`) and never a
+number, and `PlacePin` (`FUN_0080bb20`) does no mapping of its own: for every accepted value it fetches the
+dynel's name for the tooltip and hands the stat value **verbatim** as the type word to the map's waypoint add
+(`FUN_0139f520`). The meaning lives in **`RMWaypoint_c`'s constructor** (`FUN_01727820`, `MapGUI\RMWaypoint.cpp`),
+a dense 38-way switch over the type word that loads each pin's bitmaps — the string table beside it
+(`WorldmapGUI/minimap_*.tga`) is laid out in the same order. Composed from the jump table at `0x017289A8` and the
+`MOV EDX,<string>` each branch performs (the decompiler folds them into argument-less `FUN_010d16a0()` calls, so
+this needed the disassembly), it is `Faolan.Core/Enums/WaypointType.cs`:
+
+| value | bitmap | | value | bitmap |
+|---:|---|---|---:|---|
+| 1 | `minimap_arrowself` (the player) | | 20 | `minimap_travel` |
+| 2 | `minimap_player` | | 21 | `worldmap_dungeon` + `locked`/`unlocked` |
+| 3 | `minimap_shop` | | 22 | `worldmap_hub` / `_premium` + `locked`/`unlocked` |
+| 4 | `minimap_questgiver` | | 23–25 | `minimap_npc` |
+| 5 | `minimap_quest_done` | | **26** | `minimap_massivepvp_active` |
+| 7 | `minimap_resurrectionpoint` | | **27** | **`minimap_cloth`** |
+| 8 | `minimap_marker_green` (legend: POI) | | 28 | `minimap_resurrectionpoint_red` (murderer) |
+| 9 | `minimap_marker` (legend: custom waypoint) | | **29** | **`minimap_resourcegathering_active`** |
+| 10 / 11 | `ctf_flag_red` / `ctf_flag_blue` | | 30–32 | the six quest location/direction/region bitmaps: untracked / tracked / selected |
+| 12 | `minimap_tracking` | | 33–38 | `minimap_onslaught_enemyspawn` / `_enemy` / `_wildlifecamp` / `_lootmummy` / `_treasurechest` / `_boss` |
+| 13 | `worldmap_playfield` / `_premium` + `locked`/`unlocked` | | **0xC748** | `minimap_travel` — the zone label, and the value IS its class word (`EntityClass.ZoneLabel`) |
+| **15 / 16 / 17 / 18** | **`minimap_stone` / `_wood` / `_gold` / `_iron`** | | 0xC87B | `minimap_tombstone` + `_direction` — likewise `EntityClass.TombStone` |
+| 19 | `worldmap_icon_dungeon3` | | 6, 14 | default — no bitmap |
+
+The bold rows are the dynel-stat subset, and `WorldObjects.WaypointType` (proto field 7 of the spawn) already
+holds them: **15** on the 48 rocks (Basalt … Slate), **16** on the 49 trees (Ash … Yew), **17** on the 43 lodes and
+veins (Bismuth … Silver), **18** on the 41 deposits and ore nodes (Chromium …), **27** on the 11 cotton shrubs,
+**0xC748** on the 104 zone labels. So a harvest node's pin is its RESOURCE KIND's minimap icon, and the spawn
+already sends it. 26 (massive PvP) is accepted by the dynel and never captured.
+
+## ⭐⭐ 0x1D is a TRANSIENT: the node being gathered — and it is implemented
+
+`ResourceGatheringActive` (0x1D) is the one value no row stores, because retail pushes it and takes it back
+within a harvesting bout. All 32 captured pushes (16 bouts, every one a `Destructible` harvest node) follow one
+rule, measured over the corpus [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json dynel 0x4D0]:
+
+```
+21:34:01  StatIIR 0x4D0  HealthCurrent 351 -> 251        the swing lands
+21:34:01  StatIIR 0x4D0  WaypointType = 0x1D   (x2)       ... and the pin flips to "being gathered"
+21:34:11  StatIIR 0x4D0  WaypointType = 0x11   (x2)       ten seconds after the LAST swing, the kind comes back
+```
+
+* **The flip rides the FIRST swing of a bout.** Every −100 swing that was *not* followed by 0x1D landed on a node
+  already showing it (23 of 23); every swing that *was* landed on a node at its own kind (12 of 12).
+* **The restore is 10–15 s after the last swing** (10 s ×7, 12, 13, 14 ×5, 15 ×2 — never sooner), so a bout of
+  several swings holds the pin for as long as the player keeps swinging plus ten seconds.
+* **Every WaypointType push is doubled** — 672 frames are 336 identical back-to-back pairs, while the
+  `HealthCurrent` push beside them is single. The server sends it twice for that reason alone.
+* Half the bouts carry a `SimpleDynelVisualChange` `ChangeMesh`/`SetKdTree` pair in the same second — that is the
+  node's mesh tracking its health tier (see `docs/subsystems/resource-harvesting.md`), not part of the pin.
+
+Built as `Zone.MarkGathering` / `Zone.TickGatheringPins` (the countdown, `GatheringPinSeconds` = 10),
+`WorldObjectService.BroadcastGatheringPin` (called by `TradeskillService.Harvest` beside the health push) and
+`WorldObjectService.RestoreNodeWaypointType` (the tick's call through `IWorldOutbound`). Gated by
+`HarvestGatheringPinTests`. A node whose row holds no `WaypointType` gets nothing — it never had a pin, and there
+is no kind to come back to.
 
 Open work tracked in Gitea #921.
