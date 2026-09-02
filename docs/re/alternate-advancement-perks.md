@@ -158,6 +158,10 @@ Repeats are byte-identical (27/27, 91/91, 211/211), so the amount is determinist
   the Maidens (the Damsel-encounter boss) L80 → 510 (regular 258); Boros L80 → 297 (a smaller tier — ×1.15);
   and three sub-cutoff bosses each paid exactly **2** (Battlemaster Torgvall L26, the epic-instance Lurking
   Horror L28) where every ordinary grey pays 0.
+  ⭐ The multiplier has a COLUMN: the ×2 payers (Argus, Eerika) are the two `NpcStatCore.NpcType = 2` rows in the
+  table, every ×1 row is `NpcType = 4` (Hired Bodyguard, Zingaran Operative, Wharf Rat Thug, Ravenous Crocodile
+  Follower — one tier, so the curve above is not tier-confounded), and Boros's ×1.15 is a type-4 mob with
+  `NpcFlags = 0x1C0000`, the flag word Eerika also carries. So a kill's AA tier is readable off the template.
 * **The killing blow attributes the grant.** A L75 kill whose last hit was the necro PET's paid nothing while
   the player had damaged it moments before; a L78 Wharf Rat where the pets dealt the clear damage majority but
   the player landed the last hit paid in full. Majority-damage is refuted; last-hit fits every sample.
