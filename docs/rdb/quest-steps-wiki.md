@@ -36,24 +36,55 @@ text is Funcom's, and the emulator already sources journal text from the client'
 transcription would duplicate it and set up a rival source of truth for the same strings. What is kept is the
 part the wiki uniquely adds.
 
-## ⚠️ Coverage: it is small, and it barely overlaps what we have
+## ⭐ The join is at the QUEST LINE, not the quest
 
-Two numbers decide how far to trust this as a cross-check, and both are discouraging:
+A wiki **page** is one of our **`QuestLines`**; a wiki **step** is one of our **`QuestDefinitions`**. Matching
+page titles against `QuestDefinitions.Name` therefore looks like near-total disjointness — only 25 of 552 — and
+that reading is wrong. Against `QuestLines.Name` (with the leading `[Zone]` / `[NPE]` / `[Destiny …]` tag
+stripped):
 
-* **It is ~11% the size of our client-derived set** — 552 pages against 5,049 quests. The wiki is markedly
-  incomplete against the real game: its own Aquilonia index links far more quests than have pages, and Khitai has
-  no quest category at all.
-* **Only 25 of the 552 name-match a quest in `QuestDefinitions`**, against 4,302 of our quests carrying a name.
-  Titles like *A Beloved Friend* or *A Missing Filly* appear nowhere in our data under any name.
+| | pages |
+|---|---:|
+| matched one of our 2,130 named quest lines | **442** of 552 |
+| …and the step titles equal our member quest names, **in order** | **286** |
+| …matched, but the step list differs | 141 |
+| unmatched | 110 |
 
-That near-disjointness is itself the interesting result, and it is **not** yet explained. It could mean the wiki
-covers content our extraction has not reached, or that the two sides name the same quests differently, or that
-our `Name` column is populated for a different subset than the wiki documents. Until that is run down, treat a
-non-match as "unknown", never as "missing from the client".
+The 110 unmatched are mostly not quests at all — tradeskill recipe sets, arenas, and index pages, which is what
+the `parse_status` column already separates out.
 
-Two fields are close to useless as shipped: `prerequisite` is filled on exactly **one** of 552 pages (the wiki
-almost never fills `|prereqs=`), so chains are only walkable *forwards* via `next_quest` (149 pages); and `level`
-is present on 170 of 552, `zone` null on 111.
+**The starting content matches exactly.** Both chains a new character sees agree step for step, and the objective
+text agrees too — our goal on the first Casilda step reads `Kill the Scavenger`, and so does the wiki's:
+
+| our quest line | ours | wiki | agreement |
+|---|---:|---:|---|
+| `[Destiny Quest 1-5] Shipwrecked` (auto-granted) | 8 quests | 8 steps | 8 / 8 identical, in order |
+| `[Destiny 1-5 Sidequest] Casilda` (the first quest picked up) | 4 quests | 4 steps | 4 / 4 identical, in order |
+
+## Where the two disagree, and which side is usually right
+
+Of the 52 differences across the `[NPE]` and `[Destiny …]` lines:
+
+* **18 — the wiki stops short of the turn-in.** Its step list is a strict prefix of ours, missing the closing
+  *Return to X* step (`Dead Meat` → the wiki has `Salted Meat`, we also have `Return to Ninus`). **Ours is the
+  more complete side**, and this is the single most common difference.
+* **8 — the wiki page is a stub** with no steps parsed at all.
+* **10 — spelling**, almost always the wiki's (`The West Guard Wall` for our `The West Wall Guard`,
+  `Crameleico`, `Truth Revealad`, a stray trailing `=`). Two are ours to check: `Judgment`/`Judgement` and
+  `Report back to Bartholomo`.
+* **4 — the same steps in a different order.** These are the ones worth an actual look, because journal order is
+  something we serve: `[NPE] Tarisha's Sacrifice` has *The Bodyguard* first on the wiki and eighth for us, and
+  `[Destiny 30 Cimmeria] The Phoenix of the South` has the two halves of its five steps swapped.
+* the remaining 12 are a **matching artifact, not a data difference** — the wiki carries one page per class
+  variant, all titled e.g. *The Awakening I*, so a Rogue page gets compared against the Mage line. Any real check
+  of the class Destiny chains has to disambiguate on class first.
+
+⚠️ Two fields remain close to useless as shipped: `prerequisite` is filled on exactly **one** page of 552, so
+chains are only walkable *forwards* via `next_quest` (149 pages); and `level` is present on 170 of 552, `zone`
+null on 111.
+
+⚠️ Coverage is still small in absolute terms — 552 pages against our 5,049 client-derived quests, and the wiki's
+own zone indexes link far more quests than have pages. A quest absent from the wiki means nothing about our data.
 
 ## Reproducing
 
