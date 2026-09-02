@@ -194,6 +194,18 @@ catalog, which is consistent with the client never needing it offline. Captures 
 quests carry a `JournalSequence` today (890 fully-ordered lines), and 1,031 multi-step lines have no captured
 order at all. More coverage means a login capture of a character who completed those lines, not more RDB work.
 
+### ⭐ On a PARTIAL line, the `1` is a real head marker and the `0`s are merely unwritten
+
+A line can carry a sequence on some members and 0 on the rest. Twenty-four do. Those 0s are not a position:
+checked against an independent step listing ([`quest-steps-wiki.md`](quest-steps-wiki.md)), on every line where
+exactly one member is at `JournalSequence = 1` and all others are 0, that member is the listed first step —
+**5 of 5, none against**.
+
+⚠️ So anything ordering a line's members must sort **unknown LAST**. Sorting 0 ahead of 1 reverses exactly these
+lines, silently, because the fallback looks like a valid ordering. `QuestMarkerResolver.LineReached` is already
+right (it skips the gate when either side is 0); this is a note for anything written next. The 24 partial lines
+are also the cheapest to finish, since each already names its own first step.
+
 ## The reward fields do NOT name the journal record's scalars
 
 `MainQuest` carries exactly one reward pair, `xp_reward` (15) and `cash_reward` (16), populated on only 23 and

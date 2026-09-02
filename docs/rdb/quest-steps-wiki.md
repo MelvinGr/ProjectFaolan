@@ -134,9 +134,27 @@ gate — otherwise every giver on it would go silver forever.
 Anything ordering members must therefore put unknown **last**, not first; sorting `0` ahead of `1` silently
 reverses those lines.
 
-⚠️ That does **not** license copying the wiki's order into `faolan.db`. The order is the client's to state, and
-the right fix is to find where it states it; the wiki is how such a decode would be *checked*, exactly as it was
-used here. Open work tracked in Gitea #926.
+### Could the wiki simply FILL the missing order? Measured: accurate, but it reaches only 4% of the gap
+
+Held out against the lines we *can* check — those with a full captured `JournalSequence` where the wiki lists
+exactly the same step set — the wiki's order is **right on 207 of 207**, including three 6-step lines, three
+7-step, three 8-step and one 11-step, where agreeing by chance is 1 in 39 million. Its ordering is not the weak
+half of this source.
+
+| our line length | wiki order == captured order |
+|---|---|
+| 2 steps | 155 / 155 |
+| 3–5 steps | 42 / 42 |
+| 6–11 steps | 10 / 10 |
+
+⚠️ **But it can only fill 41 of the 1,009 unordered lines** — the wiki largely documents the same lines our
+captures already cover. So it is not a fix for the gap; it is a small, high-confidence increment (though a
+useful one: it includes several 6–11 step Destiny class chains such as the Warrior and Priest *Awakening* lines
+and `[NPE] Tarisha's Sacrifice`).
+
+⛔ If those 41 are ever written into the database they must carry their **provenance**, not be merged into
+`JournalSequence` as though captured — the column reads as client fact everywhere else, and 41 rows of inferred
+order silently mixed in would make every consumer's trust in it wrong. Open work tracked in Gitea #926.
 
 ## Reproducing
 
