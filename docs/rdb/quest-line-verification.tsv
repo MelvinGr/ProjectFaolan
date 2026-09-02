@@ -1,0 +1,2211 @@
+quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
+188		5	none	0	no-wiki-page	unnamed
+222	[NPE] The Legendary Turach	5	full	5	exact	
+232	[NPE] Domicile of Vileness	2	full	2	exact	
+233	[NPE] Tarisha's Sacrifice	9	none	9	same-steps-order-differs	
+234	[NPE] Caught in the Shadows	8	full	8	exact	
+235	[NPE] Xantia's Wrath	6	full	6	minor-text-diff	
+236	[NPE] Ruins and Demise	10	full	10	minor-text-diff	
+238	[Eiglophian_Mountains] Feast of Coltranach	3	none	0	no-wiki-page	
+239	[Eiglophian_Mountains] Fear of Coltranach	4	none	0	no-wiki-page	
+240		1	single	0	no-wiki-page	unnamed
+241	[Destiny Quest 1-5] Shipwrecked	8	full	8	exact	
+267	[NPE] Feeding the Hungry	6	full	6	exact	
+271	[NPE] Garden of Cursed Mysteries	2	full	2	exact	
+307	[NPE] The Mitra Clergy	3	full	2	wiki-omits-turn-in	
+309	[NPE] The Lost Bottles	2	full	2	exact	
+310	[NPE] Grave Invite	2	full	2	exact	
+315	[NPE] Path of the Pirate 	4	partial	3	wiki-omits-turn-in	
+318		9	none	0	no-wiki-page	unnamed
+319		2	none	0	no-wiki-page	unnamed
+320		3	none	0	no-wiki-page	unnamed
+322		4	none	0	no-wiki-page	unnamed
+325	[NPE] Enslaved	2	full	2	exact	
+327	[NPE] Feathers for Quills	2	full	2	exact	
+348		2	none	0	no-wiki-page	unnamed
+368	[NPE] Gone with the Wine	2	full	2	exact	
+379	[Destiny Mage 15 - 19] The Awakening III	8	full	6	mismatch	
+385	[Destiny Mage 10 - 14] The Awakening II	7	full	7	exact	
+386	[Destiny Mage 5 - 9] The Awakening I	7	full	7	minor-text-diff	
+395	[Destiny Warrior 5-9] The Awakening I	11	none	11	same-steps-order-differs	
+396	[Destiny Warrior 10-14] The Awakening II	7	none	7	minor-text-diff	
+421		2	none	0	no-wiki-page	unnamed
+422		2	none	0	no-wiki-page	unnamed
+423		2	none	0	no-wiki-page	unnamed
+474	[NPE_long] Den of no Return	3	full	3	exact	
+475	[Test] Quest Loot Function take 2	3	none	0	no-wiki-page	
+492	[Khopshef_Province] Salt for Silver	2	full	2	exact	
+494	[Khopshef_Province] Holding Fear at Bay	2	full	2	exact	
+495	[Khopshef_Province] Hethlon's Vanished Wife	2	full	2	exact	
+517	[Khopshef_Province] A Vision from Set	2	full	2	exact	
+519	[Khopshef_Province] Poisoned Arrows	2	full	2	exact	
+522	[Conarch_Village] Rotten Molars	2	none	1	wiki-omits-turn-in	
+528	[Destiny Rogue 5-9] The Awakening I	5	full	5	minor-text-diff	
+529	[Destiny Rogue 10-14] The Awakening II	7	full	7	exact	
+550	[Conarch_Village] The Gift of Healing	2	full	2	exact	
+571		2	none	0	no-wiki-page	unnamed
+606	[Destiny Priest 5-9] The Awakening I	7	none	5	mismatch	
+607	[Destiny Priest 10-14] The Awakening II	7	none	7	same-steps-order-differs	
+689	[Field_of_the_Dead] Wolves at our Throats	2	full	0	no-wiki-page	
+690	[Field_of_the_Dead] Into the Dark Woods	2	full	0	no-wiki-page	
+691	[Field_of_the_Dead] The Wolf Dream	2	full	0	no-wiki-page	
+692	[Field_of_the_Dead] The Curse of the Werewolves	2	full	0	no-wiki-page	
+693	[Field_of_the_Dead] Den of Wolves	2	full	0	no-wiki-page	
+696	[Field_of_the_Dead] Finding Safe Passage	3	full	0	no-wiki-page	
+699	[Field_of_the_Dead] Hunting the Vanir	2	full	0	no-wiki-page	
+701	[Field_of_the_Dead] To The Victor Go The Spoils	2	full	0	no-wiki-page	
+704	[Field_of_the_Dead] Morne's Clumsy Hands	2	full	0	no-wiki-page	
+705	[Field_of_the_Dead] The Music of the Night	2	full	0	no-wiki-page	
+708	[Field_of_the_Dead] Wolf Hunt	2	full	0	no-wiki-page	
+709	[Field_of_the_Dead] Greater Prey	2	full	0	no-wiki-page	
+711	[Field_of_the_Dead] The Rescue of Isobail I	2	full	0	no-wiki-page	
+712	[Field_of_the_Dead] The Rescue of Isobail II	1	full	0	no-wiki-page	
+713	[Field_of_the_Dead] The Lost Scouts	2	full	0	no-wiki-page	
+714	[Field_of_the_Dead] Captives of the White Hand	2	full	0	wiki-page-has-no-steps	
+715	[Field_of_the_Dead] Allies of the White Hand	2	full	0	no-wiki-page	
+717	[Field_of_the_Dead] The Tale of the White Hand	1	full	0	no-wiki-page	
+718	[Field_of_the_Dead] Eacharn's Favor	2	full	0	no-wiki-page	
+720		2	none	0	no-wiki-page	unnamed
+721	[Field_of_the_Dead] Through the Wolves' Pass	2	full	0	no-wiki-page	
+723	[Destiny 19] The Battle of Tortage	5	full	5	exact	
+782	[Eiglophian_Mountains] A Friend in Need	1	full	0	no-wiki-page	
+784	[Eiglophian_Mountains] Keeping the Village Safe	2	full	2	mismatch	
+786	[Eiglophian_Mountains] On the Frontline	1	full	0	no-wiki-page	
+787	[Eiglophian_Mountains] Doing Your Part	2	full	2	mismatch	
+788	[Eiglophian_Mountains] Swallowing the Pride	2	full	2	exact	
+789	[Eiglophian_Mountains] Cannibal Commotion	3	full	0	no-wiki-page	
+790		2	none	0	no-wiki-page	unnamed
+791	[Eiglophian_Mountains] Into the Breach	3	full	0	no-wiki-page	
+792	[Eiglophian_Mountains] Abominable Adversaries	3	full	0	no-wiki-page	
+793		2	none	0	no-wiki-page	unnamed
+795		1	single	0	no-wiki-page	unnamed
+796		2	none	0	no-wiki-page	unnamed
+797	[Eiglophian_Mountains] All That Is Lost Shall Be Found	2	full	0	no-wiki-page	
+798		2	full	0	no-wiki-page	unnamed
+799	[Eiglophian_Mountains] Into the Fire	2	none	1	mismatch	
+801	[Eiglophian_Mountains] Ante Up	4	full	0	no-wiki-page	
+802		3	none	0	no-wiki-page	unnamed
+803	[Eiglophian_Mountains] The Great Ordeal	2	none	0	no-wiki-page	
+805		2	none	0	no-wiki-page	unnamed
+806		2	none	0	no-wiki-page	unnamed
+807		3	none	0	no-wiki-page	unnamed
+808		4	none	0	no-wiki-page	unnamed
+811	[Eiglophian_Mountains] Proving Grounds	2	full	0	no-wiki-page	
+812	[Eiglophian_Mountains] Setback - Nera	3	full	0	no-wiki-page	
+813	[Eiglophian_Mountains] Enemies No More - Nera	4	full	0	no-wiki-page	
+815	[Destiny Priest 15-19] The Awakening III	7	none	7	same-steps-order-differs	
+825	[Destiny Warrior 15-19] The Awakening III	6	none	6	same-steps-order-differs	
+827	[Destiny Rogue 15-19] The Awakening III	4	full	4	exact	
+880	[Conarch_Village] Every Strong Arm	1	full	1	exact	
+881	[Conall's_Valley] The Wolf Menace	2	full	2	exact	
+885	[Conall's_Valley] Helping the Settlement	1	full	1	exact	
+887	[Conall's_Valley] Curing the Sick	3	full	3	exact	
+888	[Conall's_Valley] The Vanir Polluters	2	none	2	exact	
+889	[Conall's_Valley] Blinding the Enemy	2	full	2	exact	
+890	[Conall's_Valley] Plundering the Prowlers	2	none	2	exact	
+891	[Conall's_Valley] Frostblood's Camp	2	none	2	exact	
+892	[Conall's_Valley] Hunting for Valoz	2	full	2	exact	
+893	[Conall's_Valley] Old Man Gormley	3	partial	3	exact	
+894	[Conall's_Valley] Kern Wolfeye	2	full	2	exact	
+895	[Conall's_Valley] Defeating Iceblade	2	none	2	exact	
+896	[Conall's_Valley] Invading the Supply Camp	2	none	2	exact	
+897	[Conall's_Valley] A Special Request	3	none	3	exact	
+898	[Conall's_Valley] Appetite of the Wolf	3	none	3	exact	
+899	[Conall's_Valley] The Hidden Cavern	2	none	2	mismatch	
+900	[Conall's_Valley] The Passing of Blackfrost	2	full	0	no-wiki-page	
+902	[Conall's_Valley] An Impending Attack	3	none	3	mismatch	
+903	[Conall's_Valley] The Snowy Beast	2	full	2	exact	
+904	[Conall's_Valley] A Sharp Blade	1	full	0	no-wiki-page	
+905	[Conall's_Valley] Torn from the Dead	2	full	2	mismatch	
+907	[Conall's_Valley] The Lurking Horror	3	partial	3	exact	
+908	[Conall's_Valley] The Ancient Burial Mounds	3	none	3	exact	
+909	[Conall's_Valley] The Tactician's Camp	2	none	0	no-wiki-page	
+911	[Conall's_Valley] Chaos in the Fortress	2	full	2	mismatch	
+912	[Conall's_Valley] Mayhem in the Fortress	2	none	0	no-wiki-page	
+914	[Conarch_Village] The Downtrodden	2	none	2	exact	
+915	[Conall's_Valley] Decimate the Warhost	2	none	0	no-wiki-page	
+916	[Eiglophian_Mountains] Flowers of the Snow	2	partial	0	no-wiki-page	
+925	[Weaponsmith_1][1.1] Bloodsilver Khopesh and Bloodsilver Greatsword	2	full	0	no-wiki-page	
+927	[Weaponsmith_1][1.2] Bloodsilver Pugio	2	full	0	no-wiki-page	
+928	[Weaponsmith_1][1.6] Bloodsilver Mace and Bloodsilver Heavy Bludgeon	2	full	0	no-wiki-page	
+930	[Weaponsmith_1][1.9] Bloodsilver Decurve Bow	2	full	0	no-wiki-page	
+931	[Weaponsmith_1][1.A] Bloodsilver Decurve Crossbow	2	full	0	no-wiki-page	
+932		2	none	0	no-wiki-page	unnamed
+933	[Weaponsmith_2][2.6] Bloodsilver Ball Mace and Bloodsilver Great Hammer	2	full	0	no-wiki-page	
+938	[Destiny 30 Cimmeria] The Phoenix of the South	5	none	5	same-steps-order-differs	
+939	[Destiny 30 Aquilonia] The Phoenix of the South	5	none	5	same-steps-order-differs	
+940	[Destiny 30 Stygia] The Phoenix of the South	5	full	5	exact	
+941	[Weaponsmith_1][1.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+943	[Weaponsmith_1][1.C] Bloodsilver Throwing Knife	2	full	0	no-wiki-page	
+945	[NPE] Tarisha's Sorrow	2	none	2	mismatch	
+946	[Weaponsmith_2][2.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+947	[Weaponsmith_3][3.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+952	[Weaponsmith_2][2.1] Bloodsilver Broadsword and Bloodsilver Bastardsword	2	full	0	no-wiki-page	
+954	[Weaponsmith_2][2.2] Bloodsilver Poignard	2	full	0	no-wiki-page	
+955	[Weaponsmith_2][2.4] Bloodsilver Partisan	2	full	0	no-wiki-page	
+956	[Weaponsmith_2][2.9] Bloodsilver Flat Bow	2	full	0	no-wiki-page	
+957	[Weaponsmith_2][2.A] Bloodsilver Heavy Crossbow	2	full	0	no-wiki-page	
+959	[Quest Testcase] Find Character	1	single	0	no-wiki-page	
+960	[Quest Testcase] Talk to NPC	1	single	0	no-wiki-page	
+961	[Quest Testcase] Destroy a Character	1	single	0	no-wiki-page	
+962	[Quest Testcase] External Trigger	1	single	0	no-wiki-page	
+963	[Quest Testcase] Get Item	1	single	0	no-wiki-page	
+964	[Quest Testcase] Give Item to Character	1	single	0	no-wiki-page	
+965	[Quest Testcase] Put Item on Character	1	single	0	no-wiki-page	
+967	[Weaponsmith_3][3.6] Moonsteel Crowbill and Moonsteel War Mace	2	full	0	no-wiki-page	
+970	[Weaponsmith_3][3.1] Moonsteel Gladius and Moonsteel Heavy Falchion	2	full	0	no-wiki-page	
+972	[Weaponsmith_3][3.4] Moonsteel Glaive	2	full	0	no-wiki-page	
+973	[Weaponsmith_3][3.2] Moonsteel Katar	2	full	0	no-wiki-page	
+974	[Weaponsmith_3][3.A] Moonsteel Recurve Crossbow	2	full	0	no-wiki-page	
+975	[Weaponsmith_3][3.9] Moonsteel Recurve Bow	2	full	0	no-wiki-page	
+976	[Quest Testcase] Locate District	1	single	0	no-wiki-page	
+977	[Quest Testcase] Escort Character - Ignore Threats	1	single	0	no-wiki-page	
+979	[Weaponsmith_2][2.C] Bloodsilver Throwing Dagger	2	full	0	no-wiki-page	
+981	[Weaponsmith_3][3.C] Moonsteel Throwing Knife	2	full	0	no-wiki-page	
+982	[Quest Testcase] Create Item	1	single	0	no-wiki-page	
+983	[Quest Testcase] Find Simpledynel	1	single	0	no-wiki-page	
+984	[Quest Testcase] Use Simpledynel	1	single	0	no-wiki-page	
+985	[Quest Testcase] Use Item on Item	1	single	0	no-wiki-page	
+987	[NPE] Wisdom through Venom	2	full	2	exact	
+988	[Field_of_the_Dead] The Torches of Eiglophian	2	full	0	no-wiki-page	
+989	[Field_of_the_Dead] Things Man Was Not Meant To Know 	1	full	0	no-wiki-page	
+990	[Field_of_the_Dead] The Threat of the Vanir	2	full	0	no-wiki-page	
+991	[Field_of_the_Dead] The Chieftain's Command	2	full	0	no-wiki-page	
+992	[Field_of_the_Dead] The Chieftain's Vengeance	2	full	0	no-wiki-page	
+994	[Cars Test] Use Item on Item	1	single	0	no-wiki-page	
+995	[Field_of_the_Dead] The Bearer of Ill Tidings 	2	full	0	no-wiki-page	
+996	[Field_of_the_Dead] Cure for Lycanthropy	2	full	0	no-wiki-page	
+997	[Quest Testcase] Destroy Destructible	1	single	0	no-wiki-page	
+998	[Weaponsmith_4][4.1] Moonsteel Cutlass and Moonsteel Claymore	2	full	0	no-wiki-page	
+1000	[Weaponsmith_4][4.4] Moonsteel Ranseur	2	full	0	no-wiki-page	
+1001	[Weaponsmith_4][4.2] Moonsteel Kukri	2	full	0	no-wiki-page	
+1003	[Weaponsmith_4][4.6] Moonsteel War Hammer and Moonsteel Lucern Hammer	2	full	0	no-wiki-page	
+1006	[Weaponsmith_4][4.9] Moonsteel Horn Bow	2	full	0	no-wiki-page	
+1007	[Weaponsmith_4][4.A] Moonsteel Ratchet Crossbow	2	full	0	no-wiki-page	
+1008	[Weaponsmith_4][4.C] Moonsteel Throwing Dagger	2	full	0	no-wiki-page	
+1010	[Weaponsmith_4][4.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+1011	[Weaponsmith_5][5.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+1012	[Weaponsmith_5][5.1] Skymetal Shortsword and Skymetal Bastardsword	2	full	0	no-wiki-page	
+1014	[Weaponsmith_5][5.4] Skymetal Bardiche	2	full	0	no-wiki-page	
+1016	[Weaponsmith_5][5.2] Skymetal Poignard	2	full	0	no-wiki-page	
+1018	[Weaponsmith_5][5.6] Skymetal Flanged Mace and Skymetal Sledgehammer	2	full	0	no-wiki-page	
+1020	[Weaponsmith_5][5.9] Skymetal Reflex Bow	2	full	0	no-wiki-page	
+1021	[Weaponsmith_5][5.A] Skymetal Reflex Crossbow	2	full	0	no-wiki-page	
+1022	[Weaponsmith_5][5.C] Skymetal Throwing Knife	2	full	0	no-wiki-page	
+1024	[Weaponsmith_6][6.0] Weaponsmith Progression	1	full	0	no-wiki-page	
+1025	[Weaponsmith_6][6.1] Skymetal Greatsword and Skymetal Claymore	2	full	0	no-wiki-page	
+1027	[Weaponsmith_6][6.4] Skymetal Halberd	2	full	0	no-wiki-page	
+1028	[Weaponsmith_6][6.2] Skymetal Kris	2	full	0	no-wiki-page	
+1032	[Weaponsmith_6][6.6] Skymetal Spiked Mace and Skymetal Heavy War Mace	2	full	0	no-wiki-page	
+1033	[Weaponsmith_6][6.9] Skymetal Battle Bow	2	full	0	no-wiki-page	
+1034	[Weaponsmith_6][6.A] Skymetal Battle Crossbow	2	full	0	no-wiki-page	
+1036	[Weaponsmith_6][6.C] Skymetal Throwing Dagger	2	full	0	no-wiki-page	
+1037	[Atzels_Fortress] Crawling from the Depths	2	full	0	no-wiki-page	
+1038	[Atzels_Fortress] Worm Holes	2	full	0	no-wiki-page	
+1039	[NPE] Veil of Dawn	2	full	2	exact	
+1041	[Atzels_Fortress] Against the Larvae Matrons	2	full	0	no-wiki-page	
+1043	[Atzels_Fortress] The Lost Men	3	full	0	no-wiki-page	
+1044	[Conall's_Valley] The Assault Camp	2	none	2	exact	
+1045	[Atzels_Fortress] Revenge Served Cold	2	full	0	no-wiki-page	
+1046	[Conall's_Valley] The Source of Pollution	2	full	2	exact	
+1048	[Atzels_Fortress] Dead Man's Ledger	2	none	0	no-wiki-page	
+1049	[Atzels_Fortress] Kidnapping & Torture	6	full	0	no-wiki-page	
+1050	[Atzels_Fortress] Tale of Insanity	2	full	2	exact	
+1051	[Atzels_Fortress] The Stygian's Diary	2	full	0	no-wiki-page	
+1052	[Atzels_Fortress] Hard Evidence	2	full	0	no-wiki-page	
+1053	[Conall's_Valley] The Cimmerian's Plea	1	full	0	no-wiki-page	
+1054	[Destiny 1-5 Sidequest] Casilda	4	full	4	exact	
+1055	[Conall's_Valley] The Bloodied Spear	1	full	1	exact	
+1056	[Conall's_Valley] The Burning Scars	2	none	2	exact	
+1057	[Conall's_Valley] Blood and Venom	2	none	2	mismatch	
+1058	[Atzels_Fortress] Esperan the Zingaran	1	full	0	no-wiki-page	
+1059	[Atzels_Fortress] The Nemedian Dispatch	1	full	0	no-wiki-page	
+1060	[Atzels_Fortress] Bloody Ambush	3	full	0	no-wiki-page	
+1063	[Atzels_Fortress] Bridge of Blood and Death	2	full	0	no-wiki-page	
+1064	[Atzels_Fortress] Rogue Trader	2	full	2	exact	
+1066	[Atzels_Fortress] The Lamb Becomes a Wolf	2	full	2	exact	
+1070	[Atzels_Fortress] War Standard	4	full	0	no-wiki-page	
+1071	[Atzels_Fortress] The 5th Columnist	1	full	0	no-wiki-page	
+1072	[Atzels_Fortress] Proof of Raiders	2	full	2	exact	
+1073	[Atzels_Fortress] Feast of Wyrmlings	2	full	2	exact	
+1075	[Atzels_Fortress] The Troglodyte Conflict	2	full	2	exact	
+1076	[Atzels_Fortress] The Killing Zone	2	full	2	exact	
+1078	[NPE] Dousing the Fire	2	full	0	no-wiki-page	
+1080	[Atzels_Fortress] The Giant Killings	2	full	2	exact	
+1081	[Field_of_the_Dead] The Messenger	2	full	0	no-wiki-page	
+1082	[Field_of_the_Dead] The Poisoned Cup	2	full	0	no-wiki-page	
+1083	[Field_of_the_Dead] Wagon Wreck	2	full	0	no-wiki-page	
+1086	[Atzels_Fortress] Against the Giant Chief	2	full	0	no-wiki-page	
+1087	[Atzels_Fortress] Rage of the Ape God	2	full	2	exact	
+1088	[Atzels_Fortress] Revenge of the Ape God	3	full	0	no-wiki-page	
+1089	[Atzels_Fortress] Beastmaster of An-Sug	2	full	0	no-wiki-page	
+1090	[Atzels_Fortress] Trail to the Dragon's Lair	2	full	0	no-wiki-page	
+1097	[Quest Testcase] Failed task cycle - Order test	5	none	0	no-wiki-page	
+1100	[Quest Testcase] Cars Integration	1	single	0	no-wiki-page	
+1107	[Khopshef_Province] Securing the Caravan Route	2	full	2	exact	
+1111	[Khopshef_Province] The Captain's Warning	2	full	2	exact	
+1112	[Khopshef_Province] Eye for an Eye	2	partial	2	exact	
+1113	[Khopshef_Province] A Pinch of Salt	2	full	2	exact	
+1114	[Khopshef_Province] Ill Will and a Last Meal	3	full	3	exact	
+1115	[Khopshef_Province] Trapped by Lions	1	single	2	mismatch	
+1116	[Destiny LTTK] Letter to the King I	5	full	5	exact	
+1117	[Khopshef_Province] A Bright Idea	1	single	2	mismatch	
+1118	[Destiny LTTK] Letter to the King II	4	full	4	exact	
+1120	[Khemi] Caged Animals	5	full	5	minor-text-diff	
+1126	[Khemi] A Hot Day	2	full	2	exact	
+1127	[Khemi] Trouble in the Province	2	full	2	exact	
+1128	[Atzels_Fortress_Dungeon] Inside Enemy Territory	2	full	0	no-wiki-page	
+1129	[Atzels_Fortress_Dungeon] Blood Soaked Battle Plans	2	full	0	no-wiki-page	
+1133	[Khopshef_Province] Azusena's Revenge	2	none	2	exact	
+1134	[Atzels_Fortress_Dungeon] Turncoats and Cutthroats	2	full	0	no-wiki-page	
+1136	[Armorsmith_1][1.1.1] Basic Canvas Cloth Set	2	full	0	no-wiki-page	
+1139	[Armorsmith_1][1.3.1] Basic Short Tanned Leather Set	2	full	0	no-wiki-page	
+1140	[Armorsmith_1][1.4.1] Basic Short Bloodsilver-studded Set	2	full	0	no-wiki-page	
+1141	[Armorsmith_1][1.5.1] Basic Bloodsilver-mail Set	2	full	0	no-wiki-page	
+1142	[Atzels_Fortress_Dungeon] Power Behind the Throne	1	single	0	no-wiki-page	
+1143	[Atzels_Fortress_Dungeon] Talon the Spymaster	2	full	0	no-wiki-page	
+1144	[Atzels_Fortress_Dungeon] Cold Iron for the Soul	2	none	0	no-wiki-page	
+1145	[Atzels_Fortress_Dungeon] Death to the Arachneologian!	2	full	0	no-wiki-page	
+1146	[Atzels_Fortress_Dungeon] Cimmerian Allies	1	single	0	no-wiki-page	
+1150	[Armorsmith_1][1.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1153	[Armorsmith_2][2.1.1] Basic Quilted Cloth Set	2	full	0	no-wiki-page	
+1154	[Armorsmith_2][2.1.2] Advanced Quilted Cloth Set	2	full	0	no-wiki-page	
+1155	[Armorsmith_2][2.3.1] Basic Long Tanned Leather Set	2	full	0	no-wiki-page	
+1156	[Armorsmith_2][2.3.2] Advanced Long Tanned Leather Set	2	full	0	no-wiki-page	
+1157	[Armorsmith_2][2.4.1] Basic Long Bloodsilver-studded Set	2	full	0	no-wiki-page	
+1158	[Armorsmith_2][2.4.2] Advanced Long Bloodsilver-studded Set	2	full	0	no-wiki-page	
+1159	[Armorsmith_2][2.5.1] Basic Bloodsilver-ring Set	2	full	0	no-wiki-page	
+1160	[Armorsmith_2][2.5.2] Advanced Bloodsilver-ring Set	2	full	0	no-wiki-page	
+1161	[Armorsmith_2][2.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1164	[Armorsmith_3][3.1.1] Basic Sateen Set	2	full	0	no-wiki-page	
+1165	[Armorsmith_3][3.1.2] Advanced Sateen Set	2	full	0	no-wiki-page	
+1166	[Armorsmith_3][3.3.1] Basic Short Waxed Leather Set	2	full	0	no-wiki-page	
+1167	[Armorsmith_3][3.3.2] Advanced Short Waxed Leather Set	2	full	0	no-wiki-page	
+1168	[Armorsmith_3][3.4.1] Basic Short Moonsteel-studded Set	2	full	0	no-wiki-page	
+1169	[Armorsmith_3][3.4.2] Advanced Short Moonsteel-studded Set	2	full	0	no-wiki-page	
+1170	[Armorsmith_3][3.5.1] Basic Moonsteel-mail Set	2	full	0	no-wiki-page	
+1171	[Armorsmith_3][3.5.2] Advanced Moonsteel-mail Set	2	full	0	no-wiki-page	
+1174	[Armorsmith_3][3.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1175	[Armorsmith_4][4.1.1] Basic Silk Set	2	full	0	no-wiki-page	
+1176	[Armorsmith_4][4.1.2] Advanced Silk Set	2	full	0	no-wiki-page	
+1177	[Armorsmith_4][4.3.1] Basic Long Waxed Leather Set	2	full	0	no-wiki-page	
+1178	[Armorsmith_4][4.3.2] Advanced Long Waxed Leather Set	2	full	0	no-wiki-page	
+1179	[Armorsmith_4][4.4.1] Basic Long Moonsteel-studded Set	2	full	0	no-wiki-page	
+1180	[Armorsmith_4][4.4.2] Advanced Long Moonsteel-studded Set	2	full	0	no-wiki-page	
+1181	[Armorsmith_4][4.5.1] Basic Moonsteel-scaled Set	2	full	0	no-wiki-page	
+1182	[Armorsmith_4][4.5.2] Advanced Moonsteel-scaled Set	2	full	0	no-wiki-page	
+1185	[Armorsmith_4][4.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1186	[Armorsmith_5][5.1.1] Basic Ironsilk Set	2	full	0	no-wiki-page	
+1187	[Armorsmith_5][5.1.2] Advanced Ironsilk Set	2	full	0	no-wiki-page	
+1188	[Armorsmith_5][5.3.1] Basic Short Oiled Leather Set	2	full	0	no-wiki-page	
+1189	[Armorsmith_5][5.3.2] Advanced Short Oiled Leather Set	2	full	0	no-wiki-page	
+1190	[Armorsmith_5][5.4.1] Basic Short Skymetal-studded Set	2	full	0	no-wiki-page	
+1191	[Armorsmith_5][5.4.2] Advanced Short Skymetal-studded Set	2	full	0	no-wiki-page	
+1192	[Armorsmith_5][5.5.1] Basic Skymetal-mail Set	2	full	0	no-wiki-page	
+1193	[Armorsmith_5][5.5.2] Advanced Skymetal-mail Set	2	full	0	no-wiki-page	
+1194	[Armorsmith_5][5.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1195	[Armorsmith_6][6.1.1] Basic Steelsilk Set	2	full	0	no-wiki-page	
+1196	[Armorsmith_6][6.1.2] Advanced Steelsilk Set	2	full	0	no-wiki-page	
+1197	[Armorsmith_6][6.3.1] Basic Long Oiled Leather Set	2	full	0	no-wiki-page	
+1198	[Armorsmith_6][6.3.2] Advanced Long Oiled Leather Set	2	full	0	no-wiki-page	
+1199	[Armorsmith_6][6.4.1] Basic Long Skymetal-studded Set	2	full	0	no-wiki-page	
+1200	[Armorsmith_6][6.4.2] Advanced Long Skymetal-studded Set	2	full	0	no-wiki-page	
+1201	[Armorsmith_6][6.5.1] Basic Skymetal-scaled Set	2	full	0	no-wiki-page	
+1202	[Armorsmith_6][6.5.2] Advanced Skymetal-scaled Set	2	full	0	no-wiki-page	
+1203	[Armorsmith_6][6.0.1] Armorsmith Progression	1	full	0	no-wiki-page	
+1204	[Atzels_Fortress] The Draconis Hex	2	full	0	no-wiki-page	
+1205	[Khopshef_Province] Torn by Guilt	2	full	2	exact	
+1206	[ACG_Frost_Swamp][1.01] Hides and Shells	2	none	0	no-wiki-page	
+1207	[ACG_Frost_Swamp][Group][Rep]Wench's Wager	2	none	0	no-wiki-page	
+1209	[ACG_Frost_Swamp][1.04] Culling the Wild Beasts	2	none	0	no-wiki-page	
+1210	[ACG_Frost_Swamp][Group][L40]Arachnophoria	2	none	0	no-wiki-page	
+1211	[ACG_Frost_Swamp][1.07] Tusks and Tails	2	none	0	no-wiki-page	
+1212	[ACG_Frost_Swamp][Group][L40]Purge the Frost Swamp with Fire	2	none	0	no-wiki-page	
+1214	[ACG_Frost_Swamp][2.10] As Water Spins in Circles Twice	2	none	0	no-wiki-page	
+1215	[ACG_Frost_Swamp][Group][L60]Prayers for the Lost Priest	4	none	0	no-wiki-page	
+1217	[ACG_Frost_Swamp][2.13] Serpents of the Swamp	2	none	0	no-wiki-page	
+1218	[ACG_Frost_Swamp][Group][L60]Biting the White Hand	2	none	0	no-wiki-page	
+1220	[ACG_Frost_Swamp][2.16] Monsters and Serpents	2	none	0	no-wiki-page	
+1225	[Khopshef_Province] A Token of Trust	2	none	1	wiki-omits-turn-in	
+1226	[Khopshef_Province] Lost in the Desert	2	full	2	exact	
+1228	[Khopshef_Province] Yipping Hyenas	2	full	2	exact	
+1230	[Khopshef_Province] Commander Ramartarsi	2	full	2	exact	
+1231	[Khopshef_Province] The Mastermind	2	none	0	no-wiki-page	
+1232	[Khopshef_Province] The Slave Rebellion	2	full	2	exact	
+1233	[Khopshef_Province] A Lesson Learned	2	full	2	exact	
+1234	[Khopshef_Province] Heads Will Roll	2	full	2	exact	
+1235	[Khopshef_Province] The Bandit Prince	2	none	0	no-wiki-page	
+1236	[Khopshef_Province] A Question of Conscience	2	full	2	exact	
+1237	[Khopshef_Province] Distant Lands	2	full	2	mismatch	
+1238	[Khopshef_Province] A Long Voyage	2	none	0	no-wiki-page	
+1239	[Khopshef_Province] Blood of the Serpent	2	full	2	exact	
+1240	[Khopshef_Province] Tribute to Set	4	full	4	exact	
+1249	[Khemi] Something of a Delicacy	2	full	2	exact	
+1252	[NPE] A Brother's Vengeance	2	full	2	exact	
+1254	[NPE] Unholy Magic	2	full	2	exact	
+1255	[NPE] Remains of a Bygone Age	2	full	2	exact	
+1256	[NPE] Spirit of Acheron	2	full	2	exact	
+1257	[Khopshef_Province] Desert Raiders	2	full	2	mismatch	
+1258	[Khopshef_Province] The Spider Queen	2	full	2	exact	
+1259	[Khopshef_Province] Exoskeleton	2	full	2	exact	
+1260	[Khopshef_Province] Fear of the Demon	3	full	3	exact	
+1266	[Khopshef_Province] A Better Smith	2	full	0	no-wiki-page	
+1267	[Khopshef_Province] The Perils of Competition	2	full	2	mismatch	
+1268	[Tarantia_Noble_ACG] The Chef	2	full	2	exact	
+1269	[Khopshef_Province] Where Dead Men Wander	2	full	2	mismatch	
+1271	[Khopshef_Province] Ending the Threat	2	full	2	exact	
+1274	[Test] The Epic Wolf Hunt	2	none	0	no-wiki-page	
+1275	[Khopshef_Province] Life and Death	2	full	2	exact	
+1276	[Khopshef_Province] Reaching Out	1	single	2	mismatch	
+1277	[Tarantia_Noble_ACG] Lady of Villa Verde	2	full	2	exact	
+1278	[Khopshef_Province] Usurping the Power	3	none	0	no-wiki-page	
+1279	[Khopshef_Province] Breaking the Spell	3	none	3	mismatch	
+1280	[Khopshef_Province] Lost Love	1	single	0	no-wiki-page	
+1281	[Khopshef_Province] Forbidden Knowledge	2	full	2	exact	
+1282	[NPE] The Pict Threat	2	full	2	exact	
+1283	[NPE] Gold and Gore	2	full	2	exact	
+1285	[NPE] The Halls of the Dead	2	full	2	exact	
+1286	[NPE] The Prisoner's Revenge	2	full	2	exact	
+1287	[Architect_1][1.0] Architect Progression	1	single	0	no-wiki-page	
+1288	[NPE] A Deadly Message	2	full	2	exact	
+1289	[Architect_1][1.1] Principal Structures Plans	2	none	0	no-wiki-page	
+1290	[Tarantia_Noble_ACG] The Thief	2	full	2	exact	
+1291	[Architect_1][1.2] Training Buildings Plans	2	none	0	no-wiki-page	
+1292	[Architect_1][1.3] Workshops Plans	2	none	0	no-wiki-page	
+1293	[Architect_1][1.4] Siegeworks Plans	2	none	0	no-wiki-page	
+1294	[Architect_2][2.1] Advanced Principal Structures Plans	2	none	0	no-wiki-page	
+1295	[Architect_3][3.1] Superior Principal Structures Plans	2	none	0	no-wiki-page	
+1296	[Architect_2][2.4] Advanced Siegeworks Plans	2	none	0	no-wiki-page	
+1297	[Architect_3][3.4] Superior Siegeworks Plans	2	none	0	no-wiki-page	
+1298	[Architect_2][2.2] Advanced Training Buildings Plans	2	none	0	no-wiki-page	
+1299	[Architect_3][3.2] Superior Training Buildings Plans	2	none	0	no-wiki-page	
+1300	[Architect_2][2.3] Advanced Workshops Plans	2	none	0	no-wiki-page	
+1301	[Architect_3][3.3] Superior Workshops Plans	2	none	0	no-wiki-page	
+1302	[Architect_2][2.0] Architect Progression	1	single	0	no-wiki-page	
+1303	[Architect_3][3.0] Architect Progression	1	single	0	no-wiki-page	
+1304	[NPE] The Missing Cargo	2	full	2	exact	
+1305	[NPE] Cimmerian Blue Steel	3	full	3	minor-text-diff	
+1307	[NPE] The Stench of Death	2	full	2	exact	
+1308	[NPE] Horror Beneath the Surface	2	full	2	exact	
+1309	[Tarantia_Noble_ACG] The Slave Girl	2	full	2	exact	
+1311	[NPE] Of Rotting Flesh	2	full	2	exact	
+1312	[NPE] Fire for the Dead	2	full	2	exact	
+1314	[Atzels_Fortress] Traitor, Spy, or Fear	2	full	0	no-wiki-page	
+1315	[Eiglophian_Mountains] Convincing the Hunter	1	full	0	no-wiki-page	
+1316	[Atzels_Fortress] Internal Allies	2	full	0	no-wiki-page	
+1318	[NPE] Dry Times	4	full	4	exact	
+1319	[NPE] Empty Reserves	2	full	2	exact	
+1320	[NPE] Abandoned in the Halls of Fear	3	full	1	wiki-omits-turn-in	
+1321	[NPE] Queen of Punishment	2	full	2	exact	
+1322	[NPE] Breaking the Bones	2	full	2	exact	
+1323	[Atzels_Fortress_Dungeon] Callosus's Fate	4	none	0	no-wiki-page	
+1324	[Quest Testcase] One NonOptional Reward	1	single	0	no-wiki-page	
+1325	[Quest Testcase] Three NonOptional rewards	1	single	0	no-wiki-page	
+1326	[Quest Testcase] 1 NonOptional + 2 Optional rewards	1	single	0	no-wiki-page	
+1327	[Tarantia_Noble_Arena_01] The Arena Bear	2	full	2	exact	
+1328	[Tarantia_Noble_Arena_02] The Arena Panther	2	full	2	exact	
+1329	[Tarantia_Noble_Arena_03] The Arena Snow Leopard	2	full	2	exact	
+1330	[Tarantia_Noble_Arena_001] The Arena Pict Chief	2	full	0	no-wiki-page	
+1331	[Tarantia_Noble_Arena_002] The Arena One Armed Gladiator	2	full	0	no-wiki-page	
+1332	[Tarantia_Noble_Arena_003] The Arena Blasphemous Bulk	2	full	0	no-wiki-page	
+1333	[Kheshatta] Entry Permit for Kaloush	1	full	2	mismatch	
+1334	[Kheshatta] Stygian Trading Permit	1	full	2	mismatch	
+1335	[Kheshatta] The Lost License	2	full	1	wiki-omits-turn-in	
+1336	[Kheshatta] The Murderous Little Acolyte	2	full	2	exact	
+1337	[Quest Testcase] Item cleanup - Get Item	1	single	0	no-wiki-page	
+1338	[Quest Testcase] Item cleanup - Get Item - NOT	1	single	0	no-wiki-page	
+1339	[Quest Testcase] Item cleanup - Put Item on Item	1	single	0	no-wiki-page	
+1340	[Quest Testcase] Item cleanup - Put Item on Item - NOT	1	single	0	no-wiki-page	
+1341	[Kheshatta] Wanted - The Blasphemer	2	full	0	no-wiki-page	
+1342	[Kheshatta] Wanted - The Stolen Idol	2	full	0	no-wiki-page	
+1344	[Kheshatta] Public Entertainment License	1	full	2	mismatch	
+1345	[Kheshatta_Scorpion_Cave] The Four Accursed Keys	2	none	0	no-wiki-page	
+1346	[Kheshatta] The Mongrel Menace	2	full	1	wiki-omits-turn-in	
+1347	[Kheshatta] Prowling the Pack Leaders	2	full	1	wiki-omits-turn-in	
+1348	[Kheshatta] Patrolling the Wastes	2	full	1	wiki-omits-turn-in	
+1349	[Kheshatta] Desert Courier	2	full	2	exact	
+1350	[Kheshatta] Hunting the Wastes	4	full	0	no-wiki-page	
+1351	[Kheshatta] Venom in the Wastelands	2	full	2	exact	
+1352	[Kheshatta] Venomous Reduction	2	full	0	no-wiki-page	
+1353	[Kheshatta] Far Off Illicit Trade	1	full	2	mismatch	
+1355	[Wild_Lands_of_Zelata] A Father's Revenge	2	full	0	no-wiki-page	
+1356	[Wild_Lands_of_Zelata] Foundations of Trust	3	full	3	exact	
+1357	[Alchemist_1][1.0] Alchemist Progression	1	full	0	no-wiki-page	
+1358	[Alchemist_1][1.1] Crude Remedies	2	full	0	no-wiki-page	
+1359	[Alchemist_1][1.2] Crude Restoratives	2	full	0	no-wiki-page	
+1360	[Alchemist_1][1.3] Crude Sorcerous Potions	2	full	0	no-wiki-page	
+1362	[Alchemist_2][2.0] Alchemist Progression	1	full	0	no-wiki-page	
+1363	[Alchemist_2][2.1] Common Remedies	2	full	0	no-wiki-page	
+1364	[Alchemist_2][2.2] Common Restoratives	2	full	0	no-wiki-page	
+1365	[Alchemist_2][2.3] Common Sorcerous Potions	2	full	0	no-wiki-page	
+1367	[Alchemist_3][3.0] Alchemist Progression	1	full	0	no-wiki-page	
+1368	[Wild_Lands_of_Zelata] The Beaten Apprentice	2	full	2	exact	
+1369	[Alchemist_3][3.1] Refined Remedies	2	full	0	no-wiki-page	
+1370	[Wild_Lands_of_Zelata] Thick Heads and Strong Axes	2	full	2	exact	
+1371	[Alchemist_3][3.2] Refined Restoratives	2	full	0	no-wiki-page	
+1372	[Alchemist_3][3.3] Refined Sorcerous Potions	2	full	0	no-wiki-page	
+1373	[Old_Tarantia] A Queen's Carapace	2	full	2	exact	
+1374	[Wild_Lands_of_Zelata] A Refugee's Tale	5	full	5	exact	
+1375	[Wild_Lands_of_Zelata] A Triumphant Return	1	full	0	no-wiki-page	
+1376	[Wild_Lands_of_Zelata] A Vote's Worth	11	full	11	exact	
+1377	[Wild_Lands_of_Zelata] Breaking the Spearhead	2	full	0	no-wiki-page	
+1378	[Wild_Lands_of_Zelata] Bring Back the Dead	2	none	0	no-wiki-page	
+1379	[Wild_Lands_of_Zelata] Dark Beast Repellant	2	full	0	no-wiki-page	
+1380	[Wild_Lands_of_Zelata] Demicus' Experiment	2	full	2	mismatch	
+1381	[Wild_Lands_of_Zelata] Fabio's Predicament	3	full	3	exact	
+1382	[Wild_Lands_of_Zelata] Fangs of the Ferocious	2	full	2	exact	
+1383	[Wild_Lands_of_Zelata] Fetching Fungi	2	none	1	wiki-omits-turn-in	
+1384	[Wild_Lands_of_Zelata] Herbal Vitality	2	full	1	wiki-omits-turn-in	
+1385	[Wild_Lands_of_Zelata] Lifting the Curse	2	full	0	wiki-page-has-no-steps	
+1386	[Wild_Lands_of_Zelata] Mitra's Children	2	full	2	exact	
+1387	[Wild_Lands_of_Zelata] Octavia's Fate	2	full	2	mismatch	
+1388	[Wild_Lands_of_Zelata] Old Secrets	5	full	5	minor-text-diff	
+1389	[Wild_Lands_of_Zelata] Protecting the Flock	2	full	2	exact	
+1390	[Wild_Lands_of_Zelata] Prove Your Worth	2	full	2	exact	
+1391	[Wild_Lands_of_Zelata] Reconnaissance	1	full	0	no-wiki-page	
+1392	[Wild_Lands_of_Zelata] Rusty Courage	2	none	2	mismatch	
+1393	[Old_Tarantia] Save the Princess	2	full	2	exact	
+1394	[Wild_Lands_of_Zelata] Searching for Answers	2	full	2	exact	
+1395	[Wild_Lands_of_Zelata] Seeds of Desire	2	full	2	exact	
+1396	[Wild_Lands_of_Zelata] Sense of Fashion	2	full	2	exact	
+1397	[Old_Tarantia] Skins of the Corrupted	3	full	3	exact	
+1398	[Wild_Lands_of_Zelata] Strongarm Tactics	4	full	4	exact	
+1399	[Old_Tarantia] Flaying Zarathus	2	full	2	exact	
+1400	[Wild_Lands_of_Zelata] The Albino Dark Beast	3	full	3	exact	
+1401	[Wild_Lands_of_Zelata] The Battle of Corvo	5	full	5	exact	
+1402	[Wild_Lands_of_Zelata] The Cursed Scroll	3	full	0	no-wiki-page	
+1403	[Wild_Lands_of_Zelata] The Demon in the Tree	6	full	6	exact	
+1404	[Wild_Lands_of_Zelata] The Fisherman's Dilemma	2	full	0	no-wiki-page	
+1405	[Wild_Lands_of_Zelata] The Huntress	3	full	3	exact	
+1406	[Wild_Lands_of_Zelata] The Last Hero	2	full	2	exact	
+1407	[Wild_Lands_of_Zelata] The Lost Heirlooms of Kerkyra	2	full	2	exact	
+1408	[Wild_Lands_of_Zelata] The Lost Regiment	2	full	0	no-wiki-page	
+1410	[Wild_Lands_of_Zelata] The Nemedian Incursion	3	full	3	minor-text-diff	
+1411	[Wild_Lands_of_Zelata] The New Threat	4	full	4	exact	
+1412	[Wild_Lands_of_Zelata] The Party	2	full	2	exact	
+1414	[Wild_Lands_of_Zelata] Kaylee's Bastard	4	full	4	exact	
+1415	[Wild_Lands_of_Zelata] The Soldier's Reprieve	2	full	0	no-wiki-page	
+1416	[Wild_Lands_of_Zelata] The Spider Queen's Lair	2	full	2	exact	
+1417	[Wild_Lands_of_Zelata] The Spirit's Lament	3	full	3	exact	
+1418	[Wild_Lands_of_Zelata] The Witch's Brew	3	full	3	exact	
+1419	[Wild_Lands_of_Zelata] Traitorous Dogs	2	full	0	no-wiki-page	
+1420	[Wild_Lands_of_Zelata] Treachery and Deception	4	full	4	exact	
+1421	[Wild_Lands_of_Zelata] Unfinished Business	2	full	2	exact	
+1422	[Wild_Lands_of_Zelata] What Creeps Beneath	4	full	4	exact	
+1424	[Alchemist_4][4.0] Alchemist Progression	1	single	0	no-wiki-page	
+1425	[Alchemist_4][4.1] Superior Remedies	2	none	0	no-wiki-page	
+1426	[Alchemist_4][4.2] Superior Restoratives	2	none	0	no-wiki-page	
+1427	[Alchemist_4][4.3] Superior Sorcerous Potions	2	none	0	no-wiki-page	
+1429	[Alchemist_5][5.0] Alchemist Progression	1	single	0	no-wiki-page	
+1430	[Alchemist_5][5.1] Exceptional Remedies	2	none	0	no-wiki-page	
+1431	[Alchemist_5][5.2] Exceptional Restoratives	2	none	0	no-wiki-page	
+1432	[Alchemist_5][5.3] Exceptional Sorcerous Potions	2	none	0	no-wiki-page	
+1434	[Alchemist_6][6.0] Alchemist Progression	1	single	0	no-wiki-page	
+1435	[Alchemist_6][6.1] Perfect Remedies	2	none	0	no-wiki-page	
+1436	[Alchemist_6][6.2] Perfect Restoratives	2	none	0	no-wiki-page	
+1437	[Alchemist_6][6.3] Perfect Sorcerous Potions	2	none	0	no-wiki-page	
+1439	[Destiny 50 Stygia] The Phoenix of the North	4	full	0	wiki-page-has-no-steps	
+1440	[Destiny 50 Aquilonia] The Phoenix of the North	4	none	0	wiki-page-has-no-steps	
+1441	[Destiny 50 Cimmeria] The Phoenix of the North	4	none	0	wiki-page-has-no-steps	
+1442	[ACG_Imirian_Ravine][1.01] Hunting Down Vermin	2	none	0	no-wiki-page	
+1443	[ACG_Imirian_Ravine][1.04] Poachers and Predators	2	none	0	no-wiki-page	
+1444	[ACG_Imirian_Ravine][1.07] Pelts of the Predators	2	none	0	no-wiki-page	
+1445	[ACG_Imirian_Ravine][2.10] A Menace in the Wilds	2	none	0	no-wiki-page	
+1446	[ACG_Imirian_Ravine][2.13] Bandits and Bears	2	none	0	no-wiki-page	
+1447	[ACG_Imirian_Ravine][2.16] The Creeping Horrors	2	none	0	no-wiki-page	
+1448	[Destiny middlequest 20 - 30 Cimmeria] Blood and Sweat	1	single	1	mismatch	
+1449	[Destiny middlequest 20 - 30 Aquilonia] Blood and Sweat	1	single	1	mismatch	
+1450	[Destiny middlequest 20 - 30 Stygia] Blood and Sweat	1	full	1	mismatch	
+1451	[Destiny middlequest 30 - 50 Stygia] Time to Fight	1	full	1	exact	
+1452	[Destiny middlequest 30 - 50 Aquilonia] Time to Fight	1	single	1	exact	
+1453	[Destiny middlequest 30 - 50 Cimmeria] Time to Fight	1	single	1	exact	
+1454	[Destiny 20 Cimmeria] Traveling Home	1	single	1	exact	
+1455	[Destiny 20 Aquilonia] Traveling Home	1	single	1	exact	
+1456	[Destiny 20 Stygia] Traveling Home	1	full	1	exact	
+1458	[Wild_Lands_of_Zelata] Illuminating the Darkness	3	full	3	exact	
+1460	[ACG_Imirian_Ravine][Group][Rep]Paper War	2	none	0	no-wiki-page	
+1461	[ACG_Imirian_Ravine][Group][L40]Recovering the Bandits' Haul	3	none	0	no-wiki-page	
+1462	[ACG_Imirian_Ravine][Group][L40]Seeing Red	1	single	0	no-wiki-page	
+1463	[ACG_Imirian_Ravine][Group][L60]Visions of Power	3	none	0	no-wiki-page	
+1464	[ACG_Imirian_Ravine][Group][L60]Redrawing the Lines	2	none	0	no-wiki-page	
+1472	[Destiny Quest Glue to 60 Cimmeria] The Dark that Awaits	1	single	0	wiki-page-has-no-steps	
+1473	[Destiny Quest 60 Cimmeria] Phoenix of the East	5	none	0	no-wiki-page	
+1474	[Destiny Quest Glue to 80] To Battle a God	2	full	2	mismatch	
+1476	[Destiny Quest Glue to 60 Stygia] The Dark that Awaits	1	full	0	wiki-page-has-no-steps	
+1477	[Destiny Quest Glue to 60 Aquilonia] The Dark that Awaits	1	single	0	wiki-page-has-no-steps	
+1478	[Destiny Quest 60 Stygia] Phoenix of the East	5	full	0	no-wiki-page	
+1479	[Destiny Quest 60 Aquilonia ] Phoenix of the East	5	none	0	no-wiki-page	
+1481	[Destiny Quest 80 ALL] The Grim Grey God	2	full	2	exact	
+1482	[Tarantia_Noble_ACG] Paetus & the Nemedian Crown	2	full	2	exact	
+1483	[Tarantia_Noble_ACG] Paetus & the Nemedian Crown II	2	none	2	exact	
+1484	[Tarantia_Noble_ACG] Paetus & the Nemedian Crown III	1	single	2	mismatch	
+1485	[Tarantia_Noble_ACG] Paetus & the Nemedian Crown IV	2	none	0	no-wiki-page	
+1486	[Quest Testcase] Escort Character - Fight Back	1	single	0	no-wiki-page	
+1487	[Tarantia_Noble_Arena] Obtaining the Noble Arena Key	3	full	3	exact	
+1488	[Test] Destructibles	1	single	0	no-wiki-page	
+1489	[Quest Testcase] Spawn Quest from Inventory Item	1	single	0	no-wiki-page	
+1490	[Quest Testcase] Spawn Quest from Simpledynel	1	single	0	no-wiki-page	
+1491	[Quest Testcase] Time Limit - 1 minute	1	single	0	no-wiki-page	
+1492	[Wild_Lands_of_Zelata] The Northern Pass	2	full	2	exact	
+1493	[Wild_Lands_of_Zelata] The Wounded Child	2	full	2	exact	
+1494	[Wild_Lands_of_Zelata] A Matter of Pride	2	full	2	exact	
+1495	[Wild_Lands_of_Zelata] Devil's Pass	5	none	0	no-wiki-page	
+1496	[Wild_Lands_of_Zelata] Gift From a Stranger	2	full	0	wiki-page-has-no-steps	
+1497	[Wild_Lands_of_Zelata] Tainted Beddings	2	none	0	no-wiki-page	
+1498	[Wild_Lands_of_Zelata] Desperate Men	3	none	0	no-wiki-page	
+1499	[Wild_Lands_of_Zelata] Dangerous Ambitions	2	full	0	no-wiki-page	
+1500	[Wild_Lands_of_Zelata] The Rogue Bandits	2	none	0	no-wiki-page	
+1501	[Wild_Lands_of_Zelata] Scavenging	2	none	0	no-wiki-page	
+1503	[Wild_Lands_of_Zelata] The Mercenary Leader	2	none	0	no-wiki-page	
+1504	[Wild_Lands_of_Zelata] A Spirit Chained	1	single	0	no-wiki-page	
+1505	[Wild_Lands_of_Zelata] Immortal Acheron	2	none	2	mismatch	
+1506	[Wild_Lands_of_Zelata] The Sanctity of Slaughter	2	none	0	no-wiki-page	
+1507	[Quest Testcase] Quest Cooldown A	1	single	0	no-wiki-page	
+1508	[Quest Testcase] Phases - One goal each - Different	1	single	0	no-wiki-page	
+1509	[Quest Testcase] Phases - One goal each - Equal	1	single	0	no-wiki-page	
+1510	[Quest Testcase] Phases - Two then one goals - Alternate test	1	single	0	no-wiki-page	
+1511	[Quest Testcase] Repeat Count	1	single	0	no-wiki-page	
+1512	[Quest Testcase] Repeatable - No limit	1	single	0	no-wiki-page	
+1513	[Quest Testcase] Repeatable - 1 time	1	single	0	no-wiki-page	
+1514	[Quest Testcase] Repeatable - 2 times	1	single	0	no-wiki-page	
+1515	[Quest Testcase] Folder Hash - Any child	1	single	0	no-wiki-page	
+1516	[Quest Testcase] Folder Hash - By level only	1	single	0	no-wiki-page	
+1517	[Quest Testcase] Quest Cooldown B	1	single	0	no-wiki-page	
+1518	[AAAA Not Ready] AAA Not Ready	1	single	0	no-wiki-page	
+1519	[ACG_Oasis_of_Zaara][1.01] Desert Dawn Hunt	2	none	0	no-wiki-page	
+1520	[ACG_Oasis_of_Zaara][1.04] Heat and Shade	2	none	0	no-wiki-page	
+1521	[ACG_Oasis_of_Zaara][1.07] Tanned and Bleached	2	none	0	no-wiki-page	
+1522	[ACG_Oasis_of_Zaara][2.10] Twisted Sands	2	none	0	no-wiki-page	
+1523	[ACG_Oasis_of_Zaara][2.13] Blood Follows Blood	2	none	0	no-wiki-page	
+1524	[ACG_Oasis_of_Zaara][2.16] Desert Nightmare	2	none	0	no-wiki-page	
+1537	[AAA] AAA Stockphrases batch 1	1	single	0	no-wiki-page	
+1538	[Kheshatta_Kalanthes] [Chatha]The Hunt	2	none	0	no-wiki-page	
+1539	[Kheshatta_Kalanthes] Master of the Silver Peacock	4	full	0	no-wiki-page	
+1540	[Kheshatta_Kalanthes] Name of the Elder One	2	full	0	no-wiki-page	
+1541	[Kheshatta_Kalanthes] The Revenge of Leviathus	2	full	0	no-wiki-page	
+1542	[Kheshatta_Kalanthes] The Immortal Hand	1	single	0	no-wiki-page	
+1544	[Kheshatta_Kalanthes] Ibis, Master of Hidden Secrets	3	full	3	exact	
+1546	[Kheshatta_Kalanthes] The Wall of Death	1	single	0	no-wiki-page	
+1547	[Kheshatta_Kalanthes] The Cursed Treasure of Constantius	2	none	0	no-wiki-page	
+1548	[Kheshatta_Kalanthes] Bowls of Set	2	none	0	no-wiki-page	
+1550	[Conan]GENERICK VOICEOVER GREETINGS	1	single	0	no-wiki-page	
+1551	[Khemi] Spiced Wine	2	full	2	exact	
+1552	[Atzels_Fortress] Vile Venom from Stygia	1	single	0	no-wiki-page	
+1553	[Atzels_Fortress] Missing Merchandise	2	none	0	no-wiki-page	
+1554	[Atzels_Fortress_Dungeon] Saving a Snake's Hide	2	none	0	no-wiki-page	
+1555	[Atzels_Fortress] Shamanistic Remedies	2	full	0	no-wiki-page	
+1556	[Atzels_Fortress] Demon Eggs	2	full	0	no-wiki-page	
+1557	[Atzels_Fortress] White Gold	2	full	2	exact	
+1559	[Kheshatta] Wanted - The Apostate Man	2	full	0	no-wiki-page	
+1561	[Kheshatta] Wanted - The Smuggler	2	full	0	no-wiki-page	
+1562	[Kheshatta] Trek to Thrymheim	2	full	2	exact	
+1565	[Conarch_Village] Supply and Demand	1	single	1	exact	
+1566	[Conarch_Village] Clans at War	1	full	1	exact	
+1567	[Kheshatta] Find Hakar-Tep	2	full	2	exact	
+1568	[Conarch_Village] The Tanner's Request	2	none	2	exact	
+1569	[Conarch_Village] A Rare Delicacy	2	full	2	mismatch	
+1570	[Khemi] Nobles of Tarantia	2	full	2	exact	
+1571	[AAA] AAA Stockphrases batch 2	1	single	0	no-wiki-page	
+1572	[Kheshatta] Heady Kaphil Liquor	2	full	2	exact	
+1573	[Kheshatta] Anuket Spring Water	2	full	1	wiki-omits-turn-in	
+1576	[Kheshatta] The Spice in the Sand	2	full	0	no-wiki-page	
+1577	[Kheshatta] Blades of Obsidian	2	full	0	no-wiki-page	
+1578	[Conarch_Village] Supply Routes	1	full	2	mismatch	
+1579	[Conall's_Valley] The War Totem	2	full	2	exact	
+1580	[Conall's_Valley] The Cimmerian's Axe	2	full	2	exact	
+1581	[Test] Experience 31 - 40	1	single	0	no-wiki-page	
+1582	[Test] Experience 32 - 40	1	single	0	no-wiki-page	
+1583	[Test] Experience 33 - 40	1	single	0	no-wiki-page	
+1584	[Test] Experience 34 - 40	1	single	0	no-wiki-page	
+1585	[Test] Experience 35 - 40	1	single	0	no-wiki-page	
+1586	[Test] Experience 36 - 40	1	single	0	no-wiki-page	
+1587	[Test] Experience 37 - 40	1	single	0	no-wiki-page	
+1588	[Test] Experience 38 - 40	1	single	0	no-wiki-page	
+1589	[Test] Experience 39 - 40	1	single	0	no-wiki-page	
+1591	[Eiglophian_Mountains] A Broken Bloodline	3	full	0	no-wiki-page	
+1592	[Eiglophian_Mountains] The Blood-furred Beast	4	full	0	no-wiki-page	
+1593	[Kheshatta_Desert_Raiders_Hideout] Freed from their Cages	2	full	0	no-wiki-page	
+1594	[Kheshatta] Sealed in the Blood of Set	2	full	2	exact	
+1595	[Kheshatta] Sealed in Torrents of Blood	2	none	0	no-wiki-page	
+1596	[Khopshef_Province] Profit and Loss	2	full	0	no-wiki-page	
+1597	[Khopshef_Province] The Path to Enlightenment	2	full	0	no-wiki-page	
+1598	[Khopshef_Province] The Venomous South	3	full	3	exact	
+1599	[Khopshef_Province] The River Pirates	2	full	1	wiki-omits-turn-in	
+1600	[Eiglophian_Mountains] The Magic Orb	7	full	7	exact	
+1602	[Eiglophian_Mountains] Elina's Father	2	full	1	mismatch	
+1604	[Eiglophian_Mountains] A Daughter's Revenge	2	full	2	exact	
+1605	[Field_of_the_Dead] The Ymirish Bearlock	2	none	2	exact	
+1606	[Old_Tarantia] The King's Headache	1	full	0	no-wiki-page	
+1608	[Kheshatta_OnyxChamber] Stagnant Sewer Water	2	full	2	mismatch	
+1609	[Eiglophian_Mountains] White Hand Officers	2	none	1	wiki-omits-turn-in	
+1610	[Kheshatta_OnyxChamber] Intelligent Beast	2	full	0	no-wiki-page	
+1611	[Eiglophian_Mountains] Invaders from afar	2	full	0	no-wiki-page	
+1612	[Kheshatta_OnyxChamber] Khakhte's Missing Comrade, Hunnric	2	full	0	no-wiki-page	
+1613	[Kheshatta_OnyxChamber] Khakhte's Missing Comrade, Elam	2	full	0	no-wiki-page	
+1614	[Kheshatta_OnyxChamber] Vicious Hunters	2	full	0	no-wiki-page	
+1615	[Eiglophian_Mountains] Mammoth Skinning	2	full	0	no-wiki-page	
+1616	[Eiglophian_Mountains] The Screams from the Glacier	2	full	0	no-wiki-page	
+1617	[Kheshatta_OnyxChamber] Barbaric Garments	2	full	0	no-wiki-page	
+1618	[Kheshatta_OnyxChamber] Hints of Hidden Laboratories	1	full	0	no-wiki-page	
+1622	[Kheshatta_OnyxChamber] The Shells of Acheronian Soldiers	2	full	0	no-wiki-page	
+1623	[Kheshatta_OnyxChamber] Eternity in a Crystal	3	none	0	no-wiki-page	
+1624	[Kheshatta_OnyxChamber] History of Ancient Stygia	1	single	0	no-wiki-page	
+1625	[Kheshatta_OnyxChamber] Blackened Relics of the Crypt	2	none	0	no-wiki-page	
+1626	[Kheshatta_OnyxChamber] Tome of Ancient Stygia	2	none	0	no-wiki-page	
+1627	[Kheshatta_OnyxChamber] Key to the Crypt of Setsokhaten	4	none	0	no-wiki-page	
+1628	[Kheshatta_OnyxChamber] Journals of Setsokhaten	1	single	0	no-wiki-page	
+1629	[Kheshatta_OnyxChamber] Sustenance for the Fallen	1	full	0	no-wiki-page	
+1630	[Kheshatta_OnyxChamber] Mushroom Harvest	2	none	0	no-wiki-page	
+1631	[Kheshatta_OnyxChamber] Pride and Honor Over Life	2	none	0	no-wiki-page	
+1632	[Kheshatta_Scorpion_Cave] Mouth of Darkness	3	full	0	no-wiki-page	
+1633	[Kheshatta_Scorpion_Cave] Markers of the Lost Tomb	2	full	1	wiki-omits-turn-in	
+1634	[NPE_short] Den of no Return	2	none	3	minor-text-diff	
+1635	[Kheshatta_Scorpion_Cave] Nightshade Purgative	2	none	2	mismatch	
+1636	[Kheshatta_Scorpion_Cave] The Abomination	2	none	1	wiki-omits-turn-in	
+1637	[Kheshatta] The Smoky Pits of Stygia	3	full	3	exact	
+1639	[Kheshatta_Scorpion_Cave] Trials of Desert Combat	2	full	1	wiki-omits-turn-in	
+1640	[Kheshatta_OnyxChamber] Demoralizing Blow	2	none	0	no-wiki-page	
+1641	[Kheshatta_Scorpion_Cave] Lift the Curse of Constantius	2	none	0	no-wiki-page	
+1642	[Tarantia_Sewers][1.0] The Orphans in the Hovel	3	none	0	no-wiki-page	
+1643	[Tarantia_Sewers][1.1] Death to Renato Savill	2	none	0	no-wiki-page	
+1644	[Tarantia_Sewers][1.2] Oak's Scorn	2	none	0	no-wiki-page	
+1645	[Tarantia_Sewers][2.0] Band of Bandits	2	none	0	no-wiki-page	
+1646	[Kheshatta] Den of Evil Perversions	3	none	0	no-wiki-page	
+1647	[Tarantia_Sewers][2.1] Doctor's Orders	2	none	0	no-wiki-page	
+1648	[Tarantia_Sewers][2.2] Rabid Revenge	2	none	0	no-wiki-page	
+1649	[Tarantia_Sewers][2.3] Sins of the Father's Whore	2	none	0	no-wiki-page	
+1650	[Tarantia_Sewers][2.4] Crimes of Passion	2	none	0	no-wiki-page	
+1651	[Tarantia_Sewers][2.5] Dealing with Dila	2	none	0	no-wiki-page	
+1652	[Tarantia_Sewers][3.0] The Sacrifice	2	none	0	no-wiki-page	
+1653	[Tarantia_Sewers][3.1] The Uncrowning of the King	2	none	0	no-wiki-page	
+1654	[Tarantia_Sewers][3.2] Assassination Amongst Thieves	2	none	0	no-wiki-page	
+1655	[Tarantia_Sewers][4.0] Emeralds in the Rough	3	none	0	no-wiki-page	
+1656	[Tarantia_Sewers][5.0] The Ring of the Forefather	2	none	0	no-wiki-page	
+1657	[Tarantia_Sewers][5.1] Breaking the Black Ring	2	none	0	no-wiki-page	
+1658	[Tarantia_Sewers][5.2] The Final Escape	2	none	0	no-wiki-page	
+1659	[Tarantia_Sewers][6.0] Soul Searching	2	none	0	no-wiki-page	
+1660	[Tarantia_Sewers][6.1] Ruined Rites of Passage	3	none	0	no-wiki-page	
+1661	[Kheshatta_Scorpion_Cave] The Inert Corpse	1	single	0	no-wiki-page	
+1662	[Quest Testcase] Completed Tasks	4	none	0	no-wiki-page	
+1663	[Quest Testcase] Dynamic XP and Coin	1	single	0	no-wiki-page	
+1664	[Kheshatta_Black_Ring_Citadel] Stone to Flesh	1	full	0	no-wiki-page	
+1665	[Halls_of_Eternal_Frost] Acheronian Blood Hunters	2	none	0	no-wiki-page	
+1666	[Kheshatta_OnyxChamber] Paid in a Massacre	2	full	0	no-wiki-page	
+1667	[Kheshatta_OnyxChamber] Punishment Fit for the Damned	2	none	0	no-wiki-page	
+1668	[Kheshatta_OnyxChamber] Appeasing the Inner Demons	2	full	0	no-wiki-page	
+1669	[Kheshatta_OnyxChamber] Parting Gift	2	full	0	no-wiki-page	
+1670	[Kheshatta_OnyxChamber] Theft of Knowledge	2	none	0	no-wiki-page	
+1674	[Kheshatta_Black_Ring_Citadel] Minions of the Living Stone	2	full	1	mismatch	
+1675	[Kheshatta_Black_Ring_Citadel] Master of Gargoyles	2	full	1	mismatch	
+1677	[Kheshatta_Black_Ring_Citadel] Fangs of the Ring	2	full	0	no-wiki-page	
+1678	[Kheshatta_Black_Ring_Citadel] Army at the Gates of the Abyss	2	none	0	no-wiki-page	
+1679	[Kheshatta_Black_Ring_Citadel] Mistress of the Shadows	2	partial	0	no-wiki-page	
+1680	[Quest Testcase] Un-Deletable Quest	1	single	0	no-wiki-page	
+1681	[Kheshatta] Refuge for Outsiders	1	full	2	mismatch	
+1682	[Quest Testcase] Quest Cooldown Started	1	single	0	no-wiki-page	
+1691	[Kheshatta_Thoth-Amon_Stronghold] The Four Sent	2	none	0	no-wiki-page	
+1695	[Kheshatta] Tarantian Armorsmith	1	full	1	exact	
+1700	[RG][Woodcutter][1.2] Ebon Ash	1	full	0	no-wiki-page	
+1702	[RG][Miner][1.2] Tin	1	full	0	no-wiki-page	
+1704	[RG][Skinner][1.2] Brindled Leather	1	full	0	no-wiki-page	
+1706	[RG][Stonecutter][1.2] Clear Quartz	1	full	0	no-wiki-page	
+1708	[RG][Prospector][1.2] Black Silver	1	full	0	no-wiki-page	
+1709	[RG][Woodcutter][2.1] Yew	1	full	0	no-wiki-page	
+1710	[RG][Woodcutter][2.2] Amberwood	1	full	0	no-wiki-page	
+1711	[RG][Miner][2.1] Iron	1	full	0	no-wiki-page	
+1712	[RG][Miner][2.2] Aurichalcum	1	full	0	no-wiki-page	
+1713	[RG][Skinner][2.1] Calloused Leather	1	full	0	no-wiki-page	
+1714	[RG][Skinner][2.2] Grained Leather	1	full	0	no-wiki-page	
+1715	[RG][Stonecutter][2.1] Granite	1	full	0	no-wiki-page	
+1716	[RG][Stonecutter][2.2] Feldspar	1	full	0	no-wiki-page	
+1717	[RG][Prospector][2.1] Electrum	1	full	0	no-wiki-page	
+1718	[RG][Prospector][2.2] Illustrium	1	full	0	no-wiki-page	
+1719	[RG][Woodcutter][3.1] Oak	1	full	0	no-wiki-page	
+1720	[RG][Woodcutter][3.2] Soulwood	1	full	0	no-wiki-page	
+1721	[RG][Miner][3.1] Duskmetal	1	full	0	no-wiki-page	
+1722	[RG][Miner][3.2] Blue Iron	1	full	0	no-wiki-page	
+1723	[RG][Skinner][3.1] Gnarled Leather	1	full	0	no-wiki-page	
+1724	[RG][Skinner][3.2] Whorled Leather	1	full	0	no-wiki-page	
+1725	[RG][Stonecutter][3.1] Basalt	1	full	0	no-wiki-page	
+1726	[RG][Stonecutter][3.2] Adamant	1	full	0	no-wiki-page	
+1727	[RG][Prospector][3.1] Gold	1	full	0	no-wiki-page	
+1728	[RG][Prospector][3.2] Platinum	1	full	0	no-wiki-page	
+1729	[Conall's_Valley] A Beloved Friend	2	full	2	mismatch	
+1730	[Conall's_Valley] A Harrowing Journey	2	full	2	exact	
+1732	[King_Conans_Throneroom] Black Legion Recruit	2	full	0	no-wiki-page	
+1733	[King_Conans_Throneroom] In the Service of King Conan	2	full	2	exact	
+1734	[King_Conans_Throneroom] Storming the Gate	2	full	2	mismatch	
+1735	[King_Conans_Throneroom] Seek Out Kalanthes	1	single	0	no-wiki-page	
+1736	[King_Conans_Throneroom] The Battle of Set	2	full	0	no-wiki-page	
+1738	[King_Conans_Throneroom] Death to the Black Dragon	2	full	1	wiki-omits-turn-in	
+1739	[King_Conans_Throneroom] Army of Nations	2	none	0	no-wiki-page	
+1740	[King_Conans_Throneroom] Black Dragon Knighthood	2	full	0	no-wiki-page	
+1741	[King_Conans_Throneroom] Dragons Over the Citadel	3	none	0	no-wiki-page	
+1742	[King_Conans_Throneroom] The Fall of Thoth-Amon	2	none	0	no-wiki-page	
+1743	[King_Conans_Throneroom] Prisoners of War	2	full	0	no-wiki-page	
+1744	[King_Conans_Throneroom] Atzel's Head on a Pike	2	full	0	no-wiki-page	
+1745	[King_Conans_Throneroom] Chief Chulainn and the Bloody Spear	1	full	0	no-wiki-page	
+1746	[Kheshatta_Thoth-Amon_Stronghold] Defense of Asgard	2	none	0	no-wiki-page	
+1747	[Tarantia_Noble_Arena_06] The Arena Sabretooth	2	full	2	mismatch	
+1748	[Tarantia_Noble_Arena_05] The Arena Gorilla	2	full	2	exact	
+1749	[Tarantia_Noble_Arena_07] The Arena Lion	2	full	2	exact	
+1750	[Tarantia_Noble_Arena_04] The Arena Tiger	2	full	2	exact	
+1751	[Tarantia_Noble_Arena_08] The Arena Swamp Demon	2	full	2	exact	
+1752	[Tarantia_Noble_Arena_09] The Frenzied Arena Dark Beast	2	full	2	exact	
+1753	[Tarantia_Noble_Arena_10] The Arena Mantis Man	2	full	2	exact	
+1754	[Tarantia_Noble_Arena_004] The Arena Werewolf Slasher	2	full	0	no-wiki-page	
+1755	[Tarantia_Noble_Arena_005] The Arena Waxman	2	full	0	no-wiki-page	
+1756	[Tarantia_Noble_Arena_006] The Arena Black One	2	full	0	no-wiki-page	
+1757	[Tarantia_Noble_Arena_007] The Arena Laskaris Minion	2	full	0	no-wiki-page	
+1758	[Tarantia_Noble_Arena_008] The Arena Ghoul Guardian	2	full	0	no-wiki-page	
+1759	[Tarantia_Noble_Arena_009] The Arena Giant King	2	full	0	no-wiki-page	
+1760	[Tarantia_Noble_Arena_010] The Arena Undead Axeman	2	full	0	no-wiki-page	
+1762	[Conall's_Valley] Ymir's Call	2	none	0	no-wiki-page	
+1763	[Conall's_Valley] A Dirge for the Dead	2	full	0	wiki-page-has-no-steps	
+1764	[Conall's_Valley] Butchering the Weak	2	full	2	exact	
+1765	[Conall's_Valley] Fanning the Flames	2	none	2	exact	
+1766	[Conall's_Valley] Hawkeye	2	full	2	exact	
+1767	[Conall's_Valley] The Gravesinger	1	full	2	mismatch	
+1768	[Conall's_Valley] The Gravesinger's Voice	2	full	2	exact	
+1769	[Conall's_Valley] The Veteran	2	full	2	exact	
+1770	[Khemi] The Satiated Serpent	5	full	5	exact	
+1771	[Conall's_Valley] Brutal Customs	1	full	0	no-wiki-page	
+1772	[Conarch_Village] The Tanner's Stench	3	partial	3	same-steps-order-differs	
+1773	[Old_Tarantia] A Missing Filly	3	full	3	minor-text-diff	
+1774	[TEST] Apostrophe Test	1	single	0	no-wiki-page	
+1775	[Old_Tarantia] Fleet of Mouth	1	full	1	mismatch	
+1777	[Khemi] The Sigil of Set	1	full	1	exact	
+1778	[Old_Tarantia] A Needle of Truth	4	full	4	exact	
+1780	[Old_Tarantia] Seven Years	4	full	4	exact	
+1781	[NPE] Time to Pay	2	full	2	exact	
+1782	[NPE] The Unwritten Law	2	full	2	exact	
+1783	[NPE] Treading Lightly	2	full	2	exact	
+1784	[NPE] Skeggi's Fish	2	full	2	exact	
+1785	[NPE] Junia's Revenge	2	full	2	exact	
+1787	[NPE] A Name to Die For	2	full	2	exact	
+1788	[NPE] Dead Meat	2	full	2	exact	
+1789	[NPE] Empty Stalls	2	full	2	exact	
+1791	[Old_Tarantia] The Minstrel and the Bandits	2	full	2	mismatch	
+1793	[Halls_Of_Eternal_Frost] The Journal of Un Nefer	2	none	2	exact	
+1794	[Halls_Of_Eternal_Frost] Spirits in the Sand	3	none	0	no-wiki-page	
+1799	[Old_Tarantia] Pieces of Peace	3	full	3	minor-text-diff	
+1800	[Thunder River] A Gruesome Death	3	full	0	no-wiki-page	
+1801	[Thunder River] A Steep Cliff	2	full	0	no-wiki-page	
+1802	[Thunder River] Attack of the Savages	2	full	0	no-wiki-page	
+1803	[Thunder River] Dead at his Feet	1	full	0	no-wiki-page	
+1806	[Thunder River] Enslaved and Abused	3	full	0	no-wiki-page	
+1807	[Thunder River] Water for the Soldiers	2	full	0	no-wiki-page	
+1808	[Thunder River] Fighting the Pict Leaders	2	full	0	no-wiki-page	
+1809	[Thunder River] Plans of Mayhem	2	full	0	no-wiki-page	
+1812	[Thunder River] Reclaiming Lost Land	3	full	0	no-wiki-page	
+1813	[Thunder River] Heads of the Fallen	3	full	0	no-wiki-page	
+1814	[Thunder River] Silence Him!	2	full	0	no-wiki-page	
+1815	[Thunder River] Zeno's Last Hour	2	full	1	wiki-omits-turn-in	
+1816	[Thunder River] The Kitten	2	full	0	no-wiki-page	
+1817	[Thunder River] The Memory Remains	2	full	0	no-wiki-page	
+1818	[Thunder River] Mercenary Spies	2	full	0	no-wiki-page	
+1819	[Thunder River] The Monster and the Child	2	full	0	no-wiki-page	
+1820	[Thunder River] Under False Flag	2	full	0	no-wiki-page	
+1821	[Thunder River] Unnatural	2	full	0	no-wiki-page	
+1822	[Thunder River] Will to Change	2	full	0	no-wiki-page	
+1823	[Conarch_Village] The Gambler's Gambit	4	none	4	minor-text-diff	
+1827	[Field_of_the_Dead] Tabbot and the Scouts	2	full	0	no-wiki-page	
+1828	[Field_of_the_Dead] Lieutenants Haken, Karras & Vorr	2	none	2	mismatch	
+1829	[Field_of_the_Dead] Death to the Vanir	2	full	2	mismatch	
+1830	[Field_of_the_Dead] Lieutenant Rhor	2	none	2	exact	
+1831	[Kheshatta] Battling Banditry	2	full	0	no-wiki-page	
+1832	[Kheshatta_Kalanthes] The Lion Charm	3	none	0	no-wiki-page	
+1834	[Conarch_Village] The Wandering Drunk	2	full	2	exact	
+1835	[Old_Tarantia] The Urchin	6	full	6	exact	
+1836	[Old_Tarantia] The Scholar's Pages	2	full	2	exact	
+1839	[RG][Weaver][1.2] Cottonwisp	1	full	0	no-wiki-page	
+1840	[RG][Weaver][2.1] Silk	1	full	0	no-wiki-page	
+1841	[RG][Weaver][2.2] Tussah Silk	1	full	0	no-wiki-page	
+1842	[RG][Weaver][3.1] Ironsilk	1	full	0	no-wiki-page	
+1843	[RG][Weaver][3.2] Gossamer Silk	1	full	0	no-wiki-page	
+1845	[Old_Tarantia] The Wrong Kind of Message	1	full	0	no-wiki-page	
+1846	[Old_Tarantia] Shady Deliveries	1	full	1	exact	
+1848	[Khemi] The Honest Man	2	full	2	mismatch	
+1849	[Khopshef_Province] All That Remains	3	full	0	wiki-page-has-no-steps	
+1850	[Khopshef_Province] Emerald Eyes	2	full	2	exact	
+1851	[Khopshef_Province] Forgotten Treasure	3	full	3	exact	
+1852	[Khopshef_Province] Lord Atum-Keket	3	none	3	exact	
+1853	[Khopshef_Province] Sneaking Suspicions	2	full	0	no-wiki-page	
+1854	[Khopshef_Province] The Dangers of Decadence	3	none	0	no-wiki-page	
+1855	[Khopshef_Province] The Eyes of the Dead	2	full	2	exact	
+1856	[Khopshef_Province] A Plea for Prophecy	3	full	0	no-wiki-page	
+1859	[Tarantia_Noble_ACG] Juan's Apprentice	1	full	1	exact	
+1860	[Tarantia_Noble_ACG] Herbs in Villa Amiel	2	full	2	mismatch	
+1861	[Tarantia_Noble_ACG] Noble Valuables	2	none	2	exact	
+1862	[Kheshatta] Slayer of Snakes	2	full	2	exact	
+1863	[Kheshatta_Kalanthes] The Cave of Kalanthes	1	single	0	no-wiki-page	
+1866	[Tarantia_Noble_ACG] A Fools Dream	2	full	2	exact	
+1867	[Tarantia_Noble_ACG] Rahim & Lord Camillus	2	full	2	mismatch	
+1868	[Tarantia_Noble_ACG] Nemedian Envoy	2	none	2	exact	
+1869	[Wild_Lands_of_Zelata] Stockphrase	1	single	0	no-wiki-page	
+1870	[Khopshef_Province] Stockphrase	1	single	0	no-wiki-page	
+1871	[Conall's_Valley] Stockphrase	1	single	0	no-wiki-page	
+1872	[Old_Tarantia] Stockphrase	1	single	0	no-wiki-page	
+1873	[Conarch_Village] Stockphrase	1	single	0	no-wiki-page	
+1874	[Khemi] Stockphrase	1	single	0	no-wiki-page	
+1877	[Quest Testcase] Sharing - Sharable quest level 20	1	single	0	no-wiki-page	
+1878	[Quest Testcase] Sharing - Non-sharable quest level 20	1	single	0	no-wiki-page	
+1879	[Quest Testcase] Sharing - Sharable quest level 20 II	1	single	0	no-wiki-page	
+1881	[Kheshatta] Desert Scorpion Armor	2	full	2	exact	
+1882	[Kheshatta] Scorpion Archer Armor	2	full	2	exact	
+1883	[Kheshatta] Hunting the Settites	2	full	2	exact	
+1884	[Kheshatta] Blinding the Hill's Eyes	2	full	2	exact	
+1885	[Kheshatta] Raiders from Hell	2	full	2	exact	
+1886	[Kheshatta] Raiders from Hell II	2	full	0	no-wiki-page	
+1887	[Kheshatta_Desert_Raiders_Hideout] Origin of Threat	3	none	0	no-wiki-page	
+1888	[Kheshatta] The Roaming Reaver	2	none	0	no-wiki-page	
+1890	[Khemi] The Raided Tomb	5	none	5	exact	
+1891	[Lacheish_Plains] Brandoc Village	1	single	0	no-wiki-page	
+1892	[Khopshef_Province] Words of Wisdom	2	full	2	exact	
+1893	[Khopshef_Province] The Terror Beneath Bubshur	3	full	3	minor-text-diff	
+1894	[Old_Tarantia] The Woman who Never Died	2	none	2	exact	
+1895	[Conall's_Valley] Restless Spirits	1	full	2	mismatch	
+1896	[Conall's_Valley] Ossian's Odyssey	2	none	0	wiki-page-has-no-steps	
+1897	[Old_Tarantia] A Woman's Scorn	2	none	2	exact	
+1898	[Wild_Lands_of_Zelata] Tearing the Veil	2	none	0	no-wiki-page	
+1899	[Wild_Lands_of_Zelata] Oris' Overture	2	full	2	exact	
+1900	[King_Conans_Throneroom] Conan & The Nemedian Crown	1	single	0	no-wiki-page	
+1901	[Kheshatta_Desert_Raiders_Hideout] Honoring the Dead	2	none	0	no-wiki-page	
+1903	[Old_Tarantia] The Right Kind of Message	1	full	0	no-wiki-page	
+1904	[Old_Tarantia] A Poor Attempt	1	single	0	no-wiki-page	
+1905	[Old_Tarantia] The Stygian Kind of Message	1	single	0	no-wiki-page	
+1906	[Quest Testcase] Resolvegoal - Knubot 520	1	single	0	no-wiki-page	
+1907	[Field_of_the_Dead] Residents of the Haunted Forest	2	full	0	no-wiki-page	
+1908	[Field_of_the_Dead] Death to the Undead	2	full	0	no-wiki-page	
+1909	[Field_of_the_Dead] A Curious Encounter	2	full	0	no-wiki-page	
+1910	[RG][Woodcutter][1.1] Ash	1	full	0	no-wiki-page	
+1911	[RG][Miner][1.1] Copper	1	full	0	no-wiki-page	
+1912	[RG][Skinner][1.1] Rough Leather	1	full	0	no-wiki-page	
+1913	[RG][Stonecutter][1.1] Sandstone	1	full	0	no-wiki-page	
+1914	[RG][Prospector][1.1] Silver	1	full	0	no-wiki-page	
+1915	[RG][Weaver][1.1] Cotton	1	full	0	no-wiki-page	
+1916	[Halls_of_Eternal_Frost] Undead Guardians	3	none	0	no-wiki-page	
+1923	[Gemcutter][1.0] Beginner Gems	2	full	0	no-wiki-page	
+1924	[Gemcutter][2.0] Basic Gems	2	full	0	no-wiki-page	
+1925	[Gemcutter][3.0] Common Gems	2	full	0	no-wiki-page	
+1926	[Gemcutter][4.0] Advanced Gems	2	full	0	no-wiki-page	
+1927	[Gemcutter][5.0] Complex Gems	2	full	0	no-wiki-page	
+1928	[Gemcutter][6.0] Superior Gems	2	full	0	no-wiki-page	
+1944	[Thunder River] The Monster Within	2	full	0	no-wiki-page	
+1945	[NPE] The Shadow Brotherhood	1	full	1	exact	
+1947	[Quest Testcase] Two Non Optional	1	single	0	no-wiki-page	
+1948	[Quest Testcase] Optional and Non Optional	1	single	0	no-wiki-page	
+1949	[Field_of_the_Dead] Orders from Kyllikki	2	full	0	no-wiki-page	
+1950	[Field_of_the_Dead] The Second Fragment	2	full	0	no-wiki-page	
+1951	[Field_of_the_Dead] The Third Fragment	2	full	0	no-wiki-page	
+1952	[Field_of_the_Dead] The Fourth Fragment	2	full	0	no-wiki-page	
+1953	[Field_of_the_Dead] The Warning	1	full	0	no-wiki-page	
+1954	[Eiglophian_Mountains] The Hunting Lodge	1	full	0	no-wiki-page	
+1956	[Tarantia_Noble] Armsmans Tavern	2	full	0	no-wiki-page	
+1957	[Khopshef_Province] Pools of Darkness	2	full	2	exact	
+1958	[Field_of_the_Dead] Fit for a Chieftain	1	full	0	no-wiki-page	
+1959	[Destiny LTTK1 Glue] Gaining Strength I	1	full	1	exact	
+1960	[Destiny LTTK2 Glue] Gaining Strength II	1	full	1	exact	
+1961	[Thunder River] Voyage of the Dead	2	full	0	no-wiki-page	
+1962	[Thunder River] Hunger!	2	full	0	no-wiki-page	
+1963	[Thunder River] Turning Point	2	full	0	no-wiki-page	
+1964	[Thunder River] Absolute War	2	none	0	no-wiki-page	
+1965	[Thunder River] Helvenia's Harvest	2	full	0	no-wiki-page	
+1966	[Thunder River] Moonshine	1	single	0	no-wiki-page	
+1967	[Thunder River] Famian's Greedy Scheme	2	full	1	wiki-omits-turn-in	
+1968	[Atzels_Fortress] Aelfrith's Camp	1	full	1	exact	
+1970	[Thunder River] Stabbed to Death	2	full	0	no-wiki-page	
+1971	[Thunder River] Pools of Blood	2	full	0	no-wiki-page	
+1973	[ACG_Oasis_of_Zaara][Group][Rep]Salts of the Earth	2	none	0	no-wiki-page	
+1974	[ACG_Oasis_of_Zaara][Group][L40]Stolen Statues of the Elder God	2	none	0	no-wiki-page	
+1975	[ACG_Oasis_of_Zaara][Group][L40]Unjust Deserts	4	none	0	no-wiki-page	
+1976	[ACG_Oasis_of_Zaara][Group][L60]Sacrilegious Rites	2	none	0	no-wiki-page	
+1977	[ACG_Oasis_of_Zaara][Group][L60]Healing the Wounds of the Swamp	2	none	0	no-wiki-page	
+1982	[Tarantia_Noble] Assault on Tarantia	1	full	0	no-wiki-page	
+1983	[Tarantia_Noble] Death from Above	2	full	0	no-wiki-page	
+1984	[Tarantia_Noble] A Relative Risen	4	full	0	no-wiki-page	
+1985	[Tarantia_Noble] Purging the Fallen	4	full	0	no-wiki-page	
+1986	[Tarantia_Noble] Burning the Barricades	2	full	0	no-wiki-page	
+1987	[Tarantia_Noble] The Sinister Sepulcher	3	full	0	no-wiki-page	
+1988	[R&B][Conarch_Village][Lacheish_Plains] War Correspondence	4	full	0	no-wiki-page	
+1989	[R&B][Khemi][Lacheish_Plains] Settling for Half	1	full	0	no-wiki-page	
+1990	[R&B][Old_Tarantia][Lacheish_Plains] Watch the White Hand	1	full	0	no-wiki-page	
+1992	[R&B][Conarch_Village][Poitain] Order Silks in Poitain	1	full	0	no-wiki-page	
+1993	[R&B][Conarch_Village][Purple_Lotus_Swamp] Keep the Hunter's Word	1	single	0	no-wiki-page	
+1994	[R&B][Khemi][Purple_Lotus_Swamp] Message from Khemi	1	full	0	no-wiki-page	
+1995	[R&B][Khemi][Poitain] The Flow of Information	3	full	0	no-wiki-page	
+1996	[R&B][Old_Tarantia][Poitain] Family Matters	1	full	0	no-wiki-page	
+1997	[R&B][Old_Tarantia][Purple_Lotus_Swamp] Warn the Mitra Priest	1	full	0	no-wiki-page	
+1998	[Tarantia_Noble] In Defense of Beauty	2	full	2	mismatch	
+1999	[Tarantia_Noble] The Love of a Countess	3	none	3	mismatch	
+2000	[Tarantia_Noble] Merchant of Khitan	1	full	0	no-wiki-page	
+2001	[Tarantia_Noble] The Little Farmer	2	full	2	mismatch	
+2002	[Tarantia_Noble] Source of Contagion	2	full	0	no-wiki-page	
+2003	[Tarantia_Noble] Stygian Knowledge	1	full	1	exact	
+2004	[Tarantia_Noble] The Spider's Antidote	3	full	3	exact	
+2005	[Test] Group Quest	1	single	0	no-wiki-page	
+2006	[Test] Raid Quest	1	single	0	no-wiki-page	
+2007	[Atzels_Fortress] Dead Man's Ledger[2]	2	full	0	no-wiki-page	
+2017	[Tarantia_Noble] Concealing the Chinks	3	full	0	no-wiki-page	
+2018	[Tarantia_Noble] Hunting the Spider	5	full	0	no-wiki-page	
+2019	[Tarantia_Noble] Bloodroot	4	full	4	exact	
+2020	[Tarantia_Noble] Cleaning the Streets	2	full	0	no-wiki-page	
+2021	[Tarantia_Noble] The Black Skulls	2	full	0	no-wiki-page	
+2022	[Tarantia_Noble] The Purveyor of Putrescence	7	full	0	no-wiki-page	
+2023	[Kheshatta] The Last Archive	8	full	8	exact	
+2024	[Tarantia_Noble] Of Justice and War (ON HOLD)	3	none	0	no-wiki-page	
+2025	[TEST] Repeatable with reward	1	single	0	no-wiki-page	
+2026	[TEST] Repeatable with optional reward	1	single	0	no-wiki-page	
+2027	[Thunder River] Fending off Enemies	1	full	2	mismatch	
+2028	[Atzels_Fortress] The Crown of Acheron	2	full	0	no-wiki-page	
+2029	[Atzels_Fortress] Charmed by the Past	1	single	0	no-wiki-page	
+2030	[Thunder River] A Dangerous Challenge	2	none	0	no-wiki-page	
+2031	[Kheshatta] A Plea for Freedom	1	full	0	no-wiki-page	
+2032	[Kheshatta] A Deadly Contract	1	full	2	mismatch	
+2033	[Atzels_Fortress] Run Away, Far Far Away	3	full	0	no-wiki-page	
+2034	[Atzels_Fortress] Last Wish	1	single	0	no-wiki-page	
+2036	[Thunder River] Invading Mercenaries	2	full	0	no-wiki-page	
+2037	[Thunder River] Supplies from Cian	1	full	0	no-wiki-page	
+2039	[Conall's_Valley] Deiric's Sacrifice	1	full	2	mismatch	
+2040	[Conall's_Valley] Love of an Outcast	1	full	2	mismatch	
+2041	[Conall's_Valley] The Wayfarer's Stone	1	full	1	exact	
+2042	[Conall's_Valley] War and Commerce	1	single	1	exact	
+2043	[Conarch_Village] The Rabbit Hunter	1	single	1	exact	
+2044	[Wild_Lands_of_Zelata] A Corpse Far From Home	1	single	2	mismatch	
+2045	[Khopshef_Province] Trained Hounds	1	full	0	no-wiki-page	
+2046	[Wild_Lands_of_Zelata] Demicus and Naboth	1	full	1	exact	
+2047	[Khopshef_Province] Unrequited Love	1	single	0	no-wiki-page	
+2048	[Conarch_Village] The Aquilonian Bastard	1	full	1	exact	
+2049	[Khemi] The Sands of Time	1	full	1	exact	
+2050	[Khemi] The Laughing Man	2	full	2	exact	
+2051	[Old_Tarantia] Bonds of Blood	1	single	0	no-wiki-page	
+2052	[Wild_Lands_of_Zelata] By Duty Torn	3	full	0	no-wiki-page	
+2053	[Old_Tarantia] The Bronze Serpent	1	single	1	exact	
+2054	[Khopshef_Province] Derketo's Call	1	full	0	no-wiki-page	
+2056	[NPE] The Smuggler	1	full	1	exact	
+2057	[NPE Cimmeria] Back to Tortage	1	single	0	no-wiki-page	
+2058	[NPE Aquilonia] Back to Tortage	1	single	0	no-wiki-page	
+2059	[NPE Stygia] Back to Tortage	1	full	0	no-wiki-page	
+2060	[Wild_Lands_of_Zelata] The Fearless Father	4	full	0	no-wiki-page	
+2061	[Wild_Lands_of_Zelata] Liniment of Pulchritude	4	full	0	no-wiki-page	
+2062	[Tarantia_Noble] The Hunt for Star-metal	2	full	0	no-wiki-page	
+2063	[Kheshatta_Mastery][Placeholder] Freeing the Slaves	1	single	0	no-wiki-page	
+2064		2	none	0	no-wiki-page	unnamed
+2065	[Wild_Lands_of_Zelata] Disquiet Dreams	2	full	0	no-wiki-page	
+2066	[Khopshef_Province] Conflicting Interests	2	none	2	exact	
+2067	[Khopshef_Province] Fascinating Faces	2	full	2	exact	
+2068	[Khopshef_Province] Lusts of the Flesh	5	full	0	no-wiki-page	
+2069	[Khopshef_Province] Shedding Torment 	4	none	0	no-wiki-page	
+2070	[Khopshef_Province] Stygian Superstitions	2	full	2	mismatch	
+2071	[Khopshef_Province] The Aberration	4	none	4	minor-text-diff	
+2072	[Khopshef_Province] The Roots of the Earth	2	full	2	exact	
+2073	[Khopshef_Province] The Forgotten Temple	2	full	1	wiki-omits-turn-in	
+2074	[Khopshef_Province] The Swindler's Game	2	none	0	no-wiki-page	
+2075	[Khopshef_Province] The Troubles of Thutmekri	2	full	0	no-wiki-page	
+2076	[Wild_Lands_of_Zelata] Primitive Origins	1	single	0	no-wiki-page	
+2077	[Wild_Lands_of_Zelata] The Darkest Nightmare	2	none	0	no-wiki-page	
+2078	[Wild_Lands_of_Zelata] The Weakest Link	2	none	1	mismatch	
+2079	[Kheshatta_Mastery] To the Ends of Kheshatta	4	none	0	no-wiki-page	
+2080	[Kheshatta_Mastery] Master of Kheshatta's Denizens	4	none	0	no-wiki-page	
+2081	[Kheshatta_Mastery] Master of the Mightiest of Foes	3	none	0	no-wiki-page	
+2082	[Tarantia_Noble] Tongue of the Raven	1	full	0	no-wiki-page	
+2083	[Tarantia_Noble] Eyes of the Raven	1	full	1	exact	
+2084	[Tarantia_Noble] Wings of the Raven	1	full	1	exact	
+2085	[Old_Tarantia] Melanor's Star	2	full	2	mismatch	
+2086	[Old_Tarantia] Finding Your Feet	1	full	1	exact	
+2087	[Eiglophian_Mountains] Lethal Weapons	2	full	0	no-wiki-page	
+2089	[Eiglophian_Mountains] The Hyperborean Messenger	2	full	0	no-wiki-page	
+2095	[Eiglophian_Mountains] Watchers on the Heights	1	full	0	no-wiki-page	
+2097	[Eiglophian_Mountains] A Different Approach	3	none	0	no-wiki-page	
+2098	[Eiglophian_Mountains] The Lover's Ring	2	full	0	no-wiki-page	
+2099	[Eiglophian_Mountains] Effective Strategies	2	full	0	no-wiki-page	
+2100	[Eiglophian_Mountains] Fleeing to Vanaheim	2	full	0	no-wiki-page	
+2101	[Eiglophian_Mountains] Lost in the Snows	2	none	0	no-wiki-page	
+2102	[Eiglophian_Mountains] Wolves and Lambs	3	full	2	minor-text-diff	
+2103	[Eiglophian_Mountains] Puncturing Prospectors	2	none	0	no-wiki-page	
+2104	[Eiglophian_Mountains] Crom's Contempt	2	full	0	no-wiki-page	
+2105	[Tarantia_Noble] Path of the Raven	3	full	0	no-wiki-page	
+2107	[Conarch_Village] A Message for Cul	1	full	2	mismatch	
+2108	[Conarch_Village] A New Recruit	1	full	0	no-wiki-page	
+2109	[Tarantia_Noble] Curses of Travius Blacktongue	3	full	0	no-wiki-page	
+2110	[Field_of_the_Dead] Crom's Champion	1	full	1	exact	
+2111	[Field_of_the_Dead] The Watcher of the Ways	1	full	0	no-wiki-page	
+2112	[Old_Tarantia] The Odd Nemedian	1	full	0	no-wiki-page	
+2113	[Tarantia_Noble] Patterns in Insanity	5	full	0	no-wiki-page	
+2115	[NPE] A Fishy Future	2	full	2	exact	
+2116	[NPE] Pool of Black Blood	2	full	2	exact	
+2117	[NPE] Red Hand Death	2	full	1	wiki-omits-turn-in	
+2118	[NPE] Tailored Tasks	2	full	2	mismatch	
+2119	[NPE] The Evil That Men Do	2	full	2	exact	
+2120	[NPE] The Worshippers' Demise	2	full	2	exact	
+2121	[Field_of_the_Dead] Ancient Weapons	2	none	2	exact	
+2122	[Field_of_the_Dead] Entourage	2	none	2	exact	
+2123	[Field_of_the_Dead] Cleansing the Tomb	2	none	2	exact	
+2127	[Lacheish_Plains] Stockphrase	1	single	0	no-wiki-page	
+2128	[Purple_Lotus_Swamp] Stockphrase	1	single	0	no-wiki-page	
+2129	[Poitain] Stockphrase	1	single	0	no-wiki-page	
+2130	[Purple_Lotus_Swamp] Nakaset Village	1	full	0	no-wiki-page	
+2135	[Kheshatta_OnyxChamber] The Shadow and the Light	1	single	0	no-wiki-page	
+2136	[1_On_Hold] Quests on hold for launch	1	single	0	no-wiki-page	
+2137	[Armorsmith_1][1.1.2] Advanced Canvas Cloth Set	2	full	0	no-wiki-page	
+2138	[Armorsmith_1][1.2.1] Basic Assassin Canvas Cloth Set	2	full	0	no-wiki-page	
+2139	[Armorsmith_1][1.2.2] Advanced Assassin Canvas Cloth Set	2	full	0	no-wiki-page	
+2140	[Field_of_the_Dead] Wanted! Vanir Training	1	full	0	no-wiki-page	
+2141	[Armorsmith_1][1.3.2] Advanced Short Tanned Leather Set	2	full	0	no-wiki-page	
+2142	[Armorsmith_1][1.4.2] Advanced Short Bloodsilver-studded Set	2	full	0	no-wiki-page	
+2143	[Armorsmith_1][1.5.2] Advanced Bloodsilver-mail Set	2	full	0	no-wiki-page	
+2144	[Armorsmith_1][1.6.1] Crude Accessories	2	full	0	no-wiki-page	
+2145	[Field_of_the_Dead] Wanted! In Trouble with the Vanir	1	full	0	no-wiki-page	
+2146	[Field_of_the_Dead] Wanted! Destroying the Vanir	1	full	0	no-wiki-page	
+2147	[Field_of_the_Dead] Wanted! A Menace to Field of the Dead	1	full	0	no-wiki-page	
+2148	[Field_of_the_Dead] Wanted! Demoralizing the Vanir	1	full	0	no-wiki-page	
+2149	[Field_of_the_Dead] Wanted! Atzel Bandits in the Dirt	1	full	0	no-wiki-page	
+2150	[Field_of_the_Dead] Wanted! Atzel Bandits in the Grave	1	single	0	no-wiki-page	
+2151	[Eiglophian_Mountains] Wanted! Cannibals to the West	1	single	0	no-wiki-page	
+2152	[Eiglophian_Mountains] Wanted! Cannibals to the East	1	single	0	no-wiki-page	
+2153	[Eiglophian_Mountains] Wanted! Cannibals to the North	1	full	0	no-wiki-page	
+2154	[Eiglophian_Mountains] Wanted! White-Hand Tussle	1	single	0	no-wiki-page	
+2155	[Eiglophian_Mountains] Wanted! White-Hand Struggle	1	single	0	no-wiki-page	
+2156	[Eiglophian_Mountains] Wanted! White-Hand Exterminator	1	full	0	no-wiki-page	
+2157	[Eiglophian_Mountains] Wanted! Frost Apes to the North	1	full	0	no-wiki-page	
+2158	[Armorsmith_2][2.2.1] Basic Assassin Quilted Cloth Set	2	full	0	no-wiki-page	
+2159	[Armorsmith_2][2.2.2] Advanced Assassin Quilted Cloth Set	2	full	0	no-wiki-page	
+2160	[Armorsmith_2][2.6.1] Common Accessories	2	full	0	no-wiki-page	
+2161	[Armorsmith_3][3.2.1] Basic Assassin Sateen Set	2	full	0	no-wiki-page	
+2162	[Armorsmith_3][3.2.2] Advanced Assassin Sateen Set	2	full	0	no-wiki-page	
+2163	[NPE] Xan's Bounty	1	single	2	mismatch	
+2164	[Kheshatta_Mastery] A Heroes Steed	2	none	0	no-wiki-page	
+2165	[Thunder River] Wanted! An End to the Boar Menace	1	single	0	no-wiki-page	
+2166	[Thunder River] Wanted! Spreading Trouble amongst the Mercenaries	1	full	0	no-wiki-page	
+2167	[Thunder River] Wanted! Destroying the Mercenaries	1	single	0	no-wiki-page	
+2168	[Thunder River] Wanted! Destroying the Undead	1	single	0	no-wiki-page	
+2169	[Thunder River] Wanted! Destroying the Pict Tribe	1	single	0	no-wiki-page	
+2170	[Kheshatta] Wanted! Crimson Raiders	1	single	0	no-wiki-page	
+2171	[Kheshatta] Wanted! Hyenas on the Trail	1	single	0	no-wiki-page	
+2172	[Kheshatta] Wanted! Plague of Scorpions Culled	1	single	0	no-wiki-page	
+2173	[Kheshatta] Wanted! Beasts Threaten Kheshatta	1	single	1	exact	
+2174	[Atzels_Fortress] Wanted! Destroying the Troglodyte Menace	1	single	0	no-wiki-page	
+2175	[Atzels_Fortress] Wanted! Atzel's Lookouts	1	single	0	no-wiki-page	
+2176	[Atzels_Fortress] Wanted! Skammestein Prison Guards	1	single	0	no-wiki-page	
+2177	[Atzels_Fortress] Wanted! Glacial Sabertooth Menace	1	single	0	no-wiki-page	
+2178	[Atzels_Fortress] Wanted! The Atzel Struggle	1	single	1	exact	
+2179	[Atzels_Fortress] Wanted! Ivory Vale Troglodytes	1	single	0	no-wiki-page	
+2180	[Kheshatta] Wanted! Death Master Raiders	1	single	0	no-wiki-page	
+2181	[Atzels_Fortress] Wanted! Undeads to the East	1	single	0	no-wiki-page	
+2182	[Atzels_Fortress] Wanted! No Compromise	1	single	0	no-wiki-page	
+2183	[Atzels_Fortress] Wanted! Destroyer of Atzel's Guards	1	single	0	no-wiki-page	
+2184	[Kheshatta] Wanted! Intruders from Kush	1	single	0	no-wiki-page	
+2185	[Kheshatta] Wanted! Traitors to the Selkhetites	1	single	0	no-wiki-page	
+2186	[Kheshatta] Wanted! Black Ring	1	single	0	no-wiki-page	
+2187	[Kheshatta] Wanted! Mighty Felines of Kheshatta	1	single	0	no-wiki-page	
+2188	[Armorsmith_3][3.6.1] Basic Moonsteel Half-plate Set	2	full	0	no-wiki-page	
+2189	[Armorsmith_3][3.6.2] Advanced Moonsteel Half-plate Set	2	full	0	no-wiki-page	
+2190	[Armorsmith_3][3.7.1] Refined Accessories	2	full	0	no-wiki-page	
+2191	[Armorsmith_4][4.2.1] Basic Assassin Silk Set	2	full	0	no-wiki-page	
+2192	[Armorsmith_4][4.2.2] Advanced Assassin Silk Set	2	full	0	no-wiki-page	
+2193	[Armorsmith_4][4.6.1] Basic Moonsteel Full-plate Set	2	full	0	no-wiki-page	
+2194	[Armorsmith_4][4.6.2] Advanced Moonsteel Full-plate Set	2	full	0	no-wiki-page	
+2195	[Armorsmith_4][4.7.1] Superior Accessories	2	full	0	no-wiki-page	
+2196	[Armorsmith_5][5.2.1] Basic Assassin Ironsilk Set	2	full	0	no-wiki-page	
+2197	[Armorsmith_5][5.2.2] Advanced Assassin Ironsilk Set	2	full	0	no-wiki-page	
+2198	[Armorsmith_5][5.6.1] Basic Skymetal Half-plate Set	2	full	0	no-wiki-page	
+2199	[Armorsmith_5][5.6.2] Advanced Skymetal Half-plate Set	2	full	0	no-wiki-page	
+2200	[Armorsmith_5][5.7.1] Exceptional Accessories	2	full	0	no-wiki-page	
+2201	[Armorsmith_6][6.2.1] Basic Assassin Steelsilk Set	2	full	0	no-wiki-page	
+2202	[Armorsmith_6][6.2.2] Advanced Assassin Steelsilk Set	2	full	0	no-wiki-page	
+2203	[Armorsmith_6][6.7.1] Perfect Accessories	2	full	0	no-wiki-page	
+2204	[Armorsmith_6][6.6.1] Basic Skymetal Full-plate Set	2	full	0	no-wiki-page	
+2205	[Armorsmith_6][6.6.2] Advanced Skymetal Full-plate Set	2	full	0	no-wiki-page	
+2207	[Volunteers Bug Start] A Gift from Asura	1	single	0	no-wiki-page	
+2208	[Volunteers Ops Start] A Gift from Asura	1	single	0	no-wiki-page	
+2209	[Volunteers Admin Start] A Gift from Asura	1	single	0	no-wiki-page	
+2210	[Volunteer] Asura's Path	9	none	0	no-wiki-page	
+2211	[Field_of_the_Dead] The Honoured Dead I	3	full	3	exact	
+2212	[Field_of_the_Dead] The Honoured Dead II	3	full	3	exact	
+2213	[Field_of_the_Dead] The Honoured Dead III	3	full	3	exact	
+2218	[Field_of_the_Dead] The Honoured Dead IV	3	full	3	exact	
+2224	[INTERNAL][NO_LOCALIZATION_NEEDED] Do not localize	1	single	0	no-wiki-page	
+2225	[Tarantia_Noble] The Curious Cuirass	6	none	0	no-wiki-page	
+2226	[Khopshef_Province] The Architect's Challenge	3	none	0	wiki-page-has-no-steps	
+2227	[Khopshef_Province] Creature of Havoc	3	none	0	no-wiki-page	
+2229	[Thunder River] Underground Attack	2	full	2	exact	
+2230	[Thunder River] The Corpse Devourers	2	full	2	exact	
+2231	[Thunder River] Torn to Pieces	3	none	3	same-steps-order-differs	
+2234	[Thunder River] Green Yolk	2	partial	2	exact	
+2235	[Thunder River] The Elder Plans	2	full	2	mismatch	
+2236	[Thunder River] Scavenging for Provisions	2	full	2	exact	
+2237	[Thunder River] The Beast Stirs	3	none	0	no-wiki-page	
+2238	[Ymir's_Pass] Silence in the Swamps	2	full	0	no-wiki-page	
+2239	[Ymir's_Pass] The Three Towers	2	full	0	no-wiki-page	
+2240	[Ymir's_Pass] A Scar in the Earth	2	full	0	no-wiki-page	
+2241	[Ymir's_Pass] The Phantom in the Powder	2	full	0	no-wiki-page	
+2242	[Ymir's_Pass] The Bottomless Pits	3	full	0	no-wiki-page	
+2243	[Ymir's_Pass] The Mud in the Mire	2	full	0	no-wiki-page	
+2244	[Ymir's_Pass] The Darkness in the Swamps	3	full	0	no-wiki-page	
+2245	[Ymir's_Pass] Healing Nature's Wounds	5	full	0	no-wiki-page	
+2246	[Ymir's_Pass] The Ghost Kings	3	full	0	no-wiki-page	
+2247	[Ymir's_Pass] A Call to the Clan	3	full	0	no-wiki-page	
+2248	[Ymir's_Pass] The Tomes of the Dead	3	full	0	no-wiki-page	
+2249	[Ymir's_Pass] The Explorer	2	none	0	no-wiki-page	
+2250	[Ymir's_Pass] The Gaze of Crom	3	full	0	no-wiki-page	
+2251	[Ymir's_Pass] A Taste of Revenge	3	none	0	no-wiki-page	
+2252	[Ymir's_Pass] Havoc and Disruption	9	full	0	no-wiki-page	
+2253	[Ymir's_Pass] Searching the Ashes	3	full	0	no-wiki-page	
+2254	[Ymir's_Pass] The Girl With No Fear	4	none	0	no-wiki-page	
+2255	[Ymir's_Pass] The Rhino Man	2	full	0	no-wiki-page	
+2256	[Ymir's_Pass] The Vale of Lost Women	2	full	0	no-wiki-page	
+2257	[Eiglophian_Mountains] Put to Rest	2	full	0	no-wiki-page	
+2258	[Eiglophian_Mountains] Raelina's Journals	2	full	0	no-wiki-page	
+2259	[Eiglophian_Mountains] A Lost Companion	2	full	0	no-wiki-page	
+2260	[Eiglophian_Mountains] Reinforcing the Ward Wall	2	full	0	no-wiki-page	
+2261	[Eiglophian_Mountains] Trapping Spirits	2	full	0	no-wiki-page	
+2262	[Eiglophian_Mountains] A Piece of History	2	full	0	no-wiki-page	
+2263	[Eiglophian_Mountains] Reign of Terror	2	full	0	no-wiki-page	
+2264	[Eiglophian_Mountains] Missing Shaman	1	full	0	no-wiki-page	
+2265	[Eiglophian_Mountains] Failure to Report	1	full	0	no-wiki-page	
+2266	[Eiglophian_Mountains] Seeking the Messenger	1	full	0	no-wiki-page	
+2267	[Eiglophian_Mountains] Claim of Honor	2	full	0	no-wiki-page	
+2268	[Eiglophian_Mountains] Hell's Whip	2	full	0	no-wiki-page	
+2269	[Eiglophian_Mountains] To Send a Message	4	none	0	no-wiki-page	
+2270	[Field_of_the_Dead] The Price of Treason	1	single	0	no-wiki-page	
+2271	[Khopshef_Province] A Discerning Eye	2	full	2	exact	
+2272	[Khopshef_Province] The Power of the Seasons	2	full	0	no-wiki-page	
+2273	[Khopshef_Province] Nightmares of Flame	1	full	1	exact	
+2283	[Ymir's_Pass] The Murmurs of the Earth	2	full	0	no-wiki-page	
+2284	[Ymir's_Pass] Breath of Ymir	2	full	0	no-wiki-page	
+2285	[Ymir's_Pass] Don't Let Them Live	2	full	0	no-wiki-page	
+2286	[Ymir's_Pass] Don't Let Them Through	2	full	0	no-wiki-page	
+2287	[Ymir's_Pass] Fire Burns the Beast	2	full	0	no-wiki-page	
+2288	[Ymir's_Pass] Heart of Atali	2	full	0	no-wiki-page	
+2289	[Ymir's_Pass] The Twisted Skein	2	full	0	no-wiki-page	
+2290	[Ymir's_Pass] The Footprints of the Gods [Gaven]	2	none	0	no-wiki-page	
+2291	[Ymir's_Pass] The Footprints of the Gods [Gisvan]	2	full	0	no-wiki-page	
+2292	[Ymir's_Pass] The Wayward Shaman	1	full	0	no-wiki-page	
+2293	[Ymir's_Pass] Ymir's Board	3	full	0	no-wiki-page	
+2294	[Ymir's_Pass] Ymir's Progeny	2	full	0	no-wiki-page	
+2295	[Ymir's_Pass] The Broken Man	2	full	0	no-wiki-page	
+2296	[R&B][Old_Tarantia][Poitain][L40] Satiating Order	1	single	0	no-wiki-page	
+2297	[Poitain] An Errand Run	1	single	0	no-wiki-page	
+2298	[Ymir's_Pass] Ragged Diplomacy	1	single	0	no-wiki-page	
+2299	[R&B][Khemi][Purple_Lotus_Swamp][L40] Helping the Unborn Child	1	single	0	no-wiki-page	
+2300	[Purple_Lotus_Swamp] The Wig Maker's Tool	1	single	0	no-wiki-page	
+2301	[Thunder River] Keeping the Pieces	2	none	0	no-wiki-page	
+2302	[Thunder River] Warmongering	2	none	0	no-wiki-page	
+2303	[Thunder River] Death from Below	2	none	0	no-wiki-page	
+2304	[Thunder River] A Quick Bite	2	none	0	no-wiki-page	
+2305	[Thunder River] Terrorizing the Land of the Dead	3	none	0	no-wiki-page	
+2306	[Thunder River] Demonic Infestation	2	none	0	no-wiki-page	
+2307	[Thunder River] Drenched and Tainted	2	none	0	no-wiki-page	
+2308	[Thunder River] Vatia's Comfort	2	none	0	no-wiki-page	
+2309	[Thunder River] Golden Nests	2	none	0	no-wiki-page	
+2310	[Thunder River] Crater of Death	2	none	0	no-wiki-page	
+2311	[R&B][Conarch_Village][Lacheish_Plains][L40] Valued Supplies	1	single	0	no-wiki-page	
+2312	[Lacheish_Plains] Planks for the Gate	1	single	0	no-wiki-page	
+2313	[Ymir's_Pass] Rugged Diplomacy	2	full	0	no-wiki-page	
+2314	[Ymir's_Pass] Intercepting the Messenger	2	full	0	no-wiki-page	
+2316	[Ymir's_Pass] A Decent Burial	2	full	0	no-wiki-page	
+2317	[Ymir's_Pass] The Calm Before the Storm	5	full	0	no-wiki-page	
+2318	[Ymir's_Pass] The Dark Arts	2	full	0	no-wiki-page	
+2319	[Ymir's_Pass] The Red Witch	2	full	0	no-wiki-page	
+2320	[Ymir's_Pass] The Sins of Karutonia	8	full	0	no-wiki-page	
+2321	[Ymir's_Pass] Ruins Duty	1	full	0	no-wiki-page	
+2322	[Ymir's_Pass] Freeing the Frostfather	2	full	0	no-wiki-page	
+2323	[Redemp_Lacheish_Plains] Clan Caldauhn's Decimation	2	none	0	no-wiki-page	
+2324	[Redemp_Lacheish_Plains] Ramming the Snow Ocean Pirates	2	none	0	no-wiki-page	
+2325	[Redemp_Lacheish_Plains] Slaying the Unholy Worshippers	2	none	0	no-wiki-page	
+2326	[Redemp_Poitain] Bash their Blessed Brains In	2	none	0	no-wiki-page	
+2327	[Redemp_Poitain] Traitors' Ways	2	none	0	no-wiki-page	
+2328	[Redemp_Poitain] Chastising the Spirited Children	2	none	0	no-wiki-page	
+2329	[Redemp_Purple_Lotus_Swamp] The Wardens of the Swamp	2	none	0	no-wiki-page	
+2330	[Redemp_Purple_Lotus_Swamp] Followers of the Crocodile God	2	none	0	no-wiki-page	
+2331	[Redemp_Purple_Lotus_Swamp] Horrors of the Deep Waters	2	none	0	no-wiki-page	
+2332	[Redemp_White_Sands_Isle] Chasing the Hairy Beast	2	none	0	no-wiki-page	
+2333	[Redemp_Atzels_Fortress] The Smell of Fear	2	none	0	no-wiki-page	
+2334	[Redemp_Atzels_Fortress] Atzel's Men	2	none	0	no-wiki-page	
+2335	[Redemp_Atzels_Fortress] Chilled to the Bone	2	none	0	no-wiki-page	
+2336	[Ymir's_Pass] A Fallen Companion	2	none	0	no-wiki-page	
+2337	[Redemp_White_Sands_Isle] Black Water of Youth	2	none	0	no-wiki-page	
+2338	[Redemp_White_Sands_Isle] Turning Heads	2	none	0	no-wiki-page	
+2339	[Redemp_Field_of_the_Dead] Fewer Vanir	2	none	0	no-wiki-page	
+2340	[Redemp_Field_of_the_Dead] Standing Up	2	none	0	no-wiki-page	
+2341	[Redemp_Field_of_the_Dead] Clawing Away	2	none	0	no-wiki-page	
+2342	[Redemp_Thunder_River] Land of Blood	2	none	0	no-wiki-page	
+2343	[Redemp_Thunder_River] Tainted Animals	2	none	0	no-wiki-page	
+2344	[Redemp_Thunder_River] Keeping the Land Safe	2	none	0	no-wiki-page	
+2345	[Redemp_Eiglophian_Mountains] Skins of Trespassers	2	none	0	no-wiki-page	
+2346	[Redemp_Eiglophian_Mountains] Herbal Aid	2	none	0	no-wiki-page	
+2347	[Redemp_Eiglophian_Mountains] Cannibal Menace	2	none	0	no-wiki-page	
+2348	[Redemp_Kheshatta] Desert Howling	2	none	0	no-wiki-page	
+2349	[Redemp_Kheshatta] Jungle Invaders	2	full	0	no-wiki-page	
+2350	[Redemp_Kheshatta] Scoundrels and Bandits	2	none	0	no-wiki-page	
+2351	[Redemp_Kheshatta] Secrets of the Ring	2	none	0	no-wiki-page	
+2352	[Redemp_Kheshatta] Unbelievers	2	none	0	no-wiki-page	
+2353	[Redemp_Kheshatta] Under the Table	2	none	0	no-wiki-page	
+2354	[Eiglophian_Mountains] The Great Ordeal [v2]	2	none	0	no-wiki-page	
+2355	[Redemp_Conall's_Valley] The Mephitic Mushrooms	2	none	0	no-wiki-page	
+2356	[Redemp_Conall's_Valley] The Venom in the Water	2	none	0	no-wiki-page	
+2357	[Redemp_Conall's_Valley] Caught in the Net	2	none	0	no-wiki-page	
+2358	[Redemp_Tarantia_Noble] The Hidden Message	2	none	0	no-wiki-page	
+2359	[Redemp_Tarantia_Noble] The Assassination Order	2	none	0	no-wiki-page	
+2360	[Redemp_Tarantia_Noble] A Terrible Mistake	2	none	0	no-wiki-page	
+2361	[Redemp_Khopshef_Province] Coercion	3	none	0	no-wiki-page	
+2362	[Redemp_Khopshef_Province] Ruthlessness	3	none	0	no-wiki-page	
+2363	[Redemp_Khopshef_Province] Intimidation	2	none	0	no-wiki-page	
+2364	[Redemp Khopshef_Province] Path of Venom	3	none	0	no-wiki-page	
+2365	[Redemp_Khopshef_Province] Hearts of Men	2	none	0	no-wiki-page	
+2366	[Redemp Khopshef_Province] Leap of Faith	2	none	0	no-wiki-page	
+2367	[Redemp_Wild_Lands_of_Zelata] A Rogue Lover	2	none	0	no-wiki-page	
+2368	[Redemp_Wild_Lands_of_Zelata] Hidden Treasures	2	none	0	no-wiki-page	
+2369	[Redemp_Wild_Lands_of_Zelata] Nemedian Riches	2	none	0	no-wiki-page	
+2370	[Redemp_Wild_Lands_of_Zelata] A Song of Courage	2	none	0	no-wiki-page	
+2371	[Redemp_Wild_Lands_of_Zelata] A Song of Triumph	2	none	0	no-wiki-page	
+2372	[Redemp_Wild_Lands_of_Zelata] A Song of Vengeance	2	none	0	no-wiki-page	
+2373	[Cradle_of_Decay] Friend & Foe	2	none	0	no-wiki-page	
+2374	[Cradle_of_Decay] A Crawling Threat	2	none	0	no-wiki-page	
+2375	[Cradle_of_Decay] A Horrid Master	2	none	0	no-wiki-page	
+2376	[Cradle_of_Decay] The Cadge	2	none	0	no-wiki-page	
+2377	[Ymir's_Pass] Skillful Diplomacy	3	none	0	no-wiki-page	
+2378	[Ymir's_Pass] A Delay in Supply	3	full	0	no-wiki-page	
+2379	[Ymir's_Pass] Prisoner of War	1	full	0	no-wiki-page	
+2380	[Thunder River] The Missing Scouts	2	none	0	no-wiki-page	
+2381	[Thunder River] Even Death May Die	2	none	0	no-wiki-page	
+2382	[Thunder River] Bash Their Heads In	2	none	0	no-wiki-page	
+2383	[Thunder River] The Red One	2	none	0	no-wiki-page	
+2384	[Thunder River] The Terrible Decline	2	none	0	no-wiki-page	
+2385	[Thunder River] Without the Head the Body Will Die	2	none	0	no-wiki-page	
+2386	[Thunder River] Handmaiden of Acheron	1	single	0	no-wiki-page	
+2388	[Ymir's_Pass] The Road to Ymir's Pass	1	full	0	no-wiki-page	
+2389	[Atzels_Fortress] Behind the Ice	2	none	0	no-wiki-page	
+2390	[Atzels_Fortress] Red Snow	3	none	3	same-steps-order-differs	
+2391	[Atzels_Fortress] Bow Down	2	none	0	no-wiki-page	
+2392	[Atzels_Fortress] The Ice Fiend	2	full	0	no-wiki-page	
+2393	[Atzels_Fortress] Clearing the Ridge	2	none	2	exact	
+2394	[Atzels_Fortress] Rise to the Challenge	2	none	0	no-wiki-page	
+2395	[Atzels_Fortress] Hyperboreans no More	2	full	0	no-wiki-page	
+2397	[Ymir's_Pass] Lizards in the Muck	1	single	0	no-wiki-page	
+2398	[Ymir's_Pass] A Fistful of Copper	1	full	0	no-wiki-page	
+2399	[Ymir's_Pass] Esperan's Admirer	1	full	0	no-wiki-page	
+2400	[Ymir's_Pass] Joining the Clans	1	full	0	no-wiki-page	
+2401	[Thunder River] Xibaluku	2	none	2	exact	
+2402	[Redemp_Ymir's_Pass] Breaking the Ring	2	none	0	no-wiki-page	
+2403	[Tarantia_Common] Fighting Fire	4	full	0	no-wiki-page	
+2404	[Tarantia_Common] A Missing Leader	4	none	0	no-wiki-page	
+2405	[Tarantia_Common] The Plagued Task	2	full	0	no-wiki-page	
+2406	[Tarantia_Common] A Remedy for Diseases	2	full	0	no-wiki-page	
+2407	[Tarantia_Common] A Thieving Crow	2	full	0	no-wiki-page	
+2408	[Tarantia_Common] All the Same in the Dark	2	none	0	no-wiki-page	
+2409	[Tarantia_Common] Bring Out Your Dead	3	full	0	no-wiki-page	
+2410	[Tarantia_Common] Buried Alive	3	partial	0	no-wiki-page	
+2411	[Tarantia_Common] Crow-bait	3	none	0	no-wiki-page	
+2412	[Tarantia_Common] Debt and Debauchery	2	none	0	no-wiki-page	
+2413	[Tarantia_Common] Enemy Movement	2	none	0	no-wiki-page	
+2414	[Tarantia_Common] Justice in the District	4	none	0	no-wiki-page	
+2415	[Tarantia_Common] Lazar's Flock	2	full	0	no-wiki-page	
+2416	[Tarantia_Common] Patrolling the Streets	3	none	0	no-wiki-page	
+2417	[Tarantia_Common] Infiltrating the Rats	2	full	0	no-wiki-page	
+2418	[Tarantia_Common] Smoldering Supplies	3	full	0	no-wiki-page	
+2419	[Tarantia_Common] The Arsonist	3	partial	0	no-wiki-page	
+2420	[Tarantia_Common] The Boat Captain	2	full	0	no-wiki-page	
+2421	[Tarantia_Common] The Bone Collector	2	none	0	no-wiki-page	
+2422	[Tarantia_Common] The Covert Casket	2	full	0	no-wiki-page	
+2423	[Tarantia_Common] Enemy Within	2	full	0	no-wiki-page	
+2424	[Tarantia_Common] Follow that Harlot	2	none	0	no-wiki-page	
+2425	[Tarantia_Common] Mark of the Plague	2	full	0	no-wiki-page	
+2426	[Tarantia_Common] The Missing Crow	2	full	0	no-wiki-page	
+2427	[Tarantia_Common] The Destitute Prostitute	3	partial	0	no-wiki-page	
+2428	[Tarantia_Common] The Tarantia Tea Party	2	full	0	no-wiki-page	
+2429	[Tarantia_Common] Whispers from the Grave	2	full	0	no-wiki-page	
+2430	[Tarantia_Common] To Become a Rat Infiltrator	2	full	0	no-wiki-page	
+2431	[Tarantia_Common] To Become a Crow Infiltrator	2	full	0	no-wiki-page	
+2432	[Tarantia_Common] To Wake from Darkness	2	full	0	no-wiki-page	
+2433	[Tarantia_Common] Walking the Plank	5	partial	0	no-wiki-page	
+2434	[Tarantia_Common] War in the Streets	2	full	0	no-wiki-page	
+2435	[Tarantia_Common] War on the Roofs	2	full	0	no-wiki-page	
+2437	[Redemp_Ymir's_Pass] Instrument of Vengeance	2	none	0	no-wiki-page	
+2438	[Redemp_Ymir's_Pass] Midnight	2	none	0	no-wiki-page	
+2441	[Tarantia_Common] The Whining Merchant	2	none	0	no-wiki-page	
+2443	[Tarantia_Common] Chaos in the District[REPEATABLE]	4	none	0	no-wiki-page	
+2444	[Tarantia_Common] Order in the District[REWARD]	4	none	0	no-wiki-page	
+2445	[Tarantia_Common] The Brawling Drunkard	2	none	0	no-wiki-page	
+2447	[Tarantia_Common] Stockphrases	1	single	0	no-wiki-page	
+2449	[Tarantia_Common] Enemy Movement [2]	3	full	0	no-wiki-page	
+2452	[NPE] Stockphrases	1	single	0	no-wiki-page	
+2453	[Wild_Lands_of_Zelata] The Curse of Flies [New] 	3	partial	0	no-wiki-page	
+2454	[zXPTest] XPTest	1	single	0	no-wiki-page	
+2455	[Eiglophian_Mountains] Stockphrase	1	single	0	no-wiki-page	
+2491	[Redemp_Tarantia_Common] Clipping Wings	2	none	0	no-wiki-page	
+2492	[Redemp_Tarantia_Common] Light Amongst the Dead	2	none	0	no-wiki-page	
+2493	[Redemp_Tarantia_Common] Rat Hunting	2	none	0	no-wiki-page	
+2495	[Northern Grasslands][YPoY] Smell of Putrescence	3	full	0	no-wiki-page	
+2496	[Northern Grasslands][YPoY] Demonic Presence 	4	full	0	no-wiki-page	
+2497	[Chosain_Province][BB] The Perfect Kill	4	none	0	no-wiki-page	
+2498	[Northern Grasslands][CoYk] Rot Lake	4	none	0	no-wiki-page	
+2499	[Northern Grasslands][CoYk] Demon in Disguise	7	none	0	no-wiki-page	
+2500	[Northern Grasslands][SC] From Earth to Dust	2	full	0	no-wiki-page	
+2501	[Northern Grasslands][SC] The Magic Harp	5	none	0	no-wiki-page	
+2502	[Chosain_Province][BB] Contract Killer	5	none	0	no-wiki-page	
+2503	[Chosain_Province][BB] Bloody Bargains	5	none	0	no-wiki-page	
+2504	[Northern Grasslands][SoJ] Wanted!	5	partial	0	no-wiki-page	
+2506	[Northern Grasslands][WotS] Wolf Cub	3	full	0	no-wiki-page	
+2507	[Northern Grasslands][WotS] Hunting with the Wolves	3	full	0	no-wiki-page	
+2508	[Northern Grasslands][WotS] Heart of the Pack	5	none	0	no-wiki-page	
+2509	[Northern Grasslands][WotS] Running Down Prisoners	6	partial	0	no-wiki-page	
+2510	[Northern Grasslands][WotS] The Price of Betrayal	3	none	0	no-wiki-page	
+2511	[Northern Grasslands][WotS] A Lesson in Cruelty	4	none	0	no-wiki-page	
+2512	[Northern Grasslands][H] The Tigress	2	none	0	no-wiki-page	
+2513	[Northern Grasslands][WotS] The Tiger	2	none	0	no-wiki-page	
+2514	[Northern Grasslands][WotS] Coward Way	7	none	0	no-wiki-page	
+2515	[Northern Grasslands][WotS] Enemy Blood	2	none	0	no-wiki-page	
+2516	[Northern Grasslands][WotS] Burning Bridges	3	full	0	no-wiki-page	
+2518	[Northern Grasslands][H] The Magic Mirror	5	none	0	no-wiki-page	
+2519	[Chosain_Province][TT] Nourished with Lovers' Tears	2	none	0	no-wiki-page	
+2520	[Chosain_Province][CoYk] Foxtails For Fang	2	none	0	no-wiki-page	
+2521	[Chosain_Province][SoCH] Standing Against Tamarin's Tigers	4	none	0	no-wiki-page	
+2522	[Chosain_Province][SoCH] Tomes of the Moon Temple	2	none	0	no-wiki-page	
+2523	[Chosain_Province][SoCH] The Battle for Gun Xiu	5	none	0	no-wiki-page	
+2524	[Chosain_Province][SoCH] Secrets of the Scholars	4	none	0	no-wiki-page	
+2525	[Chosain_Province][SoCH] Battlefield of Shaulun	2	none	0	no-wiki-page	
+2526	[Chosain_Province][SoCH] Black Lotus Attack	4	none	0	no-wiki-page	
+2527	[Chosain_Province][SoCH] Truth and Enlightenment	5	none	0	no-wiki-page	
+2528	[Kheshatta_Black_Ring_Citadel][BROKEN] The Ibis Weapon	5	none	0	no-wiki-page	
+2529	[Chosain_Province][SoCH] Tigers' Indoctrination Camp	2	none	0	no-wiki-page	
+2530	[Chosain_Province][SoCH] Fighting for Resources	3	none	0	no-wiki-page	
+2531	[Chosain_Province][SoCH] The Path of Diao Chan	3	none	0	no-wiki-page	
+2532	[Chosain_Province][CoYk] A Blind Eye	6	none	0	no-wiki-page	
+2533	[Chosain_Province][CoYk] Mythic Brew	4	none	0	no-wiki-page	
+2534	[Chosain_Province][CoYk] Brewing Mythic Brew	4	none	0	no-wiki-page	
+2535	[Chosain_Province][TT] The Drunken Recruit	3	full	0	no-wiki-page	
+2536	[Chosain_Province][TT] Feast of the Dead	2	full	0	no-wiki-page	
+2537	[Chosain_Province][TT] Slaughter of the Scholars of Cheng-ho	2	full	0	no-wiki-page	
+2538	[Chosain_Province][TT] The Bloody Truth	2	none	0	no-wiki-page	
+2539	[Chosain_Province][TT] Tiger Claws	2	none	0	no-wiki-page	
+2540	[Chosain_Province][TT] The Hunting Grounds of Chosain	3	none	0	no-wiki-page	
+2541	[Chosain_Province][SoCH] Three Fallen Stars	2	none	0	no-wiki-page	
+2542	[Chosain_Province][SoCH] Free from the House of Concubines	9	none	0	no-wiki-page	
+2543	[Chosain_Province][TT] Battling for Resources	3	none	0	no-wiki-page	
+2544	[Chosain_Province][TT] Tiger Lair	3	none	0	no-wiki-page	
+2545	[Chosain_Province][TT] Standing Tiger Orders	6	none	0	no-wiki-page	
+2546	[Chosain_Province][TT] Mutilated Vaaghasans of Chosain	2	none	0	no-wiki-page	
+2547	[Chosain_Province][TT] The Hidden Path to Yun Rau	4	none	0	no-wiki-page	
+2549	[Northern Grasslands][YPoY] Mystery Lotus	2	full	0	no-wiki-page	
+2550	[Northern Grasslands][YPoY] The Sacrificial Lamb	5	full	0	no-wiki-page	
+2551	[Northern Grasslands][CoYk] White Lotus	3	none	0	no-wiki-page	
+2552	[Chosain_Province][Mines_of_Chosain] Not All That Glitters	2	none	0	no-wiki-page	
+2554	[Chosain_Province][BB] The Greatest Fighter in the World	5	none	0	no-wiki-page	
+2555	[Chosain_Province][BB] Baio's Betrayal	3	none	0	no-wiki-page	
+2556	[Chosain_Province][BB] The Missing Contracts	3	none	0	no-wiki-page	
+2557	[Chosain_Province][TT] The Pillars of Madness	4	none	0	no-wiki-page	
+2558	[Chosain_Province][TT] Madness in the Blood	3	none	0	no-wiki-page	
+2559	[Chosain_Province][SoJ] Thickheaded Thugs	3	none	0	no-wiki-page	
+2560	[Chosain_Province][SoJ] Shadows in the Moonlight	7	none	0	no-wiki-page	
+2561	[Chosain_Province][SoJ] The Lake of Stars	2	none	0	no-wiki-page	
+2562	[Chosain_Province][SoJ] The Seeds of Death	4	none	0	no-wiki-page	
+2563	[Tarantia_Common] Night Terror	1	single	0	no-wiki-page	
+2564	[Chosain_Province][SoJ] Shadow of the Raven	4	none	0	no-wiki-page	
+2565	[Chosain_Province][SoCH] Imprisoned in Stone	2	none	0	no-wiki-page	
+2566	[Chosain_Province][SoJ] The House of the Blades	3	none	0	no-wiki-page	
+2567	[Chosain_Province][CoYk] The Fires that Purify	6	none	0	no-wiki-page	
+2568	[Chosain_Province][CoYk] To Dance With Demons	3	none	0	no-wiki-page	
+2569	[Chosain_Province][CoYk] The Morality of Death	3	none	0	no-wiki-page	
+2570	[Chosain_Province][YPoY] Exorcism By Lotus	2	none	0	no-wiki-page	
+2571	[Chosain_Province][YPoY] Quenching the Fire	4	none	0	no-wiki-page	
+2572	[Chosain_Province][YPoY] Men of a Feather	2	none	0	no-wiki-page	
+2573	[Chosain_Province][YPoY] Destroy Life’s Elixir	3	none	0	no-wiki-page	
+2574	[Chosain_Province][YPoY] To Catch a Demon	4	none	0	no-wiki-page	
+2575	[Chosain_Province][YPoY] Shadow of the Fallen Emperor	4	none	0	no-wiki-page	
+2576	[Chosain_Province][SoCH] Return to the Moon Temple	2	none	0	no-wiki-page	
+2577	[Tarantia_Common] Infiltrating the Crows	2	full	0	no-wiki-page	
+2579	[Northern Grasslands][SC] A Message Gone Astray	3	full	0	no-wiki-page	
+2580	[Northern Grasslands][CoYk] A Favor in Return	3	none	0	no-wiki-page	
+2581	[Northern Grasslands][H] Khitan Ally	3	none	0	no-wiki-page	
+2582	[Northern Grasslands][LL] Defense of Pin-Pin [H]	2	none	0	no-wiki-page	
+2583	[Northern Grasslands][LL] Duty of the Legion	2	none	0	no-wiki-page	
+2584	[Northern Grasslands][H] Hunting for the Hyrkanians	3	none	0	no-wiki-page	
+2585	[Northern Grasslands][YPoY] Infestation	2	full	0	no-wiki-page	
+2586	[Northern Grasslands][SC] Ingredient Hunt	2	full	0	no-wiki-page	
+2587	[Northern Grasslands][LL] Last Amnesty	2	none	0	no-wiki-page	
+2588	[Chosain_Province][SC] Taunting the Troops	2	none	0	no-wiki-page	
+2590	[Chosain_Province][SC] Neglected Duty	3	none	0	no-wiki-page	
+2591	[Northern Grasslands][BB] Marking the Territory	3	partial	0	no-wiki-page	
+2592	[Northern Grasslands][CoYk] Plague	2	none	0	no-wiki-page	
+2593	[Northern Grasslands][H] Preparations	2	none	0	no-wiki-page	
+2594	[Tarantia_Common] The Priest's Tale	1	full	0	no-wiki-page	
+2595	[Chosain_Province][SC] Legions on the Loose	4	none	0	no-wiki-page	
+2596	[Chosain_Province][SC] Spreading Strife	6	partial	0	no-wiki-page	
+2597	[Chosain_Province][SC] Spreading Discontent	6	none	0	no-wiki-page	
+2598	[Chosain_Province][SC] The Tiger and the Moon	4	none	0	no-wiki-page	
+2599	[Northern Grasslands][WotS] Crippling the Enemy	2	none	0	no-wiki-page	
+2600	[Northern Grasslands][H] Venom in the Blood	1	single	0	no-wiki-page	
+2601	[Northern Grasslands][BB] Barbaric Murder	2	full	0	no-wiki-page	
+2602	[Northern Grasslands][H] Shamanistic Divination	3	none	0	no-wiki-page	
+2603	[Northern Grasslands][BB] Cloaked Kill	3	none	0	no-wiki-page	
+2604	[Northern Grasslands][BB] Swift Assassination	2	none	0	no-wiki-page	
+2605	[Northern Grasslands][H] Target Practice	2	none	0	no-wiki-page	
+2606	[Northern Grasslands][LL] Tax Collector	2	none	0	no-wiki-page	
+2608	[Northern Grasslands][SoJ] The Cause	2	none	0	no-wiki-page	
+2609	[Northern Grasslands][H] The Duel	3	none	0	no-wiki-page	
+2610	[Gateway_to_Khitai] Hunting on the Steppes	2	none	0	no-wiki-page	
+2611	[Gateway_to_Khitai] Destroying the Zang Xin	2	none	0	no-wiki-page	
+2612	[Northern Grasslands][SC] Battle of the Quarry [H]	2	full	0	no-wiki-page	
+2613	[Northern Grasslands][LL] The Executioner	2	none	0	no-wiki-page	
+2614	[Northern Grasslands][SoJ] The Heist	3	full	0	no-wiki-page	
+2615	[Northern Grasslands][H] An Easy Course	2	none	0	no-wiki-page	
+2616	[Chosain_Province][Tiger Mount][1] A Worthy Companion	3	none	0	no-wiki-page	
+2617	[Northern Grasslands][H] A Hard Course	3	none	0	no-wiki-page	
+2618	[Northern Grasslands][H] A Medial Course	3	none	0	no-wiki-page	
+2619	[Northern Grasslands][SoJ] The Rogue Way	2	full	0	no-wiki-page	
+2620	[Northern Grasslands][H] The Stallion	3	none	0	no-wiki-page	
+2621	[Northern Grasslands][NF] The Golem	1	single	0	no-wiki-page	
+2622	[Northern Grasslands][LL] Thinning the Ranks	2	none	0	no-wiki-page	
+2624	[Chosain_Province][Tiger Mount][3] Stalker of the Shadows	4	none	0	no-wiki-page	
+2625	[Chosain_Province][Tiger Mount][4] To Fight, To Kill	2	none	0	no-wiki-page	
+2626	[Tarantia_Common] Order in the District[NO REWARD]	4	none	0	no-wiki-page	
+2627	[Tarantia_Common] Chaos in the District[NO REWARD]	4	none	0	no-wiki-page	
+2628	[Tarantia_Common] Order in the District[REPEATABLE]	4	none	0	no-wiki-page	
+2629	[Tarantia_Common] Chaos in the District[REWARD]	4	none	0	no-wiki-page	
+2630	[Chosain_Province][Tiger Mount][5] To Ride a Wild Beast	2	none	0	no-wiki-page	
+2631	[Tarantia_Common] The Whining Merchant [REPEATABLE]	2	none	0	no-wiki-page	
+2632	[Northern Grasslands][SC] Battle of the Quarry [W]	2	none	0	no-wiki-page	
+2633	[Gateway_to_Khitai] Savage Worshippers	2	none	0	no-wiki-page	
+2635	[Gateway_to_Khitai] A Lost Time	1	single	0	no-wiki-page	
+2636	[Gateway_to_Khitai] Remains of the Ancestors	2	none	0	no-wiki-page	
+2637	[Gateway_to_Khitai] Menudsjin	3	none	0	no-wiki-page	
+2638	[Gateway_to_Khitai] The Fate of Kuchu Khan	2	none	0	no-wiki-page	
+2639	[Gateway_to_Khitai] Becoming a Khan	1	single	0	no-wiki-page	
+2640	[Gateway_to_Khitai] On Their Own	2	none	0	no-wiki-page	
+2642	[Gateway_to_Khitai] Brawling for Qun	2	none	0	no-wiki-page	
+2643	[Gateway_to_Khitai] Protecting the Wall	1	single	0	no-wiki-page	
+2644	[Gateway_to_Khitai] Slaying Savages	1	single	0	no-wiki-page	
+2645	[Guild_Renown][Social_Pet][S1] The Path of the Old Serpent	3	none	0	no-wiki-page	
+2647	[Guild_Renown][Social_Pet][A1] Feeding Paranoia	2	none	0	no-wiki-page	
+2649	[Guild_Renown][Social_Pet][C1] Cold Lands of the Ancestors	5	none	0	no-wiki-page	
+2651	[Northern Grasslands][NF] The Piper	5	none	0	no-wiki-page	
+2652	[Kheshatta_Black_Ring_Citadel][v2] The Ibis Weapon	5	none	0	no-wiki-page	
+2653	[Gateway_to_Khitai] The Hyrkanian Trial	3	none	0	no-wiki-page	
+2654	[Gateway_to_Khitai] Giving a Helping Hand	3	none	0	no-wiki-page	
+2655	[Gateway_to_Khitai] Betrayer of an Empire	3	none	0	no-wiki-page	
+2656	[Gateway_to_Khitai] Crazed Yaks	2	none	0	no-wiki-page	
+2657	[Gateway_to_Khitai] The Troubled Shaman	2	none	0	no-wiki-page	
+2658	[Gateway_to_Khitai] Raging Sabertooths	2	none	0	no-wiki-page	
+2659	[Gateway_to_Khitai] The Distraught Shaman	2	none	0	no-wiki-page	
+2661	[Northern Grasslands][SC] The Emperor's Gift	1	full	0	no-wiki-page	
+2662	[Gateway_to_Khitai] The Shadow of the Wall	2	none	0	no-wiki-page	
+2663	[Gateway_to_Khitai] From Beyond the Wall	2	none	0	no-wiki-page	
+2664	[Gateway_to_Khitai] The Mad Shaman	2	none	0	no-wiki-page	
+2665	[Gateway_to_Khitai] Unforgiving Thirst	2	none	0	no-wiki-page	
+2668	[Gateway_to_Khitai] They Awake at Night	2	none	0	no-wiki-page	
+2669	[Gateway_to_Khitai] Blood and Jade	2	none	0	no-wiki-page	
+2670	[Northern Grasslands][Pillars][NF] Bringing Down the Wolves	2	none	0	no-wiki-page	
+2671	[Northern Grasslands][Pillars][H] The Fall From Heaven	2	none	0	no-wiki-page	
+2672	[Northern Grasslands][Pillars][WotS] End of a Khan	2	none	0	no-wiki-page	
+2673	[Northern Grasslands][Pillars][NF] Bhangi Khan's Plans	1	single	0	no-wiki-page	
+2674	[Northern Grasslands][Pillars][NF] Hit Them Where it Hurts	2	none	0	no-wiki-page	
+2675	[Northern Grasslands][Pillars][NF] Taken by Wolves	3	none	0	no-wiki-page	
+2676	[Northern Grasslands][Pillars][NF] Letter of Lost Love	1	single	0	no-wiki-page	
+2677	[Tarantia_Common] A Mouthful of Death	2	none	0	no-wiki-page	
+2678	[Iron_Tower] Freedom for William	5	none	0	no-wiki-page	
+2679	[Iron_Tower] Strip Them of Their Honor	2	none	0	no-wiki-page	
+2680	[Iron_Tower] In Desperate Need of Iron	2	none	0	no-wiki-page	
+2681	[Iron_Tower] A Father's Rage	2	none	0	no-wiki-page	
+2682	[Iron_Tower] The Whore of Stygia	2	none	0	no-wiki-page	
+2683	[Iron_Tower] Interrogate the Prisoner	4	none	0	no-wiki-page	
+2684	[Gateway_to_Khitai] Tongues of the Traitorous	4	none	0	no-wiki-page	
+2685	[Iron_Tower] The Iron Cook Challenge: Hotsilver Spirit	3	none	0	no-wiki-page	
+2686	[Iron_Tower] The Iron Cook Challenge: Soursilver Wine	3	none	0	no-wiki-page	
+2687	[Iron_Tower] The Iron Cook Challenge: Ta Neheh Leaf Elixir	3	none	0	no-wiki-page	
+2688	[Iron_Tower] The Iron Cook Challenge: Blackbrandy Broth	3	none	0	no-wiki-page	
+2689	[Iron_Tower] The Iron Cook Challenge: Nectargold	3	none	0	no-wiki-page	
+2690	[Iron_Tower] The Iron Cook Challenge: Kingsmight Ale	3	none	0	no-wiki-page	
+2691	[Iron_Tower] The Iron Cook Challenge: Blood of the Prophet	3	none	0	no-wiki-page	
+2692	[Iron_Tower] The Iron Cook Challenge: Dreamseeker Tea	3	none	0	no-wiki-page	
+2693	[Iron_Tower] The Iron Cook Challenge: Bloodpurple Ale	3	none	0	no-wiki-page	
+2694	[Iron_Tower] Rock Salt	1	single	0	no-wiki-page	
+2695	[Iron_Tower] Carrot Stew for the Iron Cook	1	single	0	no-wiki-page	
+2696	[Gateway_to_Khitai] The Art of Deception	3	none	0	no-wiki-page	
+2697	[Gateway_to_Khitai] Last Stand on the Steppes	3	none	0	no-wiki-page	
+2703	[Chosain_Province][SoCH] Scaling the Ranks	1	single	0	no-wiki-page	
+2707	[Iron_Tower] Confess Thy Sin	1	single	0	no-wiki-page	
+2710	[Iron_Tower] Stockphrase	1	single	0	no-wiki-page	
+2711	[Gateway_to_Khitai] Assaulting a Village	1	single	0	no-wiki-page	
+2713	[Northern Grasslands][NF] A Trail of Bamboo	6	partial	0	no-wiki-page	
+2715	[Northern Grasslands][NF] The Gloom Plague	2	none	0	no-wiki-page	
+2716	[Northern Grasslands][NF] An Acquired Taste	2	full	0	no-wiki-page	
+2717	[Northern Grasslands][NF] Merciful Death	3	full	0	no-wiki-page	
+2718	[Northern Grasslands][NF] Murder in the Monastery	2	full	0	no-wiki-page	
+2719	[Northern Grasslands][NF] Pleasure to the People	3	partial	0	no-wiki-page	
+2720	[Northern Grasslands][NF] Pleasure to the Khan	2	none	0	no-wiki-page	
+2721	[Northern Grasslands][NF] Riders from Abroad	2	full	0	no-wiki-page	
+2722	[Northern Grasslands][NF] Shortage of Supplies	2	full	0	no-wiki-page	
+2723	[Northern Grasslands][NF] Slaughter the Savages	2	none	0	no-wiki-page	
+2724	[Northern Grasslands][NF] The Lost Trinket	3	partial	0	no-wiki-page	
+2725	[Northern Grasslands][NF] The Wounded Hyrkanian	2	full	0	no-wiki-page	
+2726	[Northern Grasslands][NF] Zang Xin Suppression	2	full	0	no-wiki-page	
+2727	[Northern Grasslands][NF] Wine Delivery	2	full	0	no-wiki-page	
+2728	[Kheshatta_Thoth-Amon_Stronghold] Betrayal	2	none	0	no-wiki-page	
+2729	[Kheshatta_Thoth-Amon_Stronghold] The Face of Evil	4	none	0	no-wiki-page	
+2730	[Kheshatta_Thoth-Amon_Stronghold] Master of Blades	2	none	0	no-wiki-page	
+2733	[Kheshatta_Thoth-Amon_Stronghold] Guardians from Beyond	2	none	0	no-wiki-page	
+2735	[Kheshatta_Thoth-Amon_Stronghold] The Phoenix Sword	3	none	0	no-wiki-page	
+2736	[Tarantia_Sewers] The Back Door to the Main System	2	none	0	no-wiki-page	
+2745	[Kheshatta_Thoth-Amons_Stronghold] Keeper of Artifacts	2	none	0	no-wiki-page	
+2747	[Event_Halloween] The Inheritance	1	single	0	no-wiki-page	
+2748	[Event_Halloween] Souls of the Damned	5	none	0	no-wiki-page	
+2749	[Event_Halloween] Souls of the Forgotten	5	none	0	no-wiki-page	
+2750	[Event_Halloween] Souls of the Dead	5	none	0	no-wiki-page	
+2752	[Kara Korum][CoYk] The Hard Way	3	none	0	no-wiki-page	
+2753	[Guild_Renown][Social_Pet][E1] Washed Clean	2	none	0	no-wiki-page	
+2755	[Guild_Renown][Social_Pet][E2] With Eyes Upturned	2	none	0	no-wiki-page	
+2756	[Guild_Renown][Social_Pet][So1] Stronger for the Forging	3	none	0	no-wiki-page	
+2757	[Guild_Renown][Social_Pet][So2] A Matter of Trust	3	none	0	no-wiki-page	
+2758	[Guild_Renown][Social_Pet][Pr1] Words of the Ancients	3	none	0	no-wiki-page	
+2759	[Guild_Renown][Social_Pet][Pr2] Servant of the Divine	3	none	0	no-wiki-page	
+2760	[Guild_Renown][Social_Pet][Ro1] Predator and Prey	3	none	0	no-wiki-page	
+2761	[Guild_Renown][Social_Pet][Ro2] Loyalty Unwavering	3	none	0	no-wiki-page	
+2762	[Guild_Renown][Social_Pet][Ma1] A Life's Work	3	none	0	no-wiki-page	
+2763	[Guild_Renown][Social_Pet][Ma2] Hymns of the Forbidden	3	none	0	no-wiki-page	
+2764	[Northern Grasslands][SC] Bones of the Dead	1	full	0	no-wiki-page	
+2765	[Kara Korum][LL] A Bone to Pick	3	none	0	no-wiki-page	
+2766	[Kara Korum][LL] Filling the Gap	3	none	0	no-wiki-page	
+2767	[Kara Korum][LL] The Lost Brothers	4	none	0	no-wiki-page	
+2768	[Kara Korum][LL] Secret of the Crystals	3	none	0	no-wiki-page	
+2769	[Kara Korum][LL] The Lost Hero	3	none	0	no-wiki-page	
+2770	[Kara Korum][LL] Lethal Ivy	2	none	0	no-wiki-page	
+2771	[Kara Korum][LL] The Lost Children	2	none	0	no-wiki-page	
+2772	[Kara Korum][LL] The Last Hero of Kara Korum	8	none	0	no-wiki-page	
+2773	[Paikang][CoYK] Treats and Threats	4	none	0	no-wiki-page	
+2774	[Paikang][CoYK] Silent Strides	2	none	0	no-wiki-page	
+2775	[Paikang][CoYK] Roots	2	none	0	no-wiki-page	
+2776	[Paikang][CoYK] Thorns	3	none	0	no-wiki-page	
+2777	[Paikang][CoYK] Sleepwalking	2	none	0	no-wiki-page	
+2778	[Paikang][CoYK] The Blood Seeker	3	none	0	no-wiki-page	
+2779	[Paikang][CoYK] The Cure Seeker	2	none	0	no-wiki-page	
+2781	[Paikang][CoYK] The Truth Seeker	3	none	0	no-wiki-page	
+2782	[Paikang][CoYK] Clearing Conan's Name	2	none	0	no-wiki-page	
+2783	[Kara Korum][LL] The Dying Wish	5	none	0	no-wiki-page	
+2785	[Gateway_to_Khitai] Curse from Beyond	1	single	0	no-wiki-page	
+2786	[Kara Korum][SC] The Backbone of Khitai	3	none	0	no-wiki-page	
+2787	[Kara Korum][SC] Protecting Your Own	4	none	0	no-wiki-page	
+2788	[Kara Korum][SC] Protecting the Chaos	5	none	0	no-wiki-page	
+2789	[Kara Korum][SC] Rattle the Ranks	6	none	0	no-wiki-page	
+2790	[Gateway_to_Khitai] Sacred Grounds	2	none	0	no-wiki-page	
+2791	[Kara Korum][SC] Rattle the Ranks Again [REPEAT]	11	none	0	no-wiki-page	
+2792	[Kara Korum][SC] King of the Crater	4	none	0	no-wiki-page	
+2793	[Kara Korum][SC] The Face of Khitai	5	none	0	no-wiki-page	
+2794	[Kara Korum][SC] Keeper of the Corrupted	5	none	0	no-wiki-page	
+2795	[Kara Korum][JS] A Simple Token	1	single	0	no-wiki-page	
+2796	[Kara Korum][JS] The Obituary	1	single	0	no-wiki-page	
+2797	[Kara Korum][JS] The Hunter	1	single	0	no-wiki-page	
+2798	[Kara Korum][JS] The Hanging Tree	3	none	0	no-wiki-page	
+2799	[Kara Korum][JS] Tracks in the Wasteland	2	none	0	no-wiki-page	
+2800	[Kara Korum][JS] The Lash of the Heavens	2	none	0	no-wiki-page	
+2801	[Kara Korum][JS] Telltale Signs	3	none	0	no-wiki-page	
+2802	[Kara Korum][JS] Brethren of Bone	2	none	0	no-wiki-page	
+2803	[Kara Korum][JS] The Obsidian Cult	4	none	0	no-wiki-page	
+2804	[Kara Korum][JS] Matters of Trust	4	none	0	no-wiki-page	
+2805	[Kara Korum][JS] The Passage North	2	none	0	no-wiki-page	
+2806	[Kara Korum][JS] A Cure for the Curse	2	none	0	no-wiki-page	
+2807	[Kara Korum][JS] Endless Bounty	2	none	0	no-wiki-page	
+2808	[Kara Korum][JS] The Wonders of the Wasteland	2	none	0	no-wiki-page	
+2809	[Kara Korum][JS] Entrenched Hatred	2	none	0	no-wiki-page	
+2810	[Kara Korum][JS] The One Forsaken	2	none	0	no-wiki-page	
+2811	[Kara Korum][JS] Immortal Vengeance	3	none	0	no-wiki-page	
+2812	[Kara Korum][JS] Test of Endurance	2	none	0	no-wiki-page	
+2814	[Kara Korum][CoYk] The Alchemist Apprentice	5	none	0	no-wiki-page	
+2815	[Kara Korum][YPoY] Red Rocks	2	none	0	no-wiki-page	
+2816	[Guild_Renown][Social_Pet] A Good Home	2	none	0	no-wiki-page	
+2817	[Paikang][LL] Envoy of the Legion	1	single	0	no-wiki-page	
+2818	[Paikang][LL] Living Dead	2	none	0	no-wiki-page	
+2819	[Paikang][LL] Renegades in the Jungle	7	none	0	no-wiki-page	
+2820	[Paikang][LL] Scourge of the Dark Legion	2	none	0	no-wiki-page	
+2821	[Paikang][LL] The Loving Daughter	3	none	0	no-wiki-page	
+2822	[Paikang][LL] The Souls of Souleaters' Pass	4	none	0	no-wiki-page	
+2823	[Paikang][LL] The Splinterspar Slaughter	2	none	0	no-wiki-page	
+2824	[Paikang][LL] The Vengeful Father	2	none	0	no-wiki-page	
+2825	[Paikang][LL] The Value of Life	7	none	0	no-wiki-page	
+2826	[Paikang][LL] Well Corrupted	3	none	0	no-wiki-page	
+2828	[Paikang][LL] Workers of the Circle	4	none	0	no-wiki-page	
+2829	[Faction Atonement] Atonement - Scholars of Cheng-ho	1	single	0	no-wiki-page	
+2830	[Faction Atonement] Atonement - Shadows of Jade	1	single	0	no-wiki-page	
+2831	[Faction Atonement] Atonement - The Brittle Blade	1	single	0	no-wiki-page	
+2832	[Faction Atonement] Atonement - Tamarin's Tigers	1	single	0	no-wiki-page	
+2833	[Faction Atonement] Atonement - The Hyrkanians	1	single	0	no-wiki-page	
+2834	[Faction Atonement] Atonement - The Last Legion	1	single	0	no-wiki-page	
+2835	[Faction Atonement] Atonement - The Scarlet Circle	1	full	0	no-wiki-page	
+2836	[Faction Atonement] Atonement - Wolves of the Steppes	1	single	0	no-wiki-page	
+2837	[Faction Atonement] Atonement - Yellow Priests of Yun	1	full	0	no-wiki-page	
+2838	[Faction Atonement] Atonement - Children of Yag-kosha	1	single	0	no-wiki-page	
+2839	[Paikang][YPoY] Afterlife in Anguish	2	none	0	no-wiki-page	
+2840	[Paikang][YPoY] Assassins in the Temple	2	none	0	no-wiki-page	
+2841	[Paikang][YPoY] Death and Desecration	3	none	0	no-wiki-page	
+2842	[Paikang][YPoY] In the Den of Thieves	5	none	0	no-wiki-page	
+2843	[Paikang][YPoY] Return to the Den of Thieves	3	none	0	no-wiki-page	
+2844	[Paikang][YPoY] Harvest of Death	2	none	0	no-wiki-page	
+2845	[Paikang][YPoY] The Bones of the Apes	2	none	0	no-wiki-page	
+2846	[Paikang][YPoY] The Dance of Sacrifice	2	none	0	no-wiki-page	
+2847	[Paikang][YPoY] The Garden of Death	4	none	0	no-wiki-page	
+2848	[Paikang][YPoY] The Musician	2	none	0	no-wiki-page	
+2849	[Paikang][YPoY] Thieves in the Temple	2	none	0	no-wiki-page	
+2850	[Paikang][YPoY] Water of Woe	3	none	0	no-wiki-page	
+2851	[Paikang][SoJ] Books of Power	2	none	0	no-wiki-page	
+2852	[Paikang][SoJ] Breaking the Blade	3	none	0	no-wiki-page	
+2853	[Gateway to Khitai] A Cold Desert	2	none	0	no-wiki-page	
+2854	[Paikang][SoJ] Deadly Traps	3	none	0	no-wiki-page	
+2855	[Paikang][SoJ] Fresh Supplies from the Sea	2	none	0	no-wiki-page	
+2856	[Paikang][SoJ] Leading the Way	5	none	0	no-wiki-page	
+2857	[Paikang][SoJ] Lost Possessions	2	none	0	no-wiki-page	
+2858	[Paikang][SoJ] The Spy	2	none	0	no-wiki-page	
+2859	[Paikang][SoJ] Fresh Meat Supplies	2	none	0	no-wiki-page	
+2860	[Paikang][SoJ] Fresh Fruit Supplies	2	none	0	no-wiki-page	
+2861	[Paikang][SoJ] Fresh Rice Supplies	2	none	0	no-wiki-page	
+2862	[Paikang][SC] Battling the Last Legion	2	none	0	no-wiki-page	
+2863	[Paikang][SC] Dreams of the Deranged	2	none	0	no-wiki-page	
+2864	[Paikang][SC] Healthy Specimen	2	none	0	no-wiki-page	
+2865	[Paikang][SC] Hunting the Assassin	3	none	0	no-wiki-page	
+2866	[Paikang][SC] Injustice for the Just	4	none	0	no-wiki-page	
+2867	[Paikang][SC] Spreading the Evil	2	none	0	no-wiki-page	
+2868	[Paikang][SC] Streets Running Red	2	none	0	no-wiki-page	
+2869	[Paikang][SC] The Lamentation of the Women	4	none	0	no-wiki-page	
+2870	[Paikang][SC] The Legion Attacks	5	none	0	no-wiki-page	
+2871	[Redemp_Chosain_Province] Hidden Outlaws, Dirty Gems	2	none	0	no-wiki-page	
+2872	[Gateway_to_Khitai] Small but Lethal	2	none	0	no-wiki-page	
+2873	[Paikang][SoJ] Poisonous Traps	3	none	0	no-wiki-page	
+2874	[Paikang][SoJ] Exploding Traps	3	none	0	no-wiki-page	
+2875	[Paikang][SoJ] Arrow Traps	3	none	0	no-wiki-page	
+2876	[Redemp_Chosain_Province] Nasty Critters, Foul Weeds	2	none	0	no-wiki-page	
+2877	[Redemp_Chosain_Province] Erasing the Darkest Demons	2	none	0	no-wiki-page	
+2878	[Kara Korum][YPoY] The Lost Scroll	1	single	0	no-wiki-page	
+2879	[Kara Korum][YPoY] The Lotus Experiment	4	none	0	no-wiki-page	
+2880	[Gateway_to_Khitai] The Gate and the Thief	3	none	0	no-wiki-page	
+2881	[Gateway_to_Khitai] Common People	2	none	0	no-wiki-page	
+2882	[Gateway_to_Khitai] Wei-li	3	none	0	no-wiki-page	
+2883	[Gateway_to_Khitai] The Kang Zai Summoning	3	none	0	no-wiki-page	
+2884	[Gateway_to_Khitai] Blood of the Scarlet Circle	3	none	0	no-wiki-page	
+2885	[Gateway_to_Khitai] What Should Remain Buried	3	none	0	no-wiki-page	
+2886	[Gateway_to_Khitai] They Fled South	1	single	0	no-wiki-page	
+2887	[Gateway_to_Khitai] Creatures in the Mist	2	none	0	no-wiki-page	
+2888	[Gateway_to_Khitai] Sanctity of the Dead	3	none	0	no-wiki-page	
+2889	[Gateway_to_Khitai] The Hyrkanian Rituals	2	none	0	no-wiki-page	
+2890	[Gateway_to_Khitai] The Cleansing Fire	2	none	0	no-wiki-page	
+2891	[Gateway_to_Khitai] The Cleansing Fire II	2	none	0	no-wiki-page	
+2892	[Gateway_to_Khitai] The Cleansing Fire III	2	none	0	no-wiki-page	
+2893	[Gateway_to_Khitai] The Cleansing Fire IV	2	none	0	no-wiki-page	
+2894	[Guild_Renown][Zebra] A Worthy Rider	9	none	0	no-wiki-page	
+2897	[Gateway_to_Khitai] Rage of the Kang Zai	3	none	0	no-wiki-page	
+2898	[Gateway_to_Khitai] The Beginning of the End	2	none	0	no-wiki-page	
+2899	[Gateway_to_Khitai] The Murder of Tze-meng	2	none	0	no-wiki-page	
+2900	[Gateway_to_Khitai] Betrayed by the Emperor	2	none	0	no-wiki-page	
+2901	[Gateway_to_Khitai] The Execution of Huang	3	none	0	no-wiki-page	
+2902	[Gateway_to_Khitai] The Giant	2	none	0	no-wiki-page	
+2903	[Kara Korum][YPoY] Smoke of the Corrupted	4	none	0	no-wiki-page	
+2904	[Kara Korum][CoYk] Furnace of Fengdu	3	none	0	no-wiki-page	
+2905	[Kara Korum][BB] The Pride of Pra-Eun	2	none	0	no-wiki-page	
+2906	[Kara Korum][BB] The Work of a Dead Man	5	none	0	no-wiki-page	
+2907	[Kara Korum][YPoY] Reclaiming Possessions	4	none	0	no-wiki-page	
+2908	[Kheshatta_Thoth_Amon_Stronghold_NEW] The Fall of Thoth-Amon	2	none	0	no-wiki-page	
+2910	[Kara Korum][BB] Death from Above	3	none	0	no-wiki-page	
+2911	[Kara Korum][BB] Luring the Corrupted	4	none	0	no-wiki-page	
+2912	[Kara Korum][SoJ] The Devil's Light	2	none	0	no-wiki-page	
+2913	[Guild_Renown][HyperboreanHorse] Howls in the Wind	12	none	0	no-wiki-page	
+2914	[Kheshatta_Thoth-Amon_Stronghold][Alchemist Priests] A Strange Alloy	4	none	0	no-wiki-page	
+2915	[Gateway_to_Khitai] Signs of Battle	1	single	0	no-wiki-page	
+2916	[Chosain_Province][Tiger Mount][2] A Feast of Flesh	1	single	0	no-wiki-page	
+2917	[Gateway_to_Khitai] Tainted Sands	2	none	0	no-wiki-page	
+2918	[Chosain_Province][NF] The Chosain Conflict	2	full	0	no-wiki-page	
+2919	[Chosain_Province][Mines_of_Chosain] Precious Jade	2	none	0	no-wiki-page	
+2920	[Chosain_Province][Mines_of_Chosain]Death to the Overseer	2	none	0	no-wiki-page	
+2921	[Chosain_Province][Mines_of_Chosain] End the Deception	2	none	0	no-wiki-page	
+2922	[Chosain_Province][Mines_of_Chosain] Path to Justice	2	none	0	no-wiki-page	
+2923	[Chosain_Province][Mines_of_Chosain] Scouts in the Sky	2	none	0	no-wiki-page	
+2924	[Chosain_Province][Mines_of_Chosain] The Path of Redemption	2	none	0	no-wiki-page	
+2925	[Chosain_Province][Mines_of_Chosain] The Puppet Master	2	none	0	no-wiki-page	
+2926	[Chosain_Province][Mines_of_Chosain] The Winged Messenger	2	none	0	no-wiki-page	
+2927	[Guild_Renown][Deco] Ward of the Heavens	3	none	0	no-wiki-page	
+2928	[Guild_Renown][Deco] Ward of Harmonic Balance	4	none	0	no-wiki-page	
+2929	[Guild_Renown][Deco] Ward of Ancestral Honor	2	none	0	no-wiki-page	
+2930	[Guild_Renown][Deco] The Forbidden Ward	2	none	0	no-wiki-page	
+2931	[Northern Grasslands][SC] Ingredient Hunt [B]	2	none	0	no-wiki-page	
+2932	[Northern Grasslands][SC] From Earth to Dust [B]	2	full	0	no-wiki-page	
+2933	[Northern Grasslands][LL] Duty of the Legion [B]	2	none	0	no-wiki-page	
+2934	[Northern Grasslands][YPoY] Smell of Putrescence [B]	3	none	0	no-wiki-page	
+2935	[Northern Grasslands][CoYk] Rot Lake [B]	2	none	0	no-wiki-page	
+2936	[Kara Korum][JS] On the Origin of Species	5	none	0	no-wiki-page	
+2937	[Kara Korum][CoYk] The Curse of the Crater	2	none	0	no-wiki-page	
+2938	[Kara Korum][CoYk] Sorrows of the Past	3	none	0	no-wiki-page	
+2939	[Kara Korum][CoYk] Eye of the Basilisk	2	none	0	no-wiki-page	
+2940	[CHRISTOFFER] TEST invis	1	single	0	no-wiki-page	
+2941	[Kara Korum][CoYk] Chamber of Horrors	3	none	0	no-wiki-page	
+2942	[Kara Korum][CoYk] Lost Logs	2	none	0	no-wiki-page	
+2943	[Kara Korum][BB] Essence of Destruction	2	none	0	no-wiki-page	
+2944	[Kara Korum][BB] The Invisible Slayer	6	none	0	no-wiki-page	
+2945	[Guild_Renown][Deco][A1] To See Within the Stone	3	none	0	no-wiki-page	
+2946	[Kara Korum][BB] Craving the Goddess of Death	3	none	0	no-wiki-page	
+2947	[Kara Korum][BB] The Bones of Warriors	3	none	0	no-wiki-page	
+2948	[Kara Korum][BB] The Edge of Death	4	none	0	no-wiki-page	
+2949	[Kara Korum][BB] Wondrous Venom	3	none	0	no-wiki-page	
+2950	[Guild_Renown][Deco][A2] From Stone to Flesh	1	single	0	no-wiki-page	
+2951	[Guild_Renown][Deco][A3] Maiden of Blades	5	none	0	no-wiki-page	
+2952	[Kara Korum][BB] The Way the Water Flows	4	none	0	no-wiki-page	
+2953	[Guild_Renown][Deco][A4] Conquering King	5	none	0	no-wiki-page	
+2954	[Guild_Renown][Deco][A5] Eternal Vigilance	5	none	0	no-wiki-page	
+2955	[Guild_Renown][Deco][A6] Eternal Discipline	5	none	0	no-wiki-page	
+2956	[Guild_Renown][Deco][A7] Bared Wisdom	6	none	0	no-wiki-page	
+2958	[Kara Korum][BB] The Needle of Eternal Night	3	none	0	no-wiki-page	
+2959	[Kara Korum][SoJ] A Simple Thievery	4	none	0	no-wiki-page	
+2960	[Paikang][BB] A Messenger in Disguise	5	none	0	no-wiki-page	
+2961	[Paikang][BB] Roots of the Conflict	3	none	0	no-wiki-page	
+2962	[Paikang][BB] Orphans	2	none	0	no-wiki-page	
+2963	[Paikang][BB] A Gruesome Message	3	none	0	no-wiki-page	
+2964	[Paikang][BB] The Riddle of Death	3	none	0	no-wiki-page	
+2965	[Paikang][BB] The Staff of Death	3	none	0	no-wiki-page	
+2966	[Paikang][BB] A Traitor Among Us	3	none	0	no-wiki-page	
+2967	[Paikang][BB] One Less Traitor	6	none	0	no-wiki-page	
+2968	[Paikang][BB] Cutting Through the Shadows	2	none	0	no-wiki-page	
+2969	[Paikang][BB] The Tree of Death	3	none	0	no-wiki-page	
+2971	[Kara Korum][SoJ] Town of the Vanished	2	none	0	no-wiki-page	
+2972	[Kara Korum][SoJ] O Brother, Where Art Thou?	4	none	0	no-wiki-page	
+2973	[Kara Korum][SoJ] One Step Ahead the Darkness Waits	6	none	0	no-wiki-page	
+2974	[Kara Korum][YPoY] A Children's Tale	6	none	0	no-wiki-page	
+2975	[Kara Korum][YPoY] Ashes of the Basilisk	3	none	0	no-wiki-page	
+2976	[Chosain_Province][TT] Scaling the Ranks	1	single	0	no-wiki-page	
+2977	[Kara Korum][YPoY] Internal Investigation	2	none	0	no-wiki-page	
+2978	[Kara Korum][YPoY] Souls of the Kang Zai	2	none	0	no-wiki-page	
+2979	[Kara Korum][YPoY] The Dark Path	3	none	0	no-wiki-page	
+2980	[Kara Korum][YPoY] The Needle in the Haystack	2	none	0	no-wiki-page	
+2981	[Kara Korum][SoJ] Bleeding Traitors	5	none	0	no-wiki-page	
+2982	[Gateway_to_Khitai] Message from Menudsjin 	1	single	0	no-wiki-page	
+2984	[Northern Grasslands][SC] The Leopard Anthromorph [B]	4	none	0	no-wiki-page	
+2985	[Northern Grasslands][SC] The Wolf Anthromorph [B]	4	none	0	no-wiki-page	
+2986	[Northern Grasslands][SC] The Tiger Anthromorph [B]	4	none	0	no-wiki-page	
+2987	[Kheshatta_Thoth-Amon_Stronghold][Alchemist Rogues] A Strange Alloy	4	none	0	no-wiki-page	
+2988	[Kheshatta_Thoth-Amon_Stronghold][Alchemist Mage] A Strange Alloy	4	none	0	no-wiki-page	
+2989	[Kheshatta_Thoth-Amon_Stronghold][Alchemist Soldier] A Strange Alloy	4	none	0	no-wiki-page	
+2990	[Northern Grasslands][SC] The Anthromorph	4	full	0	no-wiki-page	
+2991	[Chosain_Province][NF][Skinner] Skin Hunting in the Red Forest	2	none	0	no-wiki-page	
+2992	[Chosain_Province][NF][Skinner] Shedding Skin	2	none	0	no-wiki-page	
+2993	[Chosain_Province][NF][Skinner] A Furry Request	2	none	0	no-wiki-page	
+2994	[Chosain_Province][NF][Skinner] A Stinky Endeavor	2	none	0	no-wiki-page	
+2995	[Chosain_Province][NF][Skinner] Battling Buffaloes	2	none	0	no-wiki-page	
+2996	[Chosain_Province][NF][Skinner] The Softest Hide	2	none	0	no-wiki-page	
+2997	[Chosain_Province][NF][Skinner] A Selection of Skins	2	none	0	no-wiki-page	
+2998	[Chosain_Province][NF][Skinner] Hunting Season	2	none	0	no-wiki-page	
+2999	[Chosain_Province][NF][Skinner] Hunter and Gatherer	2	none	0	no-wiki-page	
+3000	[Chosain_Province][NF][Herbalist] A Royal Bouquet	2	none	0	no-wiki-page	
+3001	[Chosain_Province][NF][Herbalist] Healing Flowers	2	none	0	no-wiki-page	
+3002	[Chosain_Province][NF][Herbalist] Chasing Tail	2	none	0	no-wiki-page	
+3003	[Chosain_Province][NF][Herbalist] A Trail of Entrails	2	none	0	no-wiki-page	
+3004	[Chosain_Province][NF][Herbalist] Spitting Venom	2	none	0	no-wiki-page	
+3005	[Chosain_Province][NF][Herbalist] Spinal Tap	2	none	0	no-wiki-page	
+3006	[Chosain_Province][NF][Herbalist] A Handful of Dust	2	none	0	no-wiki-page	
+3007	[Chosain_Province][NF][Herbalist] A Lethal Cocktail 	2	none	0	no-wiki-page	
+3008	[Chosain_Province][NF][Herbalist] A Questionable Stew	2	none	0	no-wiki-page	
+3009	[Chosain_Province][NF][Herbalist] A Lethal Casserole 	2	none	0	no-wiki-page	
+3010	[Chosain_Province][NF][Trader] Harvesting Evil	2	none	0	no-wiki-page	
+3011	[Chosain_Province][NF][Trader] A Fistful of Feathers	2	none	0	no-wiki-page	
+3012	[Chosain_Province][NF][Trader] Charms for the Shaman	2	none	0	no-wiki-page	
+3013	[Chosain_Province][NF][Trader] Horny Devils	2	none	0	no-wiki-page	
+3014	[Chosain_Province][NF][Trader] Meaty Birds	2	none	0	no-wiki-page	
+3015	[Chosain_Province][NF][Trader] Burglarizing Bandits	2	none	0	no-wiki-page	
+3016	[Chosain_Province][NF][Trader] Shady Fangs	2	none	0	no-wiki-page	
+3017	[Chosain_Province][NF][Trader] Clawless Kappas	2	none	0	no-wiki-page	
+3018	[Chosain_Province][NF][Trader] Hunting Creatures for Coin	2	none	0	no-wiki-page	
+3020	[Chosain_Province][NF][Trader] Fearful Hunting	2	none	0	no-wiki-page	
+3021	[Kang_Pagoda] Fall of the Lei-Kang	2	full	0	no-wiki-page	
+3022	[Kang_Pagoda] Mei-zhu's Vengeance	2	full	0	no-wiki-page	
+3023	[Chosain_Province][NF][Trader] Blood and Gold	2	none	0	no-wiki-page	
+3024	[Guild_Renown][Dance] The Fruits of Luxury	6	none	0	no-wiki-page	
+3025	[Kara Korum][SC] The Backbone of Khitai [REPEAT]	3	none	0	no-wiki-page	
+3026	[Kara Korum][JS] Brethren of Bone [REPEAT]	2	none	0	no-wiki-page	
+3027	[Kara Korum][JS] Infinite Matters of Trust [REPEAT]	4	none	0	no-wiki-page	
+3028	[Kara Korum][JS] Test of Endurance [REPEAT]	2	none	0	no-wiki-page	
+3029	[Kara Korum][LL] Filling the Gap [REPEAT]	3	none	0	no-wiki-page	
+3030	[Kara Korum][SC] King of the Crater [REPEAT]	4	none	0	no-wiki-page	
+3031	[Northern Grasslands][NF][S] Hair of the Nightrunner	2	none	0	no-wiki-page	
+3032	[Northern Grasslands][NF][T] Fight the Leaders	2	none	0	no-wiki-page	
+3033	[Northern Grasslands][NF][A] The Seeds Within	2	none	0	no-wiki-page	
+3034	[Northern Grasslands][NF][S] A Bloody Tail	2	none	0	no-wiki-page	
+3035	[Northern Grasslands][NF][S] Boar Slaughter	2	none	0	no-wiki-page	
+3036	[Northern Grasslands][NF][S] The Horned Beauty	2	none	0	no-wiki-page	
+3037	[Northern Grasslands][NF][S] Roaming the Steppes	2	none	0	no-wiki-page	
+3038	[Northern Grasslands][NF][A] The Acorns of Northern Grasslands	2	none	0	no-wiki-page	
+3039	[Northern Grasslands][NF][A] Mushrooms for the Hungry	2	none	0	no-wiki-page	
+3040	[Northern Grasslands][NF][A] A Fragrant Collection	2	none	0	no-wiki-page	
+3041	[Northern Grasslands][NF][A] Underground Pickings	2	none	0	no-wiki-page	
+3042	[Northern Grasslands][NF][T] A Piece of Disease	2	none	0	no-wiki-page	
+3043	[Northern Grasslands][NF][T] The Big Hunt	2	none	0	no-wiki-page	
+3044	[Northern Grasslands][NF][T] Sticks and Stones	2	none	0	no-wiki-page	
+3045	[Northern Grasslands][NF][T] Heart of the Forest	2	none	0	no-wiki-page	
+3046	[Guild_Renown][Dance] Inborn Ambition	6	none	0	no-wiki-page	
+3049	[Kang_Pagoda] Po-Sha's Potency	2	none	0	no-wiki-page	
+3050	[Northern Grasslands][Warmonk Monastery][NF] The Element of Fire	2	full	0	no-wiki-page	
+3051	[Northern Grasslands][Warmonk Monastery][NF] The Element of Air	2	full	0	no-wiki-page	
+3052	[Northern Grasslands][Warmonk Monastery][NF] The Element of Earth	2	none	0	no-wiki-page	
+3053	[Northern Grasslands][Warmonk Monastery][SoJ] Against Chaos	2	none	0	no-wiki-page	
+3054	[Northern Grasslands][Warmonk Monastery][SoJ] Of Air and Water	2	none	0	no-wiki-page	
+3055	[Northern Grasslands][Warmonk Monastery][SoJ] Fury of Flames	3	none	0	no-wiki-page	
+3056	[Northern Grasslands][Warmonk Monastery][BB] Harbinger of Chaos	2	none	0	no-wiki-page	
+3057	[Northern Grasslands][Warmonk Monastery][BB] A Slow Death	2	none	0	no-wiki-page	
+3058	[Northern Grasslands][Warmonk Monastery][BB] Torching the Burned	3	full	0	no-wiki-page	
+3059	[Northern Grasslands][NF][T] Mammoth Attack	2	none	0	no-wiki-page	
+3060	[Northern Grasslands][NF][T] The Herbalist	2	none	0	no-wiki-page	
+3061	[Northern Grasslands][NF][T] Withered Heroes	2	none	0	no-wiki-page	
+3062	[Northern Grasslands][NF][T] The Magic Lamp	2	none	0	no-wiki-page	
+3063	[Northern Grasslands][NF][T] Misplaced Idols	2	none	0	no-wiki-page	
+3064	[Northern Grasslands][NF][S] A Fox Tale	2	none	0	no-wiki-page	
+3065	[Northern Grasslands][NF][S] Boar of Gloom	2	none	0	no-wiki-page	
+3066	[Northern Grasslands][NF][S] An Adder Delicacy	2	none	0	no-wiki-page	
+3067	[Northern Grasslands][NF][S] Arachno-hunt	2	none	0	no-wiki-page	
+3068	[Northern Grasslands][NF][S] The Buffalo Butcher	2	none	0	no-wiki-page	
+3069	[Northern Grasslands][NF][A] Beauty of the Beholder	2	none	0	no-wiki-page	
+3070	[Northern Grasslands][NF][A] Pool of Black Water	2	none	0	no-wiki-page	
+3071	[Northern Grasslands][NF][A] Raiding the Nests of the Grasslands	2	none	0	no-wiki-page	
+3072	[Northern Grasslands][NF][A] Science of Addiction	2	none	0	no-wiki-page	
+3073	[Northern Grasslands][NF][A] Have a Heart	2	none	0	no-wiki-page	
+3074	[Kara Korum][CoYk] Furnace of Fengdu [REPEAT]	3	none	0	no-wiki-page	
+3075	[Kara Korum][YPoY] Steady Smoke of the Corrupted [REPEAT]	4	none	0	no-wiki-page	
+3076	[Kara Korum][YPoY] Internal Investigation [REPEAT]	2	none	0	no-wiki-page	
+3077	[Kara Korum][CoYk] The Alchemist Apprentice [REPEAT]	5	none	0	no-wiki-page	
+3078	[Northern Grasslands][Wolf Mount][1] Against the Pack [White]	4	none	0	no-wiki-page	
+3079	[Northern Grasslands][Wolf Mount][3] Meat and Bones	1	single	0	no-wiki-page	
+3080	[Northern Grasslands][Wolf Mount][2] The Scent of the Grasslands	4	none	0	no-wiki-page	
+3081	[Northern Grasslands][Wolf Mount][4] Hunting Enemies	1	single	0	no-wiki-page	
+3082	[Northern Grasslands][Wolf Mount][5] Running with the Wolves	2	none	0	no-wiki-page	
+3084	[Chosain_Province][Yun_Rau][SoCH] Exodus of the Scholars	2	none	0	no-wiki-page	
+3085	[Chosain_Province][Yun_Rau][TT] The Immortal Warlord	2	none	0	no-wiki-page	
+3086	[Chosain_Province][Yun_Rau][TT] The Leader Shall Fall	3	none	0	no-wiki-page	
+3087	[Chosain_Province][Yun_Rau][SoCH] The Loyal Followers	2	none	0	no-wiki-page	
+3088	[Chosain_Province][Yun_Rau][TT] The Mercenaries of Gun Hai	2	none	0	no-wiki-page	
+3089	[Chosain_Province][Yun_Rau][SoCH] The Secret of Yun Rau	2	none	0	no-wiki-page	
+3090	[Kara Korum][CoYk] The Endless Curse of the Crater [REPEAT]	2	none	0	no-wiki-page	
+3091	[Kara Korum][CoYk] The Idol	2	none	0	no-wiki-page	
+3092	[Paikang][NF] A Hero Comes	5	partial	0	no-wiki-page	
+3093	[Paikang][Ins] Beneath Heaven's Lake	3	full	0	no-wiki-page	
+3095	[Paikang][Ins] Growing Discontent	1	full	0	no-wiki-page	
+3096	[Paikang][Ins] Immortal Games	3	full	0	no-wiki-page	
+3097	[Paikang][Ins] Jhil's Brood	3	full	0	no-wiki-page	
+3098	[Paikang][Ins] The Seeds of Rebellion	7	full	0	no-wiki-page	
+3099	[Paikang][Ins] The Souleaters	2	full	0	no-wiki-page	
+3100	[Paikang][Ins] Trickles of Darkness	3	full	0	no-wiki-page	
+3101	[Paikang][Ins] Washed Ashore	3	full	0	no-wiki-page	
+3102	[Paikang][Ins] Heaven's Feet	2	full	0	no-wiki-page	
+3103	[Paikang][Ins] Missing Villagers	3	full	0	no-wiki-page	
+3104	[Paikang][Ins] Hidden in Plain Sight	4	partial	0	no-wiki-page	
+3105	[Paikang][Ins] The Deepest Depths	2	full	0	no-wiki-page	
+3106	[Paikang][NF] The Summoning of Dagon	2	none	0	no-wiki-page	
+3107	[Paikang][Ins] Cleansing the Cult	2	full	0	no-wiki-page	
+3108	[Paikang][Ins] Weapons of Another Age	2	full	0	no-wiki-page	
+3109	[Chosain_Province][SoCH] Meeting Mistress Lin	1	single	0	no-wiki-page	
+3110	[Chosain_Province][TT] Meeting Monish	1	single	0	no-wiki-page	
+3111	[Paikang][YPoY] Harvest of Death [B]	2	none	0	no-wiki-page	
+3112	[Paikang][YPoY] The Bones of the Apes [B]	2	none	0	no-wiki-page	
+3114	[Kara Korum][CoYk] The Prophecy	4	none	0	no-wiki-page	
+3115	[Kara Korum][YPoY] An Idol No More	2	none	0	no-wiki-page	
+3116	[PvP_Quest] The Battle for Blood Ravine	1	single	0	no-wiki-page	
+3117	[PvP_Quest] Battle of the Hallowed Vaults	1	single	0	no-wiki-page	
+3118	[PvP_Quest] Battle for the Lost Temple	1	single	0	no-wiki-page	
+3119	[PvP_Quest] Totem Destruction	1	single	0	no-wiki-page	
+3120	[Chosain_Province][NF] Peace for Lei	2	full	0	no-wiki-page	
+3121	[Northern Grasslands][NF][CJ] Forgotten Gods	1	single	0	no-wiki-page	
+3122	[Northern Grasslands][NF][CJ] Milestones	3	none	0	no-wiki-page	
+3123	[Redemp_Northern_Grasslands] The Return to Civilization	2	none	0	no-wiki-page	
+3124	[Redemp_Paikang] Seacoast Slaughter	3	none	0	no-wiki-page	
+3127	[Northern Grasslands][H] Hunting Leopards for Yastreb [A]	2	none	0	no-wiki-page	
+3128	[Northern Grasslands][H] Hunting Tigers for Yastreb [B]	2	none	0	no-wiki-page	
+3129	[Northern Grasslands][H] Hunting Grizzly Bears for Yastreb [C]	2	none	0	no-wiki-page	
+3130	[Northern Grasslands][WotS] Hunting Leopards for Han-wu [A]	2	none	0	no-wiki-page	
+3131	[Northern Grasslands][WotS] Hunting Grizzly Bears for Han-wu [B]	2	none	0	no-wiki-page	
+3132	[Northern Grasslands][WotS] Hunting Tigers for Han-wu [C]	2	none	0	no-wiki-page	
+3133	[Northern Grasslands][NF] Murder in the Monastery [B]	2	none	0	no-wiki-page	
+3134	[Guild_Renown][Social_Pet][K1] In Remembrance	2	none	0	no-wiki-page	
+3135	[Wild_Lands_of_Zelata][KhitanWeapons] A Family Sundered	6	none	0	no-wiki-page	
+3136	[Kara Korum][CoYk] Lost Logs [REPEAT]	2	none	0	no-wiki-page	
+3137	[Gateway_to_Khitai] Ghosts of the Wall	1	single	0	no-wiki-page	
+3138	[Wild_Lands_of_Zelata][KhitanWeapons] Dreams of Blood	7	none	0	no-wiki-page	
+3139	[Gateway_to_Khitai] Poison as Defense	1	single	0	no-wiki-page	
+3140	[Gateway_to_Khitai] While They're Still Alive	1	single	0	no-wiki-page	
+3141	[Gateway_to_Khitai] The Lotus Road	2	none	0	no-wiki-page	
+3142	[Gateway_to_Khitai] Left Behind	3	none	0	no-wiki-page	
+3143	[Kara Korum][YPoY] Red Rocks [REPEAT]	2	none	0	no-wiki-page	
+3144	[Kara Korum][BB] The Bones of Warriors [REPEAT]	3	none	0	no-wiki-page	
+3145	[Kara Korum][YPoY] Souls of the Kang Zai [REPEAT]	2	none	0	no-wiki-page	
+3146	[Gateway_to_Khitai] The Demon of the Sands	2	none	0	no-wiki-page	
+3147	[Gateway_to_Khitai] Perfectly Insane	1	single	0	no-wiki-page	
+3148	[Gateway_to_Khitai] The Lotus Fiend	2	none	0	no-wiki-page	
+3149	[Gateway_to_Khitai] Deceiving the Raiders	1	single	0	no-wiki-page	
+3150	[Gateway_to_Khitai] The Furious Mammoth	1	single	0	no-wiki-page	
+3151	[Gateway_to_Khitai] Feeding Shou-Hsing	2	none	0	no-wiki-page	
+3152	[Gateway_to_Khitai] Strange Bones	1	single	0	no-wiki-page	
+3153	[Gateway_to_Khitai] Scouting the Plains	2	none	0	no-wiki-page	
+3154	[Gateway_to_Khitai] Creatures from Underneath	1	single	0	no-wiki-page	
+3155	[Gateway_to_Khitai] Snakes on the Plains	2	none	0	no-wiki-page	
+3156	[Gateway_to_Khitai] Legend of the Everliving Scorpion	1	single	0	no-wiki-page	
+3157	[Gateway_to_Khitai] An Unwilling Undead	1	single	0	no-wiki-page	
+3158	[Gateway_to_Khitai] Deadly as a Kara Korum Night	1	single	0	no-wiki-page	
+3159	[Gateway_to_Khitai] Sacred Animals	1	single	0	no-wiki-page	
+3161	[Gateway_to_Khitai] Crushed by Artillery	2	none	0	no-wiki-page	
+3163	[Gateway_to_Khitai] The Mysterious Sand People	1	single	0	no-wiki-page	
+3164	[Ymir's_Pass][KhitanWeapons] Fur to Flesh	6	full	0	no-wiki-page	
+3165	[Khemi][KhitanWeapons] In Wild Tongues	7	none	0	no-wiki-page	
+3166	[Random_Encounter_Desert] Assault on the Trail	4	none	0	no-wiki-page	
+3167	[Random_Encounter_Desert] The Haunted Oasis	3	none	0	no-wiki-page	
+3168	[Random_Encounter_Desert] Hunger Beneath the Sands	4	none	0	no-wiki-page	
+3169	[Wild_Lands_of_Zelata][KhitanWeapons] The Price of Miracles	4	none	0	no-wiki-page	
+3170	[Poitain][KhitanWeapons] Swaddled in Shame	8	none	0	no-wiki-page	
+3171	[Gateway_to_Khitai] The Black Dragon of Khitai	2	none	0	no-wiki-page	
+3172	[Gateway_to_Khitai] Whoremonger	2	none	0	no-wiki-page	
+3173	[Destiny 20 Khitai] Traveling Home	1	single	1	exact	
+3174	[Destiny 30 Khitai] The Phoenix of the South	5	none	5	same-steps-order-differs	
+3175	[Destiny 50 Khitai] The Phoenix of the North	4	none	0	wiki-page-has-no-steps	
+3176	[Destiny Quest 60 Khitai] Phoenix of the East	5	none	0	no-wiki-page	
+3177	[Destiny Quest Glue to 60 Khitai] The Dark that Awaits	1	single	0	wiki-page-has-no-steps	
+3178	[Destiny middlequest 20 - 30 Khitai] Blood and Sweat	1	single	1	mismatch	
+3179	[Destiny middlequest 30 - 50 Khitai] Time to Fight	1	single	1	exact	
+3180	[Purple_Lotus_Swamp][KhitanWeapons] Faith Betrayed	4	none	0	no-wiki-page	
+3181	[Eiglophian_Mountains][KhitanWeapons] Swallowed Whole	2	full	0	no-wiki-page	
+3182	[Paikang][Ins] The Dark Legion	3	full	0	no-wiki-page	
+3183	[Paikang][Ins] Blisters of Fear	2	none	0	no-wiki-page	
+3184	[Crater_1] The Little Children	2	none	0	no-wiki-page	
+3185	[Crater_2] Blood of the Strong	2	none	0	no-wiki-page	
+3186	[Northern Grasslands][BB] Brutal Murder	2	none	0	no-wiki-page	
+3187	[Northern Grasslands][BB] Concealed Kill	3	none	0	no-wiki-page	
+3188	[Northern Grasslands][BB] Sharp Assassination	2	none	0	no-wiki-page	
+3189	[RoTG_Storyline] A Message From Paikang	2	none	0	no-wiki-page	
+3190	[RoTG_Storyline] Allied Against the Darkness	1	single	0	no-wiki-page	
+3191	[RoTG_Storyline] Sowing Favor	2	full	0	no-wiki-page	
+3192	[RoTG_Storyline] Into the Wastes	1	single	0	no-wiki-page	
+3193	[Northern Grasslands][BB] Brutal Murder [B]	2	none	0	no-wiki-page	
+3194	[Northern Grasslands][BB] Barbaric Murder [B]	2	none	0	no-wiki-page	
+3195	[Northern Grasslands][BB] Concealed Kill [B]	3	none	0	no-wiki-page	
+3197	[Northern Grasslands][BB] Sharp Assassination [B]	2	none	0	no-wiki-page	
+3198	[Northern Grasslands][BB] Swift Assassination [B]	2	none	0	no-wiki-page	
+3199	[Northern Grasslands][BB] Cloaked Kill [B]	3	none	0	no-wiki-page	
+3200	[RoTG_Storyline] Lost in Transition	2	full	0	no-wiki-page	
+3201	[RoTG_Storyline] Making Contact	3	full	0	no-wiki-page	
+3202	[RoTG_Storyline] Pilgrims on the Road	2	full	0	no-wiki-page	
+3203	[RoTG_Storyline] Rise of the Godslayer	2	none	0	no-wiki-page	
+3204	[RoTG_Storyline] The Balance of Power	2	none	0	no-wiki-page	
+3205	[RoTG_Storyline] The Color Out of Space	4	none	0	no-wiki-page	
+3206	[RoTG_Storyline] The Heights of Lunacy	3	none	0	no-wiki-page	
+3207	[RoTG_Storyline] The Grey Leopard	1	full	0	no-wiki-page	
+3208	[RoTG_Storyline] The Neglected State	2	none	0	no-wiki-page	
+3210	[RoTG_Storyline] Shadows and Blades	2	full	0	no-wiki-page	
+3211	[RoTG_Storyline] Wolves and Hyrkanians	2	full	0	no-wiki-page	
+3212	[RoTG_Storyline] Children and Priests	2	full	0	no-wiki-page	
+3213	[RoTG_Storyline] The Circle and the Legion	2	full	0	no-wiki-page	
+3214	[RoTG_Storyline] The Rightful Heir	2	none	0	no-wiki-page	
+3215	[RoTG_Storyline] The Shadow Behind the Throne	1	single	0	no-wiki-page	
+3216	[RoTG_Storyline] Wayward Seed	2	none	0	no-wiki-page	
+3217	[Field_of_the_Dead][KhitanWeapons] Foreign Furs	6	none	0	no-wiki-page	
+3218	[Thunder_River][KhitanWeapons] Forbidden Longing	4	none	0	no-wiki-page	
+3219	[Kheshatta][KhitanWeapons] Reflections in the Sand	2	full	0	no-wiki-page	
+3220	[Kara Korum][LL] A Soldier's Word	1	single	0	no-wiki-page	
+3221	[Chosain_Province][BB] Death in the Black Desert	1	single	0	no-wiki-page	
+3222	[Chosain_Province][CoYk] A Deafening Silence	1	single	0	no-wiki-page	
+3223	[Chosain_Province][SC] Silent Scarlet Sister	1	single	0	no-wiki-page	
+3224	[Chosain_Province][SoJ] A Rising Shadow	1	single	0	no-wiki-page	
+3225	[Chosain_Province][YPoY] From One Devil to Another	1	single	0	no-wiki-page	
+3226	[Gateway_to_Khitai] Through the World	1	single	0	no-wiki-page	
+3227	[Event_Khitai] The Silver Atrium	3	none	3	exact	
+3228	[Event_Khitai] A Mistress Held Tightly	2	none	0	no-wiki-page	
+3229	[Event_Khitai] To Restore Order	2	none	0	no-wiki-page	
+3230	[Event_Khitai] Eyes of the Emperor	2	none	0	no-wiki-page	
+3231	[Event_Khitai] Rightful Owners	5	none	0	no-wiki-page	
+3232	[Kara Korum][SC] Master and Commander	1	single	0	no-wiki-page	
+3233	[Kara Korum][LL] The Untold Tales of Unsung Heroes	1	single	0	no-wiki-page	
+3234	[Kara Korum][YPoY] Seeking Yun's Glory	1	single	0	no-wiki-page	
+3235	[Kara Korum][BB] Pursuing Death	1	single	0	no-wiki-page	
+3236	[Kara Korum][CoYk] Towards Sunrise	1	single	0	no-wiki-page	
+3237	[Kara Korum][SoJ] Escaping the Black Desert	1	single	0	no-wiki-page	
+3238	[Northern Grasslands][SoJ] Love in the Shadows	1	single	0	no-wiki-page	
+3239	[Northern Grasslands][BB] A Brittle Ego	1	single	0	no-wiki-page	
+3240	[Northern Grasslands][CoYk] The Pilgrimage	2	none	0	no-wiki-page	
+3241	[Northern Grasslands][YPoY] A Short Message	1	single	0	no-wiki-page	
+3242	[Conarch_Village][Khitai] Beyond Borders	1	single	0	no-wiki-page	
+3243	[Old_Tarantia][Khitai] Nest of the Phoenix	3	none	0	no-wiki-page	
+3244	[Khemi][Khitai] Exotic Sales	1	single	0	no-wiki-page	
+3245	[Northern Grasslands][LL] Defense of Pin-Pin [W]	2	none	0	no-wiki-page	
+3246	[Old_Tarantia][Khitai] A Bloodied Throne	3	none	0	no-wiki-page	
+3247	[Kara Korum][BB] Servant of the Blade	1	single	0	no-wiki-page	
+3248	[Northern Grasslands][Wolf Mount][1] Against the Pack [Black]	4	none	0	no-wiki-page	
+3249	[Northern Grasslands][Wolf Mount][1] Against the Pack [Brown]	4	none	0	no-wiki-page	
+3250	[Enigmata_of_Yag] Forces of the Batholith	2	none	0	no-wiki-page	
+3251	[Enigmata_of_Yag] Unraveling the Undone	3	none	0	no-wiki-page	
+3259	[Gateway_to_Khitai] Assaulting a Village II	1	single	0	no-wiki-page	
+3260	[Jade_Citadel] The Obsidian Basilisk	2	none	0	no-wiki-page	
+3261	[Jade_Citadel] Invading the Citadel	2	none	0	no-wiki-page	
+3262	[Random_Encounter_Desert] Scouting Ahead	4	none	0	no-wiki-page	
+3263	[Random_Encounter_Desert] Water Shortage	8	none	0	no-wiki-page	
+3264	[Random_Encounter_Island] Supply Raid	2	none	0	no-wiki-page	
+3265	[Random_Encounter_Island] Demon of the Deep	3	full	0	no-wiki-page	
+3266	[Random_Encounter_Island] Sunken Treasure	2	full	0	no-wiki-page	
+3268	[Random_Encounter_Island] Wasting Sickness	10	partial	0	no-wiki-page	
+3269	[Paikang][SC] Streets Running Red [B]	2	none	0	no-wiki-page	
+3270	[Paikang][NF] The Summoning of Dagon [B]	2	none	0	no-wiki-page	
+3271	[Paikang][SC] Battling the Last Legion [B]	2	none	0	no-wiki-page	
+3272	[Northern Grasslands][YPoY] Mystery Lotus [B]	2	none	0	no-wiki-page	
+3273	[Chosain_Province][Yun_Rau][SoCH] Exodus of the Scholars [REPEAT]	2	none	0	no-wiki-page	
+3274	[Chosain_Province][Yun_Rau][TT] The Leader Shall Fall [REPEAT]	3	none	0	no-wiki-page	
+3275	[Guild_Renown][Dance] Uncharted Waters	10	none	0	no-wiki-page	
+3276	[Guild_Renown][Dance] The River Under the Mountain	10	none	0	no-wiki-page	
+3277	[Paikang][LL] The Splinterspar Slaughter [B]	2	none	0	no-wiki-page	
+3279	[Guild_Renown][Dance] Mapping the Unknown	8	none	0	no-wiki-page	
+3280	[Northern Grasslands][CoYk] Children of Mei-Dianwafu	1	single	0	no-wiki-page	
+3281	[Northern Grasslands][YPoY] A New Arrangement	1	full	0	no-wiki-page	
+3282	[NPE Khitai] Back to Tortage	1	single	0	no-wiki-page	
+3283	[RoTG_Storyline]Assassination!	3	none	0	no-wiki-page	
+3284	[Paikang][NF] Letters on the Road to Baishan	2	full	0	no-wiki-page	
+3285	[Random_Encounter_Desert] The Emissary	2	none	0	no-wiki-page	
+3286	[Random_Encounter_Desert] The Emissary's Return	2	none	0	no-wiki-page	
+3287	[RoTG_Storyline] Summoned	1	full	0	no-wiki-page	
+3295	[Kara Korum][Filler][Cai-yun_1] Cai-yun's Castrated Component 	2	none	0	no-wiki-page	
+3296	[Kara Korum][Filler][Cai-yun_2] Cai-yun's Deadly Components 	2	none	0	no-wiki-page	
+3297	[Kara Korum][Filler][Cai-yun_3] Cai-yun's Prickly Components 	2	none	0	no-wiki-page	
+3298	[Paikang][NF][T] A Favor to the Gods 	2	none	0	no-wiki-page	
+3299	[Kara Korum][Filler][Cai-yun_4] Cai-yun's Stinging Components	2	none	0	no-wiki-page	
+3300	[Kara Korum][Filler][Cai-yun_5] Cai-yun's Venomous Component 	2	none	0	no-wiki-page	
+3301	[Kara Korum][Filler][Cai-yun_6] Cai-yun's Scuttling Component 	2	none	0	no-wiki-page	
+3302	[Kara Korum][Filler][Cai-yun_7] Cai-yun's Dark Component 	2	none	0	no-wiki-page	
+3303	[Kara Korum][Filler][Cai-yun_8] Cai-yun's Buried Component 	2	none	0	no-wiki-page	
+3304	[Kara Korum][Filler][Cai-yun_9] Cai-yun's Liquid Component 	2	none	0	no-wiki-page	
+3305	[Kara Korum][Filler][Cai-yun_10] Cai-yun's Shrieking Component 	2	none	0	no-wiki-page	
+3306	[Kara Korum][Filler][Ling-lai_1] Ling-lai's Shield Hunt	2	none	0	no-wiki-page	
+3307	[Kara Korum][Filler][Ling-lai_2] Ling-lai's Bow Hunt	2	none	0	no-wiki-page	
+3308	[Kara Korum][Filler][Ling-lai_3] Ling-lai's Sword Hunt	2	none	0	no-wiki-page	
+3309	[Kara Korum][Filler][Ling-lai_4] Ling-lai's Knife Hunt	2	none	0	no-wiki-page	
+3310	[Kara Korum][Filler][Ling-lai_5] Ling-lai's Arrow Hunt	2	none	0	no-wiki-page	
+3311	[Kara Korum][Filler][Ling-lai_6] Ling-lai's Blade Hunt	2	none	0	no-wiki-page	
+3312	[Kara Korum][Filler][Ling-lai_7] Ling-lai's Dagger Hunt	2	none	0	no-wiki-page	
+3313	[Kara Korum][Filler][Ling-lai_8] Ling-lai's Staff & Club Hunt	2	none	0	no-wiki-page	
+3314	[Kara Korum][Filler][Ling-lai_9] Ling-lai's Kappa Hunt	2	none	0	no-wiki-page	
+3315	[Kara Korum][Filler][Ling-lai_10] Ling-lai's Bayawak Hunt	2	none	0	no-wiki-page	
+3316	[Kara Korum][Filler][Qing_1] Qing's Gory Gray Ingredients 	2	none	0	no-wiki-page	
+3317	[Kara Korum][Filler][Qing_2] Qing's Bloody Beating Ingredients 	2	none	0	no-wiki-page	
+3318	[Paikang][NF][S] A Khitan Recipe	2	none	0	no-wiki-page	
+3319	[Paikang][NF][A] A Potent Ingredient	2	none	0	no-wiki-page	
+3320	[Paikang][NF][A] A Reap of Death and Corruption	2	none	0	no-wiki-page	
+3321	[Paikang][NF][T] Ancient Armaments	2	none	0	no-wiki-page	
+3322	[Paikang][NF][A] Brain of the Brainless	2	none	0	no-wiki-page	
+3323	[Paikang][NF][S] Fabrics of the Firebird	2	none	0	no-wiki-page	
+3324	[Paikang][NF][T] Feathers of Flight	2	none	0	no-wiki-page	
+3325	[Paikang][NF][S] Fletches of the Jhil	2	none	0	no-wiki-page	
+3326	[Paikang][NF][S] Fur the Elite	2	none	0	no-wiki-page	
+3327	[Paikang][NF][S] Handle With Care	2	none	0	no-wiki-page	
+3328	[Paikang][NF][T] Manacles for the Malefactor	2	none	0	no-wiki-page	
+3329	[Kara Korum][Filler][Qing_3] Qing's Fleshy Ingredients 	2	none	0	no-wiki-page	
+3330	[Paikang][NF][S] Meat of the Majestic	2	none	0	no-wiki-page	
+3331	[Paikang][NF][S] Newborn Meat	2	none	0	no-wiki-page	
+3332	[Paikang][NF][A] Novice of the Alchemist	2	none	0	no-wiki-page	
+3333	[Paikang][NF][A] Pangs of the Present	2	none	0	no-wiki-page	
+3334	[Paikang][NF][T] Pottery by the Riverside	2	none	0	no-wiki-page	
+3335	[Paikang][NF][T] Prelude for a Treasure Hunt	2	none	0	no-wiki-page	
+3336	[Paikang][NF][A] Proficiency in Parasites	2	none	0	no-wiki-page	
+3337	[Paikang][NF][T] Relics for the Religious	2	none	0	no-wiki-page	
+3338	[Paikang][NF][A] Rocks of Potency	2	none	0	no-wiki-page	
+3339	[Paikang][NF][T] Shared Bounty	2	none	0	no-wiki-page	
+3340	[Paikang][NF][A] Shells of the Kappa	2	none	0	no-wiki-page	
+3341	[Paikang][NF][S] Skin off their Backs	2	none	0	no-wiki-page	
+3342	[Paikang][NF][S] Slithering Medicine	2	none	0	no-wiki-page	
+3343	[Paikang][NF][S] Spoils of Efficiency	2	none	0	no-wiki-page	
+3344	[Kara Korum][Filler][Qing_4] Qing's Deadly Ingredients 	2	none	0	no-wiki-page	
+3345	[Paikang][NF][A] Sunken Bottles	2	none	0	no-wiki-page	
+3346	[Paikang][NF][A] The Lure of Lotus	2	none	0	no-wiki-page	
+3347	[Paikang][NF][T] Tricks of the Trade	2	none	0	no-wiki-page	
+3348	[Paikang][NF][T] Wood by the Riverside	2	none	0	no-wiki-page	
+3349	[Kara Korum][Filler][Qing_5] Qing's Ghoulish Sack of Ingredients 	2	none	0	no-wiki-page	
+3350	[Kara Korum][Filler][Qing_6] Qing's Ghostly Ingredients	2	none	0	no-wiki-page	
+3351	[Kara Korum][Filler][Qing_7] Qing's Black Ingredients 	2	none	0	no-wiki-page	
+3352	[Kara Korum][Filler][Qing_8] Qing's Sightless Ingredients 	2	none	0	no-wiki-page	
+3353	[Kara Korum][Filler][Qing_9] Qing's Poisoned Ingredients 	2	none	0	no-wiki-page	
+3354	[Kara Korum][Filler][Qing_10] Qing's Mystical Ingredients 	2	none	0	no-wiki-page	
+3355	[Northern Grasslands][NF] A Mystery Medicine	2	none	0	no-wiki-page	
+3356	[Gateway_to_Khitai] The Oldest Profession	2	none	0	no-wiki-page	
+3357	[Gateway_to_Khitai] The Forgotten City	2	none	0	no-wiki-page	
+3358	[Gateway_to_Khitai] Tales of the Sands	2	none	0	no-wiki-page	
+3359	[Gateway_to_Khitai] Tales of a Lost People	2	none	0	no-wiki-page	
+3360	[Gateway_to_Khitai] Stay Dead, Friend	2	none	0	no-wiki-page	
+3361	[Gateway_to_Khitai] Rotten and Lost	3	none	0	no-wiki-page	
+3362	[Gateway_to_Khitai] Kuchu's Bloodied Hands	2	none	0	no-wiki-page	
+3363	[Gateway_to_Khitai] Fog of the Damned	1	single	0	no-wiki-page	
+3364	[Gateway_to_Khitai] End of a Road 	2	none	0	no-wiki-page	
+3365	[Gateway_to_Khitai] Dulling the Senses	2	none	0	no-wiki-page	
+3366	[Gateway_to_Khitai] Dulling the Mind	2	none	0	no-wiki-page	
+3367	[Gateway_to_Khitai] Dragon Breath	2	none	0	no-wiki-page	
+3368	[Gateway_to_Khitai] Dishonor Among Thieves	1	single	0	no-wiki-page	
+3369	[Gateway_to_Khitai] Death Without Honor	1	single	0	no-wiki-page	
+3370	[Gateway_to_Khitai] Beasts at Bay	2	none	0	no-wiki-page	
+3371	[Gateway_to_Khitai] A Letter to Khemi	1	single	0	no-wiki-page	
+3372	[Gateway_to_Khitai] A Bloodstained Dagger	1	single	0	no-wiki-page	
+3373	[Paikang][NF][KoreanWeapons] A Soldier's Blessed Weapon	1	single	0	no-wiki-page	
+3374	[Paikang][NF][KoreanWeapons] A Priest's Blessed Weapon	1	single	0	no-wiki-page	
+3375	[Paikang][NF][KoreanWeapons] A Rogue's Blessed Weapon	1	single	0	no-wiki-page	
+3376	[Paikang][NF][KoreanWeapons] A Mage's Blessed Weapon	1	single	0	no-wiki-page	
+3377	[Gateway_to_Khitai] The Disease	1	single	0	no-wiki-page	
+3378	[NPE] A Path to Khitai	1	single	0	no-wiki-page	
+3379	[Northern Grasslands][NF] A Mystery Medicine [B]	2	none	0	no-wiki-page	
+3381	[Redemp_Kara_Korum] The Instrument at Hand	2	none	0	no-wiki-page	
+3382	[Northern Grasslands] XX Test Quest	1	single	0	no-wiki-page	
+3383	[Paikang][NF] Treasure Hunt	4	none	0	no-wiki-page	
+3399	[Kara_Korum][RotA][SC] Disarming the Defectors [A]	2	none	0	no-wiki-page	
+3400	[Kara_Korum][RotA][SC] Disarming the Defectors [B]	2	none	0	no-wiki-page	
+3401	[Kara_Korum][RotA][SC] Deciphering Reality	2	none	0	no-wiki-page	
+3402	[Kara_Korum][RotA][LL] Reality Unraveled	2	none	0	no-wiki-page	
+3404	[Gateway_to_Khitai][The_Breach] The Upstart's Downfall	4	none	0	no-wiki-page	
+3405	[Gateway_to_Khitai][The_Breach] Subduing the Sentinel	2	none	0	no-wiki-page	
+3406	[Gateway_to_Khitai][The_Breach] Worse than Death [A]	2	none	0	no-wiki-page	
+3407	[Kara_Korum][RotA][SC] To Shatter Deception	8	none	0	no-wiki-page	
+3408	[Kara_Korum][RotA][LL] Chasing Verity	8	none	0	no-wiki-page	
+3414	[Kara_Korum][RotA][LL] Followers of the Betrayer [A]	2	none	0	no-wiki-page	
+3415	[Kara_Korum][RotA][LL] Followers of the Betrayer [B]	2	none	0	no-wiki-page	
+3425	[Architect_S] On the Edge of Forever	8	none	0	no-wiki-page	
+3426	[PvP_Quest] Blessings of an Ancient God	1	single	0	no-wiki-page	
+3427	[PvP_Quest] Battle for the Wildlands of Jhebbal Sag	1	single	0	no-wiki-page	
+3428	[PvP_Quest] Divine Calling	1	full	0	no-wiki-page	
+3433	[Gateway_to_Khitai][The_Breach] Worse than Death [B]	2	none	0	no-wiki-page	
+3434	[Paikang District][Ai][Ins] Barricades of Ai	3	none	0	no-wiki-page	
+3435	[Paikang District][Ai][Ins] The Downfall of a Ruler	2	none	0	no-wiki-page	
+3436	[Paikang District][Ai][Ins] The Battle for Paikang	1	single	0	no-wiki-page	
+3437	[Paikang District][Ai][Ins] Lighting the Darkness	2	none	0	no-wiki-page	
+3438	[Paikang District][Ai][Ins] Leading by Example 	2	none	0	no-wiki-page	
+3439	[Paikang District][Ai][Ins] Challenging Authority	2	none	0	no-wiki-page	
+3440	[Paikang District][Ai][NF] The Corruption of Sxi Ai	5	none	0	no-wiki-page	
+3441	[Paikang District][Ai][NF] The Lost Journal	3	none	0	no-wiki-page	
+3442	[Paikang District][T'ian'an][NF] The Scrolls of Ankh-Ausar	2	none	0	no-wiki-page	
+3444	[Paikang District][T'ian'an][Ins] Cleansing the District	2	none	0	no-wiki-page	
+3445	[Paikang District][T'ian'an][Ins] Disarming the Armsmaster	2	none	0	no-wiki-page	
+3449	[Paikang_Jade Citadel] An Order of High Treason	2	none	0	no-wiki-page	
+3450	[Paikang_Jade Citadel] End of an Emperor	2	none	0	no-wiki-page	
+3451	[Paikang_Jade Citadel] Secret of the Stargazer	2	none	0	no-wiki-page	
+3452	[Paikang_Jade Citadel] Shadows in the Forbidden City	3	none	0	no-wiki-page	
+3453	[Paikang_Jade Citadel] The Death of Keaira	1	single	0	no-wiki-page	
+3454	[Paikang_Jade Citadel] The Death of Lu Zhi	1	single	0	no-wiki-page	
+3455	[Paikang_Jade Citadel] The Insurrection	2	none	0	no-wiki-page	
+3456	[Paikang_Jade Citadel] The Last Contract	2	none	0	no-wiki-page	
+3457	[Paikang_Jade Citadel] The Power Behind the Throne	3	none	0	no-wiki-page	
+3458	[Paikang_Jade Citadel] Struggle for the Throne	3	none	0	no-wiki-page	
+3460	[Paikang District][Ai][Ins] Barricades of Ai [B]	3	none	0	no-wiki-page	
+3461	[Paikang District][Ai][Ins] Leading by Example [B]	2	none	0	no-wiki-page	
+3463	[Event_Midwinter] Midwinter Memories	1	single	0	no-wiki-page	
+3464	[Event_Midwinter] A Bloody Solstice	4	none	0	no-wiki-page	
+3465	[Event_Midwinter] A Feast in the Making	2	none	0	no-wiki-page	
+3466	[Event_Midwinter] The Feast of the Solstice	4	none	0	no-wiki-page	
+3467	[Kara_Korum][RotA] The Collector's Agent [A]	2	none	0	no-wiki-page	
+3468	[Kara_Korum][RotA] The Collector's Agent [B]	2	none	0	no-wiki-page	
+3469	[Gateway_to_Khitai][The_Breach] Heart of the Breach [A]	5	none	0	no-wiki-page	
+3470	[Gateway_to_Khitai][The_Breach] Heart of the Breach [B]	5	none	0	no-wiki-page	
+3489	[Paikang District][Ai][NF] The Local Laboratory	1	single	0	no-wiki-page	
+3493	[Karlab Testcase] XX Test Quest	1	single	0	no-wiki-page	
+3495	[Guild_Renown] Stockphrases	1	single	0	no-wiki-page	
+3497	[Paikang District][T'ian'an][Ins] Cleansing the District [B]	2	none	0	no-wiki-page	
+3510	[Northern Grasslands][CoYk] Rectoral Retribution	2	none	0	no-wiki-page	
+3511	[Paikang][SoJ] A Shadowed Victory	2	none	0	no-wiki-page	
+3512	[Paikang][BB] A Balanced Blade	2	none	0	no-wiki-page	
+3513	[Kara Korum][SoJ] Revenge on the Jiang Shi	2	none	0	no-wiki-page	
+3514	[Chosain_Province][BB] Bloodshed in the Shadows	2	none	0	no-wiki-page	
+3515	[Chosain_Province][SoJ] Carnage in Chosain	2	none	0	no-wiki-page	
+3521	[Northern Grasslands][SoJ] Gore in the Grasslands	2	none	0	no-wiki-page	
+3522	[Northern Grasslands][YPoY] War on the Children	2	none	0	no-wiki-page	
+3523	[TSW Testcase] Testcase Quest Success	3	none	0	no-wiki-page	
+3744		1	single	0	no-wiki-page	unnamed
+3780		3	partial	0	no-wiki-page	unnamed;member-without-goals
+3838		1	single	0	no-wiki-page	unnamed
+3901		1	single	0	no-wiki-page	unnamed
+3902		1	single	0	no-wiki-page	unnamed

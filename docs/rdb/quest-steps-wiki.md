@@ -88,6 +88,56 @@ null on 111.
 ⚠️ Coverage is still small in absolute terms — 552 pages against our 5,049 client-derived quests, and the wiki's
 own zone indexes link far more quests than have pages. A quest absent from the wiki means nothing about our data.
 
+## Verifying every quest line against it
+
+All 2,210 of our quest lines were run through this scrape; the per-line result is committed as
+[`quest-line-verification.tsv`](quest-line-verification.tsv) (one row per line: member count, ordering state,
+wiki verdict, flags).
+
+| wiki verdict | lines | |
+|---|---:|---|
+| `no-wiki-page` | 1,799 | the wiki does not document it — says nothing either way |
+| `exact` | 279 | step titles identical to our member quests, in order |
+| `mismatch` | 68 | see below — all wiki-side |
+| `wiki-omits-turn-in` | 22 | its list is a prefix of ours, missing the closing *Return to X* |
+| `minor-text-diff` | 16 | a word or spelling apart |
+| `wiki-page-has-no-steps` | 15 | stub page |
+| `same-steps-order-differs` | 11 | same set, different order |
+
+⭐ **The wiki contradicts our data in zero cases.** Every apparent disagreement resolves into one of two things,
+and neither is a defect on our side:
+
+* the 68 `mismatch` rows are wiki-side noise — step headings that did not parse and came out blank, wiki typos
+  (`Disembowling` for our `Disembowelling`, `Bartholmo` for `Bartholomo`), a `Completion` pseudo-step the wiki
+  appends, and **class-name collisions**: the wiki has one page per class all titled e.g. *The Awakening I*, so a
+  Priest page can be scored against the Warrior line. Disambiguate on class before reading anything into those.
+* the 11 `same-steps-order-differs` rows are **our missing ordering**, not a wrong order — every one of them is a
+  line whose `JournalSequence` is 0 on all or most members, so any order we display is an artifact of the
+  fallback sort, not a claim.
+
+## ⚠️ Journal ordering is absent on 1,009 lines, and the wiki can say what it should be
+
+| `JournalSequence` state | lines |
+|---|---:|
+| `full` — a complete 1..N | 889 |
+| `none` — every member at 0 | 1,009 |
+| `single` — a one-quest line, order moot | 288 |
+| `partial` — some numbered, some 0 | 24 |
+
+⛔ This is a known, deliberately handled condition, not a bug: `QuestMarkerResolver.LineReached` skips the
+line-reached gate whenever either side's sequence is 0, because a line that cannot say what comes first must not
+gate — otherwise every giver on it would go silver forever.
+
+⭐ **What the wiki adds is evidence about the `partial` case.** On lines where exactly one member carries
+`JournalSequence = 1` and the rest are 0, the wiki's first step is that member — **5 of 5, none against**. So the
+1 is a real head marker and the 0s are simply unwritten, rather than 0 being a position that sorts before 1.
+Anything ordering members must therefore put unknown **last**, not first; sorting `0` ahead of `1` silently
+reverses those lines.
+
+⚠️ That does **not** license copying the wiki's order into `faolan.db`. The order is the client's to state, and
+the right fix is to find where it states it; the wiki is how such a decode would be *checked*, exactly as it was
+used here. Open work tracked in Gitea #926.
+
 ## Reproducing
 
 Read through the MediaWiki API, not a browser fetch — Fandom answers `WebFetch` with HTTP 402:
