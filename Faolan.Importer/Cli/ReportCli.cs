@@ -1202,6 +1202,9 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "feat-name-check":
+					return await FeatNameCheck(RdbDir());
+
 				case "ldb-strings" when (arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase):
 				{
 					// `id:<text>` searches by VALUE; `id:#<number>` searches by the id itself. The second is what tells
