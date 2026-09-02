@@ -105,15 +105,27 @@ residue that is in none of them, and they are candidates for a gap, not proof of
   (Desecreation, Rejuvenanting Spirit, Copper Strom Chains), some a different name entirely (Improved Discipline
   vs Improved Fire Weave), some a `Spell -` vs `Ability -` prefix. Most likely a build difference.
 
-⚠️ The middle group is the one worth chasing, because "Don" is not a plausible feat name — but it is **not** a
-blanket apostrophe bug, and that is what makes it interesting. Six feat names in the shipped data keep their
-ASCII apostrophe intact (`Nature's Revenge`, `Winter's Bite`, `Set's Entrapment`, `Serpent's Twist`,
-`Set's Empowerment`, `Set's Brutal Storm`), so whatever cuts the other fourteen is record-dependent, not a
-character filter. `RdbFeatImporter.ReadNameAndDescription` scans for the first offset whose `(nameLen, descLen)`
-pair looks plausible and both strings decode as printable, which is exactly the shape that can lock onto a
-premature match — but the client is the arbiter, and our build may simply ship the shorter names. Open work
-tracked in Gitea #925, which also records that `Idol of Set` covers two distinct feats and so collapses two
-identities onto one string.
+⭐ **SETTLED (#925, closed): our build genuinely ships the short names.** This looked like a decode fault — "Don"
+is not a plausible feat name — and it is not one. Scanning RDB type 1000020, the type holding feat templates
+(98,048 records, both Latin-1 and UTF-16LE):
+
+| needle | records found |
+|---|---|
+| `Devourer's Might` | 0 — absent |
+| `At Death's Door` | 0 — absent |
+| `Don't Fear the Reaver` | 0 — absent |
+| `Nature's Revenge` *(control)* | 1 |
+
+The control carries the point: `Nature's Revenge` has an ASCII apostrophe and IS found, so the scan can match
+apostrophe-bearing names and the long forms are genuinely not in the data. The raw record confirms it — the name
+runs straight into its description with nothing between: `…Devourer` `Improves the damage done by the A Soul for
+our Feast and Leech Life comb…`. `RdbFeatImporter.ReadNameAndDescription` read it correctly.
+
+So the fourteen are a **build difference**: the planner is built on a later client than ours. That is corroborated
+by the two level-only differences above, which is what a balance pass looks like. `Idol of Set` on two feats is
+likewise not a collision we introduced — both carry that name in our build.
+
+⛔ Do not "fix" these names. Changing them would move our data away from the client we ship against.
 
 ## Reproducing
 
