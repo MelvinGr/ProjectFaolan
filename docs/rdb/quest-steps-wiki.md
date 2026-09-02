@@ -13,29 +13,39 @@ ways any wiki is wrong.
 
 ## What is in it
 
-552 quest pages, of which **481 carry an ordered step list — 1,145 steps in total**.
+**566 quest pages, of which 491 carry an ordered step list — 1,160 steps in total.** Each record carries a
+`discovery` field saying how it was found, because the two routes have different coverage guarantees:
 
-⚠️ **Those 552 are every page that follows the wiki's quest conventions — not every quest page on the wiki.**
-Two independent enumerations agree exactly on the 552 (519 mainspace pages titled `Quest:*`, 494 pages in the
-21-category quest tree, union 552, identical to what was scraped, zero missed and zero extra). But a page that
-is titled plainly, sits in no quest category and carries no `{{Infobox Quest}}` is invisible to all of them, and
-such pages exist: of the 196 existing pages linked from the six zone indexes, **28 are outside the scrape and 12
-of those carry quest content** — an `Objectives` section and/or `Chapter I.` / `I:` step headings (*Trapping
-Spirits*, *Battling For Resources*, *The River Pirates*, *Stygian Superstitions*, *The Roots of the Earth*,
-*Wanted! Death Master Raiders*, *The Explorer*, *Rotten Molars*, *Ingredient Hunt*, *From Earth to Dust*,
-*A Message from Paikang*, *Heart of Atali*). The other 16 are zones, NPCs or redirects.
+* **`convention` (552)** — the pages that follow the wiki's own quest conventions. Two independent enumerations
+  agree exactly on this set: 519 mainspace pages titled `Quest:*`, 494 pages in the 21-category quest tree,
+  union 552.
+* **`sweep` (14)** — quest pages that follow *none* of those conventions: plainly titled, in no quest category,
+  no `{{Infobox Quest}}`. They were found by reading **all 5,793 mainspace pages** and classifying on structure
+  alone (an `Objectives` / `Journal Entry` / roman-or-chapter step heading / `Reward` section), ignoring title,
+  category and infobox entirely.
 
-So the floor on the gap is 12, and there is **no upper bound** yet: that check only covered pages the six zone
-indexes link. Anything in the same shape elsewhere on the wiki is still uncounted.
+⚠️ **The first pass claimed its discovery was "closed by four independent passes that converged". That was
+wrong, and the convergence was the tell rather than the proof** — all four keyed on the same three conventions,
+so a page following none of them was invisible to all of them and their agreement said nothing about it. The
+sweep is what actually bounds the gap, and it bounds it at 14.
 
-⚠️ Separately, the wiki's own indexes list far more quests than it documents: those six pages link **754**
-distinct quest titles of which only **196 exist** — 558 are red links.
+The sweep's own recall was calibrated rather than assumed: run against the known 552, the structural markers
+light up 487 and miss 43 — and those 43 are exactly the `prose_only` / crafting-stub records that carry no
+structure by construction. Four further recall passes (weak tells such as `XP:` and objective counters, a scored
+heuristic, the index-page and `{{quest}}` link targets, and a census of all 96 `*Quest*` categories) found
+nothing beyond the 14.
+
+⛔ The limit that remains, stated plainly: a quest page that states **no** objective, reward or step anywhere is
+still invisible, because there is nothing structural left to match on.
+
+⚠️ Separately, the wiki's own indexes list far more quests than it documents: the six zone index pages link
+**754** distinct quest titles of which only **196 exist** — 558 are red links.
 
 | `parse_status` | pages | meaning |
 |---|---:|---|
-| `steps_found` | 481 | an ordered step list was parsed |
+| `steps_found` | 491 | an ordered step list was parsed |
 | `prose_only` | 31 | free prose, no structured objectives (mostly crafting/recipe grants) |
-| `objectives_only` | 25 | the infobox objective list and nothing else |
+| `objectives_only` | 29 | the objective list and nothing else |
 | `index_page` | 8 | a hub/listing page, not a quest |
 | `variant_hub` | 5 | points only at per-class or per-race variants |
 | `no_steps_section` / `empty` | 1 / 1 | |
@@ -54,13 +64,13 @@ part the wiki uniquely adds.
 A wiki **page** is one of our **`QuestLine`** rows; a wiki **step** is one of our **`QuestDefinition`** rows —
 the three-level model is set out in
 [`../subsystems/quests.md`](../subsystems/quests.md). Matching page titles against `QuestDefinition.Name`
-therefore compares a chain name against a step name, which looks like near-total disjointness — only 25 of 552 —
+therefore compares a chain name against a step name, which looks like near-total disjointness — only 25 of the 552 —
 and that reading is wrong. Against `QuestLines.Name` (with the leading `[Zone]` / `[NPE]` / `[Destiny …]` tag
 stripped):
 
 | | pages |
 |---|---:|
-| matched one of our 2,130 named quest lines | **442** of 552 |
+| matched one of our 2,130 named quest lines | **451** of 566 |
 | …and the step titles equal our member quest names, **in order** | **286** |
 | …matched, but the step list differs | 141 |
 | unmatched | 110 |
@@ -94,11 +104,11 @@ Of the 52 differences across the `[NPE]` and `[Destiny …]` lines:
   variant, all titled e.g. *The Awakening I*, so a Rogue page gets compared against the Mage line. Any real check
   of the class Destiny chains has to disambiguate on class first.
 
-⚠️ Two fields remain close to useless as shipped: `prerequisite` is filled on exactly **one** page of 552, so
-chains are only walkable *forwards* via `next_quest` (149 pages); and `level` is present on 170 of 552, `zone`
+⚠️ Two fields remain close to useless as shipped: `prerequisite` is filled on exactly **one** page of the 552, so
+chains are only walkable *forwards* via `next_quest` (149 pages); and `level` is present on 170 of the 552, `zone`
 null on 111.
 
-⚠️ Coverage is still small in absolute terms — 552 pages against our 5,049 client-derived quests, and the wiki's
+⚠️ Coverage is still small in absolute terms — 566 pages against our 5,049 client-derived quests, and the wiki's
 own zone indexes link far more quests than have pages. A quest absent from the wiki means nothing about our data.
 
 ## Verifying every quest line against it
@@ -109,18 +119,18 @@ wiki verdict, flags).
 
 | wiki verdict | lines | |
 |---|---:|---|
-| `no-wiki-page` | 1,799 | the wiki does not document it — says nothing either way |
-| `exact` | 279 | step titles identical to our member quests, in order |
-| `mismatch` | 68 | see below — all wiki-side |
+| `no-wiki-page` | 1,794 | the wiki does not document it — says nothing either way |
+| `exact` | 281 | step titles identical to our member quests, in order |
+| `mismatch` | 70 | see below — all wiki-side |
 | `wiki-omits-turn-in` | 22 | its list is a prefix of ours, missing the closing *Return to X* |
 | `minor-text-diff` | 16 | a word or spelling apart |
-| `wiki-page-has-no-steps` | 15 | stub page |
+| `wiki-page-has-no-steps` | 16 | stub page |
 | `same-steps-order-differs` | 11 | same set, different order |
 
 ⭐ **The wiki contradicts our data in zero cases.** Every apparent disagreement resolves into one of two things,
 and neither is a defect on our side:
 
-* the 68 `mismatch` rows are wiki-side noise — step headings that did not parse and came out blank, wiki typos
+* the 70 `mismatch` rows are wiki-side noise — step headings that did not parse and came out blank, wiki typos
   (`Disembowling` for our `Disembowelling`, `Bartholmo` for `Bartholomo`), a `Completion` pseudo-step the wiki
   appends, and **class-name collisions**: the wiki has one page per class all titled e.g. *The Awakening I*, so a
   Priest page can be scored against the Warrior line. Disambiguate on class before reading anything into those.

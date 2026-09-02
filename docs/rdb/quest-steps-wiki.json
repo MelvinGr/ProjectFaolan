@@ -7,20 +7,33 @@
   "method": "recursive walk of Category:Quests and its 20 subcategories, plus an allpages prefix sweep of mainspace 'Quest:' titles, plus Template:Infobox Quest transclusions, plus links from the area index pages",
   "categories_walked": 21,
   "infobox_transclusions": 482,
-  "pages_discovered": 552
+  "pages_discovered": 552,
+  "sweep_method": "full mainspace sweep: action=query&list=allpages (namespace 0, non-redirects) -> raw wikitext for every page -> classify by STRUCTURE (Objectives/Objective heading, Journal Entry heading, roman/chapter step headings, Reward heading, mmodb quest table), independent of title, category or infobox",
+  "sweep_pages_examined": 5793,
+  "sweep_pages_discovered": 14,
+  "pages_discovered_total": 566,
+  "provenance_field": "every record carries discovery: 'convention' (original 552) or 'sweep' (found by the structural sweep)"
  },
  "counts": {
-  "pages": 552,
-  "with_steps": 481,
-  "total_steps": 1145,
+  "pages": 566,
+  "pages_by_discovery": {
+   "convention": 552,
+   "sweep": 14
+  },
+  "with_steps": 491,
+  "total_steps": 1160,
   "parse_status": {
-   "steps_found": 481,
+   "steps_found": 491,
    "prose_only": 31,
-   "objectives_only": 25,
+   "objectives_only": 29,
    "index_page": 8,
    "variant_hub": 5,
    "empty": 1,
    "no_steps_section": 1
+  },
+  "sweep_parse_status": {
+   "steps_found": 10,
+   "objectives_only": 4
   }
  },
  "schema": {
@@ -43,14 +56,15 @@
   },
   "infobox_objectives": "ordered objective summary from the infobox |objective= field",
   "steps": "ORDERED list of quest steps; see step schema",
-  "notes": "page-level ==Notes== bullets",
+  "notes": "page-level ==Notes== bullets (populated on sweep-discovered records only)",
   "overview": "page ==Overview== prose",
   "page_text": "whole-page prose, only for pages that yielded no steps",
   "variant_pages": "linked Quest: pages (class/race variants) when the page is a hub",
   "redirect_to": "resolved redirect target when the requested title redirected",
   "categories": "wiki categories on the page",
   "revision_timestamp": "timestamp of the revision scraped",
-  "parse_status": "steps_found | objectives_only | prose_only | no_steps_section | variant_hub | index_page | empty | redirect | missing"
+  "parse_status": "steps_found | objectives_only | prose_only | no_steps_section | variant_hub | index_page | empty | redirect | missing",
+  "discovery": "'convention' = found by the original title/category/infobox scrape; 'sweep' = found by the full-mainspace structural sweep"
  },
  "step_schema": {
   "index": "1-based order on the page",
@@ -73,7 +87,10 @@
   "level is present on 170 of 552 pages; the infobox |levelreq= field is usually left blank.",
   "Wiki area index pages link many quests that have no page at all (e.g. Quests: Aquilonia lists 313 links of which 73 exist), so this is the wiki's coverage, not the game's full quest set.",
   "Wiki-side duplicates are preserved as separate records (e.g. 'Traveling Home'/'Travelling Home', 'The Pic Threat'/'The Pict Threat'); dedup key is page_title.",
-  "No content is inferred: every field is read off the page, and gaps are null rather than guessed."
+  "No content is inferred: every field is read off the page, and gaps are null rather than guessed.",
+  "A second pass swept all 5,793 non-redirect mainspace pages and classified them by wikitext STRUCTURE rather than by title/category/infobox; it added 14 pages the conventions could not see (plain-layout pages with no 'Quest:' prefix, no quest category and no infobox). Every record carries a `discovery` field so the two populations stay separable.",
+  "Sweep-discovered pages use plainer layouts: roman step headings (== I. Title == / == I: Title == / ==== Chapter I. ====), a flat ==Objectives==/==Rewards== shape with no steps at all (recorded as parse_status objectives_only, objectives in infobox_objectives), one mmodb-scraped table page, and one page whose roman step labels are body text rather than headings.",
+  "The sweep's structural test cannot see a quest page that states no objective, reward or step anywhere - the same blind spot the original scrape had for pages carrying only prose."
  ],
  "content_note": "Structure only. The per-step 'journal' narrative and page 'overview' prose were dropped: that text is Funcom's, and the emulator already sources journal text from the client's own records - keeping a second transcription would duplicate it and add a rival source of truth. What is kept is what the wiki uniquely adds: the ORDERED step decomposition, objectives, rewards and chain links.",
  "quests": [
@@ -143,7 +160,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Bright Idea",
@@ -206,7 +224,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "A Brother's Vengeance",
@@ -248,7 +267,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Brother's Vengeance",
@@ -317,7 +337,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Corpse Far From Home",
@@ -380,7 +401,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Daughter's Revenge",
@@ -452,7 +474,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Deadly Contract",
@@ -517,7 +540,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Deadly Message",
@@ -585,7 +609,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Dirge for the Dead",
@@ -611,7 +636,8 @@
    "categories": [],
    "revision_timestamp": "2020-05-29T16:40:19Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Discerning Eye",
@@ -674,7 +700,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Fishy Future",
@@ -743,7 +770,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Fools Dream",
@@ -807,7 +835,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "A Harrowing Journey",
@@ -865,7 +894,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Harrowing Journey",
@@ -932,7 +962,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Hot Day",
@@ -998,7 +1029,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Lesson Learned",
@@ -1069,7 +1101,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Matter of Pride",
@@ -1135,7 +1168,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Message for Cul",
@@ -1195,7 +1229,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Missing Filly",
@@ -1275,7 +1310,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Name to Die For",
@@ -1341,7 +1377,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "A Name to Die For",
@@ -1383,7 +1420,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Needle of Truth",
@@ -1485,7 +1523,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Pinch of Salt",
@@ -1560,7 +1599,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Queen's Carapace",
@@ -1631,7 +1671,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Question of Conscience",
@@ -1699,7 +1740,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Rare Delicacy",
@@ -1767,7 +1809,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Refugee's Tale",
@@ -1881,7 +1924,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "A Sense of Fasion",
@@ -1921,7 +1965,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Special Request",
@@ -2011,7 +2056,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Token of Trust",
@@ -2063,7 +2109,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Vision from Set",
@@ -2135,7 +2182,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Vote's Worth",
@@ -2352,7 +2400,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:A Woman's Scorn",
@@ -2426,7 +2475,8 @@
       "Again, Vesta is inside the Sailor's Den, not outside it."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Abandoned in the Halls of Fear",
@@ -2475,7 +2525,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Assassin Canvas Cloth Set",
@@ -2499,7 +2550,8 @@
    "categories": [],
    "revision_timestamp": "2010-04-05T18:50:55Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Bloodsilver-ring Set",
@@ -2523,7 +2575,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:15:48Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Gems",
@@ -2547,7 +2600,8 @@
    "categories": [],
    "revision_timestamp": "2011-08-02T17:56:39Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Long Bloodsilver Studded Set",
@@ -2571,7 +2625,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:11:44Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Long Tanned Leather Set",
@@ -2595,7 +2650,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T10:58:34Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Quilted Cloth Set",
@@ -2619,7 +2675,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:34:24Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Short Bloodsilver-Studded Set",
@@ -2643,7 +2700,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-10T12:29:38Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Advanced Short Tanned Leather Set",
@@ -2667,7 +2725,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-12T01:09:25Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Aelfrith's Camp",
@@ -2717,7 +2776,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:All That Remains",
@@ -2741,7 +2801,8 @@
    "categories": [],
    "revision_timestamp": "2008-07-06T09:43:39Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:An Impending Attack",
@@ -2813,7 +2874,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ancient Weapons",
@@ -2877,7 +2939,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Anuket Spring Water",
@@ -2940,7 +3003,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Appetite of the Wolf",
@@ -3026,7 +3090,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ardashir Arena",
@@ -3106,7 +3171,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ash",
@@ -3164,7 +3230,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Azusena's Revenge",
@@ -3241,7 +3308,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Band of Bandits",
@@ -3303,7 +3371,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Assassin Canvas Cloth Set",
@@ -3327,7 +3396,8 @@
    "categories": [],
    "revision_timestamp": "2010-04-05T18:50:11Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Bloodsilver-ring Set",
@@ -3351,7 +3421,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:19:29Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Canvas Cloth Set",
@@ -3375,7 +3446,8 @@
    "categories": [],
    "revision_timestamp": "2011-09-21T21:48:09Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Gems",
@@ -3399,7 +3471,8 @@
    "categories": [],
    "revision_timestamp": "2011-07-31T19:47:24Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Long Bloodsilver Studded Set",
@@ -3423,7 +3496,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:07:52Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Long Tanned Leather Set",
@@ -3447,7 +3521,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T23:46:38Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Quilted Cloth Set",
@@ -3471,7 +3546,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-28T11:30:36Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Short Bloodsilver Mail Set",
@@ -3495,7 +3571,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-02T11:17:57Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Short Bloodsilver Studded Set",
@@ -3519,7 +3596,8 @@
    "categories": [],
    "revision_timestamp": "2008-07-04T18:25:25Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Basic Short Tanned Leather Set",
@@ -3543,7 +3621,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-10T01:32:09Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Beginner Gems",
@@ -3569,7 +3648,8 @@
    ],
    "revision_timestamp": "2011-07-31T19:47:52Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Black Silver",
@@ -3629,7 +3709,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blinding the Enemy",
@@ -3695,7 +3776,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blinding the Hill's Eyes",
@@ -3779,7 +3861,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blood and Sweat",
@@ -3830,7 +3913,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blood and Sweat (Aquilonian)",
@@ -3878,7 +3962,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blood and Venom",
@@ -3942,7 +4027,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Blood of the Serpent",
@@ -4006,7 +4092,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodroot",
@@ -4102,7 +4189,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Awl Pike",
@@ -4133,7 +4221,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:48:57Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Ball Mace and Bloodsilver Great Hammer",
@@ -4165,7 +4254,8 @@
    ],
    "revision_timestamp": "2008-06-12T17:58:46Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Decurve Bow",
@@ -4196,7 +4286,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:51:12Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Decurve Crossbow",
@@ -4227,7 +4318,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:51:43Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Flat Bow",
@@ -4258,7 +4350,8 @@
    ],
    "revision_timestamp": "2008-06-12T18:12:55Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Heavy Crossbow",
@@ -4289,7 +4382,8 @@
    ],
    "revision_timestamp": "2008-06-12T18:15:28Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Mace and Bloodsilver Heavy Bludgeon",
@@ -4321,7 +4415,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:52:34Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Partisan",
@@ -4352,7 +4447,8 @@
    ],
    "revision_timestamp": "2008-06-12T18:18:50Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Poignard",
@@ -4383,7 +4479,8 @@
    ],
    "revision_timestamp": "2008-06-12T18:24:30Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Pugio",
@@ -4414,7 +4511,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:55:47Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Throwing Dagger",
@@ -4445,7 +4543,8 @@
    ],
    "revision_timestamp": "2008-06-12T18:26:52Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Bloodsilver Throwing Knife",
@@ -4476,7 +4575,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:58:28Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Breaking the Black Ring",
@@ -4540,7 +4640,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Breaking the Bones",
@@ -4606,7 +4707,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Breaking the Spell",
@@ -4677,7 +4779,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Brethren of Bone",
@@ -4714,7 +4817,8 @@
    ],
    "revision_timestamp": "2011-05-12T17:09:34Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Brindled Leather",
@@ -4774,7 +4878,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Butchering the Weak",
@@ -4844,7 +4949,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:By the Light of the Moon",
@@ -5113,7 +5219,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: Caged Animals",
@@ -5229,7 +5336,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Caged Animals",
@@ -5345,7 +5453,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Captives of the White Hand",
@@ -5369,7 +5478,8 @@
    "categories": [],
    "revision_timestamp": "2013-03-29T03:31:12Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Casilda",
@@ -5465,7 +5575,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Caught in the Shadows",
@@ -5634,7 +5745,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Chaos in the Fortress",
@@ -5691,7 +5803,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Cimmerian Blue Steel",
@@ -5773,7 +5886,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Clans at War",
@@ -5821,7 +5935,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Cleansing the Tomb",
@@ -5890,7 +6005,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Clear Quartz",
@@ -5950,7 +6066,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Clearing the Ridge",
@@ -6016,7 +6133,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Commander Ramartarsi",
@@ -6080,7 +6198,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Common Gems",
@@ -6104,7 +6223,8 @@
    "categories": [],
    "revision_timestamp": "2011-07-31T20:07:49Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Complex Gem Cuts",
@@ -6128,7 +6248,8 @@
    "categories": [],
    "revision_timestamp": "2011-08-02T18:00:37Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Conflicting Interest",
@@ -6198,7 +6319,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Copper",
@@ -6256,7 +6378,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Silver",
@@ -6314,7 +6437,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Cotton",
@@ -6372,7 +6496,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Crimes of Passion",
@@ -6435,7 +6560,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Crom's Champion",
@@ -6482,7 +6608,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Crude Accessories",
@@ -6506,7 +6633,8 @@
    "categories": [],
    "revision_timestamp": "2008-06-20T16:43:53Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Curing the Sick",
@@ -6587,7 +6715,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Dead Meat",
@@ -6629,7 +6758,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Dead Meat",
@@ -6698,7 +6828,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Death to Renato Savill",
@@ -6757,7 +6888,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Death to the Black Dragon",
@@ -6809,7 +6941,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Death to the Vanir",
@@ -6870,7 +7003,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Defeating Iceblade",
@@ -6944,7 +7078,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Deafeating Iceblade",
@@ -7014,7 +7149,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Deiric's Sacrifice",
@@ -7077,7 +7213,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Demicus and Naboth",
@@ -7129,7 +7266,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Demicus' Experiment",
@@ -7199,7 +7337,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Dark Beast Repellant",
@@ -7269,7 +7408,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Den of No Return",
@@ -7351,7 +7491,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Desert Courier",
@@ -7423,7 +7564,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Desert Raiders",
@@ -7478,7 +7620,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Desert Scorpion Armor",
@@ -7551,7 +7694,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Venomous Reduction",
@@ -7623,7 +7767,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Distant Lands",
@@ -7678,7 +7823,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Doing Your Part",
@@ -7751,7 +7897,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Domicile of Vileness",
@@ -7820,7 +7967,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Dry Times",
@@ -7862,7 +8010,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Dry Times",
@@ -7960,7 +8109,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ebon Ash",
@@ -8020,7 +8170,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Elina's Father",
@@ -8066,7 +8217,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Emerald Eyes",
@@ -8129,7 +8281,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Empty Reserves",
@@ -8202,7 +8355,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Empty Reserves",
@@ -8248,7 +8402,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Empty Stalls",
@@ -8316,7 +8471,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Empty Stalls",
@@ -8386,7 +8542,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ending the Threat",
@@ -8452,7 +8609,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Dousing the Fire",
@@ -8518,7 +8676,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Enslaved",
@@ -8586,7 +8745,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Entourage",
@@ -8650,7 +8810,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Entry Permit for Kaloush",
@@ -8715,7 +8876,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Every Strong Arm",
@@ -8763,7 +8925,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Exoskeleton",
@@ -8831,7 +8994,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Eye for an Eye",
@@ -8900,7 +9064,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Eyes of the Raven",
@@ -8950,7 +9115,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fabio's Predicament",
@@ -9034,7 +9200,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Famian's Greedy Scheme",
@@ -9086,7 +9253,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Family Matters",
@@ -9150,7 +9318,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fangs of the Ferocious",
@@ -9219,7 +9388,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fanning the Flames",
@@ -9285,7 +9455,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Far Off Illicit Trade",
@@ -9350,7 +9521,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fascinating Faces",
@@ -9427,7 +9599,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fear of the Demon",
@@ -9509,7 +9682,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Feast of Wyrmlings",
@@ -9582,7 +9756,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Feathers for Quills",
@@ -9654,7 +9829,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Feeding the Hungry",
@@ -9786,7 +9962,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fending off Enemies",
@@ -9851,7 +10028,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fetching Fungi",
@@ -9906,7 +10084,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Find Hakar-Tep",
@@ -9972,7 +10151,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Finding your Feet",
@@ -10030,7 +10210,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fire for the Dead",
@@ -10100,7 +10281,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Flaying Zarathus",
@@ -10163,7 +10345,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Fleet of Mouth",
@@ -10229,7 +10412,8 @@
       "Be fast on the keys: The timer for your quest starts the moment you accept it! You'll have one minute to reach each of the waypoints, so don't tarry."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Forbidden Knowledge",
@@ -10295,7 +10479,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Forgotten Treasure",
@@ -10382,7 +10567,8 @@
       "The Cartographer is located within Nakaset Village around location 1155, 1100."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Foundations of Trust",
@@ -10464,7 +10650,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Frostblood's Camp",
@@ -10540,7 +10727,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gaining Strength I (Rogue)",
@@ -10590,7 +10778,8 @@
       "For Soldier archetypes, the trainer is Sigurd."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gaining Strength I",
@@ -10640,7 +10829,8 @@
       "For Soldier archetypes, the trainer is Sigurd."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gaining Strength II (Rogue)",
@@ -10687,7 +10877,8 @@
       "For Soldier archetypes, the trainer is Sigurd."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gaining Strength II",
@@ -10734,7 +10925,8 @@
       "For Soldier archetypes, the trainer is Sigurd."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Garden of Cursed Mysteries",
@@ -10803,7 +10995,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Garden of Cursed Mysteries",
@@ -10845,7 +11038,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gift from a Stranger",
@@ -10869,7 +11063,8 @@
    "categories": [],
    "revision_timestamp": "2015-08-27T21:56:36Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gold and Gore",
@@ -10937,7 +11132,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: Gone with the Wine",
@@ -11008,7 +11204,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Gone with the Wine",
@@ -11076,7 +11273,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Gone with the Wine",
@@ -11120,7 +11318,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Grave Invite",
@@ -11187,7 +11386,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Green Yolk",
@@ -11249,7 +11449,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Hawkeye",
@@ -11318,7 +11519,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Heads Will Roll",
@@ -11384,7 +11586,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Heady Kaphil Liquor",
@@ -11457,7 +11660,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Helping the Settlement",
@@ -11506,7 +11710,8 @@
       "The quest item, Wolf Tails, are given by Cavan as a result of finishing the quest, The Wolf Menace."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Herbal Vitality",
@@ -11553,7 +11758,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Herbs in Villa Amiel",
@@ -11613,7 +11819,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Hethlon's Vanished Wife",
@@ -11681,7 +11888,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Holding Fear at Bay",
@@ -11753,7 +11961,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Horror Beneath the Surface",
@@ -11823,7 +12032,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Hunting for Valoz",
@@ -11895,7 +12105,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Hunting the Settites",
@@ -11965,7 +12176,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ibis, Master of Hidden Secrets",
@@ -12049,7 +12261,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Will and a Last Meal",
@@ -12137,7 +12350,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ill Will and a Last Meal",
@@ -12225,7 +12439,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Illuminating the Darkness",
@@ -12307,7 +12522,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Immortal Acheron",
@@ -12374,7 +12590,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:In Defense of Beauty",
@@ -12449,7 +12666,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:In the Service of King Conan",
@@ -12526,7 +12744,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Into the Fire",
@@ -12580,7 +12799,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Invading the Supply Camp",
@@ -12652,7 +12872,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Juan's Apprentice",
@@ -12702,7 +12923,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Junia's Revenge",
@@ -12744,7 +12966,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Junia's Revenge",
@@ -12812,7 +13035,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Kaylee's Bastard",
@@ -12914,7 +13138,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Keeping the Hunter's Word",
@@ -12962,7 +13187,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Keep the Hunter's Word",
@@ -13010,7 +13236,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Keeping the Village Safe",
@@ -13065,7 +13292,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Kern Wolfeye",
@@ -13130,7 +13358,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lady of Villa Verde",
@@ -13196,7 +13425,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Letter to the King I",
@@ -13313,7 +13543,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Letter to the King I (Rogue)",
@@ -13430,7 +13661,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Letter to the King II",
@@ -13528,7 +13760,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Letter to the King II (Rogue)",
@@ -13626,7 +13859,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lieutenant Rhor",
@@ -13688,7 +13922,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lieutenants Haken, Karras & Vorr",
@@ -13754,7 +13989,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Life and Death",
@@ -13824,7 +14060,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lifting the Curse",
@@ -13848,7 +14085,8 @@
    "categories": [],
    "revision_timestamp": "2009-06-04T14:15:55Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lord Atum-Keket",
@@ -13931,7 +14169,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Lost in the Desert",
@@ -13995,7 +14234,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Love of an Outcast",
@@ -14058,7 +14298,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Markers of the Lost Tomb",
@@ -14114,7 +14355,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Master of Gargoyles",
@@ -14157,7 +14399,8 @@
       "Excorant's Collossus is the second boss in Wing 1 called Yaremka."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Melanor's Star",
@@ -14221,7 +14464,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Message from Khemi",
@@ -14284,7 +14528,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Minions of the Living Stone",
@@ -14327,7 +14572,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Mitra's Children",
@@ -14393,7 +14639,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Crowbill and Moonsteel War Mace",
@@ -14425,7 +14672,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:47Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Glaive",
@@ -14456,7 +14704,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:23Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Katar",
@@ -14487,7 +14736,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:15Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Recurve Bow",
@@ -14518,7 +14768,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:41Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Recurve Crossbow",
@@ -14549,7 +14800,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:35Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Moonsteel Throwing Knife",
@@ -14580,7 +14832,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:41:02Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Nemedian Envoy",
@@ -14640,7 +14893,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Power of the Seasons",
@@ -14713,7 +14967,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Nightmares of Flame",
@@ -14764,7 +15019,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Nightshade Purgative",
@@ -14821,7 +15077,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Noble Valuables",
@@ -14883,7 +15140,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Nobles of Tarantia",
@@ -14949,7 +15207,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Obtaining the Noble Arena Key",
@@ -15033,7 +15292,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Obtaining the Noble Arena Key",
@@ -15117,7 +15377,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Octavia's Fate",
@@ -15183,7 +15444,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Of Rotting Flesh",
@@ -15255,7 +15517,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Of Rotting Flesh",
@@ -15299,7 +15562,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Old Man Gormley",
@@ -15381,7 +15645,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Old Secrets",
@@ -15501,7 +15766,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Order Silks in Poitain",
@@ -15549,7 +15815,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Orders from Kylikki",
@@ -15606,7 +15873,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Oris' Overture",
@@ -15675,7 +15943,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ossian's Odyssey",
@@ -15699,7 +15968,8 @@
    "categories": [],
    "revision_timestamp": "2010-06-29T12:11:42Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Paetus & the Nemedian Crown",
@@ -15767,7 +16037,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Paetus & the Nemedian Crown II",
@@ -15835,7 +16106,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Paetus & the Nemedian Crown III",
@@ -15900,7 +16172,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Paetus & the Nemedian Crown IIII",
@@ -15972,7 +16245,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Path of the Pirate",
@@ -16014,7 +16288,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Path of the Pirate",
@@ -16096,7 +16371,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Patrolling the Wastes",
@@ -16148,7 +16424,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Pieces of Peace",
@@ -16229,7 +16506,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Plundering the Prowlers",
@@ -16298,7 +16576,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Poisoned Arrows",
@@ -16370,7 +16649,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Pool of Black Blood",
@@ -16445,7 +16725,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Pools of Darkness",
@@ -16515,7 +16796,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Proof of Raiders",
@@ -16588,7 +16870,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Protecting the Flock",
@@ -16662,7 +16945,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Prove Your Worth",
@@ -16732,7 +17016,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Prowling the Pack Leaders",
@@ -16784,7 +17069,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Public Entertainment License",
@@ -16849,7 +17135,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Queen of Punishment",
@@ -16912,7 +17199,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quests",
@@ -16938,7 +17226,8 @@
    ],
    "revision_timestamp": "2024-12-28T20:19:00Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quests: Aquilonia",
@@ -17032,7 +17321,8 @@
    ],
    "revision_timestamp": "2026-06-25T17:55:28Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quests: Turan",
@@ -17060,7 +17350,8 @@
    ],
    "revision_timestamp": "2015-09-25T20:58:18Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rage of the Ape God",
@@ -17122,7 +17413,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rahim & Lord Camillus",
@@ -17182,7 +17474,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Raiders from Hell",
@@ -17259,7 +17552,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Reaching Out",
@@ -17314,7 +17608,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Red Hand Death",
@@ -17360,7 +17655,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Red Snow",
@@ -17452,7 +17748,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Refuge for Outsiders",
@@ -17509,7 +17806,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Remains of a Bygone Age",
@@ -17573,7 +17871,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Repeatable quests",
@@ -17601,7 +17900,8 @@
    ],
    "revision_timestamp": "2008-09-02T20:49:33Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Restless Spirits",
@@ -17664,7 +17964,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rogue Trader",
@@ -17739,7 +18040,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Roots of Evil",
@@ -17826,7 +18128,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rotten Molars",
@@ -17876,7 +18179,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rough Leather",
@@ -17934,7 +18238,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Ruins and Demise",
@@ -18143,7 +18448,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Rusty Courage",
@@ -18210,7 +18516,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Salt for Silver",
@@ -18276,7 +18583,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Sandstone",
@@ -18334,7 +18642,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Save the Princess",
@@ -18397,7 +18706,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Scavenging for Provisions",
@@ -18463,7 +18773,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Scorpion Archer Armor",
@@ -18531,7 +18842,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Sealed in the Blood of Set",
@@ -18601,7 +18913,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Searching for Answers",
@@ -18677,7 +18990,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Securing the Caravan Route",
@@ -18750,7 +19064,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Seeds of Desire",
@@ -18818,7 +19133,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Sense of Fashion",
@@ -18889,7 +19205,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Settling for Half",
@@ -18936,7 +19253,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Seven Years",
@@ -19034,7 +19352,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Shady Deliveries",
@@ -19085,7 +19404,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Shipwrecked",
@@ -19254,7 +19574,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Skeggi's Fish",
@@ -19296,7 +19617,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Skeggi's Fish",
@@ -19362,7 +19684,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Skins of the Corrupted",
@@ -19457,7 +19780,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Skymetal Battle Crossbow",
@@ -19483,7 +19807,8 @@
    ],
    "revision_timestamp": "2009-05-18T06:46:06Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Slayer of Snakes",
@@ -19551,7 +19876,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Something of a Delicacy",
@@ -19619,7 +19945,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Spiced Wine",
@@ -19687,7 +20014,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Spirit of Acheron",
@@ -19755,7 +20083,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Stagnant Sewer Water",
@@ -19816,7 +20145,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Storming the Gate",
@@ -19886,7 +20216,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Strongarm Tactics",
@@ -19986,7 +20317,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Stygian Knowledge",
@@ -20034,7 +20366,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Stygian Superstitions",
@@ -20089,7 +20422,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Stygian Trading Permit",
@@ -20156,7 +20490,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Superior Gems",
@@ -20180,7 +20515,8 @@
    "categories": [],
    "revision_timestamp": "2011-08-05T21:49:50Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Supply and Demand",
@@ -20228,7 +20564,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Supply Routes",
@@ -20291,7 +20628,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Swallowing the Pride",
@@ -20363,7 +20701,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Swords",
@@ -20395,7 +20734,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:58:44Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Swords T1",
@@ -20427,7 +20767,8 @@
    ],
    "revision_timestamp": "2008-06-06T08:58:44Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Swords T2",
@@ -20459,7 +20800,8 @@
    ],
    "revision_timestamp": "2008-07-08T05:30:01Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Swords T3",
@@ -20491,7 +20833,8 @@
    ],
    "revision_timestamp": "2008-06-24T03:42:12Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tailored Tasks",
@@ -20560,7 +20903,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tale of Insanity",
@@ -20628,7 +20972,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tarantian Armorsmith",
@@ -20682,7 +21027,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tarisha's Sacrifice",
@@ -20875,7 +21221,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tarisha's Sorrow",
@@ -20944,7 +21291,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Aberration",
@@ -21037,7 +21385,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Abomination",
@@ -21093,7 +21442,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Albino Dark Beast",
@@ -21182,7 +21532,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Ancient Burial Mounds",
@@ -21268,7 +21619,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Aquilonian Bastard",
@@ -21316,7 +21668,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Architect's Challenge",
@@ -21340,7 +21693,8 @@
    "categories": [],
    "revision_timestamp": "2010-04-15T22:35:35Z",
    "parse_status": "empty",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Bear",
@@ -21403,7 +21757,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Gorilla",
@@ -21477,7 +21832,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Lion",
@@ -21550,7 +21906,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Mantis Man",
@@ -21625,7 +21982,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Panther",
@@ -21691,7 +22049,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Sabretooth",
@@ -21766,7 +22125,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Snow Leopard",
@@ -21838,7 +22198,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Swamp Demon",
@@ -21912,7 +22273,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Arena Tiger",
@@ -21986,7 +22348,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Assault Camp",
@@ -22055,7 +22418,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening I (Rogue)",
@@ -22169,7 +22533,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening I (Soldier)",
@@ -22378,7 +22743,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening I",
@@ -22412,7 +22778,8 @@
    ],
    "revision_timestamp": "2015-12-02T04:18:44Z",
    "parse_status": "variant_hub",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening I (Mage)",
@@ -22559,7 +22926,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: The Awakening I (Priest)",
@@ -22710,7 +23078,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening I (Priest)",
@@ -22861,7 +23230,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening II",
@@ -22894,7 +23264,8 @@
    ],
    "revision_timestamp": "2011-05-14T00:07:59Z",
    "parse_status": "variant_hub",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening II (Soldier)",
@@ -23045,7 +23416,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening II (Priest)",
@@ -23193,7 +23565,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening II (Mage)",
@@ -23338,7 +23711,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening II (Rogue)",
@@ -23482,7 +23856,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening III",
@@ -23514,7 +23889,8 @@
    ],
    "revision_timestamp": "2011-05-13T05:10:19Z",
    "parse_status": "variant_hub",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening III (Priest)",
@@ -23657,7 +24033,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening III (Mage)",
@@ -23786,7 +24163,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening III (Soldier)",
@@ -23916,7 +24294,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Awakening III (Rogue)",
@@ -24018,7 +24397,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Battle of Corvo",
@@ -24142,7 +24522,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Battle of Tortage",
@@ -24256,7 +24637,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Beastmaster of An-Sug",
@@ -24328,7 +24710,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Beaten Apprentice",
@@ -24396,7 +24779,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Bloodied Spear",
@@ -24442,7 +24826,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Bronze Serpent",
@@ -24486,7 +24871,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Burning Scars",
@@ -24550,7 +24936,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Captain's Warning",
@@ -24620,7 +25007,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Chef",
@@ -24686,7 +25074,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Cimmerian's Axe",
@@ -24752,7 +25141,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Corpse Devourers",
@@ -24814,7 +25204,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Curse",
@@ -24953,7 +25344,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Curse of Flies",
@@ -24999,7 +25391,8 @@
       "This quest is obtained in the Wild Lands of Zelata. The Acheronian Chest can be found by running up the steps behind Ur-Emnet, then across the bridge and down the steps to the right. There, follow the right-hand wall until a tunnel is reached and go through the tunnel, then to the right. It's location is approximately 1185,570."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Dark That Awaits",
@@ -25023,7 +25416,8 @@
    "categories": [],
    "revision_timestamp": "2013-03-30T04:21:50Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Demon in the Tree",
@@ -25160,7 +25554,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Downtrodden",
@@ -25232,7 +25627,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Elder Plans",
@@ -25294,7 +25690,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The End Battle",
@@ -25418,7 +25815,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Evil That Men Do",
@@ -25460,7 +25858,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Evil That Men do",
@@ -25532,7 +25931,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Evil That Men Do",
@@ -25604,7 +26004,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Eyes of the Dead",
@@ -25673,7 +26074,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Final Escape",
@@ -25738,7 +26140,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Fisherman's Dilemna",
@@ -25806,7 +26209,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Flow of Information",
@@ -25885,7 +26289,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Forgotten Temple",
@@ -25927,7 +26332,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Frenzied Arena Dark Beast",
@@ -26001,7 +26407,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Gambler's Gambit",
@@ -26099,7 +26506,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Giant Killings",
@@ -26172,7 +26580,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Gift of Healing",
@@ -26246,7 +26655,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Gravesinger",
@@ -26309,7 +26719,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Gravesinger's Voice",
@@ -26390,7 +26801,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Grim Grey God",
@@ -26460,7 +26872,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Halls of the Dead",
@@ -26528,7 +26941,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Hidden Cavern",
@@ -26583,7 +26997,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Hive Mind",
@@ -26630,7 +27045,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honest Man",
@@ -26700,7 +27116,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honoured Dead I",
@@ -26784,7 +27201,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honoured Dead II",
@@ -26868,7 +27286,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honoured Dead III",
@@ -26955,7 +27374,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honoured Dead IV",
@@ -27047,7 +27467,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Honured Dead of Cimmeria",
@@ -27087,7 +27508,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The huntress",
@@ -27174,7 +27596,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Journal of Un Nefer",
@@ -27249,7 +27672,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Killing Zone",
@@ -27323,7 +27747,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Lamb Becomes a Wolf",
@@ -27391,7 +27816,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Last Archive",
@@ -27568,7 +27994,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Last Hero",
@@ -27639,7 +28066,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Laughing Man",
@@ -27703,7 +28131,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Legendary Turach",
@@ -27815,7 +28244,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Legendary Turach",
@@ -27857,7 +28287,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Little Farmer",
@@ -27917,7 +28348,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Lost Bottles",
@@ -27988,7 +28420,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Lost Heirlooms of Kerkyra",
@@ -28064,7 +28497,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Lost License",
@@ -28112,7 +28546,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Love of a Countess",
@@ -28197,7 +28632,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Lurking Horror",
@@ -28284,7 +28720,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Magic Orb",
@@ -28436,7 +28873,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Minstrel and the Bandits",
@@ -28502,7 +28940,8 @@
       "Despite the quest telling you to \"return the crate of instruments to the minstrels at the tavern\", the minstrels are actually outside the western gate, not at any tavern."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: The Missing Cargo",
@@ -28574,7 +29013,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Missing Cargo",
@@ -28646,7 +29086,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Mitra Clergy",
@@ -28708,7 +29149,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Mongrel Menace",
@@ -28763,7 +29205,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Murderous Little Acolyte",
@@ -28835,7 +29278,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Nemedian Incursion",
@@ -28921,7 +29365,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The New Clan",
@@ -28990,7 +29435,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The New Threat",
@@ -29088,7 +29534,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Northern Pass",
@@ -29153,7 +29600,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Orphans in the Hovel",
@@ -29228,7 +29676,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Party",
@@ -29302,7 +29751,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Perils of Competition",
@@ -29359,7 +29809,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the East",
@@ -29469,7 +29920,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Phoenix of the North",
@@ -29495,7 +29947,8 @@
    "categories": [],
    "revision_timestamp": "2020-05-29T17:36:15Z",
    "parse_status": "no_steps_section",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the North",
@@ -29519,7 +29972,8 @@
    "categories": [],
    "revision_timestamp": "2013-03-30T04:25:30Z",
    "parse_status": "prose_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the South (Aquilonian)",
@@ -29626,7 +30080,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the South (Stygian)",
@@ -29731,7 +30186,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the South (Cimmerian)",
@@ -29839,7 +30295,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Phoenix of the South",
@@ -29872,7 +30329,8 @@
    ],
    "revision_timestamp": "2011-06-10T19:26:16Z",
    "parse_status": "objectives_only",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "The Pict Threat",
@@ -29914,7 +30372,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Pict Threat",
@@ -29982,7 +30441,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Pic Threat",
@@ -30024,7 +30484,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Prisoner's Revenge",
@@ -30096,7 +30557,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Rabbit Hunter",
@@ -30146,7 +30608,8 @@
       "Speak to Zefat the Animal Merchant in the Souk in Khemi and convince him to send the poison to Cimmeria."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Raided Tomb",
@@ -30264,7 +30727,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:(31) The Raided Tomb",
@@ -30382,7 +30846,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The River Pirates",
@@ -30431,7 +30896,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Roots of the Earth",
@@ -30497,7 +30963,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Sands of Time",
@@ -30547,7 +31014,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Satiated Serpent",
@@ -30663,7 +31131,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: The Satiated Serpent",
@@ -30779,7 +31248,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Scholar's Pages",
@@ -30855,7 +31325,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Shadow Brotherhood",
@@ -30901,7 +31372,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: The Sigil of Set",
@@ -30955,7 +31427,8 @@
       "The corpse is at 861, 1198\n\nThe Sigil of Set\nThe Sigil of Set\nThe Sigil of Set"
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Sigil of Set",
@@ -31009,7 +31482,8 @@
       "The corpse is at 861, 1198\n\nThe Sigil of Set\nThe Sigil of Set\nThe Sigil of Set"
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Silver Atrium",
@@ -31093,7 +31567,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Slave Girl",
@@ -31158,7 +31633,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Slave Rebellion",
@@ -31230,7 +31706,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Smoky Pits of Stygia",
@@ -31328,7 +31805,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Smuggler",
@@ -31372,7 +31850,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Snowy Beast",
@@ -31442,7 +31921,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Source of Pollution",
@@ -31508,7 +31988,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Spider Queen",
@@ -31574,7 +32055,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Spider Queen's Lair",
@@ -31648,7 +32130,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Spider's Antidote",
@@ -31730,7 +32213,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Spirit's Lament",
@@ -31812,7 +32296,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Stench of Death",
@@ -31878,7 +32363,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Stygian's Diary",
@@ -31947,7 +32433,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Tanner's Request",
@@ -32015,7 +32502,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Tanner's Stench",
@@ -32097,7 +32585,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Terror Beneath Bubshur",
@@ -32177,7 +32666,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Thief",
@@ -32244,7 +32734,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Troglodyte Conflict",
@@ -32314,7 +32805,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Unwritten Law",
@@ -32384,7 +32876,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Urchin",
@@ -32514,7 +33007,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Vanir Polluters",
@@ -32583,7 +33077,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Venomous South",
@@ -32666,7 +33161,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Veteran",
@@ -32734,7 +33230,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Wandering Drunk",
@@ -32798,7 +33295,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The War Totem",
@@ -32862,7 +33360,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Wayfarer's Stone",
@@ -32912,7 +33411,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Weakest Link",
@@ -32952,7 +33452,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Witch's Brew",
@@ -33039,7 +33540,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Wolf Anthromorph",
@@ -33087,7 +33589,8 @@
       "The potion is located on the table next to De-wei, the table has a glowing skull hovering over it."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Wolf Menace",
@@ -33155,7 +33658,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Woman Who Never Died",
@@ -33221,7 +33725,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Worshippers' Demise",
@@ -33291,7 +33796,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "The Worshippers' Demise",
@@ -33333,7 +33839,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Worshipper's Demise",
@@ -33403,7 +33910,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Wounded Child",
@@ -33473,7 +33981,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Ymirish Bearlock",
@@ -33537,7 +34046,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:The Ymirish Bearlockl",
@@ -33601,7 +34111,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Thick Heads and Strong Axes",
@@ -33675,7 +34186,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Time to Fight",
@@ -33717,7 +34229,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Time to Pay",
@@ -33787,7 +34300,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Time to Pay",
@@ -33851,7 +34365,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Timeline:Destiny Quests",
@@ -33898,7 +34413,8 @@
    ],
    "revision_timestamp": "2012-07-26T22:27:13Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Timeline:Khopshef Province",
@@ -33925,7 +34441,8 @@
    "categories": [],
    "revision_timestamp": "2012-07-26T22:26:59Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Timeline:Old Tarantia",
@@ -34019,7 +34536,8 @@
    ],
    "revision_timestamp": "2026-06-25T17:55:28Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tin",
@@ -34079,7 +34597,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:To Battle a God",
@@ -34136,7 +34655,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Torn by Guilt",
@@ -34204,7 +34724,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Torn from the Dead",
@@ -34261,7 +34782,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Torn to Pieces",
@@ -34341,7 +34863,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Trapped by Lions",
@@ -34406,7 +34929,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Traveling Home (Aquilonian)",
@@ -34454,7 +34978,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Travelling Home (Aquilonian)",
@@ -34502,7 +35027,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Traveling Home",
@@ -34530,7 +35056,8 @@
    "categories": [],
    "revision_timestamp": "2009-04-29T00:55:54Z",
    "parse_status": "variant_hub",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Traveling Home (Cimmerian)",
@@ -34578,7 +35105,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Travelling Home",
@@ -34606,7 +35134,8 @@
    "categories": [],
    "revision_timestamp": "2009-04-29T00:55:54Z",
    "parse_status": "variant_hub",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Travelling Home (Cimmerian)",
@@ -34654,7 +35183,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Treachery and Deception",
@@ -34758,7 +35288,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Treading Lightly",
@@ -34826,7 +35357,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Treading Lightly",
@@ -34890,7 +35422,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Trek to Thrymheim",
@@ -34958,7 +35491,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Trials of Desert Combat",
@@ -35011,7 +35545,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Tribute to Set",
@@ -35120,7 +35655,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Trouble in the Province",
@@ -35190,7 +35726,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: Trouble in the Province",
@@ -35260,7 +35797,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest: Turan",
@@ -35288,7 +35826,8 @@
    ],
    "revision_timestamp": "2015-09-25T20:58:18Z",
    "parse_status": "index_page",
-   "steps": []
+   "steps": [],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Underground Attack",
@@ -35350,7 +35889,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Unfinished Business",
@@ -35416,7 +35956,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Unholy Magic",
@@ -35486,7 +36027,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Veil of Dawn",
@@ -35556,7 +36098,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Venom in the Wastlelands",
@@ -35629,7 +36172,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted! Beasts Threaten Kheshatta",
@@ -35673,7 +36217,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted! The Atzel Struggle",
@@ -35721,7 +36266,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted-The Apostate Man",
@@ -35794,7 +36340,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted-The Blasphemer",
@@ -35867,7 +36414,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted-The Smuggler",
@@ -35940,7 +36488,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wanted-The Stolen Idol",
@@ -36012,7 +36561,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:War and Commerce",
@@ -36060,7 +36610,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:War Correspondence",
@@ -36153,7 +36704,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Warn the Mitra Priest",
@@ -36203,7 +36755,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Watch the White Hand",
@@ -36250,7 +36803,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:What Creeps Beneath",
@@ -36353,7 +36907,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Where Dead Men Wander",
@@ -36424,7 +36979,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:White Gold",
@@ -36497,7 +37053,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:White Hand Officers",
@@ -36556,7 +37113,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wings of the Raven",
@@ -36606,7 +37164,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Wisdom through Venom",
@@ -36674,7 +37233,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wisdom through Venom",
@@ -36747,7 +37307,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wolves and Lambs",
@@ -36818,7 +37379,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Wolves in Sheeps Clothing",
@@ -36889,7 +37451,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Words of Wisdom",
@@ -36961,7 +37524,8 @@
       "Teltus can be found in Tesso at location 289.6 687.0."
      ]
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Xan's Bounty",
@@ -37024,7 +37588,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Xantia's Wrath",
@@ -37162,7 +37727,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Xibaluku",
@@ -37231,7 +37797,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Yipping Hyenas",
@@ -37299,7 +37866,8 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
   },
   {
    "page_title": "Quest:Zeno's Last Hour",
@@ -37351,7 +37919,693 @@
      },
      "notes": []
     }
-   ]
+   ],
+   "discovery": "convention"
+  },
+  {
+   "page_title": "A Message from Paikang",
+   "url": "https://aoc.fandom.com/wiki/A_Message_from_Paikang",
+   "quest_name": "A Message from Paikang",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": "Into the Wastes",
+   "rewards": {
+    "xp": 14000,
+    "money": null,
+    "items": [
+     "10 Imperial Insignias"
+    ],
+    "raw": "10 Imperial Insignias\nYou gained 14000 XP towards your Mastery Advancement.\nYou have earned 3700 Valor.\nNew Quest: \"Into the Wastes\""
+   },
+   "infobox_objectives": [
+    "Meet the Emperor's Messenger",
+    "Go to the eastern exit of Shaulun (X 1109, Y 875)",
+    "Hear the Emperor's Message",
+    "Listen to the message from the Emperor's Golem.",
+    "Return to Ageatus ( X 1021, Y 788)"
+   ],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2012-03-25T23:33:45Z",
+   "parse_status": "objectives_only",
+   "steps": [],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Battling For Resources",
+   "url": "https://aoc.fandom.com/wiki/Battling_For_Resources",
+   "quest_name": "Battling For Resources",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": 134788,
+    "money": {
+     "silver": 14,
+     "copper": 65,
+     "tin": 72
+    },
+    "items": [
+     "Leg of Fena",
+     "Red Deviled Dates",
+     "Cynosyural Ale"
+    ],
+    "raw": "XP: 134,788\nMoney: 14S, 65C, 72T\nMoA: 20\nOther: Leg of Fena, Red Deviled Dates, Cynosyural Ale"
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [
+    "This is a faction quest for Tamarin's Tigers."
+   ],
+   "categories": [
+    "Chosain Province",
+    "Tamarin Tiger Faction Quest"
+   ],
+   "revision_timestamp": "2011-08-14T07:55:33Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": null,
+     "kind": "step",
+     "objectives": [],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": []
+    },
+    {
+     "index": 2,
+     "roman": "II",
+     "title": null,
+     "kind": "step",
+     "objectives": [],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": []
+    },
+    {
+     "index": 3,
+     "roman": "III",
+     "title": "Fight & Report",
+     "kind": "step",
+     "objectives": [
+      "Kill the Enemy on the Battlefield (5/5)",
+      "Report back to Lokesh"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "From Earth to Dust",
+   "url": "https://aoc.fandom.com/wiki/From_Earth_to_Dust",
+   "quest_name": "From Earth to Dust",
+   "zone": null,
+   "subzone": "Pin Pin",
+   "level": null,
+   "quest_giver": "De-Wei",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": 100676,
+    "money": {
+     "silver": 10,
+     "copper": 99,
+     "tin": 79
+    },
+    "items": [
+     "14 Marks of Acclaim"
+    ],
+    "raw": "XP: 100676\nMoney: 10s 99c 79t\n14 Marks of Acclaim"
+   },
+   "infobox_objectives": [
+    "Get Bones from the Warmonk Graveyard x 8 (X:146 Y:391)"
+   ],
+   "variant_pages": null,
+   "notes": [
+    "Consider doing this quest alongside Ingredient Hunt if it is available."
+   ],
+   "categories": [],
+   "revision_timestamp": "2012-08-07T05:08:56Z",
+   "parse_status": "objectives_only",
+   "steps": [],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Heart of Atali",
+   "url": "https://aoc.fandom.com/wiki/Heart_of_Atali",
+   "quest_name": "Heart of Atali",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2024-01-03T04:35:37Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "Heart of Atali",
+     "kind": "step",
+     "objectives": [],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": [
+      "Getting up to Atali is tricky. If you stand at X: 690.5, Y: 1351.4 you can scale and hop up the rocks to reach the clearing on the other side."
+     ]
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Ingredient Hunt",
+   "url": "https://aoc.fandom.com/wiki/Ingredient_Hunt",
+   "quest_name": "Ingredient Hunt",
+   "zone": null,
+   "subzone": "Pin Pin",
+   "level": null,
+   "quest_giver": "De-Wei",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": 25845,
+    "money": {
+     "silver": 13,
+     "copper": 74,
+     "tin": 79
+    },
+    "items": [
+     "16 Marks of Acclaim"
+    ],
+    "raw": "XP:25845\nMoney: 13s 74c 79t\n16 Marks of Acclaim"
+   },
+   "infobox_objectives": [
+    "Get Empress Weed x 1",
+    "Get Moonlight Root x2",
+    "Get Saliva from a Magically Tainted Animal x3"
+   ],
+   "variant_pages": null,
+   "notes": [
+    "Empress Weed can be found at x:633 y:201",
+    "Moonlight Root can be found at the Warmonk Graveyard X:146 Y:391",
+    "Saliva is obtained through killing mobs in the Forest of August Bloom (X:1196 Y:183)"
+   ],
+   "categories": [],
+   "revision_timestamp": "2012-08-07T05:09:27Z",
+   "parse_status": "objectives_only",
+   "steps": [],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Rotten Molars",
+   "url": "https://aoc.fandom.com/wiki/Rotten_Molars",
+   "quest_name": "Rotten Molars",
+   "zone": "Cimmeria",
+   "subzone": "Conarch Village",
+   "level": "21",
+   "quest_giver": "Croiss",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [
+    "Get Vanir Molars (0/120)"
+   ],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [
+    "Conall's Valley Quests"
+   ],
+   "revision_timestamp": "2014-01-18T06:26:54Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "The Jaws of Danger",
+     "kind": "step",
+     "objectives": [
+      "Get Vanir Molars (0/120)"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Stygian Superstitions",
+   "url": "https://aoc.fandom.com/wiki/Stygian_Superstitions",
+   "quest_name": "Stygian Superstitions",
+   "zone": null,
+   "subzone": "Caravanserai",
+   "level": null,
+   "quest_giver": "Makalani",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2014-11-06T17:06:22Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "The shadow in the deeps",
+     "kind": "step",
+     "objectives": [
+      "Investigate the beast in the Southern Oasis"
+     ],
+     "reward": {
+      "xp": 6192,
+      "money": {
+       "copper": 35,
+       "tin": 52
+      },
+      "raw": "XP: 6192\nMoney: 35C 52T\n3 consumables"
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "The Element of Fire",
+   "url": "https://aoc.fandom.com/wiki/The_Element_of_Fire",
+   "quest_name": "The Element of Fire",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": "Chuan-hua",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [
+     "10 Marks of Acclaim.",
+     "1 Imperial Chest.",
+     "1 Flask of Completion."
+    ],
+    "raw": "10 Marks of Acclaim.\n1 Imperial Chest.\n1 Flask of Completion."
+   },
+   "infobox_objectives": [
+    "Kill Zhu-La."
+   ],
+   "variant_pages": null,
+   "notes": [
+    "Given by Chuan-hua outside the Warmonk Monastery. (X:178 Y:239)",
+    "Quest objective in the Reliquary of Flame.",
+    "The boss can be killed in Hard mode or in Normal mode, the quest will still complete.",
+    "There is no cooldown for this quest meaning you can take the same quest again after completing it although there is a 1 hour cooldown for the instance."
+   ],
+   "categories": [],
+   "revision_timestamp": "2012-08-07T06:17:37Z",
+   "parse_status": "objectives_only",
+   "steps": [],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "The Explorer",
+   "url": "https://aoc.fandom.com/wiki/The_Explorer",
+   "quest_name": "The Explorer",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2024-01-02T13:51:34Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "The Explorer",
+     "kind": "step",
+     "objectives": [
+      "Find the moving treasure map"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": [
+      "The quest is started from a skeleton found at X: 636 Y: 461",
+      "The quest objective is a Treasure Map and it can be found on any of the Swamp Snappers nearby."
+     ]
+    },
+    {
+     "index": 2,
+     "roman": "II",
+     "title": "The Amphibian Inscription",
+     "kind": "step",
+     "objectives": [
+      "Dig up the treasure"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": "a Pair of Socks, a cosmetic item"
+     },
+     "notes": [
+      "The location is nearby at X: 784 Y: 197 on top of a small hill between three trees and surrounded by giant spiders.",
+      "Click on the dirt pile to dig it up"
+     ]
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "The Price of Miracles",
+   "url": "https://aoc.fandom.com/wiki/The_Price_of_Miracles",
+   "quest_name": "The Price of Miracles",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [
+    "Pages with broken file links"
+   ],
+   "revision_timestamp": "2013-03-26T21:42:15Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": null,
+     "kind": "step",
+     "objectives": [],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": []
+    },
+    {
+     "index": 2,
+     "roman": "II",
+     "title": "The Price of a Body",
+     "kind": "step",
+     "objectives": [
+      "Collect 300 rice from Nemedian soldiers."
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": "Kal Gum\nDagger\n25.7 DPS (24-42)\n+17 Constitution\n+21 Dexterity"
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "The River Pirates",
+   "url": "https://aoc.fandom.com/wiki/The_River_Pirates",
+   "quest_name": "The River Pirates",
+   "zone": null,
+   "subzone": "Bubshur",
+   "level": null,
+   "quest_giver": "Nivenah",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2014-11-06T15:43:39Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "A shipless sailor",
+     "kind": "step",
+     "objectives": [
+      "Get the river pirate's bounty"
+     ],
+     "reward": {
+      "xp": 5487,
+      "money": {
+       "copper": 23,
+       "tin": 94
+      },
+      "raw": "XP: 5487\nMoney: 23C 94T\n3 consumables"
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "The Roots of the Earth",
+   "url": "https://aoc.fandom.com/wiki/The_Roots_of_the_Earth",
+   "quest_name": "The Roots of the Earth",
+   "zone": null,
+   "subzone": "Bubshur",
+   "level": null,
+   "quest_giver": "Kayires",
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2014-11-06T15:40:53Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "A plaque of the mind",
+     "kind": "step",
+     "objectives": [
+      "Get Darkroot for Kayires"
+     ],
+     "reward": {
+      "xp": 9193,
+      "money": {
+       "copper": 64,
+       "tin": 49
+      },
+      "raw": "XP: 9193\nMoney: 64C 49T"
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Trapping Spirits",
+   "url": "https://aoc.fandom.com/wiki/Trapping_Spirits",
+   "quest_name": "Trapping Spirits",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2023-12-27T14:18:13Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "Pushing Back the Dead",
+     "kind": "step",
+     "objectives": [
+      "Place Spiritual Wards out (5/5)"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": [
+      "At the top of the slope where Raelina has set up animal skull wards, you'll see the ziggurat. It's the small steppe pyramid. There are stairs on the North side.",
+      "At the top of the ziggurat is a sigil you can interact with, but not until you find a Spirit's Essence quest item, which drop off Vindictive Spirits and Malignant Spirits. Note: You may only have one Spirit's Essence at a time.",
+      "Bring the Spirit's Essence back to the sigil at the top of the ziggurat and use the sigil. This will summon a Tormented Spirit boss. Note: The boss has a knockback attack. When defeated, the Tormented Spirit will drop the Symbol of Life quest item.",
+      "Go immediately to the wards on the ground to the south of the ziggurat and find a glowing ward. Interact with it to change to a Symbol of Life / Spiritual Ward.",
+      "This should update the objective; complete these steps 4 more times.",
+      "Quest Task Finished: \"Pushing Back the Dead\""
+     ]
+    },
+    {
+     "index": 2,
+     "roman": "II",
+     "title": "Completion of a Brittle Wall",
+     "kind": "step",
+     "objectives": [
+      "Speak to Raelina"
+     ],
+     "reward": {
+      "xp": null,
+      "money": null,
+      "raw": null
+     },
+     "notes": [
+      "Raelina will offer a quest called Reinforcing the Ward Wall with the same objectives as this quest and is repeatable. Completing Reinforcing the Ward Wall is required for the Questing achievement for the region."
+     ]
+    }
+   ],
+   "discovery": "sweep"
+  },
+  {
+   "page_title": "Wanted! Death Master Raiders",
+   "url": "https://aoc.fandom.com/wiki/Wanted!_Death_Master_Raiders",
+   "quest_name": "Wanted! Death Master Raiders",
+   "zone": null,
+   "subzone": null,
+   "level": null,
+   "quest_giver": null,
+   "quest_end": null,
+   "prerequisite": null,
+   "next_quest": null,
+   "rewards": {
+    "xp": null,
+    "money": null,
+    "items": [],
+    "raw": null
+   },
+   "infobox_objectives": [],
+   "variant_pages": null,
+   "notes": [],
+   "categories": [],
+   "revision_timestamp": "2014-07-31T09:41:02Z",
+   "parse_status": "steps_found",
+   "steps": [
+    {
+     "index": 1,
+     "roman": "I",
+     "title": "Hunting the Southern Raiders",
+     "kind": "step",
+     "objectives": [
+      "Kill any Death Master raider."
+     ],
+     "reward": {
+      "xp": 21806,
+      "money": {
+       "silver": 2,
+       "copper": 40,
+       "tin": 6
+      },
+      "raw": "21806 XP\n2S 40C 6T"
+     },
+     "notes": []
+    }
+   ],
+   "discovery": "sweep"
   }
- ]
+ ],
+ "sweep_date": "2026-09-02"
 }

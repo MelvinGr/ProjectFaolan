@@ -1090,7 +1090,7 @@ quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
 2177	[Atzels_Fortress] Wanted! Glacial Sabertooth Menace	1	single	0	no-wiki-page	
 2178	[Atzels_Fortress] Wanted! The Atzel Struggle	1	single	1	exact	
 2179	[Atzels_Fortress] Wanted! Ivory Vale Troglodytes	1	single	0	no-wiki-page	
-2180	[Kheshatta] Wanted! Death Master Raiders	1	single	0	no-wiki-page	
+2180	[Kheshatta] Wanted! Death Master Raiders	1	single	1	exact	
 2181	[Atzels_Fortress] Wanted! Undeads to the East	1	single	0	no-wiki-page	
 2182	[Atzels_Fortress] Wanted! No Compromise	1	single	0	no-wiki-page	
 2183	[Atzels_Fortress] Wanted! Destroyer of Atzel's Guards	1	single	0	no-wiki-page	
@@ -1146,7 +1146,7 @@ quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
 2246	[Ymir's_Pass] The Ghost Kings	3	full	0	no-wiki-page	
 2247	[Ymir's_Pass] A Call to the Clan	3	full	0	no-wiki-page	
 2248	[Ymir's_Pass] The Tomes of the Dead	3	full	0	no-wiki-page	
-2249	[Ymir's_Pass] The Explorer	2	none	0	no-wiki-page	
+2249	[Ymir's_Pass] The Explorer	2	none	2	mismatch	
 2250	[Ymir's_Pass] The Gaze of Crom	3	full	0	no-wiki-page	
 2251	[Ymir's_Pass] A Taste of Revenge	3	none	0	no-wiki-page	
 2252	[Ymir's_Pass] Havoc and Disruption	9	full	0	no-wiki-page	
@@ -1158,7 +1158,7 @@ quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
 2258	[Eiglophian_Mountains] Raelina's Journals	2	full	0	no-wiki-page	
 2259	[Eiglophian_Mountains] A Lost Companion	2	full	0	no-wiki-page	
 2260	[Eiglophian_Mountains] Reinforcing the Ward Wall	2	full	0	no-wiki-page	
-2261	[Eiglophian_Mountains] Trapping Spirits	2	full	0	no-wiki-page	
+2261	[Eiglophian_Mountains] Trapping Spirits	2	full	2	exact	
 2262	[Eiglophian_Mountains] A Piece of History	2	full	0	no-wiki-page	
 2263	[Eiglophian_Mountains] Reign of Terror	2	full	0	no-wiki-page	
 2264	[Eiglophian_Mountains] Missing Shaman	1	full	0	no-wiki-page	
@@ -1176,7 +1176,7 @@ quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
 2285	[Ymir's_Pass] Don't Let Them Live	2	full	0	no-wiki-page	
 2286	[Ymir's_Pass] Don't Let Them Through	2	full	0	no-wiki-page	
 2287	[Ymir's_Pass] Fire Burns the Beast	2	full	0	no-wiki-page	
-2288	[Ymir's_Pass] Heart of Atali	2	full	0	no-wiki-page	
+2288	[Ymir's_Pass] Heart of Atali	2	full	1	mismatch	
 2289	[Ymir's_Pass] The Twisted Skein	2	full	0	no-wiki-page	
 2290	[Ymir's_Pass] The Footprints of the Gods [Gaven]	2	none	0	no-wiki-page	
 2291	[Ymir's_Pass] The Footprints of the Gods [Gisvan]	2	full	0	no-wiki-page	
@@ -1968,7 +1968,7 @@ quest_line_id	name	member_quests	ordering	wiki_steps	wiki_verdict	flags
 3186	[Northern Grasslands][BB] Brutal Murder	2	none	0	no-wiki-page	
 3187	[Northern Grasslands][BB] Concealed Kill	3	none	0	no-wiki-page	
 3188	[Northern Grasslands][BB] Sharp Assassination	2	none	0	no-wiki-page	
-3189	[RoTG_Storyline] A Message From Paikang	2	none	0	no-wiki-page	
+3189	[RoTG_Storyline] A Message From Paikang	2	none	0	wiki-page-has-no-steps	
 3190	[RoTG_Storyline] Allied Against the Darkness	1	single	0	no-wiki-page	
 3191	[RoTG_Storyline] Sowing Favor	2	full	0	no-wiki-page	
 3192	[RoTG_Storyline] Into the Wastes	1	single	0	no-wiki-page	
