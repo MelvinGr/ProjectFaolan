@@ -9,9 +9,38 @@ and `QuestObjectiveRegion` / `QuestProgress` — and the per-chain content notes
 
 | table | holds |
 |---|---|
+| `QuestLine` | one CHAIN of quests: its name, `FirstQuestId` / `LastQuestId`, `PrevQuestLineId` |
 | `QuestDefinition` | one quest: journal/snapshot fields, `NextQuestId` (the chain successor), its `Goals` |
 | `QuestGoalDefinition` | one objective: its type, its target, `RequiredCount`, the map marker |
 | `CharacterQuest` / `CharacterQuestGoal` | per-player state: which quests are active/completed, and per-goal progress |
+
+### ⚠️ Three levels, and "quest" means the MIDDLE one
+
+The single most common way to misread this data is to assume our `QuestDefinition` is what a player calls a
+quest. It is not — it is one **step** of one. The three levels line up like this:
+
+| ours | the client calls it | a player / the wiki calls it | example |
+|---|---|---|---|
+| `QuestLine` | `MainQuest_c` | the quest | `[Destiny 1-5 Sidequest] Casilda` |
+| `QuestDefinition` | `Quest_c`, `QuestIIR_c` | a numbered step | `The Scavenger` |
+| `QuestGoalDefinition` | `TalkToCharacterQuestGoal`, `GetItemQuestGoal`, … | an objective | `Kill the Scavenger` |
+
+⭐ **Our names for the bottom two are the client's own**, which is why they stay: `QuestDefinition` is its
+`Quest_c` and `QuestGoalDefinition` is its `*QuestGoal` family, so the DB tables and the wire types
+(`QuestIIR_c`, `QuestGoalIIR_c`) read as one vocabulary. Renaming a "quest" to a "step" or an "objective" to
+chase the wiki's wording would break that correspondence — don't.
+
+The one name that is ours rather than the client's is `QuestLine`; retail calls that concept a **MainQuest**.
+Both names are in the tree on purpose: the wire type keeps the client's name (`MainQuestUpdateIIR`,
+`MainQuestUpdateCodec`) and the table keeps the descriptive one, because "MainQuest" reads in English as *the
+main storyline* while the table also holds every zone side-chain. The two are the same thing, and the proof is
+in what we already ship — `MainQuestUpdateCodec.Build` is handed `QuestLineId` as the field the client reads as
+the MainQuest id, byte-exact against captures.
+
+⚠️ **This matters when joining against outside data.** A community source keyed on the player-facing name matches
+our `QuestLine.Name`, not `QuestDefinition.Name`; joining on the latter compares a chain name against a step name
+and finds almost nothing. That mistake cost a full re-analysis once — see
+[`../rdb/quest-steps-wiki.md`](../rdb/quest-steps-wiki.md).
 
 A quest completes when **every** goal reaches its `RequiredCount`; completing a stage supersedes it with
 `NextQuestId`. `QuestProgressionService` owns all of that, and every trigger funnels through its one `Advance`.

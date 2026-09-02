@@ -38,9 +38,11 @@ part the wiki uniquely adds.
 
 ## ⭐ The join is at the QUEST LINE, not the quest
 
-A wiki **page** is one of our **`QuestLines`**; a wiki **step** is one of our **`QuestDefinitions`**. Matching
-page titles against `QuestDefinitions.Name` therefore looks like near-total disjointness — only 25 of 552 — and
-that reading is wrong. Against `QuestLines.Name` (with the leading `[Zone]` / `[NPE]` / `[Destiny …]` tag
+A wiki **page** is one of our **`QuestLine`** rows; a wiki **step** is one of our **`QuestDefinition`** rows —
+the three-level model is set out in
+[`../subsystems/quests.md`](../subsystems/quests.md). Matching page titles against `QuestDefinition.Name`
+therefore compares a chain name against a step name, which looks like near-total disjointness — only 25 of 552 —
+and that reading is wrong. Against `QuestLines.Name` (with the leading `[Zone]` / `[NPE]` / `[Destiny …]` tag
 stripped):
 
 | | pages |
