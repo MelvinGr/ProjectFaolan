@@ -26,7 +26,7 @@ namespace Faolan.Importer.Cli
 	{
 		private const uint FeatNameCategory = 50220;
 
-		private static async Task<int> FeatNameCheck(string rdbDir)
+		private static async Task<int> FeatNameCheck(string rdbDir, string? arg = null)
 		{
 			using var rdb = OpenRdb(rdbDir);
 			await using var db = OpenDb();
@@ -107,6 +107,21 @@ namespace Faolan.Importer.Cli
 
 				if (list.Count > 6)
 					Console.WriteLine($"          ... and {list.Count - 6} more");
+			}
+
+			// `--report-arg tsv:<path>` writes every differing ROW with its bucket, which is what an investigation
+			// into the disjoint set needs - the console print is grouped and truncated by design.
+			if ((arg ?? "").StartsWith("tsv:", StringComparison.OrdinalIgnoreCase))
+			{
+				var path = arg![4..];
+				var byPair = buckets.SelectMany(b => b.Value.Select(x => (x.Ours, x.Theirs, Bucket: b.Key)))
+					.ToDictionary(x => (x.Ours, x.Theirs), x => x.Bucket);
+				await using var w = new System.IO.StreamWriter(path);
+				await w.WriteLineAsync("feat_id\tours\ttheirs\tbucket");
+				foreach (var (id, ours, theirs) in differing.OrderBy(d => d.Id))
+					await w.WriteLineAsync($"{id}\t{ours}\t{theirs}\t{byPair.GetValueOrDefault((ours, theirs), "?")}");
+
+				Console.WriteLine($"  wrote {differing.Count} row(s) to {path}");
 			}
 
 			// ⚠️ The exit code tracks the ADOPTABLE population, not the differing one. Most of what is left is not a

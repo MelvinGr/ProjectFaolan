@@ -1203,7 +1203,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				case "feat-name-check":
-					return await FeatNameCheck(RdbDir());
+					return await FeatNameCheck(RdbDir(), arg);
 
 				case "ldb-strings" when (arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase):
 				{

@@ -131,6 +131,35 @@ Scale, so far: LDB 50220 holds 84 entries containing `'s ` (≈17 feats, each ra
 rows / 6 distinct names in `Feats`. The possessives are only the visible subset — any feat whose display name
 differs from its authoring name at all is affected. Open work tracked in Gitea #925.
 
+## ⭐ Why most name differences are NOT defects: the LDB label is deliberately shared
+
+`--report feat-name-check` compares every shipped feat name against LDB 50220 and classifies what differs. The
+result matters because the obvious fix — prefer the LDB string — is wrong on 96% of the population it touches:
+
+| pairs / rows | pattern | verdict |
+|---|---|---|
+| 34 / 83 | ours is a strict **stem** of theirs (`Devourer` / `Devourer's Might`) | adopt theirs — **done** |
+| 7 / 16 | differ only by a `Spell - ` / `Ability - ` / `Combo - ` prefix | adopt theirs — **done** |
+| 88 / 91 | the **LDB entry is truncated** (`Spell - Dark Han` for `Spell - Dark Hand`) | keep ours |
+| 778 / — | the LDB label is **shared by several feat ids** | keep ours |
+| 15 | a unique LDB label that genuinely disagrees | open |
+
+⛔ **The shared-label group is the important one, and it is by design.** A generic feat's authoring name encodes
+class, subject, level band and rank — `Core Training: 1HB 20-40 3`, `Soldier: Shield Training 1` — while its
+displayed label is short and reused across every rank, band and often class: `Basic One-Hand Blunt Training`
+covers four ids, `Advanced Riding` eighteen, `HP` thirty. Adopting the label would collapse thirty distinct feats
+onto one name and destroy exactly the distinctions our names carry. **Ours is the more informative string there,
+and that is why the rule is a containment test rather than a preference.**
+
+⚠️ The same shape, one level down, is why the rank tag must survive: our `HP 20-40 1`…`13` are thirteen rows the
+displayed `HP 20-40` cannot tell apart, and `ParseName` reads the `Rank` column from that suffix.
+
+The 15 unique-label disagreements are the only open residue, and one of them is a real loss on our side: six
+`Gemcutter Novice` rows carry one name where the client names each crafting tier separately (`Apprentice`,
+`Adept`, `Artisan`, `Expert`, `Master`, `Grandmaster`). The rest are renames in one direction or the other
+(`Illumination` / `Vindicator`, `Improved Shield Bash` / `Improved Evasive Action`) with neither side
+established. Open work tracked in Gitea #925.
+
 ## Reproducing
 
 The planner's per-class page embeds its data as a `feats={...}` object in the page HTML; parse that, read `hex`
