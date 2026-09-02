@@ -45,27 +45,32 @@ namespace Faolan.Tests
 			Assert.Equal([321000u, 321001u, 321100u, 321101u, 321200u, 321201u, 321202u], weaponsmith.RankFeatIds);
 		}
 
-		// ⚠️ The load-bearing one: ALL SIX of Gemcutter's trained ranks are NAMED "Gemcutter Novice" in the shipped
-		// feat table. A rank read off the name would give that profession seven Novices and no ladder at all; read off
-		// the chain DEPTH it is a seven-rung ladder like every other.
+		// ⚠️ The load-bearing one: Gemcutter's six trained ranks USED to all be named "Gemcutter Novice" - the feat
+		// template's authoring name - so a rank read off the name gave that profession seven Novices and no ladder.
+		// The ladder is read off the chain DEPTH instead, and stays a seven-rung one whatever the names say. Since
+		// #925 the names are the client's own LDB 50220 labels, which name each crafting tier - the one place the
+		// two sources genuinely disagreed and the displayed one was adopted - so the ladder now reads as a ladder
+		// by name too.
 		[Fact]
-		public async Task GemcuttersRanksAreAllNamedNovice_AndTheLadderIsIntactAnyway()
+		public async Task GemcuttersRanks_ReadOffTheChainDepth_AndCarryTheClientsTierNames()
 		{
 			var ladders = await Ladders();
 			var gemcutter = ladders.Single(l => l.Name == "Gemcutter");
+			Assert.Equal(7, gemcutter.RankFeatIds.Length);
 
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var names = await (from wire in gemcutter.RankFeatIds.ToAsyncEnumerable()
-				select wire).ToListAsync(TestContext.Current.CancellationToken);
-
-			var featNames = await (from map in db.FeatIdMaps.AsNoTracking()
+			var wireIds = gemcutter.RankFeatIds.ToList();
+			var nameByWire = await (from map in db.FeatIdMaps.AsNoTracking()
 				join feat in db.Feats.AsNoTracking() on map.TemplateId equals feat.Id
-				where names.Contains(map.WireFeatId)
-				select feat.Name).ToListAsync(TestContext.Current.CancellationToken);
+				where wireIds.Contains(map.WireFeatId)
+				select new { map.WireFeatId, feat.Name }).ToDictionaryAsync(x => x.WireFeatId, x => x.Name, TestContext.Current.CancellationToken);
 
-			Assert.Equal(7, gemcutter.RankFeatIds.Length);
-			Assert.Equal(7, featNames.Count);
-			Assert.All(featNames.Take(6), n => Assert.Equal("Gemcutter Novice", n)); // ...and so is the Grandmaster row
+			Assert.Equal(
+				[
+					"Gemcutter Novice", "Gemcutter Apprentice", "Gemcutter Adept", "Gemcutter Artisan",
+					"Gemcutter Expert", "Gemcutter Master", "Gemcutter Grandmaster"
+				],
+				gemcutter.RankFeatIds.Select(id => nameByWire[id]));
 		}
 
 		// Every shipped recipe's requirement sits on one of the ladders. If a recipe requirement fell off them the
