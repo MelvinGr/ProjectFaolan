@@ -1658,6 +1658,29 @@ there is a gear/level-driven multiplier on top of the stated hit that we model a
 (`ResolveMagicDamage`), and it is worth ~4.7× to a geared level-80 and ~1.0× to a Tortage character. Open work
 tracked in Gitea #924.
 
+What a 2026-09-03 pass established about that multiplier, so it is not re-derived:
+
+* ⛔ **The client never computes a spell's hit.** The magic-damage accessor `FUN_01118ce0` has exactly four
+  callers, and all four are the character sheet's per-school "Magic Damage" rows (stats `0x36C`–`0x36F` / `0x9E`,
+  rendered through `%s` with the LDB-634 labels). No tooltip branch reads it, so a tooltip on a geared character
+  shows the raw stated hit — the multiplier is server-side and the client cannot state it.
+* **Its inputs are not on the wire either.** Across every level-80 capture the only caster stat pushed is
+  `MagicRating` (`0x39B`, 317.00); `SpellDamageMultiplier` (`0x218`), `BaseSpellDamage` (`0x411`),
+  `MagicDamageModifier` (`0x35D`), the school ratings and the attributes never travel, and the snapshot sheet is a
+  template (Intelligence 10 at level 80).
+* **RDB field 49 `Spell Damage Coefficient` is not a multiplicative coefficient**: it runs 65 / 61 / 26 / 23 / 20
+  on Ice Strike R6 / Deathly Blizzard R5 / Gangrenous Stench / Pestilential Blast R6 / Flesh to Worms R5 while the
+  observed ratio runs the other way (4.1 → 5.25). Read additively — `stated + R × coeff` — it narrows the implied
+  addend from a 3× spread to 849…1148 display units of `R`, which is suggestive of "a share of the caster's magic
+  damage" and no more: one caster, so `R` cannot be separated from anything else.
+* **The 4.7× medians are mixtures.** Ice Strike's 105 hits cluster at ~45k / ~68k / ~88k (2.5× / 3.9× / 5.0× the
+  stated mid, with a ~2× tail at 130k–210k); Deathly Blizzard's sit in one band. Per-target populations, not one
+  ratio.
+* ⭐ **`DPSHit` (53013) spells are deterministic at 80** — `Curse of Blood` lands 764.80 on 46 of 79 hits and
+  `Glacial Tomb` 585.72 on 38 of 56 — and read as `Value × K`: 3.00 × 254.93 (unholy) and 2.50 × 234.29 (cold), i.e.
+  one constant per SCHOOL that is not any pushed stat. Whichever server-side number that is, it is the same one
+  the multiplier above is made of, and a second level-80 caster is what would separate it from the level.
+
 ## Where the combat numbers come from (2026-07-28)
 
 The damage constants in `CombatResolver` are labelled **MEASURED** or **PROVISIONAL**, and the class header
