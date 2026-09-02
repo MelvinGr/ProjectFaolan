@@ -105,27 +105,31 @@ residue that is in none of them, and they are candidates for a gap, not proof of
   (Desecreation, Rejuvenanting Spirit, Copper Strom Chains), some a different name entirely (Improved Discipline
   vs Improved Fire Weave), some a `Spell -` vs `Ability -` prefix. Most likely a build difference.
 
-⭐ **SETTLED (#925, closed): our build genuinely ships the short names.** This looked like a decode fault — "Don"
-is not a plausible feat name — and it is not one. Scanning RDB type 1000020, the type holding feat templates
-(98,048 records, both Latin-1 and UTF-16LE):
+⭐ **The cause is ours: we store the RDB template's INTERNAL name, not the client's display name.**
 
-| needle | records found |
-|---|---|
-| `Devourer's Might` | 0 — absent |
-| `At Death's Door` | 0 — absent |
-| `Don't Fear the Reaver` | 0 — absent |
-| `Nature's Revenge` *(control)* | 1 |
+The client renders a feat's name from **LDB category 50220**, keyed by the feat template id — the same id
+`Feats.Id` uses, so the join is direct:
 
-The control carries the point: `Nature's Revenge` has an ASCII apostrophe and IS found, so the scan can match
-apostrophe-bearing names and the long forms are genuinely not in the data. The raw record confirms it — the name
-runs straight into its description with nothing between: `…Devourer` `Improves the damage done by the A Soul for
-our Feast and Leech Life comb…`. `RdbFeatImporter.ReadNameAndDescription` read it correctly.
+| feat template id | LDB 50220 (displayed) | our `Feats.Name` |
+|---|---|---|
+| 780379–780383 | `Devourer's Might` | `Devourer` |
+| 873300 | `At Death's Door` | `At Death` |
+| 3514944–3514945 | `Don't Fear the Reaver` | the stem before the apostrophe |
 
-So the fourteen are a **build difference**: the planner is built on a later client than ours. That is corroborated
-by the two level-only differences above, which is what a balance pass looks like. `Idol of Set` on two feats is
-likewise not a collision we introduced — both carry that name in our build.
+`RdbFeatImporter.ReadNameAndDescription` is reading correctly — the RDB template really does carry the short
+string. That string is an **authoring name**; where it coincides with the display name (most feats) nothing looks
+wrong, and where the display name carries a possessive the authoring name is the stem, which is what made this
+read as truncation at an apostrophe. There is nothing cutting anything.
 
-⛔ Do not "fix" these names. Changing them would move our data away from the client we ship against.
+⚠️ **A negative result is only as wide as the scope it was measured in.** This was first reported here as "our
+build ships the short names, the planner is on a later build" on the strength of a scan of RDB type 1000020 that
+found the long names absent — with `Nature's Revenge` as a present control. Both halves were true and the
+conclusion still did not follow: *absent from the type searched* is not *absent from the client*, and the client
+we ship against is the latest. The type scope that made the scan fast is exactly what narrowed its negative.
+
+Scale, so far: LDB 50220 holds 84 entries containing `'s ` (≈17 feats, each rank being its own id) against 20
+rows / 6 distinct names in `Feats`. The possessives are only the visible subset — any feat whose display name
+differs from its authoring name at all is affected. Open work tracked in Gitea #925.
 
 ## Reproducing
 
