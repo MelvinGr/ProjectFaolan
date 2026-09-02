@@ -13,10 +13,23 @@ ways any wiki is wrong.
 
 ## What is in it
 
-552 quest pages, of which **481 carry an ordered step list — 1,145 steps in total**. Discovery was closed by four
-independent passes that converged (a recursive walk of the quest categories, an `allpages` prefix sweep, the
-`Infobox Quest` transclusion list, and the links off the twelve area index pages); the last three found nothing
-the first had missed.
+552 quest pages, of which **481 carry an ordered step list — 1,145 steps in total**.
+
+⚠️ **Those 552 are every page that follows the wiki's quest conventions — not every quest page on the wiki.**
+Two independent enumerations agree exactly on the 552 (519 mainspace pages titled `Quest:*`, 494 pages in the
+21-category quest tree, union 552, identical to what was scraped, zero missed and zero extra). But a page that
+is titled plainly, sits in no quest category and carries no `{{Infobox Quest}}` is invisible to all of them, and
+such pages exist: of the 196 existing pages linked from the six zone indexes, **28 are outside the scrape and 12
+of those carry quest content** — an `Objectives` section and/or `Chapter I.` / `I:` step headings (*Trapping
+Spirits*, *Battling For Resources*, *The River Pirates*, *Stygian Superstitions*, *The Roots of the Earth*,
+*Wanted! Death Master Raiders*, *The Explorer*, *Rotten Molars*, *Ingredient Hunt*, *From Earth to Dust*,
+*A Message from Paikang*, *Heart of Atali*). The other 16 are zones, NPCs or redirects.
+
+So the floor on the gap is 12, and there is **no upper bound** yet: that check only covered pages the six zone
+indexes link. Anything in the same shape elsewhere on the wiki is still uncounted.
+
+⚠️ Separately, the wiki's own indexes list far more quests than it documents: those six pages link **754**
+distinct quest titles of which only **196 exist** — 558 are red links.
 
 | `parse_status` | pages | meaning |
 |---|---:|---|
