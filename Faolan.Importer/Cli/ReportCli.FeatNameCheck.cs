@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Importer.Rdb;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,7 @@ namespace Faolan.Importer.Cli
 			foreach (var ((category, id), text) in LdbStringIndex.EnglishPlaintext(rdb))
 				if (category == FeatNameCategory)
 					displayed[id] = text;
+			var labelIds = RdbFeatImporter.LabelCounts(displayed);
 
 			var feats = await db.Feats.AsNoTracking()
 				.Select(f => new { f.Id, f.Name })
@@ -74,9 +76,11 @@ namespace Faolan.Importer.Cli
 				.ToList();
 			Console.WriteLine($"  ...distinct (ours -> theirs)   {distinct.Count,7}");
 
-			// ⭐ The 983 are not one phenomenon, and only ONE of the four is safe to adopt. Classified on the pair
+			// ⭐ The 983 are not one phenomenon, and only three of the five are safe to adopt. Classified on the pair
 			// itself rather than by eye: strip the kind prefix both sides may carry (`Spell - `, `Ability - `,
-			// `Combo - `) and ask which string contains which.
+			// `Combo - `) and ask which string contains which - then, for the disjoint remainder, whether the LDB
+			// gives that label to this feat alone (adoptable: nothing can collapse) or to several (a reused category
+			// label; ours is the more informative string and stays).
 			var buckets = new Dictionary<string, List<(string Ours, string Theirs, int Ranks)>>();
 			foreach (var g in distinct)
 			{
@@ -89,7 +93,9 @@ namespace Faolan.Importer.Cli
 							? "theirs is SHORTER than ours   - LDB truncated, keep ours"
 							: string.Equals(ourCore, theirCore, StringComparison.Ordinal)
 								? "same but for the kind prefix  - adopt theirs"
-								: "DISJOINT                      - unexplained, leave alone";
+								: labelIds.GetValueOrDefault(g.Key.Theirs) == 1
+									? "DISJOINT, label UNIQUE to it  - adopt theirs"
+									: "DISJOINT, label SHARED        - a reused category label, keep ours";
 
 				if (!buckets.TryGetValue(bucket, out var list))
 					buckets[bucket] = list = [];
@@ -125,9 +131,9 @@ namespace Faolan.Importer.Cli
 			}
 
 			// ⚠️ The exit code tracks the ADOPTABLE population, not the differing one. Most of what is left is not a
-			// defect: 88 pairs are an LDB entry that is truncated where ours is right, and 685 are disjoint with
-			// neither side established. Returning non-zero on those would make this permanently red and therefore
-			// ignorable. It goes red when a name we could safely correct is not corrected - i.e. when
+			// defect: 88 pairs are an LDB entry that is truncated where ours is right, and ~670 are a category label
+			// the LDB shares across many ids. Returning non-zero on those would make this permanently red and
+			// therefore ignorable. It goes red when a name we could safely correct is not corrected - i.e. when
 			// RdbFeatImporter.PreferDisplayName has not been run over the current RDB.
 			var adoptable = buckets
 				.Where(b => b.Key.EndsWith("adopt theirs", StringComparison.Ordinal))

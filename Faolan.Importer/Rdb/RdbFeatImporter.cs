@@ -76,6 +76,7 @@ namespace Faolan.Importer.Rdb
 			foreach (var ((category, id), text) in LdbStringIndex.EnglishPlaintext(rdb))
 				if (category == FeatDisplayNameCategory)
 					displayNames[id] = text;
+			var labelIds = LabelCounts(displayNames);
 
 			// Read the client's feat TABLE first: it gates the sweep below. A template the table POINTS AT is a feat by
 			// definition, which is a far better test than the Flags heuristic - Hakotep's Hellfire (3187268) carries
@@ -127,7 +128,7 @@ namespace Faolan.Importer.Rdb
 				// ⚠️ ParseName stays on the AUTHORING name: Tree/Group/BaseName/Rank are derived from its `:` and
 				// rank-suffix structure, which the displayed name does not always carry. Only `Name` is corrected.
 				var parsed = ParseName(name);
-				var displayed = PreferDisplayName(name, displayNames.GetValueOrDefault(e.Id));
+				var displayed = PreferDisplayName(name, displayNames.GetValueOrDefault(e.Id), labelIds);
 				var effects = ParseEffects(body);
 				featEffects[e.Id] = effects;
 				featSpellMods[e.Id] = ParseSpellModifiers(body);
@@ -442,17 +443,22 @@ namespace Faolan.Importer.Rdb
 		//   "Light Blade Training 1"                       -> (null, null, Light Blade Training, 1)
 		// A name that fits none of it keeps BaseName = the whole name and Rank = 0, so nothing is lost to a parse that
 		// did not apply.
-		// #925: adopt the client's displayed name only where it is provably the SAME name, better spelled.
+		// #925: adopt the client's displayed name where it is provably the SAME name, better spelled - and where it
+		// is a label the LDB gives to THIS feat alone.
 		//
-		// ⛔ Deliberately NOT a blanket "prefer the LDB string". Measured over the 983 rows where the two differ,
-		// only 41 of the 814 distinct pairs are safe; the rest would make the data worse:
+		// ⛔ Deliberately NOT a blanket "prefer the LDB string". Measured over the 983 rows where the two differ:
 		//   * 88 pairs - the LDB entry is TRUNCATED. Feat 780269 is `Spell - Dark Hand`; its other ranks are
 		//     `Spell - Dark Han`. Ours is the correct string there and adopting theirs would break it.
-		//   * 685 pairs - the two names are DISJOINT (`Basic Riding` vs `Advanced Riding`), cause unexplained.
-		//     Neither side is known to be right, so neither is imposed.
-		// So the rule is a containment test, not a preference: take theirs when ours is a strict STEM of it, or
-		// when the two differ only by the kind prefix. Both directions of that test are what makes it safe.
-		internal static string PreferDisplayName(string authoring, string? displayed)
+		//   * 778 rows - the LDB label is SHARED by several feat ids (`Advanced Riding` covers eighteen, `HP`
+		//     thirty). A generic feat's authoring name encodes class, subject, band and rank; the label does not, so
+		//     adopting it would collapse distinct feats onto one string. Ours is the more informative name there.
+		//   * 15 rows - a UNIQUE label that genuinely disagrees (`Gemcutter Novice` where the client names each
+		//     crafting tier, `Tactical Mastery` where the client says `Hemorrhage`). The client draws the label, so
+		//     it is what a player ever saw; a label no other id carries cannot collapse anything, so it is adopted.
+		// So the rule is a containment test plus a uniqueness test, not a preference: take theirs when ours is a
+		// strict STEM of it, when the two differ only by the kind prefix, or when theirs names this feat alone and
+		// is not a truncation of ours. `labelIds` is the LDB-wide census (LabelCounts) the uniqueness test reads.
+		internal static string PreferDisplayName(string authoring, string? displayed, IReadOnlyDictionary<string, int>? labelIds = null)
 		{
 			if (string.IsNullOrEmpty(displayed) || displayed == authoring)
 				return authoring;
@@ -465,8 +471,22 @@ namespace Faolan.Importer.Rdb
 
 			var sameName = string.Equals(ours, theirs, StringComparison.Ordinal)
 				|| (theirs.StartsWith(ours, StringComparison.Ordinal) && theirs.Length > ours.Length);
+			var truncated = ours.StartsWith(theirs, StringComparison.Ordinal) && ours.Length > theirs.Length;
+			var unique = labelIds != null && labelIds.GetValueOrDefault(displayed) == 1;
 
-			return sameName ? displayed + rankSuffix : authoring;
+			return sameName || (unique && !truncated) ? displayed + rankSuffix : authoring;
+		}
+
+		// How many feat template ids the LDB gives each display label to. A label carried by one id is that feat's
+		// own name; a label carried by many (`Advanced Riding` x18) is a category the client reuses, and adopting it
+		// would merge the feats it covers.
+		internal static Dictionary<string, int> LabelCounts(IReadOnlyDictionary<uint, string> displayNames)
+		{
+			var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+			foreach (var label in displayNames.Values)
+				counts[label] = counts.GetValueOrDefault(label) + 1;
+
+			return counts;
 		}
 
 		private static string StripKindPrefix(string name)

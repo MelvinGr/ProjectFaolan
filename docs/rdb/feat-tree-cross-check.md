@@ -142,7 +142,7 @@ result matters because the obvious fix — prefer the LDB string — is wrong on
 | 7 / 16 | differ only by a `Spell - ` / `Ability - ` / `Combo - ` prefix | adopt theirs — **done** |
 | 88 / 91 | the **LDB entry is truncated** (`Spell - Dark Han` for `Spell - Dark Hand`) | keep ours |
 | 778 / — | the LDB label is **shared by several feat ids** | keep ours |
-| 15 | a unique LDB label that genuinely disagrees | open |
+| 15 | a **unique** LDB label that genuinely disagrees | adopt theirs — **done** |
 
 ⛔ **The shared-label group is the important one, and it is by design.** A generic feat's authoring name encodes
 class, subject, level band and rank — `Core Training: 1HB 20-40 3`, `Soldier: Shield Training 1` — while its
@@ -154,11 +154,14 @@ and that is why the rule is a containment test rather than a preference.**
 ⚠️ The same shape, one level down, is why the rank tag must survive: our `HP 20-40 1`…`13` are thirteen rows the
 displayed `HP 20-40` cannot tell apart, and `ParseName` reads the `Rank` column from that suffix.
 
-The 15 unique-label disagreements are the only open residue, and one of them is a real loss on our side: six
-`Gemcutter Novice` rows carry one name where the client names each crafting tier separately (`Apprentice`,
-`Adept`, `Artisan`, `Expert`, `Master`, `Grandmaster`). The rest are renames in one direction or the other
-(`Illumination` / `Vindicator`, `Improved Shield Bash` / `Improved Evasive Action`) with neither side
-established. Open work tracked in Gitea #925.
+The 15 unique-label disagreements were the last residue, and they are adopted too (2026-09-03): six
+`Gemcutter Novice` rows carried one name where the client names each crafting tier separately (`Apprentice`,
+`Adept`, `Artisan`, `Expert`, `Master`, `Grandmaster`), and the rest are renames (`Illumination` → `Vindicator`,
+`Improved Shield Bash` → `Improved Evasive Action`, `Tactical Mastery` → `Hemorrhage`). The call: the client draws
+the LDB label, so it is the only name a player ever saw, and a label no other id carries cannot collapse anything
+— which is exactly the property the shared-label rule protects. `RdbFeatImporter.PreferDisplayName` takes the
+LDB-wide label census (`LabelCounts`) for that test, and `--report feat-name-check` reports the two disjoint
+buckets separately (`label UNIQUE to it` / `label SHARED`). Closed in Gitea #925.
 
 ## Reproducing
 
