@@ -63,8 +63,9 @@ namespace Faolan.Tests
 		private static (TeamService Teams, RaidService Raids, Dictionary<uint, RecordingNetworkClient> Clients) Harness(params uint[] characterIds)
 		{
 			var clients = new Dictionary<uint, RecordingNetworkClient>();
-			var teams = new TeamService(NullLogger.Instance, new StubGameDispatcher(), new StubChatDispatcher(), Lookup);
-			var raids = new RaidService(NullLogger.Instance, teams, Lookup);
+			var connections = new ConnectionRegistry();
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, new StubGameDispatcher(), new StubChatDispatcher(), connections);
+			var raids = new RaidService(NullLogger<CsPlayerAgentListener>.Instance, teams, connections);
 
 			foreach (var id in characterIds)
 			{
@@ -72,14 +73,11 @@ namespace Faolan.Tests
 				client.Session.Character!.Name = $"C{id}";
 				client.Session.Character.Class = ConanClass.Necromancer;
 				clients[id] = client;
+				connections.Add(client);
 			}
 
 			return (teams, raids, clients);
 
-			INetworkClient? Lookup(uint id)
-			{
-				return clients.TryGetValue(id, out var c) ? c : null;
-			}
 		}
 
 		private static Character CharacterOf(RecordingNetworkClient client)

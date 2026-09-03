@@ -147,6 +147,11 @@ Two things to know before adding one:
   registered by `AddRealmGameServer` and therefore scoped to a process that hosts a realm. Any OTHER
   container-resolved type asking for a non-generic `ILogger` would silently inherit that category — the same
   test fails if a listener starts doing so.
+- **The CS tier is registered the same way** (`Faolan/CSPlayerAgent/CsPlayerAgentServices.cs`,
+  `AddRealmCsPlayerAgent`, gated by `CsPlayerAgentCompositionTests`). Two differences follow from the point above:
+  its services take `ILogger<CsPlayerAgentListener>` (a bare `ILogger` would inherit the GameServer's realm tag),
+  and its `ConnectionRegistry` is a **keyed** singleton (`[FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)]`)
+  because the GameServer already registers the unkeyed one for the world connections and the two are different sets.
 
 **Prefer composed collaborators over growing the partial.** Domain logic is pulled OUT of the listener into
 folder-namespaced service classes that take their deps by ctor and the client per call:

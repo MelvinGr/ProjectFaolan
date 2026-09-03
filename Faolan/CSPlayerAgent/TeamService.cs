@@ -15,6 +15,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -49,22 +50,22 @@ namespace Faolan.CSPlayerAgent
 		private readonly ConcurrentDictionary<uint, LiveTeam> _teams = [];
 		private readonly IChatServerDispatcher _chatServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
-		private readonly Func<uint, INetworkClient?> _csClientForCharacter;
+		private readonly ConnectionRegistry _connections;
 		private readonly ILogger _logger;
 		private uint _nextTeamId = FirstTeamId;
 
-		public TeamService(ILogger logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher, Func<uint, INetworkClient?> clientForCharacter)
+		public TeamService(ILogger<CsPlayerAgentListener> logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 		{
 			_logger = logger;
 			_gameServerDispatcher = gameServerDispatcher;
 			_chatServerDispatcher = chatServerDispatcher;
-			_csClientForCharacter = clientForCharacter;
+			_connections = connections;
 		}
 
 		// A team member is ONLINE by definition, so its row comes from the live session rather than the DB.
 		private Character? CharacterOf(uint characterId)
 		{
-			return _csClientForCharacter(characterId)?.Session.Character;
+			return _connections.ForCharacter(characterId)?.Session.Character;
 		}
 
 		// The member record, stamped with the member's LIVE playfield from the world listener rather than the
@@ -533,7 +534,7 @@ namespace Faolan.CSPlayerAgent
 
 		private async Task Push(uint characterId, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
-			if (_csClientForCharacter(characterId) is { } client)
+			if (_connections.ForCharacter(characterId) is { } client)
 				await Send(client, opcode, body);
 		}
 

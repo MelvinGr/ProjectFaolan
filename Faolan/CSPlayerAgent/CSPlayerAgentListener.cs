@@ -20,6 +20,7 @@ using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -60,26 +61,32 @@ namespace Faolan.CSPlayerAgent
 		// The port is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), taken by INJECTION rather than read from global config: `HostRealm` is a
 		// singleton the pre-host bootstrap registers, which is what lets this be a plain AddHostedService<T>().
-		public CsPlayerAgentListener(HostRealm realm, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
-			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher chatServerDispatcher) : base(realm.CsPlayerAgentPort, logger, configuration, database,
-			new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)), new ConnectionRegistry())
+		// Every collaborator arrives by injection (`CsPlayerAgentServices.AddRealmCsPlayerAgent`), the way the
+		// GameServer's do - nothing is `new`-ed here and nothing is handed `this`. The services reach a character's
+		// CS client through the shared, KEYED `ConnectionRegistry`, the same instance ServerBase fills as clients connect.
+		public CsPlayerAgentListener(HostRealm realm, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database,
+			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections,
+			GuildService guild, TeamService teams, RaidService raids, GroupFinderService groupFinder, PvpMatchMakingService pvpMatchMaking, PvpMatchService pvpMatches)
+			: base(realm.CsPlayerAgentPort, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)), connections)
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 
-			// `chatServerDispatcher` is not held here: only the guild and team flows need it, and both take it directly.
-			// A membership change moves that member's ~Guild / ~Team chat-channel subscription, which lives on their
-			// CHAT connection, not this one (#663 / #668).
-			_guild = new GuildService(database, logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
-			_teams = new TeamService(logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
+			// The chat dispatcher is not held here: only the guild and team flows take it. A membership change moves
+			// that member's ~Guild / ~Team chat-channel subscription, which lives on their CHAT connection, not this
+			// one (#663 / #668).
+			_guild = guild;
+			_teams = teams;
 
-			// No chat dispatcher: there is deliberately NO ~Raid channel. Only ~Guild and ~Team exist anywhere in the
-			// corpus, so subscribing one would be inventing a channel retail does not have (#663 / #669).
-			_raids = new RaidService(logger, _teams, ClientForCharacter);
+			// The raid service takes no chat dispatcher: it subscribes no ~Raid channel. ⚠️ That is a gap in the
+			// EVIDENCE, not a retail fact - the corpus holds no raid session at all, so only ~Guild and ~Team are ever
+			// seen subscribed (#663 / #669). Whether retail has a ~Raid channel is unknown; one is not invented, and
+			// a raid capture is what would settle it.
+			_raids = raids;
 
-			_groupFinder = new GroupFinderService(logger, database, _teams, gameServerDispatcher);
-			_pvpMatchMaking = new PvpMatchMakingService(logger, _teams, ClientForCharacter);
-			_pvpMatches = new PvpMatchService(logger, _teams, ClientForCharacter, gameServerDispatcher, database);
+			_groupFinder = groupFinder;
+			_pvpMatchMaking = pvpMatchMaking;
+			_pvpMatches = pvpMatches;
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

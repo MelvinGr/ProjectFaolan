@@ -16,6 +16,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -45,20 +46,20 @@ namespace Faolan.CSPlayerAgent
 		// (ReplySender(packet.Receiver) / packet.Sender). This is why we don't need to remember each client's endpoints.
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
-		private readonly Func<uint, INetworkClient?> _clientForCharacter;
+		private readonly ConnectionRegistry _connections;
 		private readonly IChatServerDispatcher _chatServerDispatcher;
 		private readonly IDatabaseRepository _database;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly ILogger _logger;
 
-		public GuildService(IDatabaseRepository database, ILogger logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher,
-			Func<uint, INetworkClient?> clientForCharacter)
+		public GuildService(IDatabaseRepository database, ILogger<CsPlayerAgentListener> logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher,
+			[FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 		{
 			_database = database;
 			_logger = logger;
 			_gameServerDispatcher = gameServerDispatcher;
 			_chatServerDispatcher = chatServerDispatcher;
-			_clientForCharacter = clientForCharacter;
+			_connections = connections;
 		}
 
 		// 0x201D DeclineGuildInvitation: drop the pending invite and tell the INVITER (0x2031 with joined=0 - the
@@ -69,7 +70,7 @@ namespace Faolan.CSPlayerAgent
 			if (!_pendingGuildInvites.TryRemove(characterId, out var declined))
 				return null;
 
-			if (_clientForCharacter(declined.InviterId) is { } inviterClient)
+			if (_connections.ForCharacter(declined.InviterId) is { } inviterClient)
 				await SendInviteReplyToInviter(inviterClient, declinerName ?? "", false);
 
 			return declined.GuildName;
@@ -104,7 +105,7 @@ namespace Faolan.CSPlayerAgent
 			_logger.LogInformation("{Character} joined guild \"{Guild}\" (invited by {Inviter}).", character.Name, guild.Name, invite.InviterName);
 			await SendGuildFullUpdate(client, ReplySender(packet.Receiver), packet.Sender, guild, character);
 			await BroadcastGuildMemberJoined(guild, character); // includes the joiner, matching retail order
-			if (_clientForCharacter(invite.InviterId) is { } inviterClient)
+			if (_connections.ForCharacter(invite.InviterId) is { } inviterClient)
 				await SendInviteReplyToInviter(inviterClient, character.Name ?? "", true);
 
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
@@ -319,7 +320,7 @@ namespace Faolan.CSPlayerAgent
 			// Three pushes, each to a different audience - see docs/subsystems/guilds.md for why the client needs all
 			// three: the mover's confirmation, the moved member's own notification, and everyone's roster row.
 			await SendRankFeedback(client, guild.GovernmentForm, oldRank, newRank, target.Name ?? "", promote);
-			if (_clientForCharacter(target.Id) is { } targetClient)
+			if (_connections.ForCharacter(target.Id) is { } targetClient)
 				await SendRankChanged(targetClient, newRank, oldRank);
 
 			await BroadcastMemberUpdate(guild, target);
@@ -400,7 +401,7 @@ namespace Faolan.CSPlayerAgent
 			// guild window.
 			foreach (var member in guild.Members)
 			{
-				if (_clientForCharacter(member.Id) is { } memberClient)
+				if (_connections.ForCharacter(member.Id) is { } memberClient)
 					await SendMemberLeft(memberClient, character);
 			}
 		}
@@ -411,7 +412,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			foreach (var recipient in guild.Members)
 			{
-				if (_clientForCharacter(recipient.Id) is { } recipientClient)
+				if (_connections.ForCharacter(recipient.Id) is { } recipientClient)
 					await SendMemberUpdate(recipientClient, member);
 			}
 		}
@@ -435,7 +436,7 @@ namespace Faolan.CSPlayerAgent
 
 			foreach (var member in guild.Members)
 			{
-				var memberClient = _clientForCharacter(member.Id);
+				var memberClient = _connections.ForCharacter(member.Id);
 				if (memberClient?.Session.Character == null)
 					continue;
 
@@ -478,7 +479,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			foreach (var member in guild.Members)
 			{
-				if (_clientForCharacter(member.Id) is { } memberClient)
+				if (_connections.ForCharacter(member.Id) is { } memberClient)
 					await memberClient.SendAsync(new Rpc(PushSender, PushReceiver, GuildUpdateCashCodec.Method, GuildUpdateCashCodec.Build(guild.Cash)));
 			}
 		}
@@ -565,7 +566,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			foreach (var member in guild.Members)
 			{
-				var memberClient = _clientForCharacter(member.Id);
+				var memberClient = _connections.ForCharacter(member.Id);
 				if (memberClient?.Session.Character == null)
 					continue;
 
@@ -596,7 +597,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			var targetClient = _clientForCharacter(target.Id);
+			var targetClient = _connections.ForCharacter(target.Id);
 			if (targetClient?.Session.Character == null)
 			{
 				_logger.LogWarning("Guild invite to \"{Target}\" by {Inviter}: target is not online on this listener.", targetLabel, inviter.Name);

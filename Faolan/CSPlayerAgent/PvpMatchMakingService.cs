@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Pvp;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -30,7 +31,7 @@ namespace Faolan.CSPlayerAgent
 	// unpinned column layout (docs/re/minigame-massivepvp-messages.md, `[V0: the PvPMatchRules_c element layout]`).
 	// What is built here is the whole of what the corpus shows: the queue, its board, and the acks. A player who
 	// signs up stays signed up and the counter moves; nothing pops.
-	public sealed class PvpMatchMakingService(ILogger logger, TeamService teams, Func<uint, INetworkClient?> clientForCharacter)
+	public sealed class PvpMatchMakingService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 	{
 		// characterId -> the one signup it holds. Removed by RemoveFromMatchMaking and by the disconnect hook, so a
 		// logged-off queuer stops being counted (retail's board is live state, and a stale row is a visible lie).
@@ -80,7 +81,7 @@ namespace Faolan.CSPlayerAgent
 			foreach (var member in members)
 			{
 				Record(member, signup);
-				if (clientForCharacter(member) is { } memberClient)
+				if (connections.ForCharacter(member) is { } memberClient)
 					await Send(memberClient, PvpMatchMakingStatusCodec.Method, PvpMatchMakingStatusCodec.Build(signup, true));
 			}
 

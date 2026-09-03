@@ -113,10 +113,12 @@ namespace Faolan.Tests
 				clients[id] = client;
 			}
 
-			INetworkClient? ClientFor(uint id) => clients.TryGetValue(id, out var c) ? c : null;
+			var connections = new ConnectionRegistry();
+			foreach (var client in clients.Values)
+				connections.Add(client);
 
-			var teams = new TeamService(NullLogger.Instance, world, new SilentChat(), ClientFor);
-			var matches = new PvpMatchService(NullLogger.Instance, teams, ClientFor, world, database);
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new SilentChat(), connections);
+			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, teams, connections, world, database);
 
 			var signup = new PvpMatchMakingSignup(MinigameMap, 4, false, 0);
 			var queued = members.Select(id => (CharacterId: id, Signup: signup)).ToList();
@@ -204,10 +206,12 @@ namespace Faolan.Tests
 				clients[id] = client;
 			}
 
-			INetworkClient? ClientFor(uint id) => clients.TryGetValue(id, out var c) ? c : null;
+			var connections = new ConnectionRegistry();
+			foreach (var client in clients.Values)
+				connections.Add(client);
 			var (options, path) = TestDb.NewSeededDatabase(10);
 			_databases.Add(path);
-			var matches = new PvpMatchService(NullLogger.Instance, new TeamService(NullLogger.Instance, world, new SilentChat(), ClientFor), ClientFor, world,
+			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new SilentChat(), connections), connections, world,
 				new DatabaseRepository(new TestDb.ContextFactory(options)));
 
 			await matches.HandleCreateMatch(clients[10], new PvpMatchRules(4, MinigameMap, 2, 1, 1, "", TimeLimitSeconds: 1, ScoreLimit: 100, 0, false, false, 0));

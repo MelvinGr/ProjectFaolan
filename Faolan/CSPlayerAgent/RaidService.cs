@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -45,16 +46,16 @@ namespace Faolan.CSPlayerAgent
 		// invitee -> inviter, for the window between RaidInviteCharacter and RaidAcceptInvite. Keyed by CHARACTER
 		// even for RaidInviteTeam, because it is a person who answers the box.
 		private readonly ConcurrentDictionary<uint, uint> _pendingInvites = [];
-		private readonly Func<uint, INetworkClient?> _csClientForCharacter;
+		private readonly ConnectionRegistry _connections;
 		private readonly ILogger _logger;
 		private readonly TeamService _teams;
 		private uint _nextRaidId = FirstRaidId;
 
-		public RaidService(ILogger logger, TeamService teams, Func<uint, INetworkClient?> clientForCharacter)
+		public RaidService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 		{
 			_logger = logger;
 			_teams = teams;
-			_csClientForCharacter = clientForCharacter;
+			_connections = connections;
 		}
 
 		// The raid a character is in, via their team. Membership is transitive by construction: a raid holds teams
@@ -381,7 +382,7 @@ namespace Faolan.CSPlayerAgent
 
 		private Character? CharacterOf(uint characterId)
 		{
-			return _csClientForCharacter(characterId)?.Session.Character;
+			return _connections.ForCharacter(characterId)?.Session.Character;
 		}
 
 		// A character as the wire's `cCharacter` - taken from the live session rather than from a roster, because
@@ -408,7 +409,7 @@ namespace Faolan.CSPlayerAgent
 
 			// ⚠️ The RECEIVER is the recipient's OWN CSPlayerInterface instance - its character id, never instance 0.
 			// See the same note on TeamService.Send: a push addressed to instance 0 arrives and is dropped.
-			if (_csClientForCharacter(characterId) is { } client)
+			if (_connections.ForCharacter(characterId) is { } client)
 				await client.SendAsync(new Rpc(PushSender, client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), (ushort)opcode, body));
 		}
 

@@ -72,7 +72,11 @@ namespace Faolan.Tests
 				Clients[id] = client;
 			}
 
-			return new TeamService(NullLogger.Instance, new NoWorldDispatcher(), new NoOpChatDispatcher(), id => Clients.GetValueOrDefault(id));
+			var connections = new ConnectionRegistry();
+			foreach (var client in Clients.Values)
+				connections.Add(client);
+
+			return new TeamService(NullLogger<CsPlayerAgentListener>.Instance, new NoWorldDispatcher(), new NoOpChatDispatcher(), connections);
 		}
 
 		// The wide-open search: no playfields, the whole level range, any size. This is the shape of the captured

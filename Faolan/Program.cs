@@ -180,6 +180,7 @@ namespace Faolan
 				// Seam into the CS listener: it owns the team roster, and LeaveTeam/KickFromTeam arrive on the world
 				// connection, so the world listener routes them through here (as it does chat and world actions).
 				builder.Services.AddSingleton<ICsPlayerAgentDispatcher, CsPlayerAgentDispatcher>();
+				builder.Services.AddRealmCsPlayerAgent(); // its services, container-registered like the GameServer's
 				builder.Services.AddHostedService<CsPlayerAgentListener>();
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();

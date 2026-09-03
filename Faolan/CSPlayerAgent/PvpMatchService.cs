@@ -14,6 +14,7 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -38,7 +39,7 @@ namespace Faolan.CSPlayerAgent
 	// Sides are the client's own values, stored and re-broadcast, never interpreted: the GUI produces them and the
 	// GUI consumes them, and nothing server-side needs to know which number is which team yet (scoring is #146's
 	// next slice). "Has a side" means the member has picked one at least once.
-	public sealed class PvpMatchService(ILogger logger, TeamService teams, Func<uint, INetworkClient?> clientForCharacter, IGameServerDispatcher gameServer,
+	public sealed class PvpMatchService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections, IGameServerDispatcher gameServer,
 		IDatabaseRepository database)
 	{
 		// A member's side before they pick one. The client's own GUI starts a fresh member sideless (the
@@ -706,7 +707,7 @@ namespace Faolan.CSPlayerAgent
 
 		private Task Push(uint characterId, CSPlayerInterfaceMethods method, byte[] body)
 		{
-			return clientForCharacter(characterId) is { } client
+			return connections.ForCharacter(characterId) is { } client
 				? TeamService.SendToClient(client, method, body)
 				: Task.CompletedTask;
 		}

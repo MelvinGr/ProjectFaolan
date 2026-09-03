@@ -73,9 +73,8 @@ namespace Faolan.Tests
 			var dispatcher = new RecordingDispatcher();
 			var chat = new RecordingChatDispatcher();
 			var clients = new Dictionary<uint, RecordingNetworkClient>();
-			var teams = new TeamService(NullLogger.Instance, dispatcher, chat, id => clients.TryGetValue(id, out var c)
-				? c
-				: null);
+			var connections = new ConnectionRegistry();
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, dispatcher, chat, connections);
 
 			foreach (var id in characterIds)
 			{
@@ -83,6 +82,7 @@ namespace Faolan.Tests
 				client.Session.Character!.Name = $"C{id}";
 				client.Session.Character.Class = ConanClass.Necromancer;
 				clients[id] = client;
+				connections.Add(client);
 			}
 
 			return (teams, dispatcher, chat, clients);

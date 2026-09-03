@@ -250,10 +250,10 @@ namespace Faolan.Tests
 
 			var client = new RecordingNetworkClient(Queuer);
 			var dispatcher = new TeleportRecordingDispatcher();
-			var teams = new TeamService(NullLogger.Instance, dispatcher, new NoOpChatDispatcher(), id => id == Queuer
-				? client
-				: null);
-			var service = new GroupFinderService(NullLogger.Instance, database, teams, dispatcher);
+			var connections = new ConnectionRegistry();
+			connections.Add(client);
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, dispatcher, new NoOpChatDispatcher(), connections);
+			var service = new GroupFinderService(NullLogger<CsPlayerAgentListener>.Instance, database, teams, dispatcher);
 
 			return new Harnessed(service, teams, client, dispatcher.Teleports);
 		}
