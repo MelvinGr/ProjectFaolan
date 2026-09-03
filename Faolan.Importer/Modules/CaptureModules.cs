@@ -1450,7 +1450,9 @@ namespace Faolan.Importer.Modules
 
 			// Areas FIRST: QuestDefinition.QuestLineId is an FK, so every area a definition points at must already have a
 			// row. The 4CCs come from the completed-quest journal (#390); the rest are placeholders.
-			var areas = QuestLineExtractor.Extract(packets);
+			// ...and a line an index block named without a header takes it from its own quests' header records (the
+			// three the completed journal would have carried for it) - the fix for the nameless completed-tab group.
+			var areas = QuestLineExtractor.WithHeadersFromQuests(QuestLineExtractor.Extract(packets), defs);
 			var areaCount = await ImportOps.ImportQuestLines(ctx.Db, areas, defs.Select(d => d.QuestLineId).Where(id => id != 0).Distinct().ToList());
 
 			await ImportOps.ImportQuestDefinitions(ctx.Db, defs, ctx.Force);

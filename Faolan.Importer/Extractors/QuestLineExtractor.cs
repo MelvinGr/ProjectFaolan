@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Crypt;
@@ -116,6 +117,54 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var d in disagreements)
 				System.Console.WriteLine($"  ⚠️ QuestLine trailer: {d}");
+
+			return [.. byArea.Values];
+		}
+
+		// THIRD source: the header off the line's own member QUESTS. A captured Quest_c record carries the same three
+		// header records the completed journal's area group does - slots 5/6/7 = 50300 line title, 52000 region, 52000
+		// map - so a line the second pass named only by its 4CC (an index block carries no header) gets its header
+		// from any harvested quest on it. Without this, 58 lines shipped with a 4CC and NO title, and the completed
+		// tab drew every quest finished on one of them under a nameless "(1)" group (a level-15 character's 15051 on 2237,
+		// a level-24 character's 14617 on 2043, reported in-client 2026-09-03). The quest's slot-5 ref IS the line id (2,039 of
+		// 2,039 harvested quests agree with their definition's QuestLineId), so the join needs no guesswork.
+		//
+		// Fills IN only: a line the journal already headed keeps it, and a line no quest carries a header for is left
+		// as it was. Lines a quest references that neither pass produced are added header-only (Magic 0), which
+		// ImportQuestLines treats as "fill what is non-zero" - so a 4CC already in the database is never overwritten
+		// by a header-only line's 0.
+		public static IReadOnlyList<QuestLine> WithHeadersFromQuests(IReadOnlyList<QuestLine> areas, IReadOnlyList<QuestDefinition> quests)
+		{
+			ArgumentNullException.ThrowIfNull(areas);
+			ArgumentNullException.ThrowIfNull(quests);
+
+			var byArea = areas.ToDictionary(a => a.QuestLineId);
+			foreach (var quest in quests)
+			{
+				if (quest.QuestLineId == 0)
+					continue;
+
+				var title = quest.TextRefs.FirstOrDefault(r => r.Slot == QuestTextSlot.QuestLineTitle);
+				var region = quest.TextRefs.FirstOrDefault(r => r.Slot == QuestTextSlot.RegionName);
+				var map = quest.TextRefs.FirstOrDefault(r => r.Slot == QuestTextSlot.MapName);
+				if (title == null || region == null || map == null || title.RefId != quest.QuestLineId)
+					continue;
+
+				if (!byArea.TryGetValue(quest.QuestLineId, out var line))
+					byArea[quest.QuestLineId] = line = new QuestLine { QuestLineId = quest.QuestLineId, TrailerCategory = 0 };
+				else if (line.TitleRefId != 0)
+					continue; // the journal's own header wins; every capture of an area carries the same words
+
+				line.TitleRefId = title.RefId;
+				line.TitleCategory = title.Category;
+				line.TitleKey = (ProtoDecryptionKey)title.KeyText.Clone();
+				line.RegionRefId = region.RefId;
+				line.RegionCategory = region.Category;
+				line.RegionKey = (ProtoDecryptionKey)region.KeyText.Clone();
+				line.MapRefId = map.RefId;
+				line.MapCategory = map.Category;
+				line.MapKey = (ProtoDecryptionKey)map.KeyText.Clone();
+			}
 
 			return [.. byArea.Values];
 		}

@@ -1171,21 +1171,30 @@ namespace Faolan.Importer.Captures
 
 				if (existing.TryGetValue(areaId, out var row))
 				{
-					// Only ever fill IN - never clobber a harvested 4CC with a placeholder's 0.
+					// Only ever fill IN - never clobber a harvested 4CC with a placeholder's 0. The same for the header:
+					// a line the quests headed (QuestLineExtractor.WithHeadersFromQuests) carries Magic 0, and a line
+					// the journal headed carries both - each writes only the half it has.
 					if (wire == null)
 						continue;
 
-					row.Magic = wire.Magic;
-					row.TableField1 = wire.TableField1;
-					row.TitleRefId = wire.TitleRefId;
-					row.TitleCategory = wire.TitleCategory;
-					row.TitleKey = wire.TitleKey;
-					row.MapRefId = wire.MapRefId;
-					row.MapCategory = wire.MapCategory;
-					row.MapKey = wire.MapKey;
-					row.RegionRefId = wire.RegionRefId;
-					row.RegionCategory = wire.RegionCategory;
-					row.RegionKey = wire.RegionKey;
+					if (wire.Magic != 0)
+					{
+						row.Magic = wire.Magic;
+						row.TableField1 = wire.TableField1;
+					}
+
+					if (wire.TitleRefId != 0)
+					{
+						row.TitleRefId = wire.TitleRefId;
+						row.TitleCategory = wire.TitleCategory;
+						row.TitleKey = wire.TitleKey;
+						row.MapRefId = wire.MapRefId;
+						row.MapCategory = wire.MapCategory;
+						row.MapKey = wire.MapKey;
+						row.RegionRefId = wire.RegionRefId;
+						row.RegionCategory = wire.RegionCategory;
+						row.RegionKey = wire.RegionKey;
+					}
 
 					// The two MainQuest_c trailer words (#896) - only when a captured index block actually named this
 					// line. The extractor leaves TrailerCategory at its SOLO default for a line no block covered, and
