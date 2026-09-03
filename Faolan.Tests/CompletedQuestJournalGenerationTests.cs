@@ -350,8 +350,8 @@ namespace Faolan.Tests
 				if (first.Length == 0)
 				{
 					var b = QuestIndexRegionCodec.Parse(built);
-					first = $"{source}: {built.Length} B built vs {want.Length} B captured; " + $"block0 tf1={b.Blocks[0].TableField1}/{captured.Blocks[0].TableField1} " +
-					        $"tf2={b.Blocks[0].TableField2}/{captured.Blocks[0].TableField2} " + $"area={b.Blocks[0].AreaId}/{captured.Blocks[0].AreaId} " +
+					first = $"{source}: {built.Length} B built vs {want.Length} B captured; " + $"block0 step={b.Blocks[0].StepNumber}/{captured.Blocks[0].StepNumber} " +
+					        $"after={b.Blocks[0].StepsAfter}/{captured.Blocks[0].StepsAfter} " + $"area={b.Blocks[0].AreaId}/{captured.Blocks[0].AreaId} " +
 					        $"areaQuests={b.Blocks[0].AreaQuestIds.Count}/{captured.Blocks[0].AreaQuestIds.Count}";
 				}
 

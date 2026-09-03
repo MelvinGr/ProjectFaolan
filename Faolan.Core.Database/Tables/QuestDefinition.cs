@@ -109,7 +109,9 @@ namespace Faolan.Core.Database.Tables
 		// Quest index region: the area table's marker + three lead words + trailer word. Beach 10238: marker 0x7E2,
 		// fields 1/7/0, trailer 0x156E7, and area 241's 8 quests as the table body (see IndexQuestLineQuestIds - the body is
 		// the AREA CATALOG, not "the client's 1..n goal index", which is what this said until the list was checked
-		// against the area's own rows).
+		// against the area's own rows). The first two "fields" are the block's StepNumber / StepsAfter - the held
+		// quest's step in its line and the steps after it, i.e. PROGRESS, which is why QuestGoalWiring derives them
+		// from JournalSequence and the line's length rather than harvesting them (#926).
 		//
 		// IndexMagic is the AREA's `ACGHash` token, not a per-quest magic: the client reads it through `FUN_005d7190`,
 		// which only checks the four bytes are `[0-9A-Z_]` (see docs/re/questc-region-decode.md). Area 241 = "W6QT",

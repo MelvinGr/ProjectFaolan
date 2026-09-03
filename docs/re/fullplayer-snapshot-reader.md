@@ -37,11 +37,14 @@ so the login journal shows the real quests, not the captured beach char's phanto
 OWN `@609` objective region — whose lead word is `(goals+1)*0x3F1` (NOT a constant `0xBD3`; beach 2 goals = `0xBD3`,
 Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now the region's `ListFrame` count, computed). Then the quest
 **index** = shared header `[0x3F1][marker=(N+1)*0x3F1][all questIds][count][sentinel 0xF1]` + **one block per quest**
-`[magic][tf1..3][goalCount][(step,1..n) pairs][trailer questId,1,0,0,linkWord]`, where `magic` is the quest's goal-table
+`[magic][stepNumber][stepsAfter][tf3][goalCount][(step,1..n) pairs][trailer questId,1,0,0,linkWord]`, where `magic` is the quest's goal-table
 NAME word (beach `0x57365154` "W6QT", Casilda `0x52524C33" "RRL3") and the block trailers **CHAIN**: `linkWord` = the
-NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. **All record/objective/index scalars are
+NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. **All record/objective scalars are
 PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
-beach record is the same fresh 601 B early or late). Builder: `SnapshotTails.QuestPortion(quests, primary,
+beach record is the same fresh 601 B early or late). ⚠️ The index block's first two lead words are the exception, and
+were mistaken for constants for the same reason as everything else here: they are the held quest's **step number in
+its line** and the **steps after it** (`[1][count-1]` only while the character stands on step 1 - the beach line runs
+1/3/5/8 across characters), see the 2026-09-03 update below (#926). Builder: `SnapshotTails.QuestPortion(quests, primary,
 instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
 `QuestDefinition` cols: `Level`, `SnapshotQuestLineReward`, `IndexMagic` (+migrations; `SnapshotState` was collapsed into
 `Level` and the `SnapshotField*` scalars renamed `SnapshotUnknown*` on 2026-07-20). A held quest joins the snapshot
@@ -66,7 +69,7 @@ index in **all 141** snapshots (`UnknownBeforeAccessWindowTable` 105,744 B → *
    always `[active journal][completed-journal frame][quest index]`.
 2. **The "`0xF1` sentinel" is the first block's quest AreaId** (beach area 241 == `0xF1`), and the block
    trailer `[1][0][0]` fields VARY per quest (a up to 8, c 0 or 1) — constant-looking only because every golden
-   is a beach char. The `(questId, idx)` catalog pairs' second field is a 1-based **sequence that is NOT
+   is a beach char. The lead pair `[tf1][tf2]` varies too, per CHARACTER (step number / steps after, #926). The `(questId, idx)` catalog pairs' second field is a 1-based **sequence that is NOT
    strictly monotonic** (branch/chapter quests repeat one), so the old `idx == i+1` assertion was also a
    beach-only accident.
 
@@ -76,7 +79,7 @@ PREVIOUS block as a "chainWord", manufacturing a chain grammar and a phantom "te
 ```
 [u32 marker=(count+1)*0x3F1] [u32 questId × count] [u32 count]
 per held quest (count blocks, id order):
-  [u32 areaId] [u32 magic] [u32 tf1] [u32 tf2=count-1] [u32 tf3=0]
+  [u32 areaId] [u32 magic] [u32 stepNumber] [u32 stepsAfter] [u32 tf3=0]   # stepNumber + stepsAfter == n (#926)
   [u32 n] [ (questId, sequence) × n ]             # the AREA's full quest catalog
   [u32 trailerQuestId] [u32 a] [u32 b] [u32 c]
 ```
@@ -299,15 +302,28 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 tracked]
    [u32 @0x48][u32 @0x4c][u32 @0x50]` — **all numeric, no strings** (the readable text for these quests is in
    the `Quest_c` journal list, region 2). This is `QuestIndexRegion.Block`, field for field: `@0x14` AreaId,
-   `@0x18` the ACGHash, `@0x30`/`@0x34` TableField1/2, `@0x44` TableField3, then the pair list, then
+   `@0x18` the ACGHash, `@0x30`/`@0x34` StepNumber/StepsAfter, `@0x44` TableField3, then the pair list, then
    TrailerQuestId (matched into the pair list and parked in the current-quest slot `@0x38`) and
-   TrailerA/B/C at `@0x48`/`@0x4c`/`@0x50`. ⭐ **`@0x44`/`@0x48`/`@0x50` are the SAME slots the incremental
+   TrailerA/B/C at `@0x48`/`@0x4c`/`@0x50`. ⭐ **`@0x30`/`@0x34` are per-character PROGRESS, not line data**
+   (2026-09-03, #926): on all 2,626 captured blocks `@0x30` is the held quest's own sequence in the pair list and
+   `@0x34` is `n - @0x30`. Their reader is the journal's line panel `FUN_01617260`, which fetches the line through
+   `CoreQuestHolder::GetMainQuest` (`FUN_008107d0`, a scan of the holder's `+0x4c..+0x50` list on `+0x14`), takes
+   `@0x30` as a running counter through the Roman-numeral formatter `FUN_010cfbc0` (the I/II/III the journal shows
+   for a line's chapters), then draws `@0x34` placeholder rows for the steps to come and hides that section
+   (`FUN_00ae3b30(widget+0x4e0, 0, 1)`) when `@0x34` is 0. The `[1][count-1]` reading held only because every
+   captured character stood on step 1 of the early corpus's lines. ⭐ **`@0x44`/`@0x48`/`@0x50` are the SAME slots the incremental
    `MainQuestUpdateIIR`'s Unknown1/Unknown0/Unknown2 land in** (`FUN_00810840` + the ctor `FUN_00921980`), so
    the snapshot block and the IIR trailer are two producers of one struct (#464). The one consumer found:
    `@0x48` is the quest TRACKER's sort tiebreaker (`FUN_012ce1c0` parks it in `QJQuestNode_c +0x70`;
    `FUN_012cde80`/`FUN_012cbbb0` compare it) — per line it is 1 on solo, 4 on raid, 8 on group-dungeon
-   content across all 97 captured blocks. `@0x44` and `@0x50` have no reader; see `MainQuestUpdateIIR`'s
-   record remarks for the per-field data.
+   content across all 97 captured blocks. `@0x44` and `@0x50` have no reader (re-checked 2026-09-03: neither of the two direct `GetMainQuest`
+   callers touches them, the class's 7 vtable slots are the `PtrTarget_c` boilerplate, and an offset census over
+   the struct's slot set is too generic to anchor - 889 functions); see `MainQuestUpdateIIR`'s record remarks
+   for the per-field data. `@0x50` is ALSO the word after the 4CC in the completed journal's line record
+   (`FUN_00922c90` stores it at `+0x6c` of the 0x70-byte record, after the strings at `+0x04`/`+0x20`/`+0x3c`
+   and the hash at `+0x68`): the two agree on every line captured in both records, so one `QuestLine.TrailerFlag`
+   column feeds both. Its population, decrypted: the Kalanthes raid chain, a World Bosses mastery line, the
+   2014 anniversary and 2015 Halloween event lines, two Onslaught lines (#926).
 6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
    (`FUN_0077db70`): `[u8 requiresToken][u32 accessType][u32 secondsRemaining][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`
    — VARIABLE-WIDTH (the inner count is a PLAIN count, not `0x3F1`-framed).

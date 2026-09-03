@@ -403,10 +403,7 @@ namespace Faolan.Importer.Captures
 						continue;
 
 					if (wire.Magic != 0)
-					{
 						row.Magic = wire.Magic;
-						row.TableField1 = wire.TableField1;
-					}
 
 					if (wire.TitleRefId != 0)
 					{
@@ -437,7 +434,6 @@ namespace Faolan.Importer.Captures
 				{
 					QuestLineId = areaId,
 					Magic = wire?.Magic ?? 0,
-					TableField1 = wire?.TableField1 ?? 0,
 					TitleRefId = wire?.TitleRefId ?? 0,
 					TitleCategory = wire?.TitleCategory ?? 0,
 					TitleKey = wire?.TitleKey ?? new ProtoDecryptionKey(),

@@ -3376,9 +3376,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("RegionRefId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("TableField1")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Tier")
                         .HasColumnType("INTEGER");
 

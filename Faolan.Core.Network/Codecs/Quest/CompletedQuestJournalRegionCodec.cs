@@ -17,7 +17,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//     [string mapName]                           <remoteformat category=52000> the PLAYFIELD (4010 "Tortage Island")
 	//     [string regionName]                        <remoteformat category=52000> the COARSER grouping (8 distinct)
 	//     [u32 magic]                                the area's goal-table NAME word ('RRL3', 'W6QT', ...)
-	//     [u32 tf1]                                  0 in every captured group
+	//     [u32 lineFlag]                             the line's flag - the same word the quest index's block carries
+	//                                                as TrailerC (MainQuest_c +0x50); 1 on one captured line (#926)
 	//     [u32 questsInArea]
 	//     per QUEST:
 	//       [u32 sequence]                           1-based, RESETS per area
@@ -69,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					MapName = r.ReadStringU16Length(),
 					RegionName = r.ReadStringU16Length(),
 					Magic = r.ReadU32Be(),
-					TableField1 = r.ReadU32Be()
+					LineFlag = r.ReadU32Be()
 				};
 
 				var questsInArea = r.ReadU32Be();
@@ -109,7 +110,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				s.WriteString(area.MapName);
 				s.WriteString(area.RegionName);
 				s.WriteUInt32(area.Magic);
-				s.WriteUInt32(area.TableField1);
+				s.WriteUInt32(area.LineFlag);
 				s.WriteUInt32(area.Quests.Count);
 
 				foreach (var quest in area.Quests)
@@ -152,7 +153,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 			public string MapName { get; init; } = "";
 			public string RegionName { get; init; } = "";
 			public uint Magic { get; init; } // the AREA's goal-table name word ('RRL3', 'W6QT', ...)
-			public uint TableField1 { get; init; }
+
+			// The line's flag, stored by the client's record reader (`FUN_00922c90`) at +0x6c of the 0x70-byte
+			// completed-line record, right after the 4CC at +0x68. It is the per-LINE flag the quest index block carries
+			// as TrailerC (`MainQuest_c +0x50`): the two agree on every line captured in both records, including the one
+			// positive - so it is one field with two producers, and generation takes it from QuestLine.TrailerFlag.
+			// The client reads neither copy anywhere found (#926); see QuestLine.TrailerFlag for what carries it.
+			public uint LineFlag { get; init; }
 		}
 
 		public sealed record QuestEntry

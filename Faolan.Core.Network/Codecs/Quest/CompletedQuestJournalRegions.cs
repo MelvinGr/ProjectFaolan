@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					MapName = QuestTextTokens.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey),
 					RegionName = QuestTextTokens.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey),
 					Magic = area.Magic,
-					TableField1 = area.TableField1
+					LineFlag = area.TrailerFlag
 				};
 
 				foreach (var quest in quests)

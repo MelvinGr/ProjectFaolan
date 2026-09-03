@@ -57,10 +57,6 @@ namespace Faolan.Core.Database.Tables
 		public uint MapCategory { get; set; }
 		public uint RegionCategory { get; set; }
 
-		// The word after Magic. 0 in every captured line group; kept rather than asserted, because "constant across
-		// the corpus" has repeatedly turned out to mean "the corpus only covers one case" in this protocol.
-		public uint TableField1 { get; set; }
-
 		// --- the two per-LINE MainQuest_c trailer words (#896, decoded in #464) ------------------------------------
 		//
 		// Both are fields of the client's `MainQuest_c` and have TWO producers that write the same slots: the login
@@ -76,10 +72,16 @@ namespace Faolan.Core.Database.Tables
 		// majority - and because a line we have never seen an index block for is far likelier to be solo than not.
 		public uint TrailerCategory { get; set; } = 1;
 
-		// `MainQuest_c +0x50`. No consumer found in the client; a per-line flag, set on 6 of the 97 captured lines
-		// (five of them content newer than the client's own 1000104 catalog, plus [Kheshatta_Kalanthes] The Immortal
-		// Hand). ⛔ It is NOT "another line chains from this one" - that reading was measured and misses both ways on
-		// 85 of 97. Carried so a line reproduces its captured block; 0 is the value 91 of 97 lines have.
+		// `MainQuest_c +0x50`, and ALSO the word after the 4CC in the completed journal's line group (the client's
+		// completed-line record stores it at +0x6c) - the two agree on every line captured in both records, so this one
+		// column feeds both (#926; the journal's copy used to be its own `TableField1`). No consumer found in the
+		// client: the two direct readers of a `MainQuest_c` (the tracker's insert and the journal's line panel) skip
+		// +0x50, and the class has no accessor for it. What CARRIES it is nameable now that the six lines' titles are
+		// decrypted: [Kheshatta_Kalanthes] The Immortal Hand, [World Bosses][Mastery][Mage] The Twelve Portents,
+		// [Anniversary][2014] Shadows of the Past, [Halloween 2015] The Shambling Plague, and two [Onslaught] lines -
+		// raid, world-boss, seasonal-event and Onslaught content, every one repeatable. A correlation, not a mechanism.
+		// ⛔ It is NOT "another line chains from this one" - that reading was measured and misses both ways on 85 of
+		// 97. Carried so a line reproduces its captured block; 0 is the value the other 91 captured lines have.
 		public uint TrailerFlag { get; set; }
 
 		// --- from the client's quest catalog, RDB 1000104 (`MainQuest`); see docs/rdb/quest-catalog-1000104.md ---

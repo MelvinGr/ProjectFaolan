@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
@@ -83,5 +84,40 @@ namespace Faolan.Tests
 
 			Assert.Equal(template[RegionStart..RegionEnd], QuestIndexRegionCodec.Build(region));
 		}
+
+		// The block's two lead words are the HELD quest's step number in its line and the number of steps after it -
+		// per-character progress (#926), not the `[1][count-1]` constant they read as while every captured character
+		// stood on step 1. Both halves are checked on every captured block: StepNumber equals the held quest's own
+		// sequence entry in the block's catalog, and StepsAfter is what remains of the catalog after it.
+		[Fact]
+		public void EveryCapturedBlock_CarriesTheHeldQuestsStepAndTheStepsAfterIt()
+		{
+			var blocks = 0;
+			var distinctSteps = new HashSet<uint>();
+			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			{
+				if (sub.QuestIndex is not { } index)
+					continue;
+
+				for (var i = 0; i < index.Blocks.Count; i++)
+				{
+					var block = index.Blocks[i];
+					var held = index.QuestIds[i];
+					var pos = block.AreaQuestIds.IndexOf(held);
+					Assert.True(pos >= 0, $"{source}: held quest {held} is not in its own block's catalog (line {block.AreaId})");
+					Assert.True(block.StepNumber == block.AreaQuestSequences[pos],
+						$"{source}: line {block.AreaId} held {held} at sequence {block.AreaQuestSequences[pos]} but StepNumber={block.StepNumber}");
+					Assert.True(block.StepsAfter == (uint)block.AreaQuestIds.Count - block.StepNumber,
+						$"{source}: line {block.AreaId} StepNumber={block.StepNumber} of {block.AreaQuestIds.Count} but StepsAfter={block.StepsAfter}");
+					blocks++;
+					distinctSteps.Add(block.StepNumber);
+				}
+			}
+
+			Assert.True(blocks > 0, "no captured index block");
+			// The claim is only worth a gate if the corpus reaches past step 1 - that is what made the constant reading wrong.
+			Assert.True(distinctSteps.Count > 1, $"every captured block is on step {distinctSteps.First()}; the corpus cannot tell progress from a constant");
+		}
+
 	}
 }

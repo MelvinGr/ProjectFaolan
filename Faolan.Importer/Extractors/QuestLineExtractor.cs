@@ -50,7 +50,6 @@ namespace Faolan.Importer.Extractors
 						// 0 = "no index block has named this line yet" - see the second pass. The completed journal
 						// does not carry the trailer pair, so this source never knows it.
 						TrailerCategory = 0,
-						TableField1 = area.TableField1,
 						TitleRefId = title.RefId,
 						TitleCategory = title.Category,
 						TitleKey = LdbKey.Decode(title.Key) ?? new ProtoDecryptionKey(),
@@ -74,23 +73,25 @@ namespace Faolan.Importer.Extractors
 			// and a line can have those from one source and its trailers from the other.
 			foreach (var p2 in packets)
 			{
-				if (!SnapshotJournalReader.TryRead(p2.Bytes, out _, out var journal, out var index) || index == null)
+				if (!SnapshotJournalReader.TryRead(p2.Bytes, out _, out _, out var index) || index == null)
 					continue;
 
 				foreach (var block in index.Blocks)
 				{
-					if (block.Magic == 0)
+					if (block.Magic == 0 || block.AreaId == 0)
 						continue;
 
-					var quest = journal.FirstOrDefault(r => r.QuestId == block.TrailerQuestId);
-					if (quest == null || quest.QuestLineId == 0)
-						continue;
+					// The block names its own line (its first word, #464). This used to be joined through the active
+					// journal's record for the block's ANCHOR quest, which silently dropped every block whose anchor the
+					// character had already completed - the line then kept a 0 flag while 79 captured blocks said 1
+					// (#926, [Anniversary][2014] Shadows of the Past).
+					var lineId = block.AreaId;
 
 					// Only the 4CC is available here - the area's header records are not part of the index.
-					if (!byArea.TryGetValue(quest.QuestLineId, out var line))
-						byArea[quest.QuestLineId] = line = new QuestLine
+					if (!byArea.TryGetValue(lineId, out var line))
+						byArea[lineId] = line = new QuestLine
 						{
-							QuestLineId = quest.QuestLineId,
+							QuestLineId = lineId,
 							Magic = block.Magic,
 							// 0 = "no block named this line yet", which is what ImportQuestLines reads as "leave the
 							// row's own value alone". The COLUMN's default is 1 (solo); a harvested row says 0 until a
@@ -101,15 +102,15 @@ namespace Faolan.Importer.Extractors
 					// ⚠️ First block wins, and a DISAGREEMENT is recorded rather than resolved: the pair is stable
 					// per line on all 97 captured blocks, so two blocks of one line differing would mean the
 					// per-line reading is wrong - a thing to surface, not to average away.
-					if (trailerSeen.TryGetValue(quest.QuestLineId, out var seen))
+					if (trailerSeen.TryGetValue(lineId, out var seen))
 					{
 						if (seen != (block.TrailerA, block.TrailerC))
-							disagreements.Add($"line {quest.QuestLineId}: index blocks disagree - ({seen.Category},{seen.Flag}) vs ({block.TrailerA},{block.TrailerC})");
+							disagreements.Add($"line {lineId}: index blocks disagree - ({seen.Category},{seen.Flag}) vs ({block.TrailerA},{block.TrailerC})");
 
 						continue;
 					}
 
-					trailerSeen[quest.QuestLineId] = (block.TrailerA, block.TrailerC);
+					trailerSeen[lineId] = (block.TrailerA, block.TrailerC);
 					line.TrailerCategory = block.TrailerA;
 					line.TrailerFlag = block.TrailerC;
 				}

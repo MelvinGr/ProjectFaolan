@@ -20,7 +20,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//                                             ACCESS-WINDOW TABLE's ListFrame(86) == 0x156E7, constant only
 	//                                             because every capture carries the same 86-entry catalog.
 	//     [u32 magic]                             the AREA's goal-table NAME word ("W6QT" 0x57365154, "RRL3" ...)
-	//     [u32 tf1][u32 tf2][u32 tf3]             tf2 == count-1, tf3 == 0 across the corpus
+	//     [u32 stepNumber][u32 stepsAfter][u32 tf3]
+	//                                             the held quest's 1-based step in its line and the number of steps
+	//                                             AFTER it (their sum is the line's length); the client's journal
+	//                                             draws them as Roman numerals (#926). PER-CHARACTER progress, not a
+	//                                             line constant - it read as `[1][count-1]` for as long as every
+	//                                             captured character stood on step 1. tf3 == 0 across the corpus
 	//     [u32 n][ (questId, sequence) × n ]      the AREA's full quest catalog; sequence is 1-based but NOT strictly
 	//                                             monotonic (branch/chapter quests repeat a sequence - so the old
 	//                                             "idx == i+1" assertion was a beach-only accident)
@@ -85,8 +90,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				{
 					AreaId = areaId,
 					Magic = magic,
-					TableField1 = f1,
-					TableField2 = f2,
+					StepNumber = f1,
+					StepsAfter = f2,
 					TableField3 = f3,
 					AreaQuestIds = areaQuestIds,
 					AreaQuestSequences = areaQuestSequences,
@@ -121,8 +126,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 				s.WriteUInt32(b.AreaId);
 				s.WriteUInt32(b.Magic);
-				s.WriteUInt32(b.TableField1);
-				s.WriteUInt32(b.TableField2);
+				s.WriteUInt32(b.StepNumber);
+				s.WriteUInt32(b.StepsAfter);
 				s.WriteUInt32(b.TableField3);
 
 				s.WriteUInt32((uint)b.AreaQuestIds.Count);
@@ -170,8 +175,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 			public List<uint> AreaQuestIds { get; init; } = [];
 			public List<uint> AreaQuestSequences { get; init; } = [];
 			public uint Magic { get; init; } // the area's goal-table name word (W6QT / RRL3 / ...)
-			public uint TableField1 { get; init; }
-			public uint TableField2 { get; init; }
+
+			// `MainQuest_c +0x30` / `+0x34` (#926): the HELD quest's 1-based step number within its line, and the number of
+			// steps after it - so StepNumber + StepsAfter == AreaQuestIds.Count, and on every one of the 2,626 captured
+			// blocks StepNumber is exactly the held quest's own AreaQuestSequences entry. The reader is the journal's
+			// line panel (`FUN_01617260`): it takes +0x30 as a running counter, formats it through the Roman-numeral
+			// converter (`FUN_010cfbc0`, the I/II/III the journal shows for a line's chapters) for the current step, then
+			// draws +0x34 more placeholder rows for the steps still to come and hides that section when +0x34 is 0.
+			//
+			// ⚠️ These are per-CHARACTER progress, the only two words in the block that are. They were recorded as
+			// per-quest constants (`[1][count-1]`) because every captured character stood on step 1 of the lines the
+			// early corpus covered; the beach line alone now shows 1/3/5/8 across characters. Generation derives them
+			// from the held quest's JournalSequence (QuestIndexRegions.ForQuests), which is why it stayed byte-exact.
+			public uint StepNumber { get; init; }
+			public uint StepsAfter { get; init; }
 
 			// MainQuest_c +0x44 - the SAME slot MainQuestUpdateIIR.Unknown1 lands in (the IIR path routes it through
 			// the `FUN_00921980` ctor's third argument; the snapshot filler `FUN_00922210` stores this word there).
@@ -185,8 +202,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// TrailerC == its Unknown2 (the IIR carries no TrailerB; the wire ctor parks the area token there).
 			// So the per-field facts live with the IIR record (MainQuestUpdateIIR remarks): TrailerA is the line's
 			// solo(1)/raid(4)/dungeon(8) category, consumed as the quest tracker's sort tiebreaker; TrailerB is 0 on
-			// every captured block; TrailerC is a per-line flag, 1 on 6 of 97 captured lines. Constant per LINE, not
-			// per quest - carried, not assumed (#391/#464).
+			// every captured block; TrailerC is a per-line flag, 1 on 6 of 97 captured lines, and the SAME flag the
+			// completed journal's line group carries (CompletedQuestJournalRegion.AreaGroup.LineFlag - the two agree on
+			// every line seen in both, #926). Constant per LINE, not per quest - carried, not assumed (#391/#464).
 			public uint TrailerA { get; init; } = 1;
 			public uint TrailerB { get; init; }
 			public uint TrailerC { get; init; }

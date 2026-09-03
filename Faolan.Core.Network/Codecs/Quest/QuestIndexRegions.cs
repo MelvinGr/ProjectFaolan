@@ -32,9 +32,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					? c
 					: null;
 
-				// tf1 is the quest's position in its area and tf2 the number of area quests AFTER it, so the pair is
-				// (sequence, remaining). Captured: quest 10238 seq 1 of 8 -> (1, 7); quest 13479 seq 1 of 4 -> (1, 3).
-				// tf3 is 0 in every captured block.
+				// StepNumber is the held quest's position in its line and StepsAfter the number of steps AFTER it -
+				// per-character progress, drawn by the journal as Roman numerals (Block.StepNumber). Captured: quest
+				// 10238 seq 1 of 8 -> (1, 7); the same line held at step 3 -> (3, 5). tf3 is 0 in every captured block.
 				var areaCount = catalog?.Count ?? 0;
 				var sequence = q.JournalSequence;
 
@@ -46,10 +46,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 				{
 					AreaId = q.QuestLineId,
 					Magic = magic,
-					TableField1 = catalog != null
+					StepNumber = catalog != null
 						? sequence
 						: q.IndexTableField1,
-					TableField2 = catalog != null
+					StepsAfter = catalog != null
 						? areaCount > sequence
 							? (uint)areaCount - sequence
 							: 0

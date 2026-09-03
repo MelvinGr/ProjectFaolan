@@ -111,6 +111,38 @@ namespace Faolan.Tests
 			}
 		}
 
+		// The word after a completed line group's 4CC is the line's flag - the same per-line flag the quest index
+		// block carries as TrailerC (MainQuest_c +0x50), which is why one QuestLine.TrailerFlag column now feeds both
+		// producers (#926). The gate is the agreement on every line a snapshot carries in BOTH records, and it only
+		// binds if at least one such line is flagged - all-zero agreement would not distinguish one field from two.
+		[Fact]
+		public void TheLineFlag_AgreesWithTheIndexBlocksTrailerC_OnEveryLineSeenInBoth()
+		{
+			var seenInBoth = new HashSet<uint>();
+			var flagged = new HashSet<uint>();
+			foreach (var (source, sub, _) in SubClasses())
+			{
+				if (sub.CompletedQuests is not { } completed || sub.QuestIndex is not { } index)
+					continue;
+
+				var flagByLine = index.Blocks.ToDictionary(b => b.AreaId, b => b.TrailerC);
+				foreach (var group in completed.Areas)
+				{
+					if (!flagByLine.TryGetValue(group.QuestLineId, out var trailerC))
+						continue;
+
+					Assert.True(group.LineFlag == trailerC, $"{source}: line {group.QuestLineId} completed-journal flag {group.LineFlag} vs index TrailerC {trailerC}");
+					seenInBoth.Add(group.QuestLineId);
+					if (trailerC != 0)
+						flagged.Add(group.QuestLineId);
+				}
+			}
+
+			o.WriteLine($"lines seen in both records={seenInBoth.Count} flagged={flagged.Count} [{string.Join(",", flagged)}]");
+			Assert.True(seenInBoth.Count > 0, "no snapshot carries a line in both the completed journal and the index");
+			Assert.True(flagged.Count > 0, "no flagged line is captured in both records, so the gate cannot tell one field from two");
+		}
+
 		public static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClassesForProbe()
 		{
 			return SubClasses();
