@@ -322,7 +322,19 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    for the per-field data. `@0x50` is ALSO the word after the 4CC in the completed journal's line record
    (`FUN_00922c90` stores it at `+0x6c` of the 0x70-byte record, after the strings at `+0x04`/`+0x20`/`+0x3c`
    and the hash at `+0x68`): the two agree on every line captured in both records, so one `QuestLine.TrailerFlag`
-   column feeds both. Its population, decrypted: the Kalanthes raid chain, a World Bosses mastery line, the
+   column feeds both — and a THIRD producer (#929, 2026-09-03): `FUN_00922c90` is also the area reader
+   `QuestJournalIIR_c::ReadSubClass` (`FUN_0091a4e0`) calls, for the first area at IIR+0x2c and for the further-area
+   list through the same list reader `FUN_00798c70` at +0xa0, so `QuestJournalArea.TrailerFlag` (the word after the
+   area's ACGHash, 0 on all 49 captured blocks — every one on a flag-0 line) is the same field. ⛔ The reader hunt is
+   CLOSED, negative: after the reader the only code touching the slot is the MergeType-1 stamp in
+   `JournalHolder_c::UpdateQuestEntryList`; the journal window band (243 functions decompiled) and the QJ node /
+   tracker band (604) never read `+0x6c` of the record or `+0x50` of a `MainQuest_c` (the one `+0x6c` byte test in
+   the journal band, `FUN_01618640`, is on the TREE NODE — a completed-area node versus an active-quest node — not
+   the record); the holder's per-record helpers, the completed-area panel (`FUN_016184a0`, renders the title and the
+   finished-step names) and the completed-tab tree builder (`FUN_012cd1f0`, hands the node factory the three
+   strings, the area id and the record index) skip it; and `MainQuest_c::WriteToStream` (`FUN_00921db0`) has no
+   caller and sits in no vtable, so nothing serializes `+0x50` back out. The field is stored twice and read
+   nowhere; its meaning is the server's. Its population, decrypted: the Kalanthes raid chain, a World Bosses mastery line, the
    2014 anniversary and 2015 Halloween event lines, two Onslaught lines (#926).
 6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
    (`FUN_0077db70`): `[u8 requiresToken][u32 accessType][u32 secondsRemaining][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`

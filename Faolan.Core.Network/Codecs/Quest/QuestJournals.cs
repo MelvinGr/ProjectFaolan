@@ -29,7 +29,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				// The area's ACGHash token, harvested per quest into QuestDefinition.IndexMagic. It is a property of the
 				// AREA, so the first definition's is the block's; 0 for an area no capture has shown a journal for.
-				AcgHash = first.IndexMagic
+				AcgHash = first.IndexMagic,
+				// The line's flag - the third producer of QuestLine.TrailerFlag beside the index block and the completed
+				// journal (#929), so all three agree on the wire. `Line` is an Included navigation where it is loaded;
+				// lazy loading is off, so null means "not loaded" and the block carries 0, the value every captured
+				// journal area has.
+				TrailerFlag = first.Line?.TrailerFlag ?? 0
 			};
 
 			// MergeType 0 = append: what retail's own one-quest journal carries, and the right op for a client that

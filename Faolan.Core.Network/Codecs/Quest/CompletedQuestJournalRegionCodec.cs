@@ -158,7 +158,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// completed-line record, right after the 4CC at +0x68. It is the per-LINE flag the quest index block carries
 			// as TrailerC (`MainQuest_c +0x50`): the two agree on every line captured in both records, including the one
 			// positive - so it is one field with two producers, and generation takes it from QuestLine.TrailerFlag.
-			// The client reads neither copy anywhere found (#926); see QuestLine.TrailerFlag for what carries it.
+			// THREE producers, in fact: the same `FUN_00922c90` is the area reader `QuestJournalIIR_c::ReadSubClass`
+			// calls, so `QuestJournalArea.TrailerFlag` is this word too (#929). The client reads none of the copies -
+			// see QuestLine.TrailerFlag for the exhaustive sweep and for what carries it.
 			public uint LineFlag { get; init; }
 		}
 

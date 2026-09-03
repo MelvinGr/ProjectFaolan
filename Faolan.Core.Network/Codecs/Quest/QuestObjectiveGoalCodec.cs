@@ -74,7 +74,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//     `FUN_00cba060(buf, size)` byte-swap-and-append every other field goes through.
 	// The other 50 are unrelated structs that happen to share the offsets. So the pair is read, stored and
 	// re-serialized and nothing else in the client touches it - the same "propagated, no found consumer" class as
-	// `QuestJournalAreaCodec.Unknown`, and a fourth round of offset scanning will not change that.
+	// `QuestJournalArea.TrailerFlag` (which turned out to be a named field with no reader, #929), and a fourth round of offset scanning will not change that.
 	//
 	// They are stored and 0 on every captured goal. Open work tracked in Gitea #464.
 	public static class QuestObjectiveGoalCodec

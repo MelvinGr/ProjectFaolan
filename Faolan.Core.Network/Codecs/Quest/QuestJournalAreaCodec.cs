@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//
 	// Wire (client `FUN_00922c90`, the element reader `FUN_00798c70`'s list is built from):
 	//   [u32 areaId][string areaTitle][string mapName][string regionName]
-	//   [u32 acgHash][u32 unknown][u32 count]
+	//   [u32 acgHash][u32 trailerFlag][u32 count]
 	//   count x [u32 ordinal][u32 questId][ListFrame'd list of strings]
 	//
 	// ⚠️ `AcgHash` is NOT a magic. `FUN_005d7190` reads it as the client's **ACGHash** type: a u32 whose four bytes
@@ -70,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return new QuestJournalArea(areaId, areaTitle, mapName, regionName, entries)
 			{
 				AcgHash = acgHash,
-				Unknown = unknown
+				TrailerFlag = unknown
 			};
 		}
 
@@ -82,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteString(v.MapName);
 			s.WriteString(v.RegionName);
 			s.WriteUInt32(v.AcgHash);
-			s.WriteUInt32(v.Unknown);
+			s.WriteUInt32(v.TrailerFlag);
 			s.WriteUInt32(v.Entries.Count);
 
 			for (var i = 0; i < v.Entries.Count; i++)
@@ -127,13 +127,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The area's ACGHash token - see the codec note. Carried per area rather than written as a literal.
 		public uint AcgHash { get; init; }
 
-		// The word between the hash and the entry count. 0 on ALL 49 captured journal area blocks (every area id:
-		// 241/386/1054/1772/1834), so the corpus can never vary it. Client-side (#464, 2026-08-31): it lands at
-		// area+0x6c, and a MergeType-1 journal STAMPS the incoming value onto every held area
-		// (JournalHolder_c::UpdateQuestEntryList copies it before the area-id match) - but no reader exists in the
-		// journal GUI band (the only +0x6c hits there are widget rect floats and vector copies), so like
-		// MainQuestUpdate's TableField3 it is stored and propagated without a found consumer. Carried, not asserted.
-		public uint Unknown { get; init; }
+		// The line's flag - `QuestLine.TrailerFlag`, the same word the quest index block carries as TrailerC
+		// (`MainQuest_c +0x50`) and the completed journal's line record after its 4CC. This block IS that record:
+		// `FUN_00922c90` is one reader with two callers, the FullChar completed journal (through the list reader
+		// `FUN_00798c70`) and `QuestJournalIIR_c::ReadSubClass` (`FUN_0091a4e0`, the first area at IIR+0x2c and the
+		// further-area list through the same `FUN_00798c70` at +0xa0), and it stores the word at +0x6c of the 0x70-byte
+		// record either way (#929). 0 on all 49 captured journal area blocks because every one is on a line whose
+		// flag is 0 (241/386/1054/1772/1834), which is what a per-line flag predicts; the six flagged lines are all
+		// raid / world-boss / seasonal / Onslaught content no captured journal reaches.
+		//
+		// No reader anywhere in the client: a MergeType-1 journal STAMPS the incoming value onto every held record
+		// (JournalHolder_c::UpdateQuestEntryList, before the area-id match), and that is the only code that touches
+		// the slot after the reader - the journal window band (243 functions), the QJ node / tracker band (604), the
+		// holder's per-record helpers, the completed-area panel and the completed-tab tree builder all read the
+		// record's strings, hash and quest list and skip +0x6c, and `MainQuest_c::WriteToStream` (the one serializer
+		// of the +0x50 twin) has no caller and sits in no vtable. Carried so a line reproduces its captured block.
+		public uint TrailerFlag { get; init; }
 	}
 
 	// One line in the journal list: the quest id plus its title (cat 50301) and list sub-line (cat 50303).

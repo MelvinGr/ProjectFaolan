@@ -74,9 +74,16 @@ namespace Faolan.Core.Database.Tables
 
 		// `MainQuest_c +0x50`, and ALSO the word after the 4CC in the completed journal's line group (the client's
 		// completed-line record stores it at +0x6c) - the two agree on every line captured in both records, so this one
-		// column feeds both (#926; the journal's copy used to be its own `TableField1`). No consumer found in the
-		// client: the two direct readers of a `MainQuest_c` (the tracker's insert and the journal's line panel) skip
-		// +0x50, and the class has no accessor for it. What CARRIES it is nameable now that the six lines' titles are
+		// column feeds both (#926; the journal's copy used to be its own `TableField1`) - and the QuestJournalIIR's
+		// area block is that same 0x70-byte record through the same reader (`FUN_00922c90`), so `QuestJournalArea.
+		// TrailerFlag` is a third producer (#929). ⛔ NO consumer in the client, swept exhaustively (2026-09-03,
+		// #929): the two direct `GetMainQuest` callers (the tracker's insert and the journal's line panel) skip
+		// +0x50 and the class has no accessor; the journal window band (243 functions) and the QJ node / tracker
+		// band (604) read the record's strings, hash, quest list and index and never +0x6c; the holder's per-record
+		// helpers, the completed-area panel and the completed-tab tree builder likewise; a MergeType-1 journal only
+		// STAMPS the word across the held records; and `MainQuest_c::WriteToStream` - the one thing that would
+		// serialize +0x50 back out - has no caller and is in no vtable. The flag is stored twice and read nowhere;
+		// whatever it means is the server's. What CARRIES it is nameable now that the six lines' titles are
 		// decrypted: [Kheshatta_Kalanthes] The Immortal Hand, [World Bosses][Mastery][Mage] The Twelve Portents,
 		// [Anniversary][2014] Shadows of the Past, [Halloween 2015] The Shambling Plague, and two [Onslaught] lines -
 		// raid, world-boss, seasonal-event and Onslaught content, every one repeatable. A correlation, not a mechanism.

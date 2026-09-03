@@ -143,6 +143,55 @@ namespace Faolan.Tests
 			Assert.True(flagged.Count > 0, "no flagged line is captured in both records, so the gate cannot tell one field from two");
 		}
 
+		// The THIRD producer of the same flag (#929): the QuestJournalIIR's area block is the completed journal's line
+		// record through the same client reader (`FUN_00922c90`), so its word after the ACGHash must carry what the
+		// snapshot's index block carries as TrailerC for that line. Every captured journal area is on a flag-0 line, so
+		// this gate cannot tell "one field" from "always 0" by variance - the identification is the reader, one
+		// function with two callers - but it binds the three producers to one value on every line the corpus carries
+		// in both, and a journal that started carrying a value the index does not would fail here.
+		[Fact]
+		public void TheJournalAreasTrailerFlag_AgreesWithTheIndexBlocksTrailerC_OnEveryLineSeenInBoth()
+		{
+			var trailerCByLine = new Dictionary<uint, uint>();
+			foreach (var (source, sub, _) in SubClasses())
+			{
+				if (sub.QuestIndex is not { } index)
+					continue;
+
+				foreach (var block in index.Blocks)
+				{
+					if (trailerCByLine.TryGetValue(block.AreaId, out var seen))
+						Assert.True(seen == block.TrailerC, $"{source}: line {block.AreaId} TrailerC {block.TrailerC} vs an earlier block's {seen}");
+					else
+						trailerCByLine[block.AreaId] = block.TrailerC;
+				}
+			}
+
+			var areas = 0;
+			var inBoth = new HashSet<uint>();
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.QuestJournalIIR))
+			{
+				var declared = (int)body.ReadU32Be(0);
+				if (declared + 4 > body.Length)
+					continue; // truncated capture
+
+				var journal = QuestJournalCodec.Parse(body[4..(4 + declared)]);
+				foreach (var area in journal.MoreAreas.Prepend(journal.Area))
+				{
+					areas++;
+					if (!trailerCByLine.TryGetValue(area.QuestLineId, out var trailerC))
+						continue;
+
+					Assert.True(area.TrailerFlag == trailerC, $"{source}: journal area {area.QuestLineId} flag {area.TrailerFlag} vs index TrailerC {trailerC}");
+					inBoth.Add(area.QuestLineId);
+				}
+			}
+
+			o.WriteLine($"journal areas={areas} lines seen in a journal AND an index block={inBoth.Count}");
+			Assert.True(areas > 0, "no captured journal area");
+			Assert.True(inBoth.Count > 0, "no journal area's line is on a captured index block, so the gate binds nothing");
+		}
+
 		public static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClassesForProbe()
 		{
 			return SubClasses();

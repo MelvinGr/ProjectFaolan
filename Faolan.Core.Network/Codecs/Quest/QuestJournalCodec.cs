@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// "Invalid MergeType!" on anything past 4. The ops, from the switch (holder = the per-character journal at
 	// char+0x32c): 0 = APPEND the first area and announce each of its entries; 1 = UPDATE the held area matching
 	// the first area's id (and stamp the incoming area's trailing word onto EVERY held area - see
-	// QuestJournalAreaCodec.Unknown); 2 = apply the FURTHER-areas list; 3 = REMOVE the area matching the first
+	// QuestJournalArea.TrailerFlag); 2 = apply the FURTHER-areas list; 3 = REMOVE the area matching the first
 	// area's id; 4 = a single-entry update within the matching area. Captured journals use exactly 0 (a one-quest
 	// journal, the first append) and 1 (every larger one, the whole-journal refresh naming the last entry).
 	//
