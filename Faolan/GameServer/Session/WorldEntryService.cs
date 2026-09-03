@@ -16,18 +16,31 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
+using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Server.CsPlayerAgent;
+using Faolan.GameServer.Scripting;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Server.ChatServer;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Session
 {
-	public partial class GameServerListener
+	// World ENTRY: everything between a connection reaching the world listener and the character standing in the
+	// world - the login / teleport-reentry / create-world ready bursts, the FullChar snapshot, the spawn poll, the
+	// ability/combo/spell grants and the buff + mount restores. It used to be `GameServerListener.WorldEntry.cs`
+	// (979 lines); it is a composed service because the create flow needs the burst-less entry and a service cannot
+	// take a listener method in its constructor - that was the graph's last bound seam (CreateFlowService).
+	public sealed class WorldEntryService
 	{
 		private const uint MountAllowedFlag = 0x1; // Map.PlayfieldFlags bit 0: the playfield permits mounts
 
@@ -52,7 +65,44 @@ namespace Faolan.GameServer
 		// somebody decides the upsell is worth suppressing that way.
 		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
 
-		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
+		private readonly ILogger _logger;
+		private readonly IDatabaseRepository _database;
+		private readonly WorldSimulation _simulation;
+		private readonly WorldBroadcaster _broadcaster;
+		private readonly QuestBroadcaster _questBroadcaster;
+		private readonly NpcBroadcaster _npcs;
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+		private readonly IChatServerDispatcher _agentServerDispatcher;
+		private readonly TeleportService _teleport;
+		private readonly BuffService _buffs;
+		private readonly TortageIntroService _tortageIntro;
+		private readonly MountService _mounts;
+		private readonly FactionService _factions;
+		private readonly EconomyOutbound _economyOutbound;
+		private readonly RealmClock _clock;
+
+		public WorldEntryService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, WorldBroadcaster broadcaster, QuestBroadcaster questBroadcaster,
+			NpcBroadcaster npcs, ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher agentServerDispatcher, TeleportService teleport, BuffService buffs, TortageIntroService tortageIntro,
+			MountService mounts, FactionService factions, EconomyOutbound economyOutbound, RealmClock clock)
+		{
+			_logger = logger;
+			_database = database;
+			_simulation = simulation;
+			_broadcaster = broadcaster;
+			_questBroadcaster = questBroadcaster;
+			_npcs = npcs;
+			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
+			_agentServerDispatcher = agentServerDispatcher;
+			_teleport = teleport;
+			_buffs = buffs;
+			_tortageIntro = tortageIntro;
+			_mounts = mounts;
+			_factions = factions;
+			_economyOutbound = economyOutbound;
+			_clock = clock;
+		}
+
+		internal async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
 				return;
@@ -68,13 +118,13 @@ namespace Faolan.GameServer
 			{
 				case WorldEntryMode.CreateEditor:
 				{
-					Logger.LogInformation("Create-editor connection: the post-0x205F follow-up waits for the create handoff, not for this 0x2020 poll.");
+					_logger.LogInformation("Create-editor connection: the post-0x205F follow-up waits for the create handoff, not for this 0x2020 poll.");
 					return;
 				}
 
 				case WorldEntryMode.CreateWorld:
 				{
-					Logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
+					_logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
 					return;
 				}
 
@@ -86,7 +136,7 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					Logger.LogError("Post-0x205F flush on an unhandled entry mode {Mode}: sending the login burst by default, which may be wrong for it.", client.Session.EntryMode);
+					_logger.LogError("Post-0x205F flush on an unhandled entry mode {Mode}: sending the login burst by default, which may be wrong for it.", client.Session.EntryMode);
 					break;
 				}
 			}
@@ -96,7 +146,7 @@ namespace Faolan.GameServer
 			// Login or a TeleportReentry - both of which want the full existing-character burst below. This is the
 			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
 			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
-			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
+			_logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
 			await SendWorldReadyBurst(client);
 		}
 
@@ -108,7 +158,7 @@ namespace Faolan.GameServer
 		// not send here - the combo book (12 ComboBookIIR), the deferred stat prompt, a quest marker and the post-0x2024
 		// login record stream - while missing RegenIIR. "It is a world entry, so send the world-entry burst" is what
 		// keeps re-breaking this flow: the create world entry is its OWN sequence, and the captures say so.
-		private async Task SendCreateWorldReadyBurst(INetworkClient client)
+		internal async Task SendCreateWorldReadyBurst(INetworkClient client)
 		{
 			var instance = client.Session.Character.Id;
 
@@ -128,11 +178,11 @@ namespace Faolan.GameServer
 			// A world entity with no live vitals has nothing to say here, and a fabricated delta is exactly what this
 			// record must not carry - so it rides at zero.
 			var (health, mana, stamina) = _simulation.PlayerWorldEntity(client)?.Vitals.ToRefillDeltas() ?? default;
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(RegenCodec.Build(instance, health, mana, stamina))));
 
 			// SyncCanSprint (0x200C, one byte) - the sprint pool starts available (#867).
-			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameCharInterfaceProjectMethods.DispatchSyncCanSprint, SprintFlagCodec.Build(true)));
 
 		}
@@ -145,9 +195,9 @@ namespace Faolan.GameServer
 		// intro cutscene, never during it.
 		private async Task SendWorldReadyBurst(INetworkClient client)
 		{
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(StatCodec.Build(StatIirs.ForCharacter(client.Session.Character.Id, 0x00000013, 0x00000000)))));
-			Logger.LogInformation("Sent deferred StatIIR prompt.");
+			_logger.LogInformation("Sent deferred StatIIR prompt.");
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
@@ -156,7 +206,7 @@ namespace Faolan.GameServer
 			// loading screen and enter the world" signal. We were sending the manifest but never this, so the client
 			// finished the handshake (0x2020 -> 0x2008 -> 0x2076) and then sat on the loading screen forever.
 			// Confirmed by diffing a 4010 login against the Strie dump: 0x2024 ours=0 / dump=1.
-			Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
+			_logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 			await SendReadyForPlayScreen(client);
 			// Retail grants the starting abilities (0x2052) + combo book right after 0x2024, not during world entry
 			// (TestAccount necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
@@ -215,15 +265,15 @@ namespace Faolan.GameServer
 			// between the ability grants and the CharInPlayIIR echo below, and the `00` one at the same point of an
 			// ordinary city login. The classification is GroupFinderActivityCatalog.IsFinderDestination, whose remark
 			// carries what the corpus does and does not separate.
-			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameCharInterfaceProjectMethods.DispatchInDungeonPlayfield, DungeonPlayfieldCodec.Build(GroupFinderActivityCatalog.IsFinderDestination(client.Session.Character.MapId))));
 
 			// record 0: 0x00002000, 17-byte body
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 
 			// record 1: 0x0000200C, 1-byte body
-			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameInterfaceMethods.DispatchReportServerID, (byte[])[0x01]));
 
 			// record 2: 0x00002000 - the StartFixed3d destiny step (ScryScriptIIR 0xA36D3B74), constructed (was verbatim;
@@ -234,20 +284,20 @@ namespace Faolan.GameServer
 			if (client.Session.EntryMode != WorldEntryMode.CreateWorld)
 			{
 				var startFixed3d = ScryScriptCodec.Build(instance, "StartFixed3d");
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(startFixed3d)));
 			}
 
 			if (Global.EnableTutorialOverlay)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					b => b
 						.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 						.WriteUInt32(instance)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
 				var welcomeTutorial = ScryScriptCodec.Build(instance, "WelcomeTutorial");
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(welcomeTutorial)));
 			}
 
@@ -261,7 +311,7 @@ namespace Faolan.GameServer
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or
 			// older chars, whose bind was never set) can't recall at all. Bind ONCE to the entry map's default respawn
 			// point + persist; an established bind is left untouched (it only moves via a bindstone/Wayfarer, not login).
-			Logger.LogInformation("Sent the post-0x2024 login records.");
+			_logger.LogInformation("Sent the post-0x2024 login records.");
 
 			// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
 			// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
@@ -292,13 +342,13 @@ namespace Faolan.GameServer
 			// wallet sync - keep the burst -> snapshot gap clean.)
 			if (client.Session.Character.GuildId is { } guildId)
 			{
-				var guild = await Database.GetGuild(guildId);
+				var guild = await _database.GetGuild(guildId);
 				if (guild != null)
-					await client.SendAsync(BuildGuildTag(client, client.Session.Character.Id, guild.Name));
+					await client.SendAsync(GameServerListener.BuildGuildTag(client, client.Session.Character.Id, guild.Name));
 			}
 
 			client.Session.HasPendingPost205FFollowUp = false;
-			Logger.LogInformation("Cleared pending post-0x205F follow-up flag.");
+			_logger.LogInformation("Cleared pending post-0x205F follow-up flag.");
 		}
 
 		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
@@ -316,7 +366,7 @@ namespace Faolan.GameServer
 		private static Task SendCharInPlay(INetworkClient client)
 		{
 			var instance = client.Session.Character.Id;
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 		}
 
@@ -324,15 +374,15 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var abilities = await CharacterLoadout.ResolveAbilities(Database, Logger, character);
+			var abilities = await CharacterLoadout.ResolveAbilities(_database, _logger, character);
 			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
 			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
 			// kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
 			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAddSpecialAbilityBody).
 			foreach (var ability in abilities)
-				await SendAddSpecialAbility(client, ability, false);
+				await GameServerListener.SendAddSpecialAbility(client, ability, false);
 
-			Logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class,
+			_logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class,
 				character.Level);
 		}
 
@@ -352,9 +402,9 @@ namespace Faolan.GameServer
 			// Sweep/Slam/Hell Strikes on every login. ClassCombo has NO rows for casters, and ships empty until
 			// populated from dumps, so today this grants only the persisted CharacterCombo rows (the safe default).
 			var comboIds = new HashSet<uint>();
-			foreach (var combo in await Database.GetCharacterCombos(character.Id))
+			foreach (var combo in await _database.GetCharacterCombos(character.Id))
 				comboIds.Add(combo.ComboId);
-			foreach (var combo in await Database.GetClassCombos(character.Level, character.Class))
+			foreach (var combo in await _database.GetClassCombos(character.Level, character.Class))
 				comboIds.Add(combo.Id);
 
 			foreach (var comboId in comboIds)
@@ -363,7 +413,7 @@ namespace Faolan.GameServer
 			}
 
 			if (comboIds.Count > 0)
-				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}, level {Level}).", comboIds.Count, character.Name, character.Class, character.Level);
+				_logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}, level {Level}).", comboIds.Count, character.Name, character.Class, character.Level);
 		}
 
 		// Re-grants the character's learned spells on login - the spell counterpart to GrantCharacterAbilities (#74).
@@ -375,12 +425,12 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var spells = await Database.GetCharacterSpells(character.Id);
+			var spells = await _database.GetCharacterSpells(character.Id);
 			foreach (var spell in spells)
-				await SendLearnSpell(client, spell.SpellId);
+				await GameServerListener.SendLearnSpell(client, spell.SpellId);
 
 			if (spells.Length > 0)
-				Logger.LogInformation("GrantCharacterSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
+				_logger.LogInformation("GrantCharacterSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
 		}
 
 		// The client's world-entry spawn-poll, arriving on wire 0x2020 (GameCharAgent method slot 0x20, RPC-catalog
@@ -397,11 +447,11 @@ namespace Faolan.GameServer
 		//      (capture-proven - moving it strands login on the loading screen). FlushPendingPost205FFollowUp no-ops
 		//      unless armed, so a create-editor / post-ready poll just falls through.
 		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
-		private async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet, FaolanStream body)
+		internal async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			if (body.Length < sizeof(uint) * 4)
 			{
-				LogPacketBodyDebug("GameServer 0x2020 short body", body.ToArray());
+				_logger.LogBodyDump("GameServer 0x2020 short body", body.ToArray());
 				return;
 			}
 
@@ -432,8 +482,8 @@ namespace Faolan.GameServer
 					await _npcs.SendNpcCombatMode(client, confirmed);
 			}
 
-			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
+			_logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
+			_logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
 				characterId, client.Session.HasPendingPost205FFollowUp);
 			await FlushPendingPost205FFollowUp(client);
 		}
@@ -443,11 +493,11 @@ namespace Faolan.GameServer
 		// (Map.NewPlayerSpawnSpawnPoint) when the map defines no respawn point.
 		private async Task<RespawnPoint> ResolveLoginResurrectionSpot(Character character)
 		{
-			var points = await Database.GetRespawnPoints(character.MapId);
+			var points = await _database.GetRespawnPoints(character.MapId);
 			if (points.Length == 0)
 				return Map.NewPlayerSpawnSpawnPoint;
 
-			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
+			var discovered = new HashSet<uint>(await _database.GetDiscoveredRespawnPointIds(character.Id));
 			return RespawnResolver.Resolve(character.Position, points, discovered, character.IsCriminal) ?? points[0];
 		}
 
@@ -482,7 +532,7 @@ namespace Faolan.GameServer
 			// Every LATER login gets it as usual, including the first ordinary login after creation.
 			if (client.Session.EntryMode == WorldEntryMode.CreateWorld)
 			{
-				Logger.LogInformation("Create-world entry for '{Name}': skipping Shield of the Risen (it belongs to a login, not to the intro).", client.Session.Character.Name);
+				_logger.LogInformation("Create-world entry for '{Name}': skipping Shield of the Risen (it belongs to a login, not to the intro).", client.Session.Character.Name);
 				return;
 			}
 
@@ -502,13 +552,13 @@ namespace Faolan.GameServer
 		private async Task RestoreMount(INetworkClient client)
 		{
 			if (client.Session.Character?.MountId is { } mountId)
-				await _mounts.RestoreOnWorldEntry(client, mountId, await Database.GetMap(client.Session.Character.MapId), MountAllowedFlag);
+				await _mounts.RestoreOnWorldEntry(client, mountId, await _database.GetMap(client.Session.Character.MapId), MountAllowedFlag);
 		}
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
-		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals, 		// gametime), then runs interest for the NPCs. Beach-shaped (FullCharSnapshotSubClass + BeachPlayfieldId); a non-beach
+		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals, 		// gametime), then runs interest for the NPCs. Beach-shaped (FullCharSnapshotSubClass + WorldState.DefaultPlayfieldToken); a non-beach
 		// map would get beach tails, so the flag is for a beach login until per-map sourcing lands.
-		private async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
+		internal async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
 		{
 			var character = client.Session.Character;
 
@@ -528,7 +578,7 @@ namespace Faolan.GameServer
 					destinationMap = pvpReturnMap;
 					destination = new Vector3(character.PvpReturnX, character.PvpReturnY, character.PvpReturnZ);
 				}
-				else if (character.BindRespawnPointId is { } bindPoint && await Database.GetRespawnPoint(bindPoint) is { } bound)
+				else if (character.BindRespawnPointId is { } bindPoint && await _database.GetRespawnPoint(bindPoint) is { } bound)
 				{
 					destinationMap = bound.MapId;
 					destination = bound.Position;
@@ -541,8 +591,8 @@ namespace Faolan.GameServer
 
 				character.MapId = destinationMap;
 				character.Position = destination;
-				await Database.SaveCharacterTransform(character.Id, character.Position, character.Rotation, destinationMap);
-				Logger.LogInformation("World entry: '{Name}' entered minigame map {MinigameMap} with no running match - redirected to map {ReturnMap} at {Pos}.",
+				await _database.SaveCharacterTransform(character.Id, character.Position, character.Rotation, destinationMap);
+				_logger.LogInformation("World entry: '{Name}' entered minigame map {MinigameMap} with no running match - redirected to map {ReturnMap} at {Pos}.",
 					character.Name, mapId, destinationMap, character.Position);
 				mapId = destinationMap;
 			}
@@ -552,7 +602,7 @@ namespace Faolan.GameServer
 			if (character.PvpReturnMapId != null)
 			{
 				character.PvpReturnMapId = null;
-				await Database.SaveCharacterPvpReturn(character.Id, null, default);
+				await _database.SaveCharacterPvpReturn(character.Id, null, default);
 			}
 
 			// Nothing has been handed to the client for THIS entry yet - so the tick's interest sweep must stay off
@@ -564,18 +614,18 @@ namespace Faolan.GameServer
 			// the four snapshot containers and the spawn's visible gear, from one read.
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
 			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
-			var heldItems = await Database.GetCharacterItems(character.Id);
+			var heldItems = await _database.GetCharacterItems(character.Id);
 			// Union in the item-shop-suppression flags (see ItemShopSuppressTags) so the client's shop-open Lua sees
 			// HasTag(X)==true and never auto-opens the itemshopbrowser on entry.
-			var characterTags = (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray();
+			var characterTags = (await _database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray();
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
-			var activeQuestIds = (await Database.GetCharacterQuests(character.Id, QuestState.Active)).Select(q => q.QuestId).ToHashSet();
+			var activeQuestIds = (await _database.GetCharacterQuests(character.Id, QuestState.Active)).Select(q => q.QuestId).ToHashSet();
 
 			// Populate the shared world model BEFORE building so the player entity exists for the spawn build.
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
-			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
+			var map = await _database.GetMap(mapId) ?? throw new  InvalidOperationException();
 			// #3/#251/#863: the additive stat bonuses the player carries into the world - equipped GEAR, the feats they
 			// TRAINED, and the feats the client trains for them - so their live vitals seed with all three.
 			//
@@ -585,26 +635,26 @@ namespace Faolan.GameServer
 			// characters spend every point they have - both level-80 mages come to exactly 79 - on class-tree
 			// abilities and spell nodes, so their trained contribution is a true zero. Do not read an empty result
 			// here as missing data. The AUTO-TRAINED half is never empty, and is never in a feat list either.
-			var statBonuses = await CharacterStatBonuses.For(Database, character);
+			var statBonuses = await CharacterStatBonuses.For(_database, character);
 			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
 			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
-			var classBase = await Database.GetClassAttributeBase(character.Class, character.Level);
+			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
 			if (classBase.Count == 0)
 			{
-				Logger.LogWarning("World entry: no class attribute base for {Class} at level {Level} (#444) - {Name}'s attributes are gear+buffs only, so regen and mitigation will read low.",
+				_logger.LogWarning("World entry: no class attribute base for {Class} at level {Level} (#444) - {Name}'s attributes are gear+buffs only, so regen and mitigation will read low.",
 					character.Class, character.Level, character.Name);
 			}
 
 			// #590: what the character's trained feats do to their SPELLS - "+35% on Flesh to Worms" and the like.
 			// Keyed by spell id (the feat names a line; the fan-out to its ranks is resolved in the query), so the
 			// cast path never has to look one up.
-			var spellBoosts = await Database.GetCharacterSpellBoosts(character.Id);
+			var spellBoosts = await _database.GetCharacterSpellBoosts(character.Id);
 			// #592: the handful of the character's spells that override which ATTRIBUTE their damage scales off. The
 			// class rule covers the rest, so this is usually empty.
-			var spellScaling = await Database.GetCharacterSpellScalingAttributes(character.Id);
+			var spellScaling = await _database.GetCharacterSpellScalingAttributes(character.Id);
 			// #697: and what they do to the character's COMBOS - the opening/finishing weapon attacks' damage and
 			// crit, plus the whole-combo damage that rides the finisher's spell.
-			var comboBonuses = await Database.GetCharacterComboBonuses(character.Id);
+			var comboBonuses = await _database.GetCharacterComboBonuses(character.Id);
 
 			// #309: whether the armed teleport picked the EPIC difficulty - consumed here (the reconnect is a new
 			// connection, so the flag rode TeleportService) and threaded into BOTH the instance selection (an epic
@@ -632,7 +682,7 @@ namespace Faolan.GameServer
 				foreach (var (buffId, buff) in carried)
 					entered.ActiveBuffs.TryAdd(buffId, buff);
 
-				Logger.LogInformation("World entry: carried {Count} live buff(s) across the zone change for {Name} (#907).", carried.Count, character.Name);
+				_logger.LogInformation("World entry: carried {Count} live buff(s) across the zone change for {Name} (#907).", carried.Count, character.Name);
 			}
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 
@@ -652,7 +702,7 @@ namespace Faolan.GameServer
 			var mapToken = map.PlayfieldToken;
 			var playfieldToken = mapToken != 0
 				? mapToken
-				: BeachPlayfieldId;
+				: WorldState.DefaultPlayfieldToken;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
@@ -682,7 +732,7 @@ namespace Faolan.GameServer
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
 			// so this is a plain read.
-			var knownSpellIds = (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
+			var knownSpellIds = (await _database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
 			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
 			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
 			// ⚠️ Filtered to the SHEET's own 91 ids: CharacterStats also holds stats that are NOT part of the login
@@ -690,7 +740,7 @@ namespace Faolan.GameServer
 			// feeding them through made the sheet 95 pairs and the guard below kill the entry (found live 2026-08-26,
 			// "talk to Kalanthes" completing on a parked character). Retail pushes those on the live StatUpdate
 			// channel; every captured login sheet is exactly the 91.
-			var statSheet = (await Database.GetCharacterStats(character.Id))
+			var statSheet = (await _database.GetCharacterStats(character.Id))
 				.Where(s => SubClassStatBlock.SheetStatIds.Contains((uint)s.StatId))
 				.Select(s => (s.StatId, s.Value)).ToArray();
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
@@ -702,7 +752,7 @@ namespace Faolan.GameServer
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
 			// The journal records' reward lists (#893) carry each rewarded item's TEA key, read off its Item row.
-			var rewardItems = await Database.GetItemsByTemplate(snapshotQuests.SelectMany(q => q.Rewards.Select(r => r.ItemTemplateId))
+			var rewardItems = await _database.GetItemsByTemplate(snapshotQuests.SelectMany(q => q.Rewards.Select(r => r.ItemTemplateId))
 				.Concat(indexLines.Values.SelectMany(l => l.Rewards.Select(r => r.ItemTemplateId))).ToArray());
 			var instance = client.Session.Character.Id;
 			// Every item renders: the token is harvested when a capture carried one and minted otherwise
@@ -715,14 +765,14 @@ namespace Faolan.GameServer
 			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
-			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
+			var snapshot = GameServerListener.BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>
 			{
 				// #512: if this copy of the playfield is a team's, the proxy names the TEAM as its owner rather than
 				// the player. Asked of the ZONE, so every member is told the same owner.
-				BuildMapChange(client, map!, playfieldToken,
+				GameServerListener.BuildMapChange(client, map!, playfieldToken,
 					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null, epicEntry)
 			};
 
@@ -745,7 +795,7 @@ namespace Faolan.GameServer
 			var worn = heldItems
 				.Where(i => i.Container == ContainerKind.Equipped && Enum.IsDefined((CharacterEquipmentSlot)i.Slot))
 				.ToDictionary(i => (CharacterEquipmentSlot)i.Slot);
-			toSend.Add(BuildBurstlessPlayerSpawn(client, worn, playfieldToken, await Database.GetMorphTargetRegistry(), liveMax));
+			toSend.Add(BuildBurstlessPlayerSpawn(client, worn, playfieldToken, await _database.GetMorphTargetRegistry(), liveMax));
 
 			toSend.Add(snapshot);
 
@@ -757,7 +807,7 @@ namespace Faolan.GameServer
 			// spawn RECORD is built, and a freed escortee is described by a different body (ordinary idle, walk mode)
 			// chosen on `Following`. Resuming the follow after the burst - where this used to sit - meant her record
 			// was built as still-captive, so she came back chained on every relog no matter what was sent afterwards.
-			foreach (var (_, qdef) in await Database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
+			foreach (var (_, qdef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
 				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
 				{
@@ -774,8 +824,8 @@ namespace Faolan.GameServer
 			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
 			toSend.AddRange(entryNpcRecords);
 
-			toSend.Add(BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
-			toSend.Add(BuildGameTime(client));
+			toSend.Add(GameServerListener.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
+			toSend.Add(GameServerListener.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
 
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
@@ -787,7 +837,7 @@ namespace Faolan.GameServer
 
 			await RestoreEntryBuffs(client);
 
-			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects).", mapId,
+			_logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects).", mapId,
 				character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal);
 
 			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
@@ -806,9 +856,9 @@ namespace Faolan.GameServer
 			// match lifecycle (PvpMatchService).
 			if (pvpMatch is { } startedMatch)
 			{
-				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
+				await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
 					s => s.WriteUInt32(startedMatch.SecondsSinceStarted)));
-				Logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
+				_logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
 					startedMatch.SecondsSinceStarted);
 			}
 
@@ -820,11 +870,11 @@ namespace Faolan.GameServer
 			{
 				// The starter quest is seed data every database carries; without it a new character enters the world with
 				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
-				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId)
-					?? throw new InvalidOperationException($"The beach starter quest {BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
-				await _questBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
+				var beachDef = await _database.GetQuestDefinition(QuestContent.BeachStarterQuestId)
+					?? throw new InvalidOperationException($"The beach starter quest {QuestContent.BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
+				await _questBroadcaster.SendQuestLogList(client, beachDef, [QuestContent.BeachStarterQuestId]);
 				await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
-				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
+				_logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", QuestContent.BeachStarterQuestId, character.Name);
 			}
 		}
 
@@ -871,7 +921,7 @@ namespace Faolan.GameServer
 			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _questBroadcaster.QuestMarkerStateForHandle(client, handle);
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
+			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
 
@@ -879,7 +929,7 @@ namespace Faolan.GameServer
 		// channel handshake, then replay the character's current-map world burst from the DB (MapChange + world
 		// objects + NPC spawns + the player spawn + the inventory snapshot, all re-addressed and DB-driven). Falls
 		// back to the beach burst for any map without a usable burst. The caller has already set Character.MapId/Pos.
-		private async Task SendWorldEntry(INetworkClient client)
+		internal async Task SendWorldEntry(INetworkClient client)
 		{
 			await Send0X201C(client);
 
@@ -927,7 +977,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
+			return GameServerListener.BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
 		}
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectCodec and framed. Built on
@@ -935,12 +985,12 @@ namespace Faolan.GameServer
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
 
-		private static Task ReportDimensionId(INetworkClient client, uint realmId, ProtoEndpoint sender, ProtoEndpoint receiver)
+		internal static Task ReportDimensionId(INetworkClient client, uint realmId, ProtoEndpoint sender, ProtoEndpoint receiver)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceMethods.DispatchReportDimesionID, s => s.WriteString(realmId.ToString())));
 		}
 
-		private static Task ReportServerId(INetworkClient client, uint value, ProtoEndpoint sender, ProtoEndpoint receiver)
+		internal static Task ReportServerId(INetworkClient client, uint value, ProtoEndpoint sender, ProtoEndpoint receiver)
 		{
 			// Body: [u32 0x54 (fixed header)][u32 value]. The create-flow auth handshake reports value 1.
 			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceMethods.DispatchReportServerID, s => s.WriteUInt32(0x54u).WriteUInt32(value)));
@@ -955,25 +1005,144 @@ namespace Faolan.GameServer
 			// 0x65 prefix and state ids {5, 6, 0x10, 0x12}, then a final 0x68 prefix with state 1. The old
 			// three-entry set (with a duplicated state 6 and missing 5/0x12/the 0x68 entry) left the client
 			// stuck before it ever started polling spawns (0x2020), so nothing rendered.
-			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000005, ticketBase);
-			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000006, ticketBase + 1);
-			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000010, ticketBase + 2);
-			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000012, ticketBase + 3);
-			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
+			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000005, ticketBase);
+			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000006, ticketBase + 1);
+			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000010, ticketBase + 2);
+			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000012, ticketBase + 3);
+			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
 		}
 
 		// The item at `slot` has BOUND to its owner: re-send that cell's Flags word (stat 0) with bit 26 set (#756).
 		// Retail sends it as the last message of an equip that binds, after the two 0x17 slot registrations.
-		private Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
+		internal Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
+			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
 				SetItemStatCodec.Build(SetItemStats.Bound(ContainerKind.Equipped, client.Session.Character.Id, (uint)slot, instance.Template.WireFlags))));
 		}
 
-		private static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
+		internal static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceMethods.DispatchSetItemStat,
 				b => b.WriteUInt32(prefix).WriteUInt32(client.Session.Character.Id).WriteUInt32(state).WriteUInt32(0x00000017).WriteUInt32(ticket)));
+		}
+
+		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
+		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
+		// created character carries its area's whole list in the captures (#390).
+		private async Task<(Dictionary<uint, QuestLine> Lines, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadLineCatalog(IReadOnlyList<QuestDefinition> quests)
+		{
+			var lines = new Dictionary<uint, QuestLine>();
+			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
+			if (quests.Count == 0)
+				return (lines, catalog);
+
+			var allLines = (await _database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			var lineIds = quests.Select(q => q.QuestLineId).Distinct().ToArray();
+			// One read for every line's catalog rather than a query per line.
+			var catalogs = await _database.GetQuestDefinitionsByLines(lineIds);
+			foreach (var lineId in lineIds)
+			{
+				if (allLines.TryGetValue(lineId, out var line))
+					lines[lineId] = line;
+
+				catalog[lineId] = catalogs.GetValueOrDefault(lineId, []);
+			}
+
+			return (lines, catalog);
+		}
+
+		// The character's COMPLETED-quest journal, grouped by quest line (#390) - the Completed tab's contents. Retail ships
+		// this in the login snapshot and sends no quest packets at all before the first in-session accept, so this is
+		// the ONLY path that populates that tab.
+		//
+		// The order is ours to choose: the wire order is per-character in the captures, but the client re-sorts for
+		// display (retail renders alphabetically while the wire does not), so a stable areaId/questId ordering is
+		// enough. A quest whose area has no row, or that has no definition, is skipped rather than guessed at.
+		private async Task<List<(QuestLine Line, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
+		{
+			var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
+
+			var completed = (await _database.GetCharacterQuests(character.Id, QuestState.Completed)).ToList();
+			if (completed.Count == 0)
+				return groups;
+
+			var lines = (await _database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			var byLine = new SortedDictionary<uint, List<QuestDefinition>>();
+			// One batched read rather than a query per completed quest: the journal is the whole tab, so this loop ran
+			// 158 times for a level-23 character and 1512 for a level-80 one, each time opening its own context.
+			var definitions = (await _database.GetQuestDefinitions([.. completed.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+
+			foreach (var cq in completed)
+			{
+				if (!definitions.TryGetValue(cq.QuestId, out var def) || def.QuestLineId == 0 || !lines.ContainsKey(def.QuestLineId))
+					continue;
+
+				(byLine.TryGetValue(def.QuestLineId, out var list)
+					? list
+					: byLine[def.QuestLineId] = []).Add(def);
+			}
+
+			foreach (var (lineId, defs) in byLine)
+				groups.Add((lines[lineId], defs.OrderBy(d => d.QuestId).ToList()));
+
+			return groups;
+		}
+
+		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
+		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
+		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
+		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
+		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
+		// IsSnapshotEligible is what makes such a quest appear.
+		//
+		// It also returns the character's per-goal PROGRESS resolver. The goal record's first reserved word is
+		// `QuestGoal_c::SolvedTimes` (#550) - the "3 of 7" the journal shows - and it is per-character state, so the
+		// snapshot has to source it from the character rather than from the definition row. Progress lives in two
+		// places for the same reason QuestProgressionService reads it from two: a quest's PRIMARY goal keeps the
+		// scalar on CharacterQuest, and only its secondary goals get CharacterQuestGoal rows (#357).
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary, Func<QuestGoalDefinition, uint> SolvedTimesOf)> LoadSnapshotQuests(Character character)
+		{
+			var quests = new List<QuestDefinition>();
+
+			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
+			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
+			var lineRows = (await _database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			// Batched like the completed journal above. The journal ORDER is the character's own CharacterQuests order -
+			// it picks the primary (tracked) quest below - so the rows are still walked in that order, only the
+			// definitions behind them are now fetched in one go.
+			var active = await _database.GetCharacterQuests(character.Id, QuestState.Active);
+			var definitions = (await _database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+			foreach (var cq in active)
+			{
+				if (definitions.TryGetValue(cq.QuestId, out var def) && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
+					quests.Add(def);
+			}
+
+			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
+			// held, else the first held quest (null only when the character holds none -> empty region).
+			var primary = quests.FirstOrDefault(q => q.QuestId == QuestContent.BeachStarterQuestId) ?? quests.FirstOrDefault();
+
+			// One query for every active quest's secondary-goal rows, and the primary-goal scalar off the rows already
+			// loaded above - so the resolver below is pure lookup and the journal build stays synchronous.
+			var secondary = (await _database.GetCharacterQuestGoals(character.Id)).ToDictionary(g => (g.QuestId, g.GoalId), g => g.Progress);
+			var primaryProgress = active.ToDictionary(q => q.QuestId, q => q.GoalProgress);
+
+			uint SolvedTimesOf(QuestGoalDefinition goal)
+			{
+				if (secondary.TryGetValue((goal.QuestDefinitionId, goal.GoalId), out var p))
+					return p;
+
+				// The quest's FIRST goal is the one whose progress lives on CharacterQuest - the same primary/secondary
+				// split QuestProgressionService.IsPrimaryGoal applies, and it has to agree with it or a quest's two
+				// goals would read each other's counters.
+				return definitions.TryGetValue(goal.QuestDefinitionId, out var d)
+				       && QuestProgress.InPlayOrder(d.Goals).FirstOrDefault()?.GoalId == goal.GoalId
+				       && primaryProgress.TryGetValue(goal.QuestDefinitionId, out var pp)
+					? pp
+					: 0;
+			}
+
+			return (quests, primary, SolvedTimesOf);
 		}
 	}
 }

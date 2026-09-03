@@ -103,7 +103,7 @@ namespace Faolan.GameServer
 
 		private static Dictionary<string, GmCommandEntry> _gmCommandsDict = null!;
 
-		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
+		internal static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
 		// Internal (not private) because the composed collaborators frame their own GameCharInterface sends
@@ -121,13 +121,6 @@ namespace Faolan.GameServer
 		// 10723 answered from 0xA9ECB95D/0x57 at 10726). Copying the 0x58 of its neighbours would have been the obvious
 		// guess and is wrong.
 		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x57);
-
-		// Phase shift for the world clock, in game seconds (#351). The clock itself runs off the wall clock
-		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
-		private long _gameTimeOffset;
-
-		// The game clock's speed multiplier, driven by `/gametime * f | / f | reset` and sent on the wire (#914).
-		private float _gameTimeRate = 1.0f;
 
 		// #637: hands out the cookie of each travel confirmation box. Retail's is a script-context pointer; ours only
 		// has to be unique among the boxes a client might have outstanding, which a listener-wide counter is.
@@ -318,6 +311,14 @@ namespace Faolan.GameServer
 		// IWorldOutbound port is handed to it at Start, not at construction. See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
 
+		// World entry - the login/teleport/create ready bursts, the snapshot, the spawn poll - is a composed service
+		// since the world-entry move (the last behaviour this listener owned that a service needed; see
+		// CreateFlowService, which used to reach it through a bound seam).
+		private readonly WorldEntryService _worldEntry;
+
+		// The GM-bendable game clock the GameTime sends read (RealmClock).
+		private readonly RealmClock _clock;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -348,7 +349,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -404,11 +405,8 @@ namespace Faolan.GameServer
 			_environment = environment;
 			_comboFinisher = comboFinisher;
 			_worldOutbound = worldOutbound;
-
-			// The ONE op the create flow needs that is genuinely ours: the burst-less world entry. It is a bound seam
-			// rather than a ctor argument because the flow is a service and the entry is a listener method - the last
-			// remaining edge of that shape, and the reason CreateFlowService cannot simply take us.
-			_createFlow.BindWorldEntry(SendBurstlessWorldEntry);
+			_worldEntry = worldEntry;
+			_clock = clock;
 
 			InitGmCommands();
 		}
@@ -612,124 +610,6 @@ namespace Faolan.GameServer
 				LogUnknownPacket(packet);
 		}
 
-		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
-		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
-		// created character carries its area's whole list in the captures (#390).
-		private async Task<(Dictionary<uint, QuestLine> Lines, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadLineCatalog(IReadOnlyList<QuestDefinition> quests)
-		{
-			var lines = new Dictionary<uint, QuestLine>();
-			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
-			if (quests.Count == 0)
-				return (lines, catalog);
-
-			var allLines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
-			var lineIds = quests.Select(q => q.QuestLineId).Distinct().ToArray();
-			// One read for every line's catalog rather than a query per line.
-			var catalogs = await Database.GetQuestDefinitionsByLines(lineIds);
-			foreach (var lineId in lineIds)
-			{
-				if (allLines.TryGetValue(lineId, out var line))
-					lines[lineId] = line;
-
-				catalog[lineId] = catalogs.GetValueOrDefault(lineId, []);
-			}
-
-			return (lines, catalog);
-		}
-
-		// The character's COMPLETED-quest journal, grouped by quest line (#390) - the Completed tab's contents. Retail ships
-		// this in the login snapshot and sends no quest packets at all before the first in-session accept, so this is
-		// the ONLY path that populates that tab.
-		//
-		// The order is ours to choose: the wire order is per-character in the captures, but the client re-sorts for
-		// display (retail renders alphabetically while the wire does not), so a stable areaId/questId ordering is
-		// enough. A quest whose area has no row, or that has no definition, is skipped rather than guessed at.
-		private async Task<List<(QuestLine Line, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
-		{
-			var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
-
-			var completed = (await Database.GetCharacterQuests(character.Id, QuestState.Completed)).ToList();
-			if (completed.Count == 0)
-				return groups;
-
-			var lines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
-			var byLine = new SortedDictionary<uint, List<QuestDefinition>>();
-			// One batched read rather than a query per completed quest: the journal is the whole tab, so this loop ran
-			// 158 times for a level-23 character and 1512 for a level-80 one, each time opening its own context.
-			var definitions = (await Database.GetQuestDefinitions([.. completed.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
-
-			foreach (var cq in completed)
-			{
-				if (!definitions.TryGetValue(cq.QuestId, out var def) || def.QuestLineId == 0 || !lines.ContainsKey(def.QuestLineId))
-					continue;
-
-				(byLine.TryGetValue(def.QuestLineId, out var list)
-					? list
-					: byLine[def.QuestLineId] = []).Add(def);
-			}
-
-			foreach (var (lineId, defs) in byLine)
-				groups.Add((lines[lineId], defs.OrderBy(d => d.QuestId).ToList()));
-
-			return groups;
-		}
-
-		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
-		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
-		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
-		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
-		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
-		// IsSnapshotEligible is what makes such a quest appear.
-		//
-		// It also returns the character's per-goal PROGRESS resolver. The goal record's first reserved word is
-		// `QuestGoal_c::SolvedTimes` (#550) - the "3 of 7" the journal shows - and it is per-character state, so the
-		// snapshot has to source it from the character rather than from the definition row. Progress lives in two
-		// places for the same reason QuestProgressionService reads it from two: a quest's PRIMARY goal keeps the
-		// scalar on CharacterQuest, and only its secondary goals get CharacterQuestGoal rows (#357).
-		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary, Func<QuestGoalDefinition, uint> SolvedTimesOf)> LoadSnapshotQuests(Character character)
-		{
-			var quests = new List<QuestDefinition>();
-
-			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
-			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
-			var lineRows = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
-			// Batched like the completed journal above. The journal ORDER is the character's own CharacterQuests order -
-			// it picks the primary (tracked) quest below - so the rows are still walked in that order, only the
-			// definitions behind them are now fetched in one go.
-			var active = await Database.GetCharacterQuests(character.Id, QuestState.Active);
-			var definitions = (await Database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
-			foreach (var cq in active)
-			{
-				if (definitions.TryGetValue(cq.QuestId, out var def) && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
-					quests.Add(def);
-			}
-
-			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
-			// held, else the first held quest (null only when the character holds none -> empty region).
-			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
-
-			// One query for every active quest's secondary-goal rows, and the primary-goal scalar off the rows already
-			// loaded above - so the resolver below is pure lookup and the journal build stays synchronous.
-			var secondary = (await Database.GetCharacterQuestGoals(character.Id)).ToDictionary(g => (g.QuestId, g.GoalId), g => g.Progress);
-			var primaryProgress = active.ToDictionary(q => q.QuestId, q => q.GoalProgress);
-
-			uint SolvedTimesOf(QuestGoalDefinition goal)
-			{
-				if (secondary.TryGetValue((goal.QuestDefinitionId, goal.GoalId), out var p))
-					return p;
-
-				// The quest's FIRST goal is the one whose progress lives on CharacterQuest - the same primary/secondary
-				// split QuestProgressionService.IsPrimaryGoal applies, and it has to agree with it or a quest's two
-				// goals would read each other's counters.
-				return definitions.TryGetValue(goal.QuestDefinitionId, out var d)
-				       && QuestProgress.InPlayOrder(d.Goals).FirstOrDefault()?.GoalId == goal.GoalId
-				       && primaryProgress.TryGetValue(goal.QuestDefinitionId, out var pp)
-					? pp
-					: 0;
-			}
-
-			return (quests, primary, SolvedTimesOf);
-		}
 
 		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
 		private async Task<Map?> ResolveMap(string arg)

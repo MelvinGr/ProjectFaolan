@@ -227,7 +227,7 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var zones = _simulation.World.ZonesForMap(client.Session.Character.MapId).ToArray();
-			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
+			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([
 				"System info:",
@@ -313,14 +313,14 @@ namespace Faolan.GameServer
 
 				// Shift the phase so the CURRENT instant reads as the requested time of day.
 				var wanted = (long)(hours * 3600 + minutes * 60);
-				_gameTimeOffset = (_gameTimeOffset + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
+				_clock.OffsetGameSeconds = (_clock.OffsetGameSeconds + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
 			}
 
 			await client.SendAsync(BuildGameTime(client));
 
-			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
+			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameClock.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_gameTimeOffset}s)");
+				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameClock.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_clock.OffsetGameSeconds}s)");
 		}
 
 		// /gametime * <factor> | / <factor> | reset  - "Speeds up or slows the game timer".
@@ -336,13 +336,13 @@ namespace Faolan.GameServer
 
 			if (tokens.Length == 1 && tokens[0].Equals("reset", StringComparison.OrdinalIgnoreCase))
 			{
-				_gameTimeRate = 1.0f;
-				_gameTimeOffset = 0;
+				_clock.Rate = 1.0f;
+				_clock.OffsetGameSeconds = 0;
 			}
 			else if (tokens.Length == 2 && (tokens[0] == "*" || tokens[0] == "/") &&
 			         float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var factor) && factor > 0f)
 			{
-				_gameTimeRate = tokens[0] == "*" ? _gameTimeRate * factor : _gameTimeRate / factor;
+				_clock.Rate = tokens[0] == "*" ? _clock.Rate * factor : _clock.Rate / factor;
 			}
 			else if (tokens.Length != 0)
 			{
@@ -352,7 +352,7 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(BuildGameTime(client));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Game time rate {_gameTimeRate:0.###}x - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _gameTimeRate:0.##} real hours (offset {_gameTimeOffset}s).");
+				$"Game time rate {_clock.Rate:0.###}x - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _clock.Rate:0.##} real hours (offset {_clock.OffsetGameSeconds}s).");
 		}
 
 		// Finds a live player by character id or by NAME. ⭐ Retail's own help for /summon and /assist warns that
@@ -1447,12 +1447,12 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				_gameTimeRate = scale;
+				_clock.Rate = scale;
 			}
 
 			await client.SendAsync(BuildGameTime(client));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Time scale {_gameTimeRate:0.###} - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _gameTimeRate:0.##} real hours.");
+				$"Time scale {_clock.Rate:0.###} - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _clock.Rate:0.##} real hours.");
 		}
 
 		// /showclassstatadjustments  - "Get the list of npc class stat adjustments for the target npc." No parameters.

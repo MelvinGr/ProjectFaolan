@@ -146,7 +146,7 @@ namespace Faolan.GameServer
 		// IGameServerProvider seam: the two PvP-minigame messages that END a match. The match lives on the CS tier
 		// (PvpMatchService owns the roster, the clock and the return trip) but every Minigame* dispatch is a
 		// GameCharInterface message and so travels on THIS connection - the same split the match-start clock already
-		// crosses in GameServerListener.WorldEntry. ⚠️ Client-recovered, uncaptured: no captured session finishes a
+		// crosses in WorldEntryService. ⚠️ Client-recovered, uncaptured: no captured session finishes a
 		// minigame (docs/re/minigame-massivepvp-messages.md).
 		public async Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult)
 		{
@@ -303,10 +303,10 @@ namespace Faolan.GameServer
 
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
 		// clock and the time of day from it at 5 game seconds per real second, wrapping every 86400 (see GameTimeCodec
-		// for where those come from). `_gameTimeOffset` shifts the phase for the `.time` GM command.
+		// for where those come from). `_clock.OffsetGameSeconds` shifts the phase for the `.time` GM command.
 		internal Rpc BuildGameTime(INetworkClient client)
 		{
-			return BuildGameTime(client, DateTimeOffset.UtcNow, _gameTimeOffset, _gameTimeRate);
+			return BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate);
 		}
 
 		// `now` and the offset are parameters so a golden test can feed the capturing instant and the captured dayTime

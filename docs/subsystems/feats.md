@@ -62,7 +62,7 @@ data comes from.
   feat's original `Sequence`, since the wire order is train order) and ignores a request at or below the rank held.
   It used to dedup on the exact id, which would have put an entry on the spawn's list that retail never sends.
 - **Feats GRANT their stats.** `MaxStatAggregator.AggregateFeatBonuses` sums `FeatEffect` into the same additive
-  bonus table gear feeds, applied at world entry (`GameServerListener.WorldEntry`).
+  bonus table gear feeds, applied at world entry (`WorldEntryService`).
   ⛔ **It DOES divide by `GetScale()`, exactly like the gear path** — `FeatEffect.Value` is the RAW WIRE value,
   the same as `ItemStatModifier.Amount`. This page said the opposite until #865, and the code matched it, so a
   HealthMax feat granted a hundred times what it should and an attribute feat ten. The old reasoning

@@ -35,7 +35,7 @@ which is what makes the keying a decode rather than a coincidence:
 
 The fourteenth is **6617**, which resolves to nothing in 55701 — and this codebase had already recovered it from the
 client's shop scripts as one of the item-shop `HasTag` gates (6617–6620, 7316, 7416–7421,
-`GameServerListener.WorldEntry`). So the corpus confirms both the id and its kind.
+`WorldEntryService`). So the corpus confirms both the id and its kind.
 
 ⚠️ The catalog carries **internal** entries beside the real ones (3104 *"XX Dungeon Level Range"*, 3316
 *"XX Mammoth - Blue"*), and **about three quarters ship no description** (3689 *"Puma"* has none). Both are the

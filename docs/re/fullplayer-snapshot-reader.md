@@ -6,7 +6,7 @@ Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTempl
 generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
 inherited from Strie. `SnapshotTails.FromScratch` reproduces the whole tails byte-for-byte from
 generated quest + a game-static access-window catalog + the code stat skeleton, and is now the LIVE production
-world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`, the burst-less entry #210 — the
+world-entry path (`WorldEntryService.cs` `SendBurstlessWorldEntry`, the burst-less entry #210 — the
 only world-entry path); the captured `BeachTailsTemplate.bin` survives only as the golden test oracle. See the
 memory `snapshot_tails_construction_scope`.
 
@@ -25,7 +25,7 @@ assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byt
 
 So the captured Strie tails are no longer needed to *author* a beach entry's tails. `BeachTailsTemplate.bin`
 now serves only as the golden test oracle. **`SnapshotTails.FromScratch` is now wired into the burst-less world entry
-(#210) — the ONLY world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`/
+(#210) — the ONLY world-entry path (`WorldEntryService.cs` `SendBurstlessWorldEntry`/
 `BuildBurstlessSnapshot`); the captured-burst tails are retired.** The production FullChar tails are fully
 generated.
 
@@ -186,7 +186,7 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
   fresh beach char. At that point `SnapshotTails.FromScratch` was TEST-ONLY and production still shipped the captured
   world-burst tails for everything OUTSIDE the quest portion. **That interim is retired: #210 landed, so
   `SnapshotTails.FromScratch` now builds the WHOLE tails and is the sole production path
-  (`GameServerListener.WorldEntry.cs`); there is no captured-burst splice anymore.**
+  (`WorldEntryService.cs`); there is no captured-burst splice anymore.**
 - **Stat block decoded** — `CharacterStatBlockTests`: only 25 of 338 values vary across fresh chars (class/map/XP
   + one session slot); the other 313 are a fixed skeleton, relocated to `SubClassStatBlock`.
 
@@ -198,7 +198,7 @@ the **stat skeleton** + its patches are assembled by `SnapshotTails.FromScratch`
 
 DONE (#210, since landed): both remaining integration steps below are complete —
 1. ✅ `SnapshotTails.FromScratch` is wired into the burst-less world entry (#210); it is the ONLY world-entry path
-   (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`), so the player's own FullChar tails are
+   (`WorldEntryService.cs` `SendBurstlessWorldEntry`), so the player's own FullChar tails are
    generated, not a captured burst's.
 2. **In-client chat-connect smoke test** — the standing acceptance gate for any byte-changing snapshot step.
 
@@ -414,7 +414,7 @@ In the captured beach tails (`BeachTailsTemplate.bin`) this list is **empty** at
 `00 00 00 00  00 00 02 90  00 00 00 00`. That empty list is why seeded spells USED to vanish on relog and type-4
 attacks didn't place on the bar. **FIXED (#74):** the codec `KnownSpellList` (`FullCharSnapshotSubClass`'s
 folder) models this list, and `SnapshotTails.FromScratch` builds the character's own learned spells into it — the live
-world entry loads `CharacterSpells` → `knownSpellIds` and passes them through (`GameServerListener.WorldEntry.cs`
+world entry loads `CharacterSpells` → `knownSpellIds` and passes them through (`WorldEntryService.cs`
 loads them at world entry; `KnownSpellLists.FromSpellIds` emits the type-2 records inside the stat block), so the
 snapshot now lists the character's spells and they persist across relog + place on the bar.
 

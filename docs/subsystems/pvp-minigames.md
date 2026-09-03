@@ -153,5 +153,5 @@ clock/score end and the PvP gate; `MinigameResult` — the three result words, o
 `CombatService.ApplyDamage` / `ApplyPlayerDamage` — the PvP half of the damage funnel;
 `PvpMatchMakingService` — the queue and its board (#882, capture-matched); `PvpMatchRulesCodec` /
 `PvpMatchCodec` — the ruleset element and the `i_cMatch` payload; `WorldState.MatchInstance` +
-`GameServerListener.WorldEntry` — the instance routing, the match clock and the dead-match redirect;
+`WorldEntryService` — the instance routing, the match clock and the dead-match redirect;
 `StartingData.MinigameQueueCapacity` — the client-displayed queue sizes.

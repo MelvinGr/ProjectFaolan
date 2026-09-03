@@ -19,7 +19,7 @@ namespace Faolan.GameServer.Progression
 	//
 	// It used to have none. `CombatService.PushLevelUp` built the burst for the kill path while `SetLevelCommand`
 	// built a second copy for `.level`, reaching four more senders scattered across the listener partials
-	// (`SendLevelUpDings` in .WorldEntry, `SendLevelUpFeedback` in .Buffs, `SendCombatRatings` in .Outbound), and the
+	// (`SendLevelUpDings` in WorldEntryService, `SendLevelUpFeedback` in .Buffs, `SendCombatRatings` in .Outbound), and the
 	// two copies were kept in step by a comment saying they must not diverge. Levelling is not combat: the ding sends
 	// the spell book, the ability grants and the feat-teaching writes, none of which a swing resolution has any
 	// business knowing about - and carrying them dragged two `Func<>` seams into CombatService's constructor that

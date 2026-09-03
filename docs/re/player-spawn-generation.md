@@ -19,7 +19,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 
 ## Architecture (what ships)
 
-The burst-less world entry (`GameServerListener.BuildBurstlessPlayerSpawn`, `.WorldEntry`) builds the
+The burst-less world entry (`WorldEntryService.BuildBurstlessPlayerSpawn`) builds the
 player's own spawn from DB in three steps (no captured-burst replay fallback remains — a missing scaffold
 just logs a warning and skips the spawn):
 

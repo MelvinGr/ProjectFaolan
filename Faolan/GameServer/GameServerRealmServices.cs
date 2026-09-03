@@ -97,11 +97,18 @@ namespace Faolan.GameServer
 			services.AddSingleton<WorldObjectService>();
 			services.AddSingleton<TeleportService>();
 
-			// The create flow needs two ops it does not own. The enter-world HANDOFF is TeleportService's and is a
-			// single-op seam here; the WORLD ENTRY is the listener's own - the last op in the graph that is - so it
-			// arrives through a bound seam, called from the GameServer ctor.
+			// The GM-bendable game clock every GameTime send reads (world entry's and the `.time` replies).
+			services.AddSingleton<RealmClock>();
+
+			// World entry - the ready bursts, the snapshot, the spawn poll. It was the listener's own until the
+			// world-entry move; now the create flow below simply takes it, and the graph has no bound seam into the
+			// listener left.
+			services.AddSingleton<WorldEntryService>();
+
+			// The create flow needs one op it does not own: the enter-world HANDOFF is TeleportService's, as a
+			// single-op seam here.
 			services.AddSingleton(sp => new CreateFlowService(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<IDatabaseRepository>(),
-				sp.GetRequiredService<WorldSimulation>(), async client =>
+				sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<WorldEntryService>(), async client =>
 				{
 					var teleport = sp.GetRequiredService<TeleportService>();
 					await teleport.SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);

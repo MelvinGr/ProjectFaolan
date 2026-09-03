@@ -9,7 +9,7 @@
 > refactors (which this frozen doc predates) have moved or removed:** `SpawnPacketBuilder`/`SpawnHandleTable`
 > now live in `Faolan.Core.Network/Codecs/Spawn/` (not `Faolan/GameServer/Spawn/`); the `RetailLoginReplay`
 > class no longer exists — its `TryRebuildPlayerSpawnFromDb`/`ReplayMapWorldBurst`/`RewriteBurstInstance` logic
-> is now in `Faolan/GameServer/World/WorldBroadcaster.cs` + `GameServer/GameServerListener.WorldEntry.cs`, and
+> is now in `Faolan/GameServer/World/WorldBroadcaster.cs` + `GameServer/Session/WorldEntryService.cs`, and
 > conversation replay in `GameServer/Dialogue/ConversationService.cs`; the create-editor `HandleCommandPacket`
 > handlers were folded into `CreateFlowService`; and `ArchiveDataImporter`, `ArchetypeHarvester`/
 > `ArchetypeHarvestRegenerator`, `tools/capture/extract_conversations.py`, the embedded `conversations-*.bin`/

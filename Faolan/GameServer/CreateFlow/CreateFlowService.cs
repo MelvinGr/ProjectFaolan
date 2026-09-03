@@ -21,6 +21,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Scripting;
+using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -105,13 +106,13 @@ namespace Faolan.GameServer.CreateFlow
 			(0x0002A7FD, 347663), (0x0002A7FE, 3072626)
 		];
 
-		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
-		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
-		private Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry = null!;
+		// The burst-less world entry (WorldEntryService) - the constructed live-char world the create-flow enters
+		// before the destiny cutscene overlay. A plain collaborator since the entry left the listener; it used to be
+		// the graph's last BOUND seam, because a service cannot take a listener method in its constructor.
+		private readonly WorldEntryService _worldEntry;
 
-		// The listener-owned "wash the new character ashore and hand it to the world server" op (change-map prep +
-		// the 0x2002 redirect). A narrow Func seam like _sendBurstlessWorldEntry rather than a back-reference to the
-		// listener - see the composed-collaborator note above.
+		// The "wash the new character ashore and hand it to the world server" op (change-map prep + the 0x2002
+		// redirect) - TeleportService's two sends, as a single-op seam rather than the whole service.
 		private readonly Func<INetworkClient, Task> _sendEnterWorldHandoff;
 
 		private readonly IDatabaseRepository _database;
@@ -125,26 +126,13 @@ namespace Faolan.GameServer.CreateFlow
 		// cutscene actor-binding (LiveNpcHandle) to re-address the destiny cinematic to OUR live Kalanthes.
 		private readonly WorldSimulation _simulation;
 
-		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, Func<INetworkClient, Task> sendEnterWorldHandoff)
+		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, WorldEntryService worldEntry, Func<INetworkClient, Task> sendEnterWorldHandoff)
 		{
 			_logger = logger;
 			_database = database;
 			_simulation = simulation;
+			_worldEntry = worldEntry;
 			_sendEnterWorldHandoff = sendEnterWorldHandoff;
-		}
-
-		/// <summary>
-		///     Binds the burst-less WORLD ENTRY - the one op this service needs that belongs to the listener rather
-		///     than to any service. Called once, from the GameServer ctor.
-		/// </summary>
-		/// <remarks>
-		///     A bound seam rather than a constructor argument because it is a genuine cycle: the entry is a
-		///     GameServerListener method and the listener holds this service. It is the LAST edge of that shape in
-		///     the graph - everything else the flow needs is an injected collaborator.
-		/// </remarks>
-		public void BindWorldEntry(Func<INetworkClient, uint, Task> sendBurstlessWorldEntry)
-		{
-			_sendBurstlessWorldEntry = sendBurstlessWorldEntry;
 		}
 
 		// Handles the client->server 0xA36D3B74 character-creation script callbacks.
@@ -396,7 +384,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			// (b) The live-char world (constructed; same path existing-char logins use). The intro cutscene does NOT
 			// follow here - see SendCreateIntroCutscene for why it waits for CharInPlayIIR.
-			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
+			await _worldEntry.SendBurstlessWorldEntry(client, client.Session.Character.MapId);
 		}
 
 		// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation step,

@@ -6,7 +6,7 @@ playable world, and the handshake signals that drive each one. This is the "cons
 in `cddf167b`; this page is the map that keeps the routing legible.
 
 Code: `Faolan/GameServer/GameServerListener.Inbound.cs` (the opcode handlers) and
-`Faolan/GameServer/GameServerListener.WorldEntry.cs` (the entry builders + the post-ready flush). Session state:
+`Faolan/GameServer/Session/WorldEntryService.cs` (the entry builders + the post-ready flush). Session state:
 `Faolan.Core.Network/NetworkClientSession.cs`. Create-flow specifics: `Faolan/GameServer/CreateFlow/CreateFlowService.cs`.
 
 Related: [`teleport-changemap.md`](teleport-changemap.md) (the prep records the OLD connection sends before the

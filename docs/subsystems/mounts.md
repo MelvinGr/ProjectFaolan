@@ -234,7 +234,7 @@ Open work tracked in Gitea #667 (the capture a charge needs).
 | the summon/dismount handler | `GameServerListener.Inbound.cs`, `BehaviorId.Mount` |
 | the one unseat path | `GameServerListener.Outbound.cs`, `SendDismount` (press, throw-off and death all reach it) |
 | the throw-off meter | `NpcCombatService.ThrowFromMountIfBattered` / `WorldEntity.MountDamageTaken` |
-| the entry re-seat | `GameServerListener.WorldEntry.cs`, `RestoreMount` |
+| the entry re-seat | `WorldEntryService.cs`, `RestoreMount` |
 | the mount creature model | `CaptureMountImporter` lifts it onto an `NpcTemplate` from the captures |
 
 A **known cosmetic** during dismount: the character briefly dips into the floor and re-grounds at animation

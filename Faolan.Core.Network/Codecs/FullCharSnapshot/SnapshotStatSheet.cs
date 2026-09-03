@@ -95,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// 105 captures that carry both. The login tier and this sheet must therefore send the same number.
 			yield return (CharacterStatId.PlayerId, character.AccountId);
 
-			// The WALLET. GameServerListener.WorldEntry pushes an interim 0x2005 at login with the note that "retail
+			// The WALLET. WorldEntryService pushes an interim 0x2005 at login with the note that "retail
 			// does NOT push a 0x2005 at login (the initial balance presumably rides the FullChar snapshot, location
 			// undecoded)" - this is that location. The slot is a u32 and Character.Money is a ulong, so a balance
 			// past uint.MaxValue saturates: the wire cannot express it, and clamping is visible where silently

@@ -246,7 +246,7 @@ necessarily the snapshot's playfield token. (Tracing descriptor[8] to its exact 
 step; it's a deep thiscall ctor chain — `FUN_008e0df0` Playfield ctor.)
 
 **The server-side suspect (offline-checkable lead):** our mid-session spawns get their `18 <varint>` token from
-`Zone.PlayfieldToken`, which is set at world entry (`GameServerListener.WorldEntry.cs:831`) to the map's own
+`Zone.PlayfieldToken`, which is set at world entry (`WorldEntryService.cs`) to the map's own
 `Map.PlayfieldToken` (#305), falling back to `WorldState.DefaultPlayfieldToken` (`0x004FE428`, the beach id) for a
 map with no captured token, with a minted `0x00A00000+` fallback (`WorldState._nextPlayfieldToken`) for
 server-generated zones. (Originally this came from extracting the token back out of the `0x737A6DF9` snapshot body

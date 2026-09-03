@@ -1432,7 +1432,7 @@ shape — a relog re-stating time left on a running lock — not the cast shape.
 
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `CreateFlowService.SeedStarterEquipment`
-(`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures
+(`WorldEntryService.cs`), from the `StartingData` constants harvested from the `*create*` captures
 (one row, only if absent — an existing equipment row is left as the player left it):
 - **Wrist:** Slave Manacles (`StartingData.StartingWristItem` = 3361557, universal).
 - **Clothing by sex** (`Character.Sex`): male = bare chest + Red Loincloth (legs, `StartingMaleLegsItem`); female =

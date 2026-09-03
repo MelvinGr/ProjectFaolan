@@ -125,9 +125,11 @@ the compressed GameServer downloads; the Wireshark plugin + `tools/capture/tshar
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
-`SendVitals`/`SendAddItem` — never opcode-named), plus
-`.WorldEntry`/`.ItemUse`/`.Factions`/`.Vista`; GM commands are the
-`.GmCommands` partial. `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
+`SendVitals`/`SendAddItem` — never opcode-named), plus `.ItemUse`/`.Vista`; GM commands are the
+`.GmCommands` partials. World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
+it is `Session/WorldEntryService.cs`, a composed service, because `CreateFlowService` needs the burst-less entry
+and a service cannot take a listener method in its constructor - moving it deleted the graph's last bound seam
+into the listener (see ⭐ "look for the move first" below). `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
 Domain logic proper lives in composed service folders beside it (`Apprentice/`,
 `Combat/`, `CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Inventory/`, `Progression/`, `Quest/`, `Scripting/`,
 `Session/`, `World/`). NB a partial-class file keeps
@@ -197,6 +199,9 @@ never a lazy `Func<>` closing over a not-yet-assigned field.
 between the op and its answer.** `WorldBroadcaster.BindApplySelfBuff` existed only because the knockback lived on
 the broadcaster, which is built far above `SpellEffectOutbound`. Moving the knockback to its own class built
 *after* the port turned the seam into an ordinary ctor argument and deleted the cycle outright.
+The same move, larger: `CreateFlowService.BindWorldEntry` existed only because world entry was a listener partial.
+Moving the 979-line partial to `WorldEntryService` (its GM-bendable clock fields becoming `RealmClock`) made the
+entry an ordinary ctor argument of the flow, and nothing in the graph is bound to a listener method now.
 
 ⚠️ Two shapes to know when moving a port, because **the compiler and the test suite catch neither**:
 - `((IFoo)this)` still COMPILES after `IFoo` leaves a non-sealed class, and throws `InvalidCastException` at

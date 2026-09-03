@@ -267,7 +267,7 @@ namespace Faolan.GameServer
 							// screen instead of a cutscene.
 							Logger.LogInformation("Create-world CharInPlayIIR: sending the create ready burst, then starting the intro cutscene.");
 							client.Session.HasPendingPost205FFollowUp = false;
-							await SendCreateWorldReadyBurst(client);
+							await _worldEntry.SendCreateWorldReadyBurst(client);
 							await CreateFlowService.SendCreateIntroCutscene(client);
 							break;
 						}
@@ -280,7 +280,7 @@ namespace Faolan.GameServer
 							// follow-up here is what drops the loading screen into the world; Login shares the branch
 							// because the flush no-ops unless something armed it.
 							Logger.LogInformation("Named-character CharInPlayIIR ({Mode}, no 0x205F): flushing the world post-0x205F follow-up.", client.Session.EntryMode);
-							await FlushPendingPost205FFollowUp(client);
+							await _worldEntry.FlushPendingPost205FFollowUp(client);
 							break;
 						}
 
@@ -752,8 +752,8 @@ namespace Faolan.GameServer
 							? CreateFlowService.Receiver(client)
 							: client.Endpoint(RpcInterfaces.GameInterfaceType);
 
-						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
-						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
+						await WorldEntryService.ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
+						await WorldEntryService.ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
 						await client.SendAsync(new Rpc(authSender, authReceiver, GameInterfaceMethods.DispatchAckAuthenticate, s => s.WriteUInt32(1)));
 					}
 
@@ -811,7 +811,7 @@ namespace Faolan.GameServer
 						// world content is CONSTRUCTED from the DB (WorldObject/NpcSpawn tables) and addressed to this
 						// character, so the client builds the playfield and renders the NPCs. The 0x201c handshake comes
 						// from us; the player's own position/name/inventory are rebuilt from the DB too. (See SendWorldEntry.)
-						await SendWorldEntry(client);
+						await _worldEntry.SendWorldEntry(client);
 						// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp), 						// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
 						// before the client polled/was ready - is a divergence from the Strie login dump.
 
@@ -1309,7 +1309,7 @@ namespace Faolan.GameServer
 					// wire 0x2020 on the GameCharAgent class = method-index slot 0x20, whose RPC catalog LABEL is
 					// UpdateQuestMarkerNPC - but the world-entry handshake REUSES it as the client's spawn-poll +
 					// ready-trigger. Owned by HandleWorldEntrySpawnPoll (WorldEntry partial), not decoded inline here.
-					await HandleWorldEntrySpawnPoll(client, packet, body);
+					await _worldEntry.HandleWorldEntrySpawnPoll(client, packet, body);
 					break;
 				}
 
@@ -2622,7 +2622,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 					// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
+					await WorldEntryService.Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					// ...and, when this equip BOUND the item, the cell's Flags word again with bit 26 set (#756). This
@@ -2631,7 +2631,7 @@ namespace Faolan.GameServer
 					//    0x17 slot registrations, equipped(101) slot 2 stat 0 = 0x04000001, where the same item had
 					//    arrived in the bag at 0x00000001 twelve seconds earlier]
 					if (justBound != null)
-						await SendItemBound(client, targetSlot, justBound);
+						await _worldEntry.SendItemBound(client, targetSlot, justBound);
 
 					break;
 				}
@@ -2652,7 +2652,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack with null identity + a 0x201C entry
 					// (prefix 0x68, state 0). Capture frames 320-321.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000068, 0,
+					await WorldEntryService.Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000068, 0,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					break;
