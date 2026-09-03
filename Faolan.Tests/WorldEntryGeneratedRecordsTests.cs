@@ -7,6 +7,7 @@ using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Xunit;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {
@@ -33,7 +34,7 @@ namespace Faolan.Tests
 			// Both clock fields are generated now (#351), so feed the capture's own values back: the instant it was taken
 			// (its resync anchor read as unix epoch seconds) and the time of day it was showing. The record must then
 			// rebuild byte-for-byte - what this pins is the LAYOUT; the time of day itself is server state.
-			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), BitConverter.UInt32BitsToSingle(0x472BDD00), DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
+			var record = DecodeIir(GameWire.BuildGameTime(BeachClient(), BitConverter.UInt32BitsToSingle(0x472BDD00), DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)IirTypes.GameTimeIIR, record.IirType);
@@ -49,7 +50,7 @@ namespace Faolan.Tests
 		public void BuildMapChange_ReproducesCapturedRecord()
 		{
 			// map=null -> BuildMapChange uses the beach defaults (instanced, count 2, blobLastWord 3, flags 0), reproducing the beach capture.
-			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken).Serialize());
+			var record = DecodeIir(GameWire.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)IirTypes.PlayfieldFIIR, record.IirType);

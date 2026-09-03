@@ -4,6 +4,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Protocol;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -19,7 +20,7 @@ namespace Faolan.GameServer.World
 		// Rpc the transport serializes + logs once (no re-parse).
 		public static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
-			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(StatUpdateCodec.Build(entityHandle, stats)));
 		}
 	}

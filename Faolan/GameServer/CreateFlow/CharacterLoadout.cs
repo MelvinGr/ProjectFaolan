@@ -9,6 +9,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.CreateFlow
 {
@@ -95,7 +96,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			var abilities = await ResolveAbilities(database, logger, character);
 			foreach (var ability in abilities)
-				await GameServerListener.SendAddSpecialAbility(client, ability, sender: sender);
+				await GameWire.SendAddSpecialAbility(client, ability, sender: sender);
 
 			var spells = await database.GetStartingSpells(character.Level, character.Class);
 			foreach (var spellId in spells)

@@ -17,6 +17,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Feats
@@ -165,7 +166,7 @@ namespace Faolan.GameServer.Feats
 
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(FeatCodec.Build(handle, FeatCodec.StateAck, featIds))));
 
 			_logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));

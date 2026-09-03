@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Apprentice
 {
@@ -62,7 +63,7 @@ namespace Faolan.GameServer.Apprentice
 
 			// ApprenticeLevel ALONE - not `SetLevel`, which deliberately writes Level too so the nameplate tracks a GM
 			// `.level` (#472). Here the real level is unchanged and only the mitigation term moves.
-			await GameServerListener.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ApprenticeLevel, apprenticeLevel), characterId);
+			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ApprenticeLevel, apprenticeLevel), characterId);
 		}
 		public Task SendApprenticeFeedback(uint characterId, string message)
 		{

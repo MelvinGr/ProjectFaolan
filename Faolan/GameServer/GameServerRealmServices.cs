@@ -19,6 +19,7 @@ using Faolan.GameServer.Quest;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -153,7 +154,7 @@ namespace Faolan.GameServer
 			services.AddSingleton<FatalityService>();
 			// The faction standing push is a static send, so the seam names it directly rather than an instance.
 			services.AddSingleton(sp => new FactionService(sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<ILogger>(),
-				GameServerListener.SendFactionStanding));
+				GameWire.SendFactionStanding));
 			// The kill-streak table is a configured VALUE; the BIND re-seeds the level-up port's max-stat recompute.
 			services.AddSingleton(sp =>
 			{
@@ -199,7 +200,7 @@ namespace Faolan.GameServer
 			// Two single-op seams: a feat's world reload is a teleport, and a feat that TEACHES grants a spell.
 			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<ILogger>(),
 				sp.GetRequiredService<IChatServerDispatcher>(), (id, map, pos) => sp.GetRequiredService<TeleportService>().DoTeleport(id, map, pos),
-				GameServerListener.SendLearnSpell, GameServerListener.SendForgetSpell));
+				GameWire.SendLearnSpell, GameWire.SendForgetSpell));
 			services.AddSingleton<SkillPointService>();
 
 			// --- mounts + the environment -----------------------------------------------------------------------

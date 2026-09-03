@@ -15,6 +15,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -283,7 +284,7 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
 

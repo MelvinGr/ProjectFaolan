@@ -36,6 +36,7 @@ using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
@@ -124,7 +125,7 @@ namespace Faolan.GameServer
 			if (client?.Session.Account == null)
 				return false;
 
-			await client.SendAsync(BuildGuildTag(client, characterId, guildName ?? ""));
+			await client.SendAsync(GameWire.BuildGuildTag(client, characterId, guildName ?? ""));
 			Logger.LogInformation("SendGuildTag: set in-world guild tag of {CharacterId:X8} to \"{GuildName}\".", characterId, guildName);
 			return true;
 		}
@@ -154,7 +155,7 @@ namespace Faolan.GameServer
 			if (client?.Session.Account == null)
 				return false;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchEnded,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchEnded,
 				s => s.WriteUInt32(winningSide).WriteUInt32((uint)yourResult)));
 			Logger.LogInformation("PvP minigame: told {CharacterId:X8} the match ended - winning side {Side}, result {Result}.", characterId, winningSide, yourResult);
 			return true;
@@ -166,7 +167,7 @@ namespace Faolan.GameServer
 			if (client?.Session.Account == null)
 				return false;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchForceStopMinigame,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchForceStopMinigame,
 				s => s.WriteString(message)));
 			Logger.LogInformation("PvP minigame: force-stopped for {CharacterId:X8} - \"{Message}\".", characterId, message);
 			return true;
@@ -216,18 +217,7 @@ namespace Faolan.GameServer
 		// reason this is not a general "close the window" message.
 		private static Task SendTradeAbort(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
-		}
-
-		// #792: the zero-length GameCharInterface `0x1B` retail sends immediately before every `IntendedTeleportIIR` -
-		// **102 of 102 across the corpus, no exceptions**, on cross-map handoffs and same-map revives alike.
-		//
-		// ⚠️ The client does NOTHING with it: `GamecodeClient_t`'s override of the vtable slot it dispatches to
-		// (+0x70) is an empty function. So this is sent for fidelity with retail's byte stream and for nothing else -
-		// do not hang behaviour off it, and do not go looking for what it "should" do.
-		internal static Task SendTeleportPending(INetworkClient client)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTeleportStarted, _ => { }));
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
 		}
 
 		// Awards a TAG (#748): `DispatchAddTag`, body = the tag id and nothing else, 4 bytes. That covers two
@@ -245,7 +235,7 @@ namespace Faolan.GameServer
 		// nothing is built for it.
 		private static Task SendAddTag(INetworkClient client, uint tagId)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddTag,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddTag,
 				b => b.WriteUInt32(tagId)));
 		}
 
@@ -277,7 +267,7 @@ namespace Faolan.GameServer
 			var rows = await _tradeskill.BookFor(handle, await Database.GetRecipes());
 			var records = rows.Select(RecipeRecords.FromRow).ToList();
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
@@ -306,149 +296,9 @@ namespace Faolan.GameServer
 		// for where those come from). `_clock.OffsetGameSeconds` shifts the phase for the `.time` GM command.
 		internal Rpc BuildGameTime(INetworkClient client)
 		{
-			return BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate);
+			return GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate);
 		}
 
-		// `now` and the offset are parameters so a golden test can feed the capturing instant and the captured dayTime
-		// and get the captured bytes back.
-		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now, long offsetGameSeconds, float rate = 1.0f)
-		{
-			return BuildGameTime(client, GameClock.TimeOfDay(now, offsetGameSeconds), now, rate);
-		}
-
-		internal static Rpc BuildGameTime(INetworkClient client, float dayTimeSeconds, DateTimeOffset now, float rate = 1.0f)
-		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now, rate)));
-		}
-
-		// Frames the GuildUpdateIIR_c (GuildUpdateCodec) on the world conversation: [RpcHeader][DispatchPassBlob]
-		// [u32 len][GuildUpdateIIR]. Sent on login for guilded characters and pushed live by the CsPlayerAgent
-		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildUpdateCodec.
-		internal static Rpc BuildGuildTag(INetworkClient client, uint characterId, string guildName)
-		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(GuildUpdateCodec.Build(characterId, guildName)));
-		}
-
-		// 0x5D85BFC7 MapChange = the PlayfieldFIIR: tells the client which playfield/instance the player is entering.
-		// This is now a thin wrapper over the shared CreateEditorRecordBuilder.BuildPlayfieldFiir codec (the create-flow
-		// builds the SAME packet) - it just prepends the MapChange subop and sources the PER-MAP rule fields from the Map
-		// row (#308). The client keys per-area rules on this packet (mount permission = PlayfieldFlags); those fields are
-		// NOT universal (beach vs mainland differ), so they come from the DB (Map.PlayfieldCount/BlobLastWord/Flags/Instanced), 		// defaulting to the beach values for un-sourced maps. Position is the character's entry transform (per-session);
-		// nearClip 15.0 + the farClip float are camera params (left constant). `map` may be null (fresh/unmapped -> beach
-		// defaults).
-		// The word at body [55:59] (client obj+0x54). We send 1 for every map, which is what 97 of the 151 captured
-		// records carry; the other 54 carry 0, and the split is not per-map (4000 and 4010 carry both). Was written
-		// as 0x01000000 while the builder's framing was a byte out - see BuildPlayfieldFiir (#451). [V0]
-		private const uint SceneWord = 1u;
-
-		// ⭐ #512: `teamId` names the TEAM that owns this copy of the playfield, when one does. The proxy's owner pair
-		// is `(type, id)`, and retail's own group entry carries `(0xDEA9, <teamId>)` there where a personal instance
-		// carries `(PlayfieldFieldA, <characterId>)` - the Amphitheatre of Karutonia entry names the exact id
-		// `DispatchYouJoinedTeam` had announced three seconds earlier. So the pair is switched WHOLE rather than
-		// having the id swapped under the map's own type word: a team id under type 2 would be a shape retail never
-		// sends. Null (the common case) leaves the personal form exactly as it was.
-		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken, uint? teamId = null, bool epic = false)
-		{
-			var character = client.Session.Character;
-			var charInstance = map?.PlayfieldInstanced ?? true
-				? character.Id
-				: 0u;
-			var count = map?.PlayfieldCount ?? 2u;
-			var blobLastWord = map?.PlayfieldBlobLastWord ?? 3u;
-			var flags = map?.PlayfieldFlags ?? 0u;
-			// #451: the two per-map words that used to be builder constants. The `??` defaults are those constants, so
-			// a map with no imported MapChange behaves exactly as before rather than silently getting a zero.
-			var fieldA = map?.PlayfieldFieldA ?? 0u;
-			var fieldC = map?.PlayfieldFieldC ?? 7u;
-
-			// The owner pair, switched as a unit when a team owns the copy (see the remark above).
-			var ownerType = teamId is null ? fieldA : PlayfieldProxy.TeamOwnerType;
-			var ownerId = teamId ?? charInstance;
-
-			// #309: the proxy's class word is the copy's DIFFICULTY - 0xCABC on the captured epic Spider Caverns
-			// entry against 0xC79C everywhere else. Everything else in the record is mode-independent.
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(PlayfieldFCodec.Build(new Vector3(character.PositionX, character.PositionY, character.PositionZ), character.MapId,
-					ownerId, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, ownerType, fieldC,
-					epic ? PlayfieldProxy.EpicPlayfieldClass : PlayfieldProxy.PlayfieldClass)));
-		}
-
-		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
-		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
-		// (login replay, GM, the regen tick) are unchanged.
-		internal static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
-		{
-			return VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
-		}
-
-		// Builds the player's own vitals (0x96B8DC59) from the player's LIVE world-model vitals - the world-entry
-		// replay emits this instead of replaying the captured player's vitals.
-		//
-		// `vitals` must be the live EntityVitals, not `character.MaxVitals()`. The raw class/level curve does not
-		// include worn gear, so sending it told the client a current the server did not agree with: an L23 Assassin
-		// with +156 stamina of gear was announced at 742 while the world model held 898, and the bar sat short of
-		// where regen would immediately put it.
-		internal static Rpc BuildVitals(INetworkClient client, EntityVitals vitals)
-		{
-			var character = client.Session.Character;
-			var stats = new CharacterMaxStats { Health = vitals.MaxHealth, Mana = vitals.MaxMana, Stamina = vitals.MaxStamina };
-			// Emit the full value under the CURRENT ids (0x001B/0x01F8/0x01FA) - the retail full-spawn announce sends
-			// current (== max at full health); the max ids ride the snapshot/tails. (in-client proof: CapturedCharacterStats.)
-			// Also carry Level + Exp/MaxExp so the XP bar reflects the character's REAL progress: the snapshot tails
-			// carry the captured template's stale to-next-level max, so overriding it here (the same Exp/MaxExp the
-			// combat XP path sends) scales the bar correctly for this character's level.
-			// #214: a dead character must NOT get its current health refilled here - the world-entry snapshot just set
-			// HealthCurrent = 0 to latch the client's dead state, and this post-snapshot vitals update would otherwise
-			// refill the bar (and un-latch the release window). Send 0 current health while dead.
-			var currentHealth = character.IsDead
-				? 0u
-				: stats.Health;
-			var block = new CharacterStatBlock()
-				.Set(CharacterStatId.HealthCurrent, currentHealth)
-				.Set(CharacterStatId.StaminaCurrent, stats.Stamina)
-				.Set(CharacterStatId.ManaCurrent, stats.Mana)
-				// Level AND ApprenticeLevel - the client divides by the latter for armour mitigation, and the
-				// nameplate renders max() of the two. See CharacterStatBlock.SetLevel.
-				.SetLevel(character.Level)
-				.SetExperience(character.Level, character.Experience);
-
-			return BuildStatUpdate(client, block, client.Session.Character.Id);
-		}
-
-		// Assembles the complete world-entry snapshot packet for `client` from a pre-built root + tails. The
-		// RECORD ([IirType=0x737A6DF9][TypeTag][Handle=instance][blob frame][root][tails]) is built by
-		// FullPlayerCharacterCodec, which owns the blob frame next to the reader that parses it - it used to be
-		// stated here as well, and the two drifted (see that type's header). The carrier's u32 length is written
-		// HERE, because it belongs to the sender (#530 rule 2), together with the RpcHeader + outer length/CRC. No
-		// captured packet is consulted.
-		internal static Rpc BuildWorldEntrySnapshot(INetworkClient client, ProtoFullCharacterIIR root, FullCharSnapshotSubClass tails)
-		{
-			var record = FullPlayerCharacterCodec.Build(new FullPlayerCharacterIIR(client.Session.Character.Id, root, tails));
-
-			using var body = new FaolanStream();
-			body.WriteArrayUInt32Length(record);
-			return FrameWorldEntryRecord(client, body.ToArray());
-		}
-
-		// Assembles the complete world-entry player/NPC FA015807 spawn packet for `client` from a pre-built spawn
-		// RECORD ([IirType=0xFA015807][TypeTag][Handle][FieldA][transform + pre-IIR + CharacterIIR + post-IIR]) - the
-		// form SimpleCharFullUpdateCodec builds. The carrier's u32 length is written HERE, because it belongs to the
-		// sender (#530 rule 2), which is what lets a from-scratch record reach the wire without a captured header.
-		internal static Rpc BuildWorldEntrySpawn(INetworkClient client, byte[] spawnRecord)
-		{
-			ArgumentNullException.ThrowIfNull(spawnRecord);
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(spawnRecord));
-		}
-
-		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a
-		// record body that ALREADY carries its own [u32 bodyLen] prefix - i.e. the `packet[bodyStart..]` form that
-		// SpawnPacketBuilder and WriteArrayUInt32Length produce. This is the keystone that lets a
-		// from-scratch record body reach the wire without a captured packet header.
-		internal static Rpc FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
-		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, bodyWithLenPrefix.ToArray());
-		}
 
 		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
 		// [u32 itemId][u32 itemId][u32 0][u32 count] followed by the two 24-byte identity halves the capture repeats,
@@ -466,48 +316,12 @@ namespace Faolan.GameServer
 		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
 		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
 				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
-		}
-
-		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
-		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
-		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
-		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
-		//
-		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
-		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
-		internal static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
-		{
-			return SendFeedback(client, new AreaNameBanner(areaNameId));
-		}
-
-		// Pushes a FormatFeedback message to the client's on-screen feedback, addressed to their GameInterface
-		// instance. The PAYLOAD carries its own typeFlags/footer (#539) - this used to take the child's text plus those
-		// two words, which is how the same message came to be framed differently in two services.
-		//
-		// The carrier's [u32 len] is the SENDER's (#530 rule 2), which is what WorldIir.Send writes - the codec emits
-		// the record alone.
-		internal static Task SendFeedback(INetworkClient client, FeedbackPayload payload)
-		{
-			return WorldIir.Send(client, FormatFeedbackCodec.Build(client.Session.Character.Id, payload));
-		}
-
-		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
-		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
-		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
-		internal static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
-		{
-			return SendFeedback(client, new RespawnPointDiscovered(pointId, nameKey));
 		}
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
-
-		internal static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
-		{
-			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
-		}
 
 		// #637: raises retail's "Do you want to travel to <map>?" box for a zone-line door, and remembers the trip it
 		// is confirming. The (threadCtxId, cookie) pair is retail's script-thread handle; the client only ever echoes
@@ -567,12 +381,6 @@ namespace Faolan.GameServer
 				ResurrectRequestCodec.Method, ResurrectRequestCodec.Build(characterId, resurrectSpell)));
 		}
 
-		internal static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, spots))));
-		}
-
 		// WHICH of the two vitals blocks to send is decided by WHAT MOVED, and both forms are retail's (#586).
 		//
 		// `EntityVitals.ToCurrentsBlock` - the three CURRENT ids - is for a push where only a current moved: a hit, a
@@ -602,7 +410,7 @@ namespace Faolan.GameServer
 		// resistance belongs beside it - which is why this takes the add/remove verb rather than being two methods.
 		private static Task SendSpellResistance(INetworkClient client, uint metaType, uint percentage, bool add)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				add ? GameCharInterfaceMethods.DispatchAddSpellResistance : GameCharInterfaceMethods.DispatchRemoveSpellResistance,
 				SpellResistanceCodec.Build(metaType, percentage)));
 		}
@@ -615,84 +423,17 @@ namespace Faolan.GameServer
 		private static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z,
 			uint label = WayPointCodec.TombstoneLabel, uint toolTip = WayPointCodec.TombstoneToolTip)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z, label, toolTip)));
 		}
 
 		private static Task SendRemoveWayPoint(INetworkClient client, EntityId id, uint playfieldId)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchRemoveWayPoint, RemoveWayPointCodec.Build(id, playfieldId)));
 		}
 
-		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
-		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
-		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
-		// tools/capture/decode_learn_spell.py, byte-exact in SpellBookChangeTests). The client pops the "learned a new
-		// spell" toast itself. (The siblings RemoveSpecialAbility 0x2053 / UntrainSingleFeat 0x2011 have no capture
-		// oracle yet, so they are not built - see #73.)
-		internal static Task SendLearnSpell(INetworkClient client, uint spellId)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchLearnSpell,
-				SpellBookChangeCodec.Build(spellId)));
-		}
-
-		// The revoke half (DispatchForgetSpell, s2c 0x200B) - takes one spell back out of the client's spellbook
-		// (#915). Same conversation and same one-u32 body as the grant; the client's own dispatch reader for the two
-		// is the same function twice (see SpellBookChangeCodec). No capture carries a forget - retail only sends one
-		// when something un-teaches a spell, which the corpus's sessions never do - but the client's reader settles
-		// the body, so this is recovered, not invented.
-		internal static Task SendForgetSpell(INetworkClient client, uint spellId)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchForgetSpell,
-				SpellBookChangeCodec.Build(spellId)));
-		}
-
-		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
-		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
-		// level-up), false for the silent per-login re-grant.
-		// `sender` defaults to the login/world grant sender (GameCharAgent 0x58); the create-editor world-prep grant
-		// rides its own conversation (GameCharAgent 0x0C), so it passes that in - the only thing that differs between
-		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
-		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, ProtoEndpoint? sender = null)
-		{
-			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddSpecialAbility,
-				AddSpecialAbilityCodec.Build(ability, announce)));
-		}
-
-		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
-		// GameInterface instance, on the world conversation.
-		internal static Task SendWorldChat(INetworkClient client, string xml)
-		{
-			// As SendFeedback: the [u32 len] is the sender's (#530 rule 2), written by WorldIir.Send.
-			return WorldIir.Send(client, ChatTextCodec.Build(client.Session.Character.Id, Encoding.Latin1.GetBytes(xml)));
-		}
-
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
-
-		// The level-scaled rating QUAD (#685) - AttackRating / DefenseRating / MagicRating / MagicalResist, four
-		// player-addressed StatIIRs carrying one number, in the wire order the corpus sends them.
-		//
-		// It rides the login snapshot (`SnapshotStatSheet`), and until now that was the ONLY place it ever went - so a
-		// character who dinged read the level it logged in at until the next relog. Retail restates it, and the corpus
-		// names two of the occasions outright:
-		//
-		//   - a LEVEL-UP. 15 of the 18 captured `NewLevelIIR` events are followed by a quad burst, 11 of them within
-		//     0.1 s, i.e. inside the ding burst itself. That one is a correctness fix, not fidelity: the value is
-		//     `400 x level - 300` and the level just changed.
-		//   - the COMBAT TOGGLE (#505). 13 of 13 captured 0x4E2 presses draw a burst 0.31-1.61 s later, against a
-		//     median burst interval of 10.4 s across the corpus - so it is causal, not adjacency. Mechanically it is
-		//     what a sheathe/draw IS: the active weapon changes, so the ratings are restated.
-		//
-		// ⚠️ Those are two occasions, not THE rule: bursts arrive every ~10 s in a live capture and most of them
-		// follow neither. [V0: what makes retail re-send the quad] stands - what is settled is the VALUE.
-		internal static async Task SendCombatRatings(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var rating = CombatRatingCurve.For(character.Level);
-			foreach (var stat in CombatRatingCurve.Stats)
-				await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(character.Id, (uint)stat, rating)));
-		}
 
 		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed
 		// BehaviorControlCenterIIR at slot BehaviorId.Search, and nothing else - no stat change, no buff. The client

@@ -90,31 +90,7 @@ namespace Faolan.GameServer
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
 		// (the character's real id) woven into the sender/receiver conversation id.
 
-		// The world-conversation sender shared by every world-entry / world-event packet (formerly the WorldFraming
-		// class): sender = the world-system conversation (family prefix hash("GameAgent") + sub-id 0x58); the receiver
-		// is the recipient's GameInterface endpoint addressed to its client instance. Confirmed from the Strie login
-		// capture - keeping every world packet on this single conversation is what lets the client tie the spawns to the
-		// loaded playfield and render them. Public because the composed collaborators (WorldBroadcaster, CombatService,
-		// the economy services, VitalsPacket) frame their own world sends against it.
-		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
-		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
-		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
-		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
-
 		private static Dictionary<string, GmCommandEntry> _gmCommandsDict = null!;
-
-		internal static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
-
-		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		// Internal (not private) because the composed collaborators frame their own GameCharInterface sends
-		// against it, the same reason WorldSenderEndpoint above is reachable - see Combat/CastService.cs.
-		internal static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
-
-		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
-		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
-		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
-		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		internal static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59);
 
 		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
 		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
@@ -656,16 +632,5 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Points first, then rank: a rank is a threshold ON the points, so the client has the number the title is
-		// about before it is told the title. Nothing captured says the order matters; this is the one that cannot
-		// read as a title arriving for a standing the client has not seen.
-		internal static async Task SendFactionStanding(INetworkClient client, uint factionId, int points, uint rank)
-		{
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchApplyFactionPoints, ApplyFactionPointsCodec.Build(factionId, points)));
-
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchApplyFactionRank, ApplyFactionRankCodec.Build(factionId, rank)));
-		}
 	}
 }

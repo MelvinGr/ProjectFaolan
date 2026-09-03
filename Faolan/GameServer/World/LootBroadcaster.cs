@@ -17,6 +17,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Quest;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
@@ -255,7 +256,7 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null || !viewer.Known.Contains(npc.Handle))
 					continue;
 
-				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await viewer.Client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(fade)));
 			}
 		}
@@ -273,7 +274,7 @@ namespace Faolan.GameServer.World
 
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(NewLooterCodec.Build(NewLooters.Current(bag.Handle, player.Handle)))));
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface

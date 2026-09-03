@@ -6,6 +6,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -86,7 +87,7 @@ namespace Faolan.GameServer
 
 			var locked = await Database.LockedTemplateIdsForConsumableLine(line);
 			foreach (var templateId in locked)
-				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
 
 			Logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);

@@ -12,6 +12,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -182,7 +183,7 @@ namespace Faolan.GameServer.World
 
 			return moved.Records.Count == 0
 				? Task.CompletedTask
-				: GameServerListener.SendStatUpdate(client, moved, client.Session.Character.Id);
+				: GameWire.SendStatUpdate(client, moved, client.Session.Character.Id);
 		}
 
 		public Task ResolveInterest(INetworkClient client)
@@ -198,7 +199,7 @@ namespace Faolan.GameServer.World
 		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
 		public Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
-			return GameServerListener.SendAreaNameBanner(client, areaNameId);
+			return GameWire.SendAreaNameBanner(client, areaNameId);
 		}
 
 		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
@@ -216,19 +217,19 @@ namespace Faolan.GameServer.World
 
 		public Task SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Bcc(dyingHandle)))));
 		}
 
 		public Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(MoveTaskCodec.Build(DeathSequence.Pose(dyingHandle, deathPosition)))));
 		}
 
 		public Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(SimpleCharKilledByUpdateCodec.Build(dyingHandle, killerEndpoint))));
 		}
 
@@ -259,7 +260,7 @@ namespace Faolan.GameServer.World
 
 		public Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
-			return GameServerListener.SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
+			return GameWire.SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
 		}
 
 		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a
@@ -267,13 +268,13 @@ namespace Faolan.GameServer.World
 		// the death path is only its other caller.
 		public Task SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
 		{
-			return GameServerListener.SendValidResurrectionSpots(client, referencePosition, spots);
+			return GameWire.SendValidResurrectionSpots(client, referencePosition, spots);
 		}
 
 		public Task SendRevive(INetworkClient client, uint handle, uint respawnPointId)
 		{
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
-			return client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Revive(handle, respawnPointId)))));
 		}
 
@@ -281,17 +282,17 @@ namespace Faolan.GameServer.World
 		{
 			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
-			return client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, rotation))));
 		}
 
 		public async Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
 		{
 			// #792: the zero-length 0x1B goes first - retail precedes EVERY IntendedTeleport with it, 102 of 102.
-			await GameServerListener.SendTeleportPending(client);
+			await GameWire.SendTeleportPending(client);
 			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
-			await client.SendAsync(new Rpc(GameServerListener.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, playfieldToken))));
 		}
 

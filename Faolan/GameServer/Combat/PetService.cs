@@ -8,6 +8,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -49,7 +50,7 @@ namespace Faolan.GameServer.Combat
 
 			var owner = client.Session.Character.Id;
 			entity.OwnerHandle = owner;
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, b =>
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, b =>
 				b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Assign(owner, entity.Handle, combat
 					// ⭐ The pet's own POINT COST rides here (#823) - `f2` is what the client's pet-point bar counts, and
 					// this used to be the constant 2 for every pet in the game. `pointCost` is the SUMMONING SPELL's
@@ -108,7 +109,7 @@ namespace Faolan.GameServer.Combat
 		public async Task DismissPet(INetworkClient client, uint petHandle)
 		{
 			var owner = client.Session.Character.Id;
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Remove(owner, petHandle)))));
 
 			var removed = await _npcs.DespawnEntityForPlayer(client, petHandle);

@@ -12,6 +12,7 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Crypt;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Economy
 {
@@ -97,7 +98,7 @@ namespace Faolan.GameServer.Economy
 			// trade commits.
 			await SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchCompleteTrade, []);
 			if (_connections.ForCharacter(recipientId) is { } client)
-				await GameServerListener.SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
+				await GameWire.SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
 		}
 		public Task SendWalletUpdate(uint characterId, ulong balanceTin)
 		{

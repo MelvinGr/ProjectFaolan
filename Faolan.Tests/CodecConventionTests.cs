@@ -304,7 +304,7 @@ namespace Faolan.Tests
 			// silence the test: if a codec stopped prefixing its own length, the fix is at the call site, not here.
 			var allowlist = new Dictionary<string, string>(StringComparer.Ordinal)
 			{
-				["GameServerListener.Outbound.cs"] = "FrameWorldEntryRecord takes a body that already carries its [u32 bodyLen] - its parameter is named bodyWithLenPrefix, and its one caller writes that prefix itself",
+				["GameWire.cs"] = "FrameWorldEntryRecord takes a body that already carries its [u32 bodyLen] - its parameter is named bodyWithLenPrefix, and its one caller writes that prefix itself",
 				["CreateFlowService.cs"] = "the create-editor 12-byte [entityClass][handle][0] body on the GameCharInterfaceProject receiver is not an IIR record at all, so it carries no record length"
 			};
 

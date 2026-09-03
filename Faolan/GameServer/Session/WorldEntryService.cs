@@ -31,6 +31,7 @@ using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.GameServer.Scripting;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Session
@@ -178,11 +179,11 @@ namespace Faolan.GameServer.Session
 			// A world entity with no live vitals has nothing to say here, and a fabricated delta is exactly what this
 			// record must not carry - so it rides at zero.
 			var (health, mana, stamina) = _simulation.PlayerWorldEntity(client)?.Vitals.ToRefillDeltas() ?? default;
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(RegenCodec.Build(instance, health, mana, stamina))));
 
 			// SyncCanSprint (0x200C, one byte) - the sprint pool starts available (#867).
-			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameEndpoints.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameCharInterfaceProjectMethods.DispatchSyncCanSprint, SprintFlagCodec.Build(true)));
 
 		}
@@ -195,7 +196,7 @@ namespace Faolan.GameServer.Session
 		// intro cutscene, never during it.
 		private async Task SendWorldReadyBurst(INetworkClient client)
 		{
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(StatCodec.Build(StatIirs.ForCharacter(client.Session.Character.Id, 0x00000013, 0x00000000)))));
 			_logger.LogInformation("Sent deferred StatIIR prompt.");
 
@@ -265,15 +266,15 @@ namespace Faolan.GameServer.Session
 			// between the ability grants and the CharInPlayIIR echo below, and the `00` one at the same point of an
 			// ordinary city login. The classification is GroupFinderActivityCatalog.IsFinderDestination, whose remark
 			// carries what the corpus does and does not separate.
-			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameEndpoints.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameCharInterfaceProjectMethods.DispatchInDungeonPlayfield, DungeonPlayfieldCodec.Build(GroupFinderActivityCatalog.IsFinderDestination(client.Session.Character.MapId))));
 
 			// record 0: 0x00002000, 17-byte body
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 
 			// record 1: 0x0000200C, 1-byte body
-			await client.SendAsync(new Rpc(GameServerListener.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameEndpoints.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameInterfaceMethods.DispatchReportServerID, (byte[])[0x01]));
 
 			// record 2: 0x00002000 - the StartFixed3d destiny step (ScryScriptIIR 0xA36D3B74), constructed (was verbatim;
@@ -284,20 +285,20 @@ namespace Faolan.GameServer.Session
 			if (client.Session.EntryMode != WorldEntryMode.CreateWorld)
 			{
 				var startFixed3d = ScryScriptCodec.Build(instance, "StartFixed3d");
-				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(startFixed3d)));
 			}
 
 			if (Global.EnableTutorialOverlay)
 			{
-				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					b => b
 						.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 						.WriteUInt32(instance)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
 				var welcomeTutorial = ScryScriptCodec.Build(instance, "WelcomeTutorial");
-				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(welcomeTutorial)));
 			}
 
@@ -344,7 +345,7 @@ namespace Faolan.GameServer.Session
 			{
 				var guild = await _database.GetGuild(guildId);
 				if (guild != null)
-					await client.SendAsync(GameServerListener.BuildGuildTag(client, client.Session.Character.Id, guild.Name));
+					await client.SendAsync(GameWire.BuildGuildTag(client, client.Session.Character.Id, guild.Name));
 			}
 
 			client.Session.HasPendingPost205FFollowUp = false;
@@ -366,7 +367,7 @@ namespace Faolan.GameServer.Session
 		private static Task SendCharInPlay(INetworkClient client)
 		{
 			var instance = client.Session.Character.Id;
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 		}
 
@@ -380,7 +381,7 @@ namespace Faolan.GameServer.Session
 			// kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
 			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAddSpecialAbilityBody).
 			foreach (var ability in abilities)
-				await GameServerListener.SendAddSpecialAbility(client, ability, false);
+				await GameWire.SendAddSpecialAbility(client, ability, false);
 
 			_logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class,
 				character.Level);
@@ -427,7 +428,7 @@ namespace Faolan.GameServer.Session
 
 			var spells = await _database.GetCharacterSpells(character.Id);
 			foreach (var spell in spells)
-				await GameServerListener.SendLearnSpell(client, spell.SpellId);
+				await GameWire.SendLearnSpell(client, spell.SpellId);
 
 			if (spells.Length > 0)
 				_logger.LogInformation("GrantCharacterSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
@@ -765,14 +766,14 @@ namespace Faolan.GameServer.Session
 			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
-			var snapshot = GameServerListener.BuildWorldEntrySnapshot(client, typedRoot, tails);
+			var snapshot = GameWire.BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>
 			{
 				// #512: if this copy of the playfield is a team's, the proxy names the TEAM as its owner rather than
 				// the player. Asked of the ZONE, so every member is told the same owner.
-				GameServerListener.BuildMapChange(client, map!, playfieldToken,
+				GameWire.BuildMapChange(client, map!, playfieldToken,
 					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null, epicEntry)
 			};
 
@@ -824,8 +825,8 @@ namespace Faolan.GameServer.Session
 			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
 			toSend.AddRange(entryNpcRecords);
 
-			toSend.Add(GameServerListener.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
-			toSend.Add(GameServerListener.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
+			toSend.Add(GameWire.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
+			toSend.Add(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
 
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
@@ -856,7 +857,7 @@ namespace Faolan.GameServer.Session
 			// match lifecycle (PvpMatchService).
 			if (pvpMatch is { } startedMatch)
 			{
-				await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
+				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
 					s => s.WriteUInt32(startedMatch.SecondsSinceStarted)));
 				_logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
 					startedMatch.SecondsSinceStarted);
@@ -921,7 +922,7 @@ namespace Faolan.GameServer.Session
 			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _questBroadcaster.QuestMarkerStateForHandle(client, handle);
 
-			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
 
@@ -977,7 +978,7 @@ namespace Faolan.GameServer.Session
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return GameServerListener.BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
+			return GameWire.BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
 		}
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectCodec and framed. Built on
@@ -1005,18 +1006,18 @@ namespace Faolan.GameServer.Session
 			// 0x65 prefix and state ids {5, 6, 0x10, 0x12}, then a final 0x68 prefix with state 1. The old
 			// three-entry set (with a duplicated state 6 and missing 5/0x12/the 0x68 entry) left the client
 			// stuck before it ever started polling spawns (0x2020), so nothing rendered.
-			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000005, ticketBase);
-			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000006, ticketBase + 1);
-			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000010, ticketBase + 2);
-			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000012, ticketBase + 3);
-			await Send0X201CEntry(client, GameServerListener.LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
+			await Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000005, ticketBase);
+			await Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000006, ticketBase + 1);
+			await Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000010, ticketBase + 2);
+			await Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, receiver, 0x00000065, 0x00000012, ticketBase + 3);
+			await Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
 		}
 
 		// The item at `slot` has BOUND to its owner: re-send that cell's Flags word (stat 0) with bit 26 set (#756).
 		// Retail sends it as the last message of an equip that binds, after the two 0x17 slot registrations.
 		internal Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
 				SetItemStatCodec.Build(SetItemStats.Bound(ContainerKind.Equipped, client.Session.Character.Id, (uint)slot, instance.Template.WireFlags))));
 		}
 

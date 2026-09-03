@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -49,7 +50,7 @@ namespace Faolan.GameServer.World
 				[CharacterStatId.Mount] = mount.CreatureId,
 				[CharacterStatId.MountSpeed] = MountCatalog.MountSpeed
 			};
-			await GameServerListener.SendStatUpdate(client, stats, self);
+			await GameWire.SendStatUpdate(client, stats, self);
 			if (broadcastToViewers)
 				await _broadcaster.BroadcastStatsToViewers(client, stats);
 
@@ -83,7 +84,7 @@ namespace Faolan.GameServer.World
 			{
 				[CharacterStatId.Mount] = 0
 			};
-			await GameServerListener.SendStatUpdate(client, stats, self);
+			await GameWire.SendStatUpdate(client, stats, self);
 			await _broadcaster.BroadcastStatsToViewers(client, stats);
 
 			entity?.IsMounted = false;

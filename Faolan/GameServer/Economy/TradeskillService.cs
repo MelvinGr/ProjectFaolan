@@ -14,6 +14,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -554,7 +555,7 @@ namespace Faolan.GameServer.Economy
 		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
 		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
 				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
 		}

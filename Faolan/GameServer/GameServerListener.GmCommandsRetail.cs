@@ -18,6 +18,7 @@ using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer
 {
@@ -788,7 +789,7 @@ namespace Faolan.GameServer
 			if (!localOnly)
 				subject.BuffedStats[stat] = (uint)updated;
 
-			await SendStatUpdate(client, new CharacterStatBlock().SetRaw(stat, (uint)updated), characterId);
+			await GameWire.SendStatUpdate(client, new CharacterStatBlock().SetRaw(stat, (uint)updated), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"'{subject.Name}' {stat} ({(uint)stat}): {current} -> {updated}{(localOnly ? " (CLIENT only - server state unchanged)" : "")}.");
 		}
@@ -1223,7 +1224,7 @@ namespace Faolan.GameServer
 
 					var added = await Database.AddCharacterSpell(characterId, spellId);
 					if (added)
-						await SendLearnSpell(client, spellId);
+						await GameWire.SendLearnSpell(client, spellId);
 
 					await _agentServerDispatcher.SendSystemMessage(characterId, added
 						? $"Learned spell {spellId}."
@@ -1241,7 +1242,7 @@ namespace Faolan.GameServer
 
 					var removed = await Database.RemoveCharacterSpell(characterId, spellId);
 					if (removed)
-						await SendForgetSpell(client, spellId);
+						await GameWire.SendForgetSpell(client, spellId);
 
 					await _agentServerDispatcher.SendSystemMessage(characterId, removed
 						? $"Forgot spell {spellId}."
@@ -1255,7 +1256,7 @@ namespace Faolan.GameServer
 					var known = await Database.GetCharacterSpells(characterId);
 					var removed = await Database.ClearCharacterSpells(characterId);
 					foreach (var spell in known)
-						await SendForgetSpell(client, spell.SpellId);
+						await GameWire.SendForgetSpell(client, spell.SpellId);
 
 					await _agentServerDispatcher.SendSystemMessage(characterId, removed == 0
 						? "No known spells to forget."
@@ -1505,7 +1506,7 @@ namespace Faolan.GameServer
 			}
 
 			var vitals = await _combat.ReseedFromMaxStats(client);
-			await SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
+			await GameWire.SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Recomputed your derived stats from gear and buffs: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}."
 				+ " (Retail aims this at your target; ours reseeds the caller, since the reseed runs off a connected client.)");

@@ -3,6 +3,7 @@ using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Protocol;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -22,7 +23,7 @@ namespace Faolan.GameServer.World
 		// The usual case: `record` is [u32 iirType][record] and the carrier's [u32 len] is written here.
 		public static Task Send(INetworkClient client, params byte[] record)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
 		}
 	}

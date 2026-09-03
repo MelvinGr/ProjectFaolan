@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -43,7 +44,7 @@ namespace Faolan.GameServer.World
 		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
 		public Task SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(StatDamageCodec.Build(StatDamages.Environmental(targetHandle, amount, statId, school)))));
 		}
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
@@ -54,7 +55,7 @@ namespace Faolan.GameServer.World
 			// This used to delegate to the listener's own IWorldOutbound.PushVitals. That port moved to WorldOutbound
 			// (#826) and the cast `((IWorldOutbound)this)` went with it: it still COMPILED, because the class is not
 			// sealed, and would have thrown InvalidCastException the first time an environmental hit landed.
-			return GameServerListener.SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
+			return GameWire.SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
 		}
 		public Task ApplySelfBuff(INetworkClient client, uint wireSpellId)
 		{

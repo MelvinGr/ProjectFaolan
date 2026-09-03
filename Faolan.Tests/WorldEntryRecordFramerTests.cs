@@ -8,6 +8,7 @@ using Faolan.Core.Protobuf;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
 using Xunit;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {
@@ -45,7 +46,7 @@ namespace Faolan.Tests
 			var captured = File.ReadAllBytes(SnapshotCap);
 			var (root, tails) = SplitBeachSnapshot();
 
-			var built = GameServerListener.BuildWorldEntrySnapshot(BeachClient(), root, tails).Serialize();
+			var built = GameWire.BuildWorldEntrySnapshot(BeachClient(), root, tails).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch snapshot packet must be byte-identical to the capture");
@@ -63,7 +64,7 @@ namespace Faolan.Tests
 			// (#530 rule 2).
 			var spawnRecord = captured[(bodyStart + 4)..];
 
-			var built = GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnRecord).Serialize();
+			var built = GameWire.BuildWorldEntrySpawn(BeachClient(), spawnRecord).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch player-spawn packet must be byte-identical to the capture");
@@ -78,7 +79,7 @@ namespace Faolan.Tests
 			var bodyStart = 12 + (int)captured.ReadU32Be(8);
 			var objectBody = captured[bodyStart..];
 
-			var built = GameServerListener.FrameWorldEntryRecord(BeachClient(), objectBody).Serialize();
+			var built = GameWire.FrameWorldEntryRecord(BeachClient(), objectBody).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch world-object packet must be byte-identical to the capture");

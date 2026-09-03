@@ -15,6 +15,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.CreateFlow;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -147,7 +148,7 @@ namespace Faolan.GameServer.World
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
 			// #792: the zero-length 0x1B first - retail precedes EVERY IntendedTeleport with it, 102 of 102 across the
 			// corpus. The client discards it (its handler is an empty override); we send it because retail does.
-			await GameServerListener.SendTeleportPending(client);
+			await GameWire.SendTeleportPending(client);
 			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId, epic), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor, epic) })
 			{
 				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));

@@ -9,6 +9,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Combat
 {
@@ -138,7 +139,7 @@ namespace Faolan.GameServer.Combat
 					{
 						sinceMirror = 0;
 						mirrored = session.Energy;
-						await GameServerListener.SendStatUpdate(client, new CharacterStatBlock { [CharacterStatId.Energy] = session.Energy },
+						await GameWire.SendStatUpdate(client, new CharacterStatBlock { [CharacterStatId.Energy] = session.Energy },
 							session.Character.Id);
 					}
 				}

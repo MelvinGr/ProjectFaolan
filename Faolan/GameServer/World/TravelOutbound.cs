@@ -11,6 +11,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
@@ -99,7 +100,7 @@ namespace Faolan.GameServer.World
 
 		private static Task SendWorldRecord(INetworkClient client, byte[] record)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
 		}
 	}

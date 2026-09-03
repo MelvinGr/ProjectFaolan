@@ -3,6 +3,7 @@ using System.Text;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Tests.Support;
 using Xunit;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 	//
 	// ⚠️ Every captured oracle below is the whole carrier payload, which BEGINS with the [u32 len]. That word is the
 	// SENDER's (#530 rule 2), so the assertions are against `CapturedRecord.Bytes(...)` - the capture minus its first four bytes.
-	// No wire byte moved: GameServerListener.SendFeedback writes the same length back on via WorldIir.Send.
+	// No wire byte moved: GameWire.SendFeedback writes the same length back on via WorldIir.Send.
 	public class FormatFeedbackCodecTests
 	{
 		private const string AreaNameBody = "000001508d5a8b6b0000c3500802e5d40100000000000000000000000001313c72656d6f7465666f726d617420746f6b656e3d" +

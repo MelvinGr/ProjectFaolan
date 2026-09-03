@@ -31,6 +31,7 @@ using Faolan.GameServer.Economy;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -230,7 +231,7 @@ namespace Faolan.GameServer
 						echoBody.WriteF32Be(22, acceptedPosition.Z);
 					}
 
-					await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+					await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 						s => s.WriteArrayUInt32Length(echoBody)));
 
 					// Interest-managed broadcast: spawn this player to newly-near players and forward the move to those
@@ -747,7 +748,7 @@ namespace Faolan.GameServer
 					{
 						var authSender = isNewCharacter
 							? Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59)
-							: WorldSenderEndpoint;
+							: GameEndpoints.WorldSenderEndpoint;
 						var authReceiver = isNewCharacter
 							? CreateFlowService.Receiver(client)
 							: client.Endpoint(RpcInterfaces.GameInterfaceType);
@@ -1630,7 +1631,7 @@ namespace Faolan.GameServer
 						// id playing the wrong sheathe. Sending a subset of what retail sends beats inventing the rest.
 						case CombatToggleSpecialAction:
 						{
-							await SendCombatRatings(client);
+							await GameWire.SendCombatRatings(client);
 							break;
 						}
 					}
@@ -1910,7 +1911,7 @@ namespace Faolan.GameServer
 				// zone to resolve - their retail categories are carried with the burst instead (#564).
 				category = editorCategory;
 
-			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(GameEndpoints.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				UpdateAggroStatusCodec.Method, UpdateAggroStatusCodec.Build(new UpdateAggroStatus(request.Target, category))));
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
@@ -2622,7 +2623,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 					// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-					await WorldEntryService.Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
+					await WorldEntryService.Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					// ...and, when this equip BOUND the item, the cell's Flags word again with bit 26 set (#756). This
@@ -2652,7 +2653,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack with null identity + a 0x201C entry
 					// (prefix 0x68, state 0). Capture frames 320-321.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-					await WorldEntryService.Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000068, 0,
+					await WorldEntryService.Send0X201CEntry(client, GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000068, 0,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					break;

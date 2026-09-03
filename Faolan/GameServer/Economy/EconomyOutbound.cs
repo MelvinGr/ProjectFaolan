@@ -17,6 +17,7 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 using Faolan.GameServer.Inventory;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -171,7 +172,7 @@ namespace Faolan.GameServer.Economy
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddItem,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddItem,
 				AddItemCodec.Build(new AddItem(containerType, charId, itemPos, entry, feedback))));
 		}
 
@@ -179,7 +180,7 @@ namespace Faolan.GameServer.Economy
 		// record stream (the retail money updates ride that conversation).
 		public async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
-			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchUpdateCash,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchUpdateCash,
 				UpdateCashCodec.Build(new UpdateCash(balanceTin, reason))));
 
 			_logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
@@ -193,7 +194,7 @@ namespace Faolan.GameServer.Economy
 		public async Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
 		{
 			var charId = client.Session.Character.Id;
-			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), AddToItemSlotCodec.Method,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), AddToItemSlotCodec.Method,
 				AddToItemSlotCodec.Build(container, charId, targetSlot, socket)));
 
 			await SendRemoveItem(client, container, gemSlot);
@@ -208,7 +209,7 @@ namespace Faolan.GameServer.Economy
 		// would tell the client to close its window on an item it never got.
 		public static Task SendTradeskillComplete(INetworkClient client, uint recipeId)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeskillComplete,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeskillComplete,
 				b => b.WriteUInt32(recipeId)));
 		}
 
@@ -216,14 +217,14 @@ namespace Faolan.GameServer.Economy
 		// bank uses, with the guild id where a character id would go.
 		public static Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankCodec.Method,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankCodec.Method,
 				GuildBankCodec.Build(vault)));
 		}
 
 		// The echo acknowledging a guild-bank item move - the request's own six values, raw.
 		public static Task SendGuildBankMove(INetworkClient client, GuildBankMove move)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankMoveCodec.Method,
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankMoveCodec.Method,
 				GuildBankMoveCodec.Build(move)));
 		}
 
@@ -275,7 +276,7 @@ namespace Faolan.GameServer.Economy
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchRemoveItem,
+			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchRemoveItem,
 				RemoveItemCodec.Build(new RemoveItem(containerType, charId, itemPos, amountToRemove))));
 		}
 
@@ -399,7 +400,7 @@ namespace Faolan.GameServer.Economy
 				Serializer.Serialize(ms, container);
 				var payload = ms.ToArray();
 
-				await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(UpdateInventoryCodec.Build(new UpdateInventoryIIR(characterId, 0x00, payload)))));
 			}
 

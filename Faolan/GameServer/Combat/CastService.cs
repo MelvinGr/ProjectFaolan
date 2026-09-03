@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -377,7 +378,7 @@ namespace Faolan.GameServer.Combat
 				: new[] { spell.Id };
 
 			foreach (var templateId in locked)
-				await client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
 
 			_logger.LogDebug("Locked {Count} template(s) for {Seconds:F2}s after casting {Spell} ('{Name}').", locked.Length, seconds, spell.Id, spell.Name);

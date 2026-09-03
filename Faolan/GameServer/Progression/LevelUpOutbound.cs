@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Progression
 {
@@ -33,15 +34,15 @@ namespace Faolan.GameServer.Progression
 		}
 		public Task SendCombatRatings(INetworkClient client)
 		{
-			return GameServerListener.SendCombatRatings(client);
+			return GameWire.SendCombatRatings(client);
 		}
 		public Task AnnounceAbility(INetworkClient client, Ability ability)
 		{
-			return GameServerListener.SendAddSpecialAbility(client, ability);
+			return GameWire.SendAddSpecialAbility(client, ability);
 		}
 		public Task LearnSpell(INetworkClient client, uint spellId)
 		{
-			return GameServerListener.SendLearnSpell(client, spellId);
+			return GameWire.SendLearnSpell(client, spellId);
 		}
 	}
 }

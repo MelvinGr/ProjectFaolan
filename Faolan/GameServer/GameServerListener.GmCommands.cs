@@ -22,6 +22,7 @@ using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer
 {
@@ -611,7 +612,7 @@ namespace Faolan.GameServer
 			{
 				var vitals = _simulation.GetOrAddPlayerVitals(client);
 				vitals.Health = 0; // the world tick detects the death and respawns at the nearest resurrection point
-				await SendStatUpdate(client, vitals.ToVitalsBlock(), selfHandle);
+				await GameWire.SendStatUpdate(client, vitals.ToVitalsBlock(), selfHandle);
 				await _agentServerDispatcher.SendSystemMessage(characterId, "You kill yourself.");
 				return;
 			}
@@ -682,7 +683,7 @@ namespace Faolan.GameServer
 			// alone, 211 captured - while the six-record current+max form is a SEED (93, at entry/stream-in) and the
 			// three-current form is what it sends about OTHER entities (4,676) and never about you. We have only ever
 			// sent the latter two. This sends retail's shape; if the bar moves, the shape is the whole bug.
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, vitals.Health), characterId);
+			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, vitals.Health), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Hurt to {percent}%: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}.");
 		}
@@ -855,7 +856,7 @@ namespace Faolan.GameServer
 
 			character.HeroicMode = value;
 			await Database.SetCharacterHeroicMode(character.Id, value);
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HeroicMode, value), character.Id);
+			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HeroicMode, value), character.Id);
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"HeroicMode set to {value}.");
 		}
 
@@ -879,7 +880,7 @@ namespace Faolan.GameServer
 				character.MurderPoints = 0;
 				await Database.SetCharacterCriminalState(character.Id, null, 0);
 				await _buffs.SendBuffRemoval(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8);
-				await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, 0), character.Id);
+				await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, 0), character.Id);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, "Criminal status cleared.");
 				return;
 			}
@@ -892,7 +893,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
 			await _buffs.SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
 				MagicBuffDatas.ApplyNow(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), BuffService.CasterLevel(client), casterIsPlayer: true));
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
+			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id,
 				$"Criminal for {seconds}s ({spell?.Name ?? "Criminal"} {CriminalStatus.CriminalSpellId}); murder points {character.MurderPoints}.");
@@ -1144,7 +1145,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await SendFeedback(client, new DynamicAreaBanner(text));
+			await GameWire.SendFeedback(client, new DynamicAreaBanner(text));
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Toasted: '{text}'");
 		}
 

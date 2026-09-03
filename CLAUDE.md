@@ -125,7 +125,9 @@ the compressed GameServer downloads; the Wireshark plugin + `tools/capture/tshar
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
-`SendVitals`/`SendAddItem` — never opcode-named), plus `.ItemUse`/`.Vista`; GM commands are the
+`SendVitals`/`SendAddItem` — never opcode-named; the STATIC ones several services share — `SendStatUpdate`,
+`BuildMapChange`, `SendLearnSpell`, … — live in `Wire/GameWire.cs`, and the tier's sender endpoints in
+`Wire/GameEndpoints.cs`, so no service reaches back into the listener for them, #928), plus `.ItemUse`/`.Vista`; GM commands are the
 `.GmCommands` partials. World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
 it is `Session/WorldEntryService.cs`, a composed service, because `CreateFlowService` needs the burst-less entry
 and a service cannot take a listener method in its constructor - moving it deleted the graph's last bound seam

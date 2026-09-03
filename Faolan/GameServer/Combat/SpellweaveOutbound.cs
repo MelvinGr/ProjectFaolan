@@ -3,6 +3,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Combat
 {
@@ -54,7 +55,7 @@ namespace Faolan.GameServer.Combat
 
 		public Task SendMountedRefusal(INetworkClient client)
 		{
-			return GameServerListener.SendWorldChat(client, ChatTextXml.MustNotHaveMountRunning);
+			return GameWire.SendWorldChat(client, ChatTextXml.MustNotHaveMountRunning);
 		}
 
 		public Task SendSprintBar(INetworkClient client, uint energy)

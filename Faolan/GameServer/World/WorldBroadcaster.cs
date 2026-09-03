@@ -21,6 +21,7 @@ using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Scripting;
+using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
@@ -31,7 +32,7 @@ namespace Faolan.GameServer.World
 	// every other broadcaster is built on.
 	//
 	// It reads the world model through `WorldSimulation`, loads templates from the DB, and frames every packet on the
-	// world conversation (`GameServerListener.WorldSenderEndpoint`: sender = world-system 0x58, receiver = the
+	// world conversation (`GameEndpoints.WorldSenderEndpoint`: sender = world-system 0x58, receiver = the
 	// recipient's GameInterfaceType endpoint). The FA015807 body carries the SUBJECT's handle unchanged, so the
 	// recipient renders the subject as a separate entity.
 	//
@@ -203,7 +204,7 @@ namespace Faolan.GameServer.World
 		// carrier's [u32 len] is the SENDER's (#530 rule 2), so it is written here rather than by the codec.
 		private static Rpc WorldObjectRpc(INetworkClient client, LiveWorldObject obj, uint playfieldToken)
 		{
-			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				// The door state comes from the LIVE object, not the row (#598) - a door this zone has open streams open.
 				// So does a destructible's health (#498): 142 of the 193 shipped harvest nodes were captured MID-HARVEST,
 				// so replaying the captured word rendered most of a zone's nodes empty while the server held them full.
@@ -270,9 +271,9 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await viewer.Client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(fade)));
-				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await viewer.Client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(consumed)));
 			}
 		}
@@ -438,7 +439,7 @@ namespace Faolan.GameServer.World
 				if (!viewer.Known.Contains(entity.Handle))
 					continue;
 
-				await viewer.Client.SendAsync(GameServerListener.BuildStatUpdate(viewer.Client, stats, entity.Handle));
+				await viewer.Client.SendAsync(GameWire.BuildStatUpdate(viewer.Client, stats, entity.Handle));
 			}
 		}
 
@@ -628,7 +629,7 @@ namespace Faolan.GameServer.World
 						// mounted player shows them on foot, which is the half of #428 the live relay does not cover.
 						if (ev.Subject is { IsPlayer: true, IsMounted: true, MountRideStat: > 0 })
 						{
-							await recipient.SendAsync(GameServerListener.BuildStatUpdate(recipient, new CharacterStatBlock
+							await recipient.SendAsync(GameWire.BuildStatUpdate(recipient, new CharacterStatBlock
 							{
 								[CharacterStatId.Mount] = ev.Subject.MountRideStat,
 								[CharacterStatId.MountSpeed] = 100
@@ -693,7 +694,7 @@ namespace Faolan.GameServer.World
 				return Task.CompletedTask;
 			}
 
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(N3ToClientQuitCodec.Build(subjectHandle, token, classWord))));
 		}
 
@@ -721,7 +722,7 @@ namespace Faolan.GameServer.World
 					return;
 				}
 
-				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await recipient.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(live)));
 			}
 			else
@@ -793,7 +794,7 @@ namespace Faolan.GameServer.World
 				var record = MagicBuffCodec.Build(subject.Handle, UnspecifiedCaster, wireId,
 					MagicBuffDatas.ApplyNowNoCaster(MagicBuffIds.BaseOf(wireId), remainingCs, subject.Level));
 
-				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType),
+				await recipient.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType),
 					GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 			}
 		}
@@ -865,7 +866,7 @@ namespace Faolan.GameServer.World
 			SpawnTransformPatch.TryRewritePlayfield(body, playfieldToken);
 
 			// The u32 carrier length belongs to the SENDER (#530 rule 2) - SpawnBody is the bare record.
-			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body));
 		}
 
@@ -874,7 +875,7 @@ namespace Faolan.GameServer.World
 		// already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
 		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(SetNameCodec.Build(SetNames.Nameplate(handle, name)))));
 		}
 
@@ -886,7 +887,7 @@ namespace Faolan.GameServer.World
 		// (the jump bit and its acceleration vector included) without this end having to understand it.
 		private static Task SendWorldMove(INetworkClient recipient, byte[] moveBody)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(moveBody)));
 		}
 
