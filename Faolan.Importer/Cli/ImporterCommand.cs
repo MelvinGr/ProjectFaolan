@@ -35,7 +35,7 @@ namespace Faolan.Importer.Cli
 		private static readonly Option<bool> DryRun = new Option<bool>("--dry-run") { Description = "Write nothing: run in a rolled-back transaction and print the per-table delta." };
 		private static readonly Option<bool> Force = new Option<bool>("--force") { Description = "Run modules that are otherwise suppressed (out-of-DB side effects)." };
 		private static readonly Option<bool> List = new Option<bool>("--list") { Description = "List every module (and which are opt-in) and exit." };
-		private static readonly Option<string> Report = new Option<string>("--report") { Description = "Run a read-only diagnostic instead of importing." };
+		private static readonly Option<string> Report = new Option<string>("--report") { Description = "Run a read-only diagnostic instead of importing (`--report list` names every one)." };
 		private static readonly Option<string> ReportArg = new Option<string>("--report-arg") { Description = "The report's argument (its meaning is per report)." };
 		private static readonly Option<string> Out = new Option<string>("--out") { Description = "Output directory for reports that write files." };
 		private static readonly Option<string> Skeleton = new Option<string>("--skeleton") { Description = "Skeleton id for the rdb-rig report." };

@@ -210,7 +210,7 @@ Modifiers
   --dump-templates <d> rdb-items: dump decrypted templates (module-specific)
 
 Reports (read-only, bypass the import runner)
-  --report <name>      e.g. conversation-states | anim | worldobj | spell-fields | rdb-assets
+  --report <name>      a read-only diagnostic; `--report list` prints every name, a typo answers did-you-mean
   --report-arg <v>     the target a report needs (NPC name / id / ...), e.g. --report anim --report-arg Casilda
 ```
 
@@ -254,6 +254,13 @@ using them as an input. A missing `(class, level)` is treated as unknown, not ze
 naming the character. `--report class-attribute-runs` prints the per-class block layout and the observation checks.
 
 ## Diagnostics (`--report`)
+
+**The index is the table in `Faolan.Importer/Cli/ReportCli.cs`** (`ReportCli.Reports`, one `ReportSpec` per report:
+name, description, whether it needs the capture corpus, body). `--report list` prints it, an unknown name answers
+with the nearest ones, and a report that needs the corpus fails before running when `--captures` does not resolve.
+The per-report descriptions below are the long form; the table's one-liners are the comments the old `switch`
+cases carried. `ReportCatalogTests` keeps the names unique. (#928 item 4 - the dispatcher used to be 27 guards plus
+a 139-case switch whose `default:` listed 12 names and had drifted.)
 
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (

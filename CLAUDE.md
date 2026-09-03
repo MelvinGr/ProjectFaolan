@@ -35,6 +35,7 @@ dotnet run --project Faolan.ClientLauncher -- --console --patch-universeaddr -u 
 # is a selectable module; `--dry-run` writes nothing (runs in a rolled-back txn, prints the per-table delta).
 dotnet run --project Faolan.Importer -- --skip characters     # idempotent EXCEPT characters; skip on a populated DB
 dotnet run --project Faolan.Importer -- --list                # catalog every module (+ which are opt-in)
+dotnet run --project Faolan.Importer -- --report list         # catalog every --report (the table in ReportCli.cs IS the index; a typo answers did-you-mean)
 dotnet run --project Faolan.Importer -- --only npcs --mode overwrite   # one module; overwrite = the old --reseed-npcs
 dotnet run --project Faolan.Importer -- --only rdb-maps --Content:RdbDir <dir> # rdb-* + mounts are OPT-IN (not in the default run)
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
