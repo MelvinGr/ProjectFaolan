@@ -74,6 +74,7 @@ namespace Faolan.Tests
 			var sub = CreateEditorAvatar.Snapshot(Id).SubClass;
 
 			Assert.Empty(sub.Quests.Records);
+			Assert.NotNull(sub.CompletedQuests);
 			Assert.Empty(sub.CompletedQuests.Areas);
 			Assert.Empty(sub.QuestIndex!.QuestIds);
 			Assert.Empty(sub.UnknownAfterAccessWindowTable);

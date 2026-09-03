@@ -198,7 +198,7 @@ namespace Faolan.Tests
 		{
 			Assert.InRange(NpcWeapon.MeleeComboShare, 0.28, 0.29);
 			Assert.InRange(NpcWeapon.RangedComboShare, 0.13, 0.14); // 57 of 418 captured Combat:Ranged acks
-			Assert.True(NpcWeapon.ClassComboShare is > 0.58 and < 0.59, $"{NpcWeapon.ClassComboShare}"); // 92 class / 65 generic over the two wired weapons
+			Assert.InRange(NpcWeapon.ClassComboShare, 0.58, 0.59); // 92 class / 65 generic over the two wired weapons
 		}
 
 		// #675: `Combos.Criteria` is the WEAPON CLASS a combo requires, and it maps one-to-one onto the item catalog's

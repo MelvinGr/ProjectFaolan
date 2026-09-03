@@ -109,7 +109,7 @@ namespace Faolan.Tests
 
 		private static MoveTaskNode List(params MoveTaskNode[] children)
 		{
-			return new MoveTaskNode { Mode = 4, Children = new List<MoveTaskNode>(children) };
+			return new MoveTaskNode { Mode = 4, Children = [.. children] };
 		}
 
 		// A mode-1 PathMoveTask leg carrying an explicit waypoint list (3 raw big-endian float-bit u32 per waypoint).

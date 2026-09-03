@@ -41,7 +41,7 @@ namespace Faolan.Tests
 			var bystander = Place(sim, 0x013184AE, position + new Vector3(5f, 0f, 0f));
 			var farAway = Place(sim, 0x0131830B, position + new Vector3(10_000f, 0f, 0f));
 
-			var bag = new WorldEntity(BagHandle, MapId, false, "Bag of loot", null);
+			var bag = new WorldEntity(BagHandle, MapId, false, "Bag of loot", null!); // a loot bag has no client, as ForLoot says
 			sim.World.Place(bag, MapId, position, Quaternion.Identity);
 
 			await broadcaster.BroadcastEntityFade(bag);
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 
 			var position = new Vector3(0f, 0f, 0f);
 			var viewer = Place(sim, 0x01317CF8, position);
-			var bag = new WorldEntity(BagHandle, MapId, false, "Bag of loot", null);
+			var bag = new WorldEntity(BagHandle, MapId, false, "Bag of loot", null!); // a loot bag has no client, as ForLoot says
 			sim.World.Place(bag, MapId, position, Quaternion.Identity);
 
 			await broadcaster.BroadcastEntityFade(bag);
