@@ -143,7 +143,11 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	// the item template it came from. `Transform` is row-major with the translation in the LAST row, which is
 	// System.Numerics' own convention - most are the identity, and a `1010030` weapon carries a small Z offset.
 	// `Unknown1`/`Unknown2` are constant per `ResourceType` across every captured payload - (6, 58) on a 1010030
-	// weapon, (0, 35) on the 1010201 head - so nothing in the corpus varies them.
+	// weapon, (0, 35) on the 1010201 head - so nothing in the corpus varies them. The client's own record WRITER
+	// (`FUN_00fe9f60`, #464 2026-09-03) says where they come from: after the matrix it writes attachment `+0x80`
+	// (this record's `ItemTemplateId`), attachment `+0x84` (`Unknown1`) and the attached VISUAL's `+0x4c` (`Unknown2`)
+	// - so `Unknown2` is a property of the visual object, not of the attachment, which fits a per-class constant
+	// (35 on the head's `VisualCATMesh_c`, 58 on the weapon's `VisualMesh_t`). Neither has a named reader yet.
 	public sealed record CharacterPreviewResource(
 		uint ResourceType,
 		uint ResourceId,
@@ -155,8 +159,18 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 
 	// One worn piece: an RDB 1010030 MeshIndexFile at a `CharacterEquipmentSlot` (slot 0 is the base/hair model and
 	// carries a 1010001 3D model instead). `Unknown1` runs 0..3 and is a property of the MESH, not of the slot - the
-	// same mesh id carries the same value at different slots and in different payloads - which reads like a material
-	// or colour set index; `Unknown2` is zero in every captured entry.
+	// same mesh id carries the same value at different slots and in different payloads; `Unknown2` is zero in every
+	// captured entry.
+	//
+	// What the client does with them (#464, 2026-09-03, from the writer `FUN_00fe9f60` and the attach path): each
+	// entry is a 28-byte struct in the visual's mesh vector, of which words 0, 1, 5 and 6 go on the wire, and the
+	// preview loader hands every entry to `VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, Unknown1, Unknown2,
+	// slot, word2)` (`FUN_00fed5d0`, named by its own log line). There `Unknown1` is consumed as a FLOAT (the int is
+	// converted on the way into `FUN_00dc3480`) and `MeshInstance::SetMesh` (`FUN_00f67b90`) stores it at
+	// instance `+0xd0` when it lies in [0, 6), setting bit 0x20 of `+0xe0` when it is non-zero; `Unknown2` is stored
+	// at instance `+0x1c` and DEFAULTS to the visual's own `+0x10` when 0, exactly as the slot defaults to `+0x14`.
+	// So `Unknown1` is a small per-mesh rendering parameter with a "set" bit and `Unknown2` an optional override of
+	// a per-visual default - and neither has a reader the stride probes can find, so neither has a name.
 	public sealed record CharacterPreviewMesh(uint MeshIndexFileId, uint Unknown1, uint Unknown2, uint Slot);
 
 	// One create-editor morph callback: a `MorphTargets` name with its weight, plus the editor stream index it

@@ -166,6 +166,19 @@ reproducible from a record we hold:
   does not distinguish them — which reads like a material or colour set index chosen by the item;
 * a **preview mesh's third word**, zero in every captured entry.
 
+Where each of the three comes from is now read off the client's own record WRITER, `FUN_00fe9f60` (#464,
+2026-09-03; `[V1: tools/ghidra/DecompileWithCallees.java]`): it writes the version byte, the monsterdata id, then
+each attachment as type / id / attractor / the 16 floats / attachment `+0x80` (the item template) / attachment
+`+0x84` (the first unnamed word) / the attached VISUAL's `+0x4c` (the second — a property of the visual object,
+which fits a per-class constant: 35 on the head's `VisualCATMesh_c`, 58 on the weapon's `VisualMesh_t`); then
+each mesh entry as words 0, 1, 5 and 6 of a 28-byte struct. The preview LOADER hands every mesh entry to
+`VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, word1, word5, slot, word2)` (`FUN_00fed5d0`, named by its
+own log line), where the second word is consumed as a FLOAT and stored on the `MeshInstance` at `+0xd0` when it
+lies in `[0, 6)` with bit `0x20` of `+0xe0` marking it set, and the third word is stored at instance `+0x1c`,
+defaulting to the visual's own `+0x10` when 0 — an optional override, the same shape as the slot's default from
+`+0x14`. Neither instance field has a reader the stride probes can find, so the two stay unnamed; what is settled
+is that they are rendering parameters of the attached mesh, not identity, and that a builder may write 0 for both.
+
 ### Building one
 
 `CharacterPreviewSetCodec` parses and re-encodes both committed payloads byte-exact, and
