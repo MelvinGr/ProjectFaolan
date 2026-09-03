@@ -153,7 +153,7 @@ namespace Faolan.GameServer.World
 			await GameWire.SendTeleportPending(client);
 			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId, epic), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor, epic) })
 			{
-				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+				await client.SendAsync(new Rpc(CreateFlowWire.MorphAckSender, CreateFlowWire.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}
 		}
 
@@ -162,7 +162,7 @@ namespace Faolan.GameServer.World
 			var realm = await _database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm!.IpAddress}:{realm.Port}";
 
-			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchRedirectToServer,
+			await client.SendAsync(new Rpc(CreateFlowWire.MorphAckSender, CreateFlowWire.Receiver(client), GameInterfaceMethods.DispatchRedirectToServer,
 				b => b.WriteByte(0x00).WriteStringByteLength(address)));
 
 			_logger.LogInformation("Sent enter-world handoff (0x2002) advertising world server {Address}.", address);

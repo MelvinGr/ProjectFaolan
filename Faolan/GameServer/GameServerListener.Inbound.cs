@@ -256,7 +256,7 @@ namespace Faolan.GameServer
 							// with the post-ready burst - 0x2024 + CharInPlayIIR + 0xF508F4C1 + the creation script
 							// (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95).
 							Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-							await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client);
+							await CreateEditorBursts.SendRetailCreateEditorPostReadyBurst(client);
 							break;
 						}
 
@@ -709,7 +709,7 @@ namespace Faolan.GameServer
 					// normal login of the same character does not re-trigger the intro. This connection needs the
 					// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
 					// auth + the intro/cutscene), so skip the helper auth for it.
-					var isCreateWorldEntry = !isNewCharacter && CreateFlowService.TryConsumePendingCreateWorldEntry(clientInstance);
+					var isCreateWorldEntry = !isNewCharacter && _createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
 					// ONE live connection per CHARACTER. A second login of a character that is already in the world gives
 					// two sessions writing one character's state - two world entities, two persistence writers, and a
 					// wallet/inventory that depends on which session saved last. The account may hold as many
@@ -750,7 +750,7 @@ namespace Faolan.GameServer
 							? Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59)
 							: GameEndpoints.WorldSenderEndpoint;
 						var authReceiver = isNewCharacter
-							? CreateFlowService.Receiver(client)
+							? CreateFlowWire.Receiver(client)
 							: client.Endpoint(RpcInterfaces.GameInterfaceType);
 
 						await WorldEntryService.ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
@@ -801,7 +801,7 @@ namespace Faolan.GameServer
 					case WorldEntryMode.CreateEditor: // New character -> show the creator
 					{
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
-						await CreateFlowService.SendRetailCreateEditorInitialBurst(client, Database, logger: Logger);
+						await CreateEditorBursts.SendRetailCreateEditorInitialBurst(client, Database, logger: Logger);
 						break;
 					}
 
@@ -1906,7 +1906,7 @@ namespace Faolan.GameServer
 			var player = _simulation.PlayerWorldEntity(client);
 			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))
 				category = target.Disposition;
-			else if (CreateFlowService.EditorSceneDispositions.TryGetValue(targetInstance, out var editorCategory))
+			else if (CreateEditorBursts.EditorSceneDispositions.TryGetValue(targetInstance, out var editorCategory))
 				// The create-editor scene is a scripted burst, not a simulated zone, so its five characters are in no
 				// zone to resolve - their retail categories are carried with the burst instead (#564).
 				category = editorCategory;

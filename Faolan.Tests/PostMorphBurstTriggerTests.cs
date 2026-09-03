@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task FlushOnBatchDrained_SendsTheTrioExactlyOnce_OnlyAfterArmed()
 		{
-			var service = new CreateFlowService(NullLogger.Instance, null!, null!, null!, null!);
+			var service = new CreateFlowService(NullLogger.Instance, null!, null!, null!, null!, null!);
 			var client = new RecordingNetworkClient(Instance);
 
 			// Not armed yet (no Finish / no morph seen) -> a drained batch must NOT send the trio.

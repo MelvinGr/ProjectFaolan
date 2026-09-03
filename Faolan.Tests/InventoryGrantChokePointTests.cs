@@ -43,7 +43,7 @@ namespace Faolan.Tests
 				    + "action that legitimately mints, and it cannot tick a collect goal: the items were already held, the "
 				    + "stack just became two. Equip/unequip/move are MoveCharacterItem calls and are structurally exempt."),
 
-			["Faolan/GameServer/CreateFlow/CreateFlowService.cs"] =
+			["Faolan/GameServer/CreateFlow/CharacterCreationService.cs"] =
 				(1, "the #220 STARTER GEAR, worn onto a brand-new character at creation. No collect goal can exist yet - "
 				    + "the character has no quests - and the connection is still the character editor."),
 

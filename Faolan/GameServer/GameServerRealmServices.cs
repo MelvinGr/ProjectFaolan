@@ -110,8 +110,9 @@ namespace Faolan.GameServer
 
 			// The create flow needs one op it does not own: the enter-world HANDOFF is TeleportService's, as a
 			// single-op seam here.
+			services.AddSingleton<CharacterCreationService>();
 			services.AddSingleton(sp => new CreateFlowService(sp.GetRequiredService<ILogger>(), sp.GetRequiredService<IDatabaseRepository>(),
-				sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<WorldEntryService>(), async client =>
+				sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<WorldEntryService>(), sp.GetRequiredService<CharacterCreationService>(), async client =>
 				{
 					var teleport = sp.GetRequiredService<TeleportService>();
 					await teleport.SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);

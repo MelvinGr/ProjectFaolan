@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		[Fact]
 		public Task CreationScriptBurst_IsByteStable()
 		{
-			return AssertBurstStable("CreationScriptBurst", CreateFlowService.SendRetailCreateEditorCreationScriptBurst);
+			return AssertBurstStable("CreationScriptBurst", CreateEditorBursts.SendRetailCreateEditorCreationScriptBurst);
 		}
 
 		// NOTE: the InitialBurst golden is asserted by CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden

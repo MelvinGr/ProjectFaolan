@@ -66,7 +66,7 @@ namespace Faolan.Tests
 
 			// The burst's GameTime resync anchor is generated from the wall clock (#351), so feed the instant this
 			// capture was taken - the anchor's own low word as unix epoch seconds - to keep the burst byte-identical.
-			await CreateFlowService.SendRetailCreateEditorInitialBurst(client, repo, DateTimeOffset.FromUnixTimeSeconds(0x6A1D3837));
+			await CreateEditorBursts.SendRetailCreateEditorInitialBurst(client, repo, DateTimeOffset.FromUnixTimeSeconds(0x6A1D3837));
 
 			var bytes = client.Sent.SelectMany(p => p).ToArray();
 			Assert.Equal(Convert.ToHexString(Golden.Bytes("InitialBurst")), Convert.ToHexString(bytes));

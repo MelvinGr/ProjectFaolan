@@ -305,7 +305,8 @@ namespace Faolan.Tests
 			var allowlist = new Dictionary<string, string>(StringComparer.Ordinal)
 			{
 				["GameWire.cs"] = "FrameWorldEntryRecord takes a body that already carries its [u32 bodyLen] - its parameter is named bodyWithLenPrefix, and its one caller writes that prefix itself",
-				["CreateFlowService.cs"] = "the create-editor 12-byte [entityClass][handle][0] body on the GameCharInterfaceProject receiver is not an IIR record at all, so it carries no record length"
+				["CreateFlowService.cs"] = "the create-editor 12-byte [entityClass][handle][0] body on the GameCharInterfaceProject receiver is not an IIR record at all, so it carries no record length",
+				["CreateEditorBursts.cs"] = "the editor's avatar snapshot writes its own [u32 len] prefix (WriteUInt32(length).WriteArray) ahead of a record it holds as bytes"
 			};
 
 			var offenders = new List<string>();
