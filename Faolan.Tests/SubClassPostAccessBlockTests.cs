@@ -23,40 +23,29 @@ namespace Faolan.Tests
 	public class SubClassPostAccessBlockTests
 	{
 		// The bar for a decoded region: it parses to the exact last byte, and what the reader took apart the writer
-		// puts back byte for byte - across every capture that contains it.
+		// puts back byte for byte - across every capture that contains it. The block is the sub-class's LAST region
+		// and is read sequentially (the byte[] fallback it once sat beside is gone, #464), so "parses" is the
+		// sub-class parsing at all, and the byte-exact half is the whole-snapshot gate
+		// (ProgressedJournalSnapshotTests.EveryCapturedSnapshot_RoundTrips_ByteExact); what this census keeps is the
+		// SHAPE of what it took apart.
 		[Fact]
 		public void EveryCapturedPostAccessBlock_ParsesAndReEncodesByteExact()
 		{
 			var shapes = new Dictionary<string, int>();
 			var blocks = 0;
-			var unparsed = 0;
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				var region = sub.UnknownAfterAccessWindowTable ?? [];
-				if (region.Length == 0)
-					continue;
-
 				blocks++;
-				SubClassPostAccessBlock parsed;
-				try
-				{
-					parsed = SubClassPostAccessBlockCodec.Parse(region);
-				}
-				catch (CodecParseException)
-				{
-					unparsed++;
-					continue;
-				}
+				var parsed = sub.PostAccessBlock;
 
-				Assert.Equal(region, SubClassPostAccessBlockCodec.Build(parsed));
+				Assert.Equal(SubClassPostAccessBlockCodec.Build(parsed), SubClassPostAccessBlockCodec.Build(SubClassPostAccessBlockCodec.Parse(SubClassPostAccessBlockCodec.Build(parsed))));
 
 				var shape = $"d{parsed.Displayed.Pairs.Count},s{parsed.Sheet.Pairs.Count},k{parsed.KnownSpells?.Records.Count.ToString() ?? "-"}";
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
 			}
 
 			Assert.Equal(184, blocks);
-			Assert.Equal(0, unparsed);
 
 			// Both stat lists are FIXED-SIZE across the corpus - 17 displayed stats and the sheet's 74 pairs twice.
 			// What varies is only the spell list.
@@ -81,9 +70,7 @@ namespace Faolan.Tests
 
 			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				var parsed = TryParse(sub.UnknownAfterAccessWindowTable ?? []);
-				if (parsed == null)
-					continue;
+				var parsed = sub.PostAccessBlock;
 
 				// `source` is "<capture id>#<packet>" (the opaque id, #465 - only the split on `#` matters here).
 				var hash = source.LastIndexOf('#');
@@ -122,10 +109,7 @@ namespace Faolan.Tests
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				var parsed = TryParse(sub.UnknownAfterAccessWindowTable ?? []);
-				if (parsed == null)
-					continue;
-
+				var parsed = sub.PostAccessBlock;
 				blocks++;
 
 				// 148 pairs = 74 pairs, twice. The halves match in ids AND values on every capture.
@@ -163,8 +147,7 @@ namespace Faolan.Tests
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				var parsed = TryParse(sub.UnknownAfterAccessWindowTable ?? []);
-				foreach (var record in parsed?.KnownSpells?.Records ?? [])
+				foreach (var record in sub.PostAccessBlock.KnownSpells?.Records ?? [])
 				{
 					records++;
 					types.Add(record.Type);
@@ -173,24 +156,6 @@ namespace Faolan.Tests
 
 			Assert.True(records > 2000, $"only {records} spell records - the corpus slice is wrong");
 			Assert.Equal([KnownSpellListCodec.SpellType, KnownSpellListCodec.FeatType], types.Order().ToArray());
-		}
-
-		// A block parses only when its framing lands exactly on the region's end; a sub-class whose post-catalog
-		// remainder is not one is skipped by these censuses, so the throw is converted here rather than in the codec
-		// (rule 4: Parse is strict).
-		private static SubClassPostAccessBlock? TryParse(byte[] region)
-		{
-			if (region.Length == 0)
-				return null;
-
-			try
-			{
-				return SubClassPostAccessBlockCodec.Parse(region);
-			}
-			catch (CodecParseException)
-			{
-				return null;
-			}
 		}
 	}
 }

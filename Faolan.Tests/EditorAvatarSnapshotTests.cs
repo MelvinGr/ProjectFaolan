@@ -77,10 +77,9 @@ namespace Faolan.Tests
 			Assert.NotNull(sub.CompletedQuests);
 			Assert.Empty(sub.CompletedQuests.Areas);
 			Assert.Empty(sub.QuestIndex!.QuestIds);
-			Assert.Empty(sub.UnknownAfterAccessWindowTable);
 			Assert.Equal(AccessWindowCatalog.Entries.Count, sub.AccessWindowEntries.Count);
 
-			var block = sub.PostAccessBlock!;
+			var block = sub.PostAccessBlock;
 			Assert.Null(block.KnownSpells); // ABSENT, not empty - it agrees with root.HasSpellbook
 			Assert.Empty(block.WideTail);
 			Assert.Empty(block.PairTail);

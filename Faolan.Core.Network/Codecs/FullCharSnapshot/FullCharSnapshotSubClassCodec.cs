@@ -12,8 +12,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// block have their own codecs here. Every region is read SEQUENTIALLY - the old landmark search for the catalog's
 	// first `PFAccessWindow_` name (and the "opaque gap" it implied) is gone with #464's re-carve: the quest index is
 	// self-delimiting (no terminal word; that was the catalog's own ListFrame), so the catalog's frame word is simply
-	// the next thing in the stream. Only the post-catalog remainder keeps a verbatim fallback, for tails whose stat
-	// block does not open with the two empty list frames.
+	// the next thing in the stream, and the stat block's two empty list frames are the next thing after the catalog.
+	// Nothing is carried verbatim: the post-catalog remainder used to keep a byte[] fallback "for tails whose stat
+	// block does not open with the two empty list frames", and no captured tail is one.
 	public static class FullCharSnapshotSubClassCodec
 	{
 		// CANONICAL - the only method here that writes bytes.
@@ -41,19 +42,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var completed = CompletedQuestJournalRegionCodec.Read(ref r);
 			var index = QuestIndexRegionCodec.Read(ref r);
 			var entries = PfAccessWindowEntryCodec.ReadTable(ref r);
-
-			var after = r.ReadRemaining().ToArray();
-			SubClassPostAccessBlock? block;
-			try
-			{
-				block = SubClassPostAccessBlockCodec.Parse(after);
-			}
-			catch (CodecParseException)
-			{
-				// Not a post-access block (the two leading empty list frames are what says one starts here) - the
-				// bytes stay opaque rather than being forced into a model they do not fit.
-				block = null;
-			}
+			var block = SubClassPostAccessBlockCodec.Read(ref r);
 
 			return new FullCharSnapshotSubClass
 			{
@@ -61,7 +50,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				CompletedQuests = completed,
 				QuestIndex = index,
 				AccessWindowEntries = entries,
-				UnknownAfterAccessWindowTable = after,
 				PostAccessBlock = block
 			};
 		}
@@ -79,11 +67,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				QuestIndexRegionCodec.Write(s, v.QuestIndex);
 
 			PfAccessWindowEntryCodec.WriteTable(s, v.AccessWindowEntries);
-
-			if (v.PostAccessBlock != null)
-				SubClassPostAccessBlockCodec.Write(s, v.PostAccessBlock);
-			else
-				s.WriteArray(v.UnknownAfterAccessWindowTable);
+			SubClassPostAccessBlockCodec.Write(s, v.PostAccessBlock);
 		}
 	}
 }

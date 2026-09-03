@@ -361,7 +361,7 @@ Then back in `FullPlayerCharacterIIR::ReadSubClass` (`FUN_0148c210`):
 
 ### How much of the tail this actually walks (2026-07-28, #393)
 
-Walking `UnknownAfterAccessWindowTable` with the grammar above — Lists D/E (variable-width, both empty), List F,
+Walking the post-catalog remainder (then carried as an opaque `UnknownAfterAccessWindowTable` byte[]; since #464 it is read sequentially as `SubClassPostAccessBlock` with no fallback) with the grammar above — Lists D/E (variable-width, both empty), List F,
 `StatList_t` #1, then either `StatList_t` #2 or the 12-byte known-spell list, then the trailing 17-byte-element
 list and its closing word — consumes **65 of 151** captured subclasses to their exact last byte:
 

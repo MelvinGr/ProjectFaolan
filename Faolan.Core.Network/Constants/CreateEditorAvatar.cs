@@ -75,8 +75,7 @@ namespace Faolan.Core.Network.Constants
 				CompletedQuests = new CompletedQuestJournalRegion(),
 				QuestIndex = new QuestIndexRegion(),
 				AccessWindowEntries = [.. AccessWindowCatalog.Entries],
-				PostAccessBlock = block,
-				UnknownAfterAccessWindowTable = []
+				PostAccessBlock = block
 			};
 
 			return new FullPlayerCharacterIIR(instance, root, subClass);

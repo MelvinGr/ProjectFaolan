@@ -120,16 +120,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// The tails are FULLY CONSTRUCTED for the live session - no post-hoc byte-patch: the quest portion is
 			// built with `instance`, the access-window + stat regions carry no per-session ids, and the playfield
-			// token is authored into the stat block above (from the live zone). Nothing is opaque here, so both
-			// carried-verbatim regions are empty.
+			// token is authored into the stat block above (from the live zone). Nothing is opaque here.
 			return new FullCharSnapshotSubClass
 			{
 				Quests = journal,
 				CompletedQuests = completed,
 				QuestIndex = index,
 				AccessWindowEntries = [.. AccessWindowCatalog.Entries],
-				PostAccessBlock = block,
-				UnknownAfterAccessWindowTable = []
+				PostAccessBlock = block
 			};
 		}
 

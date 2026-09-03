@@ -31,12 +31,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// than generated. Identical for every character; AccessWindowCatalog is the typed copy production emits.
 		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; } = [];
 
-		// The stat block behind the catalog. Null when the bytes there do not open a post-access block, in which
-		// case they ride UnknownAfterAccessWindowTable instead.
-		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
+		// The stat block behind the catalog - the last region, read sequentially like the four before it. It used
+		// to be nullable beside a verbatim `UnknownAfterAccessWindowTable` byte[] "for tails whose stat block does
+		// not open with the two empty list frames"; no captured tail is one (all 184 post-catalog regions in the
+		// corpus parse to their last byte, #464), and both production constructors always built the block, so the
+		// fallback was dead code that kept the register carrying an "unknown" that was fully decoded.
+		public SubClassPostAccessBlock PostAccessBlock { get; init; } = new SubClassPostAccessBlock();
 
-		public byte[] UnknownAfterAccessWindowTable { get; init; } = [];
-
-		public bool HasKnownRepeatedStatTable => PostAccessBlock?.HasRepeatedStatTable == true;
+		public bool HasKnownRepeatedStatTable => PostAccessBlock.HasRepeatedStatTable;
 	}
 }

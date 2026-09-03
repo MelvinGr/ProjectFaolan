@@ -27,16 +27,7 @@ namespace Faolan.Tests
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				SubClassPostAccessBlock parsed;
-				try
-				{
-					parsed = SubClassPostAccessBlockCodec.Parse(sub.UnknownAfterAccessWindowTable ?? []);
-				}
-				catch
-				{
-					continue; // not a post-access block (create-editor subclasses and the like)
-				}
-
+				var parsed = sub.PostAccessBlock;
 				var pairs = parsed.Displayed.Pairs.Concat(parsed.Sheet.Pairs).ToList();
 
 				uint? Value(CharacterStatId id)
