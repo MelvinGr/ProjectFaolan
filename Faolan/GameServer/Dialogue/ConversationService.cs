@@ -676,8 +676,8 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 
 				await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
-				await _questBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
-				await _questBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
+				await QuestBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
+				await QuestBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
 
 				// #820: THIS is where a turn-in quest completes, so this is where it pays. The guard above only lets a
 				// quest through while it is still Active, so the flip - and the payment - happen exactly once.

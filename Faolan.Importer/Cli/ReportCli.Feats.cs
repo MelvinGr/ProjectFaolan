@@ -378,7 +378,7 @@ namespace Faolan.Importer.Cli
 				singles++;
 				var kind = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(start));
 				var width = body.Length - start;
-				widths.TryAdd(kind, new Dictionary<int, int>());
+				widths.TryAdd(kind, []);
 				widths[kind][width] = widths[kind].GetValueOrDefault(width) + 1;
 
 				// A measured width WIDER than the key list predicts is bytes past the element, and this is what says

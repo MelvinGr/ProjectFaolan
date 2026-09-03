@@ -91,7 +91,7 @@ namespace Faolan.Importer.Cli
 				for (var w = 0; w < HeadWords && (w + 1) * 4 <= body.Length; w++)
 				{
 					var word = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(w * 4, 4));
-					var byValue = headWords.TryGetValue(w, out var hv) ? hv : headWords[w] = new Dictionary<uint, (int, int)>();
+					var byValue = headWords.TryGetValue(w, out var hv) ? hv : headWords[w] = [];
 					var (hp, hf) = byValue.GetValueOrDefault(word);
 					byValue[word] = isPercent ? (hp + 1, hf) : (hp, hf + 1);
 				}
@@ -101,7 +101,7 @@ namespace Faolan.Importer.Cli
 					if (field == SpellManaCostField)
 						continue;
 
-					var byValue = perField.TryGetValue(field, out var bv) ? bv : perField[field] = new Dictionary<uint, (int, int)>();
+					var byValue = perField.TryGetValue(field, out var bv) ? bv : perField[field] = [];
 					var (p, f) = byValue.GetValueOrDefault(value);
 					byValue[value] = isPercent ? (p + 1, f) : (p, f + 1);
 				}

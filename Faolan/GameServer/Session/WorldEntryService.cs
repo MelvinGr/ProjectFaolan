@@ -473,14 +473,14 @@ namespace Faolan.GameServer.Session
 			// rather than from the tick is also what makes the Confirmed gate structural instead of a check.
 			if (viewer != null && _simulation.World.ZoneForEntity(viewer).TryGet(requestId, out var confirmed) && !confirmed.IsPlayer && !confirmed.IsLoot)
 			{
-				await _npcs.SendNpcIdleAssert(client, confirmed);
+				await NpcBroadcaster.SendNpcIdleAssert(client, confirmed);
 
 				// #905: a mob that was ALREADY fighting when this viewer built its dynel never got the combat-mode
 				// stat - `BroadcastNpcCombatMode` fires on the engage transition and only reaches viewers who already
 				// know the handle - so it swung empty-handed for that player for the rest of the fight. This is the
 				// moment the viewer can render it, and it is the same structural gate the idle assert uses.
 				if (confirmed.InCombat)
-					await _npcs.SendNpcCombatMode(client, confirmed);
+					await NpcBroadcaster.SendNpcCombatMode(client, confirmed);
 			}
 
 			_logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
@@ -728,7 +728,7 @@ namespace Faolan.GameServer.Session
 			// A CREATE entry carries no quests, so it also carries no progress - the resolver is only ever asked about
 			// a goal of a quest in `snapshotQuests`.
 			var (snapshotQuests, primaryQuest, solvedTimesOf) = isCreateEntry
-				? (new List<QuestDefinition>(), (QuestDefinition?)null, static (QuestGoalDefinition _) => 0u)
+				? ([], (QuestDefinition?)null, static (QuestGoalDefinition _) => 0u)
 				: await LoadSnapshotQuests(character);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
@@ -873,7 +873,7 @@ namespace Faolan.GameServer.Session
 				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
 				var beachDef = await _database.GetQuestDefinition(QuestContent.BeachStarterQuestId)
 					?? throw new InvalidOperationException($"The beach starter quest {QuestContent.BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
-				await _questBroadcaster.SendQuestLogList(client, beachDef, [QuestContent.BeachStarterQuestId]);
+				await QuestBroadcaster.SendQuestLogList(client, beachDef, [QuestContent.BeachStarterQuestId]);
 				await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
 				_logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", QuestContent.BeachStarterQuestId, character.Name);
 			}
@@ -1015,7 +1015,7 @@ namespace Faolan.GameServer.Session
 
 		// The item at `slot` has BOUND to its owner: re-send that cell's Flags word (stat 0) with bit 26 set (#756).
 		// Retail sends it as the last message of an equip that binds, after the two 0x17 slot registrations.
-		internal Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
+		internal static Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
 				SetItemStatCodec.Build(SetItemStats.Bound(ContainerKind.Equipped, client.Session.Character.Id, (uint)slot, instance.Template.WireFlags))));

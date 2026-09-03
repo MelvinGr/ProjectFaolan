@@ -48,7 +48,7 @@ namespace Faolan.GameServer.World
 		// Last aura application per (holder, buff, area) - see TickAuras for why it is not WorldEntity.LastDotTick, and
 		// #776 for why the HOLDER is in the key: since a mob can carry an area-emitting debuff, two entities holding
 		// the same buff would otherwise share one stamp and each suppress the other's cadence.
-		private readonly Dictionary<(uint Holder, uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = new Dictionary<(uint, uint, uint), DateTimeOffset>();
+		private readonly Dictionary<(uint Holder, uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = [];
 
 		// `Spell.DotDelta` is a captured `StatDamageIIR` delta, so it is a WIRE number - and everything it meets at
 		// this layer is DISPLAY: `EntityVitals.Health` is the ÷100 vitals value, the melee path spends the already

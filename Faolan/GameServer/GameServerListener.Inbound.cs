@@ -446,8 +446,8 @@ namespace Faolan.GameServer
 					// deletes show c2s -> s2c with an identical body (frames 3937/3938 and 3975/3976). So the drop is
 					// confirmed by the echo, not by a bespoke reply. Send it BEFORE the delete so the client is answered
 					// even if persistence throws.
-					await _questBroadcaster.SendQuestIir(client, questId, state);
-					await Database.RemoveCharacterQuest(client.Session.Character.Id, questId);
+					await QuestBroadcaster.SendQuestIir(client, questId, state);
+					await Database.RemoveCharacterQuest(client.Session.Character!.Id, questId); // a QuestIIR only arrives from a character in the world
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
 
@@ -466,7 +466,7 @@ namespace Faolan.GameServer
 					{
 						var remaining = await Database.GetCharacterQuestsWithDefinitions(client.Session.Character.Id, QuestState.Active);
 						if (remaining.All(q => q.Definition.QuestLineId != droppedDef.QuestLineId))
-							await _questBroadcaster.SendQuestLogRemove(client, droppedDef.QuestLineId);
+							await QuestBroadcaster.SendQuestLogRemove(client, droppedDef.QuestLineId);
 					}
 
 					break;
@@ -590,7 +590,7 @@ namespace Faolan.GameServer
 					catch (CodecParseException e)
 					{
 						Logger.LogWarning(e, "GameServer FanaticCommandIIR did not parse ({RawLength} bytes) raw={Raw}", rawPayload.Length, Convert.ToHexString(rawPayload));
-						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+						await _agentServerDispatcher.SendSystemMessage(client.Session.Character!.Id, // a GM command only arrives from a character in the world
 							$"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
 						break;
 					}
@@ -617,7 +617,7 @@ namespace Faolan.GameServer
 					if (f.Text.Length > 1 && f.Text[0] == '/')
 						await _gmCommands.Handle(client, f.Text);
 					else
-						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+						await _agentServerDispatcher.SendSystemMessage(client.Session.Character!.Id,
 							$"GM command received with no verb ('{f.Text}').");
 					break;
 				}
@@ -630,7 +630,7 @@ namespace Faolan.GameServer
 					// sub-opcode is its OWN instance id (the client-instance ack/keepalive stream). Since the create flow
 					// started using the real character id that value is DYNAMIC, not a constant, so it can only be
 					// matched here. Treat it as a benign ping: log quietly, don't spam system messages.
-					if ((uint)iirType == client.Session.Character.Id)
+					if (client.Session.Character is { } self && (uint)iirType == self.Id)
 					{
 						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), rawPayload.Length);
 						break;
@@ -638,7 +638,7 @@ namespace Faolan.GameServer
 
 					Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", iirType.ToHex(), rawPayload.ToHex());
 
-					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown 0x2000 Opcode: {iirType.ToHex()} ({rawPayload.Length} bytes)");
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character!.Id, $"Unknown 0x2000 Opcode: {iirType.ToHex()} ({rawPayload.Length} bytes)"); // a 0x2000 only arrives from a character in the world
 
 					break;
 				}
@@ -1256,7 +1256,7 @@ namespace Faolan.GameServer
 					if (client.Session.ActiveVista is { } scene)
 					{
 						if (entering)
-							await _vista.OnVistaCinematicEntered(client, scene);
+							await Scripting.VistaService.OnVistaCinematicEntered(client, scene);
 						else
 							await _vista.OnVistaCinematicLeft(client, scene);
 
@@ -2632,7 +2632,7 @@ namespace Faolan.GameServer
 					//    0x17 slot registrations, equipped(101) slot 2 stat 0 = 0x04000001, where the same item had
 					//    arrived in the bag at 0x00000001 twelve seconds earlier]
 					if (justBound != null)
-						await _worldEntry.SendItemBound(client, targetSlot, justBound);
+						await WorldEntryService.SendItemBound(client, targetSlot, justBound);
 
 					break;
 				}

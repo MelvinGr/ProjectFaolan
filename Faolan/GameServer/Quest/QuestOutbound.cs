@@ -52,32 +52,32 @@ namespace Faolan.GameServer.Quest
 
 		public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
-			return _quests.SendQuestLogList(client, trackedDef, activeQuestIds);
+			return QuestBroadcaster.SendQuestLogList(client, trackedDef, activeQuestIds);
 		}
 
 		public Task SendQuestLogRemove(INetworkClient client, uint questLineId)
 		{
-			return _quests.SendQuestLogRemove(client, questLineId);
+			return QuestBroadcaster.SendQuestLogRemove(client, questLineId);
 		}
 
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
-			return _quests.SendQuestGoal(client, questId, goalId, update);
+			return QuestBroadcaster.SendQuestGoal(client, questId, goalId, update);
 		}
 
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
-			return _quests.SendQuestIir(client, questId, state);
+			return QuestBroadcaster.SendQuestIir(client, questId, state);
 		}
 
 		public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options)
 		{
-			return _quests.SendQuestRewardOffer(client, questId, options);
+			return QuestBroadcaster.SendQuestRewardOffer(client, questId, options);
 		}
 
 		public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index)
 		{
-			return _quests.SendQuestRewardConfirm(client, questId, index);
+			return QuestBroadcaster.SendQuestRewardConfirm(client, questId, index);
 		}
 
 		// --- the three that need the live world, so they stay with it.

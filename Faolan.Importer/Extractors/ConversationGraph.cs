@@ -272,7 +272,7 @@ namespace Faolan.Importer.Extractors
 		{
 			var byContent = walks.ToLookup(h => (h.Walk.NpcTemplateId, contentKeys[h]));
 			var byPath = walks.ToLookup(h => (h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, h.Walk.AnswerPath));
-			var links = new Dictionary<Harvested, (Harvested, uint)>();
+			var links = new Dictionary<Harvested, (Harvested Parent, uint OptionId)>();
 			var recovered = 0;
 			var dropped = 0;
 
@@ -320,7 +320,7 @@ namespace Faolan.Importer.Extractors
 					recovered++;
 				}
 
-				links[h] = (parent, optionId);
+				links[h] = (parent!, optionId); // a null parent has no offered options, so it always took the `dropped` branch above
 			}
 
 			if (recovered > 0)

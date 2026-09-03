@@ -772,7 +772,7 @@ namespace Faolan.GameServer.World
 		// stream-in, and the one we have is a 32-day title buff. We send every TIMED buff the entity holds, which is
 		// the narrowest thing we can do that is still useful - our own `ActiveBuffs` only ever holds self-buffs, so
 		// this is another player's own buffs and nothing else. Open work tracked in Gitea #677.
-		private async Task SendActiveBuffsOnStreamIn(INetworkClient recipient, WorldEntity subject)
+		private static async Task SendActiveBuffsOnStreamIn(INetworkClient recipient, WorldEntity subject)
 		{
 			const uint UnspecifiedCaster = 0;
 

@@ -123,7 +123,7 @@ namespace Faolan.Importer.Cli
 
 				// `--report-arg <character name>` names both populations instead of counting them - which is the only
 				// way an EXTRA becomes actionable, since what it means is decided one spell at a time.
-				if (!string.IsNullOrWhiteSpace(nameFilter) && character.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
+				if (!string.IsNullOrWhiteSpace(nameFilter) && character.Name?.Contains(nameFilter, StringComparison.OrdinalIgnoreCase) == true)
 				{
 					foreach (var (label, ids) in new[] { ("EXTRA (offered, not known)", extra), ("MISSING, never on offer", offCatalog), ("MISSING, bought in the feat TREE", fromTree), ("MISSING, held below their stated level", earlyHeld), ("MISSING, no teaching feat", noFeat) })
 					{

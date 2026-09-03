@@ -233,7 +233,7 @@ namespace Faolan.GameServer.World
 		// ⭐ Retail does not treat this as a one-shot either. Over all 138 dumps (10,373 well-formed StatUpdateIIR
 		// frames) there are 593 stat-20 records across 43 captures, and per (capture, handle) **25% are sent more
 		// than once, one of them 28 times**. So a re-assert is retail's own shape, not a patch over ours.
-		public Task SendNpcCombatMode(INetworkClient client, WorldEntity npc)
+		public static Task SendNpcCombatMode(INetworkClient client, WorldEntity npc)
 		{
 			return WorldIir.Send(client, CombatModeBody(npc, true));
 		}
@@ -262,7 +262,7 @@ namespace Faolan.GameServer.World
 		//
 		// Confirmed-gated by construction (the caller is the confirm), because a record for a Known-but-not-Confirmed
 		// handle hits the pcDynel-NULL loader crash - the hang the original heartbeat experiment ran into.
-		public Task SendNpcIdleAssert(INetworkClient recipient, WorldEntity npc)
+		public static Task SendNpcIdleAssert(INetworkClient recipient, WorldEntity npc)
 		{
 			ArgumentNullException.ThrowIfNull(recipient);
 			ArgumentNullException.ThrowIfNull(npc);
@@ -619,7 +619,7 @@ namespace Faolan.GameServer.World
 		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
 		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
 		// the spawn it was just sent); the waypoints are the absolute captured world coords.
-		private Task SendPatrol(INetworkClient recipient, WorldEntity npc)
+		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
 			if (!npc.Patrols)
 				return Task.CompletedTask;
@@ -638,7 +638,7 @@ namespace Faolan.GameServer.World
 		// paces the walk, and a rebuild that did not supply it left the client pacing off something else. It is supplied
 		// here as the WALK speed (WorldState.RouteWalkSpeed) rather than the captured scalar - the scalar is not a ground
 		// speed, and feeding it back made the fast-scalar beats sprint. See #714 for the measurement.
-		private byte[] BuildRouteBody(WorldEntity npc)
+		private static byte[] BuildRouteBody(WorldEntity npc)
 		{
 			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);
 			if (ahead.Count == 0)

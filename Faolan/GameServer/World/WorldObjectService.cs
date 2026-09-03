@@ -397,7 +397,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// The gathering window ran out (the tick's call): put the node's own kind back on its pin.
-		public Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
+		public static Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
 		{
 			return node.Row.WaypointType is { } kind
 				? BroadcastWaypointType(zone, node, (WaypointType)kind)
@@ -473,7 +473,7 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private Task BroadcastDynelVisual(Zone zone, LiveWorldObject node, SimpleDynelVisualChangeIIR change)
+		private static Task BroadcastDynelVisual(Zone zone, LiveWorldObject node, SimpleDynelVisualChangeIIR change)
 		{
 			return BroadcastToViewers(zone, node, SimpleDynelVisualChangeCodec.Build(change));
 		}

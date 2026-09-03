@@ -1105,7 +1105,7 @@ namespace Faolan.Importer.Cli
 
 			// Mode 1/2 never reaches here - UnrenderableReason takes it, because the number is the caster's.
 			var signed = (int)value.Value;
-			var range = ctx.RawRange(signed, signed);
+			var range = TooltipContext.RawRange(signed, signed);
 
 			if (stat == GameActionTooltip.HealthStatId)
 			{
@@ -1160,8 +1160,8 @@ namespace Faolan.Importer.Cli
 				// rather than being resolved at an invented level.
 				if (ctx.Level is not { } level)
 				{
-					var endpoints = $"{ctx.Range(stat.Value, (int)minLow.Value, (int)maxLow.Value)} at level {lowLevel} .. "
-					                + $"{ctx.Range(stat.Value, (int)minHigh.Value, (int)maxHigh.Value)} at level {highLevel}";
+					var endpoints = $"{TooltipContext.Range(stat.Value, (int)minLow.Value, (int)maxLow.Value)} at level {lowLevel} .. "
+					                + $"{TooltipContext.Range(stat.Value, (int)minHigh.Value, (int)maxHigh.Value)} at level {highLevel}";
 					return HitFormat(ctx, stat.Value, (int)minLow.Value, [endpoints, ctx.StatName(stat.Value)]);
 				}
 
@@ -1179,7 +1179,7 @@ namespace Faolan.Importer.Cli
 				max = (int)maxValue.Value;
 			}
 
-			return HitFormat(ctx, stat.Value, min, [ctx.Range(stat.Value, min, max), ctx.StatName(stat.Value)]);
+			return HitFormat(ctx, stat.Value, min, [TooltipContext.Range(stat.Value, min, max), ctx.StatName(stat.Value)]);
 		}
 
 		// The three token sentences and their argument shape. `Heals %s` takes the range alone; the other two take the
@@ -1288,7 +1288,7 @@ namespace Faolan.Importer.Cli
 						return null;
 
 					var kind = ctx.Ldb.GetValueOrDefault((LdbMetaTypeCategory, metaType.Value));
-					return kind == null ? null : [ctx.Magnitude(MetaTypeStatId, (int)amount.Value), kind];
+					return kind == null ? null : [TooltipContext.Magnitude(MetaTypeStatId, (int)amount.Value), kind];
 				}
 
 				// `Knockback %d meters` - one conversion, and the branch (0x014a1542) fills it from key 238 FIRST.
@@ -1422,12 +1422,12 @@ namespace Faolan.Importer.Cli
 					if (element.Ramp is { } ramp)
 					{
 						return ctx.Level is { } level
-							? [ctx.StatName(stat.Value), ctx.Magnitude(stat.Value, ramp.ValueAt(level))]
-							: [ctx.StatName(stat.Value), $"{ctx.Magnitude(stat.Value, ramp.LowValue)} at level {ramp.LowLevel} .. {ctx.Magnitude(stat.Value, ramp.HighValue)} at level {ramp.HighLevel}"];
+							? [ctx.StatName(stat.Value), TooltipContext.Magnitude(stat.Value, ramp.ValueAt(level))]
+							: [ctx.StatName(stat.Value), $"{TooltipContext.Magnitude(stat.Value, ramp.LowValue)} at level {ramp.LowLevel} .. {TooltipContext.Magnitude(stat.Value, ramp.HighValue)} at level {ramp.HighLevel}"];
 					}
 
 					var amount = element.Value(type.Keys[statSlot + 1]);
-					return amount is null ? null : [ctx.StatName(stat.Value), ctx.Magnitude(stat.Value, (int)amount.Value)];
+					return amount is null ? null : [ctx.StatName(stat.Value), TooltipContext.Magnitude(stat.Value, (int)amount.Value)];
 				}
 			}
 		}
@@ -1775,7 +1775,7 @@ namespace Faolan.Importer.Cli
 			///         magnitude draws as "20", never "20-20".
 			///     </para>
 			/// </remarks>
-			public string Range(uint statId, int min, int max)
+			public static string Range(uint statId, int min, int max)
 			{
 				var scale = StatDisplayScale.Of(statId);
 				var (low, high) = min < 0 ? (-min, -max) : (min, max);
@@ -1793,7 +1793,7 @@ namespace Faolan.Importer.Cli
 			///     the `Hit` family passes the stat's own percent predicate, `HitPercentage` passes a literal 0. Reusing
 			///     <see cref="Range" /> there would report a 30% drain as 0.3%.
 			/// </remarks>
-			public string RawRange(int min, int max)
+			public static string RawRange(int min, int max)
 			{
 				var (low, high) = min < 0 ? (-min, -max) : (min, max);
 				return low == high ? low.ToString(CultureInfo.InvariantCulture) : $"{low}-{high}";
@@ -1943,7 +1943,7 @@ namespace Faolan.Importer.Cli
 			// The client's own value rendering: divide by the stat's display scale, print the sign, append the stat's
 			// unit suffix. Trailing zeros are trimmed because the client's float formatter does - the in-client line
 			// is "-10%", not "-10.00%".
-			public string Magnitude(uint statId, int wireValue)
+			public static string Magnitude(uint statId, int wireValue)
 			{
 				var scale = StatDisplayScale.Of(statId);
 				var value = wireValue / (double)scale;

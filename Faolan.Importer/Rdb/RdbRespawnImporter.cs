@@ -46,7 +46,7 @@ namespace Faolan.Importer.Rdb
 		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b([^>]*)>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
 			RegexOptions.Compiled | RegexOptions.Singleline);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 

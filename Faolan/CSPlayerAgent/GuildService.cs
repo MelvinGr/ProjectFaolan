@@ -354,7 +354,7 @@ namespace Faolan.CSPlayerAgent
 			if (!GuildRankLadder.Allows(guild.GovernmentForm, actorRank, permission))
 			{
 				_logger.LogInformation("Guild {Verb} refused: {Actor} is rank {Rank} (\"{RankName}\") in \"{Guild}\", which may not {Verb}.", verb, actor.Name, actorRank,
-					GuildRankLadder.NameOf(guild.GovernmentForm, actorRank) ?? "?", guild.Name);
+					GuildRankLadder.NameOf(guild.GovernmentForm, actorRank) ?? "?", guild.Name, verb);
 				return null;
 			}
 

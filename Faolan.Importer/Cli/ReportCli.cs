@@ -49,7 +49,9 @@ namespace Faolan.Importer.Cli
 			public ImporterOptions Options { get; } = options;
 			public string? Arg => Options.ReportArg;
 			public string? Out => Options.Out;
-			public string CapturesDir => Options.Captures;
+			// Only a Needs.Captures report reads these, and RunAsync has checked the directory exists by then - so a
+			// report that asks without one is a table entry filed under the wrong Needs, which is what the throw says.
+			public string CapturesDir => Options.Captures ?? throw new InvalidOperationException("this report needs --captures (its ReportSpec should say Needs.Captures)");
 			public IReadOnlyList<NamedCapture> Captures => _captures ??= NamedCapture.LoadAll(CapturesDir);
 		}
 
@@ -77,9 +79,9 @@ namespace Faolan.Importer.Cli
 			}
 
 			var ctx = new ReportContext(options);
-			if (spec.Needs == Needs.Captures && !Directory.Exists(ctx.CapturesDir))
+			if (spec.Needs == Needs.Captures && !Directory.Exists(options.Captures))
 			{
-				await Console.Error.WriteLineAsync($"Captures directory not found: {ctx.CapturesDir}");
+				await Console.Error.WriteLineAsync($"Captures directory not found: {options.Captures}");
 				await Console.Error.WriteLineAsync("  The corpus is NOT in this repo - it lives in the private ProjectFaolan-Data repo");
 				await Console.Error.WriteLineAsync("  (see CLAUDE.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
 				return 1;

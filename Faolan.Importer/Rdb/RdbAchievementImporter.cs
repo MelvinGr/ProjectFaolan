@@ -26,7 +26,7 @@ namespace Faolan.Importer.Rdb
 
 		public sealed record Result(int Names, int Descriptions, int Written);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 

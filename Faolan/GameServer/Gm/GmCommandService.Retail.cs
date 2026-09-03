@@ -274,8 +274,11 @@ namespace Faolan.GameServer.Gm
 
 			// ⚠️ Said out loud because it changes how the output is read: we keep no persistent hate list, so this is
 			// derived state, not a stored one. "Engaged" means the tick has it in combat right now.
-			var lines = new List<string> { $"Hostiles near '{subject.Name}' (derived - we keep no stored hate list):" };
-			lines.Add($"  ENGAGED: {engaged.Length}");
+			var lines = new List<string>
+			{
+				$"Hostiles near '{subject.Name}' (derived - we keep no stored hate list):",
+				$"  ENGAGED: {engaged.Length}"
+			};
 			lines.AddRange(engaged.Take(10).Select(e => $"    '{e.Npc.Name}' (0x{e.Npc.Handle:X8}) {e.Distance:0.#}u"));
 			lines.Add($"  IN AGGRO RANGE BUT NOT ENGAGED: {idle.Length}");
 			lines.AddRange(idle.Take(10).Select(e => $"    '{e.Npc.Name}' (0x{e.Npc.Handle:X8}) {e.Distance:0.#}u"));

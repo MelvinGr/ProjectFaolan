@@ -53,7 +53,7 @@ namespace Faolan.Importer.Rdb
 
 		public sealed record Result(int Factions, int Awards, int Named, int Unjoined);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase, ILogger? logger = null)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 

@@ -360,7 +360,7 @@ namespace Faolan.CSPlayerAgent
 				// 0x2082 RequestNeededRole(uint32 activityId): the client selected an activity in the finder window.
 				case CSPlayerAgentMethods.RequestNeededRole:
 				{
-					await _groupFinder.HandleRequestNeededRole(client, body.ReadUInt32());
+					await GroupFinderService.HandleRequestNeededRole(client, body.ReadUInt32());
 					break;
 				}
 

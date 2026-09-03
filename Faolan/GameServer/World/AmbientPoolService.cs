@@ -92,7 +92,7 @@ namespace Faolan.GameServer.World
 
 				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, outfits, comboSets, level, level > 0
 					? CombatResolver.NpcMaxHealthForLevel(level)
-					: 1u, type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, SpawnAreaLabels.FormatAreaLabel(area));
+					: 1u, type.StatCore?.Disposition ?? WorldEntity.DispositionFriendly, SpawnAreaLabels.FormatAreaLabel(area));
 				pools.Add(pool);
 
 				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool

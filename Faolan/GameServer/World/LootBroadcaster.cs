@@ -294,7 +294,7 @@ namespace Faolan.GameServer.World
 		// item take's slot list. Measured on the eight cash loots in
 		// xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city, where the value equals the DispatchUpdateCash
 		// delta every time. We were crediting the wallet and never sending this, so the window kept showing the coins.
-		public Task AfterLootCash(INetworkClient client, uint bagHandle, uint cash)
+		public static Task AfterLootCash(INetworkClient client, uint bagHandle, uint cash)
 		{
 			return WorldIir.Send(client, LootRemoveItemsCodec.Build(new LootRemoveItemsIIR(bagHandle, [], cash)));
 		}

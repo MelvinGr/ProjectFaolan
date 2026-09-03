@@ -162,7 +162,7 @@ namespace Faolan.GameServer.Progression
 		// 1000066/67/68 across all 134 captures, where the nine counters occur in 46-72 each). So the unit and epoch
 		// are ours: unix SECONDS of the last boundary applied. Nothing observable depends on the choice - the client
 		// is never shown these - and it is recorded here rather than hidden. [V0: the reset timestamps' wire form.]
-		private Dictionary<CharacterStatId, uint> ApplyDueResets(Dictionary<CharacterStatId, uint> sheet, DateTimeOffset now)
+		private static Dictionary<CharacterStatId, uint> ApplyDueResets(Dictionary<CharacterStatId, uint> sheet, DateTimeOffset now)
 		{
 			var changed = new Dictionary<CharacterStatId, uint>();
 			var stamp = (uint)now.ToUnixTimeSeconds();

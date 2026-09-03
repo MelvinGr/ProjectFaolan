@@ -37,7 +37,7 @@ namespace Faolan.Core.Rdb
 		{
 			return rdb.TryGet(Type, RecordId, out var entry) && rdb.CanRead(entry)
 				? Parse(rdb.ReadDecompressed(entry))
-				: new Dictionary<uint, string>();
+				: [];
 		}
 
 		public static Dictionary<uint, string> Parse(ReadOnlySpan<byte> body)

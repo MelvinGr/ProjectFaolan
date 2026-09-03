@@ -119,7 +119,7 @@ namespace Faolan.Importer.Cli
 						var name = GameActionTypes.Get(element.Kind)?.Name ?? element.Kind.ToString();
 						if (showKinds)
 						{
-							var bucket = kindsById.TryGetValue(list.Id, out var k) ? k : kindsById[list.Id] = new Dictionary<string, int>();
+							var bucket = kindsById.TryGetValue(list.Id, out var k) ? k : kindsById[list.Id] = [];
 							bucket[name] = bucket.GetValueOrDefault(name) + 1;
 						}
 

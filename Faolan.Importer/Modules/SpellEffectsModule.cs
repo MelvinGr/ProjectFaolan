@@ -234,29 +234,30 @@ namespace Faolan.Importer.Modules
 		// and said so here rather than sitting silently beside data that is read (#640).
 		public static IReadOnlyList<SpellEffect> BuildRows()
 		{
-			var rows = new List<SpellEffect>();
-
-			// Both halves of the proc hang off the buff that arms it, in the order the capture shows them: the 6s
-			// self-buff first (it rides the fatality burst's own frame), then the pet.
-			rows.Add(new SpellEffect
+			var rows = new List<SpellEffect>
 			{
-				SpellId = FrozenHatredBuff,
-				Trigger = SpellEffectTrigger.OnFatality,
-				Sequence = 0,
-				Kind = SpellEffectKind.ApplySpell,
-				TargetSpellId = FrozenHatredProc
-			});
-			rows.Add(new SpellEffect
-			{
-				SpellId = FrozenHatredBuff,
-				Trigger = SpellEffectTrigger.OnFatality,
-				Sequence = 1,
-				Kind = SpellEffectKind.SummonPet,
-				Template = "Frozen Hatred",
-				Combat = true,
-				DurationMs = 60_000,
-				MaxDurationMs = 300_000
-			});
+				// Both halves of the proc hang off the buff that arms it, in the order the capture shows them: the 6s
+				// self-buff first (it rides the fatality burst's own frame), then the pet.
+				new SpellEffect
+				{
+					SpellId = FrozenHatredBuff,
+					Trigger = SpellEffectTrigger.OnFatality,
+					Sequence = 0,
+					Kind = SpellEffectKind.ApplySpell,
+					TargetSpellId = FrozenHatredProc
+				},
+				new SpellEffect
+				{
+					SpellId = FrozenHatredBuff,
+					Trigger = SpellEffectTrigger.OnFatality,
+					Sequence = 1,
+					Kind = SpellEffectKind.SummonPet,
+					Template = "Frozen Hatred",
+					Combat = true,
+					DurationMs = 60_000,
+					MaxDurationMs = 300_000
+				}
+			};
 
 			return rows;
 		}

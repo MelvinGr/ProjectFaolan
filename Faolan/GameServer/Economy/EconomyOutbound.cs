@@ -191,7 +191,7 @@ namespace Faolan.GameServer.Economy
 		// left. The socketed item's own container entry is NOT re-sent - the client updates it in place from the
 		// first message, which is why nothing here rebuilds the inventory.
 		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8248 - both in the same frame]
-		public async Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+		public static async Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
 		{
 			var charId = client.Session.Character.Id;
 			await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), AddToItemSlotCodec.Method,

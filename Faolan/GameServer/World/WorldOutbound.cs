@@ -168,7 +168,7 @@ namespace Faolan.GameServer.World
 
 		public Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
 		{
-			return _worldObjects.RestoreNodeWaypointType(zone, node);
+			return WorldObjectService.RestoreNodeWaypointType(zone, node);
 		}
 
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)

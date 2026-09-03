@@ -33,7 +33,7 @@ namespace Faolan.Importer.Rdb
 			if (overwrite)
 			{
 				db.NameFilterTerms.RemoveRange(existing.Values);
-				existing = new Dictionary<string, NameFilterTerm>();
+				existing = [];
 			}
 
 			var added = 0;

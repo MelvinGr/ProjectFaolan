@@ -138,7 +138,7 @@ namespace Faolan.Core.Progression
 		}
 
 		/// <summary>The rank's display name, or the number when a ladder runs deeper than the known names.</summary>
-		public string RankName(int rank)
+		public static string RankName(int rank)
 		{
 			return rank >= 0 && rank < TradeskillLadders.RankNames.Length
 				? TradeskillLadders.RankNames[rank]

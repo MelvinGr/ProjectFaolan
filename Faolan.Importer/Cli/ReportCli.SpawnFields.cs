@@ -403,7 +403,7 @@ namespace Faolan.Importer.Cli
 					placementNames[placement] = name;
 					foreach (var (field, value) in values)
 					{
-						var perPlacement = byPlacement.TryGetValue(field, out var pd) ? pd : byPlacement[field] = new Dictionary<(uint, float, float, float), HashSet<string>>();
+						var perPlacement = byPlacement.TryGetValue(field, out var pd) ? pd : byPlacement[field] = [];
 						(perPlacement.TryGetValue(placement, out var pv) ? pv : perPlacement[placement] = []).Add(value);
 					}
 
@@ -417,7 +417,7 @@ namespace Faolan.Importer.Cli
 					templateNames[template] = name;
 					foreach (var (field, value) in values)
 					{
-						var perType = fields.TryGetValue(field, out var d) ? d : fields[field] = new Dictionary<uint, HashSet<string>>();
+						var perType = fields.TryGetValue(field, out var d) ? d : fields[field] = [];
 						(perType.TryGetValue(template, out var vals) ? vals : perType[template] = []).Add(value);
 					}
 				}

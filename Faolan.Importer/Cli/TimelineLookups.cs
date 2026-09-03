@@ -30,7 +30,7 @@ namespace Faolan.Importer.Cli
 			Ticks = packet.Ticks;
 			Frame = packet.Frame;
 			Direction = packet.Direction;
-			Tier = look.Tier(packet);
+			Tier = TimelineLookups.Tier(packet);
 			Raw = packet.Body;
 			// ⚠️ The opcode alone CANNOT tell an IIR carrier from an ordinary method: opcodes are PER INTERFACE and
 			// every interface numbers its first method 0x2000, so PassBlob, InitiateAuthentication, DispatchChallenge
@@ -140,7 +140,7 @@ namespace Faolan.Importer.Cli
 			look.WorldObjects = (await db.WorldObjects.AsNoTracking()
 					.Select(o => new { o.MapId, o.PositionX, o.PositionY, o.PositionZ, o.Name }).ToListAsync())
 				.GroupBy(o => o.MapId)
-				.ToDictionary(g => g.Key, g => g.Select(o => new Placed(o.PositionX, o.PositionY, o.PositionZ, o.Name)).ToList());
+				.ToDictionary(g => g.Key, g => g.Select(o => new Placed(o.PositionX, o.PositionY, o.PositionZ, o.Name ?? "(unnamed world object)")).ToList());
 
 			look._ciphertext = ReportCli.EncryptedLdbBlobsFor(rdbDir);
 			look._plaintext = ReportCli.PlaintextLdbStringsFor(rdbDir);
@@ -160,7 +160,7 @@ namespace Faolan.Importer.Cli
 		// The signals that ARE deployment-independent: the dump's `Protocol` column for chat (a ChatServer frame
 		// carries no RpcHeader at all), and the frame's own ENDPOINT class for everything else. The port is kept only
 		// as the last resort, for a frame whose dump row has neither.
-		public string Tier(CapturedPacket packet)
+		public static string Tier(CapturedPacket packet)
 		{
 			if (packet.Protocol == "ChatServer")
 				return "chat";

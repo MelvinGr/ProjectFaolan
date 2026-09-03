@@ -42,7 +42,7 @@ namespace Faolan.Importer.Rdb
 		internal const int MinOverlap = 50; // need enough shared ids to trust a page's language verdict
 		internal const uint LdbType = 1030002;
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase, ILogger? logger = null)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 

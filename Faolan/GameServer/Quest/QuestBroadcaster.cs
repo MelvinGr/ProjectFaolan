@@ -134,14 +134,14 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
-		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
+		public static Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(QuestGoalCodec.Build(client.Session.Character.Id, questId, goalId, update))));
 		}
 
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
-		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
+		public static Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(QuestCodec.Build(client.Session.Character.Id, questId, state))));
@@ -149,7 +149,7 @@ namespace Faolan.GameServer.Quest
 
 		// Sends the pick-one-of-N reward OFFER (#815). The addressed instance is the character id, the same slot every
 		// other quest packet here uses.
-		public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options)
+		public static Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(QuestRewardNotifyCodec.Build(client.Session.Character.Id, questId, options))));
@@ -157,7 +157,7 @@ namespace Faolan.GameServer.Quest
 
 		// The confirm: the same IIR with NO options. Retail's carried the chosen index in the trailing block's fourth
 		// word - undecoded, so it is placed exactly where the capture put it and nothing else is claimed about it.
-		public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index)
+		public static Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index)
 		{
 			var confirm = new QuestRewardNotifyIIR(client.Session.Character.Id, 0x01, questId, [], [0, 0, 0, index, 0]);
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
@@ -226,7 +226,7 @@ namespace Faolan.GameServer.Quest
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
 		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
-		public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
+		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
 			// The line row supplies the two per-LINE trailer words (#896) - the same MainQuest_c slots the login
 			// snapshot's index block fills, so the grant and the snapshot have to agree or the client's quest tracker
@@ -255,7 +255,7 @@ namespace Faolan.GameServer.Quest
 		// reads three scalars, a count, that many pairs, the title string and the trailers, unconditionally. So there
 		// was never a second grammar; #545 had already found the same thing from the other end when it identified the
 		// "leading constant 1" as the OPERATION and noted it is 2 on every captured empty list.
-		public Task SendQuestLogRemove(INetworkClient client, uint questLineId)
+		public static Task SendQuestLogRemove(INetworkClient client, uint questLineId)
 		{
 			var body = MainQuestUpdateCodec.Build(new MainQuestUpdateIIR(client.Session.Character.Id, MainQuestUpdateOp.Remove, questLineId, 0, [], ""));
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

@@ -82,7 +82,7 @@ namespace Faolan.GameServer.Scripting
 
 		// The two records that actually start the fly-through: the scene buff (casterless - retail writes a zero class
 		// word where the caster reference would be) and the client-side scry script.
-		private async Task SendVistaCameraStart(INetworkClient client, ActiveVistaScene scene)
+		private static async Task SendVistaCameraStart(INetworkClient client, ActiveVistaScene scene)
 		{
 			var self = client.Session.Character.Id;
 			var vista = scene.Vista;
@@ -97,7 +97,7 @@ namespace Faolan.GameServer.Scripting
 
 		// The client has ENTERED the cinematic. Retail answers with the lid shutting behind the camera and nothing
 		// else - the fly-through is the client's own from here.
-		public async Task OnVistaCinematicEntered(INetworkClient client, ActiveVistaScene scene)
+		public static async Task OnVistaCinematicEntered(INetworkClient client, ActiveVistaScene scene)
 		{
 			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(scene.ObjectClass, scene.ObjectHandle, VistaClosedAnimation)));
 		}

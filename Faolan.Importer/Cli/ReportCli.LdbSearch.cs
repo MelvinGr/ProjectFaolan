@@ -37,7 +37,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			var (category, needle) = Split(arg);
+			var (category, needle) = Split(arg ?? "");
 			if (string.IsNullOrWhiteSpace(needle))
 			{
 				Console.WriteLine("ldb-search: --report-arg is [<category>:]<substring> (e.g. \"50200:Ironwood\") or id:<n>.");

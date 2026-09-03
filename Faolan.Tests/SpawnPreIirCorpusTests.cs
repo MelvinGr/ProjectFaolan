@@ -117,7 +117,7 @@ namespace Faolan.Tests
 					continue;
 
 				var block = string.Join(",", spawn.PreIir.Words.Select(w => w.ToString("x8")));
-				var e = byName.GetValueOrDefault(name, (Blocks: new HashSet<string>(), Sightings: 0));
+				var e = byName.GetValueOrDefault(name, (Blocks: [], Sightings: 0));
 				e.Blocks.Add(block);
 				byName[name] = (e.Blocks, e.Sightings + 1);
 			}

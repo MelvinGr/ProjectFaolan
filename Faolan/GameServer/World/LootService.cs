@@ -126,7 +126,7 @@ namespace Faolan.GameServer.World
 				await _database.SetCharacterMoney(character.Id, character.Money);
 				await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 				// Retail follows the balance update with the bag-window removal of the money row (#809).
-				await _loot.AfterLootCash(client, bagHandle, cash);
+				await LootBroadcaster.AfterLootCash(client, bagHandle, cash);
 				_logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 			}
 			else

@@ -53,7 +53,7 @@ namespace Faolan.CSPlayerAgent
 		// characterId -> the signup that passed the quest gate, held until the ready check resolves it.
 		private readonly ConcurrentDictionary<uint, QueueGroupFinderRequest> _pendingSignups = [];
 
-		public async Task HandleRequestNeededRole(INetworkClient client, uint activityId)
+		public static async Task HandleRequestNeededRole(INetworkClient client, uint activityId)
 		{
 			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderReceivedNeededRole, GroupFinderNeededRoleCodec.Build(activityId, CapturedNeededRoles));
 		}

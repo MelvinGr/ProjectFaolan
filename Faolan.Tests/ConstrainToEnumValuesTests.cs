@@ -72,7 +72,7 @@ namespace Faolan.Tests
 					.ReplaceService<IModelCacheKeyFactory, AlwaysRebuild>().Options);
 				// CHECK constraints live on the DESIGN-TIME model - the runtime model is read-optimized and drops them.
 				var model = ctx.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model;
-				var names = model.GetEntityTypes().SelectMany(e => e.GetCheckConstraints()).Select(c => c.Name).ToArray();
+				var names = model.GetEntityTypes().SelectMany(e => e.GetCheckConstraints()).Select(c => c.Name ?? throw new InvalidOperationException("a CHECK constraint without a name")).ToArray();
 				return (names, stderr.ToString());
 			}
 			finally

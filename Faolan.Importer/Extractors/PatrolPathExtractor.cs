@@ -167,7 +167,7 @@ namespace Faolan.Importer.Extractors
 			for (var i = 1; i < legs.Count; i++)
 			{
 				if (Vector3.Distance(LastWaypoint(legs[i - 1].Leg), FirstWaypoint(legs[i].Leg)) > LegJoinTolerance)
-					runs.Add(new List<int>());
+					runs.Add([]);
 
 				runs[^1].Add(i);
 			}

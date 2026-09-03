@@ -36,7 +36,7 @@ namespace Faolan.Importer.Cli
 		public bool Force { get; init; }
 		// The corpus directory the run loaded, or EMPTY when no module in the plan needed it (a Db-source-only run).
 		public required string CapturesDir { get; init; }
-		public required string RdbProxyBase { get; init; }
+		public required string? RdbProxyBase { get; init; }
 		public string? DumpTemplatesDir { get; init; }
 
 		// rdb-* module sub-options (from --rdb / --dump-templates). Out-of-DB write paths (dump) must be suppressed

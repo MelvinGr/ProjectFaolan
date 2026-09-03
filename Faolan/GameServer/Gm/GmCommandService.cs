@@ -1480,7 +1480,7 @@ namespace Faolan.GameServer.Gm
 			{
 				var trained = await _tradeskill.ProfessionsOf(characterId);
 				var lines = ladders.Select(l => trained.TryGetValue(l.Name, out var rank)
-					? $"{l.Name}: {l.RankName(rank)} ({l.RankFeatIds.Length} rank(s) on its ladder)"
+					? $"{l.Name}: {TradeskillLadder.RankName(rank)} ({l.RankFeatIds.Length} rank(s) on its ladder)"
 					: $"{l.Name}: -").ToList();
 
 				lines.Add($"Usage: .tradeskill <profession> [{string.Join('|', TradeskillLadders.RankNames)}]");
@@ -1514,8 +1514,8 @@ namespace Faolan.GameServer.Gm
 
 			var trainedCount = await _database.AddCharacterFeats(characterId, ladder.RankFeatIds.Take(wanted + 1));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Trained {ladder.Name} to {ladder.RankName(wanted)} ({trainedCount} feat row(s) written). Reopen the crafting window to see the book.");
-			_logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, ladder.RankName(wanted));
+				$"Trained {ladder.Name} to {TradeskillLadder.RankName(wanted)} ({trainedCount} feat row(s) written). Reopen the crafting window to see the book.");
+			_logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, TradeskillLadder.RankName(wanted));
 		}
 
 		private async Task WeaponSetCommand(INetworkClient client, string arguments)

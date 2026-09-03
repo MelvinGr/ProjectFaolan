@@ -49,7 +49,7 @@ namespace Faolan.Importer.Extractors
 		// Dog Inn). A link is only ever created when a used object is followed by an N3Teleport, so tracking the broader
 		// SimpleDynel class as a candidate is harmless (decor/benches never emit a teleport). The module enriches the
 		// same two classes (a subset of the WorldObjectExtractor object families that actually back doors).
-		internal static readonly HashSet<uint> DoorSubOpcodes = new HashSet<uint>(WorldObjectClasses.Doors);
+		internal static readonly HashSet<uint> DoorSubOpcodes = [.. WorldObjectClasses.Doors];
 
 		public static List<TeleportLink> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

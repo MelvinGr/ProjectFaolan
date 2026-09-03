@@ -638,7 +638,7 @@ namespace Faolan.GameServer.CreateFlow
 		// The post-creation WORLD connection: the second (world) connection opened after the 0x2002 enter-world
 		// handoff, flagged in the Hello handler. Distinguishes it from the editor connection and from a normal
 		// existing-character login so the intro/cutscene bursts only fire there.
-		private bool IsCreateWorldConnection(INetworkClient client)
+		private static bool IsCreateWorldConnection(INetworkClient client)
 		{
 			return client.Session is { EntryMode: WorldEntryMode.CreateWorld, Character.Name: not null };
 		}
