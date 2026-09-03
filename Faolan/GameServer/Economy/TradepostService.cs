@@ -12,6 +12,8 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
+using System.Numerics;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -57,8 +59,13 @@ namespace Faolan.GameServer.Economy
 		// listener, like every other cross-listener action.
 		private readonly ICsPlayerAgentProvider _csPlayerAgent;
 
-		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, ICsPlayerAgentProvider csPlayerAgent)
+		private readonly BankService _bank;
+		private readonly GuildBankService _guildBank;
+
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, ICsPlayerAgentProvider csPlayerAgent, BankService bank, GuildBankService guildBank)
 		{
+			_bank = bank;
+			_guildBank = guildBank;
 			_database = database;
 			_logger = logger;
 			_outbound = outbound;
@@ -698,5 +705,31 @@ namespace Faolan.GameServer.Economy
 			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
+
+		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
+		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound
+		// TalkToNpc). The window's first/default tab is the BANK (personal storage), a separate channel: container kind
+		// 105 delivered via a BankIIR (decoded, protocol_bank_storage), populated from the character's Container=105 rows.
+		// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content (the 0x201c
+		// slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already populated -
+		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
+		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
+		// bank first, open last. Returns the bank item count for the caller's feedback.
+		internal async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
+		{
+			var characterId = client.Session.Character.Id;
+			var stored = await _database.GetCharacterItems(characterId, ContainerKind.Bank);
+			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, stored);
+
+			await _bank.SendBank(client, bank);
+
+			// The GUILD vault rides the same open (#654): retail pushes DispatchGuildBankData in the SAME instant as
+			// the personal bank's slot registrations and DispatchOpenTradepost, unasked - there is no OpenGuildBank
+			// request on the wire at all. Before the open, for the same reason the bank is: a container that lands
+			// after the window exists renders empty on the first open.
+			await _guildBank.SendVault(client);
+			await TradepostResponses.SendOpenTradepost(client, accessPosition);
+			return bank.Items.Count;
+		}
 	}
 }

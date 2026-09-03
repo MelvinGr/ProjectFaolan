@@ -291,23 +291,6 @@ namespace Faolan.GameServer
 			Logger.LogInformation("ACG bind box for map {MapId} sent to character {CharacterId}.", destinationMapId, client.Session.Character.Id);
 		}
 
-		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
-		// 0x2014 DispatchResurrectRequest: "somebody is offering to resurrect you" - for now always YOURSELF, from a
-		// self-resurrection consumable (#890). The client holds the offer and answers on the GameCharAgent tier with
-		// ResurrectMe(spellId) or CancelResurrectionRequest(who, spellId), so the spell id is a token that comes back
-		// rather than something the client has to resolve.
-		//
-		// `castSpellOnResurrect` is true: the captured request carries 1, and the effect that arms the offer carries 1
-		// in the matching field. A player-to-player resurrect would send the CASTER as the resurrector; nothing sends
-		// one yet.
-		private static Task SendResurrectRequest(INetworkClient client, uint characterId, uint resurrectSpell)
-		{
-			// Same server endpoint as the release screen next door - the capture addresses both identically
-			// (GameCharAgent instance 0x57 there, 0x59 in the beach capture: an arbitrary server handle, not session
-			// data), and the receiver is the player's own GameCharInterface instance.
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				ResurrectRequestCodec.Method, ResurrectRequestCodec.Build(characterId, resurrectSpell)));
-		}
 
 		// WHICH of the two vitals blocks to send is decided by WHAT MOVED, and both forms are retail's (#586).
 		//
@@ -329,114 +312,6 @@ namespace Faolan.GameServer
 		// that slot holds. Neither blanket is right; the split above is.
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
-
-		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed
-		// BehaviorControlCenterIIR at slot BehaviorId.Search, and nothing else - no stat change, no buff. The client
-		// waits for it before the stance takes, which is why a press with no answer reads as "the client sent
-		// nothing".
-		//
-		// The animation action is the CHARACTER's, not the stance's, so it comes from a per-class map holding only the
-		// two classes a capture shows. An unmapped class logs and does nothing, the same call the spellweave toggle
-		// makes: a borrowed id would play some other class's animation and read as working.
-		private async Task PerformSearchStance(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (!StartingData.SearchStanceAction.TryGetValue(character.Class, out var animAction))
-			{
-				Logger.LogInformation("Search stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
-				return;
-			}
-
-			var entity = _simulation.PlayerWorldEntity(client);
-			// #272: a stance is something the OTHER players watch you do, so the same record is relayed to everyone who
-			// can see the actor. `BehaviorControlCenterIIR` is 11/11 broadcast in the two-client capture
-			// (`--report broadcast-check`), and a search crouch nobody else sees is a player frozen upright to them.
-			var searchStance = BehaviorControlCenterCodec.Build(BehaviorAnimations.SearchStance(character.Id, animAction, entity?.NextBehaviorPhase() ?? 3));
-			await WorldIir.Send(client, searchStance);
-			await _broadcaster.BroadcastBehaviorToViewers(client, searchStance);
-		}
-
-		// The HIDE stance (#505) - a TOGGLE on one selector, so the server holds which way the next press goes.
-		// Entering carries the shadow coverage the client itself reported a moment earlier (SetShadowCoverageIIR);
-		// leaving is the shared stand-up action, the one part of the pair that is NOT class-specific.
-		//
-		// ⚠️ The EXIT record's shape is taken from the two necromancer sightings (flags 8, no echoed command id). The
-		// one Herald of Xotli exit in the corpus carries flags 10 and a command id instead, on an otherwise identical
-		// 8-byte-tailed record. Three sightings that disagree two-to-one is not enough to model the difference, so the
-		// majority form is sent for both and the divergence is written down rather than silently averaged away.
-		private async Task ToggleSneakHide(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (!StartingData.SneakHideEnterAction.TryGetValue(character.Class, out var enterAction))
-			{
-				Logger.LogInformation("Hide stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
-				return;
-			}
-
-			var entity = _simulation.PlayerWorldEntity(client);
-			var hidden = entity?.IsHidden ?? false;
-			var phase = entity?.NextBehaviorPhase() ?? 3;
-
-			var record = hidden
-				? BehaviorAnimations.SneakHideExit(character.Id, StartingData.SneakHideExitAction, phase)
-				: BehaviorAnimations.SneakHideEnter(character.Id, enterAction, phase, entity?.NextBehaviorCommandId() ?? 3, entity?.ShadowCoverage ?? 100);
-
-			// #272: relayed like the search stance - entering or leaving hiding is visible on the actor, and a rogue
-			// who slips into the shadows only on their own screen is still standing there for everyone else.
-			var stance = BehaviorControlCenterCodec.Build(record);
-			await WorldIir.Send(client, stance);
-			await _broadcaster.BroadcastBehaviorToViewers(client, stance);
-			if (entity != null)
-				entity.IsHidden = !hidden;
-
-			Logger.LogInformation("Hide stance: '{Name}' {Action}.", character.Name, hidden
-				? "left hiding"
-				: "entered hiding");
-		}
-
-		// REST (#505). Unlike search and hide this is not a stance at all: retail answers with a self-CAST of the
-		// spell the client calls `Resting` - "Recovering health, mana, energy, and stamina" - on slot 4 MagicAttack,
-		// with the spell row's own 20,500 ms cast time in the record. The player regains vitals over that channel,
-		// which is what a 20-second cast bar with no spell at the end of it IS.
-		//
-		// The record is class-independent (the cast animation 177216 is shared with the Path of Asura recall) and is
-		// byte-identical across four captured characters, so there is no per-class map here.
-		//
-		// ⚠️ What is emitted is the CAST. The regen RATE while resting is not modelled: no capture measures it, and
-		// the tick's rates are corpus-verified numbers (RegenRates, #442) that a guessed rest multiplier would
-		// quietly break. `IsResting` is set so the tick can be taught the real rate once one is measured, and it is
-		// cleared when the channel elapses - the channel length is the spell row's, not invented.
-		private async Task PerformRestCast(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var entity = _simulation.PlayerWorldEntity(client);
-
-			var record = BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1);
-			// #272: a 20-second rest cast is an animation on the actor - relayed, like every other player behaviour.
-			var restCast = BehaviorControlCenterCodec.Build(record);
-			await WorldIir.Send(client, restCast);
-			await _broadcaster.BroadcastBehaviorToViewers(client, restCast);
-
-			// ⚠️ Rest is a CAST, so it has to arm the cast path's cancel state or it can never be cancelled (#505).
-			// The client ends this channel the same way it ends any other: it sends the c2s cancel BCC (seq 0x0002)
-			// when the player moves, and `HandleBccCastSpell` answers it with retail's 0x0007 abort - but ONLY if it
-			// finds the BEGIN's args here. Rest is answered to a `PerformSpecialAction` rather than to a c2s cast, so
-			// nothing ever set them, `beginArgs` came back null, and the cancel fell through to a plain echo instead
-			// of the abort. The client then stayed channeling: the bar hung, and a channeling client sends no further
-			// cast OR melee, so one press of rest silently disabled every combat action the player had.
-			//
-			// Verified against `NecroL80_..._cast-general-abilities` frames 867/921/927 - begin seq 0x0004 (phase 8,
-			// activation 2050) -> c2s cancel seq 0x0002 -> s2c abort seq 0x0007, whose args are these begin args with
-			// the cancel's own command id spliced in. So the record to send back is not a completion at all.
-			client.Session.PendingCastArgs = record.Args;
-			client.Session.PendingCastMode = 0; // no client command id at begin - the cancel brings its own
-
-			if (entity == null)
-				return;
-
-			entity.RestingUntil = DateTimeOffset.UtcNow.AddMilliseconds(RestingChannelMs);
-			Logger.LogInformation("Rest: '{Name}' began resting for {Ms} ms.", character.Name, RestingChannelMs);
-		}
 
 	}
 }

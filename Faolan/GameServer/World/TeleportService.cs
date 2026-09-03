@@ -14,6 +14,8 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.CreateFlow;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Codecs.Text;
 using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Wire;
 
@@ -200,6 +202,56 @@ namespace Faolan.GameServer.World
 		{
 			return _carriedBuffs.Consume(characterId);
 		}
+
+		// .recall  - recall to the BOUND location (the persisted bind point). The retail triggers that land here are the
+		// Path of Asura spell and a bindstone recall; this GM command is the test bootstrap.
+		// ⚠️ NOT the Totem of Origins - that returns to the RACIAL home city and goes through RecallToRacialHomeCommand.
+		// No on-screen line before the handoff: retail sends none, and the ones this used to send were invented.
+		public async Task RecallToBindCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character.BindRespawnPointId is not { } pointId)
+			{
+				await _chat.SendSystemMessage(character.Id, "You have no bind point. Use .bind to set one.");
+				return;
+			}
+
+			var point = await _database.GetRespawnPoint(pointId);
+			if (point == null)
+			{
+				await _chat.SendSystemMessage(character.Id, ChatMarkup.Color("red", "Your bind point no longer exists. Re-bind with .bind."));
+				return;
+			}
+
+			await this.DoTeleport(character.Id, point.MapId, point.Position);
+		}
+
+		// .recallhome  - use the Totem of Origins: return to the character's RACIAL home city, which is NOT the bind
+		// point (see StartingData.RacialHomeMap for the mapping and the capture that pins the Stygian row). Bound
+		// location vs racial origin are two separate destinations; the Totem ignores the bind entirely, so this shares
+		// no state with RecallToBindCommand beyond the DoTeleport handoff.
+		// No on-screen line before the handoff, same as the bind recall - retail sends none.
+		public async Task RecallToRacialHomeCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (!StartingData.RacialHomeMap.TryGetValue(character.Race, out var homeMapId))
+			{
+				// Not silent: an unmapped race is a content gap in RacialHomeMap, not a corrupt character.
+				_logger.LogWarning("Totem of Origins: race {Race} has no home city mapped, so {CharacterId:X8} cannot recall home.", character.Race, character.Id);
+				await _chat.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"No home city is mapped for race {character.Race}."));
+				return;
+			}
+
+			var point = await _database.GetDefaultSpawn(homeMapId);
+			if (point == null)
+			{
+				_logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);
+				await _chat.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"Home map {homeMapId} has no respawn point."));
+				return;
+			}
+
+			await this.DoTeleport(character.Id, point.MapId, point.Position);
+		}
 	}
 
 	/// <summary>
@@ -256,5 +308,7 @@ namespace Faolan.GameServer.World
 		{
 			return _held.TryRemove(characterId, out var buffs) ? buffs : [];
 		}
+
+
 	}
 }

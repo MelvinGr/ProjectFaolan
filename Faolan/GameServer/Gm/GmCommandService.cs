@@ -70,6 +70,7 @@ namespace Faolan.GameServer.Gm
 		private readonly BankService _bank;
 		private readonly PlayerPersistenceService _persistence;
 		private readonly TagService _tags;
+		private readonly TradepostService _tradepost;
 
 		// The `.command` table - built ONCE per service, per realm. It used to be a `static` on the listener filled with
 		// instance-bound delegates, which was safe only because a process hosts a single realm.
@@ -80,7 +81,7 @@ namespace Faolan.GameServer.Gm
 			TeleportService teleport, TravelService travel, CombatService combat, EconomyOutbound economyOutbound, TradeskillService tradeskill,
 			KnockbackService knockback, EquipmentService equipment, BuffService buffs, WorldObjectService worldObjects, QuestProgressionService questProgression,
 			PlayerDeathService playerDeaths, PetService pets, LevelUpService levelUp, GuildBankService guildBank, FeatService feats, FactionService factions,
-			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags)
+			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags, TradepostService tradepost)
 		{
 			_logger = logger;
 			_database = database;
@@ -111,6 +112,7 @@ namespace Faolan.GameServer.Gm
 			_bank = bank;
 			_persistence = persistence;
 			_tags = tags;
+			_tradepost = tradepost;
 			_gmCommandsDict = BuildTable();
 		}
 
@@ -367,29 +369,6 @@ namespace Faolan.GameServer.Gm
 					$"Unknown command: '{command}' - type {commandText[0]}help for info");
 		}
 
-		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
-		// [u32 command]. The command set is the client's own twelve, recovered in #307 - see PetCommand for the
-		// derivation and for the two conclusions it overturned (docs/subsystems/summon-pet-decode.md).
-		//
-		// DISMISSAL is the only family that ACTS today: retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. The
-		// stance commands need pet-side combat AI (a pet picking and engaging a target), which does not exist - a
-		// summoned minion only follows, via SetNpcFollow. They are logged rather than silently dropped so the bar's
-		// traffic is visible while that is built.
-		//
-		// All three dismissal codes are honoured, not just the captured one: `DismissFollower` (0x1F8) is what the
-		// corpus shows, but `Dismiss` and `AllDismiss` are the same act from the per-pet and all-pets bars, and
-		// answering only the captured spelling would leave the other two bars' buttons dead.
-		internal async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
-		{
-			body.ReadUInt32(); // type 0xC350
-			var petHandle = body.ReadUInt32();
-			var command = body.ReadUInt32<PetCommand>();
-			_logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", client.Session.Character.Id, petHandle, command);
-
-			if (command is PetCommand.DismissFollower or PetCommand.Dismiss or PetCommand.AllDismiss)
-				await _pets.DismissPet(client, petHandle);
-		}
-
 		private Dictionary<string, GmCommandEntry> BuildTable()
 		{
 			return BuildGmCommands(unbackedReply: u => (client, _) => SendUnbackedVerbReply(client, u), handlers: new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
@@ -404,8 +383,8 @@ namespace Faolan.GameServer.Gm
 				["teleportself"] = TeleportCommand,
 				["tp"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
-				["recall"] = (client, _) => RecallToBindCommand(client),
-				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
+				["recall"] = (client, _) => _teleport.RecallToBindCommand(client),
+				["recallhome"] = (client, _) => _teleport.RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
 				["heroicmode"] = HeroicModeCommand,
 				["travel"] = TravelCommand,
@@ -787,7 +766,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			var bankCount = await SendAuctionHouseOpen(client, entity.Position);
+			var bankCount = await _tradepost.SendAuctionHouseOpen(client, entity.Position);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bankCount} item(s).");
 		}
 
@@ -897,29 +876,6 @@ namespace Faolan.GameServer.Gm
 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
 		}
 
-		// .recall  - recall to the BOUND location (the persisted bind point). The retail triggers that land here are the
-		// Path of Asura spell and a bindstone recall; this GM command is the test bootstrap.
-		// ⚠️ NOT the Totem of Origins - that returns to the RACIAL home city and goes through RecallToRacialHomeCommand.
-		// No on-screen line before the handoff: retail sends none, and the ones this used to send were invented.
-		internal async Task RecallToBindCommand(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character.BindRespawnPointId is not { } pointId)
-			{
-				await _agentServerDispatcher.SendSystemMessage(character.Id, "You have no bind point. Use .bind to set one.");
-				return;
-			}
-
-			var point = await _database.GetRespawnPoint(pointId);
-			if (point == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", "Your bind point no longer exists. Re-bind with .bind."));
-				return;
-			}
-
-			await _teleport.DoTeleport(character.Id, point.MapId, point.Position);
-		}
-
 		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
 		// .heroicmode <n>  - set stat 0x0A9, which the client's own descriptor registry names `HeroicMode` (#625).
 		// Named for the STAT and not for a mechanic, because there is no mechanic here: nothing in retail is known to
@@ -985,33 +941,6 @@ namespace Faolan.GameServer.Gm
 				$"Criminal for {seconds}s ({spell?.Name ?? "Criminal"} {CriminalStatus.CriminalSpellId}); murder points {character.MurderPoints}.");
 		}
 
-		// .recallhome  - use the Totem of Origins: return to the character's RACIAL home city, which is NOT the bind
-		// point (see StartingData.RacialHomeMap for the mapping and the capture that pins the Stygian row). Bound
-		// location vs racial origin are two separate destinations; the Totem ignores the bind entirely, so this shares
-		// no state with RecallToBindCommand beyond the DoTeleport handoff.
-		// No on-screen line before the handoff, same as the bind recall - retail sends none.
-		internal async Task RecallToRacialHomeCommand(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (!StartingData.RacialHomeMap.TryGetValue(character.Race, out var homeMapId))
-			{
-				// Not silent: an unmapped race is a content gap in RacialHomeMap, not a corrupt character.
-				_logger.LogWarning("Totem of Origins: race {Race} has no home city mapped, so {CharacterId:X8} cannot recall home.", character.Race, character.Id);
-				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"No home city is mapped for race {character.Race}."));
-				return;
-			}
-
-			var point = await _database.GetDefaultSpawn(homeMapId);
-			if (point == null)
-			{
-				_logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);
-				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"Home map {homeMapId} has no respawn point."));
-				return;
-			}
-
-			await _teleport.DoTeleport(character.Id, point.MapId, point.Position);
-		}
-
 		// .removeitem <slot>  - the inverse of .additem: clear the calling character's bag cell `slot` (persisted
 		// CharacterInventory row) and push the live DispatchRemoveItem (0x201F) so it disappears without a relog.
 		// `.tag <id>` / `.tag <name substring>` - award an achievement (#748). The retail TRIGGERS are per-achievement
@@ -1072,32 +1001,6 @@ namespace Faolan.GameServer.Gm
 				: $"Already held tag {tagId}: {name}");
 		}
 
-
-		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
-		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound
-		// TalkToNpc). The window's first/default tab is the BANK (personal storage), a separate channel: container kind
-		// 105 delivered via a BankIIR (decoded, protocol_bank_storage), populated from the character's Container=105 rows.
-		// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content (the 0x201c
-		// slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already populated -
-		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
-		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
-		// bank first, open last. Returns the bank item count for the caller's feedback.
-		internal async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
-		{
-			var characterId = client.Session.Character.Id;
-			var stored = await _database.GetCharacterItems(characterId, ContainerKind.Bank);
-			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, stored);
-
-			await _bank.SendBank(client, bank);
-
-			// The GUILD vault rides the same open (#654): retail pushes DispatchGuildBankData in the SAME instant as
-			// the personal bank's slot registrations and DispatchOpenTradepost, unasked - there is no OpenGuildBank
-			// request on the wire at all. Before the open, for the same reason the bank is: a container that lands
-			// after the window exists renders empty on the first open.
-			await _guildBank.SendVault(client);
-			await TradepostResponses.SendOpenTradepost(client, accessPosition);
-			return bank.Items.Count;
-		}
 
 		// Lists only the commands the CALLER's privilege mask passes - the same per-bit filtering the client's own
 		// /help applies to the retail command set (#904).

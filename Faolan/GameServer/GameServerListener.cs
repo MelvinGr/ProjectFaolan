@@ -80,10 +80,6 @@ namespace Faolan.GameServer
 		// pairs with it, the rating quad (see SendCombatRatings).
 		private const uint CombatToggleSpecialAction = 0x4E2;
 
-		// How long the `Resting` channel runs. NOT a number chosen here: it is the Spells row for 3164147 `Resting`
-		// ("Recovering health, mana, energy, and stamina"), whose 20,500 ms cast time is exactly the 2050
-		// centiseconds retail puts in the rest behaviour record.
-		private const int RestingChannelMs = 20_500;
 
 		// (The spellweave activate/deactivate selector used to live here as a single 0xFC constant. It is PER CLASS -
 		// necromancer 0xFC, demonologist 0x10C - so it moved to StartingData.SpellweaveToggleAction, which carries the
@@ -300,6 +296,11 @@ namespace Faolan.GameServer
 		// Achievement tags (the vista award goes through it).
 		private readonly TagService _tags;
 
+		// The three former partials of this class that were single-domain (#928 item 6).
+		private readonly StanceService _stances;
+		private readonly VistaService _vista;
+		private readonly ItemUseService _itemUse;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -330,7 +331,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -390,6 +391,9 @@ namespace Faolan.GameServer
 			_clock = clock;
 			_gmCommands = gmCommands;
 			_tags = tags;
+			_stances = stances;
+			_vista = vista;
+			_itemUse = itemUse;
 
 		}
 

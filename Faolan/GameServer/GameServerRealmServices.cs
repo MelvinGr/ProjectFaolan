@@ -217,6 +217,11 @@ namespace Faolan.GameServer
 				sp.GetRequiredService<CombatService>(), sp.GetRequiredService<TradeskillService>(), sp.GetRequiredService<MountService>().Dismount));
 			services.AddSingleton<IWorldOutbound>(sp => sp.GetRequiredService<WorldOutbound>());
 
+			// The player stances, the achievement vistas and item use - single-domain listener partials until #928 item 6.
+			services.AddSingleton<StanceService>();
+			services.AddSingleton<VistaService>();
+			services.AddSingleton<ItemUseService>();
+
 			// The `.command` GM table and handlers - last, because a GM command can reach nearly every service above.
 			services.AddSingleton<GmCommandService>();
 

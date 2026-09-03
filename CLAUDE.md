@@ -128,9 +128,11 @@ behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` fil
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
 `SendVitals`/`SendAddItem` — never opcode-named; the STATIC ones several services share — `SendStatUpdate`,
 `BuildMapChange`, `SendLearnSpell`, … — live in `Wire/GameWire.cs`, and the tier's sender endpoints in
-`Wire/GameEndpoints.cs`, so no service reaches back into the listener for them, #928), plus `.ItemUse`/`.Vista`. GM
-commands are NOT a partial any more either: `Gm/GmCommandService.cs` (+ its `.Retail` partial) holds the table, the
-privilege gate and every handler, and the listener only routes a chat line to `Handle` (#928 item 5). World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
+`Wire/GameEndpoints.cs`, so no service reaches back into the listener for them, #928). That is the whole set: the
+former `.WorldEntry`, `.GmCommands`, `.Vista` and `.ItemUse` partials are composed services now
+(`Session/WorldEntryService`, `Gm/GmCommandService` + its `.Retail` partial, `Scripting/VistaService`,
+`Inventory/ItemUseService`; the stances went to `Combat/StanceService`), and the listener only routes to them
+(#928 items 5-6). World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
 it is `Session/WorldEntryService.cs`, a composed service, because `CreateFlowService` needs the burst-less entry
 and a service cannot take a listener method in its constructor - moving it deleted the graph's last bound seam
 into the listener (see ⭐ "look for the move first" below). `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).

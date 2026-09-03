@@ -7,12 +7,29 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer;
+using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.World;
+using Faolan.GameServer.Quest;
+using Faolan.GameServer.Economy;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Inventory
 {
-	public partial class GameServerListener
+	public sealed class ItemUseService(IDatabaseRepository database, ILogger logger, BuffService buffs, IChatServerDispatcher agentServerDispatcher, WorldSimulation simulation,
+		QuestProgressionService questProgression, PlayerDeathService playerDeaths, EconomyOutbound economyOutbound, TeleportService teleport)
 	{
+		private readonly IDatabaseRepository _database = database;
+		private readonly ILogger _logger = logger;
+		private readonly BuffService _buffs = buffs;
+		private readonly IChatServerDispatcher _agentServerDispatcher = agentServerDispatcher;
+		private readonly WorldSimulation _simulation = simulation;
+		private readonly QuestProgressionService _questProgression = questProgression;
+		private readonly PlayerDeathService _playerDeaths = playerDeaths;
+		private readonly EconomyOutbound _economyOutbound = economyOutbound;
+		private readonly TeleportService _teleport = teleport;
+
 		// Totem of Origins template (faolan.db): a non-spell on-use item that returns the player to their RACIAL home
 		// city (#206) - NOT to the bind point, which is what the Path of Asura spell does. The only special-cased use
 		// left - buff consumables are all data-driven via Items.OnUseSpell.
@@ -30,15 +47,15 @@ namespace Faolan.GameServer
 
 			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
 			{
-				Logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
+				_logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
 				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
 				return;
 			}
 
-			var spell = await Database.GetSpell(spellBase);
+			var spell = await _database.GetSpell(spellBase);
 			if (spell == null)
 			{
-				Logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
+				_logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
 				return;
 			}
 
@@ -51,7 +68,7 @@ namespace Faolan.GameServer
 			// player dies, echoing the spell id back.
 			if (spell.SelfResurrectionSpell is { } resurrectSpell && resurrectSpell != 0)
 			{
-				await SendResurrectRequest(client, self, resurrectSpell);
+				await GameWire.SendResurrectRequest(client, self, resurrectSpell);
 				_playerDeaths.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
 			}
 
@@ -85,32 +102,32 @@ namespace Faolan.GameServer
 			if (item.OnUseLockSpellLine is not { } line || item.OnUseLockSeconds is not { } seconds || seconds == 0)
 				return;
 
-			var locked = await Database.LockedTemplateIdsForConsumableLine(line);
+			var locked = await _database.LockedTemplateIdsForConsumableLine(line);
 			foreach (var templateId in locked)
 				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
 
-			Logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);
+			_logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);
 		}
 
 		// The domain side of a player USING (right-clicking) an item from a bag (#206/#64): the RightClickItem Inbound
 		// handler resolves the item by its inventory location and this routes on the item's on-use effect. Buff
 		// consumables (potions/food/drink/Double XP) are DATA-DRIVEN via Items.OnUseSpell; the Totem recall is the one
 		// remaining non-spell special case. (Folded in from the former ItemUseService / ItemUseClassifier.)
-		private async Task UseInventoryItem(INetworkClient client, ContainerKind container, int slot)
+		public async Task UseInventoryItem(INetworkClient client, ContainerKind container, int slot)
 		{
 			var character = client.Session.Character;
 
-			var item = (await Database.GetCharacterItemSlot(character.Id, container, slot))?.Template;
+			var item = (await _database.GetCharacterItemSlot(character.Id, container, slot))?.Template;
 			if (item == null)
 			{
-				Logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);
+				_logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);
 				return;
 			}
 
 			if (item.Id == TotemOfOriginsId)
 			{
-				await _gmCommands.RecallToRacialHomeCommand(client); // Totem of Origins -> the RACIAL home city, not the bind point (#206)
+				await _teleport.RecallToRacialHomeCommand(client); // Totem of Origins -> the RACIAL home city, not the bind point (#206)
 				return;
 			}
 
@@ -129,7 +146,7 @@ namespace Faolan.GameServer
 
 			// Surface the gap in-client (no-fallbacks rule, like the "no dialogue or shop imported yet" bubble) so an
 			// un-wired consumable says so instead of silently doing nothing.
-			Logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
+			_logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"('{item.Name}' has no on-use effect wired yet - id {item.Id}, no Items.OnUseSpell)");
 		}
 	}

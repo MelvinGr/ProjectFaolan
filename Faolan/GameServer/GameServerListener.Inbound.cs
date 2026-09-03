@@ -1256,9 +1256,9 @@ namespace Faolan.GameServer
 					if (client.Session.ActiveVista is { } scene)
 					{
 						if (entering)
-							await OnVistaCinematicEntered(client, scene);
+							await _vista.OnVistaCinematicEntered(client, scene);
 						else
-							await OnVistaCinematicLeft(client, scene);
+							await _vista.OnVistaCinematicLeft(client, scene);
 
 						break;
 					}
@@ -1597,7 +1597,7 @@ namespace Faolan.GameServer
 						// absorbed.
 						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
 						{
-							await _gmCommands.RecallToBindCommand(client);
+							await _teleport.RecallToBindCommand(client);
 							break;
 						}
 
@@ -1607,21 +1607,21 @@ namespace Faolan.GameServer
 						// is the whole of retail's observed answer.
 						case SearchSpecialAction:
 						{
-							await PerformSearchStance(client);
+							await _stances.PerformSearchStance(client);
 							break;
 						}
 
 						// The HIDE stance (#505) - a toggle, like the mount.
 						case SneakHideSpecialAction:
 						{
-							await ToggleSneakHide(client);
+							await _stances.ToggleSneakHide(client);
 							break;
 						}
 
 						// REST (#505) - not a stance record at all, a self-cast of the `Resting` spell.
 						case RestSpecialAction:
 						{
-							await PerformRestCast(client);
+							await _stances.PerformRestCast(client);
 							break;
 						}
 
@@ -1707,7 +1707,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.QueuePetCommand:
 				{
-					await _gmCommands.HandlePetCommand(client, packet, body);
+					await _pets.HandlePetCommand(client, packet, body);
 					return;
 				}
 
@@ -2099,7 +2099,7 @@ namespace Faolan.GameServer
 						// capture (using a Totem of Origins recalls to the RACIAL home city, #206; the recall's handoff
 						// is the capture's "long loading screen" - that capture is what pins Stygian -> Khemi).
 						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-						await UseInventoryItem(client, (ContainerKind)from, (int)target);
+						await _itemUse.UseInventoryItem(client, (ContainerKind)from, (int)target);
 
 						break;
 					}
@@ -2460,7 +2460,7 @@ namespace Faolan.GameServer
 					// is the same shape - a column-driven object whose use is a whole scripted sequence.
 					// 0x0003 is the client's BEGIN phase, the same one the teleport branch above acts on - a use that
 					// arrives twice must not start two scenes.
-					if (behaviorType == 0x0003 && _worldObjects.VistaAt(client, target) is { } vista && await TryStartAchievementVista(client, vista))
+					if (behaviorType == 0x0003 && _worldObjects.VistaAt(client, target) is { } vista && await _vista.TryStartAchievementVista(client, vista))
 						break;
 
 					// A resource NODE (#494) is harvested, not opened: it yields a stack of its matching resource
@@ -2546,7 +2546,7 @@ namespace Faolan.GameServer
 			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var auctioneerTemplate) &&
 			    await _tradepost.IsAuctioneerTemplate(auctioneerTemplate) && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 			{
-				await _gmCommands.SendAuctionHouseOpen(client, auctioneerPlayer.Position);
+				await _tradepost.SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 				return;
 			}
 

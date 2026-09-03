@@ -7,9 +7,11 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
+using Faolan.GameServer;
+using Faolan.GameServer.Progression;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Scripting
 {
 	// The achievement VISTA (#780) - using a viewpoint object plays a client-side camera fly-through and awards an
 	// achievement tag. #740 decoded the whole chain off one 50-second window; this is the wiring, and every record it
@@ -31,11 +33,14 @@ namespace Faolan.GameServer
 	// the scene ends when the client says it has left the cinematic, which is why a player who skips out early is
 	// handled by construction. A client that never reports leaving simply never gets the tag, which is also retail -
 	// there is no server-side fallback in the capture.
-	public partial class GameServerListener
+	public sealed class VistaService(TagService tags, ILogger logger)
 	{
+		private readonly TagService _tags = tags;
+		private readonly ILogger _logger = logger;
+
 		// A player used a vista object. Returns false when it is not one, so the UseObject switch falls through to the
 		// harvest / door / loot paths exactly as before.
-		private async Task<bool> TryStartAchievementVista(INetworkClient client, LiveWorldObject live)
+		public async Task<bool> TryStartAchievementVista(INetworkClient client, LiveWorldObject live)
 		{
 			if (VistaCatalog.VistaFor(live.Row.DisplayCategory, live.Row.DisplayId) is not { } vista)
 				return false;
@@ -50,7 +55,7 @@ namespace Faolan.GameServer
 				BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerViewVista(player.Id, live.Handle, BehaviorAnimations.VistaRemoteformat(vista.ObjectActionIndex))));
 
 			client.Session.ActiveVista = new ActiveVistaScene(vista, live.Handle, typeTag);
-			Logger.LogInformation("Vista: {Player} is viewing '{Vista}' 0x{Handle:X8} (path {Path}, {Duration}s).", player.Name, vista.Name, live.Handle, vista.CameraPath,
+			_logger.LogInformation("Vista: {Player} is viewing '{Vista}' 0x{Handle:X8} (path {Path}, {Duration}s).", player.Name, vista.Name, live.Handle, vista.CameraPath,
 				vista.PathDurationSeconds);
 
 			// The camera starts when the gesture ends - retail's own 5.04 s gap, which is that animation's blend.
@@ -68,7 +73,7 @@ namespace Faolan.GameServer
 				}
 				catch (Exception ex)
 				{
-					Logger.LogWarning(ex, "Vista: starting the camera path for '{Vista}' failed.", vista.Name);
+					_logger.LogWarning(ex, "Vista: starting the camera path for '{Vista}' failed.", vista.Name);
 				}
 			});
 
@@ -92,13 +97,13 @@ namespace Faolan.GameServer
 
 		// The client has ENTERED the cinematic. Retail answers with the lid shutting behind the camera and nothing
 		// else - the fly-through is the client's own from here.
-		private async Task OnVistaCinematicEntered(INetworkClient client, ActiveVistaScene scene)
+		public async Task OnVistaCinematicEntered(INetworkClient client, ActiveVistaScene scene)
 		{
 			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(scene.ObjectClass, scene.ObjectHandle, VistaClosedAnimation)));
 		}
 
 		// The client has LEFT the cinematic: close the scene and award the achievement, in retail's order.
-		private async Task OnVistaCinematicLeft(INetworkClient client, ActiveVistaScene scene)
+		public async Task OnVistaCinematicLeft(INetworkClient client, ActiveVistaScene scene)
 		{
 			var self = client.Session.Character.Id;
 			var vista = scene.Vista;
@@ -111,7 +116,7 @@ namespace Faolan.GameServer
 			await WorldIir.Send(client, MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, vista.BuffSpellBaseId, MagicBuffIds.FormEnd, null, [])));
 
 			var (granted, achievement) = await _tags.GrantTag(client, vista.AchievementTagId);
-			Logger.LogInformation("Vista: {Player} finished '{Vista}'; achievement {Tag} ({Name}) {Outcome}.", client.Session.Character.Name, vista.Name, vista.AchievementTagId,
+			_logger.LogInformation("Vista: {Player} finished '{Vista}'; achievement {Tag} ({Name}) {Outcome}.", client.Session.Character.Name, vista.Name, vista.AchievementTagId,
 				achievement?.Name ?? "?", granted
 					? "awarded"
 					: "already held");
