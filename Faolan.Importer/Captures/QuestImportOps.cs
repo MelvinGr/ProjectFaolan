@@ -96,8 +96,9 @@ namespace Faolan.Importer.Captures
 			return (added, filled);
 		}
 
-		// Fills JournalSequence from the quest INDEX blocks' pair lists (LineOrderExtractor, #926) - the line's whole
-		// order, sent for every quest a captured character HELD. Runs after the completed journal's fill and only
+		// Fills JournalSequence from the quest INDEX blocks' and MainQuestUpdate lists' pair lists (LineOrderExtractor,
+		// #926) - the line's whole order, sent for every quest a captured character HELD or was granted. Runs after the
+		// completed journal's fill and only
 		// writes a 0: the two sources state the same order (a disagreement is reported, never resolved by overwrite),
 		// so this adds the steps the completed journal has not seen finished yet. A pair naming a quest with no row
 		// (a line newer than the catalog) is counted and skipped - the order of a quest we cannot ship is not data

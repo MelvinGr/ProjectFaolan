@@ -55,14 +55,15 @@ namespace Faolan.Importer.Modules
 			var harvest = CompletedQuestExtractor.Extract(packets);
 			var (addedCompleted, filledCompleted) = await QuestImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
 
-			// The index blocks state each held line's WHOLE order, finished steps or not - the completed journal only
-			// the finished ones. Fills the sequence the journal left at 0; the index block of a held quest is built from
-			// it, so a multi-step line without one keeps its quests out of the login snapshot (#926).
-			var (order, orderDisagreements) = LineOrderExtractor.Extract(packets);
-			foreach (var d in orderDisagreements)
+			// The index blocks and the mid-session MainQuestUpdate lists state each held line's WHOLE order, finished
+			// steps or not - the completed journal only the finished ones. Fills the sequence the journal left at 0;
+			// the index block of a held quest is built from it, so a multi-step line without one keeps its quests out
+			// of the login snapshot (#926).
+			var lineOrder = LineOrderExtractor.Extract(packets);
+			foreach (var d in lineOrder.Disagreements)
 				Console.WriteLine($"  ⚠️ line order: {d}");
-			var (orderedSteps, orderDisagree, orderNoRow) = await QuestImportOps.ImportLineOrder(ctx.Db, order);
-			Console.WriteLine($"Line order from the quest index blocks: {order.Count} steps captured, {orderedSteps} filled a 0 JournalSequence, {orderDisagree} disagree with the completed journal, {orderNoRow} name a quest with no row (#926).");
+			var (orderedSteps, orderDisagree, orderNoRow) = await QuestImportOps.ImportLineOrder(ctx.Db, lineOrder.ByQuest);
+			Console.WriteLine($"Line order from the quest index blocks + MainQuestUpdate lists: {lineOrder.ByQuest.Count} steps captured ({lineOrder.OnIndexBlocks} on an index block, {lineOrder.OnlyOnUpdateLists} only on a list), {orderedSteps} filled a 0 JournalSequence, {orderDisagree} disagree with the completed journal, {orderNoRow} name a quest with no row (#926).");
 
 			// The @609 objective goals - required before a quest can ride the login snapshot (#389).
 			var goals = ObjectiveGoalExtractor.Extract(packets);
