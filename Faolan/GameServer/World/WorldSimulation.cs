@@ -221,7 +221,7 @@ namespace Faolan.GameServer.World
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
 			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null, IReadOnlyDictionary<uint, ComboFeatBonus>? comboBonuses = null,
-			uint? teamId = null, bool epic = false, uint? pvpMatchId = null)
+			uint? teamId = null, bool epic = false, uint? pvpMatchId = null, IReadOnlyList<FeatProc>? featProcs = null)
 		{
 			var character = client.Session.Character;
 
@@ -272,7 +272,9 @@ namespace Faolan.GameServer.World
 				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>(),
 				// #697: what the character's feats do to their combos, resolved once here for the same reason the
 				// spell boosts are - a swing must not turn into a query.
-				ComboBonuses = comboBonuses ?? new Dictionary<uint, ComboFeatBonus>()
+				ComboBonuses = comboBonuses ?? new Dictionary<uint, ComboFeatBonus>(),
+				// #697: and the procs they hang off those combos and the character's spell lines.
+				Procs = featProcs ?? []
 			});
 			// The CLIENT's copy of the vitals is reseeded from the world-entry snapshot, not from a push - so what we
 			// last pushed says nothing about what it now holds, and a current that happens to match would never be

@@ -32,8 +32,11 @@ namespace Faolan.GameServer.Combat
 		// #710: a feat or buff aimed at the finisher's spell moves its numbers, exactly as on a manual cast.
 		private readonly SpellModifierService _spellModifiers;
 
+		// #697: the procs the player's feats hang off this combo, fired when it lands.
+		private readonly ProcService _procs;
+
 		public ComboFinisher(WorldSimulation sim, KnockbackService knockback, CombatService combat, BuffService buffs, ComboService combos,
-			SpellModifierService spellModifiers, ILogger logger)
+			SpellModifierService spellModifiers, ProcService procs, ILogger logger)
 		{
 			_sim = sim;
 			_knockback = knockback;
@@ -41,6 +44,7 @@ namespace Faolan.GameServer.Combat
 			_buffs = buffs;
 			_combos = combos;
 			_spellModifiers = spellModifiers;
+			_procs = procs;
 			_logger = logger;
 		}
 
@@ -84,6 +88,10 @@ namespace Faolan.GameServer.Combat
 			// this spell moves its crit numbers here exactly as it does on a manual cast.
 			var finisherModifiers = await _spellModifiers.For(client.Session.Character.Id, _sim.PlayerWorldEntity(client), spellId);
 			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, comboDamageBonus, finisherModifiers);
+
+			// #697: the procs the player's feats hang off THIS combo - "Touch of Death: empowers their next combo with
+			// additional unholy damage" - fire on the landing, the hit and the damage being one event here.
+			await _procs.OnComboLanded(client, swing, targetHandle);
 
 			// ⭐ And what the combo's own NAME says it does. `Guardian_20b_knockback_Shield_Sweep_II` is a knockback,
 			// and 25 player combos across six classes are - `Shield Sweep`, `Clobber`, `Ferocious Smack`, `Batter

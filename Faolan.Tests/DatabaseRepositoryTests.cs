@@ -963,6 +963,53 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #697: a character's PROCS resolve through the same wire->template feat map as its combo bonuses, and only the
+		// feats it actually holds contribute - an untrained feat's proc on the same line must not leak in.
+		[Fact]
+		public async Task FeatProcs_ResolveThroughTheWireFeatMap_ForHeldFeatsOnly()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-feat-procs-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint characterId = 9;
+				const uint wireFeatId = 80104, templateId = 3527884, otherTemplateId = 3527800;
+				const uint lineId = 24020, comboId = 3202262;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Accounts.Add(new Account { Id = 1, UserName = "t", Password = "t", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Characters.Add(new Character { Id = characterId, Name = "Priest", AccountId = 1, RealmId = 1, Class = ConanClass.PriestOfMitra, Race = Race.Aquilonian, MapId = Map.TortageBeachId });
+					ctx.CharacterFeatSpecs.Add(new CharacterFeatSpec { CharacterId = characterId, Index = 0 });
+					ctx.CharacterFeats.Add(new CharacterFeat { CharacterId = characterId, SpecIndex = 0, FeatId = wireFeatId, Sequence = 0 });
+					ctx.FeatIdMaps.Add(new FeatIdMap { WireFeatId = wireFeatId, TemplateId = templateId, BaseIndex = 801, Rank = 4 });
+					ctx.Feats.Add(new Feat { Id = templateId, Name = "Holy Vengeance", BaseName = "Holy Vengeance" });
+					ctx.Feats.Add(new Feat { Id = otherTemplateId, Name = "Untrained", BaseName = "Untrained" });
+
+					// A line proc (after casting Wave of Life) and a combo proc, on the held feat.
+					ctx.FeatProcs.Add(new FeatProc { FeatId = templateId, Sequence = 0, SpellLineId = lineId, SelfSpellId = 4053206, Trigger = (uint)FeatProcTrigger.Cast, Amount = 200, EffectKind = 53070 });
+					ctx.FeatProcs.Add(new FeatProc { FeatId = templateId, Sequence = 1, ComboId = comboId, TargetSpellId = 1234, Trigger = (uint)FeatProcTrigger.Damage, Amount = 10, EffectKind = 53212 });
+					// An untrained feat's proc on the SAME line: must not leak in.
+					ctx.FeatProcs.Add(new FeatProc { FeatId = otherTemplateId, Sequence = 0, SpellLineId = lineId, SelfSpellId = 999, Trigger = (uint)FeatProcTrigger.Cast, Amount = 200, EffectKind = 53070 });
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				var procs = await repo.GetCharacterFeatProcs(characterId);
+
+				Assert.Equal(2, procs.Count);
+				Assert.All(procs, p => Assert.Equal(templateId, p.FeatId));
+				Assert.Contains(procs, p => p.SpellLineId == lineId && p.SelfSpellId == 4053206 && p.Trigger == (uint)FeatProcTrigger.Cast);
+				Assert.Contains(procs, p => p.ComboId == comboId && p.TargetSpellId == 1234 && p.Amount == 10);
+			}
+			finally
+			{
+				TestDb.Delete(dbPath);
+			}
+		}
+
 		// #835: an ambient spawn-area pool builds its creature from the TYPE, so the type's APPEARANCE navigations have
 		// to come back populated. Lazy loading is off by design, so a missing Include is not an error - the collection
 		// simply arrives EMPTY and the spawn body goes out with no morph table and no worn equipment. That is exactly

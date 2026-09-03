@@ -87,16 +87,17 @@ namespace Faolan.Importer.Cli
 			RawProcSlots(rdbDir);
 
 			Console.WriteLine();
-			Console.WriteLine("== ⛔ Trigger is still unnamed, and TWO offline routes are now closed off:");
-			Console.WriteLine("   1. \"a name transfers BY KEY\" (#593's plan) does not work here. Only 21 of the 150 keys in");
-			Console.WriteLine("      docs/re/gameaction-keylists.tsv are named by ANY type, and key 117 is named by none of the");
-			Console.WriteLine("      five that use it. ⚠️ Worse, the premise is unsafe: key 39 is named Type, Tier, Value AND");
-			Console.WriteLine("      ScriptID by different types, so a name does not reliably transfer even when one exists.");
-			Console.WriteLine("   2. key 73 - the client's `Flags`, the ONLY named slot in the proc family and one the importer");
-			Console.WriteLine("      drops - is 0 on every one of its 320 occurrences. It carries nothing; it is not the trigger.");
+			Console.WriteLine("== Trigger is NAMED by the client's generic proc tooltip switch (FUN_0149e450 @ 0x0149ef57, #697):");
+			Console.WriteLine("   key 117 -> 0 AddProcOnHit, 1 AddProcDamage, 2 AddProcSpellDamage (key 66 = 1 picks the Getting");
+			Console.WriteLine("   twin, which neither 53212 nor 53070 carries); 3 is the switch's DEFAULT and is named by the feats");
+			Console.WriteLine("   that carry it - every one hangs off a HEALING line and reads 'after casting...' -> Cast. So the");
+			Console.WriteLine("   combo form fires on Hit/Damage and the line form on SpellDamage/Cast (FeatProcTrigger).");
+			Console.WriteLine("   And Amount is PROCS PER MINUTE, the client's own label for key 237 - not a percent chance; the");
+			Console.WriteLine("   'chance' lift above is that reading's shadow (a low rate over a 2 s event IS a roll).");
 			Console.WriteLine();
-			Console.WriteLine("   What is left is the client: hover a proc feat with GM Level = -1, which renders the feat's wire");
-			Console.WriteLine("   ids and the client's own rendered text in the tooltip (see the feat_tooltip note). Four values.");
+			Console.WriteLine("   Two offline routes that did NOT get there, so they are not re-run: a name transfers BY KEY");
+			Console.WriteLine("   (only 21 of 150 keys are named by any type, key 117 by none, and key 39 carries four names),");
+			Console.WriteLine("   and key 73 `Flags` (0 on all 320 occurrences).");
 		}
 
 		// The slots the IMPORTER drops. `AddSpellLineProc` (53070) carries key 73, which the client names `Flags` on

@@ -272,6 +272,13 @@ namespace Faolan.GameServer.World
 		}
 
 		/// <summary>
+		///     The PROCS this player's trained feats hang off its combos and spell lines (#697), resolved once at world
+		///     entry like <see cref="ComboBonuses" />. ProcService reads them on a combo landing and a cast completing.
+		///     Empty for NPCs and for a character with no proc feats.
+		/// </summary>
+		public IReadOnlyList<FeatProc> Procs { get; set; } = [];
+
+		/// <summary>
 		///     The per-SPELL scaling-attribute OVERRIDES among this entity's known spells (#592), as
 		///     <c>spellId -> wire stat id</c> - RDB property field 847, see <c>Spell.ScalingAttribute</c>. Only the
 		///     handful of spells that deviate from the caster's class attribute carry one; everything else takes the

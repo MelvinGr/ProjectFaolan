@@ -194,9 +194,17 @@ data comes from.
   53075/53030 do. The two SPELL slots are named by the client's tooltip, which tests keys 88 and 236
   independently and renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` — so 88 is the proc cast
   on the CARRIER and 236 the one cast on the TARGET. Both are real in the data: 171 of the 876 rows are
-  target-only. The trigger (key 117) and the magnitude (key 237) are carried RAW — the trigger's value→condition
-  mapping and the magnitude's unit are not pinned, and inventing either would be the exact mistake this catalog
-  keeps punishing.
+  target-only. The trigger (key 117) is `FeatProcTrigger` — 0 Hit / 1 Damage on the combo form, 2 SpellDamage /
+  3 Cast on the line form — named by the client's generic proc tooltip switch (`FUN_0149e450` at 0x0149ef57 reads
+  key 117 into `AddProcOnHit` / `AddProcDamage` / `AddProcSpellDamage`, key 66 picking the `Getting` twin) and, for
+  the value that switch defaults on, by the feats carrying it (every one hangs off a HEALING line and reads "after
+  casting the Wave of Life…"). The magnitude (key 237) is PROCS PER MINUTE — the client's own label in the composed
+  `AddSpellLineProc` sentence — converted to a per-event chance over the event's length by `ProcRules.Chance`.
+  **Consumed (#697):** `ProcService` resolves a character's rows at world entry into `WorldEntity.Procs` and fires
+  them from `ComboFinisher` (a combo landing: both combo triggers) and `CastService` (a cast completing: Cast on
+  any cast, SpellDamage on an offensive one), each firing an ordinary `ApplySpell` of the self and/or target spell.
+  Two stated approximations: an offensive cast counts as "spell damage" whether or not the spell states a hit, and
+  an instant cast's event length is floored at 1 s. Awaiting an in-client run.
 
 - **53030 `ChangeHitPercent` — 954 rows, folded into `FeatSpellModifier`** (#593). The per-SPELL twin of 53075:
   the same three slots with the line slot (key 1) replaced by the spell slot (key 187), the same signed percent

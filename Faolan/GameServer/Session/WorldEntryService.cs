@@ -656,6 +656,8 @@ namespace Faolan.GameServer.Session
 			// #697: and what they do to the character's COMBOS - the opening/finishing weapon attacks' damage and
 			// crit, plus the whole-combo damage that rides the finisher's spell.
 			var comboBonuses = await _database.GetCharacterComboBonuses(character.Id);
+			// #697: and the PROCS they hang off combos and spell lines - resolved here so a landing is a list walk.
+			var featProcs = await _database.GetCharacterFeatProcs(character.Id);
 
 			// #309: whether the armed teleport picked the EPIC difficulty - consumed here (the reconnect is a new
 			// connection, so the flag rode TeleportService) and threaded into BOTH the instance selection (an epic
@@ -667,7 +669,7 @@ namespace Faolan.GameServer.Session
 			// entry asks the CS tier for the match the same way it asks for the team.
 			var pvpMatch = _csPlayerAgentDispatcher.PvpMatchEntryOf(client.Session.Character.Id, map.Id);
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
-				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry, pvpMatch?.MatchId);
+				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry, pvpMatch?.MatchId, featProcs);
 
 			// #907: the buffs held over the zone-change handoff, onto the entity the registration just built. The
 			// entity is NEW on every map change (PlayerRegistry is keyed by connection), so anything the old one held

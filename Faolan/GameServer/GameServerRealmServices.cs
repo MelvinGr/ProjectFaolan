@@ -160,6 +160,8 @@ namespace Faolan.GameServer
 			services.AddSingleton<BuffStatEffects>();
 			services.AddSingleton<SpellPoolEffects>();
 			services.AddSingleton<BuffService>();
+			// #697: the feat PROC engine - reads the entity's resolved procs, fires through BuffService.
+			services.AddSingleton<ProcService>();
 			services.AddSingleton<PetService>();
 			services.AddSingleton<SpellEffectOutbound>();
 			services.AddSingleton<ISpellEffectOutbound>(sp => sp.GetRequiredService<SpellEffectOutbound>());

@@ -51,6 +51,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<IReadOnlyDictionary<uint, ComboFeatBonus>> GetCharacterComboBonuses(uint characterId);
 
 		/// <summary>
+		///     The PROCS a character's trained feats hang off its combos and spell lines (#697) - every
+		///     <see cref="FeatProc" /> row of every held feat, resolved through the wire→template feat map. Empty for a
+		///     character with no proc feats, which is most of them.
+		/// </summary>
+		Task<IReadOnlyList<FeatProc>> GetCharacterFeatProcs(uint characterId);
+
+		/// <summary>
 		///     The per-spell scaling-attribute OVERRIDES among a character's KNOWN spells (#592), as
 		///     <c>spellId -> wire stat id</c>. Only spells whose template carries RDB field 847 appear; every other
 		///     spell takes the caster's class attribute (<c>CombatResolver.MagicDamageAttribute</c>), so an absent
@@ -177,6 +184,16 @@ namespace Faolan.Core.Database.Repositories
 		//
 		// ⚠️ The two tables' units differ - 53250's are whole percents and 53209's hundredths - which is the client's
 		// own doing (#593). Normalised to hundredths here so nothing downstream has to remember which is which.
+		public async Task<IReadOnlyList<FeatProc>> GetCharacterFeatProcs(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+						  join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+						  join proc in ctx.FeatProcs on map.TemplateId equals proc.FeatId
+						  orderby proc.FeatId, proc.Sequence
+						  select proc).ToListAsync();
+		}
+
 		public async Task<IReadOnlyDictionary<uint, ComboFeatBonus>> GetCharacterComboBonuses(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

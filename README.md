@@ -154,8 +154,9 @@ we've seen_, and names the gaps). Regenerate with
   prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget
   (cost = rank+1; the 3,839 levelling feats are free because the CLIENT auto-trains them itself), and named specs
   each keep their own build. Tree, column, tier and cost come from the client's own featclass table (#862, #863).
-  Trained from the client's own feat window, and untraining takes back the spell the feat taught (#920). Missing:
-  nothing consumes the decoded combo/proc modifier tables (#251, #474, #697)
+  Trained from the client's own feat window, and untraining takes back the spell the feat taught (#920). A feat's
+  combo bonuses and its PROCS both apply — an extra spell fired when a combo lands or a spell in the line is cast,
+  at the client's own procs-per-minute rate — pending an in-client run (#251, #474, #697)
 - 🟡 **Skill points** — the pool is a function of level, so it is stated on login rather than awarded. Five levels
   are captured and there is no formula for the rest, so those keep what the character already had (#507)
 - 🟡 **Spell unlock levels** — 8,460 spells carry one, read from the client's spell and combo records; 592 come

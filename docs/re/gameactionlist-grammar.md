@@ -376,10 +376,13 @@ real in the shipped data — 171 of the 876 records are target-only — which is
 Key `117` is the trigger and key `237` the magnitude the builder renders last; neither is pinned further, and
 both are stored raw. `[V1: tools/ghidra/FindSym.java]` `[V1: tools/ghidra/DisasmWin.java]`
 
-⚠️ The neighbouring `AddProc` branch (`AddProcOnHit` / `AddProcGettingHit` / `…Damage` / `…SpellDamage`) reads
-key `117` and key `66` and belongs to the **generic** proc types, not to these two — it is what says key 117 is a
-trigger condition, but the value→condition mapping it uses has not been checked against 53212/53070's own values
-(`0`/`1` on the combo form, `2`/`3` on the line form).
+⭐ The neighbouring `AddProc` branch (`FUN_0149e450` at 0x0149ef57, `[V1: tools/ghidra/DisasmWin.java]`) is the
+mapping: it reads key `117` into a three-way switch — **0 → `AddProcOnHit`, 1 → `AddProcDamage`, 2 →
+`AddProcSpellDamage`** — and key `66` (`== 1`) into the flag that swaps each for its `AddProcGetting…` twin (the
+defensive side, which neither 53212 nor 53070 carries). Value **3** is the switch's default and has no sentence in
+this family; on 53070 it is named by the feats that carry it, all on healing lines ("after casting the Wave of
+Life…"), so it is **Cast**. The two forms use disjoint halves — 0/1 on combos, 2/3 on lines — and `FeatProcTrigger`
+is the enum (#697). Key `237` is **Procs per Minute**, the client's own label in the composed 53070 sentence.
 
 ### The INTERPOLATED family is a LEVEL RAMP — keys `174`/`172`/`175`/`173`
 

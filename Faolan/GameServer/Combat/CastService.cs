@@ -59,9 +59,13 @@ namespace Faolan.GameServer.Combat
 		// #710: the per-cast overrides a caster's trained feats and live buffs put on this spell.
 		private readonly SpellModifierService _spellModifiers;
 
+		// #697: the procs the caster's feats hang off this spell's LINE, fired when the cast completes.
+		private readonly ProcService _procs;
+
 		public CastService(ICatalogRepository database, WorldSimulation sim, BuffTickService buffTicks, CombatService combat, BuffService buffs,
-			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ILogger logger, WorldBroadcaster broadcaster)
+			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ProcService procs, ILogger logger, WorldBroadcaster broadcaster)
 		{
+			_procs = procs;
 			_database = database;
 			_sim = sim;
 			_buffTicks = buffTicks;
@@ -318,8 +322,13 @@ namespace Faolan.GameServer.Combat
 					_logger.LogInformation("Cast {Spell} applied area effect {Effect} to {Hit} target(s) within {Radius}m.", spellId, area.EffectSpellId, hit, area.RadiusMetres);
 				}
 
-				if (targetHandle != 0 && targetHandle != casterHandle)
+				var offensive = targetHandle != 0 && targetHandle != casterHandle;
+				if (offensive)
 					await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, modifiers: castModifiers);
+
+				// #697: the procs the caster's feats hang off this spell's LINE - a Cast trigger on any cast ("after
+				// casting the Wave of Life…"), a SpellDamage trigger only on one that landed on a hostile.
+				await _procs.OnSpellCast(client, spellId, targetHandle, offensive);
 			}
 		}
 
