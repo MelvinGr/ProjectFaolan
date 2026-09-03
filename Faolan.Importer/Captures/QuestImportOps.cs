@@ -96,6 +96,47 @@ namespace Faolan.Importer.Captures
 			return (added, filled);
 		}
 
+		// Fills JournalSequence from the quest INDEX blocks' pair lists (LineOrderExtractor, #926) - the line's whole
+		// order, sent for every quest a captured character HELD. Runs after the completed journal's fill and only
+		// writes a 0: the two sources state the same order (a disagreement is reported, never resolved by overwrite),
+		// so this adds the steps the completed journal has not seen finished yet. A pair naming a quest with no row
+		// (a line newer than the catalog) is counted and skipped - the order of a quest we cannot ship is not data
+		// we can hold.
+		public static async Task<(int Filled, int Disagree, int NoRow)> ImportLineOrder(DatabaseContext db, IReadOnlyDictionary<uint, LineOrderExtractor.Step> order)
+		{
+			var existing = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId);
+			int filled = 0, disagree = 0, noRow = 0;
+			foreach (var (questId, step) in order)
+			{
+				if (!existing.TryGetValue(questId, out var def))
+				{
+					noRow++;
+					continue;
+				}
+
+				if (def.QuestLineId != step.QuestLineId)
+				{
+					disagree++;
+					Console.WriteLine($"  ⚠️ line order: quest {questId} sits on line {def.QuestLineId} but a captured index block lists it under line {step.QuestLineId}");
+					continue;
+				}
+
+				if (def.JournalSequence == 0)
+				{
+					def.JournalSequence = step.Sequence;
+					filled++;
+				}
+				else if (def.JournalSequence != step.Sequence)
+				{
+					disagree++;
+					Console.WriteLine($"  ⚠️ line order: quest {questId} is step {def.JournalSequence} in the completed journal but {step.Sequence} in a captured index block");
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return (filled, disagree, noRow);
+		}
+
 		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.
 		private static void AddRefIfMissing(QuestDefinition def, QuestTextSlot slot, CompletedQuestExtractor.TextRef text)
 		{
