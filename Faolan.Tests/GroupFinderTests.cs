@@ -249,53 +249,14 @@ namespace Faolan.Tests
 			}
 
 			var client = new RecordingNetworkClient(Queuer);
-			var dispatcher = new TeleportRecordingDispatcher();
+			var dispatcher = new RecordingGameServerDispatcher();
 			var connections = new ConnectionRegistry();
 			connections.Add(client);
-			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, dispatcher, new NoOpChatDispatcher(), connections);
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, dispatcher, new RecordingChatServerDispatcher(), connections);
 			var service = new GroupFinderService(NullLogger<CsPlayerAgentListener>.Instance, database, teams, dispatcher);
 
 			return new Harnessed(service, teams, client, dispatcher.Teleports);
 		}
 
-		private sealed class TeleportRecordingDispatcher : IGameServerDispatcher
-		{
-			public List<(uint CharacterId, uint MapId, System.Numerics.Vector3? Position)> Teleports { get; } = [];
-
-			public Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null)
-			{
-				Teleports.Add((characterId, mapId, position));
-				return Task.FromResult(true);
-			}
-
-			public Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined) => Task.FromResult(true);
-			public Task<bool> CreditCharacterCash(uint characterId, ulong amountTin) => Task.FromResult(false);
-			public bool DisconnectCharacter(uint characterId) => false;
-			public CharacterLiveState? GetCharacterLiveState(uint characterId) => null;
-			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];
-			public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId) => [];
-			public Task<bool> RunGmCommand(uint characterId, string commandText) => Task.FromResult(false);
-			public Task<bool> SendGuildTag(uint characterId, string guildName) => Task.FromResult(false);
-			public Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult) => Task.FromResult(false);
-			public Task<bool> SendMinigameForceStop(uint characterId, string message) => Task.FromResult(false);
-			public void Register(IGameServerProvider provider) { }
-			public void Unregister(IGameServerProvider provider) { }
-		}
-
-		private sealed class NoOpChatDispatcher : IChatServerDispatcher
-		{
-			public Task RefreshTeamChannel(uint characterId, uint? teamId) => Task.CompletedTask;
-			public Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null) => Task.CompletedTask;
-			public Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null) => Task.CompletedTask;
-			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];
-			public Task<int> SendClaudeChannelMessage(ChatMarkup message) => Task.FromResult(0);
-			public Task RefreshPlayfieldChannel(uint characterId, uint mapId) => Task.CompletedTask;
-			public Task RefreshGuildChannel(uint characterId, uint? guildId) => Task.CompletedTask;
-			public Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message) => Task.FromResult(false);
-			public Task SendSystemMessage(uint characterId, ChatMarkup message) => Task.CompletedTask;
-			public Task SystemBroadcast(ChatMarkup message) => Task.CompletedTask;
-			public void Register(IChatServerProvider provider) { }
-			public void Unregister(IChatServerProvider provider) { }
-		}
 	}
 }

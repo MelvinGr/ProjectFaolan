@@ -46,54 +46,7 @@ namespace Faolan.Tests
 				}
 		}
 
-		// Records the two GameCharInterface end messages, which is the only thing crossing to the world tier.
-		private sealed class RecordingWorldTier : IGameServerDispatcher
-		{
-			public List<(uint Character, uint WinningSide, MinigameResult Result)> Ended { get; } = [];
-			public List<(uint Character, string Message)> Stopped { get; } = [];
-
-			public Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult)
-			{
-				Ended.Add((characterId, winningSide, yourResult));
-				return Task.FromResult(true);
-			}
-
-			public Task<bool> SendMinigameForceStop(uint characterId, string message)
-			{
-				Stopped.Add((characterId, message));
-				return Task.FromResult(true);
-			}
-
-			public Task<bool> CreditCharacterCash(uint characterId, ulong amountTin) => Task.FromResult(false);
-			public bool DisconnectCharacter(uint characterId) => false;
-			public CharacterLiveState? GetCharacterLiveState(uint characterId) => null;
-			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];
-			public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId) => [];
-			public Task<bool> RunGmCommand(uint characterId, string commandText) => Task.FromResult(false);
-			public Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined) => Task.FromResult(true);
-			public Task<bool> SendGuildTag(uint characterId, string guildName) => Task.FromResult(false);
-			public Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null) => Task.FromResult(true);
-			public void Register(IGameServerProvider provider) { }
-			public void Unregister(IGameServerProvider provider) { }
-		}
-
-		private sealed class SilentChat : IChatServerDispatcher
-		{
-			public Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null) => Task.CompletedTask;
-			public Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null) => Task.CompletedTask;
-			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];
-			public Task<int> SendClaudeChannelMessage(ChatMarkup message) => Task.FromResult(0);
-			public Task RefreshPlayfieldChannel(uint characterId, uint mapId) => Task.CompletedTask;
-			public Task RefreshGuildChannel(uint characterId, uint? guildId) => Task.CompletedTask;
-			public Task RefreshTeamChannel(uint characterId, uint? teamId) => Task.CompletedTask;
-			public Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message) => Task.FromResult(false);
-			public Task SendSystemMessage(uint characterId, ChatMarkup message) => Task.CompletedTask;
-			public Task SystemBroadcast(ChatMarkup message) => Task.CompletedTask;
-			public void Register(IChatServerProvider provider) { }
-			public void Unregister(IChatServerProvider provider) { }
-		}
-
-		private sealed record Harnessed(PvpMatchService Matches, RecordingWorldTier World, uint[] Members);
+		private sealed record Harnessed(PvpMatchService Matches, RecordingGameServerDispatcher World, uint[] Members);
 
 		// Two queued players force-formed into one match: the formation locks them to alternating sides 1 and 2,
 		// which is exactly the opponent pair the PvP gate is about.
@@ -103,7 +56,7 @@ namespace Faolan.Tests
 			_databases.Add(path);
 			var database = new DatabaseRepository(new TestDb.ContextFactory(options));
 
-			var world = new RecordingWorldTier();
+			var world = new RecordingGameServerDispatcher();
 			var clients = new Dictionary<uint, RecordingNetworkClient>();
 			foreach (var id in members)
 			{
@@ -117,7 +70,7 @@ namespace Faolan.Tests
 			foreach (var client in clients.Values)
 				connections.Add(client);
 
-			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new SilentChat(), connections);
+			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new RecordingChatServerDispatcher(), connections);
 			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, teams, connections, world, database);
 
 			var signup = new PvpMatchMakingSignup(MinigameMap, 4, false, 0);
@@ -196,7 +149,7 @@ namespace Faolan.Tests
 		public async Task TheTimeLimitEndsTheMatchByItself_AndAScorelessMatchIsATieForEveryone()
 		{
 			var h = Harness(1, 2);
-			var world = new RecordingWorldTier();
+			var world = new RecordingGameServerDispatcher();
 			var clients = new Dictionary<uint, RecordingNetworkClient>();
 			foreach (var id in new uint[] { 10, 11 })
 			{
@@ -211,7 +164,7 @@ namespace Faolan.Tests
 				connections.Add(client);
 			var (options, path) = TestDb.NewSeededDatabase(10);
 			_databases.Add(path);
-			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new SilentChat(), connections), connections, world,
+			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new RecordingChatServerDispatcher(), connections), connections, world,
 				new DatabaseRepository(new TestDb.ContextFactory(options)));
 
 			await matches.HandleCreateMatch(clients[10], new PvpMatchRules(4, MinigameMap, 2, 1, 1, "", TimeLimitSeconds: 1, ScoreLimit: 100, 0, false, false, 0));
