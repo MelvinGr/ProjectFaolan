@@ -115,7 +115,10 @@ own zone indexes link far more quests than have pages. A quest absent from the w
 
 All 2,210 of our quest lines were run through this scrape; the per-line result is committed as
 [`quest-line-verification.tsv`](quest-line-verification.tsv) (one row per line: member count, ordering state,
-wiki verdict, flags).
+wiki verdict, flags). ⚠️ Its `ordering` column is a snapshot of `JournalSequence` as of 2026-09-02, BEFORE the
+index-block harvest ordered 47 more lines (#926, 2026-09-03) - the wiki-verdict columns do not depend on it and
+are current; the ordering state of those 47 lines is in `faolan.db`, not here. The file was produced by a one-off
+script that is not in the repo, which is why it is annotated rather than regenerated.
 
 | wiki verdict | lines | |
 |---|---:|---|

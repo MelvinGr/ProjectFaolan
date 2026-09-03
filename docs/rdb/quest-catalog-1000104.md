@@ -191,12 +191,15 @@ fact.
 
 **So the step order is server-side data.** Retail shipped it on the wire and kept it out of the client's
 catalog, which is consistent with the client never needing it offline. Captures are the only source, and they
-carry it in TWO places (#926): the completed journal states a finished step's sequence, and the quest INDEX block a
-character gets for every quest it HOLDS carries its whole line's `(questId, sequence)` list, finished or not
-(`LineOrderExtractor`). The two never disagree (231 index steps against the journal, 0 conflicts), and the second
-orders a line from a character who merely picked up a quest on it - 113 sequences and 47 lines the journal alone had
-not reached, 771 fully-ordered multi-step lines as of 2026-09-03. More coverage means a login capture of a
-character who holds or completed those lines, not more RDB work.
+carry it in THREE places (#926): the completed journal states a finished step's sequence, the quest INDEX block a
+character gets for every quest it HOLDS carries its whole line's `(questId, sequence)` list, finished or not, and
+the `MainQuestUpdateIIR` a grant sends mid-session fills the same `MainQuest_c` pair vector (`LineOrderExtractor`
+reads the last two; `LineOrderProducersTests` gates that they agree). None disagree (233 steps against the journal,
+0 conflicts), and the block orders a line from a character who merely picked up a quest on it - 113 sequences and
+47 lines the journal alone had not reached, 771 fully-ordered multi-step lines as of 2026-09-03. The mid-session
+list added 2 steps and no rows in this corpus (every captured grant was followed by a relog), so it pays on the
+next capture. More coverage means a capture of a character who holds, accepts or completed those lines, not more
+RDB work.
 
 ### ⭐ On a PARTIAL line, the `1` is a real head marker and the `0`s are merely unwritten
 
