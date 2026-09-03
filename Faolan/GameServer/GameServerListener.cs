@@ -46,10 +46,6 @@ namespace Faolan.GameServer
 	// in the ctor below and handed to the services that need them. It takes no `this` pass either.
 	public partial class GameServerListener : RpcServer, IGameServerProvider
 	{
-		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
-		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
-		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
-		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
 
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
@@ -301,6 +297,10 @@ namespace Faolan.GameServer
 		// The travel confirmation box + the ACG teleport choice (TravelOutbound owns the confirm cookie).
 		private readonly TravelOutbound _travelOutbound;
 
+		// The player move and the Authenticate2 hello - the two inbound cases that were handlers rather than forwards (#928 item 11).
+		private readonly MovementService _movement;
+		private readonly LoginHandshakeService _login;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -331,7 +331,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound, MovementService movement, LoginHandshakeService login)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -395,6 +395,8 @@ namespace Faolan.GameServer
 			_vista = vista;
 			_itemUse = itemUse;
 			_travelOutbound = travelOutbound;
+			_movement = movement;
+			_login = login;
 
 		}
 

@@ -13,9 +13,8 @@ namespace Faolan.Tests
 	public class SocialStatusTests
 	{
 		[Theory]
-		[InlineData("00000002", SocialStatus.LookingForGroup)] // f1071, 50us after the LFG flag went ON
+		[InlineData("00000002", SocialStatus.LookingForGroup)] // f1071, 50us after the LFG flag went ON (f3809, ON again seven minutes later, is byte-identical)
 		[InlineData("00000001", SocialStatus.Online)] //          f1094, 59us after it went OFF
-		[InlineData("00000002", SocialStatus.LookingForGroup)] // f3809, ON again seven minutes later
 		public void CapturedBody_ParsesAndRebuilds(string hex, SocialStatus expected)
 		{
 			var body = Convert.FromHexString(hex);

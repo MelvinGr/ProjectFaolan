@@ -227,7 +227,7 @@ namespace Faolan.Tests
 
 			// It is still weave state and must not survive a relog (#690) - see IsTranceBuff.
 			Assert.True(SpellweaveCatalog.IsTranceBuff(3762640u << 8));
-			Assert.NotEqual(necro.TranceBuff, 3762640u);
+			Assert.NotEqual(3762640u, necro.TranceBuff);
 		}
 
 		// Every class's element list must round-trip through the reactive-list codec that carries it to the

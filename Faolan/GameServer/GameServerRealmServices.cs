@@ -220,6 +220,8 @@ namespace Faolan.GameServer
 
 			// The player stances, the achievement vistas and item use - single-domain listener partials until #928 item 6.
 			services.AddSingleton<StanceService>();
+			services.AddSingleton<MovementService>();
+			services.AddSingleton<LoginHandshakeService>();
 			services.AddSingleton<VistaService>();
 			services.AddSingleton<ItemUseService>();
 
