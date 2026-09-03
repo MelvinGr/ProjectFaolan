@@ -59,7 +59,7 @@ namespace Faolan.GameServer
 			// `Daggamalt` -> `Health Potion Effect 10` carries +40500 (405 HP) - and this path used to apply the buff,
 			// consume the item and leave the bar exactly where it was.
 			await _buffs.ApplyPoolEffects(client, self, spellBase);
-			await RemoveItemFromBackpack(client, slot, 1);
+			await _economyOutbound.RemoveItemFromBackpack(client, slot, 1);
 			await SendConsumableCooldown(client, item);
 		}
 
@@ -110,7 +110,7 @@ namespace Faolan.GameServer
 
 			if (item.Id == TotemOfOriginsId)
 			{
-				await RecallToRacialHomeCommand(client); // Totem of Origins -> the RACIAL home city, not the bind point (#206)
+				await _gmCommands.RecallToRacialHomeCommand(client); // Totem of Origins -> the RACIAL home city, not the bind point (#206)
 				return;
 			}
 

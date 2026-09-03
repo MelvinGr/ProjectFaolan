@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
+using Faolan.GameServer.Gm;
 using Xunit;
 
 namespace Faolan.Tests
@@ -59,7 +60,7 @@ namespace Faolan.Tests
 			foreach (var verb in RetailVerbs)
 			{
 				Assert.True(registry.ContainsKey(verb), $"'{verb}' is not in the recovered registry - it is not a retail verb.");
-				Assert.True(GameServerListener.GmCommandMasks.TryGetValue(verb, out var mask), $"'{verb}' has no mask entry.");
+				Assert.True(GmCommandService.GmCommandMasks.TryGetValue(verb, out var mask), $"'{verb}' has no mask entry.");
 				Assert.Equal(registry[verb], (uint)mask);
 			}
 		}
@@ -72,7 +73,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void OnlyHelpAndSystem_AreUnrestricted()
 		{
-			var unmasked = GameServerListener.GmCommandMasks.Where(kv => kv.Value == GmPrivileges.None).Select(kv => kv.Key).Order(StringComparer.Ordinal).ToList();
+			var unmasked = GmCommandService.GmCommandMasks.Where(kv => kv.Value == GmPrivileges.None).Select(kv => kv.Key).Order(StringComparer.Ordinal).ToList();
 			Assert.Equal(["help", "system"], unmasked);
 		}
 
@@ -89,7 +90,7 @@ namespace Faolan.Tests
 				.Select(l => l.Split('\t')[0].TrimStart('/'))
 				.ToList();
 
-			var answered = GameServerListener.GmCommandMasks.Keys
+			var answered = GmCommandService.GmCommandMasks.Keys
 				.Concat(RetailCommandCatalog.Verbs.Select(u => u.Verb))
 				.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -146,20 +147,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void NoVerb_IsBothImplementedAndCatalogued()
 		{
-			var both = RetailCommandCatalog.Verbs.Select(u => u.Verb).Where(GameServerListener.GmCommandMasks.ContainsKey).ToList();
+			var both = RetailCommandCatalog.Verbs.Select(u => u.Verb).Where(GmCommandService.GmCommandMasks.ContainsKey).ToList();
 			Assert.True(both.Count == 0, $"Implemented and still catalogued: [{string.Join(", ", both)}]");
 		}
 
 		[Fact]
 		public void BuildGmCommands_RefusesAnAsymmetricTable()
 		{
-			var handlers = new Dictionary<string, GameServerListener.GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
+			var handlers = new Dictionary<string, GmCommandService.GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
 				["kill"] = (_, _) => Task.CompletedTask,
 				["notacommand"] = (_, _) => Task.CompletedTask
 			};
 
-			var e = Assert.Throws<InvalidOperationException>(() => GameServerListener.BuildGmCommands(handlers));
+			var e = Assert.Throws<InvalidOperationException>(() => GmCommandService.BuildGmCommands(handlers));
 			Assert.Contains("notacommand", e.Message); // a handler with no mask
 			Assert.Contains("help", e.Message); // a mask with no handler (all the rest)
 		}
@@ -167,14 +168,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildGmCommands_JoinsMaskToHandler()
 		{
-			var handlers = GameServerListener.GmCommandMasks.Keys
-				.ToDictionary(v => v, GameServerListener.GmCommandDelegate (_) => (_, _) => Task.CompletedTask, StringComparer.OrdinalIgnoreCase);
+			var handlers = GmCommandService.GmCommandMasks.Keys
+				.ToDictionary(v => v, GmCommandService.GmCommandDelegate (_) => (_, _) => Task.CompletedTask, StringComparer.OrdinalIgnoreCase);
 
-			var table = GameServerListener.BuildGmCommands(handlers);
+			var table = GmCommandService.BuildGmCommands(handlers);
 
 			// Our verbs PLUS every retail verb we do not back yet - the catalog is folded into the same table so the
 			// client's whole registry answers (#914).
-			Assert.Equal(GameServerListener.GmCommandMasks.Count + RetailCommandCatalog.Verbs.Count, table.Count);
+			Assert.Equal(GmCommandService.GmCommandMasks.Count + RetailCommandCatalog.Verbs.Count, table.Count);
 			Assert.Equal(GmPrivileges.NpcCommands, table["kill"].RequiredMask);
 			Assert.Equal(GmPrivileges.NpcCommands, table["KILL"].RequiredMask); // case-insensitive, like the chat parser
 		}

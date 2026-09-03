@@ -19,15 +19,101 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
+using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
+using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Server.CsPlayerAgent;
+using Faolan.GameServer.Session;
+using Faolan.GameServer.Quest;
+using Faolan.GameServer.Feats;
+using Faolan.GameServer.Scripting;
+using Faolan.GameServer.World;
+using Faolan.GameServer.Progression;
+using Faolan.GameServer.Inventory;
 using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Wire;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Gm
 {
-	public partial class GameServerListener
+	// The `.command` GM commands: the table, the privilege gate and every handler (this file: the ones we wrote; the
+	// Retail partial: the client's own verbs). Off the listener since #928 item 5 - the listener routes a chat line
+	// to Handle and nothing else.
+	public sealed partial class GmCommandService
 	{
+		private readonly ILogger _logger;
+		private readonly IDatabaseRepository _database;
+		private readonly ConnectionRegistry _connections;
+		private readonly IChatServerDispatcher _agentServerDispatcher;
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+		private readonly WorldSimulation _simulation;
+		private readonly WorldBroadcaster _broadcaster;
+		private readonly NpcBroadcaster _npcs;
+		private readonly RealmClock _clock;
+		private readonly TeleportService _teleport;
+		private readonly TravelService _travel;
+		private readonly CombatService _combat;
+		private readonly EconomyOutbound _economyOutbound;
+		private readonly TradeskillService _tradeskill;
+		private readonly KnockbackService _knockback;
+		private readonly EquipmentService _equipment;
+		private readonly BuffService _buffs;
+		private readonly WorldObjectService _worldObjects;
+		private readonly QuestProgressionService _questProgression;
+		private readonly PlayerDeathService _playerDeaths;
+		private readonly PetService _pets;
+		private readonly LevelUpService _levelUp;
+		private readonly GuildBankService _guildBank;
+		private readonly FeatService _feats;
+		private readonly FactionService _factions;
+		private readonly ClaimService _claims;
+		private readonly BankService _bank;
+		private readonly PlayerPersistenceService _persistence;
+		private readonly TagService _tags;
+
+		// The `.command` table - built ONCE per service, per realm. It used to be a `static` on the listener filled with
+		// instance-bound delegates, which was safe only because a process hosts a single realm.
+		private readonly Dictionary<string, GmCommandEntry> _gmCommandsDict;
+
+		public GmCommandService(ILogger logger, IDatabaseRepository database, ConnectionRegistry connections, IChatServerDispatcher agentServerDispatcher,
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, WorldSimulation simulation, WorldBroadcaster broadcaster, NpcBroadcaster npcs, RealmClock clock,
+			TeleportService teleport, TravelService travel, CombatService combat, EconomyOutbound economyOutbound, TradeskillService tradeskill,
+			KnockbackService knockback, EquipmentService equipment, BuffService buffs, WorldObjectService worldObjects, QuestProgressionService questProgression,
+			PlayerDeathService playerDeaths, PetService pets, LevelUpService levelUp, GuildBankService guildBank, FeatService feats, FactionService factions,
+			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags)
+		{
+			_logger = logger;
+			_database = database;
+			_connections = connections;
+			_agentServerDispatcher = agentServerDispatcher;
+			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
+			_simulation = simulation;
+			_broadcaster = broadcaster;
+			_npcs = npcs;
+			_clock = clock;
+			_teleport = teleport;
+			_travel = travel;
+			_combat = combat;
+			_economyOutbound = economyOutbound;
+			_tradeskill = tradeskill;
+			_knockback = knockback;
+			_equipment = equipment;
+			_buffs = buffs;
+			_worldObjects = worldObjects;
+			_questProgression = questProgression;
+			_playerDeaths = playerDeaths;
+			_pets = pets;
+			_levelUp = levelUp;
+			_guildBank = guildBank;
+			_feats = feats;
+			_factions = factions;
+			_claims = claims;
+			_bank = bank;
+			_persistence = persistence;
+			_tags = tags;
+			_gmCommandsDict = BuildTable();
+		}
+
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
 		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
 		// snapshot so it appears live (the snapshot is the ONLY item-delivery packet - there is no incremental
@@ -48,7 +134,7 @@ namespace Faolan.GameServer
 			// A missing Items row is the only refusal left. This also demanded a harvested hash until #723, which
 			// made the 232 never-captured templates un-`.additem`-able - and .additem is the standard bootstrap for
 			// testing exactly those.
-			var item = await Database.GetItem(itemId);
+			var item = await _database.GetItem(itemId);
 			if (item == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"No item with id {itemId}.");
@@ -82,9 +168,9 @@ namespace Faolan.GameServer
 			}
 
 			// Resolve the target account: by username first, else by a character name -> its owning account.
-			var account = await Database.GetAccount(name);
-			if (account == null && await Database.GetCharacterByName(name, client.Session.Character.RealmId) is { } ch)
-				account = await Database.GetAccount(ch.AccountId);
+			var account = await _database.GetAccount(name);
+			if (account == null && await _database.GetCharacterByName(name, client.Session.Character.RealmId) is { } ch)
+				account = await _database.GetAccount(ch.AccountId);
 
 			if (account == null)
 			{
@@ -104,7 +190,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (!await Database.SetAccountState(account.Id, ban
+			if (!await _database.SetAccountState(account.Id, ban
 				    ? AccountState.Banned
 				    : AccountState.Active))
 			{
@@ -116,7 +202,7 @@ namespace Faolan.GameServer
 			if (ban)
 			{
 				// Snapshot before iterating: Stop() -> Disconnected mutates the client set.
-				foreach (var c in NetworkClients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
+				foreach (var c in _connections.Clients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
 				{
 					if (c.Session.Character?.Id is { } cid)
 						await _agentServerDispatcher.SendSystemMessage(cid, ChatMarkup.Color("red", "You have been banned by a GM."));
@@ -167,7 +253,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var deleted = await Database.DeleteNpcSpawns(entity.MapId, entity.Name, entity.Hostile
+			var deleted = await _database.DeleteNpcSpawns(entity.MapId, entity.Name, entity.Hostile
 				? entity.SpawnPosition.X
 				: null, entity.Hostile
 				? entity.SpawnPosition.Y
@@ -209,7 +295,7 @@ namespace Faolan.GameServer
 			}
 
 			var mapId = _simulation.PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
-			var matches = (await Database.GetNpcSpawnAreas(mapId)).Where(a => string.Equals(a.GroupName, name, StringComparison.OrdinalIgnoreCase)).ToList();
+			var matches = (await _database.GetNpcSpawnAreas(mapId)).Where(a => string.Equals(a.GroupName, name, StringComparison.OrdinalIgnoreCase)).ToList();
 			if (matches.Count == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawn area named '{name}' on map {mapId}.");
@@ -226,7 +312,7 @@ namespace Faolan.GameServer
 			var removed = 0;
 			foreach (var area in resolved)
 			{
-				var n = await Database.GraduateSpawnArea(area.Id);
+				var n = await _database.GraduateSpawnArea(area.Id);
 				if (n > 0)
 					removed += n;
 			}
@@ -236,7 +322,7 @@ namespace Faolan.GameServer
 				$"Graduated '{name}' ({creature}) on map {mapId}: removed {removed} captured spawn row(s); the ambient pool now owns this population. Takes effect on zone reload (relog).");
 		}
 
-		private async Task HandleGmCommand(INetworkClient client, string commandText)
+		public async Task Handle(INetworkClient client, string commandText)
 		{
 			string command;
 			string? arguments = null;
@@ -293,20 +379,20 @@ namespace Faolan.GameServer
 		// All three dismissal codes are honoured, not just the captured one: `DismissFollower` (0x1F8) is what the
 		// corpus shows, but `Dismiss` and `AllDismiss` are the same act from the per-pet and all-pets bars, and
 		// answering only the captured spelling would leave the other two bars' buttons dead.
-		private async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
+		internal async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // type 0xC350
 			var petHandle = body.ReadUInt32();
 			var command = body.ReadUInt32<PetCommand>();
-			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", client.Session.Character.Id, petHandle, command);
+			_logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", client.Session.Character.Id, petHandle, command);
 
 			if (command is PetCommand.DismissFollower or PetCommand.Dismiss or PetCommand.AllDismiss)
 				await _pets.DismissPet(client, petHandle);
 		}
 
-		private void InitGmCommands()
+		private Dictionary<string, GmCommandEntry> BuildTable()
 		{
-			_gmCommandsDict = BuildGmCommands(unbackedReply: u => (client, _) => SendUnbackedVerbReply(client, u), handlers: new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
+			return BuildGmCommands(unbackedReply: u => (client, _) => SendUnbackedVerbReply(client, u), handlers: new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
 			{
 				["save"] = (client, _) => SaveChanges(client.Session.Character.Id),
 				["help"] = (client, _) => SendGmHelpText(client),
@@ -749,7 +835,7 @@ namespace Faolan.GameServer
 			// The remove carries the percentage too - retail's remove frames repeat the value the add carried, they
 			// do not send 0. So a `.resist X 0` sends a REMOVE of the full-immunity value, not an add of zero.
 			var add = percentage > 0;
-			await SendSpellResistance(client, metaType, add ? percentage : SpellMetaTypes.FullImmunity, add);
+			await GameWire.SendSpellResistance(client, metaType, add ? percentage : SpellMetaTypes.FullImmunity, add);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				add ? $"Resistance to metatype {metaType} set to {percentage}%." : $"Resistance to metatype {metaType} removed.");
 		}
@@ -781,7 +867,7 @@ namespace Faolan.GameServer
 
 			if ((arguments ?? "").Trim().Equals("off", StringComparison.OrdinalIgnoreCase))
 			{
-				await SendRemoveWayPoint(client, new EntityId(EntityClass.TombStone, character.Id), mapId);
+				await GameWire.SendRemoveWayPoint(client, new EntityId(EntityClass.TombStone, character.Id), mapId);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, "Waypoint removed.");
 				return;
 			}
@@ -794,7 +880,7 @@ namespace Faolan.GameServer
 				? statedToolTip
 				: WayPointCodec.TombstoneToolTip;
 
-			await SendAddWayPoint(client, character.Id, mapId, pos.X, pos.Y, pos.Z, label, toolTip);
+			await GameWire.SendAddWayPoint(client, character.Id, mapId, pos.X, pos.Y, pos.Z, label, toolTip);
 			await _agentServerDispatcher.SendSystemMessage(character.Id,
 				$"Waypoint planted on map {mapId} at {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} "
 				+ $"{pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}"
@@ -815,7 +901,7 @@ namespace Faolan.GameServer
 		// Path of Asura spell and a bindstone recall; this GM command is the test bootstrap.
 		// ⚠️ NOT the Totem of Origins - that returns to the RACIAL home city and goes through RecallToRacialHomeCommand.
 		// No on-screen line before the handoff: retail sends none, and the ones this used to send were invented.
-		private async Task RecallToBindCommand(INetworkClient client)
+		internal async Task RecallToBindCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character.BindRespawnPointId is not { } pointId)
@@ -824,7 +910,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var point = await Database.GetRespawnPoint(pointId);
+			var point = await _database.GetRespawnPoint(pointId);
 			if (point == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", "Your bind point no longer exists. Re-bind with .bind."));
@@ -855,7 +941,7 @@ namespace Faolan.GameServer
 			}
 
 			character.HeroicMode = value;
-			await Database.SetCharacterHeroicMode(character.Id, value);
+			await _database.SetCharacterHeroicMode(character.Id, value);
 			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HeroicMode, value), character.Id);
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"HeroicMode set to {value}.");
 		}
@@ -878,7 +964,7 @@ namespace Faolan.GameServer
 			{
 				character.CriminalUntil = null;
 				character.MurderPoints = 0;
-				await Database.SetCharacterCriminalState(character.Id, null, 0);
+				await _database.SetCharacterCriminalState(character.Id, null, 0);
 				await _buffs.SendBuffRemoval(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8);
 				await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, 0), character.Id);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, "Criminal status cleared.");
@@ -887,10 +973,10 @@ namespace Faolan.GameServer
 
 			character.CriminalUntil = DateTimeOffset.UtcNow.AddSeconds(seconds);
 			character.MurderPoints += CriminalStatus.PointsPerPlayerKill;
-			await Database.SetCharacterCriminalState(character.Id, character.CriminalUntil, character.MurderPoints);
+			await _database.SetCharacterCriminalState(character.Id, character.CriminalUntil, character.MurderPoints);
 
 			// The wire side: the "Criminal" debuff plus the murder-point stat, the two things the capture shows moving.
-			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
+			var spell = await _database.GetSpell(CriminalStatus.CriminalSpellId);
 			await _buffs.SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
 				MagicBuffDatas.ApplyNow(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), BuffService.CasterLevel(client), casterIsPlayer: true));
 			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
@@ -904,21 +990,21 @@ namespace Faolan.GameServer
 		// location vs racial origin are two separate destinations; the Totem ignores the bind entirely, so this shares
 		// no state with RecallToBindCommand beyond the DoTeleport handoff.
 		// No on-screen line before the handoff, same as the bind recall - retail sends none.
-		private async Task RecallToRacialHomeCommand(INetworkClient client)
+		internal async Task RecallToRacialHomeCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (!StartingData.RacialHomeMap.TryGetValue(character.Race, out var homeMapId))
 			{
 				// Not silent: an unmapped race is a content gap in RacialHomeMap, not a corrupt character.
-				Logger.LogWarning("Totem of Origins: race {Race} has no home city mapped, so {CharacterId:X8} cannot recall home.", character.Race, character.Id);
+				_logger.LogWarning("Totem of Origins: race {Race} has no home city mapped, so {CharacterId:X8} cannot recall home.", character.Race, character.Id);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"No home city is mapped for race {character.Race}."));
 				return;
 			}
 
-			var point = await Database.GetDefaultSpawn(homeMapId);
+			var point = await _database.GetDefaultSpawn(homeMapId);
 			if (point == null)
 			{
-				Logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);
+				_logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"Home map {homeMapId} has no respawn point."));
 				return;
 			}
@@ -941,7 +1027,7 @@ namespace Faolan.GameServer
 			var argument = (arguments ?? "").Trim();
 			if (argument.Length == 0)
 			{
-				var held = await Database.GetCharacterTags(characterId);
+				var held = await _database.GetCharacterTags(characterId);
 				if (held.Length == 0)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId, "No tags. Usage: .tag <id> | .tag <name substring>");
@@ -950,7 +1036,7 @@ namespace Faolan.GameServer
 
 				var named = new List<string>();
 				foreach (var tag in held.OrderBy(t => t))
-					named.Add($"{tag} ({(await Database.GetAchievement(tag))?.Name ?? "unnamed"})");
+					named.Add($"{tag} ({(await _database.GetAchievement(tag))?.Name ?? "unnamed"})");
 
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"{held.Length} tag(s): {string.Join(", ", named)}");
 				return;
@@ -959,7 +1045,7 @@ namespace Faolan.GameServer
 			// An id, or a name to look up - a 4,095-entry catalog is not something to search by hand.
 			if (!uint.TryParse(argument, out var tagId))
 			{
-				var matches = await Database.FindAchievements(argument, 6);
+				var matches = await _database.FindAchievements(argument, 6);
 				if (matches.Length == 0)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId, $"No achievement matches '{argument}'.");
@@ -976,7 +1062,7 @@ namespace Faolan.GameServer
 				tagId = matches[0].Id;
 			}
 
-			var (granted, achievement) = await GrantTag(client, tagId);
+			var (granted, achievement) = await _tags.GrantTag(client, tagId);
 			var name = achievement is null
 				? "not in the achievement catalog - an item-shop flag, or an id the catalog is short of"
 				: $"'{achievement.Name}'{(achievement.Description is { } d ? $" - {d}" : "")}";
@@ -996,10 +1082,10 @@ namespace Faolan.GameServer
 		// account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR][DispOpenTradepost].
 		// Sending the open FIRST landed the BankIIR before the window existed and the first open rendered empty. So:
 		// bank first, open last. Returns the bank item count for the caller's feedback.
-		private async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
+		internal async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
 		{
 			var characterId = client.Session.Character.Id;
-			var stored = await Database.GetCharacterItems(characterId, ContainerKind.Bank);
+			var stored = await _database.GetCharacterItems(characterId, ContainerKind.Bank);
 			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, stored);
 
 			await _bank.SendBank(client, bank);
@@ -1084,7 +1170,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var areas = await Database.GetNpcSpawnAreas(npc.MapId);
+			var areas = await _database.GetNpcSpawnAreas(npc.MapId);
 			if (areas.Length == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"Map {npc.MapId} has no RDB spawn areas (scripted/instanced playfield).");
@@ -1111,14 +1197,14 @@ namespace Faolan.GameServer
 
 			if (clearing)
 			{
-				await Database.SetNpcSpawnAreaCreature(area.Id, null);
-				var unlinked = await Database.UnlinkNpcSpawnsFromArea(area.Id);
+				await _database.SetNpcSpawnAreaCreature(area.Id, null);
+				var unlinked = await _database.UnlinkNpcSpawnsFromArea(area.Id);
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"Spawn area '{area.GroupName}' (map {npc.MapId}) cleared - creature unassigned, {unlinked} captured spawn(s) un-linked.");
 				return;
 			}
 
-			await Database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
-			var linked = await Database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
+			await _database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
+			var linked = await _database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
 		}
@@ -1316,7 +1402,7 @@ namespace Faolan.GameServer
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"\"{npcName}\" travels to:");
 				foreach (var destination in destinations)
 				{
-					var map = await Database.GetMap(destination.DestinationMapId);
+					var map = await _database.GetMap(destination.DestinationMapId);
 					await _agentServerDispatcher.SendSystemMessage(characterId,
 						$"  option {destination.OptionId} -> {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
 				}
@@ -1447,7 +1533,7 @@ namespace Faolan.GameServer
 
 			entity.GodMode = !entity.GodMode;
 			client.Session.Account.SetGmPrivilege(GmPrivileges.GodMode, entity.GodMode);
-			await Database.SaveAccount(client.Session.Account);
+			await _database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
 				? ChatMarkup.Raw($"God mode {ChatMarkup.Color("lime", "ON")} - you take no damage.")
 				: ChatMarkup.Raw($"God mode {ChatMarkup.Color("red", "OFF")}."));
@@ -1523,10 +1609,10 @@ namespace Faolan.GameServer
 				wanted = named;
 			}
 
-			var trainedCount = await Database.AddCharacterFeats(characterId, ladder.RankFeatIds.Take(wanted + 1));
+			var trainedCount = await _database.AddCharacterFeats(characterId, ladder.RankFeatIds.Take(wanted + 1));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Trained {ladder.Name} to {ladder.RankName(wanted)} ({trainedCount} feat row(s) written). Reopen the crafting window to see the book.");
-			Logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, ladder.RankName(wanted));
+			_logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, ladder.RankName(wanted));
 		}
 
 		private async Task WeaponSetCommand(INetworkClient client, string arguments)
@@ -1594,5 +1680,68 @@ namespace Faolan.GameServer
 		// the client's own convention for an unmasked command; a multi-bit mask passes on ANY set bit, the client's
 		// `(level & mask) != 0` test (#904).
 		internal sealed record GmCommandEntry(GmCommandDelegate Handler, GmPrivileges RequiredMask);
+
+		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
+		private async Task<Map?> ResolveMap(string arg)
+		{
+			if (uint.TryParse(arg, out var id))
+			{
+				var maps = await _database.GetMaps();
+				return maps.FirstOrDefault(m => m.Id == id);
+			}
+
+			var all = await _database.GetMaps();
+			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+		}
+
+		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
+		// (Gitea #404) and movement is not otherwise persisted, so this snapshots every
+		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
+		// more live state - vitals, buffs, … - as those become persisted.)
+		private async Task SaveChanges(uint characterId)
+		{
+			var saved = await _persistence.FlushAllAsync();
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
+		}
+
+		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
+		// malformed/overflowing value.
+		private static bool TryParseHandle(string arg, out uint handle)
+		{
+			handle = 0;
+			try
+			{
+				handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+					? Convert.ToUInt32(arg[2..], 16)
+					: uint.Parse(arg);
+				return true;
+			}
+			catch (FormatException)
+			{
+				return false;
+			}
+			catch (OverflowException)
+			{
+				return false;
+			}
+		}
+
+		// Lists maps for `.maps`, optionally filtered to those whose name CONTAINS `search` (case-insensitive) -
+		// e.g. `.maps castle`. A blank search lists all maps.
+		private async Task SendListAllMaps(uint characterId, string? search = null)
+		{
+			var maps = (await _database.GetMaps()).OrderBy(m => m.Name).AsEnumerable();
+			if (!string.IsNullOrWhiteSpace(search))
+				maps = maps.Where(m => m.Name != null && m.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+			var matches = maps.ToList();
+			if (matches.Count == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No map matching '{search?.Trim()}'."));
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. matches.Select(ChatMarkup (m) => $"{m.Id}: {m.Name}")]));
+		}
 	}
 }

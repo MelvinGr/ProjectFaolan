@@ -44,9 +44,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
-		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
-		private const uint BaseBackpackSlots = 24;
 
 		// IGameServerProvider seam: the PAY-OUT half of a guild-bank withdrawal (#132). The CS tier decides it (it owns
 		// Guild.Cash and the rank ladder) and this tier pays it, because the wallet lives on the live session and the
@@ -183,25 +180,6 @@ namespace Faolan.GameServer
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
-		// Removes an item from the player's backpack: deletes the persisted bag item (so it stays gone across relog) AND
-		// pushes the live DispatchRemoveItem so it disappears immediately. The mirror of GrantItemToBackpack. Returns
-		// true if an item was there to remove.
-		private async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
-		{
-			var characterId = client.Session.Character.Id;
-			if (await Database.GetCharacterItemSlot(characterId, ContainerKind.Bag, slot) == null)
-				return false;
-
-			await Database.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
-			await EconomyOutbound.SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
-
-			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
-			// case - the server took something out of the bag, the player did not move it - which is the shape the
-			// ShacklesOff capture shows. A player-initiated move is NOT followed by one: the client already knows.
-			await _economyOutbound.SendUpdateInventory(client);
-			return true;
-		}
-
 		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchAbortTrade` (GameCharInterface `0x6A`,
 		// zero-length) and we answered nothing at all - so the vendor session was left open on the client's side of
 		// the model.
@@ -218,38 +196,6 @@ namespace Faolan.GameServer
 		private static Task SendTradeAbort(INetworkClient client)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
-		}
-
-		// Awards a TAG (#748): `DispatchAddTag`, body = the tag id and nothing else, 4 bytes. That covers two
-		// phenomena sharing one id space - an ACHIEVEMENT (the catalog is LDB 55701/55700, imported into
-		// `Achievements`: 7917 "Seeing Red" / *"Achieve a kill streak."*, 716 "Old Tarantia Docks") and the item-shop
-		// "bundle shown" flags whose `HasTag` gates live in the client's own shop Lua (6617-6620, 7316, 7416-7421).
-		// [V2: NecroL80_..._gameplay_annotated_2 t+285.5 tag 0x2CC; 23 awards over 14 captures]
-		//
-		// ⚠️ There is no login re-send, and nothing needs one: NOT ONE of the 23 captured awards lands in a login
-		// burst, because the client learns the set it already holds from the FullChar snapshot (SendBurstlessWorldEntry
-		// unions `GetCharacterTags` into it). So this message is strictly the moment-of-award event, which is why the
-		// caller must not send it for a tag the character already has.
-		//
-		// A REMOVE twin exists in the client's method table - `DispatchRemoveTag` (0x17) - with zero captured frames, so
-		// nothing is built for it.
-		private static Task SendAddTag(INetworkClient client, uint tagId)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddTag,
-				b => b.WriteUInt32(tagId)));
-		}
-
-		// Grants a tag and tells the client, once. Persists first (so a relog keeps it, via the snapshot) and only
-		// sends the award if the row was new - re-awarding a held tag would pop the client's banner again.
-		// Returns the achievement it named, or null for an id the client's catalog does not carry (an item-shop flag,
-		// or an entry the catalog is short of); false in `Granted` means they already had it.
-		private async Task<(bool Granted, Achievement? Achievement)> GrantTag(INetworkClient client, uint tagId)
-		{
-			var granted = await Database.AddCharacterTag(client.Session.Character.Id, tagId);
-			if (granted)
-				await SendAddTag(client, tagId);
-
-			return (granted, await Database.GetAchievement(tagId));
 		}
 
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
@@ -271,24 +217,6 @@ namespace Faolan.GameServer
 				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
-		}
-
-		// Lists maps for `.maps`, optionally filtered to those whose name CONTAINS `search` (case-insensitive) -
-		// e.g. `.maps castle`. A blank search lists all maps.
-		private async Task SendListAllMaps(uint characterId, string? search = null)
-		{
-			var maps = (await Database.GetMaps()).OrderBy(m => m.Name).AsEnumerable();
-			if (!string.IsNullOrWhiteSpace(search))
-				maps = maps.Where(m => m.Name != null && m.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
-
-			var matches = maps.ToList();
-			if (matches.Count == 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No map matching '{search?.Trim()}'."));
-				return;
-			}
-
-			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. matches.Select(ChatMarkup (m) => $"{m.Id}: {m.Name}")]));
 		}
 
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
@@ -399,39 +327,6 @@ namespace Faolan.GameServer
 		// three fabricated records per entity per hit on the hottest path in the game, and for an NPC - which has no
 		// class curve, so ClassBasePools is null - the max ids fall back to our ceiling, which is not the quantity
 		// that slot holds. Neither blanket is right; the split above is.
-
-		// ---- SPELL RESISTANCE (#869) ----
-		//
-		// `DispatchAddSpellResistance` / `DispatchRemoveSpellResistance` - a per-character resistance to one spell
-		// METATYPE (LDB category 55200), on its own registry rather than on the stat sheet or the buff list.
-		//
-		// ⚠️ Retail never sends this ALONE: every captured frame accompanies a `Criminal Protection` apply or end in
-		// the same frame (`CriminalStatus.CriminalProtectionSpellId`). When #503 grants that buff, the matching
-		// resistance belongs beside it - which is why this takes the add/remove verb rather than being two methods.
-		private static Task SendSpellResistance(INetworkClient client, uint metaType, uint percentage, bool add)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				add ? GameCharInterfaceMethods.DispatchAddSpellResistance : GameCharInterfaceMethods.DispatchRemoveSpellResistance,
-				SpellResistanceCodec.Build(metaType, percentage)));
-		}
-
-		// ---- MAP MARKERS (#868) ----
-		//
-		// `DispatchAddWayPoint` / `DispatchRemoveWayPoint` on GameCharInterface. The endpoint pair is the ordinary
-		// GameCharAgent -> GameCharInterface one every other per-character dispatch uses; the captured sender
-		// instances (0x57 / 0x59 / 0x5A) are the per-session conversation ids, not a distinct conversation.
-		private static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z,
-			uint label = WayPointCodec.TombstoneLabel, uint toolTip = WayPointCodec.TombstoneToolTip)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z, label, toolTip)));
-		}
-
-		private static Task SendRemoveWayPoint(INetworkClient client, EntityId id, uint playfieldId)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchRemoveWayPoint, RemoveWayPointCodec.Build(id, playfieldId)));
-		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
 

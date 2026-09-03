@@ -18,22 +18,12 @@ using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer;
 using Faolan.GameServer.Wire;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Gm
 {
-	// The retail client's OWN command verbs (#914), implemented against the argument grammar recovered from the
-	// client in #913 (`docs/re/gm-command-args.tsv`) rather than one we chose.
-	//
-	// ⭐ Why these are worth having and our invented verbs are not a substitute: the client's hidden GM affordances
-	// only ever emit verbs from its own registry, and they arrive here as a `FanaticCommandIIR` that
-	// `HandleGmCommand` already routes into the same table as our `.` commands. So a verb implemented here is
-	// reachable from the client's own UI; one we invent never is.
-	//
-	// ⚠️ The grammar is retail's, including its quirks - a verb that "obviously" wants an argument may declare none
-	// and parse the line ad hoc, and a verb whose NAME matches one of ours may do a different job (retail's `/time`
-	// manipulates FRAME times; the time-of-day setter is `/settime`).
-	public partial class GameServerListener
+	public sealed partial class GmCommandService
 	{
 		// Where a character stood before /summon moved them, so /unsummon can put them back.
 		//
@@ -135,7 +125,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var stored = await Database.GetCharacterByName(name, client.Session.Character.RealmId);
+			var stored = await _database.GetCharacterByName(name, client.Session.Character.RealmId);
 			if (stored == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No character named '{name}' on this realm."));
@@ -166,7 +156,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var map = await Database.GetMap(subject.MapId);
+			var map = await _database.GetMap(subject.MapId);
 			var players = zone.Entities.Count(e => e.IsPlayer);
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([
 				$"Playfield for '{subject.Name}':",
@@ -206,7 +196,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var character = await Database.GetCharacter(wanted);
+			var character = await _database.GetCharacter(wanted);
 			if (character == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No character with id {wanted}."));
@@ -232,7 +222,7 @@ namespace Faolan.GameServer
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([
 				"System info:",
-				$"  realm {client.Session.Character.RealmId}, {NetworkClients.Count()} connection(s), {_simulation.Players.Count} player(s) in world",
+				$"  realm {client.Session.Character.RealmId}, {_connections.Clients.Count()} connection(s), {_simulation.Players.Count} player(s) in world",
 				$"  your map {client.Session.Character.MapId}: {zones.Length} live instance(s)",
 				$"  world time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameClock.GameDayRealSeconds / 3600.0:0.#} real hours)",
 				$"  terrain {(_simulation.Terrain?.Available == true ? "loaded" : "NOT loaded")}"
@@ -317,7 +307,7 @@ namespace Faolan.GameServer
 				_clock.OffsetGameSeconds = (_clock.OffsetGameSeconds + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
 			}
 
-			await client.SendAsync(BuildGameTime(client));
+			await client.SendAsync(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
 
 			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
@@ -351,7 +341,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await client.SendAsync(BuildGameTime(client));
+			await client.SendAsync(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Game time rate {_clock.Rate:0.###}x - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _clock.Rate:0.##} real hours (offset {_clock.OffsetGameSeconds}s).");
 		}
@@ -446,7 +436,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var stored = await Database.GetCharacter(subjectId);
+			var stored = await _database.GetCharacter(subjectId);
 			if (stored == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"'{subject.Name}' has no saved location to return to."));
@@ -517,7 +507,7 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
-			var character = await Database.GetCharacter(characterId);
+			var character = await _database.GetCharacter(characterId);
 			if (character == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Your character row could not be loaded.");
@@ -546,7 +536,7 @@ namespace Faolan.GameServer
 				// assignment overwrites it - comparing `updated` to an already-updated field is always "gain".
 				var reason = updated >= character.Money ? UpdateCashReason.Gain : UpdateCashReason.Spend;
 				character.Money = updated;
-				await Database.SetCharacterMoney(characterId, updated);
+				await _database.SetCharacterMoney(characterId, updated);
 				await _economyOutbound.SendUpdateCash(client, updated, reason);
 			}
 
@@ -974,7 +964,7 @@ namespace Faolan.GameServer
 				}
 				catch (Exception e)
 				{
-					Logger.LogWarning(e, "GM .{Verb} repeat loop stopped early.", verb);
+					_logger.LogWarning(e, "GM .{Verb} repeat loop stopped early.", verb);
 				}
 			});
 		}
@@ -1033,7 +1023,7 @@ namespace Faolan.GameServer
 			if (account != null)
 			{
 				account.SetGmPrivilege(GmPrivileges.InvisibleToMonsters, wanted);
-				await Database.SaveAccount(account);
+				await _database.SaveAccount(account);
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw(wanted
@@ -1068,7 +1058,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var feats = await Database.GetCharacterFeats(subject.Client.Session.Character.Id);
+			var feats = await _database.GetCharacterFeats(subject.Client.Session.Character.Id);
 			await _agentServerDispatcher.SendSystemMessage(characterId, feats.Length == 0
 				? $"'{subject.Name}' has no trained feats."
 				: $"'{subject.Name}' has {feats.Length} feat(s): {string.Join(", ", feats)}");
@@ -1117,8 +1107,8 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var character = await Database.GetCharacterByName(name, client.Session.Character.RealmId);
-			var account = character == null ? null : await Database.GetAccount(character.AccountId);
+			var character = await _database.GetCharacterByName(name, client.Session.Character.RealmId);
+			var account = character == null ? null : await _database.GetAccount(character.AccountId);
 			if (account == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", $"No character named '{name}' on this realm."));
@@ -1132,14 +1122,14 @@ namespace Faolan.GameServer
 			}
 
 			var expiresAt = DateTimeOffset.UtcNow.AddMinutes(minutes);
-			if (!await Database.BanUntil(account.Id, expiresAt))
+			if (!await _database.BanUntil(account.Id, expiresAt))
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "Error changing account state."));
 				return;
 			}
 
 			var kicked = 0;
-			foreach (var c in NetworkClients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
+			foreach (var c in _connections.Clients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
 			{
 				if (c.Session.Character?.Id is { } cid)
 					await _agentServerDispatcher.SendSystemMessage(cid, ChatMarkup.Color("red", $"You have been kicked by a GM for {minutes} minute(s)."));
@@ -1167,7 +1157,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var standings = await Database.GetCharacterFactionStandings(characterId);
+			var standings = await _database.GetCharacterFactionStandings(characterId);
 			var points = standings.TryGetValue(factionId, out var stored) ? stored : 0;
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Faction {factionId}: {points} points, rank {FactionLadder.RankFor(points)}{(standings.ContainsKey(factionId) ? "" : " (no standing row - reported as zero)")}.");
@@ -1185,7 +1175,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await Database.SetCharacterFactionStanding(characterId, factionId, points);
+			await _database.SetCharacterFactionStanding(characterId, factionId, points);
 			var rank = (uint)FactionLadder.RankFor(points);
 			await _factions.SendAll(client);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Faction {factionId} set to {points} points (rank {rank}).");
@@ -1207,7 +1197,7 @@ namespace Faolan.GameServer
 			{
 				case "list":
 				{
-					var known = await Database.GetCharacterSpells(characterId);
+					var known = await _database.GetCharacterSpells(characterId);
 					await _agentServerDispatcher.SendSystemMessage(characterId, known.Length == 0
 						? "No known spells."
 						: $"{known.Length} known spell(s): {string.Join(", ", known.Select(k => k.SpellId).Order())}");
@@ -1222,7 +1212,7 @@ namespace Faolan.GameServer
 						return;
 					}
 
-					var added = await Database.AddCharacterSpell(characterId, spellId);
+					var added = await _database.AddCharacterSpell(characterId, spellId);
 					if (added)
 						await GameWire.SendLearnSpell(client, spellId);
 
@@ -1240,7 +1230,7 @@ namespace Faolan.GameServer
 						return;
 					}
 
-					var removed = await Database.RemoveCharacterSpell(characterId, spellId);
+					var removed = await _database.RemoveCharacterSpell(characterId, spellId);
 					if (removed)
 						await GameWire.SendForgetSpell(client, spellId);
 
@@ -1253,8 +1243,8 @@ namespace Faolan.GameServer
 				case "forgetall":
 				{
 					// Read the set BEFORE the delete: the client is told per spell, so the ids have to survive the wipe.
-					var known = await Database.GetCharacterSpells(characterId);
-					var removed = await Database.ClearCharacterSpells(characterId);
+					var known = await _database.GetCharacterSpells(characterId);
+					var removed = await _database.ClearCharacterSpells(characterId);
 					foreach (var spell in known)
 						await GameWire.SendForgetSpell(client, spell.SpellId);
 
@@ -1292,7 +1282,7 @@ namespace Faolan.GameServer
 						return;
 					}
 
-					var removed = await RemoveItemFromBackpack(client, slot);
+					var removed = await _economyOutbound.RemoveItemFromBackpack(client, slot);
 					await _agentServerDispatcher.SendSystemMessage(characterId, removed
 						? $"Deleted the item in bag slot {slot}."
 						: $"No item in bag slot {slot}.");
@@ -1304,9 +1294,9 @@ namespace Faolan.GameServer
 					// Walks the backpack rather than issuing a bulk delete, so every removal takes the same live
 					// DispatchRemoveItem path a single one does and the client's bags stay in step.
 					var deleted = 0;
-					for (var slot = 0; slot < (int)BaseBackpackSlots; slot++)
+					for (var slot = 0; slot < (int)EconomyOutbound.BaseBackpackSlots; slot++)
 					{
-						if (await RemoveItemFromBackpack(client, slot))
+						if (await _economyOutbound.RemoveItemFromBackpack(client, slot))
 							deleted++;
 					}
 
@@ -1328,7 +1318,7 @@ namespace Faolan.GameServer
 				{
 					var moves = await _equipment.UnequipAll(client, await _economyOutbound.BackpackCapacity(characterId));
 					await AnnounceEquipmentMoves(client, moves);
-					var stillWorn = (await Database.GetCharacterItems(characterId, ContainerKind.Equipped)).Length;
+					var stillWorn = (await _database.GetCharacterItems(characterId, ContainerKind.Equipped)).Length;
 					await _agentServerDispatcher.SendSystemMessage(characterId, moves.Count == 0
 						? stillWorn == 0 ? "Nothing is equipped." : "The backpack is full - nothing could be taken off."
 						: $"Unequipped {moves.Count} item(s){(stillWorn > 0 ? $"; {stillWorn} left on (backpack full)" : "")}.");
@@ -1352,7 +1342,7 @@ namespace Faolan.GameServer
 			{
 				await EconomyOutbound.SendRemoveItem(client, move.From, (uint)move.FromSlot);
 
-				var landed = await Database.GetCharacterItemSlot(characterId, move.To, move.ToSlot);
+				var landed = await _database.GetCharacterItemSlot(characterId, move.To, move.ToSlot);
 				if (landed == null)
 					continue;
 
@@ -1378,7 +1368,7 @@ namespace Faolan.GameServer
 			}
 
 			var minted = AcgHash.Mint(templateId);
-			var item = await Database.GetItem(templateId);
+			var item = await _database.GetItem(templateId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Template {templateId}{(item == null ? " (not in our catalogue)" : $" '{item.Name}'")} -> HASH {minted} (0x{minted:X8}).");
 		}
@@ -1451,7 +1441,7 @@ namespace Faolan.GameServer
 				_clock.Rate = scale;
 			}
 
-			await client.SendAsync(BuildGameTime(client));
+			await client.SendAsync(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Time scale {_clock.Rate:0.###} - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _clock.Rate:0.##} real hours.");
 		}

@@ -13,6 +13,7 @@ using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Feats;
+using Faolan.GameServer.Gm;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
@@ -59,6 +60,7 @@ namespace Faolan.GameServer
 			// character" (EconomyOutbound, TeleportService, QuestShareOutbound, ApprenticeOutbound). It is registered
 			// rather than owned by ServerBase precisely so those four can be resolved without reaching into it.
 			services.AddSingleton<ConnectionRegistry>();
+			services.AddSingleton<TagService>();
 
 			// The narrower slices of IDatabaseRepository that individual services ask for, and the READ half of the
 			// CS dispatcher. Both are interfaces the shared singleton already satisfies; MS.DI does not infer that,
@@ -214,6 +216,9 @@ namespace Faolan.GameServer
 				sp.GetRequiredService<LootBroadcaster>(), sp.GetRequiredService<WorldObjectService>(), sp.GetRequiredService<BuffService>(),
 				sp.GetRequiredService<CombatService>(), sp.GetRequiredService<TradeskillService>(), sp.GetRequiredService<MountService>().Dismount));
 			services.AddSingleton<IWorldOutbound>(sp => sp.GetRequiredService<WorldOutbound>());
+
+			// The `.command` GM table and handlers - last, because a GM command can reach nearly every service above.
+			services.AddSingleton<GmCommandService>();
 
 			return services;
 		}

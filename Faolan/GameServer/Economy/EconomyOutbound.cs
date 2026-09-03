@@ -406,5 +406,28 @@ namespace Faolan.GameServer.Economy
 
 			_logger.LogDebug("Pushed UpdateInventoryIIR for {Character}: Equipped + Bag (#380).", client.Session.Character.Name);
 		}
+
+		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
+		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
+		public const uint BaseBackpackSlots = 24;
+
+		// Removes an item from the player's backpack: deletes the persisted bag item (so it stays gone across relog) AND
+		// pushes the live DispatchRemoveItem so it disappears immediately. The mirror of GrantItemToBackpack. Returns
+		// true if an item was there to remove.
+		public async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
+		{
+			var characterId = client.Session.Character.Id;
+			if (await _database.GetCharacterItemSlot(characterId, ContainerKind.Bag, slot) == null)
+				return false;
+
+			await _database.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
+			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
+
+			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
+			// case - the server took something out of the bag, the player did not move it - which is the shape the
+			// ShacklesOff capture shows. A player-initiated move is NOT followed by one: the client already knows.
+			await SendUpdateInventory(client);
+			return true;
+		}
 	}
 }

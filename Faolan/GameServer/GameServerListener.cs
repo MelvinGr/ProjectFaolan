@@ -28,6 +28,7 @@ using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Feats;
+using Faolan.GameServer.Gm;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
@@ -89,8 +90,6 @@ namespace Faolan.GameServer
 		// corpus evidence for each row.)
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
 		// (the character's real id) woven into the sender/receiver conversation id.
-
-		private static Dictionary<string, GmCommandEntry> _gmCommandsDict = null!;
 
 		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
 		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
@@ -295,6 +294,12 @@ namespace Faolan.GameServer
 		// The GM-bendable game clock the GameTime sends read (RealmClock).
 		private readonly RealmClock _clock;
 
+		// The `.command` table and its handlers (Gm/GmCommandService); the listener only routes a chat line there.
+		private readonly GmCommandService _gmCommands;
+
+		// Achievement tags (the vista award goes through it).
+		private readonly TagService _tags;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -325,7 +330,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -383,8 +388,9 @@ namespace Faolan.GameServer
 			_worldOutbound = worldOutbound;
 			_worldEntry = worldEntry;
 			_clock = clock;
+			_gmCommands = gmCommands;
+			_tags = tags;
 
-			InitGmCommands();
 		}
 
 		// The realm-tagged log category, resolved twice in the base initializer above (once for the listener, once for
@@ -446,11 +452,11 @@ namespace Faolan.GameServer
 			if (client == null)
 				return false;
 
-			// HandleGmCommand strips a single leading prefix char (".teleport" -> "teleport"), so ensure one is present.
+			// GmCommandService.Handle strips a single leading prefix char (".teleport" -> "teleport"), so ensure one is present.
 			if (commandText.Length == 0 || char.IsLetterOrDigit(commandText[0]))
 				commandText = "." + commandText;
 
-			await HandleGmCommand(client, commandText);
+			await _gmCommands.Handle(client, commandText);
 			return true;
 		}
 
@@ -586,51 +592,6 @@ namespace Faolan.GameServer
 				LogUnknownPacket(packet);
 		}
 
-
-		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
-		private async Task<Map?> ResolveMap(string arg)
-		{
-			if (uint.TryParse(arg, out var id))
-			{
-				var maps = await Database.GetMaps();
-				return maps.FirstOrDefault(m => m.Id == id);
-			}
-
-			var all = await Database.GetMaps();
-			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
-		}
-
-		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
-		// (Gitea #404) and movement is not otherwise persisted, so this snapshots every
-		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
-		// more live state - vitals, buffs, … - as those become persisted.)
-		private async Task SaveChanges(uint characterId)
-		{
-			var saved = await _persistence.FlushAllAsync();
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
-		}
-
-		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
-		// malformed/overflowing value.
-		private static bool TryParseHandle(string arg, out uint handle)
-		{
-			handle = 0;
-			try
-			{
-				handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-					? Convert.ToUInt32(arg[2..], 16)
-					: uint.Parse(arg);
-				return true;
-			}
-			catch (FormatException)
-			{
-				return false;
-			}
-			catch (OverflowException)
-			{
-				return false;
-			}
-		}
 
 	}
 }

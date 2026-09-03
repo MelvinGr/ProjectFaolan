@@ -340,5 +340,38 @@ namespace Faolan.GameServer.Wire
 			foreach (var stat in CombatRatingCurve.Stats)
 				await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(character.Id, (uint)stat, rating)));
 		}
+
+		// ---- SPELL RESISTANCE (#869) ----
+		//
+		// `DispatchAddSpellResistance` / `DispatchRemoveSpellResistance` - a per-character resistance to one spell
+		// METATYPE (LDB category 55200), on its own registry rather than on the stat sheet or the buff list.
+		//
+		// ⚠️ Retail never sends this ALONE: every captured frame accompanies a `Criminal Protection` apply or end in
+		// the same frame (`CriminalStatus.CriminalProtectionSpellId`). When #503 grants that buff, the matching
+		// resistance belongs beside it - which is why this takes the add/remove verb rather than being two methods.
+		internal static Task SendSpellResistance(INetworkClient client, uint metaType, uint percentage, bool add)
+		{
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				add ? GameCharInterfaceMethods.DispatchAddSpellResistance : GameCharInterfaceMethods.DispatchRemoveSpellResistance,
+				SpellResistanceCodec.Build(metaType, percentage)));
+		}
+
+		// ---- MAP MARKERS (#868) ----
+		//
+		// `DispatchAddWayPoint` / `DispatchRemoveWayPoint` on GameCharInterface. The endpoint pair is the ordinary
+		// GameCharAgent -> GameCharInterface one every other per-character dispatch uses; the captured sender
+		// instances (0x57 / 0x59 / 0x5A) are the per-session conversation ids, not a distinct conversation.
+		internal static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z,
+			uint label = WayPointCodec.TombstoneLabel, uint toolTip = WayPointCodec.TombstoneToolTip)
+		{
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z, label, toolTip)));
+		}
+
+		internal static Task SendRemoveWayPoint(INetworkClient client, EntityId id, uint playfieldId)
+		{
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchRemoveWayPoint, RemoveWayPointCodec.Build(id, playfieldId)));
+		}
 	}
 }

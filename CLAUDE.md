@@ -128,8 +128,9 @@ behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` fil
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
 `SendVitals`/`SendAddItem` — never opcode-named; the STATIC ones several services share — `SendStatUpdate`,
 `BuildMapChange`, `SendLearnSpell`, … — live in `Wire/GameWire.cs`, and the tier's sender endpoints in
-`Wire/GameEndpoints.cs`, so no service reaches back into the listener for them, #928), plus `.ItemUse`/`.Vista`; GM commands are the
-`.GmCommands` partials. World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
+`Wire/GameEndpoints.cs`, so no service reaches back into the listener for them, #928), plus `.ItemUse`/`.Vista`. GM
+commands are NOT a partial any more either: `Gm/GmCommandService.cs` (+ its `.Retail` partial) holds the table, the
+privilege gate and every handler, and the listener only routes a chat line to `Handle` (#928 item 5). World ENTRY (the ready bursts, the snapshot, the spawn poll) is NOT a partial any more:
 it is `Session/WorldEntryService.cs`, a composed service, because `CreateFlowService` needs the burst-less entry
 and a service cannot take a listener method in its constructor - moving it deleted the graph's last bound seam
 into the listener (see ⭐ "look for the move first" below). `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
@@ -459,10 +460,11 @@ WHOLE from typed columns (the three-tier `Npc` type / `NpcSpawn` placement / liv
 `docs/subsystems/npc-three-tier-architecture.md`); the captured `NpcSpawn.Data` blob is now **retired** — `TryBuildLive`
 is the sole spawn-body path.
 
-**GM commands** (`Faolan/GameServer/GameServerListener.GmCommands.cs`, account type >= GameMaster, typed as `.cmd` in chat)
+**GM commands** (`Faolan/GameServer/Gm/GmCommandService.cs`, account type >= GameMaster, typed as `.cmd` in chat)
 are the standard test bootstrap for features whose retail trigger isn't wired yet (`.additem`, `.teleport`, `.ah`,
-`.setnpcgroup`, ...). The registered set is the `_gmCommandsDict` in that file (`InitGmCommands`) — check it before
-assuming a command exists; several older ones were removed, and any MCP tools wrapping them are stale.
+`.setnpcgroup`, ...). The registered set is the table `BuildTable` builds in that file (one instance per realm - it
+used to be a static on the listener) — check it before assuming a command exists; several older ones were removed,
+and any MCP tools wrapping them are stale.
 
 **MCP server:** the running server hosts an in-process MCP endpoint at `http://127.0.0.1:7099/mcp`
 (DB queries + live-session inspection + GM-command routing).

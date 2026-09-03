@@ -110,7 +110,7 @@ namespace Faolan.GameServer
 			// The buff's END twin: same spell id with the END form selector and no data region at all.
 			await WorldIir.Send(client, MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, vista.BuffSpellBaseId, MagicBuffIds.FormEnd, null, [])));
 
-			var (granted, achievement) = await GrantTag(client, vista.AchievementTagId);
+			var (granted, achievement) = await _tags.GrantTag(client, vista.AchievementTagId);
 			Logger.LogInformation("Vista: {Player} finished '{Vista}'; achievement {Tag} ({Name}) {Outcome}.", client.Session.Character.Name, vista.Name, vista.AchievementTagId,
 				achievement?.Name ?? "?", granted
 					? "awarded"

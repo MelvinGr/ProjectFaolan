@@ -32,13 +32,11 @@ namespace Faolan.Tests
 		private static readonly Dictionary<string, (int Calls, string Why)> Writers = new()
 		{
 			["Faolan/GameServer/Economy/EconomyOutbound.cs"] =
-				(2, "THE choke point itself (GrantItemToBackpack) + TakeItemsFromInventory's per-step clear. The only file "
-				    + "allowed to write a GRANT. It was GameServerListener.Outbound.cs until #826 moved the economy wire "
-				    + "off the listener; the choke point moved with it, the rule did not."),
-
-			["Faolan/GameServer/GameServerListener.Outbound.cs"] =
-				(1, "a removal - RemoveItemFromBackpack's bag clear. It kept this one when the grant left for "
-				    + "EconomyOutbound, and a clear cannot introduce an item, so it cannot newly tick a collect goal."),
+				(3, "THE choke point itself (GrantItemToBackpack) + TakeItemsFromInventory's per-step clear + "
+				    + "RemoveItemFromBackpack's bag clear (a clear cannot introduce an item, so it cannot tick a collect "
+				    + "goal). The only file allowed to write a GRANT. It was GameServerListener.Outbound.cs until #826 moved "
+				    + "the economy wire off the listener; the choke point moved with it, the rule did not, and the removal "
+				    + "followed in #928 item 5."),
 
 			["Faolan/GameServer/Inventory/EquipmentService.cs"] =
 				(2, "a drop (clearing the dropped cell) and the new half of a stack SPLIT. Splitting is the one inventory "

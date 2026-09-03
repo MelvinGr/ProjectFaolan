@@ -615,7 +615,7 @@ namespace Faolan.GameServer
 					}
 
 					if (f.Text.Length > 1 && f.Text[0] == '/')
-						await HandleGmCommand(client, f.Text);
+						await _gmCommands.Handle(client, f.Text);
 					else
 						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 							$"GM command received with no verb ('{f.Text}').");
@@ -877,7 +877,7 @@ namespace Faolan.GameServer
 					Logger.LogDebug("ChatVicinity from ID32 {{{SenderClass:X}, {SenderHandle:X8}}}, mode {Mode}, {Length} message bytes.", senderClass, senderHandle, mode, messageLength);
 
 					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.IsGm)
-						await HandleGmCommand(client, text);
+						await _gmCommands.Handle(client, text);
 					else
 						// "say" is proximity chat - only same-map players within range hear it (the sender always does).
 						// The GameServer owns the live positions, so it picks the recipients here.
@@ -1597,7 +1597,7 @@ namespace Faolan.GameServer
 						// absorbed.
 						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
 						{
-							await RecallToBindCommand(client);
+							await _gmCommands.RecallToBindCommand(client);
 							break;
 						}
 
@@ -1707,7 +1707,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.QueuePetCommand:
 				{
-					await HandlePetCommand(client, packet, body);
+					await _gmCommands.HandlePetCommand(client, packet, body);
 					return;
 				}
 
@@ -2546,7 +2546,7 @@ namespace Faolan.GameServer
 			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var auctioneerTemplate) &&
 			    await _tradepost.IsAuctioneerTemplate(auctioneerTemplate) && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 			{
-				await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
+				await _gmCommands.SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 				return;
 			}
 
