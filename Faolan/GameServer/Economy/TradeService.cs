@@ -20,11 +20,11 @@ namespace Faolan.GameServer.Economy
 	public sealed class TradeService
 	{
 		private readonly ConcurrentDictionary<uint, TradeSession> _byCharacter = [];
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly ILogger _logger;
 		private readonly ITradeOutbound _outbound;
 
-		public TradeService(IDatabaseRepository database, ILogger logger, ITradeOutbound outbound)
+		public TradeService(ICharacterRepository database, ILogger logger, ITradeOutbound outbound)
 		{
 			_database = database;
 			_logger = logger;

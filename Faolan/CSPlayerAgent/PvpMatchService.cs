@@ -40,7 +40,7 @@ namespace Faolan.CSPlayerAgent
 	// GUI consumes them, and nothing server-side needs to know which number is which team yet (scoring is #146's
 	// next slice). "Has a side" means the member has picked one at least once.
 	public sealed class PvpMatchService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections, IGameServerDispatcher gameServer,
-		IDatabaseRepository database)
+		ICharacterRepository database)
 	{
 		// A member's side before they pick one. The client's own GUI starts a fresh member sideless (the
 		// CantStartMatch refusal exists exactly because of that state); 0 is what PlayerJoined announces for one.

@@ -28,13 +28,13 @@ namespace Faolan.GameServer.World
 	// record that carries the impact entirely.
 	public sealed class EnvironmentService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly IWorldRepository _database;
 		private readonly ILogger _logger;
 		private readonly ConcurrentDictionary<uint, MapHazard[]> _mapHazards = new ConcurrentDictionary<uint, MapHazard[]>();
 		private readonly ConcurrentDictionary<uint, MapRegion[]> _noMountRegions = new ConcurrentDictionary<uint, MapRegion[]>();
 		private readonly IEnvironmentOutbound _output;
 
-		public EnvironmentService(IDatabaseRepository database, IEnvironmentOutbound output, ILogger logger)
+		public EnvironmentService(IWorldRepository database, IEnvironmentOutbound output, ILogger logger)
 		{
 			_database = database;
 			_output = output;

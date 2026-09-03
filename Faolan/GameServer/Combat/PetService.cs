@@ -22,11 +22,11 @@ namespace Faolan.GameServer.Combat
 	public sealed class PetService
 	{
 		private readonly NpcBroadcaster _npcs;
-		private readonly IDatabaseRepository _database;
+		private readonly INpcRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _simulation;
 
-		public PetService(IDatabaseRepository database, WorldSimulation simulation, NpcBroadcaster npcs, ILogger logger)
+		public PetService(INpcRepository database, WorldSimulation simulation, NpcBroadcaster npcs, ILogger logger)
 		{
 			_database = database;
 			_simulation = simulation;

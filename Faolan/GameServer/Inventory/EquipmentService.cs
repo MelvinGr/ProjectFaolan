@@ -14,7 +14,7 @@ namespace Faolan.GameServer.Inventory
 	// The world-burst replay then reflects the saved item instances on next login. Extracted out of
 	// GameServerListener as a composed collaborator (like CombatService): pure persistence, no packet sends.
 	//
-	// ⚠️ Every one of these five is a MOVE, and a move goes through IDatabaseRepository.MoveCharacterItem - two column
+	// ⚠️ Every one of these five is a MOVE, and a move goes through ICharacterRepository.MoveCharacterItem - two column
 	// UPDATEs on existing rows, never a re-mint. That is what keeps the item's crafter, its stack count and its
 	// socketed gems attached to it (#750). Before item instances, an "equip" was: read the source cell's template id,
 	// write it into a slot column, clear the source cell - i.e. the item was RE-CREATED at its destination from
@@ -31,10 +31,10 @@ namespace Faolan.GameServer.Inventory
 	// The Inbound handlers (Handle0x2000) call into it.
 	public sealed class EquipmentService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly ILogger _logger;
 
-		public EquipmentService(IDatabaseRepository database, ILogger logger)
+		public EquipmentService(ICharacterRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

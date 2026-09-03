@@ -13,7 +13,7 @@ namespace Faolan.GameServer.Progression
 	// Achievement TAGS (#748): granting one to a character and telling the client about it, once. Off the listener
 	// because two callers need it - the vista award in the listener and the `.tag` GM command in GmCommandService -
 	// and a service cannot take a listener method (#928 item 5).
-	public sealed class TagService(IDatabaseRepository database)
+	public sealed class TagService(ICharacterRepository database)
 	{
 		// Awards a TAG (#748): `DispatchAddTag`, body = the tag id and nothing else, 4 bytes. That covers two
 		// phenomena sharing one id space - an ACHIEVEMENT (the catalog is LDB 55701/55700, imported into

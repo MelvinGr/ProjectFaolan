@@ -56,12 +56,12 @@ namespace Faolan.GameServer.World
 		private readonly AmbientPoolService _ambient;
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly ComboService _combos;
-		private readonly IDatabaseRepository _database;
+		private readonly INpcRepository _database;
 		private readonly RuntimeHandleAllocator _handles;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public NpcBroadcaster(WorldSimulation sim, IDatabaseRepository database, WorldBroadcaster broadcaster, AmbientPoolService ambient, ComboService combos,
+		public NpcBroadcaster(WorldSimulation sim, INpcRepository database, WorldBroadcaster broadcaster, AmbientPoolService ambient, ComboService combos,
 			RuntimeHandleAllocator handles, ILogger logger)
 		{
 			_sim = sim;

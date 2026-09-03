@@ -43,7 +43,7 @@ namespace Faolan.GameServer.Combat
 		// cast pose forever (found live 2026-08-26: "the animation never ends on the other client").
 		private readonly World.WorldBroadcaster _broadcaster;
 		private readonly CombatService _combat;
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
@@ -59,7 +59,7 @@ namespace Faolan.GameServer.Combat
 		// #710: the per-cast overrides a caster's trained feats and live buffs put on this spell.
 		private readonly SpellModifierService _spellModifiers;
 
-		public CastService(IDatabaseRepository database, WorldSimulation sim, BuffTickService buffTicks, CombatService combat, BuffService buffs,
+		public CastService(ICatalogRepository database, WorldSimulation sim, BuffTickService buffTicks, CombatService combat, BuffService buffs,
 			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ILogger logger, WorldBroadcaster broadcaster)
 		{
 			_database = database;

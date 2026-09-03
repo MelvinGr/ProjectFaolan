@@ -223,14 +223,14 @@ namespace Faolan.GameServer.Combat
 			[CharacterStatId.Dexterity] = null
 		};
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 
 		// The honored flat + percent deltas per spell BASE id. Loaded once (1.7k rows) on first use.
 		private Catalog? _catalog;
 
-		public BuffStatEffects(IDatabaseRepository database, ILogger logger)
+		public BuffStatEffects(ICatalogRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

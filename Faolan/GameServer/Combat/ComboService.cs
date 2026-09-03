@@ -46,7 +46,7 @@ namespace Faolan.GameServer.Combat
 		// `combo_attack_num` on a combo with no key sequence to index into. See TrackSwing.
 		public const uint UnsteppedAttackNum = uint.MaxValue;
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;
 
 		// The whole 744-row catalog + the 960-row scaling curve, cached on first use. Both are static content and
@@ -55,7 +55,7 @@ namespace Faolan.GameServer.Combat
 		private Dictionary<uint, ComboEntry>? _catalog;
 		private Dictionary<(ConanClass, uint), ClassComboScaling>? _scaling;
 
-		public ComboService(IDatabaseRepository database, ILogger logger)
+		public ComboService(ICatalogRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

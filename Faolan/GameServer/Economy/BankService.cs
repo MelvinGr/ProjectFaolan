@@ -29,11 +29,11 @@ namespace Faolan.GameServer.Economy
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
 
 		private const uint BankMaxSize = 50; // captured bank capacity
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _database;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 
-		public BankService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
+		public BankService(ICharacterRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
 			_database = database;
 			_logger = logger;

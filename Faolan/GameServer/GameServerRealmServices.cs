@@ -68,6 +68,12 @@ namespace Faolan.GameServer
 			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<ICatalogRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<INpcRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IEconomyRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IGuildRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IRealmRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IFactionRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<ICsPlayerAgentProvider>(sp => sp.GetRequiredService<ICsPlayerAgentDispatcher>());
 
 			// --- the world model, and the leaves it reads -------------------------------------------------------

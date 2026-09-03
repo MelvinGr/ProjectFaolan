@@ -30,7 +30,7 @@ namespace Faolan.GameServer.Combat
 	//     depletion). Those are spell REFERENCES, not a dispatch table; a row would only add a lookup.
 	public sealed class SpellEffectService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 		private readonly ISpellEffectOutbound _outbound;
@@ -38,7 +38,7 @@ namespace Faolan.GameServer.Combat
 		// (base spell id, trigger) -> its effects in Sequence order. Loaded once (a few dozen rows) on first use.
 		private IReadOnlyDictionary<(uint SpellId, SpellEffectTrigger Trigger), SpellEffect[]>? _effects;
 
-		public SpellEffectService(IDatabaseRepository database, ISpellEffectOutbound outbound, ILogger logger)
+		public SpellEffectService(ICatalogRepository database, ISpellEffectOutbound outbound, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;

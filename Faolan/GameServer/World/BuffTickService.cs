@@ -77,7 +77,7 @@ namespace Faolan.GameServer.World
 			return scaled != 0 ? scaled : Math.Sign(wireDelta);
 		}
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;
 		private readonly PlayerRegistry _players;
 		private readonly SpellAreaCatalog _spellAreas;
@@ -85,7 +85,7 @@ namespace Faolan.GameServer.World
 
 		private IWorldOutbound _output = null!;
 
-		public BuffTickService(WorldState world, PlayerRegistry players, IDatabaseRepository database, SpellAreaCatalog spellAreas, ILogger logger)
+		public BuffTickService(WorldState world, PlayerRegistry players, ICatalogRepository database, SpellAreaCatalog spellAreas, ILogger logger)
 		{
 			_world = world;
 			_players = players;

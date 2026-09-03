@@ -31,7 +31,7 @@ namespace Faolan.GameServer.Combat
 	// subclasses this rather than stubbing a wire port - see Faolan.Tests RecordingSpellAreaCatalog.
 	public class SpellAreaCatalog
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		private Dictionary<uint, SpellAreaEffect[]>? _bySpell;
 
@@ -44,7 +44,7 @@ namespace Faolan.GameServer.Combat
 		// because the chain walk needs it per edge on the same hot path.
 		private Dictionary<(uint SpellId, uint Sequence), ItemTemplateStatModifiers.Criterion[]>? _criteria;
 
-		public SpellAreaCatalog(IDatabaseRepository database)
+		public SpellAreaCatalog(ICatalogRepository database)
 		{
 			_database = database;
 		}

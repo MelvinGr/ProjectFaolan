@@ -16,7 +16,7 @@ namespace Faolan.GameServer.Scripting
 	// The scripted TORTAGE-INTRO narrative, pulled out of WorldBroadcaster + CreateFlowService (#353): the
 	// Kalanthes create-cutscene walk-up and the Casilda beach-rescue sequence (drop the invisible chain-wall, the
 	// captive/freed poses, the freed-check). Keeps this bespoke story logic in one place instead of scattered across
-	// the generic broadcaster/create-flow. Reads quest state (`IDatabaseRepository`) and resolves live entities via
+	// the generic broadcaster/create-flow. Reads quest state (`IWorldRepository`) and resolves live entities via
 	// `WorldSimulation`; the wire sends reuse the same world-conversation framing as every rendered NPC move/pose.
 	//
 	// It depends only on the simulation + DB (constructed before WorldBroadcaster), so the broadcaster's interest
@@ -43,11 +43,11 @@ namespace Faolan.GameServer.Scripting
 		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
 		private static readonly Vector3 KalanthesIntroPos = new Vector3(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
 		private static readonly Vector3 KalanthesWalkTarget = new Vector3(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
-		private readonly IDatabaseRepository _database;
+		private readonly IWorldRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public TortageIntroService(IDatabaseRepository database, WorldSimulation sim, ILogger logger)
+		public TortageIntroService(IWorldRepository database, WorldSimulation sim, ILogger logger)
 		{
 			_database = database;
 			_sim = sim;

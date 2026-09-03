@@ -56,12 +56,12 @@ namespace Faolan.GameServer.Combat
 		// The ×100 wire scale the three pool stats are stored at.
 		private const int VitalsScale = 100;
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _database;
 		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 		private IReadOnlyDictionary<uint, PoolEffect[]>? _catalog;
 
-		public SpellPoolEffects(IDatabaseRepository database, ILogger logger)
+		public SpellPoolEffects(ICatalogRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

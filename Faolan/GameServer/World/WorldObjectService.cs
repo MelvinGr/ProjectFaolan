@@ -46,11 +46,11 @@ namespace Faolan.GameServer.World
 		private const string BenchObjectClass = "TavernBenchSimpleDynel";
 
 		private readonly WorldBroadcaster _broadcaster;
-		private readonly IDatabaseRepository _database;
+		private readonly IWorldRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public WorldObjectService(WorldSimulation sim, IDatabaseRepository database, WorldBroadcaster broadcaster, ILogger logger)
+		public WorldObjectService(WorldSimulation sim, IWorldRepository database, WorldBroadcaster broadcaster, ILogger logger)
 		{
 			_sim = sim;
 			_database = database;

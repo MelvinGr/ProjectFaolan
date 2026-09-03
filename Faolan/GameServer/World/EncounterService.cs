@@ -29,7 +29,7 @@ namespace Faolan.GameServer.World
 	public sealed class EncounterService
 	{
 		private readonly Func<WorldEntity, Task> _broadcastDespawn;
-		private readonly IDatabaseRepository _database;
+		private readonly INpcRepository _database;
 		private readonly RuntimeHandleAllocator _handles;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
@@ -38,7 +38,7 @@ namespace Faolan.GameServer.World
 		// #623/#675; this path never did, so a boss or an ambusher fought with none.
 		private readonly ComboService _combos;
 
-		public EncounterService(WorldSimulation sim, IDatabaseRepository database, RuntimeHandleAllocator handles, ComboService combos, Func<WorldEntity, Task> broadcastDespawn,
+		public EncounterService(WorldSimulation sim, INpcRepository database, RuntimeHandleAllocator handles, ComboService combos, Func<WorldEntity, Task> broadcastDespawn,
 			ILogger logger)
 		{
 			_sim = sim;
