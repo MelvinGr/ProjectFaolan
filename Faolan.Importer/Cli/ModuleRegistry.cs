@@ -8,6 +8,15 @@ namespace Faolan.Importer.Cli
 	// The catalog of import modules + selection/dependency resolution. Each module wraps a CaptureX/Rdb
 	// importer or extractor (see docs/tooling/importer.md). Registration order is the stable tie-break for the
 	// topo sort.
+	// The two module GROUPS, as their files used to describe them before each module got a file of its own
+	// (#928 item 3):
+	// * CAPTURE-sourced modules: the remaining ones. Each wraps an existing CaptureX importer / extractor + the shared
+	// ImportOps orchestration. (items/shops/characters live in their own files.) Modes are advertised; threading
+	// ctx.Mode into the underlying importer internals is the tracked follow-up (see docs/tooling/importer.md
+	// "Write modes") - except where the strategy lives in ImportOps (npcs/conversations overwrite).
+	// * RDB-sourced modules: Opt-in (Source == Rdb keeps them out of the default set); all require --rdb. The two
+	// with out-of-DB write side effects (rdb-respawns -> mirror-store blobs, rdb-items -> --dump-templates) suppress
+	// that write under --dry-run.
 	public static class ModuleRegistry
 	{
 		// Registered in default-run order so a no-flag run sequences the same every time (the topo sort is
