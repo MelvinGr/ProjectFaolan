@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,227 NPC types / 3,813 placements · 5,031 items · 20,848 spells · 265 abilities · 19,777 feats · 764 conversation nodes · 112 shops · 5,049 quests · 2,688 world objects · 1,109 patrol routes · 340 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,227 NPC types / 3,813 placements · 5,144 items · 20,848 spells · 265 abilities · 19,777 feats · 764 conversation nodes · 112 shops · 5,049 quests · 2,688 world objects · 1,109 patrol routes · 340 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -33,7 +33,7 @@ we've seen_, and names the gaps). Regenerate with
 - **NPC conversations** — 116/124 greeted dialogue NPCs imported (93.5%)
 - **Vendor shops** — 77/77 captured vendors imported (100.0%)
   - of the 8 conversation gap(s): **0 carry a conversation in the corpus** (a real import gap), 8 were clicked but produced no dialogue (not a dialogue NPC)
-- **RDB template catalog** (type 1000020, partly TEA-encrypted) — 5,243/77,631 of the ENCRYPTED entries decrypted (**6.8%**), from 4,978 item and 265 ability keys harvested from captures. (+20,417 plaintext entries need no key at all - the feat catalog is entirely among them.)
+- **RDB template catalog** (type 1000020, partly TEA-encrypted) — 5,355/77,631 of the ENCRYPTED entries decrypted (**6.9%**), from 5,090 item and 265 ability keys harvested from captures. (+20,417 plaintext entries need no key at all - the feat catalog is entirely among them.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -50,7 +50,8 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Spawns are fully decoded** — player and NPC spawn streams typed end to end, no opaque regions; all 11,632
   captured spawns re-encode byte-exact (#475, #477)
 - ✅ **NPC AI** — aggro and chase, leash and heal on a break, and 177 patrol routes; friendly NPCs never attack and
-  show green names, hostiles red (#425)
+  show green names, hostiles red. A pile-on spreads onto its own slot on a retail-measured ring instead of one
+  point (#425, #908)
 - ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive says so
 - ✅ **Zone-line doors** — a doorway that changes your location teleports you, within a zone and across a loading
   screen; the costly ones ask you to confirm first. Where a door leads comes from three sources in order — a
@@ -61,6 +62,8 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy, and a group map is
   one copy per TEAM: the whole party lands in the same one and a member arriving later joins it (#512)
 - ✅ **Sit on benches** — sitting down, switching seats and standing up (#355)
+- ✅ **Emotes & stances are relayed** — /sit and the other behaviour commands are visible to other players, and an
+  NPC streaming into view shows what it is doing (#905, #912)
 - ✅ **Spend a skillpoint** — putting points into Run Speed, Climbing, Hiding and Perception out of the pool a
   level-up hands you; the pool and the skills persist. Selling one back waits for a capture (#739, #745)
 - 🟡 **Resource harvesting** — mining, chopping and picking on the 197 nodes the captures have shown us, across
@@ -100,9 +103,9 @@ we've seen_, and names the gaps). Regenerate with
   each reviving you at its own strength (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's banner and adds it to your list,
   across all 538 imported points (#372)
-- ✅ **Buffs & debuffs** — apply, tick, expire on a timer and right-click to cancel. Each damage-over-time spell
-  ticks at its own measured rate; 53 of the 84 in the captures are measured, the rest use the median (#274, #370,
-  #437, #524)
+- ✅ **Buffs & debuffs** — apply, tick, expire on a timer, right-click to cancel, and survive a zone change. Each
+  damage-over-time spell ticks at its own measured rate; 53 of the 84 in the captures are measured, the rest use
+  the median (#274, #370, #437, #524, #907)
 - ✅ **Shield of the Risen** — newcomer protection, re-applied on login and each zone, dropping when you act
   aggressively (#361)
 - ✅ **NPC death animations** — a proper death on the killing blow, per creature type, with more being harvested
@@ -119,8 +122,9 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Damage scale** — NPC swing damage is measured from the captures and caster NPCs use the right school. Only
   levels 1-6 are well sampled; above that the curve is extrapolated (#401, #479)
 - 🟡 **Gear-driven combat stats** — weapon damage rolls per swing, armour and Protection mitigate on retail's own
-  formula, and crit ratings produce crits. The crit curve and the NPC side of mitigation stay provisional (#395,
-  #401)
+  formula, and crit ratings produce crits. A cast's hit is the spell's own stated damage, exact against retail at
+  Tortage levels; the ~4.7× a geared level-80 caster gets on top is unmodelled. The crit curve and the NPC side of
+  mitigation stay provisional (#395, #401, #924)
 - 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as
   is equipping and unequipping. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** — ticks damage with floating numbers at the blast radius the client states for the
@@ -150,8 +154,8 @@ we've seen_, and names the gaps). Regenerate with
   prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget
   (cost = rank+1; the 3,839 levelling feats are free because the CLIENT auto-trains them itself), and named specs
   each keep their own build. Tree, column, tier and cost come from the client's own featclass table (#862, #863).
-  Missing: the retail training trigger — training runs off a GM command — and nothing consumes the decoded
-  combo/proc modifier tables (#251, #474, #697)
+  Trained from the client's own feat window, and untraining takes back the spell the feat taught (#920). Missing:
+  nothing consumes the decoded combo/proc modifier tables (#251, #474, #697)
 - 🟡 **Skill points** — the pool is a function of level, so it is stated on login rather than awarded. Five levels
   are captured and there is no formula for the rest, so those keep what the character already had (#507)
 - 🟡 **Spell unlock levels** — 8,460 spells carry one, read from the client's spell and combo records; 592 come
@@ -223,8 +227,12 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine; every branch any capture
   walked is reachable in-game, and a conversation can turn its NPC hostile — verified in-client (#642, #644, #839)
 - ✅ **NPCs greet you differently the second time** — a full welcome first, a terser line after (#645)
-- ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does;
-  the live J-panel refresh that rides along still needs a capture (#457, #482)
+- ✅ **Dropping a quest sticks** — abandoning one removes it from the journal, confirms it the way retail does and
+  refreshes the J-panel with retail's own remove message (#457, #482)
+- 🟡 **Quest-line order** — the journal's chapter numerals and upcoming-step rows are right on the 771 multi-step
+  lines whose order the captures carry; 968 lines have no captured order, and a held quest on one stays out of the
+  login snapshot rather than showing a wrong chapter. The client does not ship the order, so captures are the only
+  source (#926)
 
 ### Mounts & pets
 
@@ -275,13 +283,13 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Client debug channels** — switches on the retail client's own logging, so it reports every stat it applies
   and what caused it (#443)
 - ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
-- ✅ **GM commands** — our own `.commands` plus the retail client's built-in ones: a GameMaster account flips the
-  stock client into GM mode and its `/teleport`, `/cloak`, `/kill`, … route into the same command table (#449,
+- ✅ **GM commands** — our own `.commands` plus every one of the retail client's 133 built-in verbs: a GameMaster
+  account flips the stock client into GM mode, 47 verbs are backed (`/teleport`, `/kill`, `/summon`, `/inflict`,
+  the stat family, …) and the other 86 answer with their grammar, the privilege they need and what backing them
+  takes. Each is gated on the account's own privilege bits, set from the admin UI (#449, #904, #914,
   [docs](docs/subsystems/gm-commands.md))
 - 🟡 **Importer** — rebuilds the game database from captures + the client's asset files, plus read-only `--report`
   diagnostics
-- 🟡 What the server should answer for each of the client's 133 GM commands is per-command work; most are not
-  answered yet (#449)
 
 ### Wire fidelity
 
@@ -546,11 +554,9 @@ captures against the local server (no root needed) and retail-session captures a
   damage curves are only sampled to level 6, and the log names what the packets cannot: crits and absorbs
   (#479, #401)
 - A **spell cast of a known-cooldown spell** → the `SetSpellRecastTime` GameAction (#271)
-- **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote (#132, #104)
+- **Guild** member kick/promote/demote (#104)
 - A **necromancer pet summon in the open world** (#307), and the **s2c side of a trade cancel / decline /
   remove-item** — the c2s half is handled, but cancelling currently leaves the partner's window open (#427)
-- A second **quest abandoned** in a live session → the `QuestLogList` refresh variant retail sends with it; two
-  samples do not pin a grammar, and a malformed list takes the whole route down (#482)
 - A **guild-city piece taking damage** (a siege, or any attack on a plot structure) → the destructible bodies are
   already decoded and placed, but nothing in the corpus ever shows one being damaged, so there is no destruction
   or construction grammar to reproduce (#498)
