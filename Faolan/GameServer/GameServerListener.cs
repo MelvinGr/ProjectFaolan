@@ -93,9 +93,6 @@ namespace Faolan.GameServer
 		// guess and is wrong.
 		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x57);
 
-		// #637: hands out the cookie of each travel confirmation box. Retail's is a script-context pointer; ours only
-		// has to be unique among the boxes a client might have outstanding, which a listener-wide counter is.
-		private long _travelConfirmCookie;
 
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
@@ -301,6 +298,9 @@ namespace Faolan.GameServer
 		private readonly VistaService _vista;
 		private readonly ItemUseService _itemUse;
 
+		// The travel confirmation box + the ACG teleport choice (TravelOutbound owns the confirm cookie).
+		private readonly TravelOutbound _travelOutbound;
+
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
 		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
 		// surfaces instead of being swallowed.
@@ -331,7 +331,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -394,6 +394,7 @@ namespace Faolan.GameServer
 			_stances = stances;
 			_vista = vista;
 			_itemUse = itemUse;
+			_travelOutbound = travelOutbound;
 
 		}
 

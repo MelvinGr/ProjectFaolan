@@ -523,7 +523,7 @@ namespace Faolan.GameServer
 
 					Logger.LogDebug("TradeskillRequestIIR from handle 0x{Handle:X8} (env {Env}) - sending the recipe book.", tradeskill.Handle, tradeskill.Env);
 
-					await SendCraftingRecipeBook(client);
+					await _tradeskill.SendCraftingRecipeBook(client);
 
 					break;
 				}
@@ -964,7 +964,7 @@ namespace Faolan.GameServer
 				// between the two steps loses the transfer rather than duplicating it (#368).
 				case GameCharAgentMethods.GuildTransferMoney:
 				{
-					await HandleGuildDeposit(client, GuildTransferMoneyCodec.Parse(body.ReadRemainingArray()));
+					await _guildBank.HandleGuildDeposit(client, GuildTransferMoneyCodec.Parse(body.ReadRemainingArray()));
 					break;
 				}
 
@@ -1381,7 +1381,7 @@ namespace Faolan.GameServer
 
 					// #792: retail ACKS it - `DispatchAbortTrade` (0x6A), zero-length, on 152 of the 153 frames the
 					// corpus holds. We used to answer nothing.
-					await SendTradeAbort(client);
+					await GameWire.SendTradeAbort(client);
 
 					break;
 				}
@@ -2415,11 +2415,11 @@ namespace Faolan.GameServer
 						// bind box - "this instance will be bound to you" - instead of teleporting, and the trip only
 						// runs when the player accepts, which lands in the RequestACGTeleport handler. Checked BEFORE
 						// the #637 scry box: this destination has its own confirmation and must not get two.
-						await SendAcgTeleportChoice(client, dest.DestMapId, dest.AcgPlayfieldClass, dest.ArrivalPosition);
+						await _travelOutbound.SendAcgTeleportChoice(client, dest.DestMapId, dest.AcgPlayfieldClass, dest.ArrivalPosition);
 					else if (await Database.GetMap(dest.DestMapId) is { TravelConfirmKey: { IsEmpty: false } } confirming)
 						// #637: retail asks "Do you want to travel to <map>?" before entering this destination. The
 						// trip resumes in HandleScryMessageBoxAnswer when the player confirms; a decline drops it.
-						await SendTravelConfirmation(client, confirming, dest.ArrivalPosition);
+						await _travelOutbound.SendTravelConfirmation(client, confirming, dest.ArrivalPosition);
 					else
 						await _teleport.DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition);
 

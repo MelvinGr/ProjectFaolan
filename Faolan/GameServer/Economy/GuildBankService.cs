@@ -5,6 +5,12 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
+using Faolan.Core.Network.Server.CsPlayerAgent;
+using Faolan.Core.Network.Codecs.Guild;
+using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Constants;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -38,8 +44,11 @@ namespace Faolan.GameServer.Economy
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
 
-		public GuildBankService(IDatabaseRepository database, IEconomyOutbound outbound, ILogger logger)
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+
+		public GuildBankService(IDatabaseRepository database, IEconomyOutbound outbound, ILogger logger, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
 		{
+			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			_database = database;
 			_outbound = outbound;
 			_logger = logger;
@@ -109,6 +118,53 @@ namespace Faolan.GameServer.Economy
 				move.ToSlot);
 
 			return true;
+		}
+		// The deposit half of the guild bank (#654), the exact inverse of CreditCharacterCash above: there the CS tier
+		// debits the guild and this tier credits the wallet, here this tier debits the wallet and the CS tier credits
+		// the guild. Both do the debit on the side that HOLDS the money, so a failure between the two steps loses the
+		// transfer rather than minting one.
+		//
+		// A payer who cannot afford it gets retail's own named refusal (`DispatchGuildNotEnoughCash`) rather than
+		// silence: unlike the requests this codebase deliberately leaves unanswered, the client CAN legitimately send
+		// this one - it does not know the wallet moved - and the client has a message for exactly this case.
+		public async Task HandleGuildDeposit(INetworkClient client, GuildTransferMoney request)
+		{
+			var character = client.Session.Character;
+			if (character == null || request.AmountTin == 0)
+				return;
+
+			if (request.AmountTin > character.Money)
+			{
+				_logger.LogInformation("GuildTransferMoney refused: {Character} offered {Amount} tin of their {Balance}.", character.Name, request.AmountTin, character.Money);
+				// ⚠️ THE ENDPOINTS ARE THE WEAK PART, and they are not recovered from anything. The client's method
+				// table gives the METHOD and its PARAMETERS; it says nothing about the RpcHeader, whose sender is a
+				// server OBJECT id we only ever learn from a capture - and no capture performs a guild-bank deposit.
+				//
+				// Worse, the instance is demonstrably NOT constant per interface: captured GameCharInterface replies
+				// arrive from GameCharAgent{0x58} (the login/world-handshake family) AND from GameCharAgent{0x10}
+				// (the trade family). Which server object owns the guild bank is unknown, so 0x10 is a COIN FLIP
+				// taken from the nearest neighbour, exactly like the quest-share dispatches below.
+				//
+				// That is the failure mode #101's team-invite window cost a day to: a wrong sender looks like a wrong
+				// body and is not one. If this refusal does not render in-client, suspect this line before the codec.
+				// [V0: the guild-bank reply endpoints]
+				await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+					GuildNotEnoughCashCodec.Method, GuildNotEnoughCashCodec.Build(request.AmountTin)));
+				return;
+			}
+
+			character.Money -= request.AmountTin;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+
+			if (await _csPlayerAgentDispatcher.DepositToGuildBank(character.Id, request.AmountTin))
+				return;
+
+			// Nobody could take it - put it back rather than leave it nowhere (the withdrawal's refund, mirrored).
+			character.Money += request.AmountTin;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
+			_logger.LogWarning("GuildTransferMoney rolled back: {Character}'s guild is not on this realm's CS tier.", character.Name);
 		}
 	}
 }

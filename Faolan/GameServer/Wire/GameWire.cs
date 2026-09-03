@@ -391,5 +391,43 @@ namespace Faolan.GameServer.Wire
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				ResurrectRequestCodec.Method, ResurrectRequestCodec.Build(characterId, resurrectSpell)));
 		}
+
+		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
+		// [u32 itemId][u32 itemId][u32 0][u32 count] followed by the two 24-byte identity halves the capture repeats,
+		// which we send as zero: the client renders the item from the id, and the halves it echoes are the same value
+		// twice, so there is nothing per-session to reproduce.
+		//
+		// Decoded from the harvesting span of the chat-annotated capture (#494), where the loot line lands beside its
+		// annotation each time - Granite 161206 x40 (`just mined`), Oak 161213 x60 (`gethering wood`), Iron 161196 x40
+		// (`mining iron`). The item id is repeated in the first two words in every observed record.
+		// ⚠️ The 4th word is the item's LEVEL, not a count. The body is the same ProtoAcgItem-shaped layout the
+		// client's `itemref://` chat link carries - [template][template][0][level][hash][key1][key2][key3] - and
+		// reading it as a count is what put the bogus 40 / 60 / 40 yields into HarvestCatalog (#732): Items.Level for
+		// Granite, Oak and Iron is 40, 60 and 40 exactly. The line renders an item LINK, so the level is what its
+		// tooltip reads; how many arrived is the ADD's business, not this message's.
+		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
+		internal static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
+		{
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
+				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
+		}
+
+		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchAbortTrade` (GameCharInterface `0x6A`,
+		// zero-length) and we answered nothing at all - so the vendor session was left open on the client's side of
+		// the model.
+		//
+		// The name is the CLIENT's: its handler is `CoreTradeHolder::TradeAbort()`, whose own assert string reads
+		// *"is closing all trades"* - a vendor session IS a trade to the client, which is why one message serves both.
+		// The TRIGGER is measured rather than assumed: of the 153 frames across 132 captures, **152 are the immediate
+		// reply to `CloseShop`** (the odd one out follows an `UpdateQuestMarkerNPC`, i.e. a shop closed by walking
+		// away). [V2: Hakotep_hox_login_gameplay0.tshark.json fr695 -> fr697, and 151 more like it across the corpus]
+		//
+		// ⚠️ It aborts EVERY open trade, not just the shop, so it must not be sent while a player-to-player trade is
+		// running. Nothing here can do that today - a shop and a trade cannot both be open - but the constraint is the
+		// reason this is not a general "close the window" message.
+		internal static Task SendTradeAbort(INetworkClient client)
+		{
+			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
+		}
 	}
 }

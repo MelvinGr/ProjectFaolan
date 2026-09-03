@@ -13,6 +13,15 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Wire;
 
+using System.Threading;
+
+using Faolan.Core.Database.Tables;
+
+using Faolan.Core.Network.Codecs.Dialogue;
+
+using Faolan.Core.Crypt;
+using Microsoft.Extensions.Logging;
+
 namespace Faolan.GameServer.World
 {
 	// The wire side of local travel (#506) - ITravelOutbound. The decisions live in World/TravelService.cs.
@@ -26,8 +35,11 @@ namespace Faolan.GameServer.World
 		private readonly WorldSimulation _simulation;
 		private readonly TeleportService _teleport;
 
-		public TravelOutbound(IChatServerDispatcher chat, IEconomyOutbound economy, TeleportService teleport, WorldSimulation simulation)
+		private readonly ILogger _logger;
+
+		public TravelOutbound(IChatServerDispatcher chat, IEconomyOutbound economy, TeleportService teleport, WorldSimulation simulation, ILogger logger)
 		{
+			_logger = logger;
 			_chat = chat;
 			_economy = economy;
 			_teleport = teleport;
@@ -102,6 +114,49 @@ namespace Faolan.GameServer.World
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
+		}
+		// #637: hands out the cookie of each travel confirmation box. Retail's is a script-context pointer; ours only
+		// has to be unique among the boxes a client might have outstanding, which a listener-wide counter is.
+		private long _travelConfirmCookie;
+
+		// #637: raises retail's "Do you want to travel to <map>?" box for a zone-line door, and remembers the trip it
+		// is confirming. The (threadCtxId, cookie) pair is retail's script-thread handle; the client only ever echoes
+		// it, so ours are a correlation token rather than a real thread - the character id plus a per-send counter,
+		// which is unique within a session and is all the answer has to match.
+		//
+		// Retail's own sender endpoint instance varies per box across the corpus (0x54/0x56..0x5A - it is the scry
+		// agent that happens to own the script), so 0x58 here is the house default, not a captured constant.
+		public async Task SendTravelConfirmation(INetworkClient client, Map destination, Vector3? arrival)
+		{
+			var threadCtxId = client.Session.Character.Id;
+			var cookie = (ulong)Interlocked.Increment(ref _travelConfirmCookie);
+			client.Session.PendingTravelConfirm = new PendingTravelConfirm(threadCtxId, cookie, destination.Id, arrival);
+
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchScryShowMessageBox,
+				ScryShowMessageBoxCodec.Build(destination.Id, LdbKey.ToWire(destination.TravelConfirmKey), threadCtxId, cookie)));
+
+			_logger.LogInformation("Travel confirm for '{Map}' ({MapId}) sent to character {CharacterId} (cookie 0x{Cookie:X16}).", destination.Name, destination.Id,
+				client.Session.Character.Id, cookie);
+		}
+
+		// #821: the ACG INSTANCE BIND box - the confirmation retail raises instead of teleporting when the destination
+		// is a personal instance. The client answers with RequestACGTeleport (or, if the player declines, with nothing
+		// at all), so the offer is recorded on the session for the handler to check against.
+		//
+		// The proxy is built for the DESTINATION: its class word is what marks the playfield as ACG, and it is echoed
+		// back verbatim in the request. The instance token is 0 - we do not mint per-player instance tokens (#268), and
+		// the capture's token is that session's, not a per-map constant.
+		public async Task SendAcgTeleportChoice(INetworkClient client, uint destinationMapId, uint playfieldClass, Vector3? arrival)
+		{
+			client.Session.PendingAcgTeleport = new PendingAcgTeleport(destinationMapId, arrival);
+
+			var proxy = PlayfieldProxy.ForMap(destinationMapId) with { ClassWord = playfieldClass };
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x56), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchACGTeleportChoice,
+				AcgTeleportChoiceCodec.Build(new AcgTeleportChoice(client.Session.Character.Id, proxy))));
+
+			_logger.LogInformation("ACG bind box for map {MapId} sent to character {CharacterId}.", destinationMapId, client.Session.Character.Id);
 		}
 	}
 }

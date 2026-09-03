@@ -65,54 +65,6 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// The deposit half of the guild bank (#654), the exact inverse of CreditCharacterCash above: there the CS tier
-		// debits the guild and this tier credits the wallet, here this tier debits the wallet and the CS tier credits
-		// the guild. Both do the debit on the side that HOLDS the money, so a failure between the two steps loses the
-		// transfer rather than minting one.
-		//
-		// A payer who cannot afford it gets retail's own named refusal (`DispatchGuildNotEnoughCash`) rather than
-		// silence: unlike the requests this codebase deliberately leaves unanswered, the client CAN legitimately send
-		// this one - it does not know the wallet moved - and the client has a message for exactly this case.
-		private async Task HandleGuildDeposit(INetworkClient client, GuildTransferMoney request)
-		{
-			var character = client.Session.Character;
-			if (character == null || request.AmountTin == 0)
-				return;
-
-			if (request.AmountTin > character.Money)
-			{
-				Logger.LogInformation("GuildTransferMoney refused: {Character} offered {Amount} tin of their {Balance}.", character.Name, request.AmountTin, character.Money);
-				// ⚠️ THE ENDPOINTS ARE THE WEAK PART, and they are not recovered from anything. The client's method
-				// table gives the METHOD and its PARAMETERS; it says nothing about the RpcHeader, whose sender is a
-				// server OBJECT id we only ever learn from a capture - and no capture performs a guild-bank deposit.
-				//
-				// Worse, the instance is demonstrably NOT constant per interface: captured GameCharInterface replies
-				// arrive from GameCharAgent{0x58} (the login/world-handshake family) AND from GameCharAgent{0x10}
-				// (the trade family). Which server object owns the guild bank is unknown, so 0x10 is a COIN FLIP
-				// taken from the nearest neighbour, exactly like the quest-share dispatches below.
-				//
-				// That is the failure mode #101's team-invite window cost a day to: a wrong sender looks like a wrong
-				// body and is not one. If this refusal does not render in-client, suspect this line before the codec.
-				// [V0: the guild-bank reply endpoints]
-				await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-					GuildNotEnoughCashCodec.Method, GuildNotEnoughCashCodec.Build(request.AmountTin)));
-				return;
-			}
-
-			character.Money -= request.AmountTin;
-			await Database.SetCharacterMoney(character.Id, character.Money);
-			await _economyOutbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
-
-			if (await _csPlayerAgentDispatcher.DepositToGuildBank(character.Id, request.AmountTin))
-				return;
-
-			// Nobody could take it - put it back rather than leave it nowhere (the withdrawal's refund, mirrored).
-			character.Money += request.AmountTin;
-			await Database.SetCharacterMoney(character.Id, character.Money);
-			await _economyOutbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
-			Logger.LogWarning("GuildTransferMoney rolled back: {Character}'s guild is not on this realm's CS tier.", character.Name);
-		}
-
 		// IGameServerProvider seam: pushes the guild tag onto the character's live world connection, if it is
 		// connected to this listener. Used by the CsPlayerAgent guild flow (accept/create/leave) so the in-world
 		// tag updates without a relog.
@@ -170,55 +122,6 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// The first free backpack cell, skipping occupied ones. The backpack size is 24 base + the equipped bag's extra
-		// slots (#12), so a grown bag can be filled. Null = full. Read-only DB helper (mirrors
-		// AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
-		private async Task<int?> FindFreeBagSlot(uint characterId)
-		{
-			var taken = (await Database.GetCharacterItems(characterId, ContainerKind.Bag)).Select(i => i.Slot).ToHashSet();
-			var capacity = await _economyOutbound.BackpackCapacity(characterId);
-			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
-		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchAbortTrade` (GameCharInterface `0x6A`,
-		// zero-length) and we answered nothing at all - so the vendor session was left open on the client's side of
-		// the model.
-		//
-		// The name is the CLIENT's: its handler is `CoreTradeHolder::TradeAbort()`, whose own assert string reads
-		// *"is closing all trades"* - a vendor session IS a trade to the client, which is why one message serves both.
-		// The TRIGGER is measured rather than assumed: of the 153 frames across 132 captures, **152 are the immediate
-		// reply to `CloseShop`** (the odd one out follows an `UpdateQuestMarkerNPC`, i.e. a shop closed by walking
-		// away). [V2: Hakotep_hox_login_gameplay0.tshark.json fr695 -> fr697, and 151 more like it across the corpus]
-		//
-		// ⚠️ It aborts EVERY open trade, not just the shop, so it must not be sent while a player-to-player trade is
-		// running. Nothing here can do that today - a shop and a trade cannot both be open - but the constraint is the
-		// reason this is not a general "close the window" message.
-		private static Task SendTradeAbort(INetworkClient client)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
-		}
-
-		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
-		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
-		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
-		// the capture (docs/subsystems/tradeskill-recipes.md). Empty catalog -> an empty (count=0x3F1) list, which opens the book
-		// cleanly with no recipes.
-		private async Task SendCraftingRecipeBook(INetworkClient client)
-		{
-			var handle = client.Session.Character.Id;
-
-			// #735: only what the character has TRAINED for. A fresh character has learned no profession and so gets
-			// an EMPTY book, which is retail - the book is what a profession buys. The gate is the recipe's own
-			// `RequiredFeatId` against the character's rank on that profession's ladder; see TradeskillService.
-			var rows = await _tradeskill.BookFor(handle, await Database.GetRecipes());
-			var records = rows.Select(RecipeRecords.FromRow).ToList();
-
-			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
-
-			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
-		}
-
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
 		// clock and the time of day from it at 5 game seconds per real second, wrapping every 86400 (see GameTimeCodec
 		// for where those come from). `_clock.OffsetGameSeconds` shifts the phase for the `.time` GM command.
@@ -228,68 +131,8 @@ namespace Faolan.GameServer
 		}
 
 
-		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
-		// [u32 itemId][u32 itemId][u32 0][u32 count] followed by the two 24-byte identity halves the capture repeats,
-		// which we send as zero: the client renders the item from the id, and the halves it echoes are the same value
-		// twice, so there is nothing per-session to reproduce.
-		//
-		// Decoded from the harvesting span of the chat-annotated capture (#494), where the loot line lands beside its
-		// annotation each time - Granite 161206 x40 (`just mined`), Oak 161213 x60 (`gethering wood`), Iron 161196 x40
-		// (`mining iron`). The item id is repeated in the first two words in every observed record.
-		// ⚠️ The 4th word is the item's LEVEL, not a count. The body is the same ProtoAcgItem-shaped layout the
-		// client's `itemref://` chat link carries - [template][template][0][level][hash][key1][key2][key3] - and
-		// reading it as a count is what put the bogus 40 / 60 / 40 yields into HarvestCatalog (#732): Items.Level for
-		// Granite, Oak and Iron is 40, 60 and 40 exactly. The line renders an item LINK, so the level is what its
-		// tooltip reads; how many arrived is the ADD's business, not this message's.
-		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
-		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
-		{
-			return client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
-				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
-		}
-
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
-
-		// #637: raises retail's "Do you want to travel to <map>?" box for a zone-line door, and remembers the trip it
-		// is confirming. The (threadCtxId, cookie) pair is retail's script-thread handle; the client only ever echoes
-		// it, so ours are a correlation token rather than a real thread - the character id plus a per-send counter,
-		// which is unique within a session and is all the answer has to match.
-		//
-		// Retail's own sender endpoint instance varies per box across the corpus (0x54/0x56..0x5A - it is the scry
-		// agent that happens to own the script), so 0x58 here is the house default, not a captured constant.
-		private async Task SendTravelConfirmation(INetworkClient client, Map destination, Vector3? arrival)
-		{
-			var threadCtxId = client.Session.Character.Id;
-			var cookie = (ulong)Interlocked.Increment(ref _travelConfirmCookie);
-			client.Session.PendingTravelConfirm = new PendingTravelConfirm(threadCtxId, cookie, destination.Id, arrival);
-
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchScryShowMessageBox,
-				ScryShowMessageBoxCodec.Build(destination.Id, LdbKey.ToWire(destination.TravelConfirmKey), threadCtxId, cookie)));
-
-			Logger.LogInformation("Travel confirm for '{Map}' ({MapId}) sent to character {CharacterId} (cookie 0x{Cookie:X16}).", destination.Name, destination.Id,
-				client.Session.Character.Id, cookie);
-		}
-
-		// #821: the ACG INSTANCE BIND box - the confirmation retail raises instead of teleporting when the destination
-		// is a personal instance. The client answers with RequestACGTeleport (or, if the player declines, with nothing
-		// at all), so the offer is recorded on the session for the handler to check against.
-		//
-		// The proxy is built for the DESTINATION: its class word is what marks the playfield as ACG, and it is echoed
-		// back verbatim in the request. The instance token is 0 - we do not mint per-player instance tokens (#268), and
-		// the capture's token is that session's, not a per-map constant.
-		private async Task SendAcgTeleportChoice(INetworkClient client, uint destinationMapId, uint playfieldClass, Vector3? arrival)
-		{
-			client.Session.PendingAcgTeleport = new PendingAcgTeleport(destinationMapId, arrival);
-
-			var proxy = PlayfieldProxy.ForMap(destinationMapId) with { ClassWord = playfieldClass };
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x56), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-				GameCharInterfaceMethods.DispatchACGTeleportChoice,
-				AcgTeleportChoiceCodec.Build(new AcgTeleportChoice(client.Session.Character.Id, proxy))));
-
-			Logger.LogInformation("ACG bind box for map {MapId} sent to character {CharacterId}.", destinationMapId, client.Session.Character.Id);
-		}
 
 
 		// WHICH of the two vitals blocks to send is decided by WHAT MOVED, and both forms are retail's (#586).

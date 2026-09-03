@@ -559,5 +559,25 @@ namespace Faolan.GameServer.Economy
 				GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
 				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
 		}
+		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
+		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
+		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
+		// the capture (docs/subsystems/tradeskill-recipes.md). Empty catalog -> an empty (count=0x3F1) list, which opens the book
+		// cleanly with no recipes.
+		public async Task SendCraftingRecipeBook(INetworkClient client)
+		{
+			var handle = client.Session.Character.Id;
+
+			// #735: only what the character has TRAINED for. A fresh character has learned no profession and so gets
+			// an EMPTY book, which is retail - the book is what a profession buys. The gate is the recipe's own
+			// `RequiredFeatId` against the character's rank on that profession's ladder; see TradeskillService.
+			var rows = await this.BookFor(handle, await _database.GetRecipes());
+			var records = rows.Select(RecipeRecords.FromRow).ToList();
+
+			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
+
+			_logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
+		}
 	}
 }

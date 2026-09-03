@@ -197,7 +197,7 @@ namespace Faolan.Tests
 			client.Session.Character.Name = "DemoL80";
 
 			var outbound = new Recorder();
-			return (new GuildBankService(database, outbound, NullLogger.Instance), client, outbound, database, options);
+			return (new GuildBankService(database, outbound, NullLogger.Instance, csPlayerAgentDispatcher: null!), client, outbound, database, options);
 		}
 
 		private sealed class Recorder : NoOpEconomyOutbound
