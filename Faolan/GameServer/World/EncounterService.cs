@@ -58,7 +58,7 @@ namespace Faolan.GameServer.World
 		public async Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)
 		{
 			ArgumentNullException.ThrowIfNull(lure);
-			if (lure.EncounterBossTemplateId is not { } bossTemplateId)
+			if (lure.Presentation.EncounterBossTemplateId is not { } bossTemplateId)
 				return null;
 
 			var boss = await _database.GetNpcByTemplateId(bossTemplateId);
@@ -90,8 +90,8 @@ namespace Faolan.GameServer.World
 			entity.LootContainer = boss.LootContainerTemplateId;
 			entity.SpawnBody = body;
 			await StampCombatKit(entity, boss);
-			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
-			entity.EncounterLureTemplateId = lure.NpcTemplateId;
+			entity.Route.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
+			entity.Presentation.EncounterLureTemplateId = lure.NpcTemplateId;
 			foreach (var sp in boss.Spells)
 				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
 
@@ -107,7 +107,7 @@ namespace Faolan.GameServer.World
 		public async Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss)
 		{
 			ArgumentNullException.ThrowIfNull(boss);
-			if (boss.EncounterLureTemplateId is not { } lureTemplateId)
+			if (boss.Presentation.EncounterLureTemplateId is not { } lureTemplateId)
 				return null;
 
 			var lure = await _database.GetNpcByTemplateId(lureTemplateId);
@@ -123,8 +123,8 @@ namespace Faolan.GameServer.World
 			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken,
 				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(lure.StatCore) : null);
 			await StampCombatKit(entity, lure);
-			entity.NoRespawn = true;
-			entity.ArmEncounter(encounter);
+			entity.Route.NoRespawn = true;
+			entity.Presentation.ArmEncounter(encounter);
 
 			zone.Add(entity);
 			_logger.LogInformation("Encounter: {Lure} restored on map {Map} at ({X:F1}, {Z:F1}).", lure.Name, zone.MapId, boss.Position.X, boss.Position.Z);
@@ -209,7 +209,7 @@ namespace Faolan.GameServer.World
 			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken,
 				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(type.StatCore) : null);
 			await StampCombatKit(entity, type);
-			entity.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
+			entity.Route.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
 			foreach (var sp in type.Spells)
 				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
 

@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		{
 			var e = Croc();
 			// Every non-current anchor occupied -> still returns a real anchor (B or C), never stalls at A.
-			var p = e.NextWanderPoint(_ => true);
+			var p = e.Route.NextWanderPoint(e.Position, _ => true);
 			Assert.True(p == B || p == C);
 			Assert.NotEqual(A, p);
 		}
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		{
 			var e = Croc();
 			for (var i = 0; i < 100; i++)
-				Assert.NotEqual(A, e.NextWanderPoint());
+				Assert.NotEqual(A, e.Route.NextWanderPoint(e.Position));
 		}
 
 		[Fact]
@@ -37,13 +37,13 @@ namespace Faolan.Tests
 			var e = Croc();
 			// B occupied, C free, A is current -> must always pick C, regardless of the random start offset.
 			for (var i = 0; i < 100; i++)
-				Assert.Equal(C, e.NextWanderPoint(pt => pt == B));
+				Assert.Equal(C, e.Route.NextWanderPoint(e.Position, pt => pt == B));
 		}
 
 		private static WorldEntity Croc()
 		{
 			var e = WorldEntity.ForNpc(1, 4010, A, Quaternion.Identity, "Croc", EntityVitals.FromMax(10, 0, 10));
-			e.PatrolWaypoints = [A, B, C];
+			e.Route.PatrolWaypoints = [A, B, C];
 			e.Position = A;
 			return e;
 		}

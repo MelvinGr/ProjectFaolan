@@ -19,7 +19,7 @@ namespace Faolan.Tests
 			var npc = Patroller(new Vector3(0, 0, 0), [new Vector3(0, 0, 0), new Vector3(200, 0, 0)]);
 			npc.Position = new Vector3(0, 0, 500); // far from spawn and from both anchors
 
-			Assert.True(npc.BeyondLeash(500f, WorldState.NpcLeashRange));
+			Assert.True(npc.Route.BeyondLeash(npc.Position, 500f, WorldState.NpcLeashRange));
 		}
 
 		[Fact]
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			var npc = Patroller(new Vector3(0, 0, 0), [new Vector3(0, 0, 0), new Vector3(200, 0, 0)]);
 			npc.Position = new Vector3(200, 0, 0);
 
-			Assert.False(npc.BeyondLeash(200f, WorldState.NpcLeashRange));
+			Assert.False(npc.Route.BeyondLeash(npc.Position, 200f, WorldState.NpcLeashRange));
 		}
 
 		[Fact]
@@ -50,9 +50,9 @@ namespace Faolan.Tests
 				previousY = npc.Position.Y;
 			}
 
-			Assert.False(npc.Returning); // arrived
+			Assert.False(npc.Route.Returning); // arrived
 			Assert.Equal(100f, npc.Position.Y, 3); // exactly the spawn's altitude, not a residual float
-			Assert.True(Vector3.Distance(npc.Position, npc.SpawnPosition) <= WorldState.NpcMeleeRange + 0.5f);
+			Assert.True(Vector3.Distance(npc.Position, npc.Route.SpawnPosition) <= WorldState.NpcMeleeRange + 0.5f);
 		}
 
 		[Fact]
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 
 			world.Tick(0.1);
 
-			Assert.True(npc.Returning);
+			Assert.True(npc.Route.Returning);
 		}
 
 		[Fact]
@@ -77,20 +77,20 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Quaternion.Identity, "Wanderer", EntityVitals.FromMax(100, 0, 100));
 			world.Place(npc, 2040, npc.Position, Quaternion.Identity);
-			npc.PatrolWaypoints = [new Vector3(0, 0, 0), new Vector3(150, 0, 0), new Vector3(300, 0, 0)];
+			npc.Route.PatrolWaypoints = [new Vector3(0, 0, 0), new Vector3(150, 0, 0), new Vector3(300, 0, 0)];
 			npc.Position = new Vector3(300, 0, 0);
 
 			for (var i = 0; i < 50; i++)
 			{
 				world.Tick(0.1);
-				Assert.False(npc.Returning, "a patroller standing on its own route is not a stray");
+				Assert.False(npc.Route.Returning, "a patroller standing on its own route is not a stray");
 			}
 		}
 
 		private static WorldEntity Patroller(Vector3 spawn, Vector3[] waypoints)
 		{
 			var npc = WorldEntity.ForNpc(1, 2040, spawn, Quaternion.Identity, "Patroller", EntityVitals.FromMax(100, 0, 100));
-			npc.PatrolWaypoints = waypoints;
+			npc.Route.PatrolWaypoints = waypoints;
 			return npc;
 		}
 	}

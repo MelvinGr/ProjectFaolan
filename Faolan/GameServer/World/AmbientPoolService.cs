@@ -176,9 +176,9 @@ namespace Faolan.GameServer.World
 			entity.SpawnBody = body;
 			entity.SpawnAreaId = pool.AreaId;
 			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
-			entity.NoRespawn = true; // corpse fades on death; the POOL respawns a replacement (below)
-			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
-			entity.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
+			entity.Route.NoRespawn = true; // corpse fades on death; the POOL respawns a replacement (below)
+			entity.Route.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
+			entity.Route.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
 			foreach (var s in pool.Type.Spells)
 				entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
 

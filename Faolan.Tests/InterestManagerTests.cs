@@ -24,14 +24,14 @@ namespace Faolan.Tests
 			var b = Player(2, 10, 0);
 			zone.Add(a);
 			zone.Add(b);
-			b.Known.Add(1); // stale: B still "knows" A from a prior session
-			b.Confirmed.Add(1);
+			b.Knowledge.Known.Add(1); // stale: B still "knows" A from a prior session
+			b.Knowledge.Confirmed.Add(1);
 
 			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, true, true));
 
 			Assert.True(events.Has(2, 1, InterestEventType.Spawn)); // A re-spawned to B
 			Assert.False(events.Has(2, 1, InterestEventType.Move)); // NOT a (dropped) Move
-			Assert.DoesNotContain(1u, b.Confirmed); // stale build forgotten -> B must re-poll the fresh spawn
+			Assert.DoesNotContain(1u, b.Knowledge.Confirmed); // stale build forgotten -> B must re-poll the fresh spawn
 		}
 
 		[Fact]
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Quaternion.Identity, "Kalanthes"); // right next to A
 			zone.Add(a);
 			zone.Add(npc);
-			a.Known.Add(99); // entry seeded this: the burst already rendered it
+			a.Knowledge.Known.Add(99); // entry seeded this: the burst already rendered it
 
 			a.Position = new Vector3(1, 0, 0);
 			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, true));
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 
 			Assert.True(events.Has(1, 2, InterestEventType.Spawn)); // A now sees B
 			Assert.True(events.Has(2, 1, InterestEventType.Spawn)); // B now sees A
-			Assert.True(a.Known.Contains(2) && b.Known.Contains(1));
+			Assert.True(a.Knowledge.Known.Contains(2) && b.Knowledge.Known.Contains(1));
 		}
 
 		[Fact]
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			var (events, _) = MoveTo(zone, a, 1, 0);
 
 			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // NPC comes from the burst, not interest (yet)
-			Assert.DoesNotContain(99u, a.Known);
+			Assert.DoesNotContain(99u, a.Knowledge.Known);
 		}
 
 		[Fact]
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, true));
 
 			Assert.True(events.Has(1, 99, InterestEventType.Spawn)); // NPC now streamed from the model
-			Assert.Contains(99u, a.Known);
+			Assert.Contains(99u, a.Knowledge.Known);
 		}
 
 		[Fact]
@@ -107,15 +107,15 @@ namespace Faolan.Tests
 			zone.Add(a);
 			zone.Add(b);
 			InterestManager.ResolveMove(zone, a, Range); // mutually visible
-			a.Confirmed.Add(2);
-			b.Confirmed.Add(1); // both clients polled (0x2020) -> built each other; a later despawn is now safe (#245)
+			a.Knowledge.Confirmed.Add(2);
+			b.Knowledge.Confirmed.Add(1); // both clients polled (0x2020) -> built each other; a later despawn is now safe (#245)
 
 			// A runs far away.
 			var (events, _) = MoveTo(zone, a, 5000, 0);
 
 			Assert.True(events.Has(1, 2, InterestEventType.Despawn)); // A no longer sees B
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // B no longer sees A
-			Assert.False(a.Known.Contains(2) || b.Known.Contains(1));
+			Assert.False(a.Knowledge.Known.Contains(2) || b.Knowledge.Known.Contains(1));
 		}
 
 		[Fact]
@@ -144,12 +144,12 @@ namespace Faolan.Tests
 			zone.Add(a);
 			zone.Add(b);
 			InterestManager.ResolveMove(zone, a, Range);
-			b.Confirmed.Add(1); // B polled (0x2020) -> built A, so a later despawn is safe (#245/#322 gate)
+			b.Knowledge.Confirmed.Add(1); // B polled (0x2020) -> built A, so a later despawn is safe (#245/#322 gate)
 
 			var events = new WorldEvents(InterestManager.ResolveRemove(zone, a));
 
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // B told A is gone
-			Assert.DoesNotContain(1u, b.Known);
+			Assert.DoesNotContain(1u, b.Knowledge.Known);
 		}
 
 		[Fact]
@@ -168,7 +168,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveRemove(zone, a));
 
 			Assert.False(events.Has(2, 1, InterestEventType.Despawn)); // no despawn for the unconfirmed handle
-			Assert.DoesNotContain(1u, b.Known); // but A is dropped from B's Known
+			Assert.DoesNotContain(1u, b.Knowledge.Known); // but A is dropped from B's Known
 		}
 
 		[Fact]
@@ -193,7 +193,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveRemove(zone, a));
 
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // the phantom is removed
-			Assert.DoesNotContain(1u, b.Known);
+			Assert.DoesNotContain(1u, b.Knowledge.Known);
 		}
 
 		[Fact]
@@ -212,7 +212,7 @@ namespace Faolan.Tests
 			var (events, _) = MoveTo(zone, a, 5000, 0); // a runs far away
 
 			Assert.False(events.Has(1, 2, InterestEventType.Despawn)); // no despawn for the unconfirmed handle
-			Assert.DoesNotContain(2u, a.Known); // but it's dropped from Known
+			Assert.DoesNotContain(2u, a.Knowledge.Known); // but it's dropped from Known
 		}
 
 		private static (WorldEvents events, Zone zone) MoveTo(Zone zone, WorldEntity mover, float x, float z)
@@ -240,7 +240,7 @@ namespace Faolan.Tests
 
 			Assert.Equal([1u, 2u], spawn.Select(o => o.Handle).Order().ToArray());
 			Assert.Empty(despawn);
-			Assert.Equal([1u, 2u], p.KnownObjects.Order().ToArray());
+			Assert.Equal([1u, 2u], p.Knowledge.KnownObjects.Order().ToArray());
 		}
 
 		[Fact]
@@ -266,13 +266,13 @@ namespace Faolan.Tests
 			var p = Player(9, 0, 0);
 
 			InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
-			Assert.Contains(7u, p.KnownObjects);
+			Assert.Contains(7u, p.Knowledge.KnownObjects);
 
 			p.Position = new Vector3(500, 0, 0);
 			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
 			Assert.Empty(spawn);
 			Assert.Equal([7u], despawn);
-			Assert.DoesNotContain(7u, p.KnownObjects); // NOT sticky - the opposite of NPC Known (#245)
+			Assert.DoesNotContain(7u, p.Knowledge.KnownObjects); // NOT sticky - the opposite of NPC Known (#245)
 
 			p.Position = new Vector3(0, 0, 0);
 			var (back, _) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);

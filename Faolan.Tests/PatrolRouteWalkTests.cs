@@ -26,8 +26,8 @@ namespace Faolan.Tests
 			for (var i = 0; i < 600; i++)
 				world.Tick(0.1);
 
-			Assert.True(npc.RouteLoops);
-			Assert.False(npc.RouteBackwards); // a closed route never reverses - it wraps
+			Assert.True(npc.Route.RouteLoops);
+			Assert.False(npc.Route.RouteBackwards); // a closed route never reverses - it wraps
 			Assert.True(OnPolyline(square, npc.Position) <= 1f);
 		}
 
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 			{
 				world.Tick(0.1);
 				Assert.True(OnPolyline(street, npc.Position) <= 1f, $"left the route at {npc.Position}");
-				turnedRound |= npc.RouteBackwards;
+				turnedRound |= npc.Route.RouteBackwards;
 				if (Vector3.Distance(npc.Position, street[^1]) < 1f)
 					reachedFarEnd = true;
 				else if (reachedFarEnd && Vector3.Distance(npc.Position, street[0]) < 1f)
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < 1100; i++) // 110s: 220u at RouteWalkSpeed is 100s of walking
 			{
 				world.Tick(0.1);
-				Assert.False(npc.Returning, $"leashed off its own route at {npc.Position}");
+				Assert.False(npc.Route.Returning, $"leashed off its own route at {npc.Position}");
 				reached = MathF.Max(reached, npc.Position.Z);
 			}
 
@@ -90,11 +90,11 @@ namespace Faolan.Tests
 			var (_, npc) = Walker(street);
 
 			npc.Position = new Vector3(3, 0, 78); // where a chase ended: right beside the LAST waypoint
-			npc.RouteInterrupted = true;
-			npc.RejoinRouteAtNearest();
+			npc.Route.RouteInterrupted = true;
+			npc.Route.RejoinRouteAtNearest(npc.Position);
 
-			Assert.Equal(2, npc.RouteIndex);
-			Assert.False(npc.RouteInterrupted);
+			Assert.Equal(2, npc.Route.RouteIndex);
+			Assert.False(npc.Route.RouteInterrupted);
 		}
 
 		[Fact]
@@ -180,10 +180,10 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(10, 2000, route[0], Quaternion.Identity, "Tarantia Guard", EntityVitals.FromMax(100, 0, 100));
 			world.Place(npc, 2000, route[0], Quaternion.Identity);
-			npc.PatrolWaypoints = route;
-			npc.WalksRoute = true;
-			npc.RouteLoops = route.Length > 2 && Vector3.Distance(route[0], route[^1]) <= 5f;
-			npc.RejoinRouteAtNearest();
+			npc.Route.PatrolWaypoints = route;
+			npc.Route.WalksRoute = true;
+			npc.Route.RouteLoops = route.Length > 2 && Vector3.Distance(route[0], route[^1]) <= 5f;
+			npc.Route.RejoinRouteAtNearest(npc.Position);
 			return (world, npc);
 		}
 	}

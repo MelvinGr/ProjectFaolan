@@ -76,7 +76,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < 200; i++)
 			{
 				var npc = Idle((uint)(i + 1));
-				npc.AmbientAnimations = [new AmbientAnimation(62171, 419, 10)]; // the corpus' median duration, 4.19s
+				npc.Presentation.AmbientAnimations = [new AmbientAnimation(62171, 419, 10)]; // the corpus' median duration, 4.19s
 				zone.Add(npc);
 			}
 
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < 20; i++)
 			{
 				var npc = Idle((uint)(i + 1));
-				npc.AmbientAnimations = [new AmbientAnimation(62171, 200, 10)];
+				npc.Presentation.AmbientAnimations = [new AmbientAnimation(62171, 200, 10)];
 				zone.Add(npc);
 				handles.Add(npc.Handle);
 			}
@@ -140,7 +140,7 @@ namespace Faolan.Tests
 						moveTasks++;
 				}
 
-				reached = MathF.Max(reached, Vector3.Distance(walker.SpawnPosition, walker.Position));
+				reached = MathF.Max(reached, Vector3.Distance(walker.Route.SpawnPosition, walker.Position));
 			}
 
 			return (moveTasks, seconds, reached);
@@ -163,10 +163,10 @@ namespace Faolan.Tests
 			var npc = WorldEntity.ForNpc(handle, 2000, route[0], Quaternion.Identity, "Tarantia Guard", EntityVitals.FromMax(100, 0, 100));
 			npc.Hostile = false;
 			world.Place(npc, 2000, route[0], Quaternion.Identity);
-			npc.PatrolWaypoints = route;
-			npc.WalksRoute = true;
-			npc.RouteLoops = route.Length > 2 && Vector3.Distance(route[0], route[^1]) <= 5f;
-			npc.RejoinRouteAtNearest();
+			npc.Route.PatrolWaypoints = route;
+			npc.Route.WalksRoute = true;
+			npc.Route.RouteLoops = route.Length > 2 && Vector3.Distance(route[0], route[^1]) <= 5f;
+			npc.Route.RejoinRouteAtNearest(npc.Position);
 			return (world, npc);
 		}
 	}

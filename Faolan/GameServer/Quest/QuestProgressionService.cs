@@ -758,7 +758,7 @@ namespace Faolan.GameServer.Quest
 		// logic, and both halves it needs - LoadReachGoals and SolveGoal - are this service's own.
 		public async Task CheckReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
 		{
-			var pending = player.PendingReachGoals ??= await LoadReachGoals(client.Session.Character.Id);
+			var pending = player.Knowledge.PendingReachGoals ??= await LoadReachGoals(client.Session.Character.Id);
 			if (pending.Count == 0)
 				return;
 
@@ -769,7 +769,7 @@ namespace Faolan.GameServer.Quest
 			var reached = pending.Where(t => t.MapId == player.MapId && ReachedTarget(t, position)).ToList();
 			foreach (var target in reached)
 			{
-				player.PendingReachGoals?.Remove(target);
+				player.Knowledge.PendingReachGoals?.Remove(target);
 				_logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
 				await SolveGoal(client, target.GoalId);
 			}

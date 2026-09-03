@@ -195,7 +195,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var mute = WorldEntity.ForNpc(1, 4010, Vector3.Zero, Quaternion.Identity, "Bystander", EntityVitals.FromMax(100, 0, 100));
-			mute.ChatterLines = [Bark("conversation1")];
+			mute.Presentation.ChatterLines = [Bark("conversation1")];
 			world.Place(mute, 4010, Vector3.Zero, Quaternion.Identity);
 			Place(world, 2, true, 0, 5);
 
@@ -213,7 +213,7 @@ namespace Faolan.Tests
 		private static WorldEntity Crier(WorldState world)
 		{
 			var crier = WorldEntity.ForNpc(1, 4010, Vector3.Zero, Quaternion.Identity, "Tatianus the Crier", EntityVitals.FromMax(100, 0, 100));
-			crier.GreetingLines = [Bark("sendtell")];
+			crier.Presentation.GreetingLines = [Bark("sendtell")];
 			world.Place(crier, 4010, Vector3.Zero, Quaternion.Identity);
 			return crier;
 		}

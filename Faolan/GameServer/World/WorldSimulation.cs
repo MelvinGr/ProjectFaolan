@@ -81,7 +81,7 @@ namespace Faolan.GameServer.World
 		// NOT changed here because a continuum is not a timer's signature - a real interval piles up at one value,
 		// which is exactly what distinguishes the two clusters above - and a nest spawning ADDS during a fight
 		// produces the same shape. Recording the tension rather than acting on it.
-		private const double AmbientMaintainIntervalSeconds = WorldEntity.DefaultRespawnDelaySeconds;
+		private const double AmbientMaintainIntervalSeconds = NpcRoute.DefaultRespawnDelaySeconds;
 
 		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and
 		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 60 u range, so a second's granularity is two
@@ -687,7 +687,7 @@ namespace Faolan.GameServer.World
 									// matters - but it is the tell that the encounter is armed, and it is a real captured
 									// line (its `event(2)` channel is what marks these apart from ambient chatter).
 									var lure = effect.Entity;
-									if (lure.EncounterLines is not { Length: > 0 } barkLines)
+									if (lure.Presentation.EncounterLines is not { Length: > 0 } barkLines)
 										break;
 
 									var heard = new HashSet<uint>();
@@ -724,7 +724,7 @@ namespace Faolan.GameServer.World
 									// one: the Nobleman and one Noblewoman both bark `RenownBystanderLovers`. That is the
 									// client's grouping, not ours.)
 									var npc = effect.Entity;
-									if (npc.ChatterLines is not { Length: > 0 } lines)
+									if (npc.Presentation.ChatterLines is not { Length: > 0 } lines)
 										break;
 
 									var recipients = new HashSet<uint>();
@@ -742,7 +742,7 @@ namespace Faolan.GameServer.World
 									// than everyone in earshot. That is also what makes the addressee slot coherent: the line
 									// is "…, {DetectedChar.name}!", and there is exactly one name it can carry.
 									var greeter = effect.Entity;
-									if (effect.Target is not { } greeted || greeter.GreetingLines is not { Length: > 0 } greetings)
+									if (effect.Target is not { } greeted || greeter.Presentation.GreetingLines is not { Length: > 0 } greetings)
 										break;
 
 									await _agents.NpcBark(greeter.Handle, greetings[Random.Shared.Next(greetings.Length)], [greeted.Handle]);

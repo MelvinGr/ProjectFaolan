@@ -19,7 +19,7 @@ namespace Faolan.GameServer.World
 		NpcCast, // a CASTER NPC (Entity) casts a spell at a player (Target); the listener sends ApplySpell + applies damage (#232)
 		NpcPatrol, // a patrolling NPC (Entity) should (re-)issue its patrol route so it keeps walking its loop (#266)
 		NpcFollow, // a companion NPC (Entity) stepped toward the PLAYER it follows (Target); broadcast its MoveTask, ungated (not combat) (#262)
-		NpcAmbientAnimation, // the NPC (Entity) performs one of its creature's ambient idle animations (Entity.AmbientAnimationPicked): a BehaviorId.Emote record (#766)
+		NpcAmbientAnimation, // the NPC (Entity) performs one of its creature's ambient idle animations (Entity.Presentation.AmbientAnimationPicked): a BehaviorId.Emote record (#766)
 		TimedDespawn, // a summon with a lifetime (Entity) ran out of time; fade it for nearby players + remove it (the Frozen Hatred fatality pet, #140)
 		EncounterBark, // a scripted-encounter LURE (Entity) noticed an approaching player (Target) at its bark radius - cry for help once (#502)
 		EncounterTrigger, // a player (Target) closed to the LURE's (Entity) trigger radius - swap the lure for its boss (#502)

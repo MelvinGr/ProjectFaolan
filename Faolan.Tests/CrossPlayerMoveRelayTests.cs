@@ -49,8 +49,8 @@ namespace Faolan.Tests
 			var jumper = Place(sim, JumperHandle, parsed.Position);
 			var viewer = Place(sim, 0x01317CF8, parsed.Position); // the second client, standing next to them
 			var farAway = Place(sim, 0x0131830B, parsed.Position + new Vector3(10_000f, 0f, 0f));
-			sim.PlayerWorldEntity(viewer)!.Known.Add(JumperHandle);
-			sim.PlayerWorldEntity(jumper)!.Known.Add(0x01317CF8); // already sees the viewer, so this move spawns nobody
+			sim.PlayerWorldEntity(viewer)!.Knowledge.Known.Add(JumperHandle);
+			sim.PlayerWorldEntity(jumper)!.Knowledge.Known.Add(0x01317CF8); // already sees the viewer, so this move spawns nobody
 
 			// What the move handler hands us: the carrier minus its [u32 len] prefix, with the env byte cleared.
 			var moveBody = record[4..];

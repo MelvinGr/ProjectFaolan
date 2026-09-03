@@ -256,11 +256,11 @@ namespace Faolan.GameServer.Gm
 			}
 
 			var deleted = await _database.DeleteNpcSpawns(entity.MapId, entity.Name, entity.Hostile
-				? entity.SpawnPosition.X
+				? entity.Route.SpawnPosition.X
 				: null, entity.Hostile
-				? entity.SpawnPosition.Y
+				? entity.Route.SpawnPosition.Y
 				: null, entity.Hostile
-				? entity.SpawnPosition.Z
+				? entity.Route.SpawnPosition.Z
 				: null, 10f);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
@@ -1107,7 +1107,7 @@ namespace Faolan.GameServer.Gm
 			}
 
 			await _database.SetNpcSpawnAreaCreature(area.Id, npc.NpcTemplateId);
-			var linked = await _database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.SpawnPosition.X, npc.SpawnPosition.Z);
+			var linked = await _database.LinkNpcSpawnsToArea(area.Id, npc.NpcTemplateId, npc.Route.SpawnPosition.X, npc.Route.SpawnPosition.Z);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
 		}

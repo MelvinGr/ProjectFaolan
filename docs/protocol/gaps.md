@@ -151,7 +151,7 @@ consumed to EOF with no respawn field.
 **Nor is it a harvesting problem — the corpus is exhausted.** Of 251 kills that matched nothing, 151 never see
 that creature again in the dump at all and 89 more only ever see a *re-streamed* handle (an entity the client
 already knew, which is not a respawn); loosening the anchor radius would add ten candidates, all 50–300 u from the
-spawn point. So `NpcTemplate` has no respawn column and `WorldEntity.DefaultRespawnDelaySeconds` gives every
+spawn point. So `NpcTemplate` has no respawn column and `NpcRoute.DefaultRespawnDelaySeconds` gives every
 creature the best-attested 150 s.
 
 ⭐ **One capture decides it**: kill a **Panther in City of Tortage** — a beast on the humanoid's playfield — and

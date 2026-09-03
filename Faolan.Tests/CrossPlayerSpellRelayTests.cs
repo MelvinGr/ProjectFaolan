@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			var viewer = Place(sim, 0x01316e71); // the observer in the capture - has built the caster
 			var stranger = Place(sim, 0x01316d99); // in the zone but has NOT built the caster's handle
 
-			sim.PlayerWorldEntity(viewer)!.Known.Add(CasterHandle);
+			sim.PlayerWorldEntity(viewer)!.Knowledge.Known.Add(CasterHandle);
 
 			var body = Convert.FromHexString(CapturedSelfBuffBody);
 			await broadcaster.BroadcastSpellToViewers(caster, body);

@@ -462,7 +462,7 @@ namespace Faolan.GameServer.Session
 			var characterId = body.ReadUInt32();
 
 			var viewer = _simulation.PlayerWorldEntity(client);
-			viewer?.Confirmed.Add(requestId);
+			viewer?.Knowledge.Confirmed.Add(requestId);
 
 			if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
 				await SendSpawnCheckResponse(client, requestId);

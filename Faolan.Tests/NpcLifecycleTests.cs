@@ -126,7 +126,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(2040);
 			var npc = DeadNpc();
-			npc.NoRespawn = true;
+			npc.Route.NoRespawn = true;
 			zone.Add(npc);
 
 			Assert.Equal(WorldTickEffectType.NpcCorpseLootDropped, Assert.Single(world.Tick(0.1)).Type);
@@ -175,7 +175,7 @@ namespace Faolan.Tests
 		private static WorldEntity DeadNpc(double respawnDelay = 10.0)
 		{
 			var npc = WorldEntity.ForNpc(0x1234, 2040, new Vector3(10, 0, 20), Quaternion.Identity, "Mob", EntityVitals.FromMax(80, 0, 80));
-			npc.RespawnDelaySeconds = respawnDelay;
+			npc.Route.RespawnDelaySeconds = respawnDelay;
 			npc.Vitals.ApplyHealthDelta(-80); // killing blow
 			Assert.True(npc.IsDead);
 			npc.MarkDead();

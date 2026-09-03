@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			Assert.Single(records);
 			Assert.Same(npc, Assert.Single(npcs));
 			// and it is SEEDED, which is what stops the interest layer re-spawning or culling it afterwards (#245).
-			Assert.Contains(NpcHandle, player.Known);
+			Assert.Contains(NpcHandle, player.Knowledge.Known);
 			// the handle -> name/template routing the click path reads is registered at the same time
 			Assert.Equal(npc.Name, client.Session.SpawnedNpcNamesByHandle[NpcHandle]);
 		}
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 
 			Assert.Empty(records);
 			Assert.Empty(npcs);
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		private async Task<(WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc)> Harness()

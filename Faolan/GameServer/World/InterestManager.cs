@@ -69,13 +69,13 @@ namespace Faolan.GameServer.World
 					continue;
 
 				inRange.Add(obj.Handle);
-				if (player.KnownObjects.Add(obj.Handle))
+				if (player.Knowledge.KnownObjects.Add(obj.Handle))
 					spawn.Add(obj);
 			}
 
-			var despawn = player.KnownObjects.Where(h => !inRange.Contains(h)).ToList();
+			var despawn = player.Knowledge.KnownObjects.Where(h => !inRange.Contains(h)).ToList();
 			foreach (var handle in despawn)
-				player.KnownObjects.Remove(handle);
+				player.Knowledge.KnownObjects.Remove(handle);
 
 			return (spawn, despawn);
 		}
@@ -115,7 +115,7 @@ namespace Faolan.GameServer.World
 					// otherwise. `inRange` drives the prune below, so adding the handle without adding it to Known is
 					// exactly "keep what is rendered, spawn nothing new".
 					var beyondRange = Vector3.Distance(mover.Position, other.Position) > range;
-					if (beyondRange && !mover.Known.Contains(other.Handle))
+					if (beyondRange && !mover.Knowledge.Known.Contains(other.Handle))
 						continue;
 
 					if (other.IsLoot)
@@ -129,7 +129,7 @@ namespace Faolan.GameServer.World
 						// NOT know: interest would spawn it ALIVE at its death spot and that re-add to Known would gate out the
 						// real respawn's relocate-to-spawn (#246). The corpse's quit removes the handle from Known, so an
 						// awaiting-respawn NPC (past its corpse sequence) is no longer in Known and is correctly skipped here.
-						if (mover.Known.Contains(other.Handle))
+						if (mover.Knowledge.Known.Contains(other.Handle))
 							inRange.Add(other.Handle);
 						continue;
 					}
@@ -138,11 +138,11 @@ namespace Faolan.GameServer.World
 						continue; // #261: a quest-gated NPC the mover doesn't yet qualify for - treat as not in range
 
 					inRange.Add(other.Handle);
-					if (mover.Known.Add(other.Handle))
+					if (mover.Knowledge.Known.Add(other.Handle))
 						events.Add(new InterestEvent(mover, other, InterestEventType.Spawn));
 				}
 
-				foreach (var knownHandle in mover.Known.ToArray())
+				foreach (var knownHandle in mover.Knowledge.Known.ToArray())
 				{
 					if (inRange.Contains(knownHandle))
 						continue;
@@ -154,13 +154,13 @@ namespace Faolan.GameServer.World
 					if (!includeNonPlayers && zone.TryGet(knownHandle, out var known) && !known.IsPlayer)
 						continue;
 
-					mover.Known.Remove(knownHandle);
+					mover.Knowledge.Known.Remove(knownHandle);
 					// #245: only despawn what the client actually CONFIRMED constructing (polled via 0x2020). A
 					// still-loading client churns through CharDCMove position updates while settling; an entity spawned
 					// at the entry point that briefly leaves range here would otherwise get an n3ToClientQuit for a handle
 					// it hasn't built yet -> pcDynel-NULL loader crash. Unconfirmed handles are dropped from Known
 					// silently (no despawn); if the client later renders + re-ranges them, normal flow re-spawns them.
-					if (mover.Confirmed.Remove(knownHandle) && zone.TryGet(knownHandle, out var gone))
+					if (mover.Knowledge.Confirmed.Remove(knownHandle) && zone.TryGet(knownHandle, out var gone))
 						events.Add(new InterestEvent(mover, gone, InterestEventType.Despawn));
 				}
 			}
@@ -178,7 +178,7 @@ namespace Faolan.GameServer.World
 				// clears the handle to force a fresh spawn, which would otherwise make every entering mover look
 				// unknown here and lose its band.
 				var distance = Vector3.Distance(viewer.Position, mover.Position);
-				var withinBand = distance <= range || (distance <= keepRange && viewer.Known.Contains(mover.Handle));
+				var withinBand = distance <= range || (distance <= keepRange && viewer.Knowledge.Known.Contains(mover.Handle));
 
 				if (mover.IsVisibleTo(viewer) && withinBand)
 				{
@@ -186,15 +186,15 @@ namespace Faolan.GameServer.World
 					// forwarded as a Move the null-move entry dispatch would drop); the viewer re-polls the fresh spawn.
 					if (isEntry)
 					{
-						viewer.Known.Remove(mover.Handle);
-						viewer.Confirmed.Remove(mover.Handle);
+						viewer.Knowledge.Known.Remove(mover.Handle);
+						viewer.Knowledge.Confirmed.Remove(mover.Handle);
 					}
 
-					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
+					events.Add(new InterestEvent(viewer, mover, viewer.Knowledge.Known.Add(mover.Handle)
 						? InterestEventType.Spawn
 						: InterestEventType.Move));
 				}
-				else if (viewer.Known.Remove(mover.Handle) && viewer.Confirmed.Remove(mover.Handle))
+				else if (viewer.Knowledge.Known.Remove(mover.Handle) && viewer.Knowledge.Confirmed.Remove(mover.Handle))
 					// #245: same gate for a viewer losing sight of the mover - never despawn a handle the viewer's client
 					// hasn't confirmed building (a still-loading viewer would crash on the unknown handle).
 					events.Add(new InterestEvent(viewer, mover, InterestEventType.Despawn));
@@ -210,7 +210,7 @@ namespace Faolan.GameServer.World
 			var events = new List<InterestEvent>();
 			foreach (var viewer in zone.Entities)
 			{
-				if (!viewer.IsPlayer || viewer.Handle == leaver.Handle || !viewer.Known.Remove(leaver.Handle))
+				if (!viewer.IsPlayer || viewer.Handle == leaver.Handle || !viewer.Knowledge.Known.Remove(leaver.Handle))
 					continue;
 
 				// #322: the SAME #245 gate ResolveMove applies (:95) - never send an n3ToClientQuit for a handle the
@@ -225,12 +225,12 @@ namespace Faolan.GameServer.World
 				// gate left a PHANTOM standing in the minigame after its owner left. What #322 actually needs is
 				// "the viewer is not mid-load", which is the session's own WorldEntered flag - so a player despawn
 				// goes to every loaded viewer that knew the handle, and the still-loading case stays protected.
-				var confirmed = viewer.Confirmed.Remove(leaver.Handle);
+				var confirmed = viewer.Knowledge.Confirmed.Remove(leaver.Handle);
 				if (confirmed || (leaver.IsPlayer && viewer.Client?.Session.WorldEntered == true))
 					events.Add(new InterestEvent(viewer, leaver, InterestEventType.Despawn));
 			}
 
-			leaver.Known.Clear();
+			leaver.Knowledge.Known.Clear();
 			return events;
 		}
 	}

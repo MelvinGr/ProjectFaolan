@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(stopped, "an NPC arriving home should emit NpcStopped (#190)");
-			Assert.False(npc.Returning);
+			Assert.False(npc.Route.Returning);
 		}
 
 		[Fact]
@@ -170,22 +170,22 @@ namespace Faolan.Tests
 			zone.Add(npc);
 
 			world.Tick(0.5); // no player anywhere: the target is lost, and the clock starts
-			Assert.NotNull(npc.TargetLostAt);
-			Assert.False(npc.Returning, "a mob that just lost its target should hold its ground, not turn for home");
+			Assert.NotNull(npc.Route.TargetLostAt);
+			Assert.False(npc.Route.Returning, "a mob that just lost its target should hold its ground, not turn for home");
 
 			// A player walking back into range inside the delay clears the stamp - one engagement, not two.
 			var player = Player(2, 11, 0);
 			zone.Add(player);
 			world.Tick(0.5);
-			Assert.Null(npc.TargetLostAt);
-			Assert.False(npc.Returning);
+			Assert.Null(npc.Route.TargetLostAt);
+			Assert.False(npc.Route.Returning);
 
 			// Gone again, and this time the delay elapses.
 			zone.Remove(player.Handle);
 			world.Tick(0.5);
-			npc.TargetLostAt = npc.TargetLostAt!.Value.AddSeconds(-WorldState.NpcChaseDeaggroDelaySeconds);
+			npc.Route.TargetLostAt = npc.Route.TargetLostAt!.Value.AddSeconds(-WorldState.NpcChaseDeaggroDelaySeconds);
 			world.Tick(0.5);
-			Assert.True(npc.Returning, "past the deaggro delay the mob should head home");
+			Assert.True(npc.Route.Returning, "past the deaggro delay the mob should head home");
 		}
 
 		[Fact]
@@ -200,11 +200,11 @@ namespace Faolan.Tests
 
 			// First tick past the leash flips it to returning; it then ignores the adjacent player and heads home.
 			world.Tick(0.5);
-			Assert.True(npc.Returning, "NPC should leash after straying past NpcLeashRange");
+			Assert.True(npc.Route.Returning, "NPC should leash after straying past NpcLeashRange");
 
-			for (var i = 0; i < 400 && npc.Returning; i++)
+			for (var i = 0; i < 400 && npc.Route.Returning; i++)
 				world.Tick(0.5);
-			Assert.False(npc.Returning);
+			Assert.False(npc.Route.Returning);
 			Assert.True(npc.Position.X < WorldState.NpcMeleeRange + 0.001f, "NPC returned home, not parked by the player");
 		}
 
@@ -216,7 +216,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			var npc = NpcTemplate(1, 0, 0, hostile: false);
-			npc.AmbientAnimations = [new AmbientAnimation(62171, 200, 10)];
+			npc.Presentation.AmbientAnimations = [new AmbientAnimation(62171, 200, 10)];
 			zone.Add(npc);
 
 			Assert.Single(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcAmbientAnimation && e.Entity == npc);
@@ -484,7 +484,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			var npc = NpcTemplate(1, 0, 0); // homes at the origin
-			npc.RespawnDelaySeconds = 1.0;
+			npc.Route.RespawnDelaySeconds = 1.0;
 			zone.Add(npc);
 
 			// It died well away from its spawn (chased out, killed at range).
@@ -501,8 +501,8 @@ namespace Faolan.Tests
 
 			Assert.True(respawned, "a dead NPC should respawn once its delay elapses");
 			// It reappears at its ORIGINAL spawn point, not where it was killed (#246).
-			Assert.Equal(npc.SpawnPosition, npc.Position);
-			Assert.Equal(npc.SpawnPosition, npc.MoveFrom);
+			Assert.Equal(npc.Route.SpawnPosition, npc.Position);
+			Assert.Equal(npc.Route.SpawnPosition, npc.MoveFrom);
 		}
 
 		// The ambient idle animation (#766) fires on each NPC's own clock, so the "no aggro/attack happened" assertions

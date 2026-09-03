@@ -44,29 +44,10 @@ namespace Faolan.GameServer.World
 		// why this is here and not left on N3ToClientFadeCodec.DefaultFadeSeconds (that default IS the bag's 3.0).
 		public const float CorpseFadeAnimationSeconds = 2.0f;
 
-		// Default time a killed NPC stays dead before the tick respawns it. Capture-measured (`--report corpse-timing`).
-		//
-		// ⭐ **A respawn comes back on a NEW entity handle**, and that is the whole reason this was hard to see. A
-		// handle is stable for as long as an entity LIVES - the same one re-spawns at identical coords across interest
-		// churn - so the natural test, `death(H)` then `spawn(H)`, looks right and finds NOTHING. The revived creature
-		// is a new entity with a new id. The signal is the same CREATURE reappearing AT the dead one's spawn point:
-		//
-		//   Brutal Pirate   149.9  149.9  149.9  150.0  150.2  150.2   (6 kills, 2 captures)  -> 150 s
-		//   Wild Cow        119.5  120.0                               (2 kills, 2 captures)  -> 120 s
-		//   Wild Pig        119.9  (192.9, a respawn the client was out of range for)          -> 120 s
-		//
-		// Six Brutal Pirate observations spanning 0.3 s across two unrelated captures is a timer, not a coincidence.
-		// So the interval is **per creature**, in the 2-2.5 minute range, and this default takes the best-attested
-		// cluster. `NpcTemplate` has no column for it yet - Gitea #855 - so every creature currently gets 150 s.
-		//
-		// ⚠️ Do NOT re-derive this from "the client watched for N seconds and nothing came back". That bound cannot
-		// tell "no respawn" from "the client was out of range when it happened", and it is wrong by a factor of five
-		// here: the same capture that shows Brutal Pirate 0xaa88 respawning at 150.0 s also has a 334 s window in
-		// which it "never returned". Only observed intervals count.
-		public const double DefaultRespawnDelaySeconds = 150.0;
-
 		public const uint DispositionFriendly = 0;
+
 		public const uint DispositionHostile = 1;
+
 		public const uint DispositionNeutral = 2;
 
 		// The monotonic per-entity counter carried in field 3 of the continuous idle heartbeat (short-form
@@ -88,21 +69,6 @@ namespace Faolan.GameServer.World
 
 		// Remaining time (seconds) until a loot bag expires.
 		private double _expiryRemaining;
-
-		// Seconds until the patrol route is re-issued (retail re-paths a one-shot patrol so it keeps looping). Set to
-		// the cycle length (path traversal time + dwell) when the route is issued; the tick counts it down.
-		private double _patrolReissueRemaining;
-
-		// #703: seconds a route walker stands still at the end of a beat before turning round; counts down instead of
-		// stepping. Only the ENDS pause - a patrol that stopped at every waypoint would twitch its way down the street.
-		private double _routeDwellRemaining;
-
-		// #766: seconds until this NPC's next ambient idle animation - the previous animation's own length plus the
-		// pause it then stands for. Zero on a fresh entity, so the first one is due immediately.
-		private double _ambientAnimationRemaining;
-
-		// Remaining time (seconds) until respawn while dead; meaningless when alive.
-		private double _respawnRemaining;
 
 		// The MapArea.AreaNameId the player is currently standing in, or 0 for none (#348). Live world state, never
 		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
@@ -202,39 +168,6 @@ namespace Faolan.GameServer.World
 		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
 		// are the area's points, so it roams the group's area.
 		public uint? SpawnAreaId { get; set; }
-
-		// #502 scripted encounter. On a LURE: the boss type it swaps into, plus the two measured radii. On the BOSS:
-		// EncounterLureTemplateId names the lure to restore once the boss is gone. An entity carries one side or the
-		// other, never both - the swap replaces the entity rather than re-templating it, which is what the capture
-		// shows (different handles in the same second).
-		public uint? EncounterBossTemplateId { get; set; }
-		public float EncounterBarkRadius { get; set; }
-		public float EncounterTriggerRadius { get; set; }
-
-		// Set once the lure has cried for help, so the bark fires on the APPROACH rather than every tick the player
-		// stands inside the radius.
-		public bool EncounterBarked { get; set; }
-
-		// Stamp this entity as the LURE of `encounter` (a no-op when it has none, which is the common case - most NPCs
-		// are not part of a scripted encounter). Both the zone load and the lure RESTORE arm an entity the same way,
-		// which is why it lives on the entity rather than on either caller.
-		public void ArmEncounter(NpcEncounter? encounter)
-		{
-			if (encounter == null)
-				return;
-
-			EncounterBossTemplateId = encounter.BossNpcTemplateId;
-			EncounterBarkRadius = encounter.BarkRadius;
-			EncounterTriggerRadius = encounter.TriggerRadius;
-			EncounterBarked = false;
-		}
-
-		// On the boss: the lure type to put back, and where. Position comes from the boss itself - it spawned on the
-		// lure's exact spot, so restoring means spawning the lure type where the boss stood.
-		public uint? EncounterLureTemplateId { get; set; }
-
-		// True once the reset has been emitted, so a boss corpse cannot restore its lure twice.
-		public bool EncounterResetDone { get; set; }
 
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
@@ -466,67 +399,8 @@ namespace Faolan.GameServer.World
 			return announced;
 		}
 
-		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
-		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
-		public HashSet<uint> ActiveQuestIds { get; } = [];
-
-		// For a PLAYER: the quest ids the player has COMPLETED. Drives "hide once done" NPC gating (#262) - e.g. Casilda
-		// is gone from the beach once her escort quest is completed. Loaded alongside ActiveQuestIds.
-		public HashSet<uint> CompletedQuestIds { get; } = [];
-
-		// For a player: the handles the client has actually CONFIRMED constructing - i.e. polled via 0x2020 (the poll's
-		// requestId is the entity handle; the server answers with a 0x2008 SpawnCheck that renders it). Known means "spawn
-		// sent"; Confirmed means "client built it". A despawn (n3ToClientQuit) for a Known-but-not-Confirmed handle hits a
-		// pcDynel-NULL loader crash on a still-loading client (#245), so interest only despawns Confirmed handles.
-		public HashSet<uint> Confirmed { get; } = [];
-
-		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs
-		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
-		public HashSet<uint> Known { get; } = [];
-
-		// The STATIC world objects (props/doors/vines/destructibles) this player currently has rendered - the interest
-		// known-set for Zone.WorldObjects, keyed by the object's handle within this playfield (#424).
-		//
-		// Deliberately separate from `Known` above, because the rule is the OPPOSITE. `Known` is sticky: an NPC sent at
-		// entry is never culled mid-load (#245), and Known means "was ever sent". World objects are culled - retail
-		// despawns them on range exit and re-sends the full spawn record verbatim on re-entry (measured across the login
-		// captures: 565 of 648 repeated sends are byte-identical, the rest differ only in the optional kdtree field, and
-		// 212 n3ToClientQuit records carry world-object handles with their own class). Sharing one set would force one
-		// of the two rules onto both.
-		//
-		// Handles are per-PLAYFIELD, not global - the same small handle names a different object on another map - so
-		// this set is cleared on every map change along with the rest of the entity's per-zone state.
-		public HashSet<uint> KnownObjects { get; } = [];
-
 		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
 		public INetworkClient Client { get; }
-
-		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
-		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
-		// client walks the route), so the server just issues the captured route once per spawn/respawn.
-		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
-
-		// #703: a HARVESTED route is an ORDERED polyline - retail's own street-following path, sampled densely (the
-		// median gap between consecutive waypoints is 5.8u across the 1,318 stored routes, p90 12.8u). It must be
-		// walked waypoint BY waypoint, in order: the #266 wander instead picks a RANDOM anchor off the list and draws
-		// one straight line to it, and in a city that line goes through whatever stands between - which is how Old
-		// Tarantia's guards ended up walking through buildings. True only for a captured route; an ambient POOL's
-		// points (#363) are scatter anchors within an area with no order to them, and keep the random drift.
-		public bool WalksRoute { get; set; }
-
-		// Whether the route closes on itself (last waypoint back at the first): a closed route is walked round and
-		// round, an open one is walked back DOWN again on arrival. Jumping from the last waypoint to the first on an
-		// open route would draw exactly the cross-country straight line this change exists to remove - the two ends of
-		// an Old Tarantia guard's beat are 77u and a block of houses apart.
-		public bool RouteLoops { get; set; }
-
-		// The waypoint the route walk is currently heading for, and which way along the list it is going.
-		public int RouteIndex { get; set; }
-		public bool RouteBackwards { get; set; }
-
-		// Set while a route walker is doing something else (chasing, walking home): its index no longer describes where
-		// it stands, so the walk rejoins at the NEAREST waypoint rather than resuming a leg it has been dragged off.
-		public bool RouteInterrupted { get; set; }
 
 		// For an NPC: the quest ids that gate this NPC's visibility (null/empty = ungated, seen by everyone). A gated
 		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
@@ -538,11 +412,6 @@ namespace Faolan.GameServer.World
 		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
 		public List<NpcSpellCast> Spells { get; } = [];
 
-		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
-		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
-		// in-memory distance test, no DB hit; entries are removed as they're reached. Empty list = nothing to watch.
-		public List<ReachGoalTarget> PendingReachGoals { get; set; } = null!;
-
 		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
 		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
 		public List<uint> LootItems { get; } = [];
@@ -551,8 +420,8 @@ namespace Faolan.GameServer.World
 		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
 		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
 		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
+
 		public Quaternion Rotation { get; set; }
-		public Quaternion SpawnRotation { get; set; }
 
 		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
 		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next
@@ -564,15 +433,14 @@ namespace Faolan.GameServer.World
 		// Position has travelled a retail-sized distance (MoveBroadcastSegment) from this anchor, at which point the anchor
 		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
 		public Vector3 MoveOrigin { get; set; }
-		public Vector3 Position { get; set; }
 
-		// Where the entity respawns (its original spawn point) - set for NPCs by ForNpc.
-		public Vector3 SpawnPosition { get; set; }
+		public Vector3 Position { get; set; }
 
 		// #400: a PLAYER's currently-drawn weapon set (Primary = equip slots 6/8, Secondary = 20/21). Toggled by the
 		// SwitchWeaponsButton action and seeded from Character.ActiveWeaponSet on world entry; the swap is relayed to
 		// viewers via the BCC behavior channel. Unused for NPCs (they carry a fixed loadout).
 		public WeaponSet ActiveWeaponSet { get; set; }
+
 		public bool Following => FollowTargetHandle != null;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
@@ -650,6 +518,7 @@ namespace Faolan.GameServer.World
 		// client owns stat 0xA5, moves a guard on the shield keybinds and uploads the new spread as a c2s
 		// CombatShieldIIR, which HandlePlayerShieldRose stores here. So the tick never rolls or shifts a player's.
 		public uint ShieldDistribution { get; set; }
+
 		public bool Invisible { get; set; }
 
 		public bool IsCaster => Spells.Count > 0;
@@ -698,6 +567,7 @@ namespace Faolan.GameServer.World
 		public uint NextBehaviorCommandId() => ++_behaviorCommandId;
 
 		private uint _behaviorCommandId = 2;
+
 		private uint _behaviorPhase = 2;
 
 		// The mount's RIDE STAT - the value the Mount stat carries on the wire, not the DB id - so a viewer arriving
@@ -745,56 +615,16 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// A summoned/test NPC that should NOT revive when killed: once dead it lingers as a lootable
-		// corpse for RespawnDelaySeconds, then the tick fades + removes it instead of respawning it.
-		public bool NoRespawn { get; set; }
-
 		// When a TIMED summon should disappear, or null for anything that lives until killed/dismissed. The Frozen
 		// Hatred fatality pet is the case it exists for (#140): it is granted for 60s, each further fatality pushes the
 		// moment out by another 60s, and the total is capped 5 minutes ahead. Checked by the world tick (TimedDespawn),
 		// so one field carries both the lifetime and its extension - there is no separate timer to keep in sync.
 		public DateTimeOffset? DespawnAt { get; set; }
 
-		// #266 retail wander: a beach NPC with captured anchor points drifts between them - capture-measured as a SINGLE
-		// short 2-point MoveTask to a nearby anchor every ~25-60s (NOT a continuous route, NOT client-driven). The server
-		// owns the position (every client sees the same spot; a chase begins from where it actually is, not its spawn).
-		public bool Patrols => PatrolWaypoints.Count > 0;
-
 		// /falldamage on|off (#914). Retail's help states the default explicitly - "it is default on all players" - and
 		// it is a PER-CHARACTER toggle there, not a server switch, so it lives on the entity and resets with the world
 		// entry like any other live state.
 		public bool FallDamageEnabled { get; set; } = true;
-
-		// True while a leashed NPC is walking back to its spawn point - it ignores re-aggro until home (so a player
-		// camping the leash edge can't ping-pong it).
-		public bool Returning { get; set; }
-
-		// #804: when this NPC last found itself with NO target while away from home, or null if it has one. The tick
-		// only turns it for home once WorldState.NpcChaseDeaggroDelaySeconds have passed since - retail's
-		// `AIDefaults_ChaseDeaggroDelayTime`. Cleared on every tick that resolves a target, so it measures an
-		// uninterrupted absence rather than a total.
-		public DateTimeOffset? TargetLostAt { get; set; }
-
-		// The captured MoveTask record re-addressed to THIS entity. For a route walker this IS what the client is sent
-		// (#716) - the real multi-waypoint patrol form, issued once per cycle so the CLIENT walks the beat, rather than
-		// the 2-point chase form re-sent every ~6u.
-		public byte[] PatrolBody { get; set; } = null!;
-
-		// #714: seconds still to wait before a freshly-streamed-in viewer is told the beat. Retail does NOT send the
-		// patrol with the spawn - over 2,519 captured NPCs whose spawn AND first patrol were both seen, the gap runs
-		// p10 1.54s / p50 4.02s / p90 32.05s, and only 3% arrive within 0.1s of the spawn. We sent it in the same
-		// instant, which handed the client a TIMED walk for an entity it had not yet settled; it reconciled by dashing,
-		// which is the catch-up run seen on a fresh spawn's first laps. Counts down in the tick; 0 = nothing pending.
-		public double RoutePatrolDelayRemaining { get; set; }
-
-		// #716: the client needs (re-)telling what walk it is on - at the start of a lap, and after anything took the
-		// NPC off its beat (a chase, a leash home). Set true at spawn so the first lap is issued.
-		public bool RouteReissueDue { get; set; } = true;
-
-		// #714: the speed this NPC walks its beat at (u/s). Both the MODEL and the patrol body we hand the client use
-		// it, so the server's idea of where the NPC is tracks what is rendered - the two drifting apart is what put a
-		// killed patroller's corpse in the wrong place. Capture-measured; see WorldState.RouteWalkSpeed.
-		public float RouteSpeed { get; set; } = WorldState.RouteWalkSpeed;
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
 		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns
@@ -811,10 +641,6 @@ namespace Faolan.GameServer.World
 		// how a viewer arriving after someone mounted saw them on foot, and would equally have missed an equipment or
 		// level change.
 		public byte[] SpawnBody { get; set; } = null!;
-		public double PatrolCycleSeconds { get; set; }
-
-		// How long this entity stays dead before the tick respawns it.
-		public double RespawnDelaySeconds { get; set; } = DefaultRespawnDelaySeconds;
 
 		// For a LOOT BAG dropped by a kill: the NAME of the NPC whose corpse it is (e.g. "Scavenger Tuut"). The bag is a
 		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
@@ -826,6 +652,7 @@ namespace Faolan.GameServer.World
 		// rather than a display string (#521) - `Saddur` is two different templates. 0 for a standalone bag, or one
 		// dropped by something with no template behind it, which reads as "type unknown" and falls back to the name.
 		public uint LootSourceTemplateId { get; set; }
+
 		public string Name { get; }
 
 		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a
@@ -833,39 +660,6 @@ namespace Faolan.GameServer.World
 		// nameplate from its template_id LDB name and IGNORES the free spawn-body `Name` string, so the label can only
 		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
 		public string OverheadNameOverride { get; set; } = null!;
-
-		// AMBIENT bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
-		// zone load. Null/empty = this NPC has no ambient chatter group and stays silent.
-		//
-		// ⚠️ This is only the `conversation1`/`conversation2` tier. A bark's CUE is a property of the bark, not of the
-		// world tick (#694): the crier's `sendtell` greeting and the Damsel's `event` cry live in GreetingLines and
-		// EncounterLines respectively, because putting all three on one clock made the crier greet an empty street and
-		// double-fired the Damsel alongside her own encounter trigger. `NpcChatterBarks.TriggerOf` is the split.
-		public NpcChatterBark[] ChatterLines { get; set; } = null!;
-
-		// DETECTION barks (`sendtell`): said once TO a player the NPC notices arriving, not on a clock (#694). The
-		// channel names the delivery - a tell has one recipient - and the line's `DetectedChar.name` slot names them.
-		public NpcChatterBark[] GreetingLines { get; set; } = null!;
-
-		// The AMBIENT IDLE ANIMATIONS this NPC's creature performs while standing about (#766), from
-		// NpcTemplate.AmbientAnimations at zone load - weighted, because a creature's common idle is common. Empty =
-		// no capture ever caught this creature idling, so it stands still rather than performing a guessed animation.
-		public IReadOnlyList<AmbientAnimation> AmbientAnimations { get; set; } = [];
-
-		// The animation the tick most recently PICKED, for the broadcaster to send. Set by the tick alongside the
-		// NpcAmbientAnimation effect, so the choice (and its stated duration) is made once rather than re-rolled on the
-		// wire side, where the two would disagree about what the client was told.
-		public AmbientAnimation? AmbientAnimationPicked { get; set; }
-
-		// ENCOUNTER-SCRIPT barks (`event`): fired by the scripted encounter's own proximity trigger (#502), never by
-		// the ambient tick. Kept apart from ChatterLines so the lure's cry for help cannot also come out on the clock.
-		public NpcChatterBark[] EncounterLines { get; set; } = null!;
-
-		// The players this NPC has already greeted, so a detection bark is said once per arrival rather than every
-		// tick the player stands in range (#694). A player is forgotten again once they leave `forgetRange` - see
-		// WorldState.GreetingForgetRange - so walking away and coming back is a fresh arrival, which is what a
-		// greeting means, while standing on the boundary cannot re-trigger it.
-		public HashSet<uint> GreetedPlayers { get; } = [];
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the spawning player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
@@ -888,6 +682,7 @@ namespace Faolan.GameServer.World
 		// The player's aggregated Combat Rating from worn gear (#399, generic 0x36B), added as a provisional flat
 		// melee damage bonus (its real hit-rate role needs a hit/miss model). 0 for NPCs / no gear.
 		public uint CombatRating { get; set; }
+
 		public uint CriticalDamageRating { get; set; }
 
 		// Aggregated crit stats from worn gear (#399): Critical Rating drives the melee crit CHANCE, Critical Damage
@@ -917,6 +712,7 @@ namespace Faolan.GameServer.World
 		// The player's aggregated Natural Mana/Stamina Regen from worn gear (display units/sec), summed at world entry
 		// and added onto the base regen tick (WorldSimulation). 0 for NPCs and players with no such gear.
 		public uint NaturalManaRegen { get; set; }
+
 		public uint NaturalStaminaRegen { get; set; }
 
 		// The player's aggregated magical Protection rating from worn gear (#401); mitigates incoming MAGIC damage
@@ -939,6 +735,11 @@ namespace Faolan.GameServer.World
 		// If this entity is a PET, the handle of the owner (the summoner's client instance); null = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
 		public uint? OwnerHandle { get; set; }
+		// The three component shapes (#928 item 10): where an NPC lives and walks, what it shows, what a player knows.
+		public NpcRoute Route { get; } = new();
+		public NpcPresentation Presentation { get; } = new();
+		public PlayerKnowledge Knowledge { get; } = new();
+
 
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{
@@ -959,50 +760,12 @@ namespace Faolan.GameServer.World
 			_attackCooldownRemaining = interval;
 		}
 
-		// Arms the next wander move for a randomized ~25-60s (capture-measured retail cadence: a beach NPC drifts every
-		// 30-80s, the spread keeps a pack from moving in lockstep).
-		public void ArmPatrolCycle()
-		{
-			_patrolReissueRemaining = 25.0 + Random.Shared.NextDouble() * 35.0;
-		}
-
-		// #565: whether the entity has strayed beyond `leash` from its TERRITORY - what the leash check really wants to
-		// know. `homeDistance` is the horizontal distance to its spawn, which is the whole story for a stationary NPC.
-		// For a PATROLLER the route is territory too: a captured route can run hundreds of units, so an anchor past the
-		// leash is a legitimate destination, not a player dragging it. Without this the #266 wander and the leash fight
-		// each other - the wander assigns a far anchor, the next tick reads it as "led too far from spawn" and walks the
-		// NPC straight back off its own route, every cycle. Only a position far from spawn AND from the route itself is a
-		// real stray, so a dragged patroller still leashes.
-		//
-		// #716: "the route" is the POLYLINE, not its vertices. Measuring to the waypoints alone leaves the MIDDLE of a
-		// long leg outside the NPC's own territory - and the walk goes straight down that middle. Over the 1,073 stored
-		// beats that put 28 of them (all map 2070, 22 being the single-leg animal wanders whose one leg runs up to 228u)
-		// permanently in leash-return: the walker sets off, escapes its territory ~40u out, turns round, streams the walk
-		// home as ~6u chase segments, rejoins at the nearest waypoint and starts over - so it never once reached the far
-		// end of its beat, and paid MoveTask traffic for the ping-pong.
-		public bool BeyondLeash(float homeDistance, float leash)
-		{
-			if (homeDistance <= leash)
-				return false; // inside the leash of its spawn: nothing a route could add
-
-			var here = new Vector3(Position.X, 0f, Position.Z); // horizontal, like homeDistance
-			for (var i = 0; i < PatrolWaypoints.Count; i++)
-			{
-				var to = new Vector3(PatrolWaypoints[i].X, 0f, PatrolWaypoints[i].Z);
-				var from = i == 0 ? to : new Vector3(PatrolWaypoints[i - 1].X, 0f, PatrolWaypoints[i - 1].Z);
-				if (DistanceToSegment(from, to, here) <= leash)
-					return false;
-			}
-
-			return true;
-		}
-
 		// Whether `viewer` (a player) may see this entity in interest streaming. Ungated entities are visible to all;
 		// a gated NPC requires the viewer to hold one of its gating quests active.
 		public bool IsVisibleTo(WorldEntity viewer)
 		{
 			// #262: hidden once the viewer has COMPLETED the gating quest (e.g. Casilda after her escort is done).
-			if (HideWhenQuestCompletedId is { } hideQuest && viewer != null && viewer.CompletedQuestIds.Contains(hideQuest))
+			if (HideWhenQuestCompletedId is { } hideQuest && viewer != null && viewer.Knowledge.CompletedQuestIds.Contains(hideQuest))
 				return false;
 
 			if (GateQuestIds == null || GateQuestIds.Count == 0)
@@ -1012,7 +775,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var questId in GateQuestIds)
 			{
-				if (viewer.ActiveQuestIds.Contains(questId))
+				if (viewer.Knowledge.ActiveQuestIds.Contains(questId))
 					return true;
 			}
 
@@ -1024,105 +787,12 @@ namespace Faolan.GameServer.World
 		// timer revives it much later. Idempotent per death.
 		public void MarkDead()
 		{
-			_respawnRemaining = RespawnDelaySeconds;
+			Route.ArmRespawn();
 			_corpseAge = 0;
 			_corpseStage = CorpseStage.None;
 			InCombat = false; // combat ends on death; a respawn re-engages from a clean (sheathed) state
 			ShieldDistribution = 0; // the shield rose belongs to the fight; the next engage rolls a fresh one (#20)
 			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
-		}
-
-		// #703: the waypoint the route walk is heading for. Only meaningful while WalksRoute (a route always has at
-		// least one waypoint - Patrols is exactly PatrolWaypoints.Count > 0).
-		public Vector3 RouteWaypoint => PatrolWaypoints[Math.Clamp(RouteIndex, 0, PatrolWaypoints.Count - 1)];
-
-		// #703: arrived at the current waypoint - take the next one along the route. A closed route wraps; an open one
-		// turns round at each end and walks back down the same polyline, so the NPC is never off the harvested path.
-		// Returns true when it turned round or completed a lap, which is where the walk pauses (retail patrols dwell at
-		// the ends of a beat rather than pivoting on the spot).
-		public bool AdvanceRoute()
-		{
-			if (PatrolWaypoints.Count <= 1)
-				return true;
-
-			var next = RouteIndex + (RouteBackwards ? -1 : 1);
-			if (next >= 0 && next < PatrolWaypoints.Count)
-			{
-				RouteIndex = next;
-				return false;
-			}
-
-			if (RouteLoops)
-			{
-				// Round again from the other end - on a closed route that step IS a route segment, not a shortcut.
-				RouteIndex = RouteBackwards ? PatrolWaypoints.Count - 1 : 0;
-				return true;
-			}
-
-			RouteBackwards = !RouteBackwards;
-			RouteIndex = Math.Clamp(RouteIndex + (RouteBackwards ? -1 : 1), 0, PatrolWaypoints.Count - 1);
-			return true;
-		}
-
-		// #703: (re)join the route at the waypoint nearest to where the entity actually stands. Called when the route
-		// walk starts and after anything that moved it off its leg (a chase, a leash walk home) - resuming the stale
-		// index would send it back across the map to a waypoint it left behind. Horizontal distance: the route carries
-		// real altitudes (an Old Tarantia beat climbs a staircase, 99 -> 112) and a waypoint one floor up is still the
-		// nearest place to rejoin.
-		public void RejoinRouteAtNearest()
-		{
-			RouteInterrupted = false;
-			if (PatrolWaypoints.Count == 0)
-				return;
-
-			var nearest = 0;
-			var nearestDistance = float.MaxValue;
-			for (var i = 0; i < PatrolWaypoints.Count; i++)
-			{
-				var dx = PatrolWaypoints[i].X - Position.X;
-				var dz = PatrolWaypoints[i].Z - Position.Z;
-				var distance = dx * dx + dz * dz;
-				if (distance >= nearestDistance)
-					continue;
-
-				nearestDistance = distance;
-				nearest = i;
-			}
-
-			RouteIndex = nearest;
-		}
-
-		// The next wander destination: an anchor point other than where we already are (so the move isn't a no-op).
-		// `isOccupied` (#363 ambient pools): when supplied, PREFER an anchor no other entity is parked on, so pool
-		// members spread across their area's points instead of stacking; falls back to any non-current anchor when
-		// every free one is taken. Null (captured patrols) keeps the plain random-non-current pick.
-		public Vector3 NextWanderPoint(Func<Vector3, bool>? isOccupied = null)
-		{
-			if (PatrolWaypoints.Count == 1)
-				return PatrolWaypoints[0];
-
-			// Scan the anchors from a random offset (keeps the pick random) and take the first that isn't where we
-			// already stand; among those, a FREE one wins, else remember the first taken anchor as the fallback.
-			var start = Random.Shared.Next(PatrolWaypoints.Count);
-			var fallback = Position;
-			var haveFallback = false;
-			for (var i = 0; i < PatrolWaypoints.Count; i++)
-			{
-				var p = PatrolWaypoints[(start + i) % PatrolWaypoints.Count];
-				if (Vector3.DistanceSquared(p, Position) < 1f)
-					continue; // a no-op move to where we already are
-
-				if (isOccupied == null || !isOccupied(p))
-					return p;
-
-				if (!haveFallback)
-				{
-					fallback = p;
-					haveFallback = true;
-				}
-			}
-
-			return fallback;
 		}
 
 		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by
@@ -1204,53 +874,6 @@ namespace Faolan.GameServer.World
 			return _expiryRemaining <= 0;
 		}
 
-		// Counts down the wander timer; true when it's time for the next 2-point wander move (then re-arm via ArmPatrolCycle).
-		public bool TickPatrolCycle(double dt)
-		{
-			if (!Patrols)
-				return false;
-
-			_patrolReissueRemaining -= dt;
-			return _patrolReissueRemaining <= 0;
-		}
-
-		// #766: counts down to this NPC's next ambient idle animation; true on the tick one is due. `Arm` schedules the
-		// next, which is the animation's own length plus the pause the creature then stands for - retail never starts
-		// one before the last has finished (see BehaviorAnimations.AmbientEmote).
-		public bool TickAmbientAnimation(double dt)
-		{
-			if (AmbientAnimations.Count == 0)
-				return false;
-
-			_ambientAnimationRemaining -= dt;
-			return _ambientAnimationRemaining <= 0;
-		}
-
-		public void ArmAmbientAnimation(double seconds)
-		{
-			_ambientAnimationRemaining = seconds;
-		}
-
-		// #703: pauses a route walker for `seconds` (the dwell at the end of a beat).
-		public void ArmRouteDwell(double seconds)
-		{
-			_routeDwellRemaining = seconds;
-		}
-
-		// #703: whether a route walker is currently PAUSED at the end of its beat rather than walking it. The one state in
-		// which a patroller is genuinely standing still, which is what #766's ambient animations need to know.
-		public bool RouteDwelling => _routeDwellRemaining > 0;
-
-		// #703: counts the route dwell down; true once the walk may step again (so an un-armed walker walks straight on).
-		public bool TickRouteDwell(double dt)
-		{
-			if (_routeDwellRemaining <= 0)
-				return true;
-
-			_routeDwellRemaining -= dt;
-			return _routeDwellRemaining <= 0;
-		}
-
 		// (A NoRespawn NPC used to run its respawn timer down as a DESPAWN timer here. It leaves the world at the end of
 		// its corpse sequence instead - `CorpseStage.Quit` -> `NpcCorpseRemoved` - so a dead summon's exit is tied to its
 		// own corpse rather than to a respawn delay it never uses and which has since grown tenfold.)
@@ -1263,18 +886,17 @@ namespace Faolan.GameServer.World
 			if (!IsDead)
 				return false;
 
-			_respawnRemaining -= dt;
-			if (_respawnRemaining > 0)
+			if (!Route.TickRespawnDue(dt))
 				return false;
 
 			Vitals.Health = Vitals.MaxHealth;
-			Position = SpawnPosition;
-			Rotation = SpawnRotation;
+			Position = Route.SpawnPosition;
+			Rotation = Route.SpawnRotation;
 			// Reset the move anchor too (#246): a chase/return leaves MoveOrigin at wherever the NPC last stepped
 			// (the spot it died), so without this the first post-respawn MoveTask streams origin=death -> spawn and
 			// the client renders the revived NPC back at its death location before walking home. Anchor it at spawn.
-			MoveOrigin = SpawnPosition;
-			MoveFrom = SpawnPosition;
+			MoveOrigin = Route.SpawnPosition;
+			MoveFrom = Route.SpawnPosition;
 			Moving = false; // a fresh NPC starts stationary (#272); the next chase/return re-seeds the move anchor
 			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
@@ -1283,7 +905,7 @@ namespace Faolan.GameServer.World
 			_corpseStage = CorpseStage.None;
 			InCombat = false; // the fresh NPC starts idle (sheathed); re-aggro re-draws via the combat-mode broadcast
 			ShieldDistribution = 0; // ...and unrolls its shield rose until it engages again (#20)
-			Returning = false;
+			Route.Returning = false;
 			return true;
 		}
 
@@ -1310,24 +932,10 @@ namespace Faolan.GameServer.World
 			{
 				Position = position,
 				Rotation = rotation,
-				SpawnPosition = position,
-				SpawnRotation = rotation,
+				Route = { SpawnPosition = position, SpawnRotation = rotation },
 				Vitals = vitals!,
 				NpcTemplateId = templateId
 			};
-		}
-
-		// Distance from `p` to the SEGMENT a->b (not to the infinite line, and not merely to its ends). A degenerate
-		// segment (a == b - the first waypoint's self-segment) falls out as the point distance.
-		private static float DistanceToSegment(Vector3 a, Vector3 b, Vector3 p)
-		{
-			var ab = b - a;
-			var lengthSquared = ab.LengthSquared();
-			if (lengthSquared < 1e-6f)
-				return Vector3.Distance(a, p);
-
-			var t = Math.Clamp(Vector3.Dot(p - a, ab) / lengthSquared, 0f, 1f);
-			return Vector3.Distance(a + ab * t, p);
 		}
 	}
 

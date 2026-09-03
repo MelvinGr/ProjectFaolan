@@ -31,15 +31,15 @@ namespace Faolan.Tests
 			var (broadcaster, client, player, npc) = Harness();
 
 			// The player already sees it - Known AND Confirmed, since #245 only despawns what the client built.
-			player.Known.Add(NpcHandle);
-			player.Confirmed.Add(NpcHandle);
+			player.Knowledge.Known.Add(NpcHandle);
+			player.Knowledge.Confirmed.Add(NpcHandle);
 
 			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + 50f, 0, 0); // walked its beat away
 
 			await broadcaster.ResolveInterest(client);
 
 			Assert.Single(client.Sent);
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		// ...and one still inside it is left alone: an idle sweep must not churn what is already rendered.
@@ -47,15 +47,15 @@ namespace Faolan.Tests
 		public async Task AnNpcStillInRange_ProducesNoTraffic()
 		{
 			var (broadcaster, client, player, npc) = Harness();
-			player.Known.Add(NpcHandle);
-			player.Confirmed.Add(NpcHandle);
+			player.Knowledge.Known.Add(NpcHandle);
+			player.Knowledge.Confirmed.Add(NpcHandle);
 
 			npc.Position = new Vector3(40f, 0, 0);
 
 			await broadcaster.ResolveInterest(client);
 
 			Assert.Empty(client.Sent);
-			Assert.Contains(NpcHandle, player.Known);
+			Assert.Contains(NpcHandle, player.Knowledge.Known);
 		}
 
 		// The other direction, and the one a standing player could NEVER get before: a walker that arrived from
@@ -82,14 +82,14 @@ namespace Faolan.Tests
 		public async Task AnUnconfirmedHandle_IsForgottenWithoutADespawnPacket()
 		{
 			var (broadcaster, client, player, npc) = Harness();
-			player.Known.Add(NpcHandle); // spawned, never polled
+			player.Knowledge.Known.Add(NpcHandle); // spawned, never polled
 
 			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + 50f, 0, 0);
 
 			await broadcaster.ResolveInterest(client);
 
 			Assert.Empty(client.Sent);
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		// ⛔ ...and it does NOT run for a player whose world entry has not yet DELIVERED its packets. World entry places
@@ -110,7 +110,7 @@ namespace Faolan.Tests
 
 			Assert.Empty(client.Sent);
 			// and crucially NOT seeded: a seeded handle is one the entry burst will skip as already known.
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		// ⚠️ The other half of #778: BOUNDARY CHURN. A flat radius has no memory, so a walker whose beat happens to
@@ -125,8 +125,8 @@ namespace Faolan.Tests
 		public void AWalkerPacingTheBoundary_IsNotRespawnedEveryLap()
 		{
 			var (_, _, player, npc) = Harness();
-			player.Known.Add(NpcHandle);
-			player.Confirmed.Add(NpcHandle);
+			player.Knowledge.Known.Add(NpcHandle);
+			player.Knowledge.Confirmed.Add(NpcHandle);
 
 			var events = 0;
 			// Six laps of a small dither straddling the range - the shape of a beat that runs along the edge.
@@ -156,7 +156,7 @@ namespace Faolan.Tests
 			var events = InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true);
 
 			Assert.Empty(events);
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		// ...while one the player DOES hold is kept there, which is the whole point of the band.
@@ -164,14 +164,14 @@ namespace Faolan.Tests
 		public void AKnownNpcInsideTheHysteresisBand_IsKept()
 		{
 			var (_, _, player, npc) = Harness();
-			player.Known.Add(NpcHandle);
-			player.Confirmed.Add(NpcHandle);
+			player.Knowledge.Known.Add(NpcHandle);
+			player.Knowledge.Confirmed.Add(NpcHandle);
 			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + 5f, 0, 0);
 
 			var events = InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true);
 
 			Assert.Empty(events);
-			Assert.Contains(NpcHandle, player.Known);
+			Assert.Contains(NpcHandle, player.Knowledge.Known);
 		}
 
 		// ...and past the band it goes, so a genuine departure is not held for ever.
@@ -179,14 +179,14 @@ namespace Faolan.Tests
 		public void AKnownNpcBeyondTheHysteresisBand_IsDespawned()
 		{
 			var (_, _, player, npc) = Harness();
-			player.Known.Add(NpcHandle);
-			player.Confirmed.Add(NpcHandle);
+			player.Knowledge.Known.Add(NpcHandle);
+			player.Knowledge.Confirmed.Add(NpcHandle);
 			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + InterestManager.DespawnHysteresis + 1f, 0, 0);
 
 			var despawn = Assert.Single(InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true));
 
 			Assert.Equal(InterestEventType.Despawn, despawn.Type);
-			Assert.DoesNotContain(NpcHandle, player.Known);
+			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
 		private (WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc) Harness()

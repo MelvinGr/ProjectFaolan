@@ -231,7 +231,7 @@ namespace Faolan.GameServer.World
 				// a separate entity and still drops. ⚠️ Not implied by the gate: a quest-only target on a REPEATABLE
 				// quest is gated and must come back, which is the case the welded column could not express.
 				if (_storyKillTargets.Contains(npc.NpcTemplateId))
-					entity.NoRespawn = true;
+					entity.Route.NoRespawn = true;
 
 				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
@@ -242,21 +242,21 @@ namespace Faolan.GameServer.World
 					var waypoints = PatrolRoute.Waypoints(patrol);
 					if (waypoints.Count > 0)
 					{
-						entity.PatrolWaypoints = waypoints;
+						entity.Route.PatrolWaypoints = waypoints;
 						// #703: an ORDERED route, so the tick WALKS it waypoint by waypoint instead of drifting to a
 						// random one of its waypoints - that straight line is what sent Old Tarantia's guards through
 						// the houses. A route whose ends meet is walked round and round; an open one is walked back
 						// down again; either way it joins at the waypoint nearest where it spawned.
-						entity.WalksRoute = true;
-						entity.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
-						entity.RejoinRouteAtNearest();
-						entity.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
+						entity.Route.WalksRoute = true;
+						entity.Route.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
+						entity.Route.RejoinRouteAtNearest(entity.Position);
+						entity.Route.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
 						// #714: a beat is WALKED, at the speed retail's own patrollers are observed moving at - not at the
 						// chase speed, and not at the route's trailer scalar (which is not a ground speed; see
 						// WorldState.RouteWalkSpeed for the measurement that rules it out).
-						entity.RouteSpeed = WorldState.RouteWalkSpeed;
-						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / entity.RouteSpeed + PatrolDwellSeconds;
-						entity.ArmPatrolCycle();
+						entity.Route.RouteSpeed = WorldState.RouteWalkSpeed;
+						entity.Route.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.Route.PatrolWaypoints) / entity.Route.RouteSpeed + PatrolDwellSeconds;
+						entity.Route.ArmPatrolCycle();
 					}
 				}
 
@@ -379,9 +379,9 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
 				{
 					var barks = chatter.Select(c => NpcChatterColumns.ToBark(c)).ToLookup(NpcChatterBarks.TriggerOf);
-					entity.ChatterLines = barks[BarkTrigger.Ambient].ToArray();
-					entity.GreetingLines = barks[BarkTrigger.Detection].ToArray();
-					entity.EncounterLines = barks[BarkTrigger.EncounterScript].ToArray();
+					entity.Presentation.ChatterLines = barks[BarkTrigger.Ambient].ToArray();
+					entity.Presentation.GreetingLines = barks[BarkTrigger.Detection].ToArray();
+					entity.Presentation.EncounterLines = barks[BarkTrigger.EncounterScript].ToArray();
 				}
 
 				// #766: the ambient idle ANIMATIONS this creature performs while standing about, weighted as retail was
@@ -389,11 +389,11 @@ namespace Faolan.GameServer.World
 				// defaulted to the type's single `AnimIdleId` (that is the pose it holds, not something it does).
 				if (npc.NpcTemplate.AmbientAnimations is { Count: > 0 } ambient)
 				{
-					entity.AmbientAnimations = ambient
+					entity.Presentation.AmbientAnimations = ambient
 						.Select(a => new AmbientAnimation(a.AnimationId, a.DurationCentiseconds, a.Weight))
 						.ToArray();
 					// Staggered, so a street's worth of citizens do not all start an animation on the same tick.
-					entity.ArmAmbientAnimation(Random.Shared.NextDouble() * WorldState.AmbientAnimationPauseMedianSeconds * 4);
+					entity.Presentation.ArmAmbientAnimation(Random.Shared.NextDouble() * WorldState.AmbientAnimationPauseMedianSeconds * 4);
 				}
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
@@ -403,13 +403,13 @@ namespace Faolan.GameServer.World
 				if (npc.NpcSpawnAreaId is { } linkedAreaId)
 				{
 					entity.SpawnAreaId = linkedAreaId;
-					entity.NoRespawn = true;
+					entity.Route.NoRespawn = true;
 				}
 
 				// #502: a placement whose TYPE has a scripted encounter on this map becomes a LURE - it watches for an
 				// approaching player and swaps itself for its boss. Every placement of the type is armed, since the
 				// definition is keyed by (map, type) rather than by one spot.
-				entity.ArmEncounter(encounters.GetValueOrDefault(npc.NpcTemplateId));
+				entity.Presentation.ArmEncounter(encounters.GetValueOrDefault(npc.NpcTemplateId));
 
 				// #741: the creature TYPES this one walks with, kept until every entity is in the zone - a follower is
 				// bound to a LIVE leader, so the binding cannot be made while the leader may not be loaded yet.

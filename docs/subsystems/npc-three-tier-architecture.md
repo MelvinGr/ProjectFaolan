@@ -16,6 +16,14 @@ An NPC in the world is three separate concerns; the code keeps them in three sep
 | **`NpcSpawn`** (spawn point) | DB (`NpcSpawns`) | permanent, **static** | WHERE and WHAT should spawn in the world: map + position + rotation + a ref to the `NpcTemplate` (`NpcTemplateId`), plus the per-spawn STATIC config that varies between placements of the same type (level and level-scaled pools, monster scale, voice, faction override). **No gameplay/runtime state.** This table must not change as the world is played. |
 | **`WorldEntity`** (live) | **in-memory** (`Faolan/GameServer/World/WorldEntity.cs`) | ephemeral (per session) | The active instance: `Handle`, current `Position`, current HP (`EntityVitals`), behaviour state, `InstanceId`, `OwnerHandle`. Built at spawn, mutated by gameplay, gone on restart. Pets, summons (`OwnerHandle`) and loot bags live ONLY here — they have no `NpcSpawn` row. |
 
+`WorldEntity` carries three COMPONENTS beside its own fields, one per shape it used to fold into one bag (Gitea #928
+item 10): **`NpcRoute`** (`entity.Route` — the spawn point, the harvested route or wander anchors, the leash-return
+state and the respawn countdown; its three position-dependent methods take the position rather than reading the
+entity), **`NpcPresentation`** (`entity.Presentation` — chatter and greeting lines, ambient animations and their
+timer, the encounter bark/lure state) and **`PlayerKnowledge`** (`entity.Knowledge` — the `Known`/`Confirmed`
+handle sets and `KnownObjects` a player's client has been streamed, the quest-id sets, the pending reach goals). Every
+entity holds all three; an NPC's `Knowledge` and a player's `Route` are simply empty.
+
 The live tier is deliberately **not persisted**. Runtime state is ephemeral: on restart every active spawn
 is regenerated from the static `NpcSpawn` placement + the `NpcTemplate` template, and the world boots clean. A
 persisted "live NPC" table would be write-hot and buy nothing (you don't want NPC HP/positions to survive a

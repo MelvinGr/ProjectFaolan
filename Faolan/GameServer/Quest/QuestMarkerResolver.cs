@@ -376,14 +376,14 @@ namespace Faolan.GameServer.Quest
 				return;
 
 			var quests = await _quests.GetCharacterQuests(characterId.Value);
-			entity!.ActiveQuestIds.Clear();
-			entity.CompletedQuestIds.Clear();
+			entity!.Knowledge.ActiveQuestIds.Clear();
+			entity.Knowledge.CompletedQuestIds.Clear();
 			foreach (var quest in quests)
 			{
 				if (quest.State == QuestState.Active)
-					entity.ActiveQuestIds.Add(quest.QuestId);
+					entity.Knowledge.ActiveQuestIds.Add(quest.QuestId);
 				else if (quest.State == QuestState.Completed)
-					entity.CompletedQuestIds.Add(quest.QuestId); // #262: drives "hide once done" NPC gating
+					entity.Knowledge.CompletedQuestIds.Add(quest.QuestId); // #262: drives "hide once done" NPC gating
 			}
 		}
 

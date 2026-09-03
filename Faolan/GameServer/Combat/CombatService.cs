@@ -947,9 +947,9 @@ namespace Faolan.GameServer.Combat
 				await AnnounceKillChain(killer);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); loot drops now, corpse fades in {Fade}s, {Fate}.", npcEntity.Name, targetHandle, cause,
-					WorldEntity.CorpseFadeSeconds, npcEntity.NoRespawn
+					WorldEntity.CorpseFadeSeconds, npcEntity.Route.NoRespawn
 						? "then it leaves the world (no respawn)"
-						: $"respawns in {npcEntity.RespawnDelaySeconds}s");
+						: $"respawns in {npcEntity.Route.RespawnDelaySeconds}s");
 				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
 				// 13479) completes + supersedes to the next stage; a chainless kill quest keeps the legacy turn-in path.
 				// Matched by the STABLE target template id (the goal's TrailingRefId), name as fallback (#262).

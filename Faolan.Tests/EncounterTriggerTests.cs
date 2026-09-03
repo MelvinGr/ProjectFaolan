@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			Assert.Single(barked);
 			Assert.Same(lure, barked[0].Entity);
 			Assert.Same(player, barked[0].Target);
-			Assert.True(lure.EncounterBarked);
+			Assert.True(lure.Presentation.EncounterBarked);
 
 			// Still inside it: a bark per tick would be a stream of shouting, so it fires on the APPROACH only.
 			player.Position = new Vector3(10, 0, 0);
@@ -88,8 +88,8 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(2070);
 			var boss = WorldEntity.ForNpc(2, 2070, Vector3.Zero, Quaternion.Identity, "Eerika of the Maidens", EntityVitals.FromMax(8519, 0, 8519), BossTemplate);
-			boss.NoRespawn = true; // her corpse fades; the LURE comes back instead
-			boss.EncounterLureTemplateId = LureTemplate;
+			boss.Route.NoRespawn = true; // her corpse fades; the LURE comes back instead
+			boss.Presentation.EncounterLureTemplateId = LureTemplate;
 			boss.Vitals!.Health = 0;
 			zone.Add(boss);
 
@@ -100,15 +100,15 @@ namespace Faolan.Tests
 				resets += world.Tick(60.0).Count(e => e.Type == WorldTickEffectType.EncounterReset);
 
 			Assert.Equal(1, resets);
-			Assert.True(boss.EncounterResetDone);
+			Assert.True(boss.Presentation.EncounterResetDone);
 		}
 
 		private static WorldEntity Lure()
 		{
 			var lure = WorldEntity.ForNpc(1, 2070, Vector3.Zero, Quaternion.Identity, "Damsel in Distress", EntityVitals.FromMax(63, 0, 63), LureTemplate);
-			lure.EncounterBossTemplateId = BossTemplate;
-			lure.EncounterBarkRadius = 21f;
-			lure.EncounterTriggerRadius = 3f;
+			lure.Presentation.EncounterBossTemplateId = BossTemplate;
+			lure.Presentation.EncounterBarkRadius = 21f;
+			lure.Presentation.EncounterTriggerRadius = 3f;
 			return lure;
 		}
 

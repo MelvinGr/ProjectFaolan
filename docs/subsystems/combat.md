@@ -71,9 +71,9 @@ that one. Reading it that way leaves the median at 33.18 s but drops the minimum
    A kill with nothing to give leaves no bag at all.
 2. **corpse teardown** (`NpcCorpseFaded` → `BroadcastCorpseFade`, then `NpcCorpseQuit` →
    `BroadcastEntityDespawn`) fades and then drops the BODY, long after the bag landed.
-3. **respawn** (`RespawnDelaySeconds`, `WorldEntity.DefaultRespawnDelaySeconds`): revives the NPC at its spawn
+3. **respawn** (`RespawnDelaySeconds`, `NpcRoute.DefaultRespawnDelaySeconds`): revives the NPC at its spawn
    point and re-renders it (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245).
-   **EXCEPT** `WorldEntity.NoRespawn` creatures (summons, ambient pool members): they leave the world
+   **EXCEPT** `NpcRoute.NoRespawn` creatures (summons, ambient pool members): they leave the world
    (`NpcCorpseRemoved`) when the corpse sequence ends instead of waiting out a timer they never use.
 
 ⭐ **A respawn comes back on a NEW entity handle**, which is why it takes a moment to see. A handle is stable for
@@ -102,7 +102,7 @@ confounded; nine attributes survive the cross-tab (map, level, health, community
 race, monster_data) and only `faction_id`/`profession_type` are eliminated, by being unset on both. Of the 251
 kills that matched nothing, 151 never see that creature again in the dump and 89 more only see a re-streamed
 handle. **One capture would decide it: kill a Panther in City of Tortage and stand there three minutes** — a beast
-on the humanoid's map. Until then `NpcTemplate` has no column and `WorldEntity.DefaultRespawnDelaySeconds` takes
+on the humanoid's map. Until then `NpcTemplate` has no column and `NpcRoute.DefaultRespawnDelaySeconds` takes
 the best-attested cluster (**150 s**) for everything — Gitea #855.
 
 ⚠️ **Do not re-derive this from "the client watched for N seconds and nothing came back."** That bound cannot tell
@@ -861,9 +861,9 @@ the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `NpcBroadcas
 sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
 origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
 (`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (45u) from
-spawn it disengages *immediately*, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival.
+spawn it disengages *immediately*, walks home (ignoring re-aggro, `NpcRoute.Returning`), and heals on arrival.
 Losing the target out in the field also sends it home, but only after `NpcChaseDeaggroDelaySeconds` of standing
-its ground (`WorldEntity.TargetLostAt`), so stepping out of aggro range and straight back in is one engagement.
+its ground (`NpcRoute.TargetLostAt`), so stepping out of aggro range and straight back in is one engagement.
 WORKS in-client (it moves + leashes + stops on de-aggro).
 
 ### ⭐ Each attacker chases its own SLOT, and the ring is retail's (#908)
@@ -922,7 +922,7 @@ swing on the other. Gated by `AttackerSlotTests`, which compares each crowd size
 states no such rule. They used to be one constant of 10 doing all three jobs, which is why none of the retail
 numbers could be adopted until it was split.
 
-A **patroller's** territory is its spawn *plus its whole beat* (`WorldEntity.BeyondLeash`), measured to the
+A **patroller's** territory is its spawn *plus its whole beat* (`NpcRoute.BeyondLeash`), measured to the
 route's **polyline** rather than to its waypoints — the walk goes down the middle of each leg, and a sparsely
 sampled beat (the single-leg animal wanders on map 2070 run up to 228u end to end) has its entire middle
 further than a leash-radius from both ends. Measuring to the vertices alone therefore read 28 of the 1,073 stored

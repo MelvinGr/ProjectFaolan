@@ -429,15 +429,15 @@ namespace Faolan.GameServer.World
 								// Summoned (test) NPCs and ambient pool members don't revive: their corpse sequence IS
 								// their whole afterlife, so once it has run they leave the world instead of waiting out
 								// a respawn timer they will never use.
-								if (entity.NoRespawn)
+								if (entity.Route.NoRespawn)
 								{
 									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseRemoved));
 									// #502: an encounter BOSS carries the lure it replaced. Once its corpse clears, put
 									// the lure back where it stood so the encounter can fire again. Guarded so a corpse
 									// cannot restore twice.
-									if (entity is { EncounterLureTemplateId: not null, EncounterResetDone: false })
+									if (entity is { Presentation.EncounterLureTemplateId: not null, Presentation.EncounterResetDone: false })
 									{
-										entity.EncounterResetDone = true;
+										entity.Presentation.EncounterResetDone = true;
 										effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
 									}
 								}
@@ -445,7 +445,7 @@ namespace Faolan.GameServer.World
 								break;
 						}
 
-						if (!entity.NoRespawn && entity.TickRespawn(deltaSeconds))
+						if (!entity.Route.NoRespawn && entity.TickRespawn(deltaSeconds))
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
 
 						continue;
@@ -465,16 +465,16 @@ namespace Faolan.GameServer.World
 					// not scratch and look around - and it is walking behind the player afterwards, which the standing
 					// gate below already covers. Retail does animate her, but on combat EVENTS near the player rather
 					// than on this self-timed rotation.
-					if (!entity.IsQuestEscortee && entity.TickAmbientAnimation(deltaSeconds))
+					if (!entity.IsQuestEscortee && entity.Presentation.TickAmbientAnimation(deltaSeconds))
 					{
 						if (!IsStanding(zone, entity))
 						{
-							entity.ArmAmbientAnimation(AmbientAnimationPauseMedianSeconds); // busy - look again shortly
+							entity.Presentation.ArmAmbientAnimation(AmbientAnimationPauseMedianSeconds); // busy - look again shortly
 						}
-						else if (AmbientAnimations.Pick(entity.AmbientAnimations, Random.Shared) is { } picked)
+						else if (AmbientAnimations.Pick(entity.Presentation.AmbientAnimations, Random.Shared) is { } picked)
 						{
-							entity.AmbientAnimationPicked = picked;
-							entity.ArmAmbientAnimation(picked.DurationCentiseconds / 100.0 + ExponentialPause(AmbientAnimationPauseMedianSeconds));
+							entity.Presentation.AmbientAnimationPicked = picked;
+							entity.Presentation.ArmAmbientAnimation(picked.DurationCentiseconds / 100.0 + ExponentialPause(AmbientAnimationPauseMedianSeconds));
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAmbientAnimation));
 						}
 					}
@@ -488,12 +488,12 @@ namespace Faolan.GameServer.World
 					// Ambient chatter: NPCs that have captured AMBIENT bark lines occasionally speak, staggered by the
 					// per-NPC random roll so they don't all bark at once. The processor picks a random line + sends it
 					// to nearby players (cosmetic). NPCs without a captured ambient group stay silent.
-					if (chatterDue && entity.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
+					if (chatterDue && entity.Presentation.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcChatter));
 
 					// #694: a DETECTION bark is not on that clock. The crier greets a player he has NOTICED ARRIVE, so
 					// the cue is the arrival itself - one line per player per approach, addressed at them by name.
-					if (entity.GreetingLines is { Length: > 0 })
+					if (entity.Presentation.GreetingLines is { Length: > 0 })
 						DetectGreetings(zone, entity);
 
 					// #262 companion-follow: a "released" NPC (e.g. Casilda after her rescue) follows its leading player -
@@ -559,9 +559,9 @@ namespace Faolan.GameServer.World
 					// #502 scripted encounter: a LURE is a harmless NPC that watches for an approaching player and, at
 					// two measured distances, cries out and then swaps itself for a boss. Checked before the aggro block
 					// because a lure is not hostile and would otherwise never look at players at all.
-					if (entity.EncounterBossTemplateId != null)
+					if (entity.Presentation.EncounterBossTemplateId != null)
 					{
-						var approaching = NearestPlayerInRange(zone, entity, MathF.Max(entity.EncounterBarkRadius, entity.EncounterTriggerRadius));
+						var approaching = NearestPlayerInRange(zone, entity, MathF.Max(entity.Presentation.EncounterBarkRadius, entity.Presentation.EncounterTriggerRadius));
 						if (approaching != null)
 						{
 							var edx = approaching.Position.X - entity.Position.X;
@@ -570,15 +570,15 @@ namespace Faolan.GameServer.World
 
 							// The trigger wins when both are satisfied - a player who arrives inside the inner radius in
 							// one step should spring the trap, not merely be shouted at.
-							if (edist <= entity.EncounterTriggerRadius)
+							if (edist <= entity.Presentation.EncounterTriggerRadius)
 							{
 								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterTrigger, approaching));
 								continue; // the lure is about to be replaced; skip the rest of its tick
 							}
 
-							if (!entity.EncounterBarked && edist <= entity.EncounterBarkRadius)
+							if (!entity.Presentation.EncounterBarked && edist <= entity.Presentation.EncounterBarkRadius)
 							{
-								entity.EncounterBarked = true;
+								entity.Presentation.EncounterBarked = true;
 								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterBark, approaching));
 							}
 						}
@@ -602,16 +602,16 @@ namespace Faolan.GameServer.World
 							: null) ?? RecentAttackerOf(zone, entity)
 						: null;
 
-					var homeDx = entity.SpawnPosition.X - entity.Position.X;
-					var homeDz = entity.SpawnPosition.Z - entity.Position.Z;
+					var homeDx = entity.Route.SpawnPosition.X - entity.Position.X;
+					var homeDz = entity.Route.SpawnPosition.Z - entity.Position.Z;
 					var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
 
 					// Leash: once led too far from its territory, disengage and keep returning home until arrived (ignoring
 					// re-aggro) so a player hovering at the edge can't ping-pong it. A returning NPC walks back, then
 					// heals to full on arrival. Territory is spawn plus - for a patroller - its route (#565: measuring
 					// against spawn alone made the #266 wander and this check fight over every far anchor).
-					if (entity.BeyondLeash(homeDist, NpcLeashRange))
-						entity.Returning = true;
+					if (entity.Route.BeyondLeash(entity.Position, homeDist, NpcLeashRange))
+						entity.Route.Returning = true;
 
 					// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
 					// spawn, walk it back home instead of leaving it standing where the chase ended. Patrollers are
@@ -623,34 +623,34 @@ namespace Faolan.GameServer.World
 					// home, and a fresh aggro. The stamp is cleared the moment it has a target again, so the delay only
 					// ever measures an uninterrupted absence.
 					if (target != null)
-						entity.TargetLostAt = null;
-					else if (homeDist > NpcMeleeRange && !entity.Patrols && !entity.Returning)
+						entity.Route.TargetLostAt = null;
+					else if (homeDist > NpcMeleeRange && !entity.Route.Patrols && !entity.Route.Returning)
 					{
-						entity.TargetLostAt ??= DateTimeOffset.UtcNow;
-						if ((DateTimeOffset.UtcNow - entity.TargetLostAt.Value).TotalSeconds >= NpcChaseDeaggroDelaySeconds)
-							entity.Returning = true;
+						entity.Route.TargetLostAt ??= DateTimeOffset.UtcNow;
+						if ((DateTimeOffset.UtcNow - entity.Route.TargetLostAt.Value).TotalSeconds >= NpcChaseDeaggroDelaySeconds)
+							entity.Route.Returning = true;
 					}
 
-					if (entity.Returning)
+					if (entity.Route.Returning)
 					{
 						SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
 						entity.ArmAttackCooldown(NpcAttackInterval);
-						entity.RouteInterrupted = true; // #703: walked off its beat - rejoin at the nearest waypoint after
+						entity.Route.RouteInterrupted = true; // #703: walked off its beat - rejoin at the nearest waypoint after
 						if (homeDist > NpcMeleeRange)
 						{
 							// #565: the walk home also descends to the SPAWN's altitude. Movement otherwise keeps the
 							// entity's current Y ("keep terrain Y"), which is right for a chase (the ground under the
 							// path) but wrong here - the stray Y is whatever height it was led/wandered to, so the NPC
 							// would walk the whole way home at that altitude and arrive floating above its spawn.
-							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!, entity.SpawnPosition.Y);
+							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!, entity.Route.SpawnPosition.Y);
 							continue;
 						}
 
-						entity.Returning = false;
+						entity.Route.Returning = false;
 						// #565: home again - plant the spawn's altitude. The walk down closes the height gap in proportion
 						// to the horizontal one, but it stops NpcMeleeRange short of the spawn, so that same fraction of
 						// the gap would be left standing. Arriving is the point to be exact about it.
-						entity.Position = new Vector3(entity.Position.X, entity.SpawnPosition.Y, entity.Position.Z);
+						entity.Position = new Vector3(entity.Position.X, entity.Route.SpawnPosition.Y, entity.Position.Z);
 						entity.Vitals.ReviveToFull(); // home again
 						EndMove(entity, true, WorldTickEffectType.NpcMove); // arrived: flush + stop (#190/#272)
 						continue;
@@ -664,7 +664,7 @@ namespace Faolan.GameServer.World
 						// #703: a ROUTE walker resumes its beat here, and must NOT be stopped first - EndMove would close
 						// its move stream every idle tick. It keeps one continuous walk instead, so the flush/stop below is
 						// for the wander and the chase, which genuinely end.
-						if (entity.WalksRoute)
+						if (entity.Route.WalksRoute)
 						{
 							if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
 								entity.Vitals.ReviveToFull();
@@ -687,7 +687,7 @@ namespace Faolan.GameServer.World
 						// nearby anchor every ~25-60s - NOT a continuous client-walked route. Server-driven: we move the
 						// model to the destination and broadcast the one MoveFrom->Position segment, so every player sees the
 						// same spot and a later chase starts from where the NPC actually is (no aggro-from-spawn teleport).
-						if (entity.Patrols && entity.TickPatrolCycle(deltaSeconds))
+						if (entity.Route.Patrols && entity.Route.TickPatrolCycle(deltaSeconds))
 						{
 							entity.MoveFrom = entity.Position;
 							// #363 ambient anti-stacking: an area-managed pool member (SpawnAreaId set) avoids drifting onto a
@@ -710,8 +710,8 @@ namespace Faolan.GameServer.World
 
 									return false;
 								};
-							entity.Position = entity.NextWanderPoint(occupied);
-							entity.ArmPatrolCycle();
+							entity.Position = entity.Route.NextWanderPoint(entity.Position, occupied);
+							entity.Route.ArmPatrolCycle();
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 						}
 
@@ -723,7 +723,7 @@ namespace Faolan.GameServer.World
 					// the tick the mob acquires its target, while it's still closing the distance (#218). The target rides
 					// the effect so the broadcaster can also push the aggro (HateList/ThreatLevel, #216).
 					SetCombat(entity, true, target);
-					entity.RouteInterrupted = true; // #703: a chase leaves the beat; the walk rejoins at the nearest waypoint
+					entity.Route.RouteInterrupted = true; // #703: a chase leaves the beat; the walk rejoins at the nearest waypoint
 
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
 					// is broadcast in retail-sized segments (StepAndStream throttle, #272) so the client interpolates the
@@ -832,15 +832,15 @@ namespace Faolan.GameServer.World
 					if (Vector3.Distance(player.Position, e.Position) > GreetingRange)
 						continue; // inside the forget band but not yet close enough to greet - leave the state alone
 
-					if (e.GreetedPlayers.Add(player.Handle))
+					if (e.Presentation.GreetedPlayers.Add(player.Handle))
 						effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcGreeting, player));
 				}
 
-				if (e.GreetedPlayers.Count == 0)
+				if (e.Presentation.GreetedPlayers.Count == 0)
 					return;
 
 				// Forget anyone who has left the band (or the zone entirely), so their next approach greets again.
-				e.GreetedPlayers.RemoveWhere(handle => !z.TryGet(handle, out var p)
+				e.Presentation.GreetedPlayers.RemoveWhere(handle => !z.TryGet(handle, out var p)
 				                                       || Vector3.Distance(p.Position, e.Position) > GreetingForgetRange);
 			}
 
@@ -879,13 +879,13 @@ namespace Faolan.GameServer.World
 			// that climbs a staircase climbs it instead of walking through the steps at the ground floor's height.
 			void WalkRoute(WorldEntity e)
 			{
-				if (e.RouteInterrupted)
+				if (e.Route.RouteInterrupted)
 				{
-					e.RejoinRouteAtNearest(); // chased or leashed off the beat: pick it up where it now stands
-					e.RouteReissueDue = true; // ...and the client's copy of the walk is now wrong, so re-issue it
+					e.Route.RejoinRouteAtNearest(e.Position); // chased or leashed off the beat: pick it up where it now stands
+					e.Route.RouteReissueDue = true; // ...and the client's copy of the walk is now wrong, so re-issue it
 				}
 
-				if (!e.TickRouteDwell(deltaSeconds))
+				if (!e.Route.TickRouteDwell(deltaSeconds))
 					return; // standing at a turnaround; the client is already holding the same pose
 
 				// #716: the beat is issued to the CLIENT as the captured multi-waypoint patrol and walked THERE - the
@@ -893,25 +893,25 @@ namespace Faolan.GameServer.World
 				// 3.09/s corpus maximum, made the NPC run (the chase form carries no duration, so the client paced it off
 				// its run attribute), and tugged it back once per segment. Retail sends this form: of the 759 captured
 				// multi-point patrol nodes, 535 carry [duration][remaining], where 423 of 425 two-point ones do not.
-				if (e.RouteReissueDue)
+				if (e.Route.RouteReissueDue)
 				{
-					e.RouteReissueDue = false;
+					e.Route.RouteReissueDue = false;
 					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcPatrol));
 				}
 
 				// #714: a viewer that just streamed this NPC in is told the beat a few seconds LATER, as retail does -
 				// see RoutePatrolDelaySeconds. Sending it with the spawn made the client dash to reconcile.
-				if (e.RoutePatrolDelayRemaining > 0)
+				if (e.Route.RoutePatrolDelayRemaining > 0)
 				{
-					e.RoutePatrolDelayRemaining -= deltaSeconds;
-					if (e.RoutePatrolDelayRemaining <= 0)
+					e.Route.RoutePatrolDelayRemaining -= deltaSeconds;
+					if (e.Route.RoutePatrolDelayRemaining <= 0)
 					{
-						e.RoutePatrolDelayRemaining = 0;
-						e.RouteReissueDue = true;
+						e.Route.RoutePatrolDelayRemaining = 0;
+						e.Route.RouteReissueDue = true;
 					}
 				}
 
-				var waypoint = e.RouteWaypoint;
+				var waypoint = e.Route.RouteWaypoint;
 				var dx = waypoint.X - e.Position.X;
 				var dz = waypoint.Z - e.Position.Z;
 				var distance = MathF.Sqrt(dx * dx + dz * dz);
@@ -919,7 +919,7 @@ namespace Faolan.GameServer.World
 				{
 					// The MODEL only - no broadcast. It advances at the route's own captured speed so the server's idea of
 					// where the NPC stands tracks what the client is rendering, which is what death-pose/loot/aggro need.
-					StepToward(e, dx, dz, distance, deltaSeconds, 0f, waypoint.Y, e.RouteSpeed);
+					StepToward(e, dx, dz, distance, deltaSeconds, 0f, waypoint.Y, e.Route.RouteSpeed);
 					return;
 				}
 
@@ -927,10 +927,10 @@ namespace Faolan.GameServer.World
 				// take the next waypoint; pause only where the route turns round or a lap closes - and re-issue the beat
 				// there, since that is where the client's own copy of the walk has run out.
 				e.Position = new Vector3(waypoint.X, waypoint.Y, waypoint.Z);
-				if (e.AdvanceRoute())
+				if (e.Route.AdvanceRoute())
 				{
-					e.ArmRouteDwell(RouteTurnaroundDwellSeconds);
-					e.RouteReissueDue = true;
+					e.Route.ArmRouteDwell(RouteTurnaroundDwellSeconds);
+					e.Route.RouteReissueDue = true;
 				}
 			}
 
@@ -1135,9 +1135,9 @@ namespace Faolan.GameServer.World
 		// itself while walking down the street.
 		private bool IsStanding(Zone zone, WorldEntity entity)
 		{
-			if (entity.Moving || entity.InCombat || entity.Returning || entity.FollowTargetHandle != null)
+			if (entity.Moving || entity.InCombat || entity.Route.Returning || entity.FollowTargetHandle != null)
 				return false;
-			if (entity.WalksRoute && !entity.RouteDwelling)
+			if (entity.Route.WalksRoute && !entity.Route.RouteDwelling)
 				return false;
 
 			// #822: an NPC that never initiates keeps idling while a player stands beside it - it is not about to

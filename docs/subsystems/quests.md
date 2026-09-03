@@ -981,7 +981,7 @@ do not respawn once killed. Saddur and Scavenger Tuut are the two, and retail so
 
 ⚠️ **Those are two independent properties and they are two columns** (#708). Visibility is
 `GatesTargetVisibility` → `WorldEntity.GateQuestIds`, fed by `DatabaseRepository.GetQuestGatedNpcMap`; staying
-dead is `TargetStaysDead` → `WorldEntity.NoRespawn`, fed by `DatabaseRepository.GetStoryKillTargets`. Both of
+dead is `TargetStaysDead` → `NpcRoute.NoRespawn`, fed by `DatabaseRepository.GetStoryKillTargets`. Both of
 today's targets want both, which is exactly why one column answered both questions for so long — and the weld
 could not express the first case that wants only one: a quest-only target on a **repeatable or retryable** quest
 is gated and has to come back. Taking the gate forced `NoRespawn`; dropping it made the NPC visible to everyone.

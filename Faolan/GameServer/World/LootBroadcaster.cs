@@ -253,7 +253,7 @@ namespace Faolan.GameServer.World
 			var fade = N3ToClientFadeCodec.Build(EntityClass.Character, npc.Handle, WorldEntity.CorpseFadeAnimationSeconds);
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client == null || !viewer.Known.Contains(npc.Handle))
+				if (viewer.Client == null || !viewer.Knowledge.Known.Contains(npc.Handle))
 					continue;
 
 				await viewer.Client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

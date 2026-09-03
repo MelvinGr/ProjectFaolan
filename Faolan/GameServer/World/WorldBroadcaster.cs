@@ -185,7 +185,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			// On a move the entity's own set is current - BroadcastPlayerMove refreshes it immediately before this.
-			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, player, WorldSimulation.PlayerInterestRange, player.ActiveQuestIds);
+			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, player, WorldSimulation.PlayerInterestRange, player.Knowledge.ActiveQuestIds);
 
 			foreach (var obj in spawn)
 				await client.SendAsync(WorldObjectRpc(client, obj, zone.PlayfieldToken));
@@ -231,7 +231,7 @@ namespace Faolan.GameServer.World
 			{
 				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
 					continue;
-				if (!viewer.Known.Contains(entity.Handle))
+				if (!viewer.Knowledge.Known.Contains(entity.Handle))
 					continue; // only players who already see the actor (their client has the handle)
 
 				await WorldIir.Send(viewer.Client, body);
@@ -249,7 +249,7 @@ namespace Faolan.GameServer.World
 		{
 			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Remove(entity.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Remove(entity.Handle))
 					await SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entity.Handle);
 			}
 		}
@@ -294,7 +294,7 @@ namespace Faolan.GameServer.World
 				if (viewer.Handle == entity.Handle)
 					continue;
 
-				if (viewer.Client != null && viewer.Confirmed.Contains(entity.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Confirmed.Contains(entity.Handle))
 					await WorldIir.Send(viewer.Client, record);
 			}
 		}
@@ -320,7 +320,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(subject).PlayersInRange(subject.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client == null || !viewer.Known.Contains(subject.Handle))
+				if (viewer.Client == null || !viewer.Knowledge.Known.Contains(subject.Handle))
 					continue;
 
 				foreach (var record in records)
@@ -392,7 +392,7 @@ namespace Faolan.GameServer.World
 			if (spawns > 0 || despawns > 0)
 			{
 				_logger.LogInformation("Interest: {Player} at {Pos} -> streamed +{Spawns} / -{Despawns} entities (now knows {Known}).", entity.Name, entity.Position, spawns, despawns,
-					entity.Known.Count);
+					entity.Knowledge.Known.Count);
 			}
 
 			await DispatchInterest(events, moveBody, client, entity);
@@ -412,7 +412,7 @@ namespace Faolan.GameServer.World
 			{
 				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
 					continue;
-				if (!viewer.Known.Contains(entity.Handle))
+				if (!viewer.Knowledge.Known.Contains(entity.Handle))
 					continue; // only players who already see the caster (their client has the handle)
 
 				await WorldIir.Send(viewer.Client, body);
@@ -436,7 +436,7 @@ namespace Faolan.GameServer.World
 			{
 				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
 					continue;
-				if (!viewer.Known.Contains(entity.Handle))
+				if (!viewer.Knowledge.Known.Contains(entity.Handle))
 					continue;
 
 				await viewer.Client.SendAsync(GameWire.BuildStatUpdate(viewer.Client, stats, entity.Handle));
@@ -480,7 +480,7 @@ namespace Faolan.GameServer.World
 					continue;
 				if (!npc.IsVisibleTo(entity))
 					continue; // #261: a quest-gated NPC the player doesn't qualify for yet - treat as not in range
-				if (!entity.Known.Add(npc.Handle))
+				if (!entity.Knowledge.Known.Add(npc.Handle))
 					continue; // already seeded (idempotent guard)
 
 				if (npc.Name != null)
@@ -561,7 +561,7 @@ namespace Faolan.GameServer.World
 			{
 				foreach (var npc in _sim.World.ZoneForEntity(player).Entities)
 				{
-					if (npc.OverheadNameOverride is not { } label || !player.Known.Contains(npc.Handle))
+					if (npc.OverheadNameOverride is not { } label || !player.Knowledge.Known.Contains(npc.Handle))
 						continue;
 
 					await SendSetName(client, npc.Handle, _debugAreaLabels
@@ -656,8 +656,8 @@ namespace Faolan.GameServer.World
 						// 4.02s between the two over 2,519 captured NPCs; only 3% inside 0.1s). Sending both in the same
 						// instant is what made a freshly-spawned NPC dash its first laps. The tick fires the beat to
 						// everyone in range once the delay elapses - see WorldState.RoutePatrolDelaySeconds.
-						if (ev.Subject is { IsPlayer: false, WalksRoute: true })
-							ev.Subject.RoutePatrolDelayRemaining = WorldState.RoutePatrolDelaySeconds;
+						if (ev.Subject is { IsPlayer: false, Route.WalksRoute: true })
+							ev.Subject.Route.RoutePatrolDelayRemaining = WorldState.RoutePatrolDelaySeconds;
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
 						if (ev.Subject is { IsPlayer: false, NpcTemplateId: TortageIntroService.CasildaTemplateId } && recipient.Session.Character != null &&

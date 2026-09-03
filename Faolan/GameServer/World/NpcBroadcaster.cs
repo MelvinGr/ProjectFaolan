@@ -119,7 +119,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 				{
 					await WorldIir.Send(viewer.Client, hate);
 					await WorldIir.Send(viewer.Client, threatOpen);
@@ -195,7 +195,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client == null || !viewer.Known.Contains(npc.Handle))
+				if (viewer.Client == null || !viewer.Knowledge.Known.Contains(npc.Handle))
 					continue;
 
 				await WorldIir.Send(viewer.Client, body);
@@ -215,7 +215,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, body);
 			}
 		}
@@ -277,7 +277,7 @@ namespace Faolan.GameServer.World
 		public async Task BroadcastNpcAmbientAnimation(WorldEntity npc)
 		{
 			ArgumentNullException.ThrowIfNull(npc);
-			if (npc.AmbientAnimationPicked is not { } animation)
+			if (npc.Presentation.AmbientAnimationPicked is not { } animation)
 				return;
 
 			var record = BehaviorControlCenterCodec.Build(
@@ -285,7 +285,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Confirmed.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, record);
 			}
 		}
@@ -311,7 +311,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, body);
 			}
 		}
@@ -329,7 +329,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, body);
 			}
 		}
@@ -350,7 +350,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(entity.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(entity.Handle))
 					await WorldIir.Send(viewer.Client, body);
 			}
 		}
@@ -361,7 +361,7 @@ namespace Faolan.GameServer.World
 		{
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 					await SendPatrol(viewer.Client, npc);
 			}
 		}
@@ -394,7 +394,7 @@ namespace Faolan.GameServer.World
 				// Re-add to Known: the corpse's quit (#246) removed the handle, so the player
 				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
-				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Add(npc.Handle))
 					await _broadcaster.SendWorldSpawn(viewer.Client, npc, spawnAnimation: true); // #266: no route replay - the tick drives a server-side wander
 			}
 		}
@@ -406,7 +406,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, record);
 			}
 		}
@@ -424,7 +424,7 @@ namespace Faolan.GameServer.World
 			{
 				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
 				// recipient was never sent crashes it). Removes it from Known as it goes.
-				if (viewer.Client != null && viewer.Known.Remove(entityHandle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Remove(entityHandle))
 					await _broadcaster.SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entityHandle);
 			}
 
@@ -447,7 +447,7 @@ namespace Faolan.GameServer.World
 			{
 				foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
 				{
-					if (viewer.Client != null && viewer.Known.Add(entity.Handle))
+					if (viewer.Client != null && viewer.Knowledge.Known.Add(entity.Handle))
 						await _broadcaster.SendWorldSpawn(viewer.Client, entity);
 				}
 			}
@@ -516,7 +516,7 @@ namespace Faolan.GameServer.World
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
 			entity.FactionId = npc.NpcTemplate.StatCore?.FactionId; // #310
 			entity.SpawnBody = body;
-			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
+			entity.Route.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
 
 			// Load this NPC type's caster spells (same as the zone-load path) so a summoned caster actually casts
 			// (#232) instead of only meleeing - the sim's cast branch lights up when entity.Spells is non-empty.
@@ -534,7 +534,7 @@ namespace Faolan.GameServer.World
 				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
 				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
 				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
-				if (viewer.Client != null && viewer.Known.Add(entity.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Add(entity.Handle))
 					await _broadcaster.SendWorldSpawn(viewer.Client, entity);
 			}
 
@@ -574,7 +574,7 @@ namespace Faolan.GameServer.World
 			// client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
 			entity.Level = level;
 			entity.SpawnBody = body;
-			entity.NoRespawn = true;
+			entity.Route.NoRespawn = true;
 
 			foreach (var s in npcType.Spells)
 				entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
@@ -586,7 +586,7 @@ namespace Faolan.GameServer.World
 				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
 				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
 				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
-				if (viewer.Client != null && viewer.Known.Add(entity.Handle))
+				if (viewer.Client != null && viewer.Knowledge.Known.Add(entity.Handle))
 					await _broadcaster.SendWorldSpawn(viewer.Client, entity);
 			}
 
@@ -621,11 +621,11 @@ namespace Faolan.GameServer.World
 		// the spawn it was just sent); the waypoints are the absolute captured world coords.
 		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
-			if (!npc.Patrols)
+			if (!npc.Route.Patrols)
 				return Task.CompletedTask;
 
 			// Encode emits a bare 0x2000 body (no length prefix), so it rides WorldIir.Send.
-			return WorldIir.Send(recipient, npc.WalksRoute ? BuildRouteBody(npc) : npc.PatrolBody);
+			return WorldIir.Send(recipient, npc.Route.WalksRoute ? BuildRouteBody(npc) : npc.Route.PatrolBody);
 		}
 
 		// #716: the beat as this NPC is about to walk it, anchored where it NOW stands.
@@ -640,9 +640,9 @@ namespace Faolan.GameServer.World
 		// speed, and feeding it back made the fast-scalar beats sprint. See #714 for the measurement.
 		private static byte[] BuildRouteBody(WorldEntity npc)
 		{
-			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);
+			var ahead = PatrolRoute.FromHere(npc.Route.PatrolWaypoints, npc.Route.RouteIndex, npc.Route.RouteBackwards, npc.Route.RouteLoops);
 			if (ahead.Count == 0)
-				return npc.PatrolBody;
+				return npc.Route.PatrolBody;
 
 			// ⚠️ The walk STARTS where the NPC is standing, so its live position is the path's first waypoint (#714).
 			//
@@ -659,10 +659,10 @@ namespace Faolan.GameServer.World
 			// State how long the walk takes, so the CLIENT is paced by time rather than by its own movement-speed
 			// attribute - which for an NPC is its RUN speed, and is what made the beat get sprinted and then stood
 			// through.
-			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.RouteSpeed;
+			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.Route.RouteSpeed;
 
 			return MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position,
-				MoveTaskNodes.PatrolTimed(path, npc.RouteSpeed, npc.Position, seconds, seconds)));
+				MoveTaskNodes.PatrolTimed(path, npc.Route.RouteSpeed, npc.Position, seconds, seconds)));
 		}
 	}
 }

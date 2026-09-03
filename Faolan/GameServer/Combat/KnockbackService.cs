@@ -130,7 +130,7 @@ namespace Faolan.GameServer.Combat
 			{
 				if (!viewer.IsPlayer || viewer.Handle == victim.Handle || viewer.Client == null)
 					continue;
-				if (!viewer.Known.Contains(victim.Handle))
+				if (!viewer.Knowledge.Known.Contains(victim.Handle))
 					continue; // only players whose client already holds the victim's handle
 
 				await WorldIir.Send(viewer.Client, move);

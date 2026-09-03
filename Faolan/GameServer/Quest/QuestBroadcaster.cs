@@ -87,7 +87,7 @@ namespace Faolan.GameServer.Quest
 		public void InvalidateReachGoals(INetworkClient client)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			player?.PendingReachGoals = null!;
+			player?.Knowledge.PendingReachGoals = null!;
 		}
 
 		// #267: re-send one NPC's quest marker in-place (handles are session-volatile, so the NPC is resolved in the

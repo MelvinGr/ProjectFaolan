@@ -259,7 +259,7 @@ transaction (18 lines, 13 of them mid-sale). In-client the crier greeted a playe
 **ambient channels only** (#717): on a conditional channel the script's state picks the line, and the harvest's
 slot-free filter selects *against* the NPC's own lines there, since those are exactly the ones carrying slots.
 
-Detection state is per NPC (`WorldEntity.GreetedPlayers`): a player is greeted once on arrival and forgotten again
+Detection state is per NPC (`NpcPresentation.GreetedPlayers`): a player is greeted once on arrival and forgotten again
 only after leaving `WorldState.GreetingForgetRange`, which is deliberately wider than `GreetingRange` so someone
 loitering on the boundary is not greeted, forgotten and greeted again every few ticks. Both numbers are **ours** —
 `GreetingRange` is matched to `SayRangeUnits` (50 u) on the ground that greeting someone too far away to hear it

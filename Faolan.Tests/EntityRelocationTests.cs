@@ -60,12 +60,12 @@ namespace Faolan.Tests
 		public async Task RelocateEntity_LeavesTheSpawnPositionAlone()
 		{
 			var (sim, _, mob) = Harness();
-			var placed = mob.SpawnPosition;
+			var placed = mob.Route.SpawnPosition;
 
 			await sim.RelocateEntity(mob, new Vector3(500f, 12f, -300f));
 
-			Assert.Equal(placed, mob.SpawnPosition);
-			Assert.NotEqual(mob.Position, mob.SpawnPosition);
+			Assert.Equal(placed, mob.Route.SpawnPosition);
+			Assert.NotEqual(mob.Position, mob.Route.SpawnPosition);
 		}
 
 		private static (WorldSimulation Sim, RecordingWorldOutbound Output, WorldEntity Mob) Harness(Vector3? secondPlayerAt = null)

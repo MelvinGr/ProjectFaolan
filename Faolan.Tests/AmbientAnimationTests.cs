@@ -27,8 +27,8 @@ namespace Faolan.Tests
 			var performed = Count(world, 300.0);
 
 			Assert.InRange(performed, 20, 120);
-			Assert.NotNull(npc.AmbientAnimationPicked);
-			Assert.Equal(62171u, npc.AmbientAnimationPicked!.Value.AnimationId);
+			Assert.NotNull(npc.Presentation.AmbientAnimationPicked);
+			Assert.Equal(62171u, npc.Presentation.AmbientAnimationPicked!.Value.AnimationId);
 		}
 
 		[Fact]
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			var (world, npc) = Idler([]);
 
 			Assert.Equal(0, Count(world, 300.0));
-			Assert.Null(npc.AmbientAnimationPicked);
+			Assert.Null(npc.Presentation.AmbientAnimationPicked);
 		}
 
 		[Fact]
@@ -53,9 +53,9 @@ namespace Faolan.Tests
 			// is why this gate walks a real beat rather than setting a flag.
 			var beat = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 200) };
 			var (world, npc) = Idler([new AmbientAnimation(62171, 200, 10)]);
-			npc.PatrolWaypoints = beat;
-			npc.WalksRoute = true;
-			npc.RejoinRouteAtNearest();
+			npc.Route.PatrolWaypoints = beat;
+			npc.Route.WalksRoute = true;
+			npc.Route.RejoinRouteAtNearest(npc.Position);
 
 			// 200u at RouteWalkSpeed is 90s of walking against a 3s dwell at the far end, so a walker that ignored the
 			// walk would rack up dozens over this window.
@@ -158,7 +158,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(7, 2000, Vector3.Zero, Quaternion.Identity, "Citizen", EntityVitals.FromMax(100, 0, 100));
 			npc.Hostile = false;
-			npc.AmbientAnimations = animations;
+			npc.Presentation.AmbientAnimations = animations;
 			world.Place(npc, 2000, Vector3.Zero, Quaternion.Identity);
 			return (world, npc);
 		}
