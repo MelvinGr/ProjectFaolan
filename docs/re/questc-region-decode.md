@@ -685,7 +685,9 @@ quests.
 ## Synthesising a Quest_c record — the snapshot ceiling, 82 → 99
 
 `SnapshotTails.IsSnapshotEligible` wants five things: the record scalars, a non-empty goal list, a verified
-objective region, the line's 4CC, and the five header text refs. Seventeen quests had **everything but the
+objective region, the line's 4CC, and the five header text refs (and, since #926, a sixth: an ORDER for the quest's
+line - the index block states the held quest's step number, so a multi-step line whose `JournalSequence` no capture
+has filled keeps its quests out rather than shipping "step 0"). Seventeen quests had **everything but the
 record** — no capture ever carried one for them — so they sat out of the login snapshot.
 
 `QuestImportOps.SeedDerivedSnapshotRecords` derives one, running after `VerifyObjectiveRegions` because that

@@ -1113,9 +1113,13 @@ namespace Faolan.GameServer.Session
 			// definitions behind them are now fetched in one go.
 			var active = await _database.GetCharacterQuests(character.Id, QuestState.Active);
 			var definitions = (await _database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+			// The gate also needs each line's LENGTH: the index block states the held quest's step number against it
+			// (#926), and a multi-step line no capture has ordered cannot state one. One batched read, like the catalog.
+			var lineSteps = await _database.GetQuestDefinitionsByLines([.. definitions.Values.Select(d => d.QuestLineId).Distinct()]);
 			foreach (var cq in active)
 			{
-				if (definitions.TryGetValue(cq.QuestId, out var def) && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
+				if (definitions.TryGetValue(cq.QuestId, out var def) && lineRows.TryGetValue(def.QuestLineId, out var line)
+				    && SnapshotTails.IsSnapshotEligible(def, line, lineSteps.TryGetValue(def.QuestLineId, out var steps) ? steps.Length : 0))
 					quests.Add(def);
 			}
 

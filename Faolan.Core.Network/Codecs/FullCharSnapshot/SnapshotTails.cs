@@ -146,9 +146,20 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// in StatList_t ("(nSize%1009)==0 && nSize>0, inconsistent IdentityList"). A round-trip through our own
 		// codec will NOT catch that - reader and writer share the model - so widen this only with a byte-exact
 		// regeneration test behind it.
-		public static bool IsSnapshotEligible(QuestDefinition? def, QuestLine? area)
+		// `lineSteps` is how many quests the quest's LINE has (its catalog length) - the index block states the held
+		// quest's step number against it, so the gate has to know whether there is an order to state.
+		public static bool IsSnapshotEligible(QuestDefinition? def, QuestLine? area, int lineSteps)
 		{
 			if (def is not { HasSnapshotRecord: true })
+				return false;
+
+			// The index block carries the held quest's STEP NUMBER in its line and the steps after it - the client draws
+			// them as the journal's chapter numerals (QuestIndexRegion.Block.StepNumber, #926). That number is the
+			// quest's JournalSequence, which is capture-sourced and 0 on the 1,009 lines no capture has ordered. A
+			// multi-step line with no order would go out as "step 0, all n to come" - a block no capture shows - so the
+			// quest waits for its line's order instead, the way it waits for its line's 4CC. A single-step line has
+			// nothing to order and its one quest is step 1 by construction.
+			if (lineSteps > 1 && def.JournalSequence == 0)
 				return false;
 
 			// Only quests whose objective region provably reproduces the wire (see

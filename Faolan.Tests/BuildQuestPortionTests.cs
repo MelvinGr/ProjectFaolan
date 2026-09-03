@@ -141,8 +141,10 @@ namespace Faolan.Tests
 				.FirstAsync(q => q.QuestId == 10238, TestContext.Current.CancellationToken);
 			var area = await db.QuestLines.FirstAsync(a => a.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
 
+			var lineSteps = await db.QuestDefinitions.CountAsync(q => q.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
+
 			Assert.True(def.ObjectiveRegionVerified, "10238's @609 objective region must be verified byte-exact against the captures");
-			Assert.True(SnapshotTails.IsSnapshotEligible(def, area), "the beach starter must ride the login snapshot");
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area, lineSteps), "the beach starter must ride the login snapshot");
 
 			// And the region it produces must be non-empty - eligibility is worthless if the portion comes out as the
 			// empty-quest form the create path uses.
@@ -164,8 +166,29 @@ namespace Faolan.Tests
 
 			Assert.False(def.ObjectiveRegionVerified, "13563 has no captured region - if this flips, the test is no longer covering the buildable path");
 			Assert.True(SnapshotTails.IsObjectiveRegionBuildable(def), "every non-partial goal of 13563 states its wire kind, so its region is buildable");
-			Assert.True(SnapshotTails.IsSnapshotEligible(def, area), "13563 must ride the login snapshot or its line reads as finished");
+			var lineSteps = await db.QuestDefinitions.CountAsync(q => q.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area, lineSteps), "13563 must ride the login snapshot or its line reads as finished");
 			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), SnapshotTails.QuestPortion([def], def, CaptureInstance));
+		}
+
+		// The index block states the held quest's STEP NUMBER in its line (#926), and that number is the capture-sourced
+		// JournalSequence - 0 on the 1,009 lines no capture has ordered. A multi-step line with no order would ship as
+		// "step 0, all n still to come", which no capture shows, so the gate refuses the quest until its line is ordered.
+		// A single-step line has nothing to order, and its quest still rides.
+		[Fact]
+		public async Task AQuestOnAMultiStepLine_WithNoJournalSequence_WaitsForItsLinesOrder()
+		{
+			await using var db = new DatabaseContext(TestDb.Options(DbPath));
+			var def = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs)
+				.FirstAsync(q => q.QuestId == 10238, TestContext.Current.CancellationToken);
+			var area = await db.QuestLines.FirstAsync(a => a.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
+			var lineSteps = await db.QuestDefinitions.CountAsync(q => q.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
+			Assert.True(lineSteps > 1 && def.JournalSequence != 0, "the beach starter sits at a known step of a multi-step line - the control this test needs");
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area, lineSteps));
+
+			def.JournalSequence = 0;
+			Assert.False(SnapshotTails.IsSnapshotEligible(def, area, lineSteps), "no order on a multi-step line: the block would state step 0");
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area, 1), "a single-step line has nothing to order");
 		}
 
 		// ⚠️ The bar for that widening, and the reason it is not "the builder produced some bytes": a goal with no

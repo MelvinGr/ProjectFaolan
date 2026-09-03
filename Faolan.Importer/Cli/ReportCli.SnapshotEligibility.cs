@@ -42,6 +42,8 @@ namespace Faolan.Importer.Cli
 				.Include(q => q.Goals)
 				.Include(q => q.TextRefs)
 				.ToListAsync();
+			var lineSteps = quests.Where(q => q.QuestLineId != 0).GroupBy(q => q.QuestLineId).ToDictionary(g => g.Key, g => g.Count());
+			int StepsOf(QuestDefinition q) => lineSteps.GetValueOrDefault(q.QuestLineId);
 
 			Console.WriteLine($"snapshot eligibility over {quests.Count} quest definitions\n");
 
@@ -54,7 +56,10 @@ namespace Faolan.Importer.Cli
 				("line carries its 4CC (Magic)", q => lines.TryGetValue(q.QuestLineId, out var l) && l.Magic != 0),
 				("has a Level", q => q.Level != 0),
 				("@609 region verified or buildable", q => q.ObjectiveRegionVerified || SnapshotTails.IsObjectiveRegionBuildable(q)),
-				("Quest_c record scalars", q => q.HasSnapshotRecord)
+				("Quest_c record scalars", q => q.HasSnapshotRecord),
+				// The index block states the held quest's step number (#926); a multi-step line with no captured order
+				// cannot state one, so its quests wait for a capture that orders the line.
+				("line ordered (sequence, or 1 step)", q => StepsOf(q) <= 1 || q.JournalSequence != 0)
 			};
 
 			Console.WriteLine($"  {"arm",-38} {"passes",8}");
@@ -70,7 +75,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {$"header text: {slot}",-38} {n,8}   ({keyed} with an LDB key)");
 			}
 
-			var eligible = quests.Count(q => SnapshotTails.IsSnapshotEligible(q, lines.GetValueOrDefault(q.QuestLineId)));
+			var eligible = quests.Count(q => SnapshotTails.IsSnapshotEligible(q, lines.GetValueOrDefault(q.QuestLineId), StepsOf(q)));
 			Console.WriteLine($"\n  ELIGIBLE (every arm)                   {eligible,8}");
 
 			// ⭐ The diagnostic that actually names a culprit: for each arm, how many quests fail THAT ARM AND NOTHING
@@ -95,6 +100,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("     per-string LDB key, the Quest_c record's Level word, and every goal's wire KIND tag - are all");
 			Console.WriteLine("     known for the SAME quests, because one captured journal carries all three at once. So no single");
 			Console.WriteLine("     arm can be relaxed to widen coverage; what widens it is a capture. See #389.");
+			Console.WriteLine("     The one arm that DOES fail alone is the line ORDER (#926): a quest with everything else whose");
+			Console.WriteLine("     multi-step line no capture has ordered. That too is a capture - a login of a character who");
+			Console.WriteLine("     completed the line, whose completed journal carries the [seq][questId] pairs.");
 			Console.WriteLine("\n  The summary's category (50302) and RefId (the quest's own id) ARE derivable; its 128-bit LDB key");
 			Console.WriteLine("  is not - uniformly random, absent from the client, and not a function of (RefId, Category). Without");
 			Console.WriteLine("  it the client cannot decrypt the text. See Faolan.Core/Crypt/LdbKey.cs.");
