@@ -32,15 +32,17 @@ namespace Faolan.GameServer.Quest
 	// `QuestOutbound` is what puts the two halves back together behind the one port.
 	public sealed class QuestBroadcaster
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterQuestRepository _quests;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 		private readonly QuestMarkerResolver _questMarkers;
 		private readonly WorldSimulation _sim;
 
-		public QuestBroadcaster(WorldSimulation sim, IDatabaseRepository database, QuestMarkerResolver questMarkers, ILogger logger)
+		public QuestBroadcaster(WorldSimulation sim, ICharacterQuestRepository quests, IWorldRepository world, QuestMarkerResolver questMarkers, ILogger logger)
 		{
 			_sim = sim;
-			_database = database;
+			_quests = quests;
+			_world = world;
 			_questMarkers = questMarkers;
 			_logger = logger;
 		}
@@ -57,7 +59,7 @@ namespace Faolan.GameServer.Quest
 			if (character == null || player == null)
 				return;
 
-			var held = (await _database.GetCharacterQuests(character.Id)).Where(q => q.State is QuestState.Active or QuestState.Completed).Select(q => q.QuestId).ToHashSet();
+			var held = (await _quests.GetCharacterQuests(character.Id)).Where(q => q.State is QuestState.Active or QuestState.Completed).Select(q => q.QuestId).ToHashSet();
 			if (held.Count == 0)
 				return;
 
@@ -125,7 +127,7 @@ namespace Faolan.GameServer.Quest
 			// The record's four reward lists (#893): the quest's own harvested set and the line's catalog reward, each
 			// element carrying its item's TEA key - so the Item rows are loaded here, keyed by template.
 			var templates = def.Rewards.Select(r => r.ItemTemplateId).Concat(def.Line?.Rewards.Select(r => r.ItemTemplateId) ?? []).ToArray();
-			var items = await _database.GetItemsByTemplate(templates);
+			var items = await _world.GetItemsByTemplate(templates);
 			var rewards = QuestRewardLists.ForQuest(def, def.Line, client.Session.Character.Id, id => items.GetValueOrDefault(id));
 			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue, rewards));
 

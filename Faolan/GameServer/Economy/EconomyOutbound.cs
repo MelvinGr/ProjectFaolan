@@ -39,17 +39,19 @@ namespace Faolan.GameServer.Economy
 	public sealed class EconomyOutbound : IEconomyOutbound
 	{
 		private readonly ConnectionRegistry _connections;
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterInventoryRepository _inventory;
 		private readonly ILogger _logger;
 		// The one op this needs from the quest engine, and a genuine CYCLE: QuestProgressionService takes
 		// IEconomyOutbound in its own ctor. It is a post-grant NOTIFICATION, so it is a single-op seam bound right
 		// after that service exists - the same shape (and the same reason) as WorldSimulation's outbound.
 		private Func<INetworkClient, uint, uint, Task> _advanceCollectGoals = null!;
 
-		public EconomyOutbound(ConnectionRegistry connections, IDatabaseRepository database, ILogger logger)
+		public EconomyOutbound(ConnectionRegistry connections, ICatalogRepository catalog, ICharacterInventoryRepository inventory, ILogger logger)
 		{
 			_connections = connections;
-			_database = database;
+			_catalog = catalog;
+			_inventory = inventory;
 			_logger = logger;
 		}
 
@@ -88,7 +90,7 @@ namespace Faolan.GameServer.Economy
 			// grant that silently did nothing looked identical to a grant that had never been asked for. #824 is what
 			// that costs: harvesting a `Spool of Thread` played the whole node animation and put nothing in the bag,
 			// and the reason (its template is not in `Items`) appeared in no log anywhere.
-			var item = await _database.GetItem(itemTemplateId);
+			var item = await _catalog.GetItem(itemTemplateId);
 			if (item == null)
 			{
 				// A DATA gap rather than a player condition, so it is a warning: something in the world - a quest
@@ -136,8 +138,8 @@ namespace Faolan.GameServer.Economy
 			// both name it by (#750). The two used to agree via a formula over (instance, kind, slot); they agree by
 			// identity now. A GRANT mints it here; a HAND-OVER moves the existing one, keeping everything hanging off it.
 			var delivered = transferring != null
-				? await _database.TransferCharacterItem(transferring.Id, characterId, kind, slot.Value)
-				: await _database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
+				? await _inventory.TransferCharacterItem(transferring.Id, characterId, kind, slot.Value)
+				: await _inventory.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
 			if (delivered == null)
 			{
 				// A free slot was found and the write still did not produce a row - so this one is neither a data gap
@@ -246,16 +248,16 @@ namespace Faolan.GameServer.Economy
 				return 0;
 
 			var characterId = client.Session.Character.Id;
-			var steps = InventoryTake.Plan(await _database.GetCharacterItems(characterId), itemTemplateId, count);
+			var steps = InventoryTake.Plan(await _inventory.GetCharacterItems(characterId), itemTemplateId, count);
 
 			foreach (var step in steps)
 			{
 				// A partial take DECREMENTS the item in place - the crafter and any socketed gems stay on it because the
 				// row is not re-minted (#750).
 				if (step.Remaining == 0)
-					await _database.SetCharacterItemSlot(characterId, step.Container, step.Slot, null);
+					await _inventory.SetCharacterItemSlot(characterId, step.Container, step.Slot, null);
 				else
-					await _database.SetCharacterItemCount(characterId, step.Container, step.Slot, step.Remaining);
+					await _inventory.SetCharacterItemCount(characterId, step.Container, step.Slot, step.Remaining);
 
 				await SendRemoveItem(client, step.Container, (uint)step.Slot, step.Taken);
 			}
@@ -347,7 +349,7 @@ namespace Faolan.GameServer.Economy
 
 		public async Task<int> BackpackCapacity(uint characterId)
 		{
-			var bag = await _database.GetCharacterItemSlot(characterId, ContainerKind.Equipped, (int)CharacterEquipmentSlot.Bag);
+			var bag = await _inventory.GetCharacterItemSlot(characterId, ContainerKind.Equipped, (int)CharacterEquipmentSlot.Bag);
 			return (int)(FullCharacterRoots.BaseBackpackSlots + (bag?.Template.BagExtraSlots ?? 0));
 		}
 
@@ -366,7 +368,7 @@ namespace Faolan.GameServer.Economy
 			if (preferred is { } slot && (slot < 0 || slot >= capacity))
 				throw new ArgumentOutOfRangeException(nameof(preferred), slot, $"a requested {container} slot outside 0..{capacity - 1} cannot come from the client - the body was misread.");
 
-			var taken = (await _database.GetCharacterItems(characterId, container)).Select(i => i.Slot).ToHashSet();
+			var taken = (await _inventory.GetCharacterItems(characterId, container)).Select(i => i.Slot).ToHashSet();
 			if (preferred is { } wanted && !taken.Contains(wanted))
 				return wanted;
 
@@ -390,7 +392,7 @@ namespace Faolan.GameServer.Economy
 		public async Task SendUpdateInventory(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var containers = FullCharacterRoots.Containers(characterId, await _database.GetCharacterItems(characterId));
+			var containers = FullCharacterRoots.Containers(characterId, await _inventory.GetCharacterItems(characterId));
 
 			// containers[0] = Equipped(101), [1] = Bag(104) - the two retail pushes. The Resource and Quest containers
 			// it also builds are NOT pushed: the capture carries exactly these two.
@@ -417,10 +419,10 @@ namespace Faolan.GameServer.Economy
 		public async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
 		{
 			var characterId = client.Session.Character.Id;
-			if (await _database.GetCharacterItemSlot(characterId, ContainerKind.Bag, slot) == null)
+			if (await _inventory.GetCharacterItemSlot(characterId, ContainerKind.Bag, slot) == null)
 				return false;
 
-			await _database.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
+			await _inventory.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
 			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
 
 			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that

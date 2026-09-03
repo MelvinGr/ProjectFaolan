@@ -48,7 +48,9 @@ namespace Faolan.GameServer.Combat
 
 		// The player's live vitals, for the INSTANT pool move a landing spell carries (#702). The world model owns
 		// them; CombatService is their accessor.
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterStatRepository _stats;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 
 		// #702: the instant pool moves (heal / mana / stamina) a spell's rows state.
@@ -58,10 +60,12 @@ namespace Faolan.GameServer.Combat
 		private readonly SpellAreaCatalog _spellAreas;
 		private readonly WorldSimulation _sim;
 
-		public BuffService(IDatabaseRepository database, WorldSimulation sim, WorldBroadcaster broadcaster,
+		public BuffService(ICatalogRepository catalog, ICharacterStatRepository stats, IWorldRepository world, WorldSimulation sim, WorldBroadcaster broadcaster,
 			SpellAreaCatalog spellAreas, SpellPoolEffects poolEffects, BuffStatEffects buffStats, ILogger logger)
 		{
-			_database = database;
+			_catalog = catalog;
+			_stats = stats;
+			_world = world;
 			_sim = sim;
 			_broadcaster = broadcaster;
 			_spellAreas = spellAreas;
@@ -114,7 +118,7 @@ namespace Faolan.GameServer.Combat
 		// re-entering a spell it has already applied to this subject.
 		public async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, SpellChainWalk? chain = null)
 		{
-			var spell = await _database.GetSpell(spellId) ?? await _database.GetSpell(spellId >> 8);
+			var spell = await _catalog.GetSpell(spellId) ?? await _catalog.GetSpell(spellId >> 8);
 
 			// Seed the walk with the record that is landing here, so an edge pointing back at it terminates.
 			chain ??= new SpellChainWalk();
@@ -126,7 +130,7 @@ namespace Faolan.GameServer.Combat
 			// 4377209 - a distinct id, same name, carrying the 27.7h duration and the cold-effect resource
 			// (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell 0x42CA7900 fr5400). Applying the CAST id
 			// meant a zero-duration record that renders no icon and tracks no buff, i.e. casting it did nothing.
-			if (spell is { DurationMs: 0, EffectSpell: > 0 } && await _database.GetSpell(spell.EffectSpell) is { } effect)
+			if (spell is { DurationMs: 0, EffectSpell: > 0 } && await _catalog.GetSpell(spell.EffectSpell) is { } effect)
 			{
 				var effectWireId = effect.Id << 8;
 				_logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
@@ -257,7 +261,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ApplyBuffById(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
 			var spellBase = spellId >> 8;
-			var spell = await _database.GetSpell(spellBase) ?? await _database.GetSpell(spellId);
+			var spell = await _catalog.GetSpell(spellBase) ?? await _catalog.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
 		}
@@ -298,7 +302,7 @@ namespace Faolan.GameServer.Combat
 		{
 			var character = client.Session.Character;
 
-			var buffs = await _database.GetCharacterBuffs(character.Id);
+			var buffs = await _stats.GetCharacterBuffs(character.Id);
 			if (buffs.Length == 0)
 				return;
 
@@ -512,7 +516,7 @@ namespace Faolan.GameServer.Combat
 				return; // not in the world yet - world entry will build the aggregate itself
 
 			var character = client.Session.Character;
-			entity.GearBonuses = await CharacterStatBonuses.For(_database, character);
+			entity.GearBonuses = await CharacterStatBonuses.For(_stats, character);
 
 			// Recompute the derived live fields off the new aggregate - max pools (which clamps current when a max
 			// shrinks), magic damage, the regen rates. The returned change list is DELIBERATELY DISCARDED: it is what
@@ -579,7 +583,7 @@ namespace Faolan.GameServer.Combat
 		public async Task SendShieldOfTheRisen(INetworkClient client)
 		{
 			var self = client.Session.Character.Id;
-			var map = await _database.GetMap(client.Session.Character.MapId);
+			var map = await _world.GetMap(client.Session.Character.MapId);
 			var desired = map?.InstanceMode is null or MapInstanceMode.Shared
 				? ShieldOfTheRisenBase2 // 10h shared/open-world
 				: ShieldOfTheRisenBase1; // 1h instanced
@@ -708,7 +712,7 @@ namespace Faolan.GameServer.Combat
 
 		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)
 		{
-			var spell = await _database.GetSpell(spellBase);
+			var spell = await _catalog.GetSpell(spellBase);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client), casterIsPlayer: true));
 		}

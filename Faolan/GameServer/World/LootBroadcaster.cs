@@ -54,22 +54,22 @@ namespace Faolan.GameServer.World
 		private const float MaxLootGroundSnap = 5f;
 
 		private readonly WorldBroadcaster _broadcaster;
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
 		private readonly RuntimeHandleAllocator _handles;
 		private readonly ILogger _logger;
 		private readonly QuestMarkerResolver _questMarkers;
 		private readonly WorldSimulation _sim;
 
-		public LootBroadcaster(WorldSimulation sim, IDatabaseRepository database, WorldBroadcaster broadcaster, QuestMarkerResolver questMarkers,
+		public LootBroadcaster(WorldSimulation sim, ICatalogRepository catalog, IWorldRepository world, WorldBroadcaster broadcaster, QuestMarkerResolver questMarkers,
 			RuntimeHandleAllocator handles, ILogger logger)
 		{
 			_sim = sim;
-			_database = database;
+			_catalog = catalog;
 			_broadcaster = broadcaster;
 			_questMarkers = questMarkers;
 			_handles = handles;
 			_logger = logger;
-			Bags = new LootBagContents(sim, database, logger);
+			Bags = new LootBagContents(sim, catalog, world, logger);
 		}
 
 		// What is IN a loot bag. Public because LootService asks it directly - taking an item out of a bag is not a
@@ -319,7 +319,7 @@ namespace Faolan.GameServer.World
 			// non-buildable template dropped only at splice-time (the old behaviour) shifted every later display slot,
 			// so a single-drag (TakeBagItem indexes LootItems by the client's display Pos) removed/granted the WRONG
 			// item and the window showed one fewer than it held (#226 / handoff Problems 2+3).
-			var loot = await _database.GetItems(itemTemplates);
+			var loot = await _catalog.GetItems(itemTemplates);
 
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the

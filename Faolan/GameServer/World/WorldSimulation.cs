@@ -113,7 +113,8 @@ namespace Faolan.GameServer.World
 		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new ConcurrentDictionary<uint, MapRegion[]>(); // #348: per-map banner volumes, read every tick
 
 		private readonly IChatServerDispatcher _agents;
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _characters;
+		private readonly IWorldRepository _worldData;
 		private readonly ILogger _logger;
 
 		// BOUND AT Start, NOT AT CONSTRUCTION (#826). Everything this port reaches - WorldBroadcaster above all - is
@@ -159,11 +160,12 @@ namespace Faolan.GameServer.World
 		// ⚠️ `World` and `Players` arrive by INJECTION rather than being created here (#900). Both are shared with
 		// PlayerDeathService, which must not hold this class - so the state they both read is what gets passed, not
 		// a reference back to their owner.
-		public WorldSimulation(IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
+		public WorldSimulation(ICharacterRepository characters, IWorldRepository worldData, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
 			WorldState world, PlayerRegistry players, PlayerDeathService playerDeaths, BuffTickService buffTicks, NpcCombatService npcCombat, TerrainService? terrain = null)
 		{
 			_spellAreas = spellAreas;
-			_database = database;
+			_characters = characters;
+			_worldData = worldData;
 			_agents = agents;
 			_logger = logger;
 			Terrain = terrain;
@@ -315,7 +317,7 @@ namespace Faolan.GameServer.World
 
 			entity.Position = destination;
 			character.Position = destination;
-			await _database.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
+			await _characters.SaveCharacterTransform(character.Id, destination, character.Rotation, character.MapId);
 
 			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
 			await _output.SendReviveTeleport(client!, entity.Handle, character.MapId, liveToken);
@@ -446,7 +448,7 @@ namespace Faolan.GameServer.World
 			if (_mapAreas.TryGetValue(mapId, out var cached))
 				return cached;
 
-			var areas = await _database.GetAreaBannerRegions(mapId);
+			var areas = await _worldData.GetAreaBannerRegions(mapId);
 			_mapAreas[mapId] = areas;
 			return areas;
 		}

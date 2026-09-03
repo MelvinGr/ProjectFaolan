@@ -174,7 +174,7 @@ namespace Faolan.Tests
 				NpcTemplateId = GiverTemplate
 			};
 
-			return new Harnessed(new QuestMarkerResolver(database, NullLogger.Instance), database, client, npc);
+			return new Harnessed(new QuestMarkerResolver(database, database, database, NullLogger.Instance), database, client, npc);
 		}
 
 		private static QuestDefinition Step(uint questId, string name, uint sequence, uint? mapId = null) =>

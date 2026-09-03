@@ -54,13 +54,17 @@ namespace Faolan.GameServer.World
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly IChatServerDispatcher _chat;
 		private readonly ConnectionRegistry _connections;
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _characters;
+		private readonly IRealmRepository _realms;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 
-		public TeleportService(ConnectionRegistry connections, IDatabaseRepository database, WorldBroadcaster broadcaster, IChatServerDispatcher chat, ILogger logger)
+		public TeleportService(ConnectionRegistry connections, ICharacterRepository characters, IRealmRepository realms, IWorldRepository world, WorldBroadcaster broadcaster, IChatServerDispatcher chat, ILogger logger)
 		{
 			_connections = connections;
-			_database = database;
+			_characters = characters;
+			_realms = realms;
+			_world = world;
 			_broadcaster = broadcaster;
 			_chat = chat;
 			_logger = logger;
@@ -76,7 +80,7 @@ namespace Faolan.GameServer.World
 			if (client?.Session.Character == null)
 				return;
 
-			var map = await _database.GetMap(mapId);
+			var map = await _world.GetMap(mapId);
 			if (map == null)
 			{
 				await _chat.SendSystemMessage(characterId, ChatMarkup.Color("red", $"Unknown map id: {mapId}"));
@@ -95,7 +99,7 @@ namespace Faolan.GameServer.World
 			}
 			else
 			{
-				var spawn = await _database.GetDefaultSpawn(map.Id);
+				var spawn = await _world.GetDefaultSpawn(map.Id);
 				if (spawn == null)
 				{
 					await _chat.SendSystemMessage(characterId,
@@ -110,7 +114,7 @@ namespace Faolan.GameServer.World
 			client.Session.Character.MapId = map.Id;
 			client.Session.Character.Position = position;
 			client.Session.Character.Rotation = rotation;
-			await _database.SaveCharacterTransform(client.Session.Character.Id, position, rotation, map.Id);
+			await _characters.SaveCharacterTransform(client.Session.Character.Id, position, rotation, map.Id);
 
 			var mapLabel = string.IsNullOrEmpty(map.Name)
 				? map.Id.ToString()
@@ -159,7 +163,7 @@ namespace Faolan.GameServer.World
 
 		public async Task SendWorldHandoff(INetworkClient client)
 		{
-			var realm = await _database.GetRealm(client.Session.Character.RealmId);
+			var realm = await _realms.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm!.IpAddress}:{realm.Port}";
 
 			await client.SendAsync(new Rpc(CreateFlowWire.MorphAckSender, CreateFlowWire.Receiver(client), GameInterfaceMethods.DispatchRedirectToServer,
@@ -216,7 +220,7 @@ namespace Faolan.GameServer.World
 				return;
 			}
 
-			var point = await _database.GetRespawnPoint(pointId);
+			var point = await _world.GetRespawnPoint(pointId);
 			if (point == null)
 			{
 				await _chat.SendSystemMessage(character.Id, ChatMarkup.Color("red", "Your bind point no longer exists. Re-bind with .bind."));
@@ -242,7 +246,7 @@ namespace Faolan.GameServer.World
 				return;
 			}
 
-			var point = await _database.GetDefaultSpawn(homeMapId);
+			var point = await _world.GetDefaultSpawn(homeMapId);
 			if (point == null)
 			{
 				_logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);

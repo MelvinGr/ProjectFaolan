@@ -47,18 +47,20 @@ namespace Faolan.GameServer.World
 		// IsVisible/BoundingBoxColor/ShowBoundingBox + Export* metadata - see RdbRespawnImporter).
 		private const float RespawnDiscoveryRange = 30f;
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _characters;
+		private readonly IWorldRepository _worldData;
 		private readonly ILogger _logger;
 		private readonly PlayerRegistry _players;
 		private readonly WorldState _world;
 
 		private IWorldOutbound _output = null!;
 
-		public PlayerDeathService(WorldState world, PlayerRegistry players, IDatabaseRepository database, ILogger logger)
+		public PlayerDeathService(WorldState world, PlayerRegistry players, ICharacterRepository characters, IWorldRepository worldData, ILogger logger)
 		{
 			_world = world;
 			_players = players;
-			_database = database;
+			_characters = characters;
+			_worldData = worldData;
 			_logger = logger;
 		}
 
@@ -135,7 +137,7 @@ namespace Faolan.GameServer.World
 			if (character.IsDead)
 			{
 				character.IsDead = false;
-				await _database.SaveCharacterDeadState(character.Id, false);
+				await _characters.SaveCharacterDeadState(character.Id, false);
 			}
 
 			// The same in-place revive the release screen takes (#214): a BccIIR flipping bcc_state 29 -> 1 closes the
@@ -164,7 +166,7 @@ namespace Faolan.GameServer.World
 
 			_playerRespawnRemaining.TryRemove(client, out _);
 			var character = client.Session.Character;
-			var point = await _database.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
+			var point = await _worldData.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
 
 			// Revive at the POINT's RestorationLevel, not always full (#375): 344 of the 538 imported points restore
 			// 10% and 157 restore 100%, so which spot you pick is a real choice. An unresolved point restores full.
@@ -172,7 +174,7 @@ namespace Faolan.GameServer.World
 			if (character.IsDead)
 			{
 				character.IsDead = false;
-				await _database.SaveCharacterDeadState(character.Id, false);
+				await _characters.SaveCharacterDeadState(character.Id, false);
 			}
 
 			// Retail's RespawnMe revive (decoded from the beach death+resurrect capture, Stihetfv #1382-1387) is a
@@ -237,7 +239,7 @@ namespace Faolan.GameServer.World
 					if (!inVolume)
 						continue;
 
-					await _database.DiscoverRespawnPoint(character.Id, point.Id);
+					await _characters.DiscoverRespawnPoint(character.Id, point.Id);
 					discovered.Add(point.Id);
 					newlyFound = true;
 
@@ -277,7 +279,7 @@ namespace Faolan.GameServer.World
 			if (_discoveredRespawnByCharacter.TryGetValue(characterId, out var cached))
 				return cached;
 
-			var set = new HashSet<uint>(await _database.GetDiscoveredRespawnPointIds(characterId));
+			var set = new HashSet<uint>(await _characters.GetDiscoveredRespawnPointIds(characterId));
 			_discoveredRespawnByCharacter[characterId] = set;
 			return set;
 		}
@@ -288,7 +290,7 @@ namespace Faolan.GameServer.World
 			if (_respawnPointsByMap.TryGetValue(mapId, out var cached))
 				return cached;
 
-			var points = await _database.GetRespawnPoints(mapId);
+			var points = await _worldData.GetRespawnPoints(mapId);
 			_respawnPointsByMap[mapId] = points;
 			return points;
 		}
@@ -366,7 +368,7 @@ namespace Faolan.GameServer.World
 			if (character.IsDead)
 			{
 				character.IsDead = false;
-				await _database.SaveCharacterDeadState(character.Id, false);
+				await _characters.SaveCharacterDeadState(character.Id, false);
 			}
 
 			// The point the player would respawn at (closest known, else the map's AlwaysKnown/first) - used as the
@@ -479,8 +481,8 @@ namespace Faolan.GameServer.World
 					// total, and dying to a mob used to show against it. Nothing here can be a PvP death: the server
 					// has no player-versus-player kill path at all.
 					character.NpcDeaths++; // the sheet's death counter (#447)
-					await _database.SaveCharacterDeadState(character.Id, true);
-					await _database.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
+					await _characters.SaveCharacterDeadState(character.Id, true);
+					await _characters.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
 					await SendDeathScreen(client, character, pair.Value, pair.Value.Position);
 				}
 			}

@@ -192,7 +192,7 @@ namespace Faolan.Tests
 			client.Session.Character.Name = "NecroL80";
 
 			var outbound = new Recorder();
-			return (new TradeskillService(database, outbound, null!, null!, NullLogger.Instance), client, outbound, database);
+			return (new TradeskillService(database, database, database, outbound, null!, null!, NullLogger.Instance), client, outbound, database);
 		}
 
 		// Records what a socketing asked the wire to say, so the test asserts on the TRANSACTION rather than bytes

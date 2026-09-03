@@ -44,10 +44,10 @@ namespace Faolan.GameServer.Progression
 		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_3.tshark.json frame 956 carries env=0 + env=1 for 0x43D; frames 1041/1122/1180 carry env=1 only]
 		private static readonly HashSet<CharacterStatId> DynelMirrored = [CharacterStatId.RunSpeed];
 
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterStatRepository _database;
 		private readonly ILogger _logger;
 
-		public SkillPointService(ICharacterRepository database, ILogger logger)
+		public SkillPointService(ICharacterStatRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

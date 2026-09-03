@@ -106,7 +106,7 @@ namespace Faolan.GameServer.World
 			_combos = combos;
 			_questMarkers = questMarkers;
 			_quests = quests;
-			_zones = new ZonePopulationLoader(sim, database, combos, _ambient, logger);
+			_zones = new ZonePopulationLoader(sim, database, database, combos, _ambient, logger);
 			_encounters = new EncounterService(sim, database, _handles, combos, BroadcastEntityDespawn, logger);
 		}
 

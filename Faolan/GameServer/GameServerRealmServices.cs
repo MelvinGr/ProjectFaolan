@@ -66,6 +66,10 @@ namespace Faolan.GameServer
 			// CS dispatcher. Both are interfaces the shared singleton already satisfies; MS.DI does not infer that,
 			// so each is forwarded explicitly rather than the services being widened to take the whole repository.
 			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterInventoryRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterQuestRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterStatRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterProgressionRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<ICatalogRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<INpcRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 			services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
@@ -167,7 +171,8 @@ namespace Faolan.GameServer
 			// The kill-streak table is a configured VALUE; the BIND re-seeds the level-up port's max-stat recompute.
 			services.AddSingleton(sp =>
 			{
-				var combat = new CombatService(sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<IDatabaseRepository>(),
+				var combat = new CombatService(sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<ICatalogRepository>(),
+					sp.GetRequiredService<ICharacterRepository>(), sp.GetRequiredService<ICharacterStatRepository>(),
 					sp.GetRequiredService<QuestProgressionService>(), sp.GetRequiredService<ILogger>(), sp.GetRequiredService<LevelUpService>(),
 					sp.GetRequiredService<FatalityService>(), sp.GetRequiredService<FactionService>(), sp.GetRequiredService<WorldBroadcaster>(),
 					sp.GetRequiredService<ICsPlayerAgentDispatcher>(), sp.GetRequiredService<SpellPoolEffects>(),
@@ -207,7 +212,7 @@ namespace Faolan.GameServer
 			services.AddSingleton<TradeskillService>();
 			services.AddSingleton<ClaimService>();
 			// Two single-op seams: a feat's world reload is a teleport, and a feat that TEACHES grants a spell.
-			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<IDatabaseRepository>(), sp.GetRequiredService<ILogger>(),
+			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<ICharacterProgressionRepository>(), sp.GetRequiredService<ICatalogRepository>(), sp.GetRequiredService<ILogger>(),
 				sp.GetRequiredService<IChatServerDispatcher>(), (id, map, pos) => sp.GetRequiredService<TeleportService>().DoTeleport(id, map, pos),
 				GameWire.SendLearnSpell, GameWire.SendForgetSpell));
 			services.AddSingleton<SkillPointService>();

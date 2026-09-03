@@ -17,10 +17,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Inventory
 {
-	public sealed class ItemUseService(IDatabaseRepository database, ILogger logger, BuffService buffs, IChatServerDispatcher agentServerDispatcher, WorldSimulation simulation,
+	public sealed class ItemUseService(ICatalogRepository catalog, ICharacterInventoryRepository inventory, ILogger logger, BuffService buffs, IChatServerDispatcher agentServerDispatcher, WorldSimulation simulation,
 		QuestProgressionService questProgression, PlayerDeathService playerDeaths, EconomyOutbound economyOutbound, TeleportService teleport)
 	{
-		private readonly IDatabaseRepository _database = database;
+		private readonly ICatalogRepository _catalog = catalog;
+		private readonly ICharacterInventoryRepository _inventory = inventory;
 		private readonly ILogger _logger = logger;
 		private readonly BuffService _buffs = buffs;
 		private readonly IChatServerDispatcher _agentServerDispatcher = agentServerDispatcher;
@@ -52,7 +53,7 @@ namespace Faolan.GameServer.Inventory
 				return;
 			}
 
-			var spell = await _database.GetSpell(spellBase);
+			var spell = await _catalog.GetSpell(spellBase);
 			if (spell == null)
 			{
 				_logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
@@ -102,7 +103,7 @@ namespace Faolan.GameServer.Inventory
 			if (item.OnUseLockSpellLine is not { } line || item.OnUseLockSeconds is not { } seconds || seconds == 0)
 				return;
 
-			var locked = await _database.LockedTemplateIdsForConsumableLine(line);
+			var locked = await _catalog.LockedTemplateIdsForConsumableLine(line);
 			foreach (var templateId in locked)
 				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
@@ -118,7 +119,7 @@ namespace Faolan.GameServer.Inventory
 		{
 			var character = client.Session.Character;
 
-			var item = (await _database.GetCharacterItemSlot(character.Id, container, slot))?.Template;
+			var item = (await _inventory.GetCharacterItemSlot(character.Id, container, slot))?.Template;
 			if (item == null)
 			{
 				_logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);

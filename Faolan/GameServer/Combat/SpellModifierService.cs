@@ -23,16 +23,18 @@ namespace Faolan.GameServer.Combat
 	// here - training changes it, and it is one indexed query.
 	public sealed class SpellModifierService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterStatRepository _stats;
 		private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
 		// carrier spell -> its modifier rows, and line -> member spells, both resolved once.
 		private Dictionary<uint, SpellSpellStatModifier[]>? _byCarrier;
 		private Dictionary<uint, uint[]>? _lineMembers;
 
-		public SpellModifierService(IDatabaseRepository database)
+		public SpellModifierService(ICatalogRepository catalog, ICharacterStatRepository stats)
 		{
-			_database = database;
+			_catalog = catalog;
+			_stats = stats;
 		}
 
 		// The effective modifiers on `spellId` for this caster: their trained feats, plus every live buff whose spell
@@ -47,7 +49,7 @@ namespace Faolan.GameServer.Combat
 
 			// The FEAT half. A row is kept only if it aims at THIS spell - directly, or through a line this spell is
 			// a rank of.
-			foreach (var row in await _database.GetCharacterFeatSpellStatModifiers(characterId))
+			foreach (var row in await _stats.GetCharacterFeatSpellStatModifiers(characterId))
 				if (Targets(row.SpellId, row.SpellLineId, spellId))
 					Fold(absolute, percent, row.StatId, row.Value, row.PercentHundredths);
 
@@ -102,11 +104,11 @@ namespace Faolan.GameServer.Combat
 			await _lock.WaitAsync();
 			try
 			{
-				_byCarrier ??= (await _database.GetSpellStatModifiers())
+				_byCarrier ??= (await _catalog.GetSpellStatModifiers())
 					.GroupBy(m => m.SpellId)
 					.ToDictionary(g => g.Key, g => g.OrderBy(m => m.Sequence).ToArray());
 
-				_lineMembers ??= (await _database.GetSpellLineMembers())
+				_lineMembers ??= (await _catalog.GetSpellLineMembers())
 					.GroupBy(x => x.Line)
 					.ToDictionary(g => g.Key, g => g.Select(x => x.SpellId).ToArray());
 			}

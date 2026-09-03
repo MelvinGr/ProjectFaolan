@@ -40,13 +40,13 @@ namespace Faolan.GameServer.Economy
 		private const uint VaultDisabledSlots = 0;
 		private const uint VaultSlots = 100;
 
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterInventoryRepository _database;
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
 
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
-		public GuildBankService(ICharacterRepository database, IEconomyOutbound outbound, ILogger logger, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
+		public GuildBankService(ICharacterInventoryRepository database, IEconomyOutbound outbound, ILogger logger, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
 		{
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			_database = database;

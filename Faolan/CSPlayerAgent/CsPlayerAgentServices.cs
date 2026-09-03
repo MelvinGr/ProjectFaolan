@@ -28,10 +28,15 @@ namespace Faolan.CSPlayerAgent
 			// the two must never be one set: a character is on both listeners at once, as two different clients.
 			services.AddKeyedSingleton<ConnectionRegistry>(ConnectionsKey);
 
-			// The repository SLICE the team services take (#928 item 9); the shared singleton already is one, MS.DI just
+			// The repository SLICES the team and guild services take (#928 item 9); the shared singleton already is one, MS.DI just
 			// does not infer that. The same forward AddRealmGameServer makes - registered here too so a CS-only test
 			// composition resolves.
 			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterInventoryRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterQuestRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterStatRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<ICharacterProgressionRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			services.AddSingleton<IGuildRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
 
 			services.AddSingleton<GuildService>();
 			services.AddSingleton<TeamService>();

@@ -36,10 +36,10 @@ namespace Faolan.Tests.Support
 			var log = logger ?? NullLogger.Instance;
 			var world = new WorldState(terrain);
 			var players = new PlayerRegistry();
-			var deaths = new PlayerDeathService(world, players, database!, log);
+			var deaths = new PlayerDeathService(world, players, database!, database!, log);
 			var buffTicks = new BuffTickService(world, players, database!, spellAreas!, log);
 
-			return new WorldParts(new WorldSimulation(database!, agents!, log, spellAreas!, world, players, deaths, buffTicks, new NpcCombatService(buffTicks, log), terrain),
+			return new WorldParts(new WorldSimulation(database!, database!, agents!, log, spellAreas!, world, players, deaths, buffTicks, new NpcCombatService(buffTicks, log), terrain),
 				deaths, buffTicks, world, players);
 		}
 
@@ -48,10 +48,10 @@ namespace Faolan.Tests.Support
 		public static WorldBroadcaster Broadcaster(WorldSimulation sim, IDatabaseRepository? database = null, ILogger? logger = null)
 		{
 			var log = logger ?? NullLogger.Instance;
-			var markers = new QuestMarkerResolver(database!, log);
+			var markers = new QuestMarkerResolver(database!, database!, database!, log);
 			var handles = new RuntimeHandleAllocator();
 
-			return new WorldBroadcaster(sim, database!, log, null!, null!, markers, new QuestBroadcaster(sim, database!, markers, log), handles,
+			return new WorldBroadcaster(sim, database!, log, null!, null!, markers, new QuestBroadcaster(sim, database!, database!, markers, log), handles,
 				new AmbientPoolService(sim, database!, handles, null!, log));
 		}
 	}

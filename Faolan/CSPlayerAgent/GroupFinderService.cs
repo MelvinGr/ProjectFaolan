@@ -28,7 +28,7 @@ namespace Faolan.CSPlayerAgent
 	// A composed collaborator of the CsPlayerAgent listener, like TeamService/RaidService. Matchmaking proper is
 	// NOT modelled - every signup runs the solo/private-team path the capture shows; a queuer who is already in a
 	// team takes that team along instead of a fresh solo one.
-	public sealed class GroupFinderService(ILogger<CsPlayerAgentListener> logger, ICharacterRepository database, TeamService teams, IGameServerDispatcher gameServerDispatcher)
+	public sealed class GroupFinderService(ILogger<CsPlayerAgentListener> logger, ICharacterQuestRepository database, TeamService teams, IGameServerDispatcher gameServerDispatcher)
 	{
 		// RDB 1000516 `Quest_MaxQuestPerPremiumPlayer` = 45 (the free-player twin is 30). Every account here is
 		// premium, so the finder refuses a signup at 45 held quests - the capture's refusal cleared after deleting

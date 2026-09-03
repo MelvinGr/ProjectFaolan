@@ -144,12 +144,12 @@ namespace Faolan.Tests
 				h.Service.RecordCategoryProgress(h.Client, Character, CharacterStatId.DailyDailyCounter, DateTimeOffset.UnixEpoch));
 		}
 
-		private static async Task<Dictionary<CharacterStatId, uint>> ReadSheet(ICharacterRepository database)
+		private static async Task<Dictionary<CharacterStatId, uint>> ReadSheet(ICharacterStatRepository database)
 		{
 			return (await database.GetCharacterStats(Character)).GroupBy(s => s.StatId).ToDictionary(g => g.Key, g => g.First().Value);
 		}
 
-		private sealed record Harnessed(DailyChallengeService Service, ICharacterRepository Database, RecordingNetworkClient Client);
+		private sealed record Harnessed(DailyChallengeService Service, ICharacterStatRepository Database, RecordingNetworkClient Client);
 
 		private async Task<Harnessed> Harness()
 		{

@@ -24,14 +24,16 @@ namespace Faolan.GameServer.World
 	// not automatically one another player may empty; the zone lookup is what scopes it.
 	public sealed class LootBagContents
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public LootBagContents(WorldSimulation sim, IDatabaseRepository database, ILogger logger)
+		public LootBagContents(WorldSimulation sim, ICatalogRepository catalog, IWorldRepository world, ILogger logger)
 		{
 			_sim = sim;
-			_database = database;
+			_catalog = catalog;
+			_world = world;
 			_logger = logger;
 		}
 
@@ -108,9 +110,9 @@ namespace Faolan.GameServer.World
 			if (count <= 0)
 				return [];
 
-			var items = await _database.GetMapLootSample(mapId, count);
+			var items = await _world.GetMapLootSample(mapId, count);
 			if (items.Length == 0)
-				items = await _database.GetRandomBuildableItems(count); // map has no captured loot pool - fall back
+				items = await _catalog.GetRandomBuildableItems(count); // map has no captured loot pool - fall back
 
 			return items.Select(i => i.Id).ToList();
 		}

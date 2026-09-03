@@ -99,10 +99,10 @@ namespace Faolan.GameServer.Progression
 		// "Complete 10/25/50/100/250/500 daily challenges", LDB 55700).
 		private const CharacterStatId Lifetime = CharacterStatId.CounterDailyChallenges;
 
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterStatRepository _database;
 		private readonly ILogger _logger;
 
-		public DailyChallengeService(ICharacterRepository database, ILogger logger)
+		public DailyChallengeService(ICharacterStatRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

@@ -18,7 +18,7 @@ namespace Faolan.GameServer.Combat
 	/// </remarks>
 	public static class CharacterStatBonuses
 	{
-		public static async Task<IReadOnlyDictionary<CharacterStatId, int>> For(ICharacterRepository database, Character character)
+		public static async Task<IReadOnlyDictionary<CharacterStatId, int>> For(ICharacterStatRepository database, Character character)
 		{
 			return MaxStatAggregator.Combine(
 				MaxStatAggregator.AggregateGearBonuses(await database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),

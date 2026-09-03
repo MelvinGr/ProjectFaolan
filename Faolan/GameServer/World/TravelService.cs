@@ -29,13 +29,15 @@ namespace Faolan.GameServer.World
 	// derived by chopping the last index off an answer path). ConversationService calls in as it takes each branch.
 	public sealed class TravelService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterInventoryRepository _inventory;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 		private readonly ITravelOutbound _output;
 
-		public TravelService(IDatabaseRepository database, ITravelOutbound output, ILogger logger)
+		public TravelService(ICharacterInventoryRepository inventory, IWorldRepository world, ITravelOutbound output, ILogger logger)
 		{
-			_database = database;
+			_inventory = inventory;
+			_world = world;
 			_output = output;
 			_logger = logger;
 		}
@@ -47,7 +49,7 @@ namespace Faolan.GameServer.World
 		/// </summary>
 		public Task<TravelDestination[]> DestinationsOf(string npcName)
 		{
-			return _database.GetTravelDestinationsByNpcName(npcName);
+			return _world.GetTravelDestinationsByNpcName(npcName);
 		}
 
 		/// <summary>
@@ -66,7 +68,7 @@ namespace Faolan.GameServer.World
 			// and each destination one pick deeper, and the edge states which screen that is. That screen is half of
 			// this table's primary key, so it is the LOOKUP (#646) - the NPC no longer has to be named to find it, and
 			// its name comes back off the row for the text and the log lines.
-			var offered = await _database.GetTravelDestinationsFrom(listNodeId);
+			var offered = await _world.GetTravelDestinationsFrom(listNodeId);
 			if (offered.Length == 0)
 				return true;
 
@@ -99,7 +101,7 @@ namespace Faolan.GameServer.World
 			if (fare > 0)
 			{
 				character.Money -= fare;
-				await _database.SetCharacterMoney(character.Id, character.Money);
+				await _inventory.SetCharacterMoney(character.Id, character.Money);
 				await _output.SendTravelFeeCharged(client, character.Money);
 				_logger.LogInformation("Travel: {Character} paid \"{Npc}\" {Fare} tin for a ride ({Count} destination(s) offered).", character.Name, npcName, fare, offered.Length);
 			}
@@ -119,7 +121,7 @@ namespace Faolan.GameServer.World
 
 			// `(FromNodeId, OptionId)` IS the table's primary key, so the pick is a single-row lookup rather than a
 			// fetch-by-name filtered down to one (#646).
-			var destination = await _database.GetTravelDestination(fromNodeId, optionId);
+			var destination = await _world.GetTravelDestination(fromNodeId, optionId);
 			if (destination == null)
 				return false;
 

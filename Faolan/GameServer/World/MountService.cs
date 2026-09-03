@@ -22,14 +22,16 @@ namespace Faolan.GameServer.World
 	{
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly BuffService _buffs;
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterRepository _characters;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public MountService(WorldSimulation sim, IDatabaseRepository database, BuffService buffs, WorldBroadcaster broadcaster, ILogger logger)
+		public MountService(WorldSimulation sim, ICatalogRepository catalog, ICharacterRepository characters, BuffService buffs, WorldBroadcaster broadcaster, ILogger logger)
 		{
 			_sim = sim;
-			_database = database;
+			_catalog = catalog;
+			_characters = characters;
 			_buffs = buffs;
 			_broadcaster = broadcaster;
 			_logger = logger;
@@ -65,7 +67,7 @@ namespace Faolan.GameServer.World
 		{
 			await Seat(client, mount, true);
 			client.Session.Character.MountId = mount.Id;
-			await _database.SaveCharacterMount(client.Session.Character.Id, mount.Id);
+			await _characters.SaveCharacterMount(client.Session.Character.Id, mount.Id);
 		}
 
 		// Takes the player off their mount and clears the persisted one, so world entry does not re-seat a mount they
@@ -92,7 +94,7 @@ namespace Faolan.GameServer.World
 			entity?.MountDamageTaken = 0;
 
 			character.MountId = null;
-			await _database.SaveCharacterMount(self, null);
+			await _characters.SaveCharacterMount(self, null);
 		}
 
 		/// <summary>
@@ -104,7 +106,7 @@ namespace Faolan.GameServer.World
 			if (((map?.PlayfieldFlags ?? 0) & mountAllowedFlag) == 0)
 				return false;
 
-			var mount = await _database.GetMount(mountId);
+			var mount = await _catalog.GetMount(mountId);
 			if (mount == null)
 				return false;
 

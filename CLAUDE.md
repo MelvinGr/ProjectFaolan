@@ -255,7 +255,17 @@ chat/system messages, `IGameServerDispatcher` for world actions), never direct r
 
 **Database:** SQLite via EF Core (`Faolan.Core.Database`: `DatabaseContext` + `Tables/`), pooled
 `DbContextFactory`, short-lived per-unit-of-work contexts — lazy loading is deliberately NOT used; load
-navigations explicitly with `Include`. All access goes through `IDatabaseRepository`. `faolan.db` carries the game data (built by the importer, committed to
+navigations explicitly with `Include`. All access goes through `IDatabaseRepository` — which is only the COMPOSITE of 13
+per-domain slices, each declared beside its implementation (`Repositories/DatabaseRepository.<Domain>.cs`), and the
+character's five split by the QUESTION a member answers: `ICharacterRepository` (the row and its 1:1 satellites),
+`ICharacterInventoryRepository` (what it carries), `ICharacterQuestRepository` (what it is on),
+`ICharacterProgressionRepository` (what it has learned) and `ICharacterStatRepository` (what it adds up to). **A
+service takes the slices it calls, not the composite** (#928 item 9): one to three slices as separate ctor params
+(`_catalog` / `_inventory` / `_world`, …); a genuine four-plus-slice consumer (`WorldEntryService`, `GmCommandService`,
+`TradepostService`, …) or one that hands the repository on to a helper needing the composite keeps
+`IDatabaseRepository`. Both realm containers forward every slice to the one singleton — a new slice is not resolvable
+until it is added to BOTH `AddRealmGameServer` and `AddRealmCsPlayerAgent` (the composition tests catch the miss).
+`faolan.db` carries the game data (built by the importer, committed to
 git) and the server only migrates + reads/writes at save/load points. The sqlite3 CLI has foreign keys
 OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan child rows.
 

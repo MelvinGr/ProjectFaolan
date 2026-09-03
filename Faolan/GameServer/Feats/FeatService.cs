@@ -34,7 +34,7 @@ namespace Faolan.GameServer.Feats
 	public sealed class FeatService
 	{
 		private readonly Func<uint, uint, Vector3?, Task> _teleport;
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterProgressionRepository _database;
 
 		// The CATALOG half, for one question: what the character's LEVEL grants, which is the guard on the untrain's
 		// spell revoke (#920). A second narrow interface rather than widening `_database` to `IDatabaseRepository` -
@@ -50,7 +50,7 @@ namespace Faolan.GameServer.Feats
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
 		private readonly Func<INetworkClient, uint, Task> _forgetSpell;
 
-		public FeatService(ICharacterRepository database, ICatalogRepository catalog, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
+		public FeatService(ICharacterProgressionRepository database, ICatalogRepository catalog, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
 			Func<INetworkClient, uint, Task> learnSpell, Func<INetworkClient, uint, Task> forgetSpell)
 		{
 			_database = database;

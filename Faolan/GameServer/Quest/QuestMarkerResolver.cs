@@ -99,7 +99,9 @@ namespace Faolan.GameServer.Quest
 		/// </remarks>
 		public const int LitBandBelowPlayer = -2, LitBandAbovePlayer = 1;
 
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterQuestRepository _quests;
+		private readonly INpcRepository _npcs;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 
 		// Quest-giver NPC template id -> EVERY quest it grants, cached once (small set).
@@ -109,9 +111,11 @@ namespace Faolan.GameServer.Quest
 		// mostly about and the giver map does not carry (#857).
 		private Dictionary<uint, uint[]> _goalTargets = null!;
 
-		public QuestMarkerResolver(IDatabaseRepository database, ILogger logger)
+		public QuestMarkerResolver(ICharacterQuestRepository quests, INpcRepository npcs, IWorldRepository world, ILogger logger)
 		{
-			_database = database;
+			_quests = quests;
+			_npcs = npcs;
+			_world = world;
 			_logger = logger;
 		}
 
@@ -127,8 +131,8 @@ namespace Faolan.GameServer.Quest
 		/// </remarks>
 		public async Task<bool> IsQuestRelevant(uint npcTemplateId)
 		{
-			_questGivers ??= await _database.GetQuestGiverMap();
-			_goalTargets ??= await _database.GetQuestGoalTargetMap();
+			_questGivers ??= await _npcs.GetQuestGiverMap();
+			_goalTargets ??= await _npcs.GetQuestGoalTargetMap();
 			return _questGivers.ContainsKey(npcTemplateId) || _goalTargets.ContainsKey(npcTemplateId);
 		}
 
@@ -157,8 +161,8 @@ namespace Faolan.GameServer.Quest
 			// client's serialized poll queue took ~20s to drain and every request behind it - including its 5s latency
 			// check - measured that backlog. One batched read instead; order is preserved, so the FIRST match wins.
 			// The giver logic below needs the raw rows in EVERY state (held / completed), so that stays a plain read.
-			var quests = await _database.GetCharacterQuests(character.Id);
-			foreach (var (_, qDef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
+			var quests = await _quests.GetCharacterQuests(character.Id);
+			foreach (var (_, qDef) in await _world.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
 				// #521: template first, name second - the same test the talk TRIGGER uses, so the marker and what
 				// actually fires on the greeting cannot disagree.
@@ -167,7 +171,7 @@ namespace Faolan.GameServer.Quest
 					return TurnIn;
 			}
 
-			_questGivers ??= await _database.GetQuestGiverMap();
+			_questGivers ??= await _npcs.GetQuestGiverMap();
 			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questIds))
 				return await ChainRunsThrough(character, npc, quests)
 					? Unavailable
@@ -209,7 +213,7 @@ namespace Faolan.GameServer.Quest
 				// from wearing the marker ("Halen van Dummy" is the internal name of 27 unrelated templates). That job
 				// belongs to the TEMPLATE-keyed lookup above since #646, so removing the gate does not give it back.
 				// docs/subsystems/quests.md already said MapId "cannot be a general match key - it is a marker pin".
-				var giverQuest = await _database.GetQuestDefinition(questId);
+				var giverQuest = await _world.GetQuestDefinition(questId);
 				var held = Array.Find(quests, q => q.QuestId == questId);
 				// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest
 				// is only marked Completed on turn-in, not on the kill, #47/#241). It outranks the rest: a giver you can
@@ -271,7 +275,7 @@ namespace Faolan.GameServer.Quest
 		/// </remarks>
 		private async Task<bool> ChainRunsThrough(Character character, WorldEntity npc, CharacterQuest[] quests)
 		{
-			_goalTargets ??= await _database.GetQuestGoalTargetMap();
+			_goalTargets ??= await _npcs.GetQuestGoalTargetMap();
 			if (!_goalTargets.TryGetValue(npc.NpcTemplateId, out var targetingQuestIds))
 				return false;
 
@@ -282,7 +286,7 @@ namespace Faolan.GameServer.Quest
 			var lineOf = new Dictionary<uint, QuestDefinition>();
 			foreach (var questId in quests.Select(q => q.QuestId).Concat(targetingQuestIds).Distinct())
 			{
-				if (await _database.GetQuestDefinition(questId) is not { } def)
+				if (await _world.GetQuestDefinition(questId) is not { } def)
 					continue;
 
 				lineOf[questId] = def;
@@ -339,7 +343,7 @@ namespace Faolan.GameServer.Quest
 
 			// One batched read rather than a query per active quest - this sits on the LOOT path, so it ran per kill
 			// that could drop a bag.
-			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
+			foreach (var (quest, def) in await _world.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
 				// #521: template first, name second - the same test MatchingLootGoal applies when the item is actually
 				// taken. The two must agree, or the drop is forced for a goal the take then refuses to advance.
@@ -371,7 +375,7 @@ namespace Faolan.GameServer.Quest
 			if (characterId == null)
 				return;
 
-			var quests = await _database.GetCharacterQuests(characterId.Value);
+			var quests = await _quests.GetCharacterQuests(characterId.Value);
 			entity!.ActiveQuestIds.Clear();
 			entity.CompletedQuestIds.Clear();
 			foreach (var quest in quests)
@@ -393,7 +397,7 @@ namespace Faolan.GameServer.Quest
 		// the behaviour before this gate existed. Only a genuine lower sequence gates.
 		private async Task<bool> IsLineReady(QuestDefinition quest, CharacterQuest[] quests)
 		{
-			return quest.JournalSequence == 0 || LineReached(quest, await _database.GetQuestDefinitionsByLine(quest.QuestLineId), quests);
+			return quest.JournalSequence == 0 || LineReached(quest, await _world.GetQuestDefinitionsByLine(quest.QuestLineId), quests);
 		}
 
 		// The rule itself, split from the fetch so it can be tested against the real quest lines without a database.

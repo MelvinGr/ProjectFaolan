@@ -37,7 +37,8 @@ namespace Faolan.GameServer.Quest
 		private const uint NotShareableFlag = 0x10;
 
 		private readonly ICsPlayerAgentProvider _teams;
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterQuestRepository _quests;
+		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 		private readonly IQuestShareOutbound _outbound;
 		private readonly QuestProgressionService _progression;
@@ -47,9 +48,10 @@ namespace Faolan.GameServer.Quest
 		// - the same rule the team accept and the trade start follow.
 		private readonly ConcurrentDictionary<uint, PendingShare> _pendingByTarget = [];
 
-		public QuestSharingService(IDatabaseRepository database, ICsPlayerAgentProvider teams, IQuestShareOutbound outbound, QuestProgressionService progression, ILogger logger)
+		public QuestSharingService(ICharacterQuestRepository quests, IWorldRepository world, ICsPlayerAgentProvider teams, IQuestShareOutbound outbound, QuestProgressionService progression, ILogger logger)
 		{
-			_database = database;
+			_quests = quests;
+			_world = world;
 			_teams = teams;
 			_outbound = outbound;
 			_progression = progression;
@@ -71,9 +73,9 @@ namespace Faolan.GameServer.Quest
 
 			// You can only share a quest you are actually on. A completed one is not shareable either - it is no longer
 			// in the log the Share button lives in.
-			var mine = await _database.GetCharacterQuests(sharerId);
+			var mine = await _quests.GetCharacterQuests(sharerId);
 			var def = mine.Any(q => q.QuestId == questId && q.State == QuestState.Active)
-				? await _database.GetQuestDefinition(questId)
+				? await _world.GetQuestDefinition(questId)
 				: null;
 			if (def == null)
 			{
@@ -97,7 +99,7 @@ namespace Faolan.GameServer.Quest
 				if (member == null)
 					continue; // in the roster but not in this world process - nothing to offer, and no code says so
 
-				var theirs = await _database.GetCharacterQuests(memberId);
+				var theirs = await _quests.GetCharacterQuests(memberId);
 				if (theirs.Any(q => q.QuestId == questId && q.State == QuestState.Completed))
 				{
 					await _outbound.SendQuestShareIndividualFeedback(sharerId, QuestShareFeedback.AlreadyFinished, member.Name);

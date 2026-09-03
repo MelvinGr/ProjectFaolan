@@ -91,7 +91,9 @@ namespace Faolan.GameServer.Economy
 		// The refusal lines a harvest can produce ("already harvested", "bag full", "not yet harvestable") - said by
 		// the NODE, which is how retail words them, rather than as a system message.
 		private readonly IChatServerDispatcher _chat;
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterInventoryRepository _inventory;
+		private readonly ICharacterProgressionRepository _progression;
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
 
@@ -99,9 +101,11 @@ namespace Faolan.GameServer.Economy
 		// own command QUEUE can hold more than one, and dropping a second craft on the floor would silently eat it.
 		private readonly List<StagedTradeskill> _staged = [];
 
-		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, WorldObjectService worldObjects, IChatServerDispatcher chat, ILogger logger)
+		public TradeskillService(ICatalogRepository catalog, ICharacterInventoryRepository inventory, ICharacterProgressionRepository progression, IEconomyOutbound outbound, WorldObjectService worldObjects, IChatServerDispatcher chat, ILogger logger)
 		{
-			_database = database;
+			_catalog = catalog;
+			_inventory = inventory;
+			_progression = progression;
 			_outbound = outbound;
 			_worldObjects = worldObjects;
 			_chat = chat;
@@ -186,7 +190,7 @@ namespace Faolan.GameServer.Economy
 
 		public async Task<ImmutableArray<TradeskillLadder>> Ladders()
 		{
-			return _ladders ??= TradeskillLadders.Build(await _database.GetSingleFeatPrereqs());
+			return _ladders ??= TradeskillLadders.Build(await _progression.GetSingleFeatPrereqs());
 		}
 
 		// What professions a character has trained, and how far - profession NAME -> rank index (0 = Novice). Empty
@@ -205,7 +209,7 @@ namespace Faolan.GameServer.Economy
 		// believed to be - which is exactly how the tier came to look absent from that table.
 		public async Task<Dictionary<string, int>> ProfessionsOf(uint characterId)
 		{
-			var held = (await _database.GetCharacterFeats(characterId)).Concat(await _database.GetCharacterSkillIds(characterId)).ToHashSet();
+			var held = (await _progression.GetCharacterFeats(characterId)).Concat(await _progression.GetCharacterSkillIds(characterId)).ToHashSet();
 			var ranks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 			if (held.Count == 0)
 				return ranks;
@@ -280,7 +284,7 @@ namespace Faolan.GameServer.Economy
 		// graph rather than a statement that the character may not do it.
 		public async Task<bool> HasReachedFeat(uint characterId, uint templateFeatId)
 		{
-			if (await _database.GetWireFeatId(templateFeatId) is not { } wireFeatId)
+			if (await _progression.GetWireFeatId(templateFeatId) is not { } wireFeatId)
 				return true;
 
 			var ladders = await Ladders();
@@ -307,8 +311,8 @@ namespace Faolan.GameServer.Economy
 			if (target.Container != gem.Container || target.Slot == gem.Slot)
 				return false; // both addresses are cells of the player's own bag in every captured socketing
 
-			var host = await _database.GetCharacterItemSlot(character.Id, target.Container, (int)target.Slot);
-			var stone = await _database.GetCharacterItemSlot(character.Id, gem.Container, (int)gem.Slot);
+			var host = await _inventory.GetCharacterItemSlot(character.Id, target.Container, (int)target.Slot);
+			var stone = await _inventory.GetCharacterItemSlot(character.Id, gem.Container, (int)gem.Slot);
 			if (host == null || stone == null)
 			{
 				_logger.LogInformation("Socket refused: {Character} named {Container}[{Target}] + [{Gem}] and one of them is empty.", character.Name, target.Container, target.Slot,
@@ -336,7 +340,7 @@ namespace Faolan.GameServer.Economy
 				return false;
 			}
 
-			var socket = await _database.SocketGem(host.Id, index.Value, stone.Id);
+			var socket = await _inventory.SocketGem(host.Id, index.Value, stone.Id);
 			if (socket == null)
 				return false;
 
@@ -355,7 +359,7 @@ namespace Faolan.GameServer.Economy
 			if (count == 0)
 				return null;
 
-			var recipe = await _database.GetRecipe(recipeId);
+			var recipe = await _catalog.GetRecipe(recipeId);
 			if (recipe == null)
 			{
 				_logger.LogInformation("Craft refused: {Character} asked for recipe {Recipe}, which is not in the catalog.", character.Name, recipeId);
@@ -395,7 +399,7 @@ namespace Faolan.GameServer.Economy
 			// CHECK EVERYTHING BEFORE TAKING ANYTHING. Taking as we go would leave a player who is one silver short
 			// having paid the copper - the same grant-before-consume discipline the shop's buy path and the harvest
 			// bag-full refusal use.
-			var held = await _database.GetCharacterItems(character.Id);
+			var held = await _inventory.GetCharacterItems(character.Id);
 			foreach (var (itemId, quantity) in needed)
 			{
 				var have = held.Where(i => i.TemplateId == itemId).Aggregate(0u, (sum, i) => sum + (i.Count == 0 ? 1u : i.Count));
@@ -407,7 +411,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			// The product first, so a full bag refuses the craft with the materials still in it.
-			var productItem = await _database.GetItem(product.ItemId);
+			var productItem = await _catalog.GetItem(product.ItemId);
 			var slot = await _outbound.GrantItemToBackpack(client, product.ItemId, count, creatorName: character.Name);
 			if (slot == null)
 			{
@@ -524,7 +528,7 @@ namespace Faolan.GameServer.Economy
 			var before = node.Health ?? HarvestCatalog.NodeMaxHealth;
 			var after = before - HarvestCatalog.SwingCost;
 			node.Health = after;
-			await SendItemLootChatMessage(client, resourceId, (uint)((await _database.GetItem(resourceId))?.Level ?? 0));
+			await SendItemLootChatMessage(client, resourceId, (uint)((await _catalog.GetItem(resourceId))?.Level ?? 0));
 			await _worldObjects.BroadcastNodeHealth(client, node, after);
 			await _worldObjects.BroadcastGatheringPin(client, node); // #921: the map pin flips to "being gathered"
 
@@ -571,7 +575,7 @@ namespace Faolan.GameServer.Economy
 			// #735: only what the character has TRAINED for. A fresh character has learned no profession and so gets
 			// an EMPTY book, which is retail - the book is what a profession buys. The gate is the recipe's own
 			// `RequiredFeatId` against the character's rank on that profession's ladder; see TradeskillService.
-			var rows = await this.BookFor(handle, await _database.GetRecipes());
+			var rows = await this.BookFor(handle, await _catalog.GetRecipes());
 			var records = rows.Select(RecipeRecords.FromRow).ToList();
 
 			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

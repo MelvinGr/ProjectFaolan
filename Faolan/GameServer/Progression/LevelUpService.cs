@@ -29,7 +29,9 @@ namespace Faolan.GameServer.Progression
 	// wires in as a second `ApplyXp` caller rather than a third copy of this burst.
 	public sealed class LevelUpService
 	{
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterProgressionRepository _progression;
+		private readonly ICharacterRepository _characters;
 		private readonly ILogger _logger;
 
 		// The wire ops the burst needs from the listener (vitals reseed, rating quad, ability grant, spell learn).
@@ -39,9 +41,11 @@ namespace Faolan.GameServer.Progression
 		// The live world model: a ding must move the player ENTITY's level too, not just the row.
 		private readonly WorldSimulation _sim;
 
-		public LevelUpService(IDatabaseRepository database, WorldSimulation sim, ILevelUpOutbound? outbound, ILogger logger)
+		public LevelUpService(ICatalogRepository catalog, ICharacterProgressionRepository progression, ICharacterRepository characters, WorldSimulation sim, ILevelUpOutbound? outbound, ILogger logger)
 		{
-			_database = database;
+			_catalog = catalog;
+			_progression = progression;
+			_characters = characters;
 			_sim = sim;
 			_outbound = outbound;
 			_logger = logger;
@@ -70,13 +74,13 @@ namespace Faolan.GameServer.Progression
 				// ever updated - a combat level-up wrote the level and left the row at its creation value, so the next
 				// login re-seeded current health from the old ceiling and the player came back at a fraction of their
 				// bar (a level-2 necromancer reading 89/955).
-				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
+				await _progression.SetCharacterProgress(character.Id, character.Experience, character.Level);
 				await PushLevelUp(client, character, levelsGained);
 				_logger.LogInformation("Progression: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
 				return;
 			}
 
-			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
+			await _progression.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
 			var block = new CharacterStatBlock().SetExperience(character.Level, character.Experience);
 			await SendStatUpdate(client, block);
@@ -101,7 +105,7 @@ namespace Faolan.GameServer.Progression
 			character.Experience = 0;
 			// No vitals row to refresh: the ceiling is DERIVED from (Class, Level), so setting the level above is
 			// already the new max (#578).
-			await _database.SaveCharacter(character);
+			await _characters.SaveCharacter(character);
 
 			if (level > previousLevel)
 			{
@@ -143,7 +147,7 @@ namespace Faolan.GameServer.Progression
 				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
 				// class-independent level-keyed catalog (casters have no rows); it ships empty until populated from dumps,
 				// so this is a no-op today.
-				foreach (var combo in await _database.GetClassCombosUnlockedBetween(character.Class, lvl - 1, lvl))
+				foreach (var combo in await _catalog.GetClassCombosUnlockedBetween(character.Class, lvl - 1, lvl))
 					await WorldIir.Send(client, ComboBookCodec.Build(instance, combo.Id));
 			}
 
@@ -169,18 +173,18 @@ namespace Faolan.GameServer.Progression
 			if (_outbound == null)
 				return;
 
-			foreach (var ability in await _database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, character.Level))
+			foreach (var ability in await _catalog.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, character.Level))
 				await _outbound.AnnounceAbility(client, ability);
 
 			// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed
 			// range - learned (DispatchLearnSpell) and persisted to CharacterSpells so they ride every relog, exactly
 			// like .learnspell / a create-flow starter. Combos are NOT in that set (#298) - they went out above, on the
 			// combo book, which is the only place retail puts them.
-			var learned = await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level);
+			var learned = await _catalog.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level);
 			foreach (var spellId in learned)
 			{
 				await _outbound.LearnSpell(client, spellId);
-				await _database.AddCharacterSpell(character.Id, spellId);
+				await _progression.AddCharacterSpell(character.Id, spellId);
 			}
 
 			await GrantCastabilityFor(character);
@@ -256,7 +260,7 @@ namespace Faolan.GameServer.Progression
 		{
 			var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
 			if (fullScaffold != null)
-				await _database.EnsureCharacterSkills(character.Id, fullScaffold);
+				await _progression.EnsureCharacterSkills(character.Id, fullScaffold);
 		}
 
 		// Pushes a 0x96B8DC59 stat block to the player, addressed to their own handle (shared wire builder on

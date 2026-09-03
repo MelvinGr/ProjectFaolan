@@ -48,14 +48,16 @@ namespace Faolan.CSPlayerAgent
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
 		private readonly ConnectionRegistry _connections;
 		private readonly IChatServerDispatcher _chatServerDispatcher;
-		private readonly IDatabaseRepository _database;
+		private readonly ICharacterRepository _characters;
+		private readonly IGuildRepository _guilds;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly ILogger _logger;
 
-		public GuildService(IDatabaseRepository database, ILogger<CsPlayerAgentListener> logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher,
+		public GuildService(ICharacterRepository characters, IGuildRepository guilds, ILogger<CsPlayerAgentListener> logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher,
 			[FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 		{
-			_database = database;
+			_characters = characters;
+			_guilds = guilds;
 			_logger = logger;
 			_gameServerDispatcher = gameServerDispatcher;
 			_chatServerDispatcher = chatServerDispatcher;
@@ -92,13 +94,13 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			if (!await _database.SetCharacterGuild(character.Id, guildId, 0))
+			if (!await _characters.SetCharacterGuild(character.Id, guildId, 0))
 				return;
 
 			character.GuildId = guildId;
 			character.GuildRank = 0;
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return;
 
@@ -120,7 +122,7 @@ namespace Faolan.CSPlayerAgent
 			body.ReadUInt32(); // ID32 type (0x0000C350)
 			var targetId = body.ReadUInt32();
 
-			var target = await _database.GetCharacter(targetId);
+			var target = await _characters.GetCharacter(targetId);
 			if (target?.GuildId is not { } targetGuildId)
 				return;
 
@@ -133,7 +135,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			var guild = await _database.GetGuild(targetGuildId);
+			var guild = await _guilds.GetGuild(targetGuildId);
 			if (guild == null)
 				return;
 
@@ -166,7 +168,7 @@ namespace Faolan.CSPlayerAgent
 			body.ReadUInt32(); // ID32 type (0x0000DEB7)
 			var guildId = body.ReadUInt32();
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 			{
 				// Retail sends nothing for a guild it cannot resolve, and the client keeps showing the raw id. Say so
@@ -199,7 +201,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			var guild = await _database.CreateGuild(name, character.Id);
+			var guild = await _guilds.CreateGuild(name, character.Id);
 			if (guild == null)
 			{
 				// ⭐ Retail's name-taken refusal, and it is a NO-ARG dispatch - the client already knows which name
@@ -238,7 +240,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			body.ReadUInt32(); // ID32 type (0x0000C350)
 			var targetId = body.ReadUInt32();
-			var target = await _database.GetCharacter(targetId);
+			var target = await _characters.GetCharacter(targetId);
 			await InviteCharacterToGuild(client, target, $"{targetId:X8}");
 		}
 
@@ -247,7 +249,7 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleGuildInviteByName(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var targetName = body.ReadString();
-			var target = await _database.GetCharacterByName(targetName, client.Session.Character.RealmId);
+			var target = await _characters.GetCharacterByName(targetName, client.Session.Character.RealmId);
 			await InviteCharacterToGuild(client, target, targetName);
 		}
 
@@ -293,7 +295,7 @@ namespace Faolan.CSPlayerAgent
 			if (target == null)
 				return;
 
-			var guild = await _database.GetGuild(target.GuildId!.Value);
+			var guild = await _guilds.GetGuild(target.GuildId!.Value);
 			if (guild == null)
 				return;
 
@@ -309,7 +311,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			if (!await _database.SetCharacterGuild(target.Id, guild.Id, (GuildRank)newRank))
+			if (!await _characters.SetCharacterGuild(target.Id, guild.Id, (GuildRank)newRank))
 				return;
 
 			target.GuildRank = (GuildRank)newRank;
@@ -346,7 +348,7 @@ namespace Faolan.CSPlayerAgent
 				return null;
 			}
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return null;
 
@@ -358,7 +360,7 @@ namespace Faolan.CSPlayerAgent
 				return null;
 			}
 
-			var target = await _database.GetCharacter(targetId);
+			var target = await _characters.GetCharacter(targetId);
 			if (target == null || target.GuildId != guildId || target.Id == actor.Id)
 			{
 				_logger.LogInformation("Guild {Verb} refused: target {TargetId:X8} is not another member of \"{Guild}\".", verb, targetId, guild.Name);
@@ -382,8 +384,8 @@ namespace Faolan.CSPlayerAgent
 			if (character.GuildId is not { } guildId)
 				return;
 
-			var guild = await _database.GetGuild(guildId);
-			if (!await _database.SetCharacterGuild(character.Id, null, 0))
+			var guild = await _guilds.GetGuild(guildId);
+			if (!await _characters.SetCharacterGuild(character.Id, null, 0))
 				return;
 
 			character.GuildId = null;
@@ -426,12 +428,12 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			var motd = body.ReadString();
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return;
 
 			guild.MessageOfTheDay = motd;
-			await _database.SaveGuild(guild);
+			await _guilds.SaveGuild(guild);
 			_logger.LogInformation("Guild \"{Guild}\" MOTD set by {Character} ({Length} chars).", guild.Name, character.Name, motd.Length);
 
 			foreach (var member in guild.Members)
@@ -457,16 +459,16 @@ namespace Faolan.CSPlayerAgent
 			if (amountTin == 0)
 				return false;
 
-			var character = await _database.GetCharacter(characterId);
+			var character = await _characters.GetCharacter(characterId);
 			if (character?.GuildId is not { } guildId)
 				return false;
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return false;
 
 			guild.Cash += amountTin;
-			await _database.SaveGuild(guild);
+			await _guilds.SaveGuild(guild);
 			_logger.LogInformation("Guild \"{Guild}\": {Character} deposited {Amount} tin (bank {Balance}).", guild.Name, character.Name, amountTin, guild.Cash);
 
 			await BroadcastGuildCash(guild);
@@ -505,7 +507,7 @@ namespace Faolan.CSPlayerAgent
 			if (character?.GuildId is not { } guildId)
 				return;
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return;
 
@@ -529,13 +531,13 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			guild.Cash -= request.AmountTin;
-			await _database.SaveGuild(guild);
+			await _guilds.SaveGuild(guild);
 
 			if (!await _gameServerDispatcher.CreditCharacterCash(character.Id, request.AmountTin))
 			{
 				// Nobody could receive it - put it back rather than leave it nowhere.
 				guild.Cash += request.AmountTin;
-				await _database.SaveGuild(guild);
+				await _guilds.SaveGuild(guild);
 				_logger.LogWarning("GuildWithdrawMoney rolled back: {Character} is not on this realm's game host.", character.Name);
 				return;
 			}
@@ -553,7 +555,7 @@ namespace Faolan.CSPlayerAgent
 			if (character?.GuildId is not { } guildId)
 				return;
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return;
 
@@ -604,7 +606,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			var guild = await _database.GetGuild(guildId);
+			var guild = await _guilds.GetGuild(guildId);
 			if (guild == null)
 				return;
 

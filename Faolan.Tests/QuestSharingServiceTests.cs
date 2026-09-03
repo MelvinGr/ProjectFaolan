@@ -252,7 +252,7 @@ namespace Faolan.Tests
 
 			var questOutbound = new RecordingQuestOutbound();
 			var progression = new QuestProgressionService(database, questOutbound, null!, null!, null!, new QuestRewardService(database, questOutbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), new DailyChallengeService(database, NullLogger.Instance), NullLogger.Instance);
-			var service = new QuestSharingService(database, new FixedRoster(roster), outbound, progression, NullLogger.Instance);
+			var service = new QuestSharingService(database, database, new FixedRoster(roster), outbound, progression, NullLogger.Instance);
 
 			return new Harnessed(service, database, outbound, questOutbound);
 		}

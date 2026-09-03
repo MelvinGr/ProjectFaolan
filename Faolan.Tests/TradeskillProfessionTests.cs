@@ -274,7 +274,7 @@ namespace Faolan.Tests
 			}
 
 			var database = new DatabaseRepository(new Factory(options));
-			var service = new TradeskillService(database, null!, null!, null!, NullLogger.Instance);
+			var service = new TradeskillService(database, database, database, null!, null!, null!, NullLogger.Instance);
 
 			if (profession != null && rank != null)
 			{

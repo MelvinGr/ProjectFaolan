@@ -29,13 +29,17 @@ namespace Faolan.GameServer.Economy
 	public sealed class ClaimService
 	{
 		private readonly IChatServerDispatcher _chat;
-		private readonly IDatabaseRepository _database;
+		private readonly IAccountRepository _accounts;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterInventoryRepository _inventory;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 
-		public ClaimService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, IChatServerDispatcher chat)
+		public ClaimService(IAccountRepository accounts, ICatalogRepository catalog, ICharacterInventoryRepository inventory, ILogger logger, IEconomyOutbound outbound, IChatServerDispatcher chat)
 		{
-			_database = database;
+			_accounts = accounts;
+			_catalog = catalog;
+			_inventory = inventory;
 			_logger = logger;
 			_outbound = outbound;
 			_chat = chat;
@@ -52,7 +56,7 @@ namespace Faolan.GameServer.Economy
 
 			if (parts.Length >= 1 && parts[0].Equals("list", StringComparison.OrdinalIgnoreCase))
 			{
-				var rows = await _database.GetAccountClaims(accountId);
+				var rows = await _accounts.GetAccountClaims(accountId);
 				if (rows.Length == 0)
 				{
 					await _chat.SendSystemMessage(characterId, "No pending claims.");
@@ -60,7 +64,7 @@ namespace Faolan.GameServer.Economy
 				}
 
 				// One read for every listed claim's item rather than a query per row.
-				var items = (await _database.GetItems([.. rows.Select(r => r.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
+				var items = (await _catalog.GetItems([.. rows.Select(r => r.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
 				for (var i = 0; i < rows.Length; i++)
 				{
 					var qty = rows[i].Quantity?.ToString() ?? "∞"; // null = infinite charges
@@ -84,11 +88,11 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			var template = await _database.GetItem(itemId);
+			var template = await _catalog.GetItem(itemId);
 			// Level is cosmetic (the client shows the item's own level from its RDB); seed it from our Items row if we
 			// have it. count <= 1 = an ordinary INFINITE item claim (null charges, shown as ∞); count > 1 = a finite
 			// multi-charge claim.
-			await _database.CreateAccountClaim(new AccountClaim
+			await _accounts.CreateAccountClaim(new AccountClaim
 			{
 				AccountId = accountId,
 				ItemTemplateId = itemId,
@@ -149,7 +153,7 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			var claim = await _database.GetAccountClaim(slots[(int)(index - 1)]);
+			var claim = await _accounts.GetAccountClaim(slots[(int)(index - 1)]);
 			if (claim == null || claim.AccountId != client.Session.Account.Id)
 				return; // already redeemed (or not this account's) - no-op
 
@@ -159,7 +163,7 @@ namespace Faolan.GameServer.Economy
 			// spent on a duplicate the player cannot use burns it for good.
 			if (claim.Quantity is not null && characterId != 0)
 			{
-				var alreadyHeld = (await _database.GetCharacterItems(characterId)).Any(i => i.TemplateId == claim.ItemTemplateId);
+				var alreadyHeld = (await _inventory.GetCharacterItems(characterId)).Any(i => i.TemplateId == claim.ItemTemplateId);
 				if (alreadyHeld)
 				{
 					_logger.LogInformation("Redeem of claim {ClaimId} (template {Template}) refused: {Character} already holds one.", claim.Id, claim.ItemTemplateId, characterId);
@@ -198,14 +202,14 @@ namespace Faolan.GameServer.Economy
 			// is spent (its DispatchAddItem then tells the client to remove it).
 			if (remaining > 1)
 			{
-				await _database.SetAccountClaimQuantity(claim.Id, remaining - 1);
+				await _accounts.SetAccountClaimQuantity(claim.Id, remaining - 1);
 				await SendRedeemAck(client, claim, index, remaining - 1);
 				_logger.LogInformation("Account {AccountId} redeemed 1 charge of claim {ClaimId} (template {Template}); {Remaining} left.", client.Session.Account.Id, claim.Id, claim.ItemTemplateId,
 					remaining - 1);
 				return;
 			}
 
-			await _database.DeleteAccountClaim(claim.Id);
+			await _accounts.DeleteAccountClaim(claim.Id);
 			_logger.LogInformation("Account {AccountId} redeemed claim {ClaimId} (template {Template}).", client.Session.Account.Id, claim.Id, claim.ItemTemplateId);
 		}
 
@@ -215,7 +219,7 @@ namespace Faolan.GameServer.Economy
 		{
 			var accountId = client.Session.Account.Id;
 			var handle = client.Session.Character.Id;
-			var rows = await _database.GetAccountClaims(accountId);
+			var rows = await _accounts.GetAccountClaims(accountId);
 			var entries = BuildClaimEntries(accountId, rows);
 
 			// Remember the exact order we sent, so a subsequent redeem resolves its 1-based index against THIS list even
@@ -227,7 +231,7 @@ namespace Faolan.GameServer.Economy
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
 			// so a re-entry this session doesn't re-glow).
-			await _database.SetAccountClaimsAvailable(accountId, false);
+			await _accounts.SetAccountClaimsAvailable(accountId, false);
 			client.Session.Account.ClaimsAvailable = false;
 
 			_logger.LogInformation("Sent {Count} claim(s) to account {AccountId}.", entries.Count, accountId);

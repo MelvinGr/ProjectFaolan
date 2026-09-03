@@ -73,7 +73,8 @@ namespace Faolan.GameServer.World
 
 		private readonly ComboService _combos;
 
-		private readonly IDatabaseRepository _database;
+		private readonly INpcRepository _npcs;
+		private readonly IWorldRepository _world;
 
 		private readonly ILogger _logger;
 
@@ -98,10 +99,11 @@ namespace Faolan.GameServer.World
 		// are independent, and one column answering both could not express a quest-only target that must come back.
 		private HashSet<uint> _storyKillTargets = null!;
 
-		public ZonePopulationLoader(WorldSimulation sim, IDatabaseRepository database, ComboService combos, AmbientPoolService ambient, ILogger logger)
+		public ZonePopulationLoader(WorldSimulation sim, INpcRepository npcs, IWorldRepository world, ComboService combos, AmbientPoolService ambient, ILogger logger)
 		{
 			_sim = sim;
-			_database = database;
+			_npcs = npcs;
+			_world = world;
 			_combos = combos;
 			_ambient = ambient;
 			_logger = logger;
@@ -122,17 +124,17 @@ namespace Faolan.GameServer.World
 			if (!_npcLoadedZones.TryAdd((mapId, instanceId), 0))
 				return;
 
-			var npcs = await _database.GetNpcSpawns(mapId, forClass);
+			var npcs = await _npcs.GetNpcSpawns(mapId, forClass);
 
 			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
-			var encounters = (await _database.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
+			var encounters = (await _npcs.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
 
 			// #528: the map's TRIGGER-SPAWNED types - a quest ambusher and an encounter BOSS alike. Neither stands in
 			// the world (one appears when a goal advances, the other when a lure swaps), so a captured "placement" of
 			// one is a harvest of the trigger FIRING, and it is skipped below. The importer already excludes them from
 			// the burst-truth set (ImportOps.BuildBurstTruthSpawns, alongside the summoned pets), so on a current
 			// database this finds nothing; it is the second net, for a database built before that rule.
-			var triggerSpawned = (await _database.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId)
+			var triggerSpawned = (await _npcs.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId)
 				.Concat(encounters.Values.Select(e => e.BossNpcTemplateId))
 				.ToHashSet();
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
@@ -140,12 +142,12 @@ namespace Faolan.GameServer.World
 			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
 			// `.togglenpcgroup` toggle. Computed at load (a cheap query, stored as a string) so the toggle is instant and
 			// also catches NPCs that stream in while it's on - the toggle only gates whether the label is SENT.
-			var spawnAreas = await _database.GetNpcSpawnAreas(mapId);
+			var spawnAreas = await _npcs.GetNpcSpawnAreas(mapId);
 
 			// #261 quest-gated spawns: NPC template id -> the quest ids that reveal it (kill-target NPCs that aren't givers).
-			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
-			_storyKillTargets ??= await _database.GetStoryKillTargets();
-			_escortHiddenNpcs ??= await _database.GetEscortHiddenNpcMap();
+			_questGatedNpcs ??= await _npcs.GetQuestGatedNpcMap();
+			_storyKillTargets ??= await _npcs.GetStoryKillTargets();
+			_escortHiddenNpcs ??= await _npcs.GetEscortHiddenNpcMap();
 
 			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
 			// already produced one clean row per intended placement (keyed by MapId + exact XYZ), so this load path
@@ -447,7 +449,7 @@ namespace Faolan.GameServer.World
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 			zone.WorldObjects =
 			[
-				.. (await _database.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row)
+				.. (await _world.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row)
 				{
 					// A harvest node starts FULL on every zone load (#494). Retail's nodes are shared across the whole
 					// playfield and regrow, and neither the sharing nor a respawn cadence is measured - so a fresh zone
@@ -469,11 +471,11 @@ namespace Faolan.GameServer.World
 		// the zone-line reports the gap in-game instead of teleporting, the same rule as an un-imported vendor.
 		public async Task<string?> DescribeMissingClassImport(uint mapId, ConanClass forClass)
 		{
-			var map = await _database.GetMap(mapId);
+			var map = await _world.GetMap(mapId);
 			if (map is not { ClassSpecific: true })
 				return null;
 
-			var imported = await _database.GetImportedSpawnClasses(mapId);
+			var imported = await _npcs.GetImportedSpawnClasses(mapId);
 			if (imported.Contains(forClass))
 				return null;
 

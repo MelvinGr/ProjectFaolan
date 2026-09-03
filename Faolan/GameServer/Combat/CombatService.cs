@@ -56,7 +56,9 @@ namespace Faolan.GameServer.Combat
 
 		private readonly FatalityService _fatality; // #140: the fatality burst on a killing blow
 		private readonly FactionService _factions; // #310: Khitai reputation, awarded on a kill
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterRepository _characters;
+		private readonly ICharacterStatRepository _stats;
 
 		// Content:KillStreaks - whether a kill CHAIN is tracked and announced at all (#446). Read once at construction
 		// like the terrain dir, not per kill: it is a content switch for the server, not per-session state.
@@ -86,7 +88,7 @@ namespace Faolan.GameServer.Combat
 
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
+		public CombatService(WorldSimulation sim, ICatalogRepository catalog, ICharacterRepository characters, ICharacterStatRepository stats, QuestProgressionService questProgression, ILogger logger,
 			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent,
 			SpellPoolEffects poolEffects, bool killStreaks)
 		{
@@ -97,7 +99,9 @@ namespace Faolan.GameServer.Combat
 			_factions = factions;
 			_fatality = fatality;
 			_sim = sim;
-			_database = database;
+			_catalog = catalog;
+			_characters = characters;
+			_stats = stats;
 			_questProgression = questProgression;
 			_logger = logger;
 			_levelUp = levelUp;
@@ -163,7 +167,7 @@ namespace Faolan.GameServer.Combat
 			// sources overlap - Deathly Blizzard's 2,500 ms, Waves of Flame's 1,000 and Resting's 500 are each exactly
 			// what the captured StatDamage gaps measured independently (Spell.DotIntervalMs), on all three and with no
 			// disagreement. Only a spell the client states none for falls back to the constant.
-			var spell = await _database.GetSpell(spellId);
+			var spell = await _catalog.GetSpell(spellId);
 			var intervalMs = spell?.ChannelingIntervalMs > 0
 				? (int)spell.ChannelingIntervalMs
 				: GroundAoeTickIntervalMs;
@@ -213,8 +217,8 @@ namespace Faolan.GameServer.Combat
 		public async Task<EntityVitals> ReseedFromMaxStats(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			var statBonuses = await CharacterStatBonuses.For(_database, character);
-			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
+			var statBonuses = await CharacterStatBonuses.For(_stats, character);
+			var classBase = await _stats.GetClassAttributeBase(character.Class, character.Level);
 			var seeded = EntityVitals.FromCharacter(character, statBonuses, classBase);
 			var vitals = _sim.GetOrAddPlayerVitals(client);
 
@@ -270,7 +274,7 @@ namespace Faolan.GameServer.Combat
 			// to both on the melee curve. A spell whose record states no chance does not crit; nothing is invented for
 			// the 20,278 that say nothing. Like a melee crit this is NOT a distinct wire flag - retail conveys it by
 			// the larger number alone.
-			var spell = await _database.GetSpell(spellId);
+			var spell = await _catalog.GetSpell(spellId);
 
 			// ⭐ #710: a trained FEAT or a live BUFF can move the spell's OWN crit numbers before the caster's rating
 			// is added. `Spell Critical Chance` (147) and `Spell Critical Damage` (129) are the two commonest stats
@@ -337,7 +341,7 @@ namespace Faolan.GameServer.Combat
 			var level = client.Session.Character.Level;
 			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
-			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
+			var weapon = await _stats.GetEquippedWeaponDamage(client.Session.Character.Id);
 			var attackerEntity = _sim.PlayerWorldEntity(client);
 			attackerEntity?.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
 			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
@@ -450,7 +454,7 @@ namespace Faolan.GameServer.Combat
 			if (player.MaxMana == 0)
 				return;
 
-			var spell = await _database.GetSpell(spellId);
+			var spell = await _catalog.GetSpell(spellId);
 
 			// #710: a trained FEAT or a live BUFF can make the spell cheaper - "Mana Cost" is the stat these records
 			// aim at most (217 of its 228 shipped rows are relative, 11 absolute). ⭐ Both halves apply since #787:
@@ -589,7 +593,7 @@ namespace Faolan.GameServer.Combat
 				return 0;
 
 			// Per-spell where the client states one (Spell.AreaRadius, #349); GroundAoeRadiusUnits otherwise.
-			var spell = await _database.GetSpell(spellId);
+			var spell = await _catalog.GetSpell(spellId);
 			var radius = spell?.AreaRadius > 0
 				? spell.AreaRadius
 				: GroundAoeRadiusUnits;
@@ -812,8 +816,8 @@ namespace Faolan.GameServer.Combat
 			// the same reason as the PvE pair: a kill is earned once.
 			attackerCharacter.PvpKills++;
 			victimCharacter.PvpDeaths++;
-			await _database.SetCharacterPvpKillCounts(attackerCharacter.Id, attackerCharacter.PvpKills, attackerCharacter.PvpDeaths);
-			await _database.SetCharacterPvpKillCounts(victimCharacter.Id, victimCharacter.PvpKills, victimCharacter.PvpDeaths);
+			await _characters.SetCharacterPvpKillCounts(attackerCharacter.Id, attackerCharacter.PvpKills, attackerCharacter.PvpDeaths);
+			await _characters.SetCharacterPvpKillCounts(victimCharacter.Id, victimCharacter.PvpKills, victimCharacter.PvpDeaths);
 
 			// And the match's own scoreboard, which may end it on the score limit.
 			await _csPlayerAgent.CreditPvpMatchKill(attackerCharacter.Id, victimCharacter.Id);
@@ -875,7 +879,7 @@ namespace Faolan.GameServer.Combat
 			// is a PvP CAREER total, and a mob kill used to land on it. `AwardKillXp` is reached only for a creature
 			// kill - it takes the NPC's level - so every increment here is PvE by construction.
 			character.NpcKills++;
-			await _database.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
+			await _characters.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
 
 			await _levelUp.ApplyXp(killer, CombatResolver.ResolveKillXp(npcLevel));
 		}

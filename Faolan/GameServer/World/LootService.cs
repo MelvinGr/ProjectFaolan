@@ -28,13 +28,13 @@ namespace Faolan.GameServer.World
 	public sealed class LootService
 	{
 		private readonly IChatServerDispatcher _chat;
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterInventoryRepository _database;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly LootBroadcaster _loot;
 
-		public LootService(LootBroadcaster loot, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression,
+		public LootService(LootBroadcaster loot, IEconomyOutbound outbound, ICharacterInventoryRepository database, QuestProgressionService questProgression,
 			IChatServerDispatcher chat, ILogger logger)
 		{
 			_loot = loot;

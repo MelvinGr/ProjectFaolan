@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Repositories
 	// implementation in DatabaseRepository.<Domain>.cs) so a consumer that genuinely needs everything can keep taking
 	// IDatabaseRepository unchanged, while a consumer that only touches one domain can depend on the narrow interface
 	// (interface segregation - Gitea #353). IDatabaseRepository itself carries only the cross-cutting unit-of-work seam.
-	public interface IDatabaseRepository : IAccountRepository, ICharacterRepository, ICatalogRepository, IEconomyRepository, IFactionRepository, IGuildRepository, INpcRepository, IRealmRepository, IWorldRepository
+	public interface IDatabaseRepository : IAccountRepository, ICharacterRepository, ICharacterInventoryRepository, ICharacterQuestRepository, ICharacterStatRepository, ICharacterProgressionRepository, ICatalogRepository, IEconomyRepository, IFactionRepository, IGuildRepository, INpcRepository, IRealmRepository, IWorldRepository
 	{
 		Task Execute(Func<IDatabaseContext, Task> work);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);

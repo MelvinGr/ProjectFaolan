@@ -21,14 +21,16 @@ namespace Faolan.GameServer.World
 	{
 		private static readonly TimeSpan AutoSaveInterval = TimeSpan.FromMinutes(5);
 
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterRepository _characters;
+		private readonly ICharacterStatRepository _stats;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _simulation;
 		private Task _autoSaveTask = Task.CompletedTask;
 
-		public PlayerPersistenceService(ICharacterRepository database, ILogger logger, WorldSimulation simulation)
+		public PlayerPersistenceService(ICharacterRepository characters, ICharacterStatRepository stats, ILogger logger, WorldSimulation simulation)
 		{
-			_database = database;
+			_characters = characters;
+			_stats = stats;
 			_logger = logger;
 			_simulation = simulation;
 		}
@@ -59,7 +61,7 @@ namespace Faolan.GameServer.World
 				character.MapId = entity.MapId;
 				character.Position = entity.Position;
 				character.Rotation = entity.Rotation;
-				await _database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
+				await _characters.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
 
 				// Snapshot the live self-buffs with their absolute expiry so a relog restores them with the time left
 				// (#274). Only the buffs no dedicated re-applier owns (shield/mount are excluded) and that haven't
@@ -74,7 +76,7 @@ namespace Faolan.GameServer.World
 						ExpiresAt = b.ExpiresAt
 					})
 					.ToList();
-				await _database.SaveCharacterBuffs(character.Id, buffs);
+				await _stats.SaveCharacterBuffs(character.Id, buffs);
 				return true;
 			}
 			catch (Exception ex)

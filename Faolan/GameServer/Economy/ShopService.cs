@@ -47,13 +47,15 @@ namespace Faolan.GameServer.Economy
 		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new ConcurrentDictionary<INetworkClient, LastShopSale>();
 
 		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new ConcurrentDictionary<INetworkClient, OpenShop>();
-		private readonly IDatabaseRepository _database;
+		private readonly ICatalogRepository _catalog;
+		private readonly ICharacterInventoryRepository _inventory;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 
-		public ShopService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
+		public ShopService(ICatalogRepository catalog, ICharacterInventoryRepository inventory, ILogger logger, IEconomyOutbound outbound)
 		{
-			_database = database;
+			_catalog = catalog;
+			_inventory = inventory;
 			_logger = logger;
 			_outbound = outbound;
 		}
@@ -89,7 +91,7 @@ namespace Faolan.GameServer.Economy
 			// No `?? 0` on the price: a ware pointing at an item row we do not have is a broken shop, and pricing it at
 			// zero would sell it for free. The grant below happens to fail for the same missing row today, so this only
 			// ever showed up as an aborted purchase - one refactor away from being a free-item exploit.
-			var wareItem = await _database.GetItem(ware.ItemTemplateId);
+			var wareItem = await _catalog.GetItem(ware.ItemTemplateId);
 			if (wareItem == null)
 			{
 				_logger.LogError("BuyItem: shop \"{Vendor}\" slot {Pos} sells item {Template}, which has no Items row - the shop's ware list needs re-importing.", shop.VendorName, pos,
@@ -114,7 +116,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			character.Money -= price;
-			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _inventory.SetCharacterMoney(character.Id, character.Money);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).", character.Name,
@@ -143,7 +145,7 @@ namespace Faolan.GameServer.Economy
 					return;
 				}
 
-			var sold = await _database.GetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot);
+			var sold = await _inventory.GetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot);
 			if (sold == null)
 			{
 				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);
@@ -159,9 +161,9 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _database.SetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot, null);
+			await _inventory.SetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot, null);
 			character.Money += price;
-			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _inventory.SetCharacterMoney(character.Id, character.Money);
 			// ⚠️ The undo re-MINTS the item from its template, so anything per-instance about the sold one is gone: a
 			// crafted item comes back without its crafter and a gemmed one without its gems. The sold instance is
 			// deleted outright rather than parked, which is what makes that unavoidable here - see #750 for the shape
@@ -185,11 +187,11 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _database.SetCharacterItemSlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
+			await _inventory.SetCharacterItemSlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
 			character.Money = character.Money >= sale.PriceTin
 				? character.Money - sale.PriceTin
 				: 0;
-			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _inventory.SetCharacterMoney(character.Id, character.Money);
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin,
@@ -236,7 +238,7 @@ namespace Faolan.GameServer.Economy
 		{
 			// The codec's item resolver is synchronous; pre-resolve every ware's Items row up front, in ONE read rather
 			// than a query per ware (a stocked vendor is dozens of them, paid on every window open).
-			var resolved = (await _database.GetItems([.. shop.Items.Select(w => w.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
+			var resolved = (await _catalog.GetItems([.. shop.Items.Select(w => w.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
 
 			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
 			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id)!);

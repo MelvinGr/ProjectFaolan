@@ -31,10 +31,10 @@ namespace Faolan.GameServer.Inventory
 	// The Inbound handlers (Handle0x2000) call into it.
 	public sealed class EquipmentService
 	{
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterInventoryRepository _database;
 		private readonly ILogger _logger;
 
-		public EquipmentService(ICharacterRepository database, ILogger logger)
+		public EquipmentService(ICharacterInventoryRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;

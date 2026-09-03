@@ -20,13 +20,15 @@ namespace Faolan.GameServer.Economy
 	public sealed class TradeService
 	{
 		private readonly ConcurrentDictionary<uint, TradeSession> _byCharacter = [];
-		private readonly ICharacterRepository _database;
+		private readonly ICharacterInventoryRepository _inventory;
+		private readonly ICharacterRepository _characters;
 		private readonly ILogger _logger;
 		private readonly ITradeOutbound _outbound;
 
-		public TradeService(ICharacterRepository database, ILogger logger, ITradeOutbound outbound)
+		public TradeService(ICharacterInventoryRepository inventory, ICharacterRepository characters, ILogger logger, ITradeOutbound outbound)
 		{
-			_database = database;
+			_inventory = inventory;
+			_characters = characters;
 			_logger = logger;
 			_outbound = outbound;
 		}
@@ -80,7 +82,7 @@ namespace Faolan.GameServer.Economy
 
 			// Clamp to what I actually have, so the commit cannot be asked to move money that does not exist. Retail
 			// presumably refuses client-side; we cannot rely on that.
-			var character = await _database.GetCharacter(characterId);
+			var character = await _characters.GetCharacter(characterId);
 			side.Cash = character == null
 				? 0
 				: System.Math.Min(tin, character.Money);
@@ -99,7 +101,7 @@ namespace Faolan.GameServer.Economy
 			if (!TryGetSide(characterId, out var session, out var side))
 				return;
 
-			var offer = await _database.GetCharacterItemSlot(characterId, ContainerKind.Bag, (int)itemPos);
+			var offer = await _inventory.GetCharacterItemSlot(characterId, ContainerKind.Bag, (int)itemPos);
 			if (offer == null)
 			{
 				_logger.LogWarning("Trade: {Character:X8} offered empty bag slot {Slot}.", characterId, itemPos);
@@ -226,15 +228,15 @@ namespace Faolan.GameServer.Economy
 			if (from.Cash == 0)
 				return;
 
-			var giver = await _database.GetCharacter(from.CharacterId);
-			var receiver = await _database.GetCharacter(to.CharacterId);
+			var giver = await _characters.GetCharacter(from.CharacterId);
+			var receiver = await _characters.GetCharacter(to.CharacterId);
 			if (giver == null || receiver == null)
 				return;
 
 			// Re-clamp at commit time: the offer was clamped when it was made, but the giver may have spent since.
 			var moved = System.Math.Min(from.Cash, giver.Money);
-			await _database.SetCharacterMoney(from.CharacterId, giver.Money - moved);
-			await _database.SetCharacterMoney(to.CharacterId, receiver.Money + moved);
+			await _inventory.SetCharacterMoney(from.CharacterId, giver.Money - moved);
+			await _inventory.SetCharacterMoney(to.CharacterId, receiver.Money + moved);
 			await _outbound.SendWalletUpdate(from.CharacterId, giver.Money - moved);
 			await _outbound.SendWalletUpdate(to.CharacterId, receiver.Money + moved);
 		}

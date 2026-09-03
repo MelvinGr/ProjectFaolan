@@ -237,7 +237,7 @@ namespace Faolan.Tests
 			client.Session.Character.Name = "NecroL80";
 
 			var outbound = new RecordingEconomyOutbound();
-			return new Harnessed(new TradeskillService(database, outbound, null!, null!, NullLogger.Instance), client, outbound);
+			return new Harnessed(new TradeskillService(database, database, database, outbound, null!, null!, NullLogger.Instance), client, outbound);
 		}
 
 		private sealed record Harnessed(TradeskillService Service, RecordingNetworkClient Client, RecordingEconomyOutbound Outbound);
