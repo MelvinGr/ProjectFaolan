@@ -46,8 +46,8 @@ namespace Faolan.Importer.Modules
 			var offers = QuestRewardOptionExtractor.Merge(ctx.Captures.SelectMany(c => QuestRewardOptionExtractor.Extract(c.Packets)))
 				.Where(o => !recordQuests.Contains(o.QuestId))
 				.ToList();
-			var (written, skippedQuest, skippedItem) = await ImportOps.ImportQuestRewardOptions(ctx.Db, [.. own, .. offers]);
-			var (quantities, wireOnly, unmatched) = await ImportOps.ImportQuestLineRewardQuantities(ctx.Db, fromRecords.SelectMany(r => r.Line).ToList());
+			var (written, skippedQuest, skippedItem) = await QuestImportOps.ImportQuestRewardOptions(ctx.Db, [.. own, .. offers]);
+			var (quantities, wireOnly, unmatched) = await QuestImportOps.ImportQuestLineRewardQuantities(ctx.Db, fromRecords.SelectMany(r => r.Line).ToList());
 
 			var skipped = skippedQuest + skippedItem == 0
 				? ""

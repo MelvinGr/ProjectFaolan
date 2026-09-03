@@ -118,7 +118,7 @@ namespace Faolan.Importer.Extractors
 
 				try
 				{
-					worldObjectIdByHandle[w.Handle] = ImportOps.PopulateObject(new WorldObject
+					worldObjectIdByHandle[w.Handle] = WorldObjectImportOps.PopulateObject(new WorldObject
 					{
 						MapId = w.MapId,
 						PositionX = w.X,

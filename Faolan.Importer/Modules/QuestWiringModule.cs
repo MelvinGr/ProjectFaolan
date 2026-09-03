@@ -43,12 +43,12 @@ namespace Faolan.Importer.Modules
 			// Only quests whose objective region provably rebuilds may ride the login snapshot. Verified HERE, as the
 			// last thing that touches these rows: `quests` refreshes the goal fields from the captures and this overlay
 			// then re-applies the hand-authored ones, so a check run before it judges bytes we never ship.
-			var (verified, verifiable) = await ImportOps.VerifyObjectiveRegions(ctx.Db,
+			var (verified, verifiable) = await QuestImportOps.VerifyObjectiveRegions(ctx.Db,
 				ObjectiveGoalExtractor.CapturedRegions(ctx.Captures.SelectMany(c => c.Packets).ToList()));
 			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
 
 			// AFTER the verification, which is the gate it reads.
-			var seeded = await ImportOps.SeedDerivedSnapshotRecords(ctx.Db);
+			var seeded = await QuestImportOps.SeedDerivedSnapshotRecords(ctx.Db);
 			Console.WriteLine($"  derived a Quest_c record for {seeded} quest(s) that had everything but one.");
 
 			return new ImportResult($"quest wiring applied (Casilda + Shipwrecked chains + sourced location quests); {seeded} derived snapshot record(s).");

@@ -52,7 +52,7 @@ namespace Faolan.Importer.Modules
 				ctx.Out.WriteLine($"[conversations] {line}");
 
 			var conversations = ConversationExtractor.Merge(split);
-			var result = await ImportOps.ImportConversations(ctx.Db, conversations, ctx.Force);
+			var result = await ConversationImportOps.ImportConversations(ctx.Db, conversations, ctx.Force);
 			foreach (var line in result.Report)
 				ctx.Out.WriteLine($"[conversations] {line}");
 

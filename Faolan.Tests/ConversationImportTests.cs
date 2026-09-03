@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		{
 			await WithDatabase(async db =>
 			{
-				var result = await ImportOps.ImportConversations(db, [Walk(""), Walk("0", grant: GrantedQuestId)]);
+				var result = await ConversationImportOps.ImportConversations(db, [Walk(""), Walk("0", grant: GrantedQuestId)]);
 
 				Assert.Equal(2, result.Nodes);
 				Assert.Equal(1, result.Edges);
@@ -63,10 +63,10 @@ namespace Faolan.Tests
 		{
 			await WithDatabase(async db =>
 			{
-				await ImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
+				await ConversationImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
 				var before = await db.ConversationNodes.Select(n => n.Id).OrderBy(i => i).ToListAsync(TestContext.Current.CancellationToken);
 
-				await ImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
+				await ConversationImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
 
 				Assert.Equal(before, await db.ConversationNodes.Select(n => n.Id).OrderBy(i => i).ToListAsync(TestContext.Current.CancellationToken));
 				Assert.Equal(1, await db.ConversationEdges.CountAsync(TestContext.Current.CancellationToken));
@@ -80,8 +80,8 @@ namespace Faolan.Tests
 		{
 			await WithDatabase(async db =>
 			{
-				await ImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
-				await ImportOps.ImportConversations(db, [Walk("")]);
+				await ConversationImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
+				await ConversationImportOps.ImportConversations(db, [Walk("")]);
 
 				Assert.Equal(1, await db.ConversationNodes.CountAsync(TestContext.Current.CancellationToken));
 				Assert.Equal(0, await db.ConversationEdges.CountAsync(TestContext.Current.CancellationToken));
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 		{
 			await WithDatabase(async db =>
 			{
-				await ImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
+				await ConversationImportOps.ImportConversations(db, [Walk(""), Walk("0")]);
 
 				foreach (var n in await db.ConversationNodes.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken))
 					Assert.Equal(n.ComputeId(), n.Id);

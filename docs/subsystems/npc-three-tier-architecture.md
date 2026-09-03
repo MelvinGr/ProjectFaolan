@@ -407,7 +407,7 @@ from typed columns.
 - [x] Migrate the remaining `Npc.Community`/`Level` readers to `StatCore`, then DROP the duplicate
       `Npc.Community`/`Level`/`Race`/`Sex` columns (`6ca6061c`). Verified redundant first: 0 rows carried data
       `StatCore` lacked. The last readers (`WorldBroadcaster` ×3, `Faolan.Mcp/DatabaseTools`) now read
-      `StatCore`, and the importer's duplicate writes (`ImportOps`, pet/mount importers) are gone. `NpcTemplate` is now
+      `StatCore`, and the importer's duplicate writes (`NpcImportOps`, pet/mount importers) are gone. `NpcTemplate` is now
       just `Id`/`Name`/`TemplateId` + its navigations. `NpcStatCore.Sex` is the `Sex` enum (wire code
       `None=0`/`Male=2`/`Female=3`); `NpcStatCore.Race` stays a raw `uint` (creature model-race 0..98 — a
       different domain from the 3-value player `Race` enum).
@@ -461,7 +461,7 @@ everywhere else, which is what keeps every ordinary spawn behaving exactly as be
 - It joins the spawn's unique index **and** its derived key — but only **when set**, so the ~1900 class-agnostic
   spawns keep the ids they already had. Both are required, not optional: the two classes' quartermasters stand on
   *identical* coordinates, so a `(map, position)` key collapses them and one whole set is silently lost.
-- The importer's per-type burst-truth election (`ImportOps.BuildBurstTruthSpawns`) keys on `(map, class, name)` and
+- The importer's per-type burst-truth election (`NpcImportOps.BuildBurstTruthSpawns`) keys on `(map, class, name)` and
   stamps each spawn with the class of the capture's own played character (`CaptureCharacterImporter.DetectPlayedClass`).
   A spawn on such a map from a capture whose class cannot be determined is dropped rather than kept class-agnostic —
   null means "every class sees this", which is the bug, not a safe default.

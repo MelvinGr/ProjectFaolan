@@ -21,7 +21,7 @@ namespace Faolan.Importer.Captures
 	// wire. `SpawnAnimation` in particular is a presence FLAG and never a number (#607), so "did retail send it" is
 	// the only thing its column carries.
 	//
-	// ⚠️ This lives here, shared, because the correction used to be inline in `ImportOps.UpsertNpcTypes` and therefore
+	// ⚠️ This lives here, shared, because the correction used to be inline in `NpcImportOps.UpsertNpcTypes` and therefore
 	// reached only PLACED NPCs (#689). Pets, companions and mounts are lifted by their own importers - they have no
 	// `NpcSpawns` placement at all, being summoned rather than placed - so every one of them kept its representative's
 	// pose. That is what shipped Courtesan 11479 in `BccState` 50 when 10 of its 11 sightings are state 1.

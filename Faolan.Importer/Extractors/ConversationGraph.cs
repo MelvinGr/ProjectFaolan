@@ -426,7 +426,7 @@ namespace Faolan.Importer.Extractors
 			{
 				try
 				{
-					packets.Add(ImportOps.BuildPacket(screen[i], i));
+					packets.Add(ConversationImportOps.BuildPacket(screen[i], i));
 				}
 				catch (Exception)
 				{

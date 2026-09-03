@@ -688,7 +688,7 @@ quests.
 objective region, the line's 4CC, and the five header text refs. Seventeen quests had **everything but the
 record** — no capture ever carried one for them — so they sat out of the login snapshot.
 
-`ImportOps.SeedDerivedSnapshotRecords` derives one, running after `VerifyObjectiveRegions` because that
+`QuestImportOps.SeedDerivedSnapshotRecords` derives one, running after `VerifyObjectiveRegions` because that
 verdict is its gate. It re-tests every other arm of `IsSnapshotEligible`, so it can never flag a quest the
 gate would reject. What it fills:
 

@@ -676,7 +676,7 @@ namespace Faolan.Tests
 		// ⚠️ This is a gate on something that used to be an ACCIDENT. The Bat Demon really did stand in the Tortage
 		// quarry for every player; the encounter boss escaped only because she spawns on the exact spot her lure
 		// vacated and the position dedup dropped her (#501) - which would have stopped protecting her the moment a
-		// capture caught the swap a few units off. `ImportOps.BuildBurstTruthSpawns` now excludes both by rule.
+		// capture caught the swap a few units off. `NpcImportOps.BuildBurstTruthSpawns` now excludes both by rule.
 		[Fact]
 		public async Task NoTriggerSpawnedType_HasAWorldPlacement()
 		{

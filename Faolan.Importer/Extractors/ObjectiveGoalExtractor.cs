@@ -12,7 +12,7 @@ namespace Faolan.Importer.Extractors
 	public static class ObjectiveGoalExtractor
 	{
 		// The captured objective goals per quest, exactly as the wire carried them - the oracle the importer compares
-		// a rebuilt region against (ImportOps.VerifyObjectiveRegions).
+		// a rebuilt region against (QuestImportOps.VerifyObjectiveRegions).
 		//
 		// EVERY capture of the quest, not just the first, and each one TAGGED with its record's `XpReward`: retail has
 		// more than one spelling of the same quest's region, and F0 is what selects it. Quest 10238's goal 1448 carries

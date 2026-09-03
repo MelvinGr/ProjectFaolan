@@ -55,7 +55,7 @@ namespace Faolan.Importer.Extractors
 				// 317 of the 17,717 captured character spawns are player-backed and all 317 are excluded
 				// (NpcSpellExtractorPlayerFilterTests).
 				//
-				// That matters because the fallback would have been the NAME: `ImportOps.ImportNpcSpells` requires
+				// That matters because the fallback would have been the NAME: `NpcImportOps.ImportNpcSpells` requires
 				// the name to resolve to an NpcTemplates row, which a stranger called `Guard` would have passed.
 				// It is still there as a second line, not as the only one.
 				if (!nameByHandle.TryGetValue(caster, out var name))

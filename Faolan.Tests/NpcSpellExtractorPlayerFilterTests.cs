@@ -19,7 +19,7 @@ namespace Faolan.Tests
 	// The separation is already STRUCTURAL, and these gates are what say so rather than a comment. A player's spawn
 	// carries `player_stats` and no `npc_stats`, and `NpcSpawnExtractor.TryBuildEntry` drops it on exactly that
 	// (#244) - so a player-backed handle never enters the name map at all, and the name it would have collided under
-	// is never consulted. The downstream `NpcTemplates` join in `ImportOps.ImportNpcSpells` is a second line, not the
+	// is never consulted. The downstream `NpcTemplates` join in `NpcImportOps.ImportNpcSpells` is a second line, not the
 	// only one.
 	//
 	// Written as a whole-corpus measurement because the claim is about what the corpus CONTAINS: if the extractor's

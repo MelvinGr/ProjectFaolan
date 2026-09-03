@@ -1034,7 +1034,7 @@ Two kinds of creature are put in play by a *script* rather than by a placement, 
 | encounter **boss** | a proximity lure swaps into it | `NpcEncounter.BossNpcTemplateId` |
 
 A capture that caught either one caught the **trigger firing**, so harvesting it as a placement is the summoned-pet
-failure one level over. `ImportOps.BuildBurstTruthSpawns` excludes both from the burst-truth set exactly as it
+failure one level over. `NpcImportOps.BuildBurstTruthSpawns` excludes both from the burst-truth set exactly as it
 excludes summoned pets, and for the reason already written beside that exclusion: *a trigger spawn is not a world
 placement, and a type with no `NpcSpawn` row is an established shape.* The **type** still survives via
 `observedTypes` — that is what the trigger spawns from. `ZonePopulationLoader.EnsureZoneNpcs` skips them too, as the

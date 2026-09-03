@@ -59,7 +59,7 @@ namespace Faolan.Importer.Modules
 			var triggerSpawnedTypes = await ctx.Db.NpcAmbushes.Select(a => a.NpcTemplateId)
 				.Concat(ctx.Db.NpcEncounters.Select(e => e.BossNpcTemplateId))
 				.ToHashSetAsync();
-			var (spawns, patrols, observedTypes) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps, triggerSpawnedTypes);
+			var (spawns, patrols, observedTypes) = NpcImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps, triggerSpawnedTypes);
 
 			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
 			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the
@@ -98,10 +98,10 @@ namespace Faolan.Importer.Modules
 					entry.State = EntityState.Detached;
 			}
 
-			await ImportOps.ImportNpcSpawns(ctx.Db, spawns, observedTypes);
+			await NpcImportOps.ImportNpcSpawns(ctx.Db, spawns, observedTypes);
 			var npcSpells = NpcSpellExtractor.Merge(ctx.Captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
-			var spellsAdded = await ImportOps.ImportNpcSpells(ctx.Db, npcSpells);
-			await ImportOps.ImportPatrolPaths(ctx.Db, patrols);
+			var spellsAdded = await NpcImportOps.ImportNpcSpells(ctx.Db, npcSpells);
+			await NpcImportOps.ImportPatrolPaths(ctx.Db, patrols);
 
 			var prefix = removed > 0
 				? $"replaced {removed} spawn(s) across {maps.Count} map(s); "

@@ -40,7 +40,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var pooled = await ImportOps.ImportStationaryPlacements(ctx.Db, ctx.Captures);
+			var pooled = await NpcImportOps.ImportStationaryPlacements(ctx.Db, ctx.Captures);
 			return new ImportResult($"{pooled} stationary row(s) pooled into their placement.");
 		}
 	}

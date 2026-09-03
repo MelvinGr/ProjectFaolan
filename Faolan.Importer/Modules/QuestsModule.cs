@@ -46,18 +46,18 @@ namespace Faolan.Importer.Modules
 			// ...and a line an index block named without a header takes it from its own quests' header records (the
 			// three the completed journal would have carried for it) - the fix for the nameless completed-tab group.
 			var areas = QuestLineExtractor.WithHeadersFromQuests(QuestLineExtractor.Extract(packets), defs);
-			var areaCount = await ImportOps.ImportQuestLines(ctx.Db, areas, defs.Select(d => d.QuestLineId).Where(id => id != 0).Distinct().ToList());
+			var areaCount = await QuestImportOps.ImportQuestLines(ctx.Db, areas, defs.Select(d => d.QuestLineId).Where(id => id != 0).Distinct().ToList());
 
-			await ImportOps.ImportQuestDefinitions(ctx.Db, defs, ctx.Force);
+			await QuestImportOps.ImportQuestDefinitions(ctx.Db, defs, ctx.Force);
 
 			// The completed journal carries a title + sub-line for every quest the character ever finished - far more
 			// quests than any capture session touches. Additive: never disturbs the richer full-update definitions.
 			var harvest = CompletedQuestExtractor.Extract(packets);
-			var (addedCompleted, filledCompleted) = await ImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
+			var (addedCompleted, filledCompleted) = await QuestImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
 
 			// The @609 objective goals - required before a quest can ride the login snapshot (#389).
 			var goals = ObjectiveGoalExtractor.Extract(packets);
-			var addedGoals = await ImportOps.ImportObjectiveGoals(ctx.Db, goals);
+			var addedGoals = await QuestImportOps.ImportObjectiveGoals(ctx.Db, goals);
 
 			// NB the objective-region verification does NOT run here - it runs at the end of quest-wiring, because the
 			// rows it judges are not final until that overlay has re-applied the hand-authored fields this harvest

@@ -35,7 +35,7 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var entries = MapLootExtractor.Merge(ctx.Captures.SelectMany(c => MapLootExtractor.Extract(c.Packets)));
-			var kept = await ImportOps.ImportMapLootPool(ctx.Db, entries);
+			var kept = await LootImportOps.ImportMapLootPool(ctx.Db, entries);
 			return new ImportResult($"{kept} map-loot entries ({entries.Count} seen).");
 		}
 	}
