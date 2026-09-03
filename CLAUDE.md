@@ -137,8 +137,11 @@ it is `Session/WorldEntryService.cs`, a composed service, because `CreateFlowSer
 and a service cannot take a listener method in its constructor - moving it deleted the graph's last bound seam
 into the listener (see ⭐ "look for the move first" below). `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
 Domain logic proper lives in composed service folders beside it (`Apprentice/`,
-`Combat/`, `CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Inventory/`, `Progression/`, `Quest/`, `Scripting/`,
-`Session/`, `World/`). NB a partial-class file keeps
+`Behavior/`, `Combat/`, `CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Inventory/`, `Progression/`, `Quest/`,
+`Scripting/`, `Session/`, `World/`). `Behavior/BehaviorService` is the client's ACTION switch — the whole
+`BehaviorControlCenterIIR` family (attack / use dynel / use character / equip / mount), 700 lines that touch 23
+services and were the last inbound bodies on the listener that were not forwards (#928 item 11); `.Inbound` is now
+the routing switch plus thin handlers, nothing that a service needs. NB a partial-class file keeps
 `namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder
 is organizational only. That suppression is for **partials only** — a non-partial type takes its folder's
 namespace like anything else, and there is currently no exception to that in the tree.

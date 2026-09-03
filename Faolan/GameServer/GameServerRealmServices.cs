@@ -8,6 +8,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.GameServer.Apprentice;
+using Faolan.GameServer.Behavior;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -237,6 +238,7 @@ namespace Faolan.GameServer
 			services.AddSingleton<ItemUseService>();
 
 			// The `.command` GM table and handlers - last, because a GM command can reach nearly every service above.
+			services.AddSingleton<BehaviorService>();
 			services.AddSingleton<GmCommandService>();
 
 			return services;

@@ -23,6 +23,7 @@ using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Apprentice;
+using Faolan.GameServer.Behavior;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -299,6 +300,7 @@ namespace Faolan.GameServer
 
 		// The player move and the Authenticate2 hello - the two inbound cases that were handlers rather than forwards (#928 item 11).
 		private readonly MovementService _movement;
+		private readonly BehaviorService _behavior;
 		private readonly LoginHandshakeService _login;
 
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
@@ -331,7 +333,7 @@ namespace Faolan.GameServer
 			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
 			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
 			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound, MovementService movement, LoginHandshakeService login)
+			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound, MovementService movement, LoginHandshakeService login, BehaviorService behavior)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -396,6 +398,7 @@ namespace Faolan.GameServer
 			_itemUse = itemUse;
 			_travelOutbound = travelOutbound;
 			_movement = movement;
+			_behavior = behavior;
 			_login = login;
 
 		}
