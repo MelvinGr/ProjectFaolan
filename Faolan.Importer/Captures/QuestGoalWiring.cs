@@ -90,7 +90,7 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.Field118 = 4;
+			quest.BandLevel = 4;
 			quest.QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags; // the beach record's `n` (@+0x14)
 			quest.FieldEc = 1;
 			quest.FieldF0 = 0x96;
@@ -281,7 +281,7 @@ namespace Faolan.Importer.Captures
 		//
 		// ⚠️ Its per-goal @609 transcription is gone (#705): goal 5744's whole objective record - `Separator`, `SubId`,
 		// marker, `Extra5/6`, refs, categories, both LDB keys - is reproduced EXACTLY by the harvest, field for field.
-		// `Level`, `Field118`, `FieldEc`, `HasSnapshotRecord` and `QuestLineFlags` are harvested too; these five are not.
+		// `Level`, `BandLevel`, `FieldEc`, `HasSnapshotRecord` and `QuestLineFlags` are harvested too; these five are not.
 		private static async Task SeedCasildaQuestSnapshot(DatabaseContext db)
 		{
 			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == 13479);

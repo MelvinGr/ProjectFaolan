@@ -260,13 +260,13 @@ namespace Faolan.Importer.Cli
 			using var db = OpenDb();
 			var ids = clean.Select(o => o.QuestId).Distinct().ToList();
 			var defs = db.QuestDefinitions.Where(q => ids.Contains(q.QuestId))
-				.Select(q => new { q.QuestId, q.Name, q.Level, q.QuestLineId, q.XpReward, q.MoneyReward, q.FieldF0, q.FieldF8, q.Field118 })
+				.Select(q => new { q.QuestId, q.Name, q.Level, q.QuestLineId, q.XpReward, q.MoneyReward, q.FieldF0, q.FieldF8, q.BandLevel })
 				.ToList()
 				.ToDictionary(q => q.QuestId);
 
 			Console.WriteLine("=== ⭐ what the shipped data holds for each PAID quest (#820) ===");
 			Console.WriteLine();
-			Console.WriteLine("  quest     paid xp   cash    line   Level  Field118  XpReward  MoneyReward  FieldF0  FieldF8   name");
+			Console.WriteLine("  quest     paid xp   cash    line   Level  BandLevel  XpReward  MoneyReward  FieldF0  FieldF8   name");
 			foreach (var g in clean.GroupBy(o => o.QuestId).OrderBy(g => g.Key))
 			{
 				var paid = g.Select(o => o.XpDelta).Distinct().OrderBy(x => x).ToList();
@@ -277,7 +277,7 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				Console.WriteLine($"  {g.Key,-8}  {Trim(string.Join("/", paid), 8),8}  {Trim(string.Join("/", cash), 6),6}  {d.QuestLineId,-6} {d.Level,5}  {d.Field118,8}  {d.XpReward,8}  {d.MoneyReward,11}  {d.FieldF0,7}  {d.FieldF8,7}   {Trim(d.Name ?? "", 28)}");
+				Console.WriteLine($"  {g.Key,-8}  {Trim(string.Join("/", paid), 8),8}  {Trim(string.Join("/", cash), 6),6}  {d.QuestLineId,-6} {d.Level,5}  {d.BandLevel,8}  {d.XpReward,8}  {d.MoneyReward,11}  {d.FieldF0,7}  {d.FieldF8,7}   {Trim(d.Name ?? "", 28)}");
 			}
 
 			Console.WriteLine();

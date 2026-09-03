@@ -158,16 +158,19 @@ namespace Faolan.Core.Database.Tables
 		// (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets, so they are seeded (not harvested). They
 		// let the snapshot's Quest_c record + quest index generate from the DB with no literals.
 
-		// A level-ADJACENT value: across the captured journals it runs level..level+5 (NecroL80 L80 -> 80-83,
-		// Hakotep L24 -> 19-30). Was called SnapshotN, which was doubly wrong - it is not `n` (that is
-		// QuestLineFlags, a different word at a different offset).
+		// The Quest_c record's word @+0x118: the level the quest's difficulty BAND is centred on - named for what its
+		// one client consumer does with it (#464, 2026-09-03; it was `SnapshotN`, then `Field118`). The journal's band
+		// function `FUN_0091f6f0(quest, characterLevel)` centres the band here (falling back to `Level` @+0x10 when
+		// this is 0), widens it by the record's @+0x114 tolerance, and returns the quest's colour - on-level, above,
+		// far above, below, far below (#802). A level-ADJACENT value: across the captured journals it runs
+		// level..level+5 (NecroL80 L80 -> 80-83, Hakotep L24 -> 19-30).
 		//
-		// ⭐ **It is the level the quest's REWARDS are scaled to** - measured, and the one thing about it that is now
-		// pinned. Both reward pairs the record carries (`MoneyReward`/`XpReward` and `FieldF8`/`FieldF0`) have a
-		// money:xp ratio that is a function of THIS field and not of `Level`: grouped by `Field118` the within-group
+		// ⭐ **And it is the level the quest's REWARDS are scaled to** - measured on the server side of the same
+		// field. Both reward pairs the record carries (`MoneyReward`/`XpReward` and `FieldF8`/`FieldF0`) have a
+		// money:xp ratio that is a function of THIS field and not of `Level`: grouped by `BandLevel` the within-group
 		// spread is **0.0032**, grouped by `Level` it is **0.0702** - 22x looser, and the two disagree on 20 of the 30
 		// rows that carry a pair. See FieldF0 below for what that buys.
-		public uint Field118 { get; set; }
+		public uint BandLevel { get; set; }
 
 		// The Quest_c record's word @+0x14 - a BITFIELD, and a property of the quest LINE rather than the quest.
 		// Across the 99 quests with a captured record it takes five values (2, 10, 18, 26, 1042), every one ≡ 2
@@ -330,8 +333,8 @@ namespace Faolan.Core.Database.Tables
 		// 99 samples do not close the law - do NOT derive one from the other.
 		//
 		// ⭐ That factor is now known to be **the same function that relates `MoneyReward` to `XpReward`**, keyed on
-		// `Field118`. The two pairs are populated on DISJOINT rows (only quest 13479 carries both), so they had never
-		// been compared; where a `Field118` group happens to contain both, they agree to four decimals:
+		// `BandLevel`. The two pairs are populated on DISJOINT rows (only quest 13479 carries both), so they had never
+		// been compared; where a `BandLevel` group happens to contain both, they agree to four decimals:
 		//
 		//     F118=20   F8/F0 0.2674, 0.2669   |  Mon/Xp 0.2674
 		//     F118=21   F8/F0 0.2919           |  Mon/Xp 0.2918

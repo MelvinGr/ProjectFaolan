@@ -252,7 +252,7 @@ captures to infer the WTHD/progress fields empirically.
 A progressed journal round-trips, and getting there was a naming correction rather than a decode: the structure
 was already fully known, just attributed to the wrong owner.
 
-- The fields the beach capture named for its own values are now `Field114`, `Field118`, `N` and `Field2c`, and
+- The fields the beach capture named for its own values are now `BandTolerance`, `BandLevel`, `N` and `Field2c`, and
   the two beach-only asserts (`!=0x412`, `questId2!=questId`) are gone. Read/write order never changed, so every
   beach golden stayed byte-exact. What was called `Marker` is `QuestcRecord.Unknown14` — the value the beach
   template happens to carry in the goal-count slot, never something to assert against.
@@ -571,7 +571,8 @@ level < low                -> 3 while within 1 less, else 4     (slightly / far 
 so `@+0x118` is **the level the quest is FOR** and `@+0x114` its **tolerance**, and the return is the journal's
 quest colour. Its caller is the journal panel at `FUN_012ce1c0`. This is an independent client-side confirmation
 of `@+0x118`, which the corpus had only reached by measurement (it is the field the money:xp ratio is a function
-of — see `QuestDefinition.Field118`); it also names `@+0x114`, which had none.
+of — see `QuestDefinition.BandLevel`); it also names `@+0x114`, which had none. Both fields carry those names
+now — `BandLevel` and `BandTolerance`, after the offset placeholders they had until 2026-09-03 (#464).
 
 ⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 at level 23 rising to ~1.10 at 80), but 99
 samples do not close the law. Do not derive one from the other.

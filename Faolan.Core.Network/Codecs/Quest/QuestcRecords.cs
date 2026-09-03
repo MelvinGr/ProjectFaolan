@@ -24,10 +24,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				QuestId = def.QuestId,
 				Level = level,
-				Field114 = 0,
-				// The Field118 column feeds field118 despite its name - the DB column keeps the old
-				// (mislabeled) name to avoid a rename migration.
-				Field118 = def.Field118,
+				BandTolerance = 0,
+				BandLevel = def.BandLevel,
 				// Carried through from the capture, meaning unknown. This used to emit a constant 0x412 for EVERY
 				// quest, which is only right for the beach journal - captured records vary (NecroL80's run 2, 10, ...).
 				// Substituting a constant here is the same mistake as defaulting the vanity mask: the wire must carry

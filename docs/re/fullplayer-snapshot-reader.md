@@ -177,7 +177,7 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest INDEX (`@1168`)** — codec `QuestIndexRegion` (the `0x3F1` index + the `0x57365154` "W6QT" goal-id
   table), wired into `FullCharSnapshotSubClass`, with a `Build` generator.
 - **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
-  (`Field118/FieldEc/FieldF0/FieldF8`, `IndexMarker/IndexTableField*/IndexTrailerWord/IndexQuestLineQuestIds`) +
+  (`BandLevel/FieldEc/FieldF0/FieldF8`, `IndexMarker/IndexTableField*/IndexTrailerWord/IndexQuestLineQuestIds`) +
   migration; seeded
   for the beach starter (importer `SeedBeachQuestGoals`). ⚠️ `IndexMagic`, `IndexTableField1..3` and
   `IndexQuestLineQuestIds` are no longer seeded — `DeriveQuestIndexFromLine` computes them from `QuestLines.Magic`

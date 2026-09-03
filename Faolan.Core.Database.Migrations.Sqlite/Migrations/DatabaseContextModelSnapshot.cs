@@ -3103,10 +3103,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("QuestId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("ChainHeadQuestId")
+                    b.Property<uint>("BandLevel")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("Field118")
+                    b.Property<uint>("ChainHeadQuestId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("FieldEc")

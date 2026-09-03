@@ -100,7 +100,7 @@ namespace Faolan.Importer.Extractors
 		// the scan went - EXCEPT the markers, which the scan got WRONG (see below).
 		//
 		// ⚠️ The level is the record's `state` slot: with the `[u32 len]` prefix `CapturedPacket.Body` keeps, the
-		// scan's `body[33..37]` is `state`, not `Field114` (which is 0 on every captured full-update).
+		// scan's `body[33..37]` is `state`, not `BandTolerance` (which is 0 on every captured full-update).
 		private static void MergeFullUpdate(QuestcRecord record, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// A full-update carries ONE 50304 objective record PER GOAL, in goal order - reading only the first is how
@@ -236,7 +236,7 @@ namespace Faolan.Importer.Extractors
 				def.Level = record.Level;
 
 			def.QuestLineFlags = record.QuestLineFlags;
-			def.Field118 = record.Field118;
+			def.BandLevel = record.BandLevel;
 			def.FieldEc = record.FieldEc;
 			def.FieldF0 = record.FieldF0;
 			def.FieldF8 = record.FieldF8;

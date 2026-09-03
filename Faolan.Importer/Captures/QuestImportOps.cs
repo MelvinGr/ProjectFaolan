@@ -599,7 +599,7 @@ namespace Faolan.Importer.Captures
 				{
 					existing.HasSnapshotRecord = true;
 					existing.QuestLineFlags = def.QuestLineFlags;
-					existing.Field118 = def.Field118;
+					existing.BandLevel = def.BandLevel;
 					existing.FieldEc = def.FieldEc;
 				}
 
@@ -787,7 +787,7 @@ namespace Faolan.Importer.Captures
 		//     button changes, on bit 4) - so an inherited or defaulted flag word is cosmetic, not structural;
 		//   * @+0x28 is the XP the journal prints, so 0 renders "XP: 0" - wrong, but only wrong on screen;
 		//   * @+0xf0 / @+0xf8 changed nothing visible at any value tried.
-		// The scalars that ARE structural are the constants: FieldEc 1, Field114 0, Field11c 0, and the chain head,
+		// The scalars that ARE structural are the constants: FieldEc 1, BandTolerance 0, Field11c 0, and the chain head,
 		// which QuestcRecords.ForQuest already falls back to the quest's own id for.
 		//
 		// A quest with NO captured sibling in its line gets flags 2 - the modal captured value (52 of 99) and the one
@@ -835,7 +835,7 @@ namespace Faolan.Importer.Captures
 
 				// @+0x118 runs level..level+5 across the captured records; the level itself is the low end of that
 				// range and the only value we can derive rather than guess.
-				def.Field118 = def.Level;
+				def.BandLevel = def.Level;
 				def.HasSnapshotRecord = true;
 				seeded++;
 			}

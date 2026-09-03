@@ -78,8 +78,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				QuestId = questId,
 				Level = level,
-				Field114 = field114,
-				Field118 = field118,
+				BandTolerance = field114,
+				BandLevel = field118,
 				QuestLineFlags = n,
 				Title = title,
 				Summary = summary,
@@ -109,8 +109,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(RecordVersion);
 			s.WriteUInt32(v.QuestId);
 			s.WriteUInt32(v.Level);
-			s.WriteUInt32(v.Field114);
-			s.WriteUInt32(v.Field118);
+			s.WriteUInt32(v.BandTolerance);
+			s.WriteUInt32(v.BandLevel);
 			s.WriteUInt32(v.QuestLineFlags);
 
 			s.WriteString(v.Title);
@@ -191,17 +191,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public string Region2 { get; init; } = ""; // <remoteformat category=52000>
 		public string Summary { get; init; } = ""; // <remoteformat category=50302>
 		public string Title { get; init; } = ""; // <remoteformat category=50301>
-		// @+0x114 - the TOLERANCE of the quest's level band, and @+0x118 the level it is centred on. Recovered from
+		// @+0x114 - the TOLERANCE of the quest's level band, and @+0x118 the level it is centred on - named for what
+		// their one consumer does with them (#464; they were `Field114`/`Field118` until 2026-09-03). Recovered from
 		// the client's own band function `FUN_0091f6f0(quest, characterLevel)` (#802), which is the ONE consumer of
 		// either field and returns a 5-way difficulty code:
-		//     H = quest.Field118 != 0 ? quest.Field118 : quest.Level     // @+0x10 is the fallback
-		//     L = quest.Field114;  low = H - L - 1;  top = H + L + 3
+		//     H = quest.BandLevel != 0 ? quest.BandLevel : quest.Level     // @+0x10 is the fallback
+		//     L = quest.BandTolerance;  low = H - L - 1;  top = H + L + 3
 		//     level in [low, top] -> 2  |  above: 1 within 3 more, else 0  |  below: 3 within 1 less, else 4
 		// i.e. the quest's colour in the journal (on-level, slightly/far above, slightly/far below). Its caller is the
-		// journal panel at `FUN_012ce1c0`. That is also what pins Field118 as "the level this quest is FOR" from the
-		// client side, independently of the reward-scaling measurement in QuestDefinition.Field118.
-		public uint Field114 { get; init; } // @+0x114 (=0 on the beach template)
-		public uint Field118 { get; init; } // @+0x118
+		// journal panel at `FUN_012ce1c0`. That is also what pins BandLevel as "the level this quest is FOR" from the
+		// client side, independently of the reward-scaling measurement in QuestDefinition.BandLevel.
+		public uint BandTolerance { get; init; } // @+0x114 (=0 on the beach template)
+		public uint BandLevel { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
 		// @+0x28 - the quest's EXPERIENCE reward: the number the journal's detail pane renders as "XP:". Proven
 		// in-client by driving one quest's value to 5553, 0 and 7777 and reading the panel back. See
@@ -225,7 +226,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// touch `Quest_c+0xf0`/`+0xf8`: the constructor `FUN_0091cf10` (zeroes them), the stream reader `FUN_0091df50`
 		// (fills them) and the stream WRITER `FUN_0091d260` (puts them back) - nothing reads them to compute or draw
 		// anything, which is why driving them to 8888/999999 in-client moved no label. ⚠️ Not vacuous: the
-		// neighbouring `Field114`/`Field118` DO have a consumer (the band function above), so this is a real
+		// neighbouring `BandTolerance`/`BandLevel` DO have a consumer (the band function above), so this is a real
 		// difference between the fields, not "the client reads none of them". They are values the journal round-trips
 		// on retail's behalf, and our sender's job is to echo what was captured per quest.
 		public uint FieldF0 { get; init; }

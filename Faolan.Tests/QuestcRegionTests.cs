@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			// same 1 as "state == active", which passed only by coincidence.
 			Assert.Equal(1u, q.Level);
 			Assert.Equal(241u, q.QuestLineId); // matches the 50300 quest-line title string id
-			Assert.Equal(4u, q.Field118);
+			Assert.Equal(4u, q.BandLevel);
 			// +0x14 - the beach template's value, carried through opaquely. NOT a 0x412 "marker" (asserting it as one
 			// rejected every level-80 snapshot, #384) and NOT a goal count either: this quest has TWO goals while the
 			// word is 0x412, and NecroL80 rec0 holds 2. Reading it as a count crashed the client - see the rename

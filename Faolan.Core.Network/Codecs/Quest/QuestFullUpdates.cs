@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// Not a codec.
 	//
 	// The record it builds is the LIVE-GRANT shape - the one the Casilda golden pins - which differs from the snapshot
-	// journal's shape (QuestcRecords.ForQuest) in the scalars it fills: FieldEc 1, Field118 3, QuestLineReward 0x50,
+	// journal's shape (QuestcRecords.ForQuest) in the scalars it fills: FieldEc 1, BandLevel 3, QuestLineReward 0x50,
 	// XpReward 0x64, CashReward 0 and a single synthesized goal record, versus the per-quest Snapshot* columns. The two
 	// were separate hand-rolled encoders until #530 wave 5 showed they write the same record.
 	public static class QuestFullUpdates
@@ -48,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			}
 		}
 
-		private const uint LiveField118 = 3;
+		private const uint LiveBandLevel = 3;
 		private const uint LiveField28 = 0x50;
 		private const uint LiveFieldEc = 1;
 		private const uint LiveFieldF0 = 0x64;
@@ -179,8 +179,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				QuestId = def.QuestId,
 				Level = level,
-				Field114 = 0,
-				Field118 = LiveField118,
+				BandTolerance = 0,
+				BandLevel = LiveBandLevel,
 				QuestLineFlags = LiveQuestLineFlags,
 				Title = QuestTextTokens.Record(def, QuestTextSlot.Title),
 				Summary = QuestTextTokens.Record(def, QuestTextSlot.Summary),

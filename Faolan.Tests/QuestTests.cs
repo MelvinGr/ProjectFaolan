@@ -88,7 +88,7 @@ namespace Faolan.Tests
 
 			var record = new QuestcRecord
 			{
-				QuestId = 0x34A7, Level = 3, Field118 = 3, QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags,
+				QuestId = 0x34A7, Level = 3, BandLevel = 3, QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags,
 				Title = QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
 				Summary = QuestTextTokens.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
 				Area = QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
