@@ -1680,6 +1680,16 @@ What a 2026-09-03 pass established about that multiplier, so it is not re-derive
   `Glacial Tomb` 585.72 on 38 of 56 — and read as `Value × K`: 3.00 × 254.93 (unholy) and 2.50 × 234.29 (cold), i.e.
   one constant per SCHOOL that is not any pushed stat. Whichever server-side number that is, it is the same one
   the multiplier above is made of, and a second level-80 caster is what would separate it from the level.
+* ⭐ **And the multiplier FACTORS** (2026-09-03, second pass). The unholy-to-cold ratio is **1.088** on the
+  deterministic DPSHit pair (254.93 / 234.29) and **1.082** on the direct-damage medians (unholy mean 4.93×,
+  cold mean 4.55×, across five spells whose bases differ 3×); and direct-to-DPSHit is **1.93** for unholy and
+  **1.94** for cold. Two families, two schools, and the same two numbers come out of each cut — so what the
+  server applies is a product of a per-SCHOOL caster term (the same one in both families, ≈1.085 apart between
+  unholy and cold on this character) and a per-FAMILY term (direct ≈1.94× what a DPSHit element gets, whatever
+  the school). That is the shape a second caster has to reproduce: the 1.94 should hold and the 1.085 should move
+  with gear. Read additively instead (`Value + coeff × R`, coefficient 100 on both DPSHit spells) the pair gives
+  `R` = 464.80 unholy / 335.72 cold, which is the same 1.38 spread — the two readings are not separable on one
+  caster, and neither is modelled.
 
 ## Where the combat numbers come from (2026-07-28)
 
