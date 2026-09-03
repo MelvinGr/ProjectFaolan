@@ -86,7 +86,12 @@ namespace Faolan
 				o.SingleLine = true;
 			});
 
-			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
+			// Registered through a FACTORY, not as a pre-built instance: MS.DI disposes the singletons it creates and
+			// leaves the ones it is handed alone, and `AddProvider(instance)` is the latter. The provider buffers its
+			// writes and flushes on a 1 s timer (see FileLoggerProvider), so an undisposed one could lose the last
+			// second of faolan.log at shutdown; owned by the container, its Dispose flushes when the host stops.
+			var logFile = builder.Configuration.LogFile;
+			builder.Logging.Services.AddSingleton<ILoggerProvider>(_ => new FileLoggerProvider(logFile));
 
 			// The login DH private key (Server:PrivateKey). Read BEFORE any listener starts so a bad value throws here
 			// rather than mid-login, where it would silently degrade every login to accept-any.
