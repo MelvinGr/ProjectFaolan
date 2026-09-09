@@ -146,9 +146,14 @@ namespace Faolan.Importer.Cli
 			// seedGameData: false ON PURPOSE - the importer's whole job is to BUILD that content from captures, so
 			// loading faolan.sql first would import on top of a copy of its own previous output and blur what this run
 			// actually produced (the --dry-run per-table delta especially).
-			var seeded = await DatabaseInitializer.InitializeAsync(db, false);
-			if (seeded.RealmCreated)
-				Console.WriteLine("Importer: no realm present - inserted the default realm.");
+			// The declared realms come along for the ride so the importer brings a database up the same way the server
+			// does - a fresh DB it builds is one the server can serve without a second reconcile pass. It never scopes
+			// to one realm: the importer hosts none, so there is no "own row" for it to be limited to.
+			var seeded = await DatabaseInitializer.InitializeAsync(db, false, FaolanRealms.Declared(options.Configuration));
+			foreach (var realm in seeded.Realms.Created)
+				Console.WriteLine($"Importer: declared realm not in the database - inserted {realm}.");
+			foreach (var realm in seeded.Realms.Updated)
+				Console.WriteLine($"Importer: realm changed by the config - {realm}.");
 			if (seeded.AccountCreated)
 				Console.WriteLine("Importer: no account present - inserted the default account.");
 

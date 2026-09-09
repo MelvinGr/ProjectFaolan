@@ -159,10 +159,16 @@ namespace Faolan.Core.Cli
 				blocks.Add(Object(section, run));
 			}
 
+			// The declared realms are the one part of this file that is NOT a catalog setting (a list of records fits
+			// neither the flat key/accessor shape nor the command line), so the block is rendered by its own owner and
+			// spliced in HERE - at the position "Realms" sorts to among the section names, keeping the whole file in
+			// one ordinal order.
+			blocks.Insert(blocks.Count(b => string.CompareOrdinal(b.Section, FaolanRealms.Section) < 0), new Block(FaolanRealms.DefaultJsonLines(), FaolanRealms.Section));
+
 			Join(blocks);
 			for (var i = 0; i < blocks.Count; i++)
 			{
-				if (i > 0 && (blocks[i].Section || blocks[i - 1].Section))
+				if (i > 0 && (blocks[i].Section != null || blocks[i - 1].Section != null))
 					text.AppendLine();
 
 				foreach (var line in blocks[i].Lines)
@@ -319,7 +325,7 @@ namespace Faolan.Core.Cli
 			lines.AddRange(entries.SelectMany(e => e.Lines));
 			lines.Add("\t}");
 
-			return new Block(lines, true);
+			return new Block(lines, section);
 		}
 
 
@@ -360,6 +366,9 @@ namespace Faolan.Core.Cli
 				: throw new InvalidOperationException($"'{key}' is set to '{text}', which is not a {typeof(T).Name}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
-		private sealed record Block(List<string> Lines, bool Section = false);
+		// Section carries the section NAME, not a bare flag: the generated file is ordinal by key, and the Realms
+		// block (which is not a catalog setting - see FaolanRealms) has to be inserted at the position its name sorts
+		// to rather than appended, or the file stops being scannable in one order.
+		private sealed record Block(List<string> Lines, string? Section = null);
 	}
 }

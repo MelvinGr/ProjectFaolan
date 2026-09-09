@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -11,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database
 {
 	// Brings a database up to a runnable state: migrate to the latest schema for the active provider, load the game
-	// data if the database has none, then ensure the default realm + account exist. Shared by the server and the
+	// data if the database has none, then reconcile the declared realms + ensure the default account. Shared by the server and the
 	// importer so a fresh DB is brought up the SAME way on either path - the one place that sequence lives. Returns
 	// what happened so the caller logs in its own style (ILogger on the server, Console in the importer).
 	public static class DatabaseInitializer
@@ -39,23 +42,150 @@ namespace Faolan.Core.Database
 
 		// Ports/type mirror the committed faolan.db realm so a fresh DB matches the reference deployment. The realm's
 		// id is left DB-generated (1 on a fresh DB) - realm-scoped rows resolve it by lookup, not by a hard-coded id.
+		//
+		// ⚠️ This is the UNDECLARED path only (see ReconcileRealmsAsync): it runs for a deployment that configures no
+		// realms at all, and its "any realm exists, do nothing" gate is what makes that deployment's database
+		// untouchable. A declared deployment goes through the reconciler instead, which addresses rows by id.
 		public static async Task<bool> EnsureDefaultRealmAsync(DatabaseContext db, CancellationToken cancellationToken = default)
 		{
 			if (await db.Realms.AnyAsync(cancellationToken))
 				return false;
 
+			var realm = FaolanRealms.Default[0];
 			db.Realms.Add(new Realm
 			{
-				Name = "Project Faolan",
-				IpAddress = "127.0.0.1",
-				Port = 7014,
-				ChatServerPort = 7012,
-				CsPlayerAgentPort = 7001,
-				Type = RealmType.PvP,
-				Country = RealmCountry.English
+				Name = realm.Name,
+				IpAddress = realm.IpAddress,
+				Port = realm.Port,
+				ChatServerPort = realm.ChatServerPort,
+				CsPlayerAgentPort = realm.CsPlayerAgentPort,
+				Type = realm.Type,
+				Country = realm.Country
 			});
 
 			return await db.SaveChangesAsync(cancellationToken) == 1;
+		}
+
+		/// <summary>
+		///     Brings the <c>Realms</c> table into line with what the configuration DECLARES - the static half of each
+		///     row, so a realm's name, address and ports are reviewable in faolan.json instead of being edited into a
+		///     committed binary database by hand.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ It writes the STATIC columns only. The three LIVE ones are never touched here. <c>OnlineStatus</c> and
+		///     <c>LastSeenUtc</c> are how a login process learns whether a realm host - possibly on another machine -
+		///     is still serving (#909, #922), and the invariant that keeps that honest is that the host which owns a
+		///     realm's PORTS is the only thing that writes its liveness; a file cannot observe an absence, so it does
+		///     not get to claim one. <c>LoadStatus</c> is the realm's POPULATION, which nothing computes yet - and
+		///     declaring it would be the reason it never could, since every restart would overwrite whatever the live
+		///     count had put there. A realm this call CREATES starts Offline with a null heartbeat, which reads as
+		///     down until a host says otherwise.
+		///     <para />
+		///     ⚠️ It never DELETES. Four tables FK a realm - characters, guilds, mail and auction listings - so a row
+		///     that has dropped out of the config is reported to the caller and left standing. Removing a realm is a
+		///     data migration, not a config edit.
+		///     <para />
+		///     <paramref name="onlyRealmId" /> scopes the write to one row, which is what a realm-role process passes:
+		///     it keeps "a realm process writes only its own row" true of the static columns as well as the liveness
+		///     pair. The login tier passes null and reconciles the whole declared set, because the realm list it
+		///     serves is exactly that set.
+		/// </remarks>
+		public static async Task<RealmReconciliation> ReconcileRealmsAsync(DatabaseContext db, IReadOnlyList<DeclaredRealm>? declared,
+			uint? onlyRealmId = null, CancellationToken cancellationToken = default)
+		{
+			// Nothing declared: the historical behaviour, unchanged. Falling through to the reconciler with the
+			// built-in default instead would address the default realm by id 1 - and a database whose realm carries
+			// some other id (it was DB-generated) would then gain a SECOND realm that nobody asked for.
+			if (declared is not { Count: > 0 })
+				return await EnsureDefaultRealmAsync(db, cancellationToken)
+					? new RealmReconciliation([FaolanRealms.Default[0].Name], [], [])
+					: RealmReconciliation.Nothing;
+
+			var wanted = onlyRealmId is { } only
+				? declared.Where(r => r.Id == only).ToArray()
+				: [.. declared];
+
+			var rows = await db.Realms.ToDictionaryAsync(r => r.Id, cancellationToken);
+			var created = new List<string>();
+			var updated = new List<string>();
+
+			foreach (var realm in wanted)
+			{
+				if (!rows.TryGetValue(realm.Id, out var row))
+				{
+					db.Realms.Add(Row(realm));
+					created.Add($"{realm.Name} (id {realm.Id})");
+					continue;
+				}
+
+				// Written field by field rather than by replacing the row, so the liveness pair is not in the set of
+				// things that COULD be assigned here by a later edit.
+				var changes = Changes(row, realm);
+				if (changes.Length == 0)
+					continue;
+
+				row.Name = realm.Name;
+				row.IpAddress = realm.IpAddress;
+				row.Port = realm.Port;
+				row.ChatServerPort = realm.ChatServerPort;
+				row.CsPlayerAgentPort = realm.CsPlayerAgentPort;
+				row.Type = realm.Type;
+				row.Country = realm.Country;
+
+				updated.Add($"{realm.Name} (id {realm.Id}): {string.Join(", ", changes)}");
+			}
+
+			await db.SaveChangesAsync(cancellationToken);
+
+			// Only meaningful for the whole-set pass: a process reconciling its own row knows nothing about whether
+			// the others are declared, and saying they are not would be a guess.
+			var undeclared = onlyRealmId.HasValue
+				? []
+				: rows.Values.Where(row => declared.All(r => r.Id != row.Id)).Select(row => $"{row.Name} (id {row.Id})").Order().ToArray();
+
+			return new RealmReconciliation([.. created], [.. updated], undeclared);
+		}
+
+		// What the config says that the row does not, phrased as "was -> is" so the caller can LOG it. ⚠️ A port
+		// change on a realm whose host is already running is the reason this is worth spelling out: the login tier
+		// starts advertising the new port immediately and the running host keeps serving the old one.
+		private static string[] Changes(Realm row, DeclaredRealm realm)
+		{
+			var changes = new List<string>();
+
+			void Compare<T>(string field, T was, T now)
+			{
+				if (!EqualityComparer<T>.Default.Equals(was, now))
+					changes.Add($"{field} {was} -> {now}");
+			}
+
+			Compare(nameof(Realm.Name), row.Name, realm.Name);
+			Compare(nameof(Realm.IpAddress), row.IpAddress, realm.IpAddress);
+			Compare(nameof(Realm.Port), row.Port, realm.Port);
+			Compare(nameof(Realm.ChatServerPort), row.ChatServerPort, realm.ChatServerPort);
+			Compare(nameof(Realm.CsPlayerAgentPort), row.CsPlayerAgentPort, realm.CsPlayerAgentPort);
+			Compare(nameof(Realm.Type), row.Type, realm.Type);
+			Compare(nameof(Realm.Country), row.Country, realm.Country);
+
+			return [.. changes];
+		}
+
+		// ⚠️ The live columns are left at their defaults - Offline, never seen, Recommended - and are NOT settable from
+		// the config. RealmLiveness reads a null heartbeat as down even when the flag says Online, so a realm declared
+		// today does not appear up until a host has actually claimed it and said so.
+		private static Realm Row(DeclaredRealm realm)
+		{
+			return new Realm
+			{
+				Id = realm.Id,
+				Name = realm.Name,
+				IpAddress = realm.IpAddress,
+				Port = realm.Port,
+				ChatServerPort = realm.ChatServerPort,
+				CsPlayerAgentPort = realm.CsPlayerAgentPort,
+				Type = realm.Type,
+				Country = realm.Country
+			};
 		}
 
 		// Loads faolan.sql into a database that came up with NO GAME CONTENT (#412) - what makes a fresh clone
@@ -98,8 +228,15 @@ namespace Faolan.Core.Database
 			await command.ExecuteNonQueryAsync(cancellationToken);
 		}
 
-		public static async Task<(bool RealmCreated, bool AccountCreated, bool DataSeeded)> InitializeAsync(DatabaseContext db, bool seedGameData = true,
-			CancellationToken cancellationToken = default)
+		/// <param name="realms">
+		///     The realms the configuration declares (<c>FaolanRealms.Declared</c>), or null/empty for a deployment
+		///     that declares none - which keeps the historical "insert the default realm into an empty table" path.
+		/// </param>
+		/// <param name="onlyRealmId">
+		///     Reconcile just this realm's row, which a realm-role process passes so it writes only its own (#909).
+		/// </param>
+		public static async Task<(RealmReconciliation Realms, bool AccountCreated, bool DataSeeded)> InitializeAsync(DatabaseContext db, bool seedGameData = true,
+			IReadOnlyList<DeclaredRealm>? realms = null, uint? onlyRealmId = null, CancellationToken cancellationToken = default)
 		{
 			// Both providers migrate the same way - each has its own migration project (see UseFaolanDatabase);
 			// Migrate applies the pending set for the active provider.
@@ -112,9 +249,9 @@ namespace Faolan.Core.Database
 
 			// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.
 			// These are config state, not schema, so they're ensured here rather than shipped in a migration. Idempotent.
-			var realmCreated = await EnsureDefaultRealmAsync(db, cancellationToken);
+			var reconciled = await ReconcileRealmsAsync(db, realms, onlyRealmId, cancellationToken);
 			var accountCreated = await EnsureDefaultAccountAsync(db, cancellationToken);
-			return (realmCreated, accountCreated, dataSeeded);
+			return (reconciled, accountCreated, dataSeeded);
 		}
 	}
 }

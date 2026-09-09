@@ -315,6 +315,12 @@ namespace Faolan.Tests
 		// The committed faolan.json IS that generated file (this checkout's own deviations live in the gitignored
 		// faolan.user.json), so every key in it must be a catalog key. This is what catches a setting RENAMED in code and left behind in the
 		// config: the stale key loads fine, is read by nobody, and the deployment silently runs on the default.
+		//
+		// ⚠️ `Realms` is the ONE exemption, and it is a whole section rather than a key: a LIST of records fits
+		// neither the catalog's flat key/accessor shape nor its one-option-per-key command line, so it is owned by
+		// FaolanRealms instead. It is still generated into this file from the same kind of built-in default, and
+		// TheCommittedConfig_DeclaresTheDefaultRealms below is what keeps the committed block honest - so exempting it here
+		// removes no coverage, it just moves which test provides it.
 		[Fact]
 		public void TheCommittedConfig_NamesOnlyCatalogKeys()
 		{
@@ -322,10 +328,24 @@ namespace Faolan.Tests
 
 			var keys = config.AsEnumerable()
 				.Where(pair => pair.Value != null) // a section itself has no value, only its leaves do
-				.Select(pair => pair.Key);
+				.Select(pair => pair.Key)
+				.Where(key => !key.StartsWith($"{FaolanRealms.Section}:", StringComparison.Ordinal));
 
 			foreach (var key in keys)
 				FaolanSettings.Get(key); // throws, naming the key, if the catalog does not have it
+		}
+
+		// The committed block IS the built-in default, read back through the configuration stack - the same
+		// round-trip TheGeneratedDefaultJson_ReadsBackAsTheCatalog does for the catalog half. A hand-edit to the
+		// Realms block that no longer parses, or that quietly declares something other than what the code falls back
+		// to, is the failure this catches.
+		[Fact]
+		public void TheCommittedConfig_DeclaresTheDefaultRealms()
+		{
+			var config = new ConfigurationBuilder().AddJsonFile(TestPaths.Repo("faolan.json")).Build();
+
+			Assert.True(FaolanRealms.IsDeclared(config));
+			Assert.Equal(FaolanRealms.Default, FaolanRealms.Declared(config));
 		}
 
 		// The `--help` text a command carrying `option` prints - the rendering under test, not a reconstruction of it.

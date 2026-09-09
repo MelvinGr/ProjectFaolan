@@ -62,6 +62,24 @@
 		"Port": 7099
 	},
 
+	// The realms this deployment serves - the STATIC half of each Realm row, reconciled into the database at
+	// startup. The LIVE columns are not here and cannot be declared: Online status and the heartbeat are written
+	// by the host that serves the realm, and LoadStatus is its population.
+	// Ids are explicit and must stay stable: every character, guild, mail and auction listing is FK'd to one.
+	// Declare the whole set - a later layer overrides an entry's keys but cannot remove an entry.
+	"Realms": [
+		{
+			"Id": 1,
+			"Name": "Project Faolan",
+			"IpAddress": "127.0.0.1",
+			"Port": 7014,
+			"ChatServerPort": 7012,
+			"CsPlayerAgentPort": 7001,
+			"Type": "PvP",
+			"Country": "English"
+		}
+	],
+
 	"Server": {
 		// The interface the server BINDS. Not an address to dial - that is Server:PublicAddress.
 		"ListenAddress": "0.0.0.0",

@@ -7,7 +7,7 @@
 # CONFIG COMES FROM ENV VARS. The image carries NO faolan.json (it's optional; precedence is env > cmdline > json),
 # so every game process sets its config in `environment:` - shared here via the `x-faolan-config` anchor. Two caveats:
 #   - Server:PublicAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT 127.0.0.1 -
-#     the login tier advertises it (and each Realm row's IpAddress) and the client connects there from OUTSIDE Docker.
+#     the login tier advertises it (and each realm's declared IpAddress) and the client connects there from OUTSIDE Docker.
 #   - The all-in-one SQLite default builds its database into the bind-mounted ./data on first start; a shared
 #     multi-realm deployment wants Postgres (no single-writer file lock) - see the commented POSTGRES section.
 
@@ -48,8 +48,10 @@ services:
 
 # ---------------------------------------------------------------------------------------------------------------
 # PROCESS-PER-REALM example (uncomment; remove/keep the all-in-one `faolan` service above as you like). One shared
-# login/router tier + one game host per realm, all against the shared DB. Seed a Realm row per realm first
-# (id + IpAddress reachable by the client + its Port/AgentServerPort/CsPlayerAgentPort), then publish those ports.
+# login/router tier + one game host per realm, all against the shared DB. DECLARE each realm in the `Realms`
+# section of faolan.json (or faolan.user.json) first - explicit stable Id, an IpAddress the client can reach from
+# OUTSIDE Docker, and its Port/ChatServerPort/CsPlayerAgentPort - then publish those ports here. Every process
+# reconciles that declaration into the Realm rows at startup, so there is no row to seed by hand.
 # ---------------------------------------------------------------------------------------------------------------
 #  login:
 #    build:
@@ -70,10 +72,10 @@ services:
 #      context: .
 #      dockerfile: Faolan/Dockerfile
 #    image: projectfaolan
-#    command: ["--role", "realm=2"]      # one realm's game host, bound to Realm row 2's ports
+#    command: ["--role", "realm=2"]      # one realm's game host, bound to the ports declared for realm 2
 #    environment: *faolan-config
 #    ports:
-#      - "7014:7014"                      # world / chat / cs = Realm row 2's Port / AgentServerPort / CsPlayerAgentPort
+#      - "7014:7014"                      # world / chat / cs = realm 2's declared Port / ChatServerPort / CsPlayerAgentPort
 #      - "7012:7012"
 #      - "7001:7001"
 #    volumes:
@@ -85,7 +87,7 @@ services:
 #      context: .
 #      dockerfile: Faolan/Dockerfile
 #    image: projectfaolan
-#    command: ["--role", "realm=3"]      # a second realm (seed Realm row 3 with these ports first)
+#    command: ["--role", "realm=3"]      # a second realm (declare realm 3 with these ports first)
 #    environment: *faolan-config
 #    ports:
 #      - "7024:7024"

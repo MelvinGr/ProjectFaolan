@@ -102,7 +102,11 @@ serves both the create-editor and world connections). **Process role (multi-real
 `docs/subsystems/multi-realm.md`):** by default `dotnet run --project Faolan` is *all-in-one* (login +
 a game host for the first realm — the historical single-process dev run); `--role login` runs ONLY the
 router tier; `--role realm=<id>` runs ONE realm's game host (GameServer + realm-local chat + guilds, bound to
-that `Realm` row's ports). `--role` is **repeatable** — `--role login --role realm=<id>` co-hosts both in one
+that realm's ports). Realms are **declared in the `Realms` section of faolan.json** — the STATIC half of a `Realm`
+row (name/address/ports/type/country), reconciled into the table at startup; the LIVE half (`OnlineStatus`,
+`LastSeenUtc`, `LoadStatus`) is written only by the host serving the realm and is never declarable, and a row is
+never deleted because four tables FK it. A deployment that declares nothing keeps the old "insert the default
+realm into an empty table" behaviour exactly. `--role` is **repeatable** — `--role login --role realm=<id>` co-hosts both in one
 process — but **at most one realm role per process** (co-hosting realms would leak chat/session state across
 them). So one login + N realm processes compose a multi-realm deployment against the shared DB;
 guild/AH/mail/character-name are realm-scoped (`RealmId`), routed by the character's realm.

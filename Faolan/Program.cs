@@ -125,14 +125,37 @@ namespace Faolan
 				// The shared migrate + load-the-data + seed sequence (DatabaseInitializer), logged Console-style because
 				// the host - and with it any ILogger - does not exist yet. A database with no content gets faolan.sql
 				// loaded into it here, which is what lets a clone run without the committed binary (#412).
-				var seeded = await DatabaseInitializer.InitializeAsync(db);
+				// The realms this deployment DECLARES (the `Realms` section - see FaolanRealms), reconciled into the
+				// table below. Read before the initializer so a malformed declaration fails here, naming the offending
+				// key, rather than half-way through a bootstrap.
+				//
+				// ⭐ The SCOPE is the role. A login process reconciles the whole declared set, because the realm list
+				// it serves is exactly that set; a realm-only process reconciles just its own row, which keeps
+				// "a realm process writes only its own row" (#909/#922) true of the static columns too. An all-in-one
+				// run is the login tier, so it takes the whole set.
+				var declared = FaolanRealms.Declared(builder.Configuration);
+				var reconcileOnly = runLogin
+					? null
+					: realmId;
+
+				var seeded = await DatabaseInitializer.InitializeAsync(db, true, declared, reconcileOnly);
 
 				if (seeded.DataSeeded)
 					Console.WriteLine($"[db] Empty database - loaded the game data from {Global.SeedPath}.");
-				if (seeded.RealmCreated)
-					Console.WriteLine("[db] No realm present - inserted the default realm.");
 				if (seeded.AccountCreated)
 					Console.WriteLine("[db] No account present - inserted the default account.");
+
+				foreach (var realm in seeded.Realms.Created)
+					Console.WriteLine($"[db] Declared realm not in the database - inserted {realm}.");
+
+				// ⚠️ A port change is the one that bites: this process now advertises the new port, while a realm host
+				// that is already running keeps serving the old one until somebody restarts it.
+				foreach (var realm in seeded.Realms.Updated)
+					Console.WriteLine($"[db] Realm changed by the config - {realm}. A running host for it keeps its old ports until restarted.");
+
+				// Never deleted - characters, guilds, mail and auction listings FK a realm - so this is a notice.
+				foreach (var realm in seeded.Realms.Undeclared)
+					Console.WriteLine($"[db] Realm {realm} is in the database but declared by no config layer; left as it is.");
 
 				if (runRealm)
 				{
@@ -140,10 +163,11 @@ namespace Faolan
 						? db.Realms.FirstOrDefault(r => r.Id == realmId.Value)
 						: db.Realms.OrderBy(r => r.Id).FirstOrDefault();
 
-					// Only reachable for an explicit id - the no-id branch always finds a realm, since the seed above
-					// inserts the default one when the table is empty.
+					// Only reachable for an explicit id - the no-id branch always finds a realm, since the reconcile
+					// above inserts the declared realms (and the default one when nothing is declared and the table is
+					// empty).
 					if (hostRealm == null)
-						throw new Exception($"--role realm={realmId}: no such realm in the DB (add the Realm row, or omit the id to host the first one).");
+						throw new Exception($"--role realm={realmId}: no such realm. Declare it in the '{FaolanRealms.Section}' section of faolan.json (or faolan.user.json), or omit the id to host the first one.");
 				}
 			}
 			catch (Exception ex)

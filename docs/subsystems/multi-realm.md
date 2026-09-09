@@ -4,6 +4,44 @@ Project Faolan supports **N realms** (AoC "servers" — Crom/Fury/…), each an 
 to, hosted as separate processes (see below). The wire + data model is realm-aware, and the dynamic data is
 scoped per realm.
 
+## Where a realm is defined
+
+A realm row is **three things wearing one name**, and knowing which is which is what decides where each part
+lives:
+
+| Half | Columns | Owner |
+|---|---|---|
+| Static deployment config | `Name`, `IpAddress`, `Port`, `ChatServerPort`, `CsPlayerAgentPort`, `Type`, `Country` | the `Realms` section of faolan.json |
+| Live | `OnlineStatus`, `LastSeenUtc`, `LoadStatus` | the host that serves the realm |
+| Relational anchor | `Id` | the four tables that FK it |
+
+The **static half is declared in configuration** and reconciled into the table at startup
+(`FaolanRealms` reads the section, `DatabaseInitializer.ReconcileRealmsAsync` writes it), so a realm’s name,
+address and ports are reviewable in a text file instead of being edited into a committed binary database by hand.
+
+⚠️ The other two halves **cannot** move to a file, and the reconciler never writes them:
+
+- `OnlineStatus` + `LastSeenUtc` are how a login process learns whether a realm host — possibly on another
+  machine — is still serving (#909, #922). A file cannot observe an absence. The invariant that keeps this honest
+  is that the process owning a realm’s **ports** is the only thing that writes its liveness, which is why a
+  realm-role process reconciles **only its own row** (`onlyRealmId`) while the login tier reconciles the whole
+  declared set.
+- `LoadStatus` is the realm’s **population**, which nothing computes yet. Declaring it would be the reason it
+  never could: every restart would overwrite whatever a live count had put there.
+
+⭐ A deployment that declares **no** realms is left completely alone — the historical “insert the default realm
+if the table is empty, else do nothing” path. Config becomes authoritative only once somebody writes it down, so a
+database whose realm carries some other id never gains a duplicate from a declaration it never made.
+
+Two more rules follow from the anchor half. Ids are **explicit and must stay stable**, because `Character.RealmId`
+is persisted — an implicit ordinal would silently repoint every character the day somebody reordered the file. And
+a row the config has dropped is **reported, never deleted**: four tables FK a realm, so removing one is a data
+migration rather than a config edit.
+
+Declarations are validated at config time rather than at wire-write time, which is where the same mistakes used to
+surface — after a player had already picked the realm. A non-IPv4 address (#845), a zero port, a duplicate id or
+name, and two realms sharing a port on one address are all refused, naming the offending key.
+
 ## Realm-ready foundations
 
 Already realm-ready:
@@ -11,7 +49,7 @@ Already realm-ready:
   **`IpAddress` + `Port`** (so a realm can live on any host:port).
 - **`Character.RealmId`** — every character is FK'd to a realm.
 - **`SendRealmList`** (PlayerAgent/Packets.cs) — already **loops all DB realms** (count-prefixed per-realm record);
-  sending N realms is coded, the DB just has 1 row (`Project Faolan`, 127.0.0.1:7014).
+  sending N realms is coded, and the config declares 1 by default (`Project Faolan`, 127.0.0.1:7014).
 - **`RequestCharRealmData` / `SendCharacterRealmData` / `CreateCharacter(accountId, realmId)`** — the realm-select
   wire flow exists.
 
