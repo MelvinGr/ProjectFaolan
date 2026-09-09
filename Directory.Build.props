@@ -5,34 +5,25 @@
 		<LangVersion>latest</LangVersion>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+		<Nullable>enable</Nullable>
+		<!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
+
 		<!--<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>-->
-		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
-		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</RuntimeIdentifier>
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">linux-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+
 		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
 		<Authors>Project Faolan</Authors>
 		<Copyright>Copyright © Project Faolan $([System.DateTime]::Now.Year)</Copyright>
 		<ApplicationIcon>..\logo.ico</ApplicationIcon>
-		<!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
-		<Nullable>enable</Nullable>
-		<!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
 	</PropertyGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Faolan.Tests" />
 	</ItemGroup>
 
-	<!--
-	  Async/await correctness analyzer (AsyncFixer01-05). Analyzer-only: PrivateAssets=all keeps it out of the
-	  produced packages/output, ExcludeAssets=runtime means nothing ships with it.
-
-	  OFF by default - uncomment to re-run it. Its correctness half found NOTHING, and that is not luck: .editorconfig
-	  already carries CS1998 (async without await) and CS4014 (unawaited call) at `error`, which is the same ground
-	  AsyncFixer03/04/05 cover. The last full pass over the solution was AsyncFixer03/04/05 = 0, and the AsyncFixer02
-	  sites (sync File/EF calls inside an async method) are all fixed. What is left if you switch it on is 37x
-	  AsyncFixer01 - `return await X()` that could be `return X()`, which trades one state machine for a lost stack
-	  frame in exception traces and changes no behaviour.
-	-->
 	<!--<ItemGroup>
 		<PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" ExcludeAssets="runtime" />
 	</ItemGroup>-->
@@ -48,21 +39,6 @@
         <ContainerImageTag>dev</ContainerImageTag>
     </PropertyGroup>-->
 
-	<!--
-	  The startup banner's build stamp (Faolan.Core/Global.cs). `BuildDateTimeUtc` is a TIMESTAMP, so an assembly
-	  carrying it can never be byte-identical across two builds of the same source - it was the whole of #551: three
-	  no-op `dotnet build`s, three different `Faolan.Core.Database.dll` hashes, and that hash is part of the test
-	  fixture cache key, so every build threw the cached fixture away.
-
-	  It is scoped to the ENTRY assembly because that is the only place it is ever read: `Global` resolves both
-	  attributes off `Assembly.GetEntryAssembly()` and degrades gracefully when they are absent, so the twelve library
-	  copies were paying determinism for a value nothing could reach. `OutputType == Exe` is the condition rather than
-	  a project list so a new host picks it up by being a host.
-
-	  ⚠️ The executables themselves are still non-deterministic by construction - that is what a build timestamp IS.
-	  Making them deterministic too means sourcing the stamp from the COMMIT rather than the clock; the git SHA
-	  already rides along for free in the informational version, so the date is the only piece left.
-	-->
 	<Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile" Condition="'$(OutputType)' == 'Exe'">
 		<ItemGroup>
 			<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
@@ -76,24 +52,6 @@
 			</AssemblyAttribute>
 		</ItemGroup>
 	</Target>
-
-	<!--<Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
-	        Condition="'$(Configuration)' == 'Debug'">
-		<ItemGroup>
-			<RuntimeFolders
-				Include="$([System.IO.Directory]::GetDirectories('$(TargetDir)runtimes'))"
-				Condition="Exists('$(TargetDir)runtimes')" />
-
-			<RuntimeFoldersToRemove Include="@(RuntimeFolders)"
-			                        Exclude="$(TargetDir)runtimes/linux-x64;$(TargetDir)runtimes/win-x64" />
-		</ItemGroup>
-
-		<Message Importance="High"
-		         Text="Removing runtime folders: @(RuntimeFoldersToRemove)"
-		         Condition="'@(RuntimeFoldersToRemove)' != ''" />
-
-		<RemoveDir Directories="@(RuntimeFoldersToRemove)" />
-	</Target>-->
 
 	<Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')" />
 </Project>
