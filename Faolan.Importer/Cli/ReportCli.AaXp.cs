@@ -75,6 +75,11 @@ namespace Faolan.Importer.Cli
 
 			var grants = new List<(string Capture, int Index, string Token, long Amount, int? Bonus)>();
 			var kills = new List<(string Capture, uint PlayerLevel, uint MobLevel, string Mob, long Amount, int? Bonus, int Distance)>();
+			// #935: each pool push against the kill it belongs to, DIRECTLY. Counting pushes and kills per capture and
+			// dividing gives 2.00 on six captures and misses on three, which cannot say whether the residue is a
+			// clipped window, a witnessed death or something else. Pairing says where each push actually sits.
+			var pushAttribution = new List<(string Capture, int[] Pushes, (int Index, bool ByPlayer)[] Deaths, int[] Grants)>();
+
 			var poolSeries = new List<(string Capture, uint Stat, uint First, uint Last, int Moves, long Sum, int Pushes, int Deaths, int PlayerKills, int Grants)>();
 
 			foreach (var capture in captures)
@@ -220,6 +225,13 @@ namespace Faolan.Importer.Cli
 
 					poolSeries.Add((capture.Name, stat, values[0].Value, values[^1].Value, moves, sum, values.Count, deaths.Count,
 						deaths.Count(d => damagedByPlayer.Contains(d.Actor)), localGrants.Count));
+
+					if (stat == AaPvEXpStat)
+					{
+						pushAttribution.Add((capture.Name, values.Select(v => v.Index).ToArray(),
+							deaths.Select(d => (d.Index, damagedByPlayer.Contains(d.Actor))).ToArray(),
+							localGrants.Select(g => g.Index).ToArray()));
+					}
 				}
 			}
 
@@ -289,6 +301,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("     the pushes outside its window, and summing the three slices gives 1.85 rather than 2.00, so");
 			Console.WriteLine("     clipping does not explain them on its own. We push on a grant alone until it does.");
 
+			AaPushAttribution(pushAttribution);
+
 			Console.WriteLine();
 			Console.WriteLine("  ⭐ The pool's DENOMINATOR is the client's own `AlternateAdvancement_XPCap` = 1,000,000, and the");
 			Console.WriteLine("     client divides by it itself - see docs/re/alternate-advancement-perks.md.");
@@ -327,6 +341,77 @@ namespace Faolan.Importer.Cli
 
 			if (seen == 0)
 				Console.WriteLine("  none.");
+		}
+
+		/// <summary>
+		///     ⭐ Where each `AAPvEXP` push actually SITS - against the nearest death and the nearest grant (#935).
+		/// </summary>
+		/// <remarks>
+		///     The per-capture ratio `pushes / player kills` reads exactly 2.00 on six of the nine captures that hold a
+		///     kill and 2.20 / 2.14 / 0.67 on the rest, which cannot say WHY: a clipped capture window, a witnessed
+		///     death that is not the player's, and a second trigger all produce the same miss. Pairing each push with
+		///     the event nearest to it answers it directly, the way the grant announcements were paired to their kills.
+		/// </remarks>
+		private static void AaPushAttribution(IReadOnlyList<(string Capture, int[] Pushes, (int Index, bool ByPlayer)[] Deaths, int[] Grants)> captures)
+		{
+			Console.WriteLine();
+			Console.WriteLine("--- where each pool push SITS: distance to the nearest death and the nearest grant (#935) ---");
+
+			var toDeath = new List<int>();
+			var toGrant = new List<int>();
+			int pairedToPlayerKill = 0, pairedToOtherDeath = 0, unpaired = 0, total = 0;
+			var perDeath = new List<int>();
+
+			foreach (var c in captures)
+			{
+				foreach (var push in c.Pushes)
+				{
+					total++;
+					var nearestDeath = c.Deaths.Length == 0 ? (int?)null : c.Deaths.MinBy(d => Math.Abs(d.Index - push)).Index;
+					var nearestGrant = c.Grants.Length == 0 ? (int?)null : c.Grants.MinBy(g => Math.Abs(g - push));
+					if (nearestDeath is { } nd)
+						toDeath.Add(push - nd);
+					if (nearestGrant is { } ng)
+						toGrant.Add(push - ng);
+
+					var owner = c.Deaths.Where(d => Math.Abs(d.Index - push) <= AaPushToDeathWindow).OrderBy(d => Math.Abs(d.Index - push)).ToArray();
+					if (owner.Length == 0)
+						unpaired++;
+					else if (owner[0].ByPlayer)
+						pairedToPlayerKill++;
+					else
+						pairedToOtherDeath++;
+				}
+
+				// How many pushes each death carries, which is the "twice per kill" claim stated per EVENT.
+				foreach (var d in c.Deaths)
+					perDeath.Add(c.Pushes.Count(p => Math.Abs(p - d.Index) <= AaPushToDeathWindow));
+			}
+
+			Console.WriteLine($"  {total} push(es) over {captures.Count} capture(s), window +/-{AaPushToDeathWindow} packets");
+			Console.WriteLine($"    paired to a death the PLAYER caused : {pairedToPlayerKill}");
+			Console.WriteLine($"    paired to a death they only WITNESSED: {pairedToOtherDeath}");
+			Console.WriteLine($"    paired to no death at all           : {unpaired}");
+			if (toDeath.Count > 0)
+				Console.WriteLine($"  signed distance to the nearest death: {Percentiles(toDeath)}");
+			if (toGrant.Count > 0)
+				Console.WriteLine($"  signed distance to the nearest grant: {Percentiles(toGrant)}");
+
+			Console.WriteLine();
+			Console.WriteLine("  pushes carried by each death (the \"twice per kill\" claim, stated per EVENT):");
+			foreach (var g in perDeath.GroupBy(n => n).OrderBy(g => g.Key))
+				Console.WriteLine($"    {g.Key} push(es): {g.Count()} death(s)");
+		}
+
+		// How near a push has to be to a death to be called its own. Wide enough to cover a burst, narrow enough that
+		// two consecutive kills do not both claim the same push - the kills in these captures are seconds apart.
+		private const int AaPushToDeathWindow = 30;
+
+		private static string Percentiles(List<int> values)
+		{
+			values.Sort();
+
+			return $"min {values[0]}, p25 {values[values.Count / 4]}, median {values[values.Count / 2]}, p75 {values[values.Count * 3 / 4]}, max {values[^1]}";
 		}
 
 		// A remoteformat parameter's value is `<kind>;<number>` (kind 2 = an integer). Anything else is not a number

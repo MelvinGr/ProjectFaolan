@@ -51,11 +51,27 @@ namespace Faolan.GameServer.Progression
 		public async Task AwardKillXp(INetworkClient client, uint creatureLevel, uint? npcType, uint? npcFlags)
 		{
 			var character = client.Session.Character;
-			var amount = AlternateAdvancementRules.KillXp(character.Level, LevelingResolver.MaxLevel, creatureLevel, npcType, npcFlags);
-			if (amount == 0)
+
+			// The same gate the accrual has, and it covers the restatement below too: no capture shows a kill moving
+			// this stat below the level cap, in either direction.
+			if (character.Level < LevelingResolver.MaxLevel)
 				return;
 
-			await AwardXp(client, amount);
+			var amount = AlternateAdvancementRules.KillXp(character.Level, LevelingResolver.MaxLevel, creatureLevel, npcType, npcFlags);
+			if (amount > 0)
+				await AwardXp(client, amount); // announces, drains, and restates the pool ONCE
+
+			// ⭐ #935: retail restates the pool TWICE per kill, whether or not the kill pays. Measured by pairing each
+			// push with the event nearest to it rather than by counting both per capture and dividing: of the 142
+			// `AAPvEXP` pushes in the corpus, 128 sit within 30 packets of a death the PLAYER caused, at a median
+			// distance of -2 - and 52 deaths carry exactly two. The 23 that carry none are the deaths the player only
+			// witnessed, which is the count of `deaths - playerKills`.
+			//
+			// ⚠️ The value is whatever the pool now reads, unchanged on a kill that pays nothing: the captures with no
+			// grant at all still push, and their pool never moves (10 pushes, 0 moves in one).
+			await SendPool(client, CharacterStatId.AAPvEXP, character.AaPvEXp);
+			if (amount == 0)
+				await SendPool(client, CharacterStatId.AAPvEXP, character.AaPvEXp);
 		}
 
 		/// <summary>
