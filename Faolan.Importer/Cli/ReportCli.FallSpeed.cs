@@ -158,13 +158,6 @@ namespace Faolan.Importer.Cli
 					if (p is not { IsIirCarrier: true, SubOpcode: StatDamageCodec.Opcode } || !p.TryParse(StatDamageCodec.Parse, out var dmg) || !IsFall(dmg))
 						continue;
 
-					if (Environment.GetEnvironmentVariable("FALL_FIELDS") != null)
-					{
-						Console.WriteLine($"FALLREC handle={dmg.Handle:X8} env={dmg.Env:X2} statValue={dmg.StatValue,8} statId=0x{dmg.StatId:X} count={dmg.Count} "
-						                  + $"delta={dmg.Delta,8} school={dmg.School} casterClass={dmg.CasterClass:X8} caster={dmg.Caster:X8} idx={dmg.Idx} "
-						                  + $"spell={dmg.SpellBaseId} MAGNITUDE={dmg.Magnitude} w1={dmg.Word1:X8} w2={dmg.Word2:X8}");
-					}
-
 					if (!moves.TryGetValue(dmg.Handle, out var track))
 					{
 						noMove++;

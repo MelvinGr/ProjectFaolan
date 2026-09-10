@@ -183,18 +183,6 @@ namespace Faolan.Importer.Cli
 			SpellCasterCensus(rows, names, kinds, stated);
 			SpellDamageByTarget(perTarget, names, stated);
 			SpellDamageByTargetLevel(perTarget, stated);
-			if (Environment.GetEnvironmentVariable("SPELL_DUMP") is { } want)
-			{
-				foreach (var g in rows.Where(r => r.IsPlayer && names.GetValueOrDefault(r.SpellId, "").Contains(want, StringComparison.OrdinalIgnoreCase)).GroupBy(r => (r.Caster, r.SpellId)))
-				{
-					var hits = g.SelectMany(r => r.Hits).Order().ToArray();
-					var mid = StatedMid(stated, g.Key.SpellId, 80);
-					Console.WriteLine($"\nDUMP {names.GetValueOrDefault(g.Key.SpellId)} caster {g.Key.Caster:X8} stated {mid} n={hits.Length}");
-					Console.WriteLine("  " + string.Join(" ", hits));
-					if (mid is > 0)
-						Console.WriteLine("  ratios: " + string.Join(" ", hits.Select(h => $"{(double)h / mid.Value:F2}")));
-				}
-			}
 
 			// ⚠️ PLAYER casters only. Every pet, guard and mob that lands a spell hit carries its own handle, which is
 			// how a first cut of this counted 41 "casters" at the level cap - a number that would have unblocked the
@@ -212,16 +200,12 @@ namespace Faolan.Importer.Cli
 			var atCap = players.Where(r => r.PlayerLevel >= 80).ToList();
 			var comparable = atCap.Where(r => StatedMid(stated, r.SpellId, r.PlayerLevel) is > 0).Select(r => r.Caster).Distinct().Count();
 			Console.WriteLine();
-			Console.WriteLine($"  player casters at the level cap: {DistinctCasters(atCap)}, of which {comparable} land a FLAT-kind hit this can ratio");
-			Console.WriteLine(comparable > 1
-				? "  ⭐ MORE THAN ONE COMPARABLE CASTER - the per-caster multiplier can now be separated from the level.\n"
-				  + "     #924 is unblocked: fit the ratio per caster and see whether it moves."
-				: "  ⛔ ONE COMPARABLE CASTER. A per-CASTER multiplier and a per-LEVEL one are indistinguishable on a single\n"
-				  + "     character, and the inputs never travel (only MagicRating is pushed at level 80).\n"
-				  + "  ⚠️ Note what the row above does and does not say: the corpus DOES hold a second level-80 player caster,\n"
-				  + "     so \"only one caster was captured\" is no longer the blocker. What is missing is narrower and more\n"
-				  + "     findable - a session in which that caster lands a DIRECT-DAMAGE nuke, rather than only the\n"
-				  + "     percent-of-pool spells its captures happen to use. Re-run this rather than trusting the prose.");
+			Console.WriteLine($"  player casters at the level cap: {DistinctCasters(atCap)}, of which {comparable} land a FLAT-kind hit this can ratio,");
+			Console.WriteLine("  so only that many could ever be compared caster-to-caster.");
+			Console.WriteLine("  ⛔ But that comparison is NOT what #924 needs any more - see the per-target table above. The ~4.7x is");
+			Console.WriteLine("     per-TARGET, so a second caster separates nothing: the same caster already produces 2.53 to 8.02 on");
+			Console.WriteLine("     one spell in one session. This block stays because it is how that was found - the caster count is");
+			Console.WriteLine("     what the ticket asked for, and answering it is what showed the question was the wrong one.");
 		}
 
 		/// <summary>

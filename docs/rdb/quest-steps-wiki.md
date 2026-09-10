@@ -160,6 +160,36 @@ gate — otherwise every giver on it would go silver forever.
 Anything ordering members must therefore put unknown **last**, not first; sorting `0` ahead of `1` silently
 reverses those lines.
 
+### ⛔ And nothing we SHIP can fill it either — every candidate is measured
+
+`--report quest-line-order` (DB-only, runs from a plain clone) scores each candidate against the 770 lines whose
+captured sequence is complete, on the reasoning that a column which orders a line has to reproduce that sequence:
+
+| candidate | lines ordered right | by line length |
+|---|---:|---|
+| ascending quest id | **89.4%** | 2:573/613  3:73/91  4:21/29  5:11/17  6+:10/20 |
+| `FieldF0` / `FieldF8` | 85.5% | |
+| `BandLevel` | 81.9% | |
+| `Level` / `FieldEc` | 81.7% | |
+| DESCENDING id (control) | 5.3% | |
+
+⭐ **The quest ID beats every undecoded column that was shaped for this, and each of those scores BELOW it** —
+they add noise to an ordering the id already carries.
+
+⚠️ **The id is not the mechanism either.** 89% decaying to 50% on the six-step-and-longer lines — the only place
+a real order shows — is what authoring-order correlation looks like: ids are assigned roughly in the order the
+content was written, and that usually matches play order. Shipping it as the rule would silently reverse exactly
+the long lines that matter.
+
+⛔ Two candidates need no scoring: `Magic` and the `Trailer*` group are columns of `QuestLine`, one row per LINE
+(2,210 rows, 2,210 distinct lines), so they cannot express an order WITHIN one. `Quest.tier` /
+`start_new_tier`, the client-catalog fields shaped for exactly this, are empty.
+
+⭐ What retail STATES is the quest index block's ordered id list, and the two quests carrying a captured one match
+their line's `JournalSequence` exactly (8/8 and 4/4) — but we DERIVE that list from the sequence rather than the
+reverse (`QuestIndexRegions.ForQuests`), so it is a consumer of the order and not a source. Which is why the gap
+is capture coverage, not decode.
+
 ### Could the wiki simply FILL the missing order? Measured: accurate, but it reaches only 4% of the gap
 
 Held out against the lines we *can* check — those with a full captured `JournalSequence` where the wiki lists

@@ -522,7 +522,7 @@ namespace Faolan.Importer.Cli
 				DailyKills(ctx.Captures);
 				return 0;
 			}),
-			new("spell-damage-ratio", "#924: every captured spell hit against what the spell's own template STATES at the caster's level, grouped by CASTER - and the count of distinct casters at the level cap, which is what says whether the per-caster multiplier can be separated from the level yet.", Needs.Captures, async ctx =>
+			new("spell-damage-ratio", "#924: every captured spell hit against what the spell's own template STATES, split by the TARGET - which is what the ~4.7x actually varies with. Same caster, same spell, same session: 2.53 to 8.02 across targets, and the spell's own roll within one.", Needs.Captures, async ctx =>
 			{
 				await SpellDamageRatio(ctx.Captures);
 				return 0;
