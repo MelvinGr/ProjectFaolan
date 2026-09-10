@@ -26,7 +26,7 @@ The total mixes costs that recur on different schedules, and each wants a differ
 |---|---|---|
 | **once per server** | the combat catalogs (`BuffStatEffects` ~400 ms, `SpellPoolEffects`, `SpellEffectService`, `ComboService`) and the quest-giver / goal-target maps | **warmed at startup** — `RealmWarmupService` |
 | **once per map** | the zone's NPC load (`EnsureZoneNpcs`, ~1 s cold) and its terrain heightmap + collision (~130 ms) | terrain is warmed off the tick at entry; the zone load stays lazy (see below) |
-| **every entry** | the character's own rows — the completed journal, the per-NPC quest markers, the snapshot | query work; the two heavy ones are tracked in Gitea |
+| **every entry** | the character's own rows — the completed journal (#938), the per-NPC quest markers (#939), the snapshot | query work; the two heavy N+1s are #938 / #939 |
 
 ## `RealmWarmupService` — the once-per-server half
 
@@ -46,4 +46,4 @@ terrain is warmed, off the tick, at entry.
 
 ⭐ The two biggest slices for a level-80 with a full journal — `completed-journal` (~2.6 s) and `npc-followups`
 (~1.7 s) — are paid on **every** login by that character, not just the first into a map, and no preload touches
-them. They are N+1-shaped query work of the kind #582 fixed elsewhere, and are tracked as their own tickets.
+them. They are N+1-shaped query work of the kind #582 fixed elsewhere: `LoadCompletedJournal` reloads a deep Include over every completed quest (#938), and `SendEntryNpcFollowups` re-reads the character's quests + definitions once per burst NPC (#939).
