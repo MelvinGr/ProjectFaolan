@@ -735,8 +735,10 @@ namespace Faolan.GameServer.Session
 			timing.Mark("zone-objects");
 
 			// Warm this map's terrain heightmap + collision mesh off the tick (#284) so the first aggro/loot doesn't
-			// stall the game loop with the ~12 MB decompress + grid build. Fire-and-forget; the caches are thread-safe.
-			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId)); // TODO: Is this still needed?
+			// stall the game loop with the decompress + grid build. Fire-and-forget; the caches are thread-safe.
+			// Still needed, and now measured (#938): the first touch of a map's bake is 124-184 ms (Tortage Beach
+			// 116k triangles, Tortage 196k), once per map per process. Off the tick is where that belongs.
+			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId));
 
 			// Mark this connection as having entered the world. The conversation system (ConversationService), the
 			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
