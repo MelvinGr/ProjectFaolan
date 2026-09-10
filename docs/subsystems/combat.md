@@ -1676,6 +1676,31 @@ What a 2026-09-03 pass established about that multiplier, so it is not re-derive
 * **The 4.7× medians are mixtures.** Ice Strike's 105 hits cluster at ~45k / ~68k / ~88k (2.5× / 3.9× / 5.0× the
   stated mid, with a ~2× tail at 130k–210k); Deathly Blizzard's sit in one band. Per-target populations, not one
   ratio.
+* ⛔⭐⭐ **The ~4.7x is NOT per-caster - it is per-TARGET** (2026-09-10, `--report spell-damage-ratio`). Split by
+  the creature being hit instead of aggregated per spell, the same corpus says so outright: within ONE target the
+  spread is 1.03-1.11, i.e. the spell's own stated roll and nothing else, while ACROSS targets in the SAME
+  capture, from the SAME caster at the SAME level with the SAME spell, the mean ratio runs 2.53 to 8.02. A
+  per-caster multiplier cannot vary between two mobs killed a minute apart.
+  * ⭐ **A crit is a clean x2 and has to come out first.** Every target's hits are a tight base cluster plus
+    occasional outliers at almost exactly twice it - `Pestilential Blast` on Boros is ten hits of 15,444-16,900
+    and one of 32,199; on Argus five of 15,402-16,531 and two of 33,562/33,769.
+  * ⭐⭐ **With crits removed the ratio falls with the TARGET's level**, flat for anything below 78 and stepping
+    down sharply at the top:
+
+    | target level | hits | targets | mean ratio |
+    |---|---:|---:|---:|
+    | under 20 | 4 | 3 | 5.96 |
+    | 20-39 | 108 | 19 | 5.51 |
+    | 40-59 | 38 | 7 | 5.39 |
+    | 60-77 | 125 | 16 | 5.13 |
+    | **78-80** | **151** | **10** | **2.64** |
+
+    So the "4.7x" is an average over a target mixture that is mostly LOW-level mobs, and against the level-80
+    creatures a level-80 player actually fights it is **2.64**.
+  * ⚠️ Which END is the caster's own term is not settled: read as mitigation the caster puts out ~5.5x and a
+    level-80 target absorbs half of it; read the other way the caster term is ~2.6x. Separating those needs a
+    target whose armour we know, which is a different capture ask from the "second geared caster" this was
+    carrying. Levels 1-6 are unaffected either way - the ratio there is 1.00.
 * ⭐ **The corpus holds TWO level-80 player casters, not one** (2026-09-10, `--report spell-damage-ratio`). The
   necromancer and a **demonologist** (`DemoL80`) both cast at the cap. So "one caster, so `R`
   cannot be separated from anything else" is no longer the blocker; what is missing is narrower. Every captured
