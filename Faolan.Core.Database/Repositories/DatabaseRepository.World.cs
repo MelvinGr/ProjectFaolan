@@ -29,6 +29,20 @@ namespace Faolan.Core.Database.Repositories
 		Task<QuestRewardOption[]> GetQuestGuaranteedRewards(uint questId);
 		Task<Dictionary<uint, Item>> GetItemsByTemplate(IReadOnlyCollection<uint> templateIds);
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
+
+		/// <summary>
+		///     The completed-journal read (#938): the definitions for <paramref name="questIds" /> with ONLY their
+		///     <c>TextRefs</c>, and only the lines those quests sit on, with no navigations at all.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ Shaped by what the completed tab RENDERS - a title and a sub-line per quest, grouped under a line's
+		///     three names - and nothing else. <see cref="GetQuestDefinitions" /> is the ACTIVE journal's read and
+		///     carries the whole graph (goals, their regions and vertices, reward options, the line's rewards)
+		///     because the active journal needs it; using it for the completed tab was a five-level Include over
+		///     every quest the character had ever finished, on every login: 2.6 s for a level-80 with 1,565
+		///     completions, against 79 ms for a level-4.
+		/// </remarks>
+		Task<(QuestDefinition[] Definitions, QuestLine[] Lines)> GetCompletedJournal(IReadOnlyCollection<uint> questIds);
 		Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
 		Task<Dictionary<uint, QuestDefinition[]>> GetQuestDefinitionsByLines(IReadOnlyCollection<uint> questLineIds);
@@ -276,6 +290,37 @@ namespace Faolan.Core.Database.Repositories
 		// Split query for the same reason it is on GetNpcSpawns: TextRefs, Goals and each Goal's region ring are three
 		// collection levels, and one JOIN multiplies them together. Chunked so a journal of any size stays clear of a
 		// provider's IN-list ceiling - the round trips are then per 500 quests, not per quest.
+		public async Task<(QuestDefinition[] Definitions, QuestLine[] Lines)> GetCompletedJournal(IReadOnlyCollection<uint> questIds)
+		{
+			if (questIds.Count == 0)
+				return ([], []);
+
+			var definitions = new List<QuestDefinition>(questIds.Count);
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			foreach (var chunk in questIds.Distinct().Chunk(500))
+			{
+				definitions.AddRange(await ctx
+					.QuestDefinitions.AsNoTracking()
+					.Include(q => q.TextRefs)
+					.Where(q => chunk.Contains(q.QuestId))
+					.ToArrayAsync());
+			}
+
+			// Only the lines these quests sit on, and no navigations: the tab writes a line's names and two words,
+			// never its rewards.
+			var lineIds = definitions.Select(d => d.QuestLineId).Where(id => id != 0).Distinct().ToArray();
+			var lines = new List<QuestLine>(lineIds.Length);
+			foreach (var chunk in lineIds.Chunk(500))
+			{
+				lines.AddRange(await ctx
+					.QuestLines.AsNoTracking()
+					.Where(l => chunk.Contains(l.QuestLineId))
+					.ToArrayAsync());
+			}
+
+			return ([.. definitions], [.. lines]);
+		}
+
 		public async Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds)
 		{
 			if (questIds.Count == 0)

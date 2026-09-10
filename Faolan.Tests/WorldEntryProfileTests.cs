@@ -103,6 +103,18 @@ namespace Faolan.Tests
 
 					var timing = await entry.SendBurstlessWorldEntry(client, character.MapId);
 					report.Add($"character {id} (level {character.Level}, {character.Class}) on map {character.MapId}: terrain warm {terrainMs} ms; entry {timing}; {client.Sent.Count} packets sent");
+
+					// FAOLAN_PROFILE_DUMP=<dir>: one line per packet sent, `<index> <length> <sha256>`, so an entry can be
+					// diffed byte-for-byte against the same entry on another build - the check that a query rewrite
+					// changed the COST and not the WIRE. (The game-time packet carries the clock and differs by design.)
+					if (Environment.GetEnvironmentVariable("FAOLAN_PROFILE_DUMP") is { Length: > 0 } dumpDir)
+					{
+						Directory.CreateDirectory(dumpDir);
+						var hashes = client.Sent.Select((packet, i) => $"{i} {packet.Length} {Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packet))} {Convert.ToHexString(packet.AsSpan(0, Math.Min(24, packet.Length)))}");
+						await File.WriteAllLinesAsync(Path.Combine(dumpDir, $"entry-{id}.txt"), hashes, TestContext.Current.CancellationToken);
+						for (var i = 0; i < client.Sent.Count; i++)
+							await File.WriteAllTextAsync(Path.Combine(dumpDir, $"entry-{id}-{i:D2}.hex"), Convert.ToHexString(client.Sent[i]), TestContext.Current.CancellationToken);
+					}
 				}
 
 				report.Add("");

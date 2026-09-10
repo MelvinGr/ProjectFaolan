@@ -26,7 +26,7 @@ The total mixes costs that recur on different schedules, and each wants a differ
 |---|---|---|
 | **once per server** | the combat catalogs (`BuffStatEffects` ~400 ms, `SpellPoolEffects`, `SpellEffectService`, `ComboService`) and the quest-giver / goal-target maps | **warmed at startup** — `RealmWarmupService` |
 | **once per map** | the zone's NPC load (`EnsureZoneNpcs`, ~1 s cold) and its terrain heightmap + collision (~130 ms) | terrain is warmed off the tick at entry; the zone load stays lazy (see below) |
-| **every entry** | the character's own rows — the completed journal (#938), the per-NPC quest markers (#939), the snapshot | query work; the two heavy N+1s are #938 / #939 |
+| **every entry** | the character's own rows — the completed journal (#938, fixed), the per-NPC quest markers (#939), the snapshot | query work shaped to what each consumer reads |
 
 ## `RealmWarmupService` — the once-per-server half
 
@@ -46,4 +46,15 @@ terrain is warmed, off the tick, at entry.
 
 ⭐ The two biggest slices for a level-80 with a full journal — `completed-journal` (~2.6 s) and `npc-followups`
 (~1.7 s) — are paid on **every** login by that character, not just the first into a map, and no preload touches
-them. They are N+1-shaped query work of the kind #582 fixed elsewhere: `LoadCompletedJournal` reloads a deep Include over every completed quest (#938), and `SendEntryNpcFollowups` re-reads the character's quests + definitions once per burst NPC (#939).
+them. They are N+1-shaped query work of the kind #582 fixed elsewhere.
+
+**`completed-journal` — fixed (#938).** `LoadCompletedJournal` used the ACTIVE journal's read, `GetQuestDefinitions`,
+whose five-level Include (goals → regions → vertices, reward options, the line's rewards) exists because the active
+journal needs it — and pulled it for every quest the character had ever finished, plus all 2,210 quest lines with
+their rewards, unfiltered. The completed tab renders a title and a sub-line per quest under a line's three names
+and nothing else, so `GetCompletedJournal` reads exactly that: the definitions with only their `TextRefs`, and only
+the lines those quests sit on. **2745 ms → ~160 ms** for the level-80 (1,565 completions), and the snapshot packet
+that carries the tab is byte-identical before and after (hashed by the profiler's `FAOLAN_PROFILE_DUMP`).
+
+**`npc-followups` — open (#939).** `SendEntryNpcFollowups` re-reads the character's quests + definitions once per
+burst NPC through `MarkerStateFor`; it is now the largest step of a level-80 entry.

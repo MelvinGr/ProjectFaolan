@@ -1095,11 +1095,14 @@ namespace Faolan.GameServer.Session
 			if (completed.Count == 0)
 				return groups;
 
-			var lines = (await _database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			// One batched read, and a LEAN one (#938): the tab renders a title and a sub-line per quest under a line's
+			// three names, so the read carries each definition's TextRefs and the lines those quests sit on - not the
+			// active journal's whole graph (goals, regions, vertices, rewards), which is what this used to pull for
+			// every quest the character had ever finished: 2.6 s of the level-80's login, against 79 ms at level 4.
+			var (definitionRows, lineRows) = await _database.GetCompletedJournal([.. completed.Select(q => q.QuestId)]);
+			var lines = lineRows.ToDictionary(a => a.QuestLineId);
+			var definitions = definitionRows.ToDictionary(d => d.QuestId);
 			var byLine = new SortedDictionary<uint, List<QuestDefinition>>();
-			// One batched read rather than a query per completed quest: the journal is the whole tab, so this loop ran
-			// 158 times for a level-23 character and 1512 for a level-80 one, each time opening its own context.
-			var definitions = (await _database.GetQuestDefinitions([.. completed.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
 
 			foreach (var cq in completed)
 			{
