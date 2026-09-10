@@ -167,7 +167,7 @@ namespace Faolan.Tests
 			{
 				onHandoff();
 				return Task.CompletedTask;
-			});
+			}, null!);
 		}
 
 		// The handoff runs on a background task, so poll rather than sleeping a fixed amount.

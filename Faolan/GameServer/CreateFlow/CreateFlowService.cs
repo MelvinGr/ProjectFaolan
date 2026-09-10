@@ -20,6 +20,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
@@ -84,8 +85,14 @@ namespace Faolan.GameServer.CreateFlow
 		// cutscene actor-binding (LiveNpcHandle) to re-address the destiny cinematic to OUR live Kalanthes.
 		private readonly WorldSimulation _simulation;
 
-		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, WorldEntryService worldEntry, CharacterCreationService creation, Func<INetworkClient, Task> sendEnterWorldHandoff)
+		// #936: the token wallet's one appearance in the create flow. The service owns every DispatchUpdateTokenAmount
+		// send, so the create burst asks it rather than framing the message itself.
+		private readonly AlternateAdvancementService _alternateAdvancement;
+
+		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, WorldEntryService worldEntry, CharacterCreationService creation, Func<INetworkClient, Task> sendEnterWorldHandoff,
+			AlternateAdvancementService alternateAdvancement)
 		{
+			_alternateAdvancement = alternateAdvancement;
 			_logger = logger;
 			_database = database;
 			_simulation = simulation;
@@ -340,6 +347,16 @@ namespace Faolan.GameServer.CreateFlow
 				(byte[])[0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03]));
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x08), Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, id), GameInterfaceMethods.DispatchAckAuthenticate,
 				(byte[])[0x00, 0x00, 0x00, 0x01]));
+
+			// #936: the one token push retail opens a new character with - `VeteranPoints` 0/0, a statement that the
+			// wallet is empty rather than a credit. It is in five of the six character-CREATE captures and in no login
+			// capture, which is why it is here and not on the shared world entry.
+			//
+			// ⚠️ Retail's exact slot is between the entry teleport and the map change, with the three
+			// `DispatchSetItemStat` channel registrations after it. Ours goes immediately before the world burst,
+			// whose first record IS that map change - so the relative order retail sends is kept, and the difference
+			// is the registrations, which our create path sends on a different leg entirely.
+			await _alternateAdvancement.StateWallet(client, TokenPool.VeteranPoints);
 
 			// (b) The live-char world (constructed; same path existing-char logins use). The intro cutscene does NOT
 			// follow here - see SendCreateIntroCutscene for why it waits for CharInPlayIIR.

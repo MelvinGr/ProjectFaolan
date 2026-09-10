@@ -119,6 +119,13 @@ namespace Faolan.GameServer
 			// listener left.
 			services.AddSingleton<WorldEntryService>();
 
+			// #150: the ALTERNATE-ADVANCEMENT pools and the perk-token wallet. It takes only the progression slice plus
+			// a logger, so it has no wire port of its own - AA adds no messages, it rides feedback / stat /
+			// token-amount. It sits HERE rather than beside LevelUpService, which is where it belongs by subject,
+			// because the create flow below is its first consumer (#936, the VeteranPoints 0/0 a new character opens
+			// with) and this file's order is the only place the graph's layering is legible.
+			services.AddSingleton<AlternateAdvancementService>();
+
 			// The create flow needs one op it does not own: the enter-world HANDOFF is TeleportService's, as a
 			// single-op seam here.
 			services.AddSingleton<CharacterCreationService>();
@@ -128,16 +135,12 @@ namespace Faolan.GameServer
 					var teleport = sp.GetRequiredService<TeleportService>();
 					await teleport.SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
 					await teleport.SendWorldHandoff(client);
-				}));
+				}, sp.GetRequiredService<AlternateAdvancementService>()));
 
 			// --- progression + economy ------------------------------------------------------------------------
 			services.AddSingleton<LevelUpOutbound>();
 			services.AddSingleton<ILevelUpOutbound>(sp => sp.GetRequiredService<LevelUpOutbound>());
 			services.AddSingleton<LevelUpService>();
-			// #150: the ALTERNATE-ADVANCEMENT pools and the perk-token wallet. Beside LevelUpService because it is the
-			// same shape - a second pool the same kill feeds - and it takes only the progression slice plus a logger,
-			// so it has no wire port of its own (AA adds no messages; it rides feedback/stat/token-amount).
-			services.AddSingleton<AlternateAdvancementService>();
 			services.AddSingleton<EconomyOutbound>();
 			services.AddSingleton<IEconomyOutbound>(sp => sp.GetRequiredService<EconomyOutbound>());
 			services.AddSingleton<TradeOutbound>();

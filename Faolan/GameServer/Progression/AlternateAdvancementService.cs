@@ -140,6 +140,26 @@ namespace Faolan.GameServer.Progression
 			return true;
 		}
 
+		/// <summary>
+		///     Restates one wallet's current totals to the client, without changing them (#936).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ Retail opens a NEW character with exactly this, and only this: a
+		///     <c>DispatchUpdateTokenAmount</c> saying <see cref="TokenPool.VeteranPoints" /> <b>0 gained / 0 spent</b>.
+		///     It is in five of the six character-CREATE captures and in NO login capture, at the same place in the
+		///     burst every time - between the entry teleport and the map change. So it is a statement that the wallet
+		///     is empty rather than a credit, and it is sent ONCE, at creation.
+		///     <para />
+		///     ⚠️ That is also why this does not belong on the ordinary world entry: restating a wallet on every login
+		///     and every teleport is traffic retail does not send.
+		/// </remarks>
+		public async Task StateWallet(INetworkClient client, TokenPool pool)
+		{
+			var wallets = await _progression.GetCharacterTokens(client.Session.Character.Id);
+			var wallet = Array.Find(wallets, w => w.Pool == pool);
+			await SendWallet(client, pool, wallet?.Gained ?? 0, wallet?.Spent ?? 0);
+		}
+
 		/// <summary>How many unspent tokens one wallet holds - what the purchase gate reads.</summary>
 		public async Task<ulong> Unspent(uint characterId, TokenPool pool)
 		{
