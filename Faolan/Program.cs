@@ -235,6 +235,8 @@ namespace Faolan
 				// Its realm-tagged log category ("...GameServerListener-<realmId>") is built inside the listener from the
 				// injected HostRealm - see its ctor for why that is an ILoggerFactory rather than an ILogger.
 				builder.Services.AddHostedService<GameServerListener>();
+				// #938: build the once-per-server combat/quest catalogs at startup so no player pays their first-touch.
+				builder.Services.AddHostedService<RealmWarmupService>();
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
 				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).

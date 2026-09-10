@@ -559,9 +559,10 @@ namespace Faolan.GameServer.Session
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
 		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals, 		// gametime), then runs interest for the NPCs. Beach-shaped (FullCharSnapshotSubClass + WorldState.DefaultPlayfieldToken); a non-beach
 		// map would get beach tails, so the flag is for a beach login until per-map sourcing lands.
-		internal async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
+		internal async Task<WorldEntryTiming> SendBurstlessWorldEntry(INetworkClient client, uint mapId)
 		{
 			var character = client.Session.Character;
+			var timing = new WorldEntryTiming();
 
 			// #146: a character entering a MINIGAME map with no started match of theirs on it does not belong there -
 			// a relog mid-match (or across a server restart) must not strand them on the PvP map. The entry goes to
@@ -615,18 +616,22 @@ namespace Faolan.GameServer.Session
 			// the four snapshot containers and the spawn's visible gear, from one read.
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
 			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
+			timing.Mark("minigame-return");
 			var heldItems = await _database.GetCharacterItems(character.Id);
+			timing.Mark("items");
 			// Union in the item-shop-suppression flags (see ItemShopSuppressTags) so the client's shop-open Lua sees
 			// HasTag(X)==true and never auto-opens the itemshopbrowser on entry.
 			var characterTags = (await _database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray();
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
 			var activeQuestIds = (await _database.GetCharacterQuests(character.Id, QuestState.Active)).Select(q => q.QuestId).ToHashSet();
+			timing.Mark("tags+active-quests");
 
 			// Populate the shared world model BEFORE building so the player entity exists for the spawn build.
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await _database.GetMap(mapId) ?? throw new  InvalidOperationException();
+			timing.Mark("map");
 			// #3/#251/#863: the additive stat bonuses the player carries into the world - equipped GEAR, the feats they
 			// TRAINED, and the feats the client trains for them - so their live vitals seed with all three.
 			//
@@ -637,6 +642,7 @@ namespace Faolan.GameServer.Session
 			// abilities and spell nodes, so their trained contribution is a true zero. Do not read an empty result
 			// here as missing data. The AUTO-TRAINED half is never empty, and is never in a feat list either.
 			var statBonuses = await CharacterStatBonuses.For(_database, character);
+			timing.Mark("stat-bonuses");
 			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
 			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
 			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
@@ -658,6 +664,7 @@ namespace Faolan.GameServer.Session
 			var comboBonuses = await _database.GetCharacterComboBonuses(character.Id);
 			// #697: and the PROCS they hang off combos and spell lines - resolved here so a landing is a list walk.
 			var featProcs = await _database.GetCharacterFeatProcs(character.Id);
+			timing.Mark("class-base+spell-mods");
 
 			// #309: whether the armed teleport picked the EPIC difficulty - consumed here (the reconnect is a new
 			// connection, so the flag rode TeleportService) and threaded into BOTH the instance selection (an epic
@@ -708,10 +715,13 @@ namespace Faolan.GameServer.Session
 				: WorldState.DefaultPlayfieldToken;
 			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 
+			timing.Mark("place-in-world");
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
+			timing.Mark("zone-npcs");
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
 			// from there instead of re-querying per entry.
 			await _broadcaster.EnsureZoneWorldObjects(mapId, instanceId);
+			timing.Mark("zone-objects");
 
 			// Warm this map's terrain heightmap + collision mesh off the tick (#284) so the first aggro/loot doesn't
 			// stall the game loop with the ~12 MB decompress + grid build. Fire-and-forget; the caches are thread-safe.
@@ -735,7 +745,9 @@ namespace Faolan.GameServer.Session
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
 			// so this is a plain read.
+			timing.Mark("snapshot-quests");
 			var knownSpellIds = (await _database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
+			timing.Mark("spells");
 			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
 			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
 			// ⚠️ Filtered to the SHEET's own 91 ids: CharacterStats also holds stats that are NOT part of the login
@@ -746,10 +758,12 @@ namespace Faolan.GameServer.Session
 			var statSheet = (await _database.GetCharacterStats(character.Id))
 				.Where(s => SubClassStatBlock.SheetStatIds.Contains((uint)s.StatId))
 				.Select(s => (s.StatId, s.Value)).ToArray();
+			timing.Mark("stat-sheet");
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
 			var completedJournal = isCreateEntry
 				? []
 				: await LoadCompletedJournal(character);
+			timing.Mark("completed-journal");
 
 			// The quest INDEX needs, per active quest, its LINE's 4CC and that line's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
@@ -768,7 +782,9 @@ namespace Faolan.GameServer.Session
 			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
+			timing.Mark("line-catalog+rewards");
 			var snapshot = GameWire.BuildWorldEntrySnapshot(client, typedRoot, tails);
+			timing.Mark("build-snapshot");
 
 			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>
@@ -824,7 +840,9 @@ namespace Faolan.GameServer.Session
 			// seeds them into the player's Known set, so the interest layer (BroadcastPlayerMove) then streams only the
 			// DELTA as the player walks - and the initial set is never culled mid-load (subsumes #245). The markers /
 			// captive pose for these NPCs are separate IIRs and ride SendEntryNpcFollowups after the flush.
+			timing.Mark("map-change+objects+player-spawn+quests");
 			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
+			timing.Mark("npc-burst");
 			toSend.AddRange(entryNpcRecords);
 
 			toSend.Add(GameWire.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
@@ -832,6 +850,7 @@ namespace Faolan.GameServer.Session
 
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
+			timing.Mark("flush");
 
 			// The client now HAS the world - MapChange first, then the objects/spawn/snapshot/NPC burst - so the tick's
 			// interest sweep may start streaming to it. Until this point the sweep would have been the first sender to
@@ -839,12 +858,15 @@ namespace Faolan.GameServer.Session
 			client.Session.WorldEntryDelivered = true;
 
 			await RestoreEntryBuffs(client);
+			timing.Mark("restore-buffs");
 
-			_logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects).", mapId,
-				character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal);
+			// The step breakdown rides the line: every real entry in faolan.log is its own profile (#938).
+			_logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects) - {Timing}.", mapId,
+				character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal, timing);
 
 			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
 			await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
+			timing.Mark("npc-followups");
 
 			// Spawn this player to nearby OTHER players (its NPC set already rode the burst above). The quest journal is
 			// NOT re-sent here: retail ships both tabs in the login snapshot and sends no quest packet at all until the
@@ -879,6 +901,10 @@ namespace Faolan.GameServer.Session
 				await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
 				_logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", QuestContent.BeachStarterQuestId, character.Name);
 			}
+
+			timing.Mark("broadcast-entry");
+
+			return timing;
 		}
 
 		private async Task SendReadyForPlayScreen(INetworkClient client)

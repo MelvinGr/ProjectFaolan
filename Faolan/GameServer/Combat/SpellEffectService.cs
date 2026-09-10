@@ -30,6 +30,10 @@ namespace Faolan.GameServer.Combat
 	//     depletion). Those are spell REFERENCES, not a dispatch table; a row would only add a lookup.
 	public sealed class SpellEffectService
 	{
+		// See BuffStatEffects.WarmAsync (#938): build the triggered-effect table at startup rather than on the first
+		// pet summon / proc.
+		public async Task WarmAsync() => await EnsureLoaded();
+
 		private readonly ICatalogRepository _database;
 		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
@@ -157,6 +161,7 @@ namespace Faolan.GameServer.Combat
 				if (_effects != null)
 					return _effects;
 
+				var clock = System.Diagnostics.Stopwatch.StartNew();
 				var rows = await _database.GetSpellEffects();
 				_effects = rows.GroupBy(r => (r.SpellId, r.Trigger)).ToDictionary(g => g.Key, g => g.OrderBy(r => r.Sequence).ToArray());
 
@@ -166,7 +171,7 @@ namespace Faolan.GameServer.Combat
 				if (rows.Length == 0)
 					_logger.LogWarning("SpellEffectService: no spell effects in the database - pet summons and triggered procs will not fire. Run the importer's `spell-effects` module.");
 				else
-					_logger.LogInformation("SpellEffectService: {Rows} effect(s) over {Spells} spell(s).", rows.Length, _effects.Keys.Select(k => k.SpellId).Distinct().Count());
+					_logger.LogInformation("SpellEffectService: {Rows} effect(s) over {Spells} spell(s). Built in {Ms} ms.", rows.Length, _effects.Keys.Select(k => k.SpellId).Distinct().Count(), clock.ElapsedMilliseconds);
 
 				return _effects;
 			}

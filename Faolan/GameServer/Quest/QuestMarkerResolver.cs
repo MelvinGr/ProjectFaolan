@@ -131,9 +131,9 @@ namespace Faolan.GameServer.Quest
 		/// </remarks>
 		public async Task<bool> IsQuestRelevant(uint npcTemplateId)
 		{
-			_questGivers ??= await _npcs.GetQuestGiverMap();
-			_goalTargets ??= await _npcs.GetQuestGoalTargetMap();
-			return _questGivers.ContainsKey(npcTemplateId) || _goalTargets.ContainsKey(npcTemplateId);
+			var givers = await Givers();
+			var targets = await Targets();
+			return givers.ContainsKey(npcTemplateId) || targets.ContainsKey(npcTemplateId);
 		}
 
 		// The quest-marker state byte (#241) for a viewer + a giver NPC in view, from the player's CharacterQuests:
@@ -171,8 +171,7 @@ namespace Faolan.GameServer.Quest
 					return TurnIn;
 			}
 
-			_questGivers ??= await _npcs.GetQuestGiverMap();
-			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questIds))
+			if (!(await Givers()).TryGetValue(npc.NpcTemplateId, out var questIds))
 				return await ChainRunsThrough(character, npc, quests)
 					? Unavailable
 					: None;
@@ -273,10 +272,41 @@ namespace Faolan.GameServer.Quest
 		///     improvement on what it replaces (0x00 for every one of these NPCs, i.e. wrong on the 78% that should be
 		///     lit) but it is not the rule, and #857 holds the remainder.
 		/// </remarks>
+		// The two catalog maps, built ONCE per server and logged with their cost: they are the first thing the entry's
+		// per-NPC quest markers reach for, and on a cold server they were the bulk of a 1.8 s step (#938).
+		// See BuffStatEffects.WarmAsync (#938): build the quest-giver and goal-target maps at startup. On a cold
+		// server they were the first thing the entry's per-NPC markers reached for.
+		public async Task WarmAsync()
+		{
+			await Givers();
+			await Targets();
+		}
+
+		private async Task<Dictionary<uint, uint[]>> Givers()
+		{
+			if (_questGivers != null)
+				return _questGivers;
+
+			var clock = System.Diagnostics.Stopwatch.StartNew();
+			_questGivers = await _npcs.GetQuestGiverMap();
+			_logger.LogInformation("QuestMarkerResolver: quest-giver map ({Count} templates) built in {Ms} ms.", _questGivers.Count, clock.ElapsedMilliseconds);
+			return _questGivers;
+		}
+
+		private async Task<Dictionary<uint, uint[]>> Targets()
+		{
+			if (_goalTargets != null)
+				return _goalTargets;
+
+			var clock = System.Diagnostics.Stopwatch.StartNew();
+			_goalTargets = await _npcs.GetQuestGoalTargetMap();
+			_logger.LogInformation("QuestMarkerResolver: goal-target map ({Count} templates) built in {Ms} ms.", _goalTargets.Count, clock.ElapsedMilliseconds);
+			return _goalTargets;
+		}
+
 		private async Task<bool> ChainRunsThrough(Character character, WorldEntity npc, CharacterQuest[] quests)
 		{
-			_goalTargets ??= await _npcs.GetQuestGoalTargetMap();
-			if (!_goalTargets.TryGetValue(npc.NpcTemplateId, out var targetingQuestIds))
+			if (!(await Targets()).TryGetValue(npc.NpcTemplateId, out var targetingQuestIds))
 				return false;
 
 			// "Begun" is per LINE and counts BOTH states: a completed quest began its line just as much as a held one.

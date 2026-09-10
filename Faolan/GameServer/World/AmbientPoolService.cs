@@ -59,6 +59,7 @@ namespace Faolan.GameServer.World
 		// runs on first entry to the zone, before anyone is watching it.
 		public async Task LoadAsync(uint mapId, uint instanceId, Zone zone)
 		{
+			var clock = System.Diagnostics.Stopwatch.StartNew();
 			var areas = await _database.GetResolvedSpawnAreas(mapId);
 
 			// The harvested OUTFITS of each creature this map pools (#836). Retail dresses the individuals of a type
@@ -112,7 +113,7 @@ namespace Faolan.GameServer.World
 
 			_pools[(mapId, instanceId)] = pools;
 			if (spawned > 0)
-				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map}.", spawned, pools.Count, mapId);
+				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map} in {Ms} ms.", spawned, pools.Count, mapId, clock.ElapsedMilliseconds);
 		}
 
 		// Top every under-strength pool back up, yielding each member as it is spawned so the caller can stream it.

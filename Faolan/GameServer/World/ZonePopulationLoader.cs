@@ -124,6 +124,7 @@ namespace Faolan.GameServer.World
 			if (!_npcLoadedZones.TryAdd((mapId, instanceId), 0))
 				return;
 
+			var clock = System.Diagnostics.Stopwatch.StartNew();
 			var npcs = await _npcs.GetNpcSpawns(mapId, forClass);
 
 			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
@@ -145,9 +146,14 @@ namespace Faolan.GameServer.World
 			var spawnAreas = await _npcs.GetNpcSpawnAreas(mapId);
 
 			// #261 quest-gated spawns: NPC template id -> the quest ids that reveal it (kill-target NPCs that aren't givers).
-			_questGatedNpcs ??= await _npcs.GetQuestGatedNpcMap();
-			_storyKillTargets ??= await _npcs.GetStoryKillTargets();
-			_escortHiddenNpcs ??= await _npcs.GetEscortHiddenNpcMap();
+			if (_questGatedNpcs == null || _storyKillTargets == null || _escortHiddenNpcs == null)
+			{
+				var maps = System.Diagnostics.Stopwatch.StartNew();
+				_questGatedNpcs ??= await _npcs.GetQuestGatedNpcMap();
+				_storyKillTargets ??= await _npcs.GetStoryKillTargets();
+				_escortHiddenNpcs ??= await _npcs.GetEscortHiddenNpcMap();
+				_logger.LogInformation("World: quest-gated / story-kill / escort-hidden NPC maps built in {Ms} ms (once per server).", maps.ElapsedMilliseconds);
+			}
 
 			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
 			// already produced one clean row per intended placement (keyed by MapId + exact XYZ), so this load path
@@ -427,7 +433,7 @@ namespace Faolan.GameServer.World
 
 			await _ambient.LoadAsync(mapId, instanceId, zone);
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup) in {Ms} ms.", zone.Count, mapId, instanceId, npcs.Length, clock.ElapsedMilliseconds);
 			if (undisposed > 0)
 			{
 				// WARNING, not information: these creatures are being served green and passive because nothing in the

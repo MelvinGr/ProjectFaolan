@@ -38,6 +38,14 @@ namespace Faolan.GameServer.Combat
 	// against the catalog sequence's LENGTH, and `ComboActionParser` stays the vocabulary for the catalog side.
 	public sealed class ComboService
 	{
+		// See BuffStatEffects.WarmAsync (#938): parse the combo catalog + scaling at startup rather than on the first
+		// swing that consults them.
+		public async Task WarmAsync()
+		{
+			_catalog ??= await LoadCatalog();
+			_scaling ??= await LoadScaling();
+		}
+
 		// The client floors a combo's animation length at 0.1 s ("Got negative or below 0.1s full combo animation
 		// duration; falling back to 0.1", BCTCombo::GetComboAnimationLength) - so a combo whose steps report no
 		// activation time still costs stamina rather than dividing by zero.
@@ -266,11 +274,13 @@ namespace Faolan.GameServer.Combat
 
 		private async Task<Dictionary<uint, ComboEntry>> LoadCatalog()
 		{
+			var clock = System.Diagnostics.Stopwatch.StartNew();
 			var combos = await _database.GetCombos();
 			var map = new Dictionary<uint, ComboEntry>(combos.Length);
 			foreach (var combo in combos)
 				map[combo.Id] = new ComboEntry(combo, ComboActionParser.TryParse(combo.Actions, out var sequence) ? sequence : []);
 
+			_logger.LogInformation("ComboService: {Count} combos loaded in {Ms} ms (once per server).", map.Count, clock.ElapsedMilliseconds);
 			return map;
 		}
 

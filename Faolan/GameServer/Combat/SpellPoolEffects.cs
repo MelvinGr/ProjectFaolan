@@ -28,6 +28,10 @@ namespace Faolan.GameServer.Combat
 	//     stat ids (`StatDisplayScale.Percent1` contains 0x01B, 0x1F8 and 0x1FA).
 	public sealed class SpellPoolEffects
 	{
+		// See BuffStatEffects.WarmAsync (#938): build the instant-pool-move catalog at startup rather than on the
+		// first heal/nuke.
+		public async Task WarmAsync() => await EnsureLoaded();
+
 		// The kinds whose Amount is an instant, FLAT move of a pool at the ×100 wire scale. `Hit` and its variants
 		// are all one thing as far as a pool is concerned - the distinctions between them (magical, DPS-scaled,
 		// interpolated) are about how retail COMPUTED the number, not about what to do with it.
@@ -152,10 +156,11 @@ namespace Faolan.GameServer.Combat
 				if (_catalog != null)
 					return _catalog;
 
+				var clock = System.Diagnostics.Stopwatch.StartNew();
 				var rows = await _database.GetSpellStatEffects();
 				var catalog = BuildCatalog(rows);
 				_catalog = catalog;
-				_logger.LogInformation("SpellPoolEffects: {Spells} spell(s) move a pool instantly, out of {Rows} imported records (#702).", catalog.Count, rows.Length);
+				_logger.LogInformation("SpellPoolEffects: {Spells} spell(s) move a pool instantly, out of {Rows} imported records (#702). Built in {Ms} ms.", catalog.Count, rows.Length, clock.ElapsedMilliseconds);
 
 				return catalog;
 			}

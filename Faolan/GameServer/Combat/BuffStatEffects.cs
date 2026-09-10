@@ -39,6 +39,11 @@ namespace Faolan.GameServer.Combat
 	// stats" - and answers it from data.
 	public sealed class BuffStatEffects
 	{
+		// Build the flat/percent/derived stat-effect catalog now (#938): 25k rows, ~400 ms, and lazily built on the
+		// first buff resolution otherwise - so the first player to be hit or to cast paid it. WarmAsync moves it to
+		// startup for every subsystem that shares it.
+		public async Task WarmAsync() => await EnsureLoaded();
+
 		// The PERCENT kind: the Amount is a percentage x100, so 200 is "+2%" - confirmed against the client's own elixir
 		// descriptions, whose 2%/5% tiers carry 200/500 and 10%/20% carry 1000/2000. It scales a computed TOTAL rather
 		// than adding to it, which is why it needed a model of its own (#436).
@@ -608,6 +613,7 @@ namespace Faolan.GameServer.Combat
 				if (_catalog != null)
 					return _catalog.Value;
 
+				var clock = System.Diagnostics.Stopwatch.StartNew();
 				var rows = await _database.GetSpellStatEffects();
 				var criteria = await _database.GetSpellStatEffectCriteria();
 				var catalog = BuildCatalog(rows, criteria);
@@ -617,10 +623,10 @@ namespace Faolan.GameServer.Combat
 					"out of {Rows} imported records " +
 					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats, " +
 					"{Derived} derived from a stat we do not resolve - see #367/#807); " +
-					"{Conditional} honored delta(s) carry CONDITIONS and are evaluated per carrier (#791).",
+					"{Conditional} honored delta(s) carry CONDITIONS and are evaluated per carrier (#791). Built in {Ms} ms.",
 					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, catalog.DerivedBySpellBase?.Count ?? 0, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped,
 					catalog.DerivedSkipped,
-					catalog.BySpellBase.Values.Concat(catalog.PercentBySpellBase.Values).Sum(d => d.Count(x => x.Criteria != null)));
+					catalog.BySpellBase.Values.Concat(catalog.PercentBySpellBase.Values).Sum(d => d.Count(x => x.Criteria != null)), clock.ElapsedMilliseconds);
 				return catalog;
 			}
 			finally

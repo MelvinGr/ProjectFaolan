@@ -136,6 +136,7 @@ namespace Faolan.GameServer.World
 			if (_terrainDir == null || !_loaded.TryAdd(mapId, 0))
 				return;
 
+			var clock = System.Diagnostics.Stopwatch.StartNew();
 			try
 			{
 				var path = Path.Combine(_terrainDir, $"{mapId}{TerrainFile.Extension}");
@@ -161,9 +162,9 @@ namespace Faolan.GameServer.World
 				}
 
 				// First-touch cost: file read + gunzip + parse + grid build. One-time per map, then cached.
-				_logger.LogInformation("Terrain: loaded map {Map} (heightmap {Heightmap}, collision {Tris} triangles).", mapId, hasHeightmap
+				_logger.LogInformation("Terrain: loaded map {Map} (heightmap {Heightmap}, collision {Tris} triangles) in {Ms} ms.", mapId, hasHeightmap
 					? "yes"
-					: "no", tris);
+					: "no", tris, clock.ElapsedMilliseconds);
 			}
 			catch (Exception ex)
 			{
