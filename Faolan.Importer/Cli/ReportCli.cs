@@ -124,6 +124,11 @@ namespace Faolan.Importer.Cli
 				await TerrainLos(ctx.Arg);
 				return 0;
 			}),
+			new("quest-line-order", "#926: does any SHIPPED column order the steps of a quest line? Scores each candidate against the lines whose captured JournalSequence is complete. DB-only, so it runs from a plain clone.", Needs.None, async ctx =>
+			{
+				await QuestLineOrder();
+				return 0;
+			}),
 			new("spell-effect-gap", "DB-only, no corpus and no RDB: how much of the imported spell-effect table reaches a live engine (#701).", Needs.None, async ctx =>
 			{
 				await SpellEffectGap(ctx.Arg);
