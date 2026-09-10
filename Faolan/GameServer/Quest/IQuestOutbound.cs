@@ -29,6 +29,10 @@ namespace Faolan.GameServer.Quest
 		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.
 		Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null);
 
+		// The character's quest rows were WRITTEN: drop their cached quest-marker state so the next marker - including
+		// the refresh a write is usually followed by - reads the new rows (#939). Every writer calls this.
+		void ForgetQuestMarkers(uint characterId);
+
 		// #528: a goal that springs an AMBUSH just advanced for the first time - put the ambusher in the world beside
 		// the player after the definition's delay. No-op when the player is no longer there to ambush.
 		void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush);

@@ -517,12 +517,10 @@ namespace Faolan.GameServer.World
 		// (these are separate IIRs, not FA015807 spawn records) but still before the player starts moving.
 		public async Task SendEntryNpcFollowups(INetworkClient client, List<WorldEntity> burstNpcs)
 		{
-			// The character's quest state, read ONCE for the whole burst (#939): per NPC it was the whole thing again.
-			var markers = client.Session.Character is { } character && burstNpcs.Count > 0 ? await _quests.MarkerContextFor(character) : null;
 			foreach (var npc in burstNpcs)
 			{
 				// #241: quest-giver marker from THIS viewer's quest state (! available / ? ready-to-turn-in / none).
-				await _quests.SendQuestMarkerIfGiver(client, npc, markers);
+				await _quests.SendQuestMarkerIfGiver(client, npc); // the marker context is cached per character (#939)
 
 				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
 				if (npc.NpcTemplateId == TortageIntroService.CasildaTemplateId && client.Session.Character != null && !await _tortageIntro.IsCasildaFreed(client.Session.Character.Id))
@@ -597,25 +595,11 @@ namespace Faolan.GameServer.World
 		// the object half into the quest-visibility path only - the two methods have identical three-line bodies, so a
 		// textual edit hit the wrong one and objects never streamed as the player walked. Taking the player here means a
 		// caller cannot dispatch one half without the other.
-		private async Task<QuestMarkerContext?> MarkerContextFor(INetworkClient recipient, Dictionary<uint, QuestMarkerContext> contexts)
-		{
-			if (recipient.Session.Character is not { } character)
-				return null;
-
-			if (!contexts.TryGetValue(character.Id, out var context))
-				contexts[character.Id] = context = await _quests.MarkerContextFor(character);
-
-			return context;
-		}
-
 		private async Task DispatchInterest(IReadOnlyList<InterestEvent> events, byte[]? moveBody, INetworkClient? mover = null, WorldEntity? moverEntity = null)
 		{
 			if (mover != null && moverEntity != null)
 				await StreamWorldObjects(mover, moverEntity);
 
-			// One quest-marker context per recipient per dispatch (#939): a sweep that streams several NPCs to one player
-			// reads that player's quest state once, not once per NPC.
-			var markerContexts = new Dictionary<uint, QuestMarkerContext>();
 			foreach (var ev in events)
 			{
 				var recipient = ev.Recipient.Client;
@@ -656,7 +640,7 @@ namespace Faolan.GameServer.World
 						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
 						if (ev.Subject is { IsPlayer: false, IsLoot: false })
-							await _quests.SendQuestMarkerIfGiver(recipient, ev.Subject, await MarkerContextFor(recipient, markerContexts));
+							await _quests.SendQuestMarkerIfGiver(recipient, ev.Subject);
 						// #716: a ROUTE walker's beat is issued here so the CLIENT walks it. This was removed once, for a
 						// good reason that no longer holds: the client-walked route left entity.Position pinned at spawn,
 						// so the server put the NPC's death-pose, loot bag and aggro where it STARTED rather than where the

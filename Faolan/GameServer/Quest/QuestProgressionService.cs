@@ -93,6 +93,7 @@ namespace Faolan.GameServer.Quest
 			var goalTargetName = firstGoal?.TargetName;
 
 			await _database.SetCharacterQuest(character.Id, questId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Source} (goalRequired={Req}, target={Target}).", questId, character.Name, source, goalRequired,
 				goalTargetName ?? "-");
 			return def;
@@ -586,12 +587,14 @@ namespace Faolan.GameServer.Quest
 			var required = Math.Max(quest.GoalRequired, 1);
 			await SendStageCompletion(client, quest.QuestId, goalId);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 
 			// Reached only via CompleteObjective's `NextQuestId is not null` guard, so the successor id is present.
 			var nextQuestId = def.NextQuestId!.Value;
 			var nextDef = await _database.GetQuestDefinition(nextQuestId);
 			var nextGoal = nextDef == null ? null : QuestProgress.InPlayOrder(nextDef.Goals).FirstOrDefault();
 			await _database.SetCharacterQuest(character.Id, nextQuestId, QuestState.Active, 0, nextGoal?.RequiredCount ?? 0, nextGoal?.TargetName);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 			if (nextDef != null)
 				await _outbound.SendQuestFullUpdate(client, nextDef);
 
@@ -628,6 +631,7 @@ namespace Faolan.GameServer.Quest
 		{
 			await SendStageCompletion(client, quest.QuestId, goalId);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 
 			// #509: retail ticks DailyQuestsCompleted HERE and not on a superseded stage - the chain end is the event
 			// its five captured occurrences line up with, one for one.
@@ -686,6 +690,7 @@ namespace Faolan.GameServer.Quest
 		private async Task ObjectiveCompleteAwaitTurnIn(INetworkClient client, Character character, CharacterQuest quest, uint goalId, uint required)
 		{
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Active, required, quest.GoalRequired, quest.GoalTargetName);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 			await _outbound.SendQuestGoal(client, quest.QuestId, goalId, QuestGoalUpdate.Satisfied);
 			await _outbound.SendQuestIir(client, quest.QuestId, QuestCodec.StateActive);
 			await _agents.SendSystemMessage(character.Id, $"Objective complete ({required}/{required}). Return to the quest giver.");
@@ -697,6 +702,7 @@ namespace Faolan.GameServer.Quest
 				await _database.SetCharacterQuest(characterId, quest.QuestId, QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
 			else
 				await _database.SetCharacterQuestGoal(characterId, quest.QuestId, goal.GoalId, progress);
+			_outbound.ForgetQuestMarkers(characterId); // #939 - after either branch
 		}
 
 		// The HUD update for a goal that moved but did NOT finish the whole quest. Retail has exactly two shapes here,

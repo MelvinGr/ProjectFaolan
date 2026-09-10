@@ -26,6 +26,10 @@ namespace Faolan.Tests.Support
 		{
 		}
 
+		public virtual void ForgetQuestMarkers(uint characterId)
+		{
+		}
+
 		public virtual Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null)
 		{
 			return Task.CompletedTask;

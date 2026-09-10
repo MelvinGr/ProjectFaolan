@@ -259,7 +259,12 @@ namespace Faolan.GameServer.Session
 			// "New claims available" glow (CoreClaimIIR sub 0x0009) - pushed ONLY when the account has unseen claims,
 			// matching retail (present on a fresh login with new claims, absent once viewed). Previously this fired
 			// unconditionally, so the claims button lit up for every account; see GameServerListener.Claims.cs.
+			// Timed like the entry itself (#938): a teleport into Tortage showed 4.6 s of silence between the combos grant
+			// and this block's last line, and the breakdown says whether that is our reads or the client not draining
+			// its socket while it loads the map (a SendAsync that blocks on backpressure shows up under "sends").
+			var timing = new WorldEntryTiming();
 			await ClaimService.SendNewClaimsGlowIfAny(client);
+			timing.Mark("claims-glow");
 
 			// DispatchInDungeonPlayfield (#874 decoded it, #882 gave it a source): the one-byte per-playfield flag
 			// that tells the client it is standing in a dungeon. Retail sends it HERE - both captured `01` frames sit
@@ -305,14 +310,17 @@ namespace Faolan.GameServer.Session
 			// #262: apply any after-quest world-object effects up-front (e.g. a relog after freeing Casilda drops the
 			// beach chain-wall collision, so the returning player isn't re-blocked by the world-entry burst's chain
 			// dynel), and clear the escortee's captive pose if she's already freed. Both data-driven / no-op when N/A.
+			timing.Mark("sends");
 			await _questBroadcaster.ApplyQuestWorldEffects(client);
-			await _tortageIntro.ClearCasildaCaptivePose(client); // it IS in the intro service now; the gating is Gitea's, not a TODO here
+			timing.Mark("quest-world-effects");
+			await _tortageIntro.ClearCasildaCaptivePose(client);
+			timing.Mark("casilda-pose"); // it IS in the intro service now; the gating is Gitea's, not a TODO here
 
 			// Bind the character on entry if it has never bound. Every recall targets BindRespawnPointId - the Totem of
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or
 			// older chars, whose bind was never set) can't recall at all. Bind ONCE to the entry map's default respawn
 			// point + persist; an established bind is left untouched (it only moves via a bindstone/Wayfarer, not login).
-			_logger.LogInformation("Sent the post-0x2024 login records.");
+			_logger.LogInformation("Sent the post-0x2024 login records - {Timing}.", timing);
 
 			// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
 			// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
@@ -450,6 +458,9 @@ namespace Faolan.GameServer.Session
 		// Bodies shorter than the 16-byte poll are not spawn-polls (some other same-opcode traffic); just log them.
 		internal async Task HandleWorldEntrySpawnPoll(INetworkClient client, Rpc packet, FaolanStream body)
 		{
+			// The client sends one of these per NPC it loads and waits for each answer, so the handling time here IS the
+			// player's post-load lag, multiplied by the NPC count (#939). Logged on the summary line.
+			var clock = System.Diagnostics.Stopwatch.StartNew();
 			if (body.Length < sizeof(uint) * 4)
 			{
 				_logger.LogBodyDump("GameServer 0x2020 short body", body.ToArray());
@@ -483,7 +494,7 @@ namespace Faolan.GameServer.Session
 					await NpcBroadcaster.SendNpcCombatMode(client, confirmed);
 			}
 
-			_logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
+			_logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}, handled in {Ms} ms", ack0, requestId, ack1, characterId, clock.ElapsedMilliseconds);
 			_logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
 				characterId, client.Session.HasPendingPost205FFollowUp);
 			await FlushPendingPost205FFollowUp(client);

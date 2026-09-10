@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
@@ -156,9 +158,33 @@ namespace Faolan.GameServer.Quest
 			return await MarkerStateFor(client, npc, await ContextFor(character));
 		}
 
-		public Task<QuestMarkerContext> ContextFor(Character character)
+		// One context per ONLINE character, kept until that character's quest state is written or they leave
+		// (#939, the spawn-poll half). The client polls once per NPC it loads and waits for each answer, so a
+		// context built PER POLL cost ~95 ms x 52 polls on a teleport into Tortage (4020): fourteen seconds of
+		// serialized backlog, which the player feels as a lag spike after the loading screen. Every writer of
+		// quest state forgets the entry (QuestProgressionService, the reward pick, the dialogue completion, the
+		// DeleteQuest echo) and the disconnect path drops it.
+		//
+		// ⚠️ The TTL is a BOUND, not the mechanism: a writer this list does not know about would otherwise serve
+		// stale markers for ever. Ten seconds covers the whole poll storm and limits an unknown writer's damage
+		// to that window; the explicit Forget calls are what keep a marker current the instant a quest moves.
+		private readonly ConcurrentDictionary<uint, (QuestMarkerContext Context, long BuiltAt)> _contexts = new ConcurrentDictionary<uint, (QuestMarkerContext, long)>();
+		private static readonly long ContextTtlTicks = Stopwatch.Frequency * 10;
+
+		public async Task<QuestMarkerContext> ContextFor(Character character)
 		{
-			return QuestMarkerContext.Load(_quests, _world, character);
+			if (_contexts.TryGetValue(character.Id, out var cached) && Stopwatch.GetTimestamp() - cached.BuiltAt < ContextTtlTicks)
+				return cached.Context;
+
+			var context = await QuestMarkerContext.Load(_quests, _world, character);
+			_contexts[character.Id] = (context, Stopwatch.GetTimestamp());
+			return context;
+		}
+
+		// The character's quest state moved (or they left): the next marker rebuilds from the rows.
+		public void Forget(uint characterId)
+		{
+			_contexts.TryRemove(characterId, out _);
 		}
 
 		public async Task<byte> MarkerStateFor(INetworkClient client, WorldEntity npc, QuestMarkerContext context)

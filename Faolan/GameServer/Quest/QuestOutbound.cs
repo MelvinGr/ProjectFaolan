@@ -40,6 +40,11 @@ namespace Faolan.GameServer.Quest
 			_quests.InvalidateReachGoals(client);
 		}
 
+		public void ForgetQuestMarkers(uint characterId)
+		{
+			_quests.ForgetMarkerContext(characterId);
+		}
+
 		public Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null)
 		{
 			return _quests.RefreshQuestMarkerFor(client, npcName, npcTemplateId);

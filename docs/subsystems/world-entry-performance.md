@@ -64,3 +64,26 @@ per character per batch (the entry followups, the interest sweep, a spawn poll) 
 it; what a marker needs from a definition — line, level, step — comes through the `GetQuestLineMembership`
 projection, memoised as the NPCs name new quests. **3895 ms → ~140–260 ms** for the level-80, 26 → 2 ms for the
 level-4, and every marker packet in the burst hashes identically before and after.
+
+## The spawn-poll storm after the loading screen
+
+The entry burst is not the last thing a player waits on. The client sends one `UpdateQuestMarkerNPC` poll
+(`0x2020`) **per NPC it loads** and will not advance until each is answered, so the reply cost is multiplied by
+the NPC count and paid serially. A teleport into Tortage (map 4020, 192 NPCs) drew **52 polls in 14 s** at a
+steady ~95 ms each — reply, 2 ms, next poll — which the player feels as a lag spike *after* the world has
+appeared. It is #582's shape on the marker path, and it came back the moment each poll built its own
+`QuestMarkerContext`.
+
+The context is now cached per online character (`QuestMarkerResolver.ContextFor`), dropped by every writer of
+quest state (`IQuestOutbound.ForgetQuestMarkers` — the progression service, the reward pick, the dialogue
+completion, the DeleteQuest echo) and on disconnect, with a ten-second creation TTL as a bound on any writer the
+list does not know about. Each `0x2020 summary` log line now carries `handled in N ms`, so the per-poll cost is
+visible live.
+
+## Open: the 4.6 s between the combos grant and the post-ready records
+
+The same teleport showed 4.6 s of near-silence between `GrantCharacterCombos` and `Sent the post-0x2024 login
+records`, with only five packets on the wire. The block's own awaits are cheap sends, the claims check and
+`ApplyQuestWorldEffects`, so two readings are open: our reads are slow there, or the client is not draining its
+socket while it loads the map and a `SendAsync` blocks on backpressure. The block is now step-timed like the
+entry; the breakdown on the next teleport says which (`sends` vs `quest-world-effects`).

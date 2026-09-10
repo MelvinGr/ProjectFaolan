@@ -179,6 +179,7 @@ namespace Faolan.GameServer.Quest
 			// Recorded BEFORE the grant: if the item hand-off throws, the reward stays spent rather than becoming
 			// re-claimable, which is the safe direction for a duplicate.
 			await _database.SetCharacterQuestReward(character.Id, questId, index);
+			_outbound.ForgetQuestMarkers(character.Id); // #939
 
 			if (await _economy.GrantItemToBackpack(client, picked.ItemTemplateId) == null)
 			{

@@ -538,6 +538,7 @@ namespace Faolan.GameServer
 				// Same rule for a quest share offered TO this player: the window is gone with the connection, so the
 				// offer must be too - otherwise a reconnect could accept one made minutes ago on the other side of the map.
 				_questSharing.Forget(tradingCharacter.Id);
+				_questBroadcaster.ForgetMarkerContext(tradingCharacter.Id); // #939: the cached quest-marker state leaves with the session
 				// And every apprenticeship they are in, on either side: the level boost is a pushed stat, so a bond
 				// that survived a disconnect would leave the OTHER party's client holding it (#144).
 				_ = _apprentice.Forget(tradingCharacter.Id);

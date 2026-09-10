@@ -676,6 +676,7 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 
 				await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
+				_questBroadcaster.ForgetMarkerContext(character.Id); // #939
 				await QuestBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
 				await QuestBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
 

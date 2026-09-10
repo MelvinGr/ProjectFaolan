@@ -117,6 +117,12 @@ namespace Faolan.GameServer.Quest
 			return _questMarkers.ContextFor(character);
 		}
 
+		// Call after ANY write to a character's quests: the cached marker context is stale from that moment (#939).
+		public void ForgetMarkerContext(uint characterId)
+		{
+			_questMarkers.Forget(characterId);
+		}
+
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
 		// its seeded definition.
 		//

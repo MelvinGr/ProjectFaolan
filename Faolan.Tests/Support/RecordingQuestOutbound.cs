@@ -47,6 +47,7 @@ namespace Faolan.Tests.Support
 
 		public Task ApplyQuestWorldEffects(INetworkClient client) => Task.CompletedTask;
 		public void InvalidateReachGoals(INetworkClient client) { }
+		public void ForgetQuestMarkers(uint characterId) { }
 		public Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null) => Task.CompletedTask;
 		public Task RefreshQuestVisibility(INetworkClient client) => Task.CompletedTask;
 		public Task SendQuestLogRemove(INetworkClient client, uint questLineId) => Task.CompletedTask;

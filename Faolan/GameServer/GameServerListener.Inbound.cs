@@ -308,6 +308,7 @@ namespace Faolan.GameServer
 					// even if persistence throws.
 					await QuestBroadcaster.SendQuestIir(client, questId, state);
 					await Database.RemoveCharacterQuest(client.Session.Character!.Id, questId); // a QuestIIR only arrives from a character in the world
+					_questBroadcaster.ForgetMarkerContext(client.Session.Character.Id); // #939
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
 
