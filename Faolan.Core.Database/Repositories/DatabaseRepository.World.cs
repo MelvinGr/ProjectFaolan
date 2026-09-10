@@ -31,6 +31,17 @@ namespace Faolan.Core.Database.Repositories
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
 
 		/// <summary>
+		///     Which LINE each of <paramref name="questIds" /> sits on, at what level and step - the three words the
+		///     quest-marker rules read off a definition, and nothing else (#939).
+		/// </summary>
+		/// <remarks>
+		///     A projection, not an entity load: the marker resolver used to fetch every held quest's full definition
+		///     through <see cref="GetQuestDefinition" /> - the five-level Include - ONE QUERY EACH, once per NPC it was
+		///     asked about, to read these three columns. For a level-80 that was ~1,565 graph loads per NPC.
+		/// </remarks>
+		Task<Dictionary<uint, QuestLineMembership>> GetQuestLineMembership(IReadOnlyCollection<uint> questIds);
+
+		/// <summary>
 		///     The completed-journal read (#938): the definitions for <paramref name="questIds" /> with ONLY their
 		///     <c>TextRefs</c>, and only the lines those quests sit on, with no navigations at all.
 		/// </summary>
@@ -321,6 +332,26 @@ namespace Faolan.Core.Database.Repositories
 			return ([.. definitions], [.. lines]);
 		}
 
+		public async Task<Dictionary<uint, QuestLineMembership>> GetQuestLineMembership(IReadOnlyCollection<uint> questIds)
+		{
+			var result = new Dictionary<uint, QuestLineMembership>(questIds.Count);
+			if (questIds.Count == 0)
+				return result;
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			foreach (var chunk in questIds.Distinct().Chunk(500))
+			{
+				var rows = await ctx.QuestDefinitions.AsNoTracking()
+					.Where(q => chunk.Contains(q.QuestId))
+					.Select(q => new QuestLineMembership(q.QuestId, q.QuestLineId, q.Level, q.JournalSequence))
+					.ToArrayAsync();
+				foreach (var row in rows)
+					result[row.QuestId] = row;
+			}
+
+			return result;
+		}
+
 		public async Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds)
 		{
 			if (questIds.Count == 0)
@@ -440,4 +471,8 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.WorldObjects.Include(o => o.Words).Where(o => o.MapId == mapId && o.DisplayKind != null).ToArrayAsync();
 		}
 	}
+
+	// The quest-marker rules' view of a definition (#939): its line, its level (the silver band), its step (the
+	// line-reached gate). See IWorldRepository.GetQuestLineMembership.
+	public sealed record QuestLineMembership(uint QuestId, uint QuestLineId, uint Level, uint JournalSequence);
 }

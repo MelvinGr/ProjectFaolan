@@ -112,6 +112,11 @@ namespace Faolan.GameServer.Quest
 				await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc));
 		}
 
+		public Task<QuestMarkerContext> MarkerContextFor(Character character)
+		{
+			return _questMarkers.ContextFor(character);
+		}
+
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
 		// its seeded definition.
 		//
@@ -194,7 +199,9 @@ namespace Faolan.GameServer.Quest
 		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each
 		// time the NPC is streamed in, so the '!' transitions to '?' (and clears) as the player accepts/completes the
 		// quest - e.g. Casilda shows '!' before, nothing while held, '?' once the kill goal is done (return to turn in).
-		public async Task SendQuestMarkerIfGiver(INetworkClient client, WorldEntity npc)
+		// `context` is the character's quest state read once for a BATCH of NPCs (#939); a caller with one NPC may
+		// leave it null and one is built for that call.
+		public async Task SendQuestMarkerIfGiver(INetworkClient client, WorldEntity npc, QuestMarkerContext? context = null)
 		{
 			if (npc.Name == null || client.Session.Character == null)
 				return;
@@ -205,7 +212,8 @@ namespace Faolan.GameServer.Quest
 			if (!await _questMarkers.IsQuestRelevant(npc.NpcTemplateId))
 				return; // no quest touches this NPC -> no marker
 
-			await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc));
+			context ??= await _questMarkers.ContextFor(client.Session.Character);
+			await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc, context));
 		}
 
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken

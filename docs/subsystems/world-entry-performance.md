@@ -26,7 +26,7 @@ The total mixes costs that recur on different schedules, and each wants a differ
 |---|---|---|
 | **once per server** | the combat catalogs (`BuffStatEffects` ~400 ms, `SpellPoolEffects`, `SpellEffectService`, `ComboService`) and the quest-giver / goal-target maps | **warmed at startup** — `RealmWarmupService` |
 | **once per map** | the zone's NPC load (`EnsureZoneNpcs`, ~1 s cold) and its terrain heightmap + collision (~130 ms) | terrain is warmed off the tick at entry; the zone load stays lazy (see below) |
-| **every entry** | the character's own rows — the completed journal (#938, fixed), the per-NPC quest markers (#939), the snapshot | query work shaped to what each consumer reads |
+| **every entry** | the character's own rows — the completed journal (#938, fixed), the per-NPC quest markers (#939, fixed), the snapshot | query work shaped to what each consumer reads |
 
 ## `RealmWarmupService` — the once-per-server half
 
@@ -56,5 +56,11 @@ and nothing else, so `GetCompletedJournal` reads exactly that: the definitions w
 the lines those quests sit on. **2745 ms → ~160 ms** for the level-80 (1,565 completions), and the snapshot packet
 that carries the tab is byte-identical before and after (hashed by the profiler's `FAOLAN_PROFILE_DUMP`).
 
-**`npc-followups` — open (#939).** `SendEntryNpcFollowups` re-reads the character's quests + definitions once per
-burst NPC through `MarkerStateFor`; it is now the largest step of a level-80 entry.
+**`npc-followups` — fixed (#939).** `QuestMarkerResolver.MarkerStateFor` reloaded the character's quest state for
+every NPC it was asked about — the rows, the active definitions, and, inside `ChainRunsThrough`, one five-level
+definition load per quest the character had EVER held, to read that definition's line and level. A burst of seven
+NPCs on a level-80 with 1,565 completions ran ~11,000 queries. The state is now a `QuestMarkerContext`, read once
+per character per batch (the entry followups, the interest sweep, a spawn poll) and handed to every resolution in
+it; what a marker needs from a definition — line, level, step — comes through the `GetQuestLineMembership`
+projection, memoised as the NPCs name new quests. **3895 ms → ~140–260 ms** for the level-80, 26 → 2 ms for the
+level-4, and every marker packet in the burst hashes identically before and after.

@@ -144,7 +144,24 @@ namespace Faolan.GameServer.Quest
 		// my next talk goal names" is name-vs-name, since a talk goal's target is a string in the client's own RDB data
 		// (#521), while "does this NPC give a quest" is answered by the TEMPLATE, which is what the dialogue graph the
 		// giver map is derived from is keyed by.
+		// One NPC on its own: a context is built for this call alone. A batch of NPCs should build ONE context
+		// (`ContextFor`) and pass it to the overload below - that is the whole difference between a 2.5 s entry
+		// step and a 30 ms one (#939).
 		public async Task<byte> MarkerStateFor(INetworkClient client, WorldEntity npc)
+		{
+			var character = client.Session.Character;
+			if (npc?.Name == null || character == null)
+				return None;
+
+			return await MarkerStateFor(client, npc, await ContextFor(character));
+		}
+
+		public Task<QuestMarkerContext> ContextFor(Character character)
+		{
+			return QuestMarkerContext.Load(_quests, _world, character);
+		}
+
+		public async Task<byte> MarkerStateFor(INetworkClient client, WorldEntity npc, QuestMarkerContext context)
 		{
 			var character = client.Session.Character;
 			var npcName = npc?.Name;
@@ -161,8 +178,8 @@ namespace Faolan.GameServer.Quest
 			// client's serialized poll queue took ~20s to drain and every request behind it - including its 5s latency
 			// check - measured that backlog. One batched read instead; order is preserved, so the FIRST match wins.
 			// The giver logic below needs the raw rows in EVERY state (held / completed), so that stays a plain read.
-			var quests = await _quests.GetCharacterQuests(character.Id);
-			foreach (var (_, qDef) in await _world.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
+			var quests = context.Quests;
+			foreach (var (_, qDef) in context.Active)
 			{
 				// #521: template first, name second - the same test the talk TRIGGER uses, so the marker and what
 				// actually fires on the greeting cannot disagree.
@@ -172,9 +189,12 @@ namespace Faolan.GameServer.Quest
 			}
 
 			if (!(await Givers()).TryGetValue(npc.NpcTemplateId, out var questIds))
-				return await ChainRunsThrough(character, npc, quests)
+				return await ChainRunsThrough(context, npc)
 					? Unavailable
 					: None;
+
+			// The giver's quests' line / level / step, in one projection - the fold below reads nothing else off them.
+			var giverQuests = await context.Memberships(questIds);
 
 			// ⭐ The marker describes the NEXT quest this NPC can GRANT you, and a giver is not one quest - Turach hands
 			// out two, Laranga two, Cramaleico two. So the answer is a fold over all of them:
@@ -212,8 +232,8 @@ namespace Faolan.GameServer.Quest
 				// from wearing the marker ("Halen van Dummy" is the internal name of 27 unrelated templates). That job
 				// belongs to the TEMPLATE-keyed lookup above since #646, so removing the gate does not give it back.
 				// docs/subsystems/quests.md already said MapId "cannot be a general match key - it is a marker pin".
-				var giverQuest = await _world.GetQuestDefinition(questId);
-				var held = Array.Find(quests, q => q.QuestId == questId);
+				var giverQuest = giverQuests[questId];
+				var held = context.Held(questId);
 				// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest
 				// is only marked Completed on turn-in, not on the kill, #47/#241). It outranks the rest: a giver you can
 				// hand something to says so before it advertises what it has left.
@@ -227,7 +247,7 @@ namespace Faolan.GameServer.Quest
 					continue;
 
 				outstanding = true;
-				offerable |= giverQuest == null || await IsLineReady(giverQuest, quests);
+				offerable |= giverQuest == null || await IsLineReady(giverQuest, context);
 			}
 
 			// A giver with nothing left to offer can still be silver for a DIFFERENT chain that runs through it - which
@@ -235,7 +255,7 @@ namespace Faolan.GameServer.Quest
 			// through him and the player never began). So the non-giver rule below applies here too, rather than only
 			// to NPCs the giver map has never heard of.
 			if (!outstanding)
-				return await ChainRunsThrough(character, npc, quests) ? Unavailable : None;
+				return await ChainRunsThrough(context, npc) ? Unavailable : None;
 
 			return offerable ? Available : Unavailable;
 		}
@@ -304,7 +324,7 @@ namespace Faolan.GameServer.Quest
 			return _goalTargets;
 		}
 
-		private async Task<bool> ChainRunsThrough(Character character, WorldEntity npc, CharacterQuest[] quests)
+		private async Task<bool> ChainRunsThrough(QuestMarkerContext context, WorldEntity npc)
 		{
 			if (!(await Targets()).TryGetValue(npc.NpcTemplateId, out var targetingQuestIds))
 				return false;
@@ -312,19 +332,19 @@ namespace Faolan.GameServer.Quest
 			// "Begun" is per LINE and counts BOTH states: a completed quest began its line just as much as a held one.
 			// Reading only the active set would call a finished line untouched and light a chain the player has been
 			// all the way through, which is the single biggest way this rule can go wrong.
+			//
+			// The held set's memberships are already in the context; only this NPC's targeting ids can be new, and
+			// they come back in one projection (#939 - this used to be one full definition load per held quest,
+			// per NPC).
+			var memberships = await context.Memberships(context.Quests.Select(q => q.QuestId).Concat(targetingQuestIds));
 			var startedLines = new HashSet<uint>();
-			var lineOf = new Dictionary<uint, QuestDefinition>();
-			foreach (var questId in quests.Select(q => q.QuestId).Concat(targetingQuestIds).Distinct())
+			foreach (var held in context.Quests)
 			{
-				if (await _world.GetQuestDefinition(questId) is not { } def)
-					continue;
-
-				lineOf[questId] = def;
-				if (Array.Exists(quests, q => q.QuestId == questId))
-					startedLines.Add(def.QuestLineId);
+				if (memberships.GetValueOrDefault(held.QuestId) is { } m)
+					startedLines.Add(m.QuestLineId);
 			}
 
-			return LightsSilver(targetingQuestIds.Select(id => lineOf.GetValueOrDefault(id)), startedLines, character.Level);
+			return LightsSilverByMembership(targetingQuestIds.Select(id => memberships.GetValueOrDefault(id)), startedLines, context.Character.Level);
 		}
 
 		/// <summary>
@@ -337,6 +357,13 @@ namespace Faolan.GameServer.Quest
 		///     public. A rule measured in one implementation and shipped in another is a rule with no measurement.
 		/// </remarks>
 		public static bool LightsSilver(IEnumerable<QuestDefinition?> throughQuests, ISet<uint> startedLines, uint playerLevel, bool applyLevelBand = true)
+		{
+			return LightsSilverByMembership(throughQuests.Select(d => d == null ? null : new QuestLineMembership(d.QuestId, d.QuestLineId, d.Level, d.JournalSequence)), startedLines, playerLevel, applyLevelBand);
+		}
+
+		// The lean form the live resolver runs on (#939); the QuestDefinition overload above is the report's and the
+		// tests' entry point and delegates here, so there is exactly one rule.
+		public static bool LightsSilverByMembership(IEnumerable<QuestLineMembership?> throughQuests, ISet<uint> startedLines, uint playerLevel, bool applyLevelBand = true)
 		{
 			foreach (var def in throughQuests)
 			{
@@ -425,17 +452,22 @@ namespace Faolan.GameServer.Quest
 		// lines have it on every step (see GetQuestDefinitionsByLine). A line ordered entirely by 0s cannot say what
 		// comes first, so a 0 on either side is skipped rather than guessed at: an unorderable line stays GOLD, which is
 		// the behaviour before this gate existed. Only a genuine lower sequence gates.
-		private async Task<bool> IsLineReady(QuestDefinition quest, CharacterQuest[] quests)
+		private static async Task<bool> IsLineReady(QuestLineMembership quest, QuestMarkerContext context)
 		{
-			return quest.JournalSequence == 0 || LineReached(quest, await _world.GetQuestDefinitionsByLine(quest.QuestLineId), quests);
+			return quest.JournalSequence == 0 || LineReached(quest.JournalSequence, await context.LineSteps(quest.QuestLineId), context.Quests);
 		}
 
 		// The rule itself, split from the fetch so it can be tested against the real quest lines without a database.
 		public static bool LineReached(QuestDefinition quest, IEnumerable<QuestDefinition> line, CharacterQuest[] quests)
 		{
+			return LineReached(quest.JournalSequence, line, quests);
+		}
+
+		public static bool LineReached(uint questSequence, IEnumerable<QuestDefinition> line, CharacterQuest[] quests)
+		{
 			foreach (var step in line)
 			{
-				if (step.JournalSequence == 0 || step.JournalSequence >= quest.JournalSequence)
+				if (step.JournalSequence == 0 || step.JournalSequence >= questSequence)
 					continue;
 
 				if (Array.Find(quests, q => q.QuestId == step.QuestId) is not { State: QuestState.Completed })
