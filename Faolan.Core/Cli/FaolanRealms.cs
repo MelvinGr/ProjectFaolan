@@ -37,7 +37,7 @@ namespace Faolan.Core.Cli
 		ushort ChatServerPort,
 		ushort CsPlayerAgentPort,
 		RealmType Type,
-		RealmCountry Country);
+		RealmLanguage Language);
 
 	/// <summary>
 	///     The <c>Realms</c> configuration section: the realms this deployment declares, and the built-in default when
@@ -64,7 +64,7 @@ namespace Faolan.Core.Cli
 		/// </summary>
 		public static readonly ImmutableArray<DeclaredRealm> Default =
 		[
-			new DeclaredRealm(1, "Project Faolan", "127.0.0.1", 7014, 7012, 7001, RealmType.PvP, RealmCountry.English)
+			new DeclaredRealm(1, "Project Faolan", "127.0.0.1", 7014, 7012, 7001, RealmType.PvP, RealmLanguage.English)
 		];
 
 		/// <summary>
@@ -130,7 +130,7 @@ namespace Faolan.Core.Cli
 				lines.Add($"\t\t\t\"ChatServerPort\": {realm.ChatServerPort.ToString(CultureInfo.InvariantCulture)},");
 				lines.Add($"\t\t\t\"CsPlayerAgentPort\": {realm.CsPlayerAgentPort.ToString(CultureInfo.InvariantCulture)},");
 				lines.Add($"\t\t\t\"Type\": {JsonSerializer.Serialize(realm.Type.ToString())},");
-				lines.Add($"\t\t\t\"Country\": {JsonSerializer.Serialize(realm.Country.ToString())}");
+				lines.Add($"\t\t\t\"Language\": {JsonSerializer.Serialize(realm.Language.ToString())}");
 				lines.Add(i == Default.Length - 1
 					? "\t\t}"
 					: "\t\t},");
@@ -206,7 +206,7 @@ namespace Faolan.Core.Cli
 				Port(realm, nameof(DeclaredRealm.ChatServerPort)),
 				Port(realm, nameof(DeclaredRealm.CsPlayerAgentPort)),
 				Choice<RealmType>(realm, nameof(DeclaredRealm.Type)),
-				Choice<RealmCountry>(realm, nameof(DeclaredRealm.Country)));
+				Choice<RealmLanguage>(realm, nameof(DeclaredRealm.Language)));
 		}
 
 		private static string Text(IConfigurationSection realm, string key)

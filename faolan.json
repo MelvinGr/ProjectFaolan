@@ -76,7 +76,7 @@
 			"ChatServerPort": 7012,
 			"CsPlayerAgentPort": 7001,
 			"Type": "PvP",
-			"Country": "English"
+			"Language": "English"
 		}
 	],
 

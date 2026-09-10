@@ -31,11 +31,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void ADeclaredRealm_ParsesEveryField()
 		{
-			var config = Config(Realm(7, name: "Fury", ip: "10.0.0.4", port: 8014, chat: 8012, cs: 8001, type: "PvE", country: "German"));
+			var config = Config(Realm(7, name: "Fury", ip: "10.0.0.4", port: 8014, chat: 8012, cs: 8001, type: "PvE", language: "German"));
 
 			var realm = Assert.Single(FaolanRealms.Declared(config));
 
-			Assert.Equal(new DeclaredRealm(7, "Fury", "10.0.0.4", 8014, 8012, 8001, RealmType.PvE, RealmCountry.German), realm);
+			Assert.Equal(new DeclaredRealm(7, "Fury", "10.0.0.4", 8014, 8012, 8001, RealmType.PvE, RealmLanguage.German), realm);
 		}
 
 		[Fact]
@@ -43,10 +43,10 @@ namespace Faolan.Tests
 		// same way the catalog's own enum settings parse.
 		public void AnEnum_IsSpelledByNameAndIsCaseInsensitive()
 		{
-			var realm = Assert.Single(FaolanRealms.Declared(Config(Realm(1, type: "pvpbyfaction", country: "FRENCH"))));
+			var realm = Assert.Single(FaolanRealms.Declared(Config(Realm(1, type: "pvpbyfaction", language: "FRENCH"))));
 
 			Assert.Equal(RealmType.PvPByFaction, realm.Type);
-			Assert.Equal(RealmCountry.French, realm.Country);
+			Assert.Equal(RealmLanguage.French, realm.Language);
 		}
 
 		[Theory]
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		[InlineData("ChatServerPort")]
 		[InlineData("CsPlayerAgentPort")]
 		[InlineData("Type")]
-		[InlineData("Country")]
+		[InlineData("Language")]
 		public void AMissingField_IsRefusedByName(string field)
 		{
 			var realm = Realm(1);
@@ -173,7 +173,7 @@ namespace Faolan.Tests
 		// One realm's keys, at index 0 - Config renumbers them when several are passed, so each case below reads as
 		// the realm it declares rather than as an index.
 		private static Dictionary<string, string?> Realm(uint id, string name = "Test", string ip = "127.0.0.1", ushort port = 7014,
-			ushort chat = 7012, ushort cs = 7001, string type = "PvP", string country = "English")
+			ushort chat = 7012, ushort cs = 7001, string type = "PvP", string language = "English")
 		{
 			return new Dictionary<string, string?>
 			{
@@ -184,7 +184,7 @@ namespace Faolan.Tests
 				["Realms:0:ChatServerPort"] = chat.ToString(),
 				["Realms:0:CsPlayerAgentPort"] = cs.ToString(),
 				["Realms:0:Type"] = type,
-				["Realms:0:Country"] = country
+				["Realms:0:Language"] = language
 			};
 		}
 

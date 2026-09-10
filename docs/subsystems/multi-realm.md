@@ -11,7 +11,7 @@ lives:
 
 | Half | Columns | Owner |
 |---|---|---|
-| Static deployment config | `Name`, `IpAddress`, `Port`, `ChatServerPort`, `CsPlayerAgentPort`, `Type`, `Country` | the `Realms` section of faolan.json |
+| Static deployment config | `Name`, `IpAddress`, `Port`, `ChatServerPort`, `CsPlayerAgentPort`, `Type`, `Language` | the `Realms` section of faolan.json |
 | Live | `OnlineStatus`, `LastSeenUtc`, `LoadStatus` | the host that serves the realm |
 | Relational anchor | `Id` | the four tables that FK it |
 
@@ -38,6 +38,15 @@ is persisted — an implicit ordinal would silently repoint every character the 
 a row the config has dropped is **reported, never deleted**: four tables FK a realm, so removing one is a data
 migration rather than a config edit.
 
+⭐ `Language` was called `Country` until #930. That name had no basis at all: "country" does not occur once in the
+34 MB `AgeOfConan.exe`, and it arrived verbatim in a 2021 commit with nothing behind it. The client's vocabulary is
+language throughout — `VerifyLanguageSetting(const int nClientLanguage)`, `DispatchResetLanguage(nNewLanguage)` —
+and the login LDB page carries *"Your account does not have any valid **language flags**"* in the same block as
+every dimension error, so **dimension access is gated on the account's language flags**, which is what a
+per-dimension language is for. ⚠️ The VALUES are still unverified and were carried over unchanged (#932): they
+match neither the client's LDB page order (fr, en, de, es, ru, pl, ko) nor the string code `LoginCharacter` sends,
+and nothing was found reading the slot they land in.
+
 Declarations are validated at config time rather than at wire-write time, which is where the same mistakes used to
 surface — after a player had already picked the realm. A non-IPv4 address (#845), a zero port, a duplicate id or
 name, and two realms sharing a port on one address are all refused, naming the offending key.
@@ -45,7 +54,7 @@ name, and two realms sharing a port on one address are all refused, naming the o
 ## Realm-ready foundations
 
 Already realm-ready:
-- **`Realm` table** — `Id`, `Name`, `Country`, `Type`, `OnlineStatus`, `LoadStatus`, and crucially its own
+- **`Realm` table** — `Id`, `Name`, `Language`, `Type`, `OnlineStatus`, `LoadStatus`, and crucially its own
   **`IpAddress` + `Port`** (so a realm can live on any host:port).
 - **`Character.RealmId`** — every character is FK'd to a realm.
 - **`SendRealmList`** (PlayerAgent/Packets.cs) — already **loops all DB realms** (count-prefixed per-realm record);

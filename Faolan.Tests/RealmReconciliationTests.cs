@@ -186,7 +186,7 @@ namespace Faolan.Tests
 
 		private static DeclaredRealm Declared(uint id, string name, ushort port = 8014, ushort chat = 8012, ushort cs = 8001)
 		{
-			return new DeclaredRealm(id, name, "127.0.0.1", port, chat, cs, RealmType.PvP, RealmCountry.English);
+			return new DeclaredRealm(id, name, "127.0.0.1", port, chat, cs, RealmType.PvP, RealmLanguage.English);
 		}
 
 		private static Realm Row(uint id, string name, ushort port)
@@ -200,7 +200,7 @@ namespace Faolan.Tests
 				ChatServerPort = 8012,
 				CsPlayerAgentPort = 8001,
 				Type = RealmType.PvP,
-				Country = RealmCountry.English
+				Language = RealmLanguage.English
 			};
 		}
 

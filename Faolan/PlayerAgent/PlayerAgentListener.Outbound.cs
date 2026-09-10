@@ -191,7 +191,7 @@ namespace Faolan.PlayerAgent
 					b.WriteUInt16(0x0000);
 					b.WriteByte(0x00);
 					b.WriteUInt16(realm.Type);
-					b.WriteUInt32(realm.Country);
+					b.WriteUInt32(realm.Language);
 					b.WriteByte(0x00);
 				}
 			}));

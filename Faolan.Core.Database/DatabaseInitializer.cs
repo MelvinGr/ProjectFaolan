@@ -60,7 +60,7 @@ namespace Faolan.Core.Database
 				ChatServerPort = realm.ChatServerPort,
 				CsPlayerAgentPort = realm.CsPlayerAgentPort,
 				Type = realm.Type,
-				Country = realm.Country
+				Language = realm.Language
 			});
 
 			return await db.SaveChangesAsync(cancellationToken) == 1;
@@ -130,7 +130,7 @@ namespace Faolan.Core.Database
 				row.ChatServerPort = realm.ChatServerPort;
 				row.CsPlayerAgentPort = realm.CsPlayerAgentPort;
 				row.Type = realm.Type;
-				row.Country = realm.Country;
+				row.Language = realm.Language;
 
 				updated.Add($"{realm.Name} (id {realm.Id}): {string.Join(", ", changes)}");
 			}
@@ -165,7 +165,7 @@ namespace Faolan.Core.Database
 			Compare(nameof(Realm.ChatServerPort), row.ChatServerPort, realm.ChatServerPort);
 			Compare(nameof(Realm.CsPlayerAgentPort), row.CsPlayerAgentPort, realm.CsPlayerAgentPort);
 			Compare(nameof(Realm.Type), row.Type, realm.Type);
-			Compare(nameof(Realm.Country), row.Country, realm.Country);
+			Compare(nameof(Realm.Language), row.Language, realm.Language);
 
 			return [.. changes];
 		}
@@ -184,7 +184,7 @@ namespace Faolan.Core.Database
 				ChatServerPort = realm.ChatServerPort,
 				CsPlayerAgentPort = realm.CsPlayerAgentPort,
 				Type = realm.Type,
-				Country = realm.Country
+				Language = realm.Language
 			};
 		}
 

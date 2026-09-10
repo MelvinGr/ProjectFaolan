@@ -16,7 +16,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<Character> Characters { get; set; } = [];
 
 		[ConstrainToEnumValues]
-		public RealmCountry Country { get; set; }
+		public RealmLanguage Language { get; set; }
 
 		[ConstrainToEnumValues]
 		public RealmLoadStatus LoadStatus { get; set; }

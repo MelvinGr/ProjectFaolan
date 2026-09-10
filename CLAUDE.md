@@ -103,7 +103,7 @@ serves both the create-editor and world connections). **Process role (multi-real
 a game host for the first realm — the historical single-process dev run); `--role login` runs ONLY the
 router tier; `--role realm=<id>` runs ONE realm's game host (GameServer + realm-local chat + guilds, bound to
 that realm's ports). Realms are **declared in the `Realms` section of faolan.json** — the STATIC half of a `Realm`
-row (name/address/ports/type/country), reconciled into the table at startup; the LIVE half (`OnlineStatus`,
+row (name/address/ports/type/language), reconciled into the table at startup; the LIVE half (`OnlineStatus`,
 `LastSeenUtc`, `LoadStatus`) is written only by the host serving the realm and is never declarable, and a row is
 never deleted because four tables FK it. A deployment that declares nothing keeps the old "insert the default
 realm into an empty table" behaviour exactly. `--role` is **repeatable** — `--role login --role realm=<id>` co-hosts both in one

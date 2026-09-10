@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Ability", b =>
                 {
@@ -3486,9 +3486,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<ushort>("ChatServerPort")
                         .HasColumnType("INTEGER");
 
-                    b.Property<byte>("Country")
-                        .HasColumnType("INTEGER");
-
                     b.Property<ushort>("CsPlayerAgentPort")
                         .HasColumnType("INTEGER");
 
@@ -3496,6 +3493,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
+
+                    b.Property<byte>("Language")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("LastSeenUtc")
                         .HasColumnType("TEXT");
@@ -3524,7 +3524,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("Realms", t =>
                         {
-                            t.HasCheckConstraint("CK_Realm_Country", "Country IN (0, 1, 2, 3)");
+                            t.HasCheckConstraint("CK_Realm_Language", "Language IN (0, 1, 2, 3)");
 
                             t.HasCheckConstraint("CK_Realm_LoadStatus", "LoadStatus IN (0, 1, 2, 3, 4)");
 
