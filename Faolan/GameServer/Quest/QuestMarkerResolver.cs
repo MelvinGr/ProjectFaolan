@@ -370,7 +370,7 @@ namespace Faolan.GameServer.Quest
 					startedLines.Add(m.QuestLineId);
 			}
 
-			return LightsSilverByMembership(targetingQuestIds.Select(id => memberships.GetValueOrDefault(id)), startedLines, context.Character.Level);
+			return LightsSilverByMembership(targetingQuestIds.Select(memberships.GetValueOrDefault), startedLines, context.Character.Level);
 		}
 
 		/// <summary>

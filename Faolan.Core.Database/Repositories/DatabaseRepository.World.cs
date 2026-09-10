@@ -55,6 +55,18 @@ namespace Faolan.Core.Database.Repositories
 		/// </remarks>
 		Task<(QuestDefinition[] Definitions, QuestLine[] Lines)> GetCompletedJournal(IReadOnlyCollection<uint> questIds);
 		Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null);
+
+		/// <summary>
+		///     The template the character is (or was) escorting: the <c>TrailingRefId</c> of the first Escort goal on
+		///     any Active or Completed quest they hold, or 0 (#940).
+		/// </summary>
+		/// <remarks>
+		///     One projection over the goal rows. <c>TortageIntroService</c> used to answer this by loading EVERY quest
+		///     the character had ever held with the five-level Include and walking their goals - 4.3-4.9 s of every
+		///     world entry for a level-80, paid to ask whether Casilda is still captive. "First" is the held order the
+		///     walk had: lowest quest id, then lowest goal id.
+		/// </remarks>
+		Task<uint> GetEscorteeTemplateId(uint characterId);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
 		Task<Dictionary<uint, QuestDefinition[]>> GetQuestDefinitionsByLines(IReadOnlyCollection<uint> questLineIds);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
@@ -387,6 +399,18 @@ namespace Faolan.Core.Database.Repositories
 		//
 		// A quest whose definition is missing is DROPPED, which is what every caller already did - the ones reading
 		// `def?.Goals` fell through to `goal == null -> continue`, the rest tested `def == null` explicitly.
+		public async Task<uint> GetEscorteeTemplateId(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterQuests.AsNoTracking()
+				.Where(q => q.CharacterId == characterId && (q.State == QuestState.Active || q.State == QuestState.Completed))
+				.Join(ctx.QuestGoalDefinitions.AsNoTracking().Where(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId != 0),
+					q => q.QuestId, g => g.QuestDefinitionId, (q, g) => new { q.QuestId, g.GoalId, g.TrailingRefId })
+				.OrderBy(x => x.QuestId).ThenBy(x => x.GoalId)
+				.Select(x => x.TrailingRefId)
+				.FirstOrDefaultAsync();
+		}
+
 		public async Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null)
 		{
 			var held = await GetCharacterQuests(characterId, state);

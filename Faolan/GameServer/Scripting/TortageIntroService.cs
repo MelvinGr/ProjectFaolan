@@ -128,21 +128,13 @@ namespace Faolan.GameServer.Scripting
 
 		// The template id of the escortee the player is (or was) escorting - the Escort goal's TrailingRefId on any
 		// Active/Completed escort quest, or 0 if none. Used to resolve the escortee live by ID rather than by name.
-		private async Task<uint> EscorteeTemplateId(uint characterId)
+		private Task<uint> EscorteeTemplateId(uint characterId)
 		{
-			// ⚠️ This wants Active AND Completed, so on a level-80 character the per-quest lookup it replaces was over
-			// 1500 queries - the completed journal never shrinks. One batched read of every held quest instead (the two
-			// states it skips are a rounding error next to the journal); order is preserved, so the first escort wins.
-			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId))
-			{
-				if (quest.State is not (QuestState.Active or QuestState.Completed))
-					continue;
-
-				if (def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
-					return escort.TrailingRefId;
-			}
-
-			return 0;
+			// One projection over the goal rows (#940). This used to load EVERY quest the character had ever held with
+			// the full definition graph and walk their goals for one Escort - 4.3-4.9 s of every world entry for a
+			// level-80, paid in the post-ready block where the client's spawn polls queue behind it, which is what the
+			// "lag spike after the loading screen" on a teleport turned out to be.
+			return _database.GetEscorteeTemplateId(characterId);
 		}
 
 		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.

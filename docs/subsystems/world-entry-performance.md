@@ -80,10 +80,19 @@ completion, the DeleteQuest echo) and on disconnect, with a ten-second creation 
 list does not know about. Each `0x2020 summary` log line now carries `handled in N ms`, so the per-poll cost is
 visible live.
 
-## Open: the 4.6 s between the combos grant and the post-ready records
+## The 4.6 s between the combos grant and the post-ready records — `ClearCasildaCaptivePose` (#940)
 
 The same teleport showed 4.6 s of near-silence between `GrantCharacterCombos` and `Sent the post-0x2024 login
-records`, with only five packets on the wire. The block's own awaits are cheap sends, the claims check and
-`ApplyQuestWorldEffects`, so two readings are open: our reads are slow there, or the client is not draining its
-socket while it loads the map and a `SendAsync` blocks on backpressure. The block is now step-timed like the
-entry; the breakdown on the next teleport says which (`sends` vs `quest-world-effects`).
+records`, with five packets on the wire. Two readings were open — our reads, or the client not draining its socket
+while it loads the map — and the block's new step timer settled it on the first re-run: `casilda-pose 4914 ms` on
+login, `4306 ms` on the teleport, everything else under 100 ms. Ours.
+
+`TortageIntroService.EscorteeTemplateId` answered "is Casilda still captive for this character" by loading EVERY
+quest the character had ever held with the five-level Include and walking their goals for one Escort goal — on a
+level-80, 1,565 graph loads to read one `TrailingRefId`, on every world entry, for a character who has never
+been near the beach. It is one projection over the goal rows now (`GetEscorteeTemplateId`: Active/Completed
+held quests joined to Escort goals, first by quest id then goal id — the same order the walk had).
+
+⚠️ Why it felt like lag rather than a longer loading screen: the client's spawn-poll storm queues behind this
+block, so the first poll was answered at 21:26:05.7 and the second at 21:26:10.4. The world was visible; nothing
+in it responded.
