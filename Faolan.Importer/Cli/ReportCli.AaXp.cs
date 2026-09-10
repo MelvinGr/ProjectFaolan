@@ -75,7 +75,7 @@ namespace Faolan.Importer.Cli
 
 			var grants = new List<(string Capture, int Index, string Token, long Amount, int? Bonus)>();
 			var kills = new List<(string Capture, uint PlayerLevel, uint MobLevel, string Mob, long Amount, int? Bonus, int Distance)>();
-			var poolSeries = new List<(string Capture, uint Stat, uint First, uint Last, int Moves, long Sum, int Pushes, int Deaths, int Grants)>();
+			var poolSeries = new List<(string Capture, uint Stat, uint First, uint Last, int Moves, long Sum, int Pushes, int Deaths, int PlayerKills, int Grants)>();
 
 			foreach (var capture in captures)
 			{
@@ -95,6 +95,12 @@ namespace Faolan.Importer.Cli
 				var deaths = new List<(int Index, uint Actor)>();
 				var localGrants = new List<(int Index, string Token, long Amount, int? Bonus)>();
 				var series = new Dictionary<uint, List<(int Index, uint Value)>>();
+
+				// #935: the pool is restated more often than it MOVES, and the restatements track deaths rather than
+				// grants. Separating the deaths the PLAYER caused from the ones they merely witnessed is what decides
+				// whether the rule is "twice per kill" or "twice per witnessed death" - the two agree on every capture
+				// with fewer than six deaths and diverge on the busy ones.
+				var damagedByPlayer = new HashSet<uint>();
 
 				for (var i = 0; i < capture.Packets.Count; i++)
 				{
@@ -127,6 +133,32 @@ namespace Faolan.Importer.Cli
 					{
 						if (!deaths.Any(d => d.Actor == bcc.Actor && i - d.Index < 50))
 							deaths.Add((i, bcc.Actor));
+					}
+					else if (p is { IsDownload: true } && p.SubOpcode == DamageResultCodec.Opcode && p.Body.Length > 4)
+					{
+						try
+						{
+							var swing = DamageResultCodec.Parse(p.Body.AsSpan(4));
+							if (playerHandles.Contains(swing.Attacker))
+								damagedByPlayer.Add(swing.Target);
+						}
+						catch
+						{
+							// a truncated record - counted by its absence, not by a wrong number
+						}
+					}
+					else if (p is { IsDownload: true } && p.SubOpcode == StatDamageCodec.Opcode && p.Body.Length > 4)
+					{
+						try
+						{
+							var hit = StatDamageCodec.Parse(p.Body.AsSpan(4));
+							if (playerHandles.Contains(hit.Caster))
+								damagedByPlayer.Add(hit.Handle);
+						}
+						catch
+						{
+							// as above
+						}
 					}
 					else if (p.SubOpcode == FormatFeedbackCodec.Opcode && p.Body.Length > 4)
 					{
@@ -186,7 +218,8 @@ namespace Faolan.Importer.Cli
 						sum += values[i].Value - values[i - 1].Value;
 					}
 
-					poolSeries.Add((capture.Name, stat, values[0].Value, values[^1].Value, moves, sum, values.Count, deaths.Count, localGrants.Count));
+					poolSeries.Add((capture.Name, stat, values[0].Value, values[^1].Value, moves, sum, values.Count, deaths.Count,
+						deaths.Count(d => damagedByPlayer.Contains(d.Actor)), localGrants.Count));
 				}
 			}
 
@@ -238,20 +271,23 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine();
 			Console.WriteLine("--- the POOL stat, per capture (1000006 = PvP, 1000007 = PvE) ---");
-			Console.WriteLine($"  {"capture",-46} {"stat",8} {"first",12} {"last",12} {"moves",6} {"sum",10} {"pushes",7} {"deaths",7} {"grants",7}");
+			Console.WriteLine($"  {"capture",-40} {"stat",8} {"last",10} {"moves",6} {"pushes",7} {"deaths",7} {"pKills",7} {"grants",7} {"push/pk",8}");
 			foreach (var s in poolSeries.OrderBy(s => s.Capture).ThenBy(s => s.Stat))
 			{
-				Console.WriteLine($"  {Trim(s.Capture, 46),-46} {s.Stat,8} {s.First,12} {s.Last,12} {s.Moves,6} {s.Sum,10} {s.Pushes,7} {s.Deaths,7} {s.Grants,7}");
+				Console.WriteLine($"  {Trim(s.Capture, 40),-40} {s.Stat,8} {s.Last,10} {s.Moves,6} {s.Pushes,7} {s.Deaths,7} {s.PlayerKills,7} {s.Grants,7} "
+				                  + $"{(s.PlayerKills > 0 ? $"{(double)s.Pushes / s.PlayerKills:F2}" : "-"),8}");
 			}
 
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ `pushes` outruns `grants`, and NOT at world entry: the first push of every session lands beside a");
 			Console.WriteLine("     grant, hundreds to thousands of packets in, so there is no entry restatement to send.");
-			Console.WriteLine("  ⭐ The restatements track DEATHS, not grants: `pushes` == 2 x `deaths` exactly on the five captures");
-			Console.WriteLine("     with fewer than six of them (10/5, 6/3, 8/4, 6/3, 2/1-grant), i.e. retail restates the pool twice");
-			Console.WriteLine("     per kill whether or not the kill pays. The two busiest captures run 12/12 and 60/37 instead, which");
-			Console.WriteLine("     is what a witnessed death that is not the PLAYER's kill would do to the ratio. We push on a grant");
-			Console.WriteLine("     alone until that is separated - see Gitea #150.");
+			Console.WriteLine("  ⭐ The restatements track KILLS rather than grants, at TWO pushes each (#935). `push/pk` reads");
+			Console.WriteLine("     exactly 2.00 on six of the nine captures that hold a kill, and a capture with NO kill and one");
+			Console.WriteLine("     grant carries exactly 2 pushes - so a grant pays two as well.");
+			Console.WriteLine("  ⚠️ It is not yet a rule. The three that miss are 2.20 (10 kills, 5 grants), 2.14 and 0.67, and the");
+			Console.WriteLine("     last two are consecutive SLICES of one session - a capture that starts or ends mid-stream loses");
+			Console.WriteLine("     the pushes outside its window, and summing the three slices gives 1.85 rather than 2.00, so");
+			Console.WriteLine("     clipping does not explain them on its own. We push on a grant alone until it does.");
 
 			Console.WriteLine();
 			Console.WriteLine("  ⭐ The pool's DENOMINATOR is the client's own `AlternateAdvancement_XPCap` = 1,000,000, and the");
