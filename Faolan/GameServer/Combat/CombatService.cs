@@ -68,6 +68,10 @@ namespace Faolan.GameServer.Combat
 		// the ding burst, the level-gated ability/spell unlocks and the persistence. One-directional: combat drives
 		// progression, never the reverse.
 		private readonly LevelUpService _levelUp;
+
+		// #150: the AA pool is the second thing a kill advances. A separate service for the same reason LevelUpService
+		// is one - what a kill decides is the amount, and what the amount then does is not combat's business.
+		private readonly AlternateAdvancementService _alternateAdvancement;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 
@@ -89,7 +93,7 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, ICatalogRepository catalog, ICharacterRepository characters, ICharacterStatRepository stats, QuestProgressionService questProgression, ILogger logger,
-			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent,
+			LevelUpService levelUp, AlternateAdvancementService alternateAdvancement, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent,
 			SpellPoolEffects poolEffects, bool killStreaks)
 		{
 			_poolEffects = poolEffects;
@@ -105,6 +109,7 @@ namespace Faolan.GameServer.Combat
 			_questProgression = questProgression;
 			_logger = logger;
 			_levelUp = levelUp;
+			_alternateAdvancement = alternateAdvancement;
 		}
 
 
@@ -869,7 +874,7 @@ namespace Faolan.GameServer.Combat
 		//
 		// What a kill decides is the AMOUNT - `CombatResolver.ResolveKillXp(npcLevel)`. What that amount then does to
 		// the character is not combat's business, and used to be 40 lines of level curve + ding burst right here.
-		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
+		private async Task AwardKillXp(INetworkClient killer, WorldEntity npc)
 		{
 			var character = killer.Session.Character;
 
@@ -881,7 +886,13 @@ namespace Faolan.GameServer.Combat
 			character.NpcKills++;
 			await _characters.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
 
-			await _levelUp.ApplyXp(killer, CombatResolver.ResolveKillXp(npcLevel));
+			await _levelUp.ApplyXp(killer, CombatResolver.ResolveKillXp(npc.Level));
+
+			// #150: the ALTERNATE-ADVANCEMENT pool is the OTHER thing a kill feeds, and it is the one that keeps
+			// filling once the level bar cannot - retail pays AA xp only at the level cap. The service decides whether
+			// this kill pays at all; combat's part is that the KILLING BLOW is what attributes it, which is exactly
+			// where this call sits.
+			await _alternateAdvancement.AwardKillXp(killer, npc.Level, npc.NpcType, npc.NpcFlags);
 		}
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
@@ -940,7 +951,7 @@ namespace Faolan.GameServer.Combat
 					MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)),
 					BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter, npcEntity.DeathActivationTime)));
 
-				await AwardKillXp(killer, npcEntity.Level);
+				await AwardKillXp(killer, npcEntity);
 				// #310: Khitai reputation. A no-op for every base-game NPC - the faction ids are Khitai's and a
 				// creature with no `NpcStatCore.FactionId` moves nothing.
 				await _factions.AwardForKill(killer, npcEntity.FactionId);

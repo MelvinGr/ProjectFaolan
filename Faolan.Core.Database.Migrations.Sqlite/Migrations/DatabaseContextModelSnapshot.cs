@@ -245,6 +245,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Id")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("AaPvEXp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("AaPvPXp")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("AccountId")
                         .HasColumnType("INTEGER");
 
@@ -843,6 +849,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasKey("CharacterId", "TagId");
 
                     b.ToTable("CharacterTags");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterToken", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Pool")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("Gained")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("Spent")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CharacterId", "Pool");
+
+                    b.ToTable("CharacterTokens", t =>
+                        {
+                            t.HasCheckConstraint("CK_CharacterToken_Pool", "Pool IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 30, 31, 32, 33, 34, 35, 36, 50, 60, 61, 62)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ChatMessage", b =>
@@ -4643,6 +4671,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterToken", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithMany("Tokens")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.ClassAbility", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Ability", "Ability")
@@ -6166,6 +6205,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Spells");
 
                     b.Navigation("Tags");
+
+                    b.Navigation("Tokens");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>

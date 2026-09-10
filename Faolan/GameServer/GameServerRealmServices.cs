@@ -134,6 +134,10 @@ namespace Faolan.GameServer
 			services.AddSingleton<LevelUpOutbound>();
 			services.AddSingleton<ILevelUpOutbound>(sp => sp.GetRequiredService<LevelUpOutbound>());
 			services.AddSingleton<LevelUpService>();
+			// #150: the ALTERNATE-ADVANCEMENT pools and the perk-token wallet. Beside LevelUpService because it is the
+			// same shape - a second pool the same kill feeds - and it takes only the progression slice plus a logger,
+			// so it has no wire port of its own (AA adds no messages; it rides feedback/stat/token-amount).
+			services.AddSingleton<AlternateAdvancementService>();
 			services.AddSingleton<EconomyOutbound>();
 			services.AddSingleton<IEconomyOutbound>(sp => sp.GetRequiredService<EconomyOutbound>());
 			services.AddSingleton<TradeOutbound>();
@@ -177,7 +181,7 @@ namespace Faolan.GameServer
 				var combat = new CombatService(sp.GetRequiredService<WorldSimulation>(), sp.GetRequiredService<ICatalogRepository>(),
 					sp.GetRequiredService<ICharacterRepository>(), sp.GetRequiredService<ICharacterStatRepository>(),
 					sp.GetRequiredService<QuestProgressionService>(), sp.GetRequiredService<ILogger>(), sp.GetRequiredService<LevelUpService>(),
-					sp.GetRequiredService<FatalityService>(), sp.GetRequiredService<FactionService>(), sp.GetRequiredService<WorldBroadcaster>(),
+					sp.GetRequiredService<AlternateAdvancementService>(), sp.GetRequiredService<FatalityService>(), sp.GetRequiredService<FactionService>(), sp.GetRequiredService<WorldBroadcaster>(),
 					sp.GetRequiredService<ICsPlayerAgentDispatcher>(), sp.GetRequiredService<SpellPoolEffects>(),
 					sp.GetRequiredService<IConfiguration>().ContentKillStreaks);
 				sp.GetRequiredService<LevelUpOutbound>().BindReseed(combat.ReseedFromMaxStats);
@@ -217,7 +221,7 @@ namespace Faolan.GameServer
 			// Two single-op seams: a feat's world reload is a teleport, and a feat that TEACHES grants a spell.
 			services.AddSingleton(sp => new FeatService(sp.GetRequiredService<ICharacterProgressionRepository>(), sp.GetRequiredService<ICatalogRepository>(), sp.GetRequiredService<ILogger>(),
 				sp.GetRequiredService<IChatServerDispatcher>(), (id, map, pos) => sp.GetRequiredService<TeleportService>().DoTeleport(id, map, pos),
-				GameWire.SendLearnSpell, GameWire.SendForgetSpell));
+				GameWire.SendLearnSpell, GameWire.SendForgetSpell, sp.GetRequiredService<AlternateAdvancementService>()));
 			services.AddSingleton<SkillPointService>();
 
 			// --- mounts + the environment -----------------------------------------------------------------------

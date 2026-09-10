@@ -515,6 +515,8 @@ namespace Faolan.GameServer.World
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
 			entity.FactionId = npc.NpcTemplate.StatCore?.FactionId; // #310
+			entity.NpcType = npc.NpcTemplate.StatCore?.NpcType; // #150, as in the zone-load path
+			entity.NpcFlags = npc.NpcTemplate.StatCore?.NpcFlags;
 			entity.SpawnBody = body;
 			entity.Route.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
 

@@ -45,10 +45,12 @@ namespace Faolan.Tests
 			["OpenSiteInBrowserCodec"] = "retail used it for its own item shop; we have no store and should not point a player's browser anywhere by default",
 			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
 			["RequestGetEffectCodec"] = "all eight captured frames ask for effect 0, so what to ask FOR is unknown (#874)",
-			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363",
-			["UpdateTokenAmountCodec"] = "we model no token pool at all - the 29 pools the client names (TokenPool, RDB 1000520) are all unimplemented content, and the AA three are #150, whose grant rule the corpus refutes rather than states (#870)"
+			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363"
 		};
 
+		// UpdateTokenAmountCodec came OFF the list with #150: AlternateAdvancementService now credits and charges the
+		// three AA pools, so the wallet is written to and restated on the wire whenever it moves.
+		//
 		// BattleKeepInfoCodec came OFF the list with #147: CSPlayerAgentListener now answers 0x2042
 		// RequestBattleKeepInformation with the honest empty keep list (BattleKeepInfo.Empty) - the same shape as the
 		// zero-guild Massive-PvP board - instead of dropping the query as an unknown packet.

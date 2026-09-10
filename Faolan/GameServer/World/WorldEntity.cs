@@ -702,6 +702,12 @@ namespace Faolan.GameServer.World
 		// DB -> DispositionFriendly here (matching the client's green default for an NPC it was never told about).
 		public uint Disposition { get; set; } = DispositionFriendly;
 
+		// The two template words the ALTERNATE-ADVANCEMENT pay-out multiplier reads (#150) - `NpcStatCore.NpcType`
+		// and `NpcStatCore.NpcFlags`, stamped at spawn beside Disposition and FactionId. Null on a player, on a loot
+		// bag and on any creature spawned from a pool rather than from a template row, which is the ordinary x1 case.
+		public uint? NpcType { get; set; }
+		public uint? NpcFlags { get; set; }
+
 		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
 		public uint Handle { get; }
 

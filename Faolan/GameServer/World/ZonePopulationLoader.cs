@@ -299,6 +299,10 @@ namespace Faolan.GameServer.World
 				// #310: the Khitai faction this creature belongs to, so a kill can pay reputation. Null for every
 				// base-game NPC - the ids are the expansion's.
 				entity.FactionId = npc.NpcTemplate.StatCore?.FactionId;
+				// #150: what this creature's kill is worth to the AA pool is a property of its TEMPLATE - the named
+				// tier pays roughly double and one flagged tier ~15% more (AlternateAdvancementRules).
+				entity.NpcType = npc.NpcTemplate.StatCore?.NpcType;
+				entity.NpcFlags = npc.NpcTemplate.StatCore?.NpcFlags;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with

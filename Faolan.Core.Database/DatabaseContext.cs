@@ -50,6 +50,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterSkill> CharacterSkills { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterStat> CharacterStats { get; }
+		DbSet<CharacterToken> CharacterTokens { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ChatMessage> ChatMessages { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
@@ -172,6 +173,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterStat> CharacterStats { get; set; }
+		public DbSet<CharacterToken> CharacterTokens { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ChatMessage> ChatMessages { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
@@ -520,6 +522,9 @@ namespace Faolan.Core.Database
 			// the BuffId is NOT a catalog FK - the spell BASE (BuffId >> 8) is what the Spells catalog holds, and a live
 			// buff can carry an id with no persisted duration, so this is pure per-character savegame state.
 			modelBuilder.Entity<CharacterBuff>().HasOne(b => b.Character).WithMany(c => c.Buffs).OnDelete(DeleteBehavior.Cascade);
+
+			// The token wallets (#150) delete with the character; keyed by (CharacterId, Pool).
+			modelBuilder.Entity<CharacterToken>().HasOne(t => t.Character).WithMany(c => c.Tokens).OnDelete(DeleteBehavior.Cascade);
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
 			modelBuilder.Entity<Character>().HasOne(c => c.Guild).WithMany(g => g.Members).OnDelete(DeleteBehavior.SetNull);

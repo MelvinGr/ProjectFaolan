@@ -17,6 +17,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
 
@@ -50,9 +51,16 @@ namespace Faolan.GameServer.Feats
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
 		private readonly Func<INetworkClient, uint, Task> _forgetSpell;
 
+		// #150: an ALTERNATE-ADVANCEMENT perk arrives here as an ordinary feat train carrying a perk id - the client's
+		// `TrainAAFeat` goes through the same `FeatHolder` train virtual a class feat does, which is why AA needs no
+		// message of its own. What differs is the PRICE: a perk is charged to a token pool, never to the class
+		// feat-point budget.
+		private readonly AlternateAdvancementService _alternateAdvancement;
+
 		public FeatService(ICharacterProgressionRepository database, ICatalogRepository catalog, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
-			Func<INetworkClient, uint, Task> learnSpell, Func<INetworkClient, uint, Task> forgetSpell)
+			Func<INetworkClient, uint, Task> learnSpell, Func<INetworkClient, uint, Task> forgetSpell, AlternateAdvancementService alternateAdvancement)
 		{
+			_alternateAdvancement = alternateAdvancement;
 			_database = database;
 			_catalog = catalog;
 			_logger = logger;
@@ -101,6 +109,9 @@ namespace Faolan.GameServer.Feats
 					}
 
 					var added = await TrainWithinBudget(client, character.Level, ids);
+					if (added == RejectedAndExplained)
+						return;
+
 					if (added < 0)
 					{
 						await _chat.SendSystemMessage(character.Id, $"Not enough feat points (budget {FeatRules.PointBudget(character.Level)} at level {character.Level}).");
@@ -157,6 +168,9 @@ namespace Faolan.GameServer.Feats
 			var character = client.Session.Character;
 
 			var added = await TrainWithinBudget(client, character.Level, featIds);
+			if (added == RejectedAndExplained)
+				return; // the perk charge already named the pool and the shortfall
+
 			if (added < 0)
 			{
 				// Over the feat-point budget (safety net; the client normally pre-validates). Don't add or ack.
@@ -292,14 +306,29 @@ namespace Faolan.GameServer.Feats
 			return taughtByUntrainedFeats.Where(spellId => !grantedByLevel.Contains(spellId));
 		}
 
+		// What TrainWithinBudget returns when it has ALREADY told the player why - the perk charge names the pool and
+		// the shortfall, which the caller's generic "not enough feat points" would only contradict.
+		private const int RejectedAndExplained = -2;
+
 		// Trains `requested` onto the character iff the resulting feat set is legal: within the feat-point budget AND
 		// with every PREREQUISITE satisfied (FeatPrereq, the client's own feat-tree edges - #251). Returns the number
 		// of feats added, or -1 when the train is rejected.
 		private async Task<int> TrainWithinBudget(INetworkClient client, ushort level, IReadOnlyList<uint> requested)
 		{
-			var characterId = client.Session.Character.Id;
+			var character = client.Session.Character;
+			var characterId = character.Id;
 			var existing = await _database.GetCharacterFeats(characterId);
 			var after = existing.Concat(requested.Where(id => !existing.Contains(id))).ToList();
+
+			// ⭐ #150: split the request into PERKS and ordinary feats before either budget is asked about. They are
+			// two currencies - a perk's price is a per-placement `FeatPerkCost` in an AA token pool, an ordinary
+			// feat's is one point per rank against the level budget - and charging a perk to the feat-point budget
+			// (which is what happened before) both overspends the wrong purse and leaves the tokens untouched.
+			var perkPrices = await _database.GetPerkCosts(character.Class, after);
+			if (!await ChargePerks(client, requested, perkPrices))
+				return RejectedAndExplained;
+
+			after = after.Where(id => !perkPrices.ContainsKey(id)).ToList();
 
 			// #850: the AUTOMATIC feats cost nothing. A character accumulates them by levelling, not by spending, and
 			// counting them was enough on its own to reject every train request at level 80 for three classes - their
@@ -313,9 +342,12 @@ namespace Faolan.GameServer.Feats
 			}
 
 			// Checked against the RESULTING set, not against `requested`: training a feat and its prerequisite in one
-			// request is legal, and so is a prerequisite the character already holds.
-			var prereqs = await _database.GetFeatPrereqs(after);
-			var missing = FeatRules.MissingPrerequisites(after, prereqs);
+			// request is legal, and so is a prerequisite the character already holds. The perks come back in for this:
+			// they are outside the POINT budget, not outside the prerequisite graph - an AA tree has tiers like any
+			// other.
+			var whole = after.Concat(perkPrices.Keys).ToList();
+			var prereqs = await _database.GetFeatPrereqs(whole);
+			var missing = FeatRules.MissingPrerequisites(whole, prereqs);
 			if (missing.Count > 0)
 			{
 				_logger.LogWarning("Character {CharacterId} feat train rejected: {Count} unmet prerequisite(s), first {Feat} requires {Requires}.",
@@ -326,6 +358,55 @@ namespace Faolan.GameServer.Feats
 			var added = await _database.AddCharacterFeats(characterId, requested);
 			await GrantSpellsTaughtBy(client, requested);
 			return added;
+		}
+
+		/// <summary>
+		///     Charges the ALTERNATE-ADVANCEMENT perks in a train request to their token pools (#150). False - and
+		///     nothing charged - when any one of them is unaffordable, so a mixed request is all-or-nothing.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Only NEW perks are charged. A train request that re-names a perk the character already holds is not
+		///     a second purchase, and the client sends the whole resulting set often enough that charging per request
+		///     would bill a player repeatedly for one perk.
+		///     <para />
+		///     ⚠️ The affordability of the WHOLE request is checked before anything is spent. Spending as it goes
+		///     would leave a player who could afford two of three perks having paid for two and trained none, because
+		///     the caller rejects the request outright.
+		/// </remarks>
+		private async Task<bool> ChargePerks(INetworkClient client, IReadOnlyList<uint> requested, IReadOnlyDictionary<uint, (TokenPool Pool, uint Cost)> prices)
+		{
+			var character = client.Session.Character;
+			var held = await _database.GetCharacterFeats(character.Id);
+			var buying = requested.Distinct().Where(id => prices.ContainsKey(id) && !held.Contains(id)).ToArray();
+			if (buying.Length == 0)
+				return true;
+
+			var owed = new Dictionary<TokenPool, uint>();
+			foreach (var id in buying)
+			{
+				var (pool, cost) = prices[id];
+				owed[pool] = owed.GetValueOrDefault(pool) + cost;
+			}
+
+			foreach (var (pool, cost) in owed)
+			{
+				var unspent = await _alternateAdvancement.Unspent(character.Id, pool);
+				if (unspent >= cost)
+					continue;
+
+				_logger.LogWarning("Character {CharacterId} perk train rejected: {Cost} {Pool} needed, {Unspent} held.", character.Id, cost, pool, unspent);
+				await _chat.SendSystemMessage(character.Id, $"Not enough {pool} ({unspent} of {cost}).");
+
+				return false;
+			}
+
+			foreach (var (pool, cost) in owed)
+				await _alternateAdvancement.Spend(client, pool, cost);
+
+			_logger.LogInformation("Character {CharacterId} bought {Count} perk(s) for {Cost}.", character.Id, buying.Length,
+				string.Join(", ", owed.Select(o => $"{o.Value} {o.Key}")));
+
+			return true;
 		}
 
 		// ⭐ A feat that TEACHES a spell hands it over when it is trained (#847). The catalog carries two grant

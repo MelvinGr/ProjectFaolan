@@ -92,6 +92,7 @@ namespace Faolan.Core.Network.Codecs.Text
 				RespawnPointDiscovered point => RespawnPointDiscoveredCodec.Build(point),
 				AttributeChanged attribute => AttributeChangedCodec.Build(attribute),
 				FeatRequired feat => FeatRequiredCodec.Build(feat),
+				AlternateAdvancementXpGranted aaXp => AlternateAdvancementXpCodec.Build(aaXp),
 				FeedbackLiteral literal => literal.Xml,
 				_ => throw new ArgumentOutOfRangeException(nameof(payload), payload, "unknown FormatFeedbackIIR payload")
 			};

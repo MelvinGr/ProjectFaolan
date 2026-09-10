@@ -74,6 +74,7 @@ namespace Faolan.GameServer.Gm
 
 		// The `.command` table - built ONCE per service, per realm. It used to be a `static` on the listener filled with
 		// instance-bound delegates, which was safe only because a process hosts a single realm.
+		private readonly AlternateAdvancementService _alternateAdvancement;
 		private readonly Dictionary<string, GmCommandEntry> _gmCommandsDict;
 
 		public GmCommandService(ILogger logger, IDatabaseRepository database, ConnectionRegistry connections, IChatServerDispatcher agentServerDispatcher,
@@ -81,7 +82,8 @@ namespace Faolan.GameServer.Gm
 			TeleportService teleport, TravelService travel, CombatService combat, EconomyOutbound economyOutbound, TradeskillService tradeskill,
 			KnockbackService knockback, EquipmentService equipment, BuffService buffs, WorldObjectService worldObjects, QuestProgressionService questProgression,
 			PlayerDeathService playerDeaths, PetService pets, LevelUpService levelUp, GuildBankService guildBank, FeatService feats, FactionService factions,
-			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags, TradepostService tradepost)
+			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags, TradepostService tradepost,
+			AlternateAdvancementService alternateAdvancement)
 		{
 			_logger = logger;
 			_database = database;
@@ -113,6 +115,7 @@ namespace Faolan.GameServer.Gm
 			_persistence = persistence;
 			_tags = tags;
 			_tradepost = tradepost;
+			_alternateAdvancement = alternateAdvancement;
 			_gmCommandsDict = BuildTable();
 		}
 
@@ -369,6 +372,47 @@ namespace Faolan.GameServer.Gm
 					$"Unknown command: '{command}' - type {commandText[0]}help for info");
 		}
 
+		// .aa                     - report the AA pools and the perk-token wallets
+		// .aa xp <n>              - pay n AA xp into the PvE pool (the give-away fires if it fills)
+		// .aa token <pool> <n>    - credit a token pool outright
+		//
+		// The test bootstrap for #150, and it exists because the retail TRIGGER is out of reach: retail pays AA xp for
+		// a kill only at the level cap, so nothing on a level-1..6 dev character can fill a 1,000,000-xp pool or buy a
+		// perk. Everything below it - the announcement, the pool push, the give-away, the wallet - is the ordinary
+		// path; this only supplies the event.
+		private async Task AlternateAdvancementCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var verb = parts.Length > 0 ? parts[0].ToLowerInvariant() : "";
+
+			switch (verb)
+			{
+				case "xp" when parts.Length == 2 && uint.TryParse(parts[1], out var amount):
+					await _alternateAdvancement.AwardXp(client, amount);
+					return;
+
+				case "token" when parts.Length == 3 && Enum.TryParse<TokenPool>(parts[1], true, out var pool) && uint.TryParse(parts[2], out var count):
+					await _alternateAdvancement.GrantTokens(client, pool, count);
+					return;
+
+				case "":
+				{
+					var wallets = await _database.GetCharacterTokens(character.Id);
+					var held = wallets.Length == 0
+						? "no tokens"
+						: string.Join(", ", wallets.Select(w => $"{w.Pool} {w.Gained - w.Spent} ({w.Gained} gained / {w.Spent} spent)"));
+					await _agentServerDispatcher.SendSystemMessage(character.Id,
+						$"AA: PvE {character.AaPvEXp}/{AlternateAdvancementRules.XpCap}, PvP {character.AaPvPXp}/{AlternateAdvancementRules.XpCap}; {held}");
+					return;
+				}
+
+				default:
+					await _agentServerDispatcher.SendSystemMessage(character.Id, "Usage: .aa | .aa xp <amount> | .aa token <pool> <count>");
+					return;
+			}
+		}
+
 		private Dictionary<string, GmCommandEntry> BuildTable()
 		{
 			return BuildGmCommands(unbackedReply: u => (client, _) => SendUnbackedVerbReply(client, u), handlers: new Dictionary<string, GmCommandDelegate>(StringComparer.OrdinalIgnoreCase)
@@ -390,6 +434,7 @@ namespace Faolan.GameServer.Gm
 				["travel"] = TravelCommand,
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
+				["aa"] = AlternateAdvancementCommand,
 				// ⚠️ `feat` is retail's READ-ONLY lister (mask GetStats, on your target); the manipulator is `feats`
 				// (mask SetStats). Ours was the manipulator wearing the reader's name and mask - the same mismatch
 				// `.time` had (#914 rule 1), so it moved to `feats` and `feat` now does what retail's does.
@@ -549,6 +594,7 @@ namespace Faolan.GameServer.Gm
 			["update"] = GmPrivileges.Developer,
 			["level"] = GmPrivileges.SetStats,
 			["kill"] = GmPrivileges.NpcCommands,
+			["aa"] = GmPrivileges.SetStats,
 
 			// OURS - family choices. `help` is unrestricted and lists only what the caller may run.
 			["help"] = GmPrivileges.None,

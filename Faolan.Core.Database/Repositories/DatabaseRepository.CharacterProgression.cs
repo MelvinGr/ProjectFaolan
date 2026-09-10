@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,13 @@ namespace Faolan.Core.Database.Repositories
 		// The WIRE ids of the AUTOMATIC feats - the handed-out ones, which cost no feat points (#850).
 		Task<HashSet<uint>> GetAutotrainedFeatWireIds();
 
+		/// <summary>
+		///     What each of <paramref name="wireFeatIds" /> costs as an ALTERNATE-ADVANCEMENT PERK for
+		///     <paramref name="conanClass" />, and out of which token pool (#150). A feat with no entry here is an
+		///     ordinary feat, bought with a feat point.
+		/// </summary>
+		Task<Dictionary<uint, (TokenPool Pool, uint Cost)>> GetPerkCosts(ConanClass conanClass, IEnumerable<uint> wireFeatIds);
+
 		// The inverse: the TREE spells a set of just-trained feats teaches. See the implementation's remarks.
 		Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
@@ -51,6 +59,18 @@ namespace Faolan.Core.Database.Repositories
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
+
+		/// <summary>The two ALTERNATE-ADVANCEMENT xp pools (#150), persisted as they move.</summary>
+		Task SetAlternateAdvancementPools(uint characterId, uint pvE, uint pvP);
+
+		/// <summary>Every token wallet the character has ever touched. An absent pool is 0/0.</summary>
+		Task<CharacterToken[]> GetCharacterTokens(uint characterId);
+
+		/// <summary>
+		///     Adds to one wallet's LIFETIME totals and returns what they now read. Both halves move independently -
+		///     an award raises <c>gained</c>, a purchase raises <c>spent</c> - because that is what the wire carries.
+		/// </summary>
+		Task<(ulong Gained, ulong Spent)> AddTokens(uint characterId, TokenPool pool, ulong gained, ulong spent);
 	}
 
 	public partial class DatabaseRepository
@@ -253,6 +273,45 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		/// <summary>
+		///     The perk price of each requested feat in one class's tree.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ A price is attached to a PLACEMENT, not to a feat: <see cref="FeatPerkCost" /> keys on the
+		///     <see cref="FeatClassEntry" /> row id, so the same perk in two classes' trees is two rows. Hence the
+		///     class parameter - asking without it would price a Conqueror's perk off a Necromancer's tree.
+		///     <para />
+		///     ⚠️ 216 placements are priced in BOTH specific pools at the same price. The PvE one is taken when both
+		///     exist, because that is the pool a PvE server can actually fill; nothing in the client picks for us -
+		///     `GetPointCost` renders whichever row it is handed.
+		/// </remarks>
+		public async Task<Dictionary<uint, (TokenPool Pool, uint Cost)>> GetPerkCosts(ConanClass conanClass, IEnumerable<uint> wireFeatIds)
+		{
+			var ids = wireFeatIds.Distinct().ToArray();
+			if (ids.Length == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx.FeatPerkCosts.AsNoTracking()
+				.Where(p => ids.Contains(p.Entry.FeatId) && p.Entry.Class == conanClass && p.Entry.TreeId >= AlternateAdvancementFirstTreeId && p.Entry.TreeId <= AlternateAdvancementLastTreeId)
+				.Select(p => new { p.Entry.FeatId, p.PointType, p.Cost })
+				.ToListAsync();
+
+			return rows
+				.GroupBy(r => r.FeatId)
+				.ToDictionary(g => g.Key, g =>
+				{
+					var chosen = g.FirstOrDefault(r => r.PointType == TokenPool.AltAdvancementPvEToken) ?? g.First();
+
+					return (chosen.PointType, chosen.Cost);
+				});
+		}
+
+		// The twelve ALTERNATE-ADVANCEMENT perk trees, one per playable class: TreeId 1000177..1000190 (the range is
+		// not dense - 1000185 and 1000187 do not exist). See FeatClassEntry.TreeId.
+		private const uint AlternateAdvancementFirstTreeId = 1000177;
+		private const uint AlternateAdvancementLastTreeId = 1000190;
+
+		/// <summary>
 		///     The spells a set of just-TRAINED feats teaches - the other half of the spell-grant story (#847).
 		/// </summary>
 		/// <remarks>
@@ -348,6 +407,37 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Experience, experience).SetProperty(c => c.Level, level));
+		}
+
+		public async Task SetAlternateAdvancementPools(uint characterId, uint pvE, uint pvP)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s.SetProperty(c => c.AaPvEXp, pvE).SetProperty(c => c.AaPvPXp, pvP));
+		}
+
+		public async Task<CharacterToken[]> GetCharacterTokens(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			return await ctx.CharacterTokens.AsNoTracking().Where(t => t.CharacterId == characterId).ToArrayAsync();
+		}
+
+		public async Task<(ulong Gained, ulong Spent)> AddTokens(uint characterId, TokenPool pool, ulong gained, ulong spent)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var wallet = await ctx.CharacterTokens.FirstOrDefaultAsync(t => t.CharacterId == characterId && t.Pool == pool);
+			if (wallet == null)
+			{
+				wallet = new CharacterToken { CharacterId = characterId, Pool = pool };
+				ctx.CharacterTokens.Add(wallet);
+			}
+
+			wallet.Gained += gained;
+			wallet.Spent += spent;
+			await ctx.SaveChangesAsync();
+
+			return (wallet.Gained, wallet.Spent);
 		}
 
 		public async Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId)

@@ -517,6 +517,11 @@ namespace Faolan.Importer.Cli
 				DailyKills(ctx.Captures);
 				return 0;
 			}),
+			new("aa-xp", "#150: what a kill pays into the ALTERNATE-ADVANCEMENT xp pool - retail announces every grant in an on-screen feedback message, so the amount is stated verbatim beside the kill that earned it.", Needs.Captures, async ctx =>
+			{
+				await AaXp(ctx.Captures);
+				return 0;
+			}),
 			new("npc-pose-check", "", Needs.Captures, async ctx =>
 			{
 				return await NpcPoseCheck(ctx.Captures);

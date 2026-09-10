@@ -98,6 +98,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; } = [];
 		public virtual ICollection<CharacterSkill> Skills { get; set; } = [];
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
+		public virtual ICollection<CharacterToken> Tokens { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
 		// The client-authored UI settings + select-screen preview, stored verbatim and handed straight back (#611).
@@ -229,6 +230,17 @@ namespace Faolan.Core.Database.Tables
 		// Both of those are PvE-only paths today, which is exactly why they used to feed the PvP slots wrongly.
 		public uint NpcKills { get; set; }
 		public uint NpcDeaths { get; set; }
+
+		// The two ALTERNATE-ADVANCEMENT xp POOLS (#150) - the values the client reads as stats `AAPvEXP` (1000007)
+		// and `AAPvPXP` (1000006), and divides by `AlternateAdvancement_XPCap` = 1,000,000 to render the "next
+		// give-away" percentage. Each is a running total toward that cap; reaching it pays tokens and the remainder
+		// carries over (AlternateAdvancementRules.Drain).
+		//
+		// ⚠️ Columns rather than CharacterStat rows: CharacterStat is the FullChar snapshot's stat SHEET, keyed by
+		// ordinal within the two captured stat lists, and neither list carries an AA pool - retail pushes them as
+		// standalone StatIIRs instead. Storing them there would put a value in a slot the snapshot then sends.
+		public uint AaPvEXp { get; set; }
+		public uint AaPvPXp { get; set; }
 
 		// The PvP CAREER pair the snapshot's 0x290/0x292 carry. Nothing increments them yet - the server has no PvP
 		// kill path - and 0 is what retail sends for a character with no PvP record, so they are correct at rest

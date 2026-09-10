@@ -1,7 +1,12 @@
 # Alternate Advancement / perks: where the client keeps it (Gitea #150)
 
-The AA perk trees. Not implemented. The useful finding is a negative one about the wire and a positive one
-about where the data lives — all of which is now imported, so what is left is rules rather than content.
+The AA perk trees, from the CLIENT's side. The useful finding is a negative one about the wire and a positive one
+about where the data lives — all of which is imported.
+
+⭐ **The rules are now implemented**, off the measurements below: the accrual table, the give-away, the token
+wallet and the perk purchase. What our server does with them is
+[`../subsystems/alternate-advancement.md`](../subsystems/alternate-advancement.md), and `--report aa-xp`
+re-derives the pay-out table from the dumps.
 
 ⚠️ **They are not post-80 trees.** Every one of the twelve gates at levels **20–80**, so AA runs alongside
 ordinary levelling from 20 up rather than starting where levelling stops.
