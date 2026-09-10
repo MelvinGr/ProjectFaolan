@@ -2,6 +2,7 @@ using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Progression;
+using Faolan.GameServer.World;
 using Xunit;
 
 namespace Faolan.Tests
@@ -56,6 +57,31 @@ namespace Faolan.Tests
 			Assert.Equal((uint)CharacterStatId.HealthCurrent, rt.StatId);
 			Assert.Equal(FallDamage.EnvironmentalSchool, (uint)rt.School);
 			Assert.Equal(built, StatDamageCodec.Build(rt));
+		}
+
+		/// <summary>
+		///     The environmental record's amount is a WIRE value, and the SENDER is what converts it (#937).
+		/// </summary>
+		/// <remarks>
+		///     ⛔ <b>The bug this pins was visible in game and invisible here.</b> `EnvironmentService` works in DISPLAY
+		///     units, like everything on `EntityVitals`, and handed them straight to the record while the vitals push
+		///     beside it scaled through `CharacterStatBlock.Set`. So a fall moved the health BAR by the right amount
+		///     and rendered a floating number a hundredth of it - "1" for a fall that cost 27 health.
+		///     <para />
+		///     The golden above is retail's own frame and could not catch it: it builds the record from an
+		///     already-scaled 219125 and says nothing about who scales. This asserts the CONVERSION instead, which is
+		///     where the two halves of a fall disagreed.
+		/// </remarks>
+		[Fact]
+		public void EnvironmentalDamage_ScalesTheDisplayAmountToTheWire()
+		{
+			// 2191 health lost reaches the wire as 219100 - the same hundredths the captured frame carries for its
+			// 2191.25.
+			Assert.Equal(219100u, EnvironmentOutbound.WireAmount(2191, (uint)CharacterStatId.HealthCurrent));
+
+			// And it is the stat's OWN scale, not a flat 100: the same table the vitals push goes through.
+			Assert.Equal(StatDisplayScale.Of((uint)CharacterStatId.HealthCurrent),
+				EnvironmentOutbound.WireAmount(1, (uint)CharacterStatId.HealthCurrent));
 		}
 
 		// StatDamageIIR (0xE9F24184), frame 6689: Rend (base 0x316449) cast by the trapper 0x00002C58 applies -8 to

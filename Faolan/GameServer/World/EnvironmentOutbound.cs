@@ -42,10 +42,30 @@ namespace Faolan.GameServer.World
 		}
 		// IEnvironmentOutbound (#495/#504). The StatDamageIIR ENVIRONMENTAL form - no caster, no spell, and NO paired
 		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
-		public Task SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)
+		//
+		// ⚠️ `displayAmount` is in DISPLAY units, like everything on EntityVitals, and the record carries the WIRE
+		// value - so it is scaled here. Sending it unscaled is a bug you can watch happen: the health BAR moves by the
+		// right amount (PushVitals scales, through CharacterStatBlock.Set) while the floating number reads a hundredth
+		// of it, i.e. "1" for a fall that actually cost 27 health. The combat path scales at the same point, in
+		// CombatService, which is why only the environmental one was wrong.
+		public Task SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint displayAmount, uint statId, uint school)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(StatDamageCodec.Build(StatDamages.Environmental(targetHandle, amount, statId, school)))));
+				s => s.WriteArrayUInt32Length(StatDamageCodec.Build(StatDamages.Environmental(targetHandle, WireAmount(displayAmount, statId), statId, school)))));
+		}
+
+		/// <summary>
+		///     A display amount at the stat's own wire scale - the conversion the record needs and
+		///     <see cref="EntityVitals" /> does not carry.
+		/// </summary>
+		/// <remarks>
+		///     Per STAT rather than a flat 100, because that is what the client applies: `StatDisplayScale.Of` is the
+		///     same table <c>CharacterStatBlock.Set</c> goes through for the vitals push beside this record, so the two
+		///     halves of a fall cannot disagree about units again.
+		/// </remarks>
+		internal static uint WireAmount(uint displayAmount, uint statId)
+		{
+			return displayAmount * StatDisplayScale.Of(statId);
 		}
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
