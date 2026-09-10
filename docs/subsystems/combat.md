@@ -1676,6 +1676,17 @@ What a 2026-09-03 pass established about that multiplier, so it is not re-derive
 * **The 4.7× medians are mixtures.** Ice Strike's 105 hits cluster at ~45k / ~68k / ~88k (2.5× / 3.9× / 5.0× the
   stated mid, with a ~2× tail at 130k–210k); Deathly Blizzard's sit in one band. Per-target populations, not one
   ratio.
+* ⭐ **The corpus holds TWO level-80 player casters, not one** (2026-09-10, `--report spell-damage-ratio`). The
+  necromancer and a **demonologist** (`DemoL80`) both cast at the cap. So "one caster, so `R`
+  cannot be separated from anything else" is no longer the blocker; what is missing is narrower. Every captured
+  demonologist hit is a `HitPercentage` (53007) - `Spellweaving`, `Archfiend` - which states a percent OF THE
+  TARGET'S POOL and therefore has no stated magnitude to ratio against. The separating capture is a session in
+  which that character lands a DIRECT-DAMAGE nuke.
+  ⚠️ Include the percent kinds by accident and the corpus produces exactly the finding this ticket is looking
+  for, wrongly: dividing each median by its "stated" 1 / 2 / 5 gives a clean per-caster constant - 6341 for the
+  necromancer, 6126 and 5949 for the demonologist, the second moving between that character's own sessions.
+  Two casters, one level, different constants, one of them gear-shaped. They are **target health pools**
+  (634,100 / 612,600 / 594,900). The report excludes 53007 for this reason.
 * ⭐ **`DPSHit` (53013) spells are deterministic at 80** — `Curse of Blood` lands 764.80 on 46 of 79 hits and
   `Glacial Tomb` 585.72 on 38 of 56 — and read as `Value × K`: 3.00 × 254.93 (unholy) and 2.50 × 234.29 (cold), i.e.
   one constant per SCHOOL that is not any pushed stat. Whichever server-side number that is, it is the same one

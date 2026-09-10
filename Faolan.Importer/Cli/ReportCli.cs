@@ -517,6 +517,11 @@ namespace Faolan.Importer.Cli
 				DailyKills(ctx.Captures);
 				return 0;
 			}),
+			new("spell-damage-ratio", "#924: every captured spell hit against what the spell's own template STATES at the caster's level, grouped by CASTER - and the count of distinct casters at the level cap, which is what says whether the per-caster multiplier can be separated from the level yet.", Needs.Captures, async ctx =>
+			{
+				await SpellDamageRatio(ctx.Captures);
+				return 0;
+			}),
 			new("aa-xp", "#150: what a kill pays into the ALTERNATE-ADVANCEMENT xp pool - retail announces every grant in an on-screen feedback message, so the amount is stated verbatim beside the kill that earned it.", Needs.Captures, async ctx =>
 			{
 				await AaXp(ctx.Captures);
