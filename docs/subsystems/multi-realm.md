@@ -66,10 +66,22 @@ fields have a consumer:
 | `+0x38` | type, high byte | compared against 7 |
 | `+0x40` | language id | tested **non-zero only**, to show the flag-button row |
 
-⚠️ Two of those were being written wrongly. `+0x30` was receiving a `== Full` **boolean** with the real enum in the
-next slot, which nothing reads — invisible because every realm we serve is `Recommended`, making both spellings 0
-(#931, fixed). And `+0x24` is still a hard-coded 1, which happens to set the English bit, so a non-English realm
-cannot currently declare itself (#933).
+⚠️ Two of those were being written wrongly, and both are fixed. `+0x30` was receiving a `== Full` **boolean** with
+the real enum in the next slot, which nothing reads — invisible because every realm we serve is `Recommended`,
+making both spellings 0 (#931). And `+0x24` was a hard-coded 1, which sets the English bit: right by accident for
+an English realm and impossible to change for any other (#933).
+
+⭐ **The two language fields are not redundant.** `+0x24` says what language a realm IS, as a bitfield: Russian
+`0x400`, Polish `0x800`, Korean `0x100000`, and bits 0 or 1 for English. `+0x40` only says whether it has one at
+all. French, Spanish and German have **no bit of their own**, and that is the finding rather than a gap in it — the
+widget row this pairs with holds exactly `EnglishFlag`, `GermanFlag`, `FrenchFlag` and `SpanishFlag`, so one
+Western realm serves all four and the player picks with the flag row, while Russian, Polish and Korean get realms
+of their own.
+
+The language **ids** are the client's own, from the table in `FUN_011D7740` that turns the running client's
+two-letter code into the int it sends: `en=0 fr=1 es=2 de=3 pl=4 ru=5 ko=6`, with its inverse feeding
+`DispatchResetLanguage`. The four values that predate the decode turned out to be right; Polish, Russian and Korean
+were added (#932).
 
 ⭐ `DimensionList_t`'s hand-written getters say nothing about any of this: all eight have **zero** callers, because
 the client inlines the map lookup at each site instead.

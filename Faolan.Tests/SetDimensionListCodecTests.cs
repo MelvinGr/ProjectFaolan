@@ -102,6 +102,34 @@ namespace Faolan.Tests
 		// +0x3c's bool, then +0x40's u32 and +0x44's bool.
 		private const int TailBytes = 5 * 4 + 5 + 4 + 1;
 
+		[Theory]
+		// #933: the bitfield at +0x24 is what the client resolves a realm's language FROM, and it is not the id at
+		// +0x40. Three languages have a bit of their own; the four Western ones share one, because the flag row the
+		// client shows holds exactly EnglishFlag, GermanFlag, FrenchFlag and SpanishFlag - one realm serves all four
+		// and the player picks.
+		[InlineData(RealmLanguage.English, RealmLanguageFlags.Western)]
+		[InlineData(RealmLanguage.French, RealmLanguageFlags.Western)]
+		[InlineData(RealmLanguage.Spanish, RealmLanguageFlags.Western)]
+		[InlineData(RealmLanguage.German, RealmLanguageFlags.Western)]
+		[InlineData(RealmLanguage.Polish, RealmLanguageFlags.Polish)]
+		[InlineData(RealmLanguage.Russian, RealmLanguageFlags.Russian)]
+		[InlineData(RealmLanguage.Korean, RealmLanguageFlags.Korean)]
+		public void TheLanguageFlags_AreTheBitTheClientResolves(RealmLanguage language, uint expected)
+		{
+			Assert.Equal(expected, RealmLanguageFlags.For(language));
+		}
+
+		[Fact]
+		// ⚠️ Not a redundant restatement of the table above: it pins the flags to +0x24 rather than to +0x40, which
+		// is the confusion #933 exists to remove. The two carry different things about the same realm.
+		public void TheLanguageFlags_GoToOffset0x24_NotTheLanguageIdSlot()
+		{
+			var korean = Sample with { Language = RealmLanguage.Korean, LanguageFlags = RealmLanguageFlags.For(RealmLanguage.Korean) };
+
+			Assert.Equal(RealmLanguageFlags.Korean, Field(korean, 0x24));
+			Assert.Equal((uint)RealmLanguage.Korean, Field(korean, 0x40));
+		}
+
 		private static DimensionList List(params DimensionEntry[] realms)
 		{
 			return new DimensionList(realms);

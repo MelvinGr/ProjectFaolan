@@ -3524,7 +3524,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("Realms", t =>
                         {
-                            t.HasCheckConstraint("CK_Realm_Language", "Language IN (0, 1, 2, 3)");
+                            t.HasCheckConstraint("CK_Realm_Language", "Language IN (0, 1, 2, 3, 4, 5, 6)");
 
                             t.HasCheckConstraint("CK_Realm_LoadStatus", "LoadStatus IN (0, 1, 2, 3, 4)");
 

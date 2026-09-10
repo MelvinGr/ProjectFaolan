@@ -183,7 +183,13 @@ namespace Faolan.PlayerAgent
 				realm.LoadStatus,
 				realm.LoadStatus == RealmLoadStatus.Full,
 				realm.Type,
-				realm.Language)).ToArray();
+				realm.Language)
+			{
+				// The bitfield the client actually resolves the realm's language from (#933). It used to be a
+				// hard-coded 1, which sets the English bit - right by accident for an English realm and impossible
+				// to change for any other.
+				LanguageFlags = RealmLanguageFlags.For(realm.Language)
+			}).ToArray();
 
 			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SetDimensionList, SetDimensionListCodec.Build(new DimensionList(entries))));
 		}

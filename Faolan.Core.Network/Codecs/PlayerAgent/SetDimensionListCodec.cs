@@ -37,9 +37,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		///     <c>0x100000</c> returns 6 (Korean), and anything else falls back to 0. <c>FUN_00A68170</c> reads the
 		///     same word and tests bits 0 and 1.
 		///     <para />
-		///     ⚠️ So this - NOT <see cref="DimensionEntry.Language" /> at +0x40 - is what the client consults. We have
-		///     always sent 1, which sets the English bit, so an English realm has been declaring itself correctly by
-		///     accident. Wiring it to the realm's declared language is Gitea #933.
+		///     ⚠️ So this - NOT <see cref="DimensionEntry.Language" /> at +0x40 - is what the client consults. It used
+		///     to be a hard-coded 1, which sets the English bit: right by accident for an English realm and impossible
+		///     to change for any other. <see cref="RealmLanguageFlags" /> derives it from the realm's declared
+		///     language now (#933), and carries why French, Spanish and German share the English-family bit.
 		/// </remarks>
 		public uint LanguageFlags { get; init; } = 1;
 

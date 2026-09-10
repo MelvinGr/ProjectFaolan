@@ -20,7 +20,11 @@ namespace Faolan.Core.Enums
 	// load order and not anything the .tdbl files carry:
 	//     en=0  fr=1  es=2  de=3  pl=4  ru=5  ko=6   (anything else falls back to 0)
 	// Its inverse FUN_011D7800 maps the same ids back to codes and is what DispatchResetLanguage(nNewLanguage) feeds,
-	// so both directions share this space. The four below match it exactly; Polish, Russian and Korean are Gitea #932.
+	// so both directions share this space. All seven are below, in the client's order.
+	//
+	// ⭐ The four that predate the decode (English/French/Spanish/German) turned out to be RIGHT - they match the
+	// client's table exactly. Only the NAME was ever wrong (#930); the values were carried over untouched and then
+	// confirmed, which is why they were left alone rather than "fixed" on a guess in the meantime.
 	//
 	// ⚠️ This is NOT the field the client resolves a dimension's language from. That is the BITFIELD at
 	// Dimension_t+0x24 (FUN_00A69180: bit 0 or 1 -> English, 0x400 -> Russian, 0x800 -> Polish, 0x100000 -> Korean).
@@ -31,6 +35,9 @@ namespace Faolan.Core.Enums
 		English = 0,
 		French = 1,
 		Spanish = 2,
-		German = 3
+		German = 3,
+		Polish = 4,
+		Russian = 5,
+		Korean = 6
 	}
 }
