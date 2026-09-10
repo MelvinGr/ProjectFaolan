@@ -63,7 +63,7 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 
 			s.WriteUInt32LittleEndian((uint)value.Meshes.Count);
 			foreach (var m in value.Meshes)
-				s.WriteUInt32LittleEndian(m.MeshIndexFileId).WriteUInt32LittleEndian(m.Unknown1).WriteUInt32LittleEndian(m.Unknown2).WriteUInt32LittleEndian(m.Slot);
+				s.WriteUInt32LittleEndian(m.MeshIndexFileId).WriteUInt32LittleEndian(m.Layer).WriteUInt32LittleEndian(m.Unknown2).WriteUInt32LittleEndian(m.Slot);
 
 			s.WriteUInt32LittleEndian((uint)value.Morphs.Count);
 			foreach (var m in value.Morphs)
@@ -158,20 +158,38 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		uint Unknown2);
 
 	// One worn piece: an RDB 1010030 MeshIndexFile at a `CharacterEquipmentSlot` (slot 0 is the base/hair model and
-	// carries a 1010001 3D model instead). `Unknown1` runs 0..3 and is a property of the MESH, not of the slot - the
+	// carries a 1010001 3D model instead). `Layer` runs 0..3 and is a property of the MESH, not of the slot - the
 	// same mesh id carries the same value at different slots and in different payloads; `Unknown2` is zero in every
 	// captured entry.
 	//
 	// What the client does with them (#464, 2026-09-03, from the writer `FUN_00fe9f60` and the attach path): each
 	// entry is a 28-byte struct in the visual's mesh vector, of which words 0, 1, 5 and 6 go on the wire, and the
-	// preview loader hands every entry to `VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, Unknown1, Unknown2,
-	// slot, word2)` (`FUN_00fed5d0`, named by its own log line). There `Unknown1` is consumed as a FLOAT (the int is
-	// converted on the way into `FUN_00dc3480`) and `MeshInstance::SetMesh` (`FUN_00f67b90`) stores it at
-	// instance `+0xd0` when it lies in [0, 6), setting bit 0x20 of `+0xe0` when it is non-zero; `Unknown2` is stored
-	// at instance `+0x1c` and DEFAULTS to the visual's own `+0x10` when 0, exactly as the slot defaults to `+0x14`.
-	// So `Unknown1` is a small per-mesh rendering parameter with a "set" bit and `Unknown2` an optional override of
-	// a per-visual default - and neither has a reader the stride probes can find, so neither has a name.
-	public sealed record CharacterPreviewMesh(uint MeshIndexFileId, uint Unknown1, uint Unknown2, uint Slot);
+	// preview loader hands every entry to `VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, layer, unknown2,
+	// slot, word2)` (`FUN_00fed5d0`, named by its own log line). There the layer is consumed as a FLOAT (the int is
+	// converted on the way into `FUN_00dc3480`) and `MeshInstance::SetMesh` (`FUN_00f67b90`, which names its own
+	// file in an assert) stores it at instance `+0xd0` when it lies in [0, 6), setting bit 0x20 of `+0xe0` when it
+	// is non-zero; `Unknown2` is stored at instance `+0x1c` and DEFAULTS to the visual's own `+0x10` when 0, exactly
+	// as the slot defaults to `+0x14`.
+	//
+	// ⭐ **`Layer` is named by the client's own ACTION PAIR** (#464, 2026-09-10) - the sibling-PRODUCER route, after
+	// four rounds of offset scans failed to find a reader. Two GameAction kinds attach a skinned mesh to a
+	// character and they call this same function:
+	//
+	//   * `e_Type_GC_GameAction_AddSkinnedMesh` (53240, `FUN_008ac440`) - ONE key, `GameAction_MeshID` (0x4CA) -
+	//     passes **0** for this argument;
+	//   * `e_Type_GC_GameAction_AddLayeredSkinnedMesh` (53003, `FUN_008ac1f0`) - TWO keys, `GameAction_MeshID` and
+	//     `GameAction_Value` (0x2F9) - passes the Value stat for it.
+	//
+	// Every other argument is identical between the two (`docs/re/gameaction-keylists.tsv` carries the key lists,
+	// `gameaction-executors.tsv` the executor pair). So the one word that separates a skinned mesh from a LAYERED
+	// skinned mesh is this one, stated twice by the client - in the kind's own name and in its key list. It fits
+	// everything the value does: a small index the renderer takes as a float in [0, 6), with a "is layered" bit set
+	// iff it is non-zero, and 0..3 across the captured payloads. A third caller (`FUN_00fecf20`) passes
+	// **0xffffffff**, which as a float fails that range test and stores nothing - the "no layer" sentinel.
+	//
+	// ⛔ `Unknown2` is NOT named by the same route: both executors pass the same expression for it. It stays what
+	// the register says - an optional override of a per-visual default, zero in every captured entry.
+	public sealed record CharacterPreviewMesh(uint MeshIndexFileId, uint Layer, uint Unknown2, uint Slot);
 
 	// One create-editor morph callback: a `MorphTargets` name with its weight, plus the editor stream index it
 	// arrived at (the same ordering `CharacterBodyResource.Sequence` keeps).
