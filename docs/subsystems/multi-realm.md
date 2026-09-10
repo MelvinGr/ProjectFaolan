@@ -51,6 +51,29 @@ Declarations are validated at config time rather than at wire-write time, which 
 surface — after a player had already picked the realm. A non-IPv4 address (#845), a zero port, a duplicate id or
 name, and two realms sharing a port on one address are all refused, naming the offending key.
 
+## What the client does with the realm list
+
+`SetDimensionList` is built by `SetDimensionListCodec`, and that codec is the record of the layout: each entry maps
+onto the client's `Dimension_t`, whose fields were read off its per-entry reader at `0x005888C0`. Six of the eleven
+fields have a consumer:
+
+| offset | what | consumer |
+|---|---|---|
+| `+0x04` | online status | the row renderer's `== 2` gate |
+| `+0x08` | name | rendered |
+| `+0x24` | **language flags**, a bitfield | resolved to a language id in `FUN_00A69180` |
+| `+0x30` | **load level**, the 0-4 enum | `FUN_011F4490`, display code = value + 1 |
+| `+0x38` | type, high byte | compared against 7 |
+| `+0x40` | language id | tested **non-zero only**, to show the flag-button row |
+
+⚠️ Two of those were being written wrongly. `+0x30` was receiving a `== Full` **boolean** with the real enum in the
+next slot, which nothing reads — invisible because every realm we serve is `Recommended`, making both spellings 0
+(#931, fixed). And `+0x24` is still a hard-coded 1, which happens to set the English bit, so a non-English realm
+cannot currently declare itself (#933).
+
+⭐ `DimensionList_t`'s hand-written getters say nothing about any of this: all eight have **zero** callers, because
+the client inlines the map lookup at each site instead.
+
 ## Realm-ready foundations
 
 Already realm-ready:

@@ -175,26 +175,17 @@ namespace Faolan.PlayerAgent
 			// Read here rather than filtered in the query: a down realm still belongs on the select screen, greyed.
 			var now = DateTimeOffset.UtcNow;
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SetDimensionList, b =>
-			{
-				b.WriteUInt32(realms.Length);
-				foreach (var realm in realms)
-				{
-					b.WriteUInt32(realm.Id);
-					b.WriteUInt32((uint)RealmLiveness.Effective(realm.OnlineStatus, realm.LastSeenUtc, now));
-					b.WriteString(realm.Name);
-					b.WriteUInt32(0x00000001); //u2
-					b.WriteUInt32(0x00000000); //u3
-					b.WriteUInt32(0x00000000); //u4
-					b.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
-					b.WriteUInt32(realm.LoadStatus);
-					b.WriteUInt16(0x0000);
-					b.WriteByte(0x00);
-					b.WriteUInt16(realm.Type);
-					b.WriteUInt32(realm.Language);
-					b.WriteByte(0x00);
-				}
-			}));
+			// The record layout, and which of its fields the client actually reads, live in the codec (#931).
+			var entries = realms.Select(realm => new DimensionEntry(
+				realm.Id,
+				RealmLiveness.Effective(realm.OnlineStatus, realm.LastSeenUtc, now),
+				realm.Name,
+				realm.LoadStatus,
+				realm.LoadStatus == RealmLoadStatus.Full,
+				realm.Type,
+				realm.Language)).ToArray();
+
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SetDimensionList, SetDimensionListCodec.Build(new DimensionList(entries))));
 		}
 
 		// The reply to GetStartupData: every character's stored select-screen preview, then the settings checksum map.

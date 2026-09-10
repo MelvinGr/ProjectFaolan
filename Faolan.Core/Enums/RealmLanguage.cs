@@ -15,12 +15,17 @@ namespace Faolan.Core.Enums
 	//     DispatchResetLanguage's own text). So dimension access is gated on the account's language flags, which is
 	//     exactly what a per-dimension language is for.
 	//
-	// ⚠️ The VALUES below are NOT verified and are carried over unchanged from the old enum - renaming a field is not
-	// evidence about its encoding. They match nothing observed: the client bundles seven languages and orders its LDB
-	// pages fr, en, de, es, ru, pl, ko, and `LoginCharacter` sends the client's own language as a string CODE ("en")
-	// beside a separate uint16 regionCode. Nothing was found reading Dimension_t+0x40, so the client may not consume
-	// this at all. Establishing the real id space is Gitea #932; do not "fix" these on a guess - the committed
-	// faolan.db and every declared realm carry them.
+	// ⭐ The VALUES are the client's own id space, recovered from FUN_011D7740 - the function that turns the running
+	// client's 2-letter language code into the int it hands to VerifyLanguageSetting. It is a hard-coded table, not a
+	// load order and not anything the .tdbl files carry:
+	//     en=0  fr=1  es=2  de=3  pl=4  ru=5  ko=6   (anything else falls back to 0)
+	// Its inverse FUN_011D7800 maps the same ids back to codes and is what DispatchResetLanguage(nNewLanguage) feeds,
+	// so both directions share this space. The four below match it exactly; Polish, Russian and Korean are Gitea #932.
+	//
+	// ⚠️ This is NOT the field the client resolves a dimension's language from. That is the BITFIELD at
+	// Dimension_t+0x24 (FUN_00A69180: bit 0 or 1 -> English, 0x400 -> Russian, 0x800 -> Polish, 0x100000 -> Korean).
+	// The value here lands at +0x40, which the client reads only to test NON-ZERO - it counts the realms that have one
+	// and shows or hides its language-flag button row. See #933.
 	public enum RealmLanguage : byte
 	{
 		English = 0,
