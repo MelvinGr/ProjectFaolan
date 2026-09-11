@@ -1,19 +1,12 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Cli;
 using Faolan.Core.Constants;
-using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.Faction;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
@@ -49,7 +42,6 @@ namespace Faolan.GameServer
 	/// </remarks>
 	public partial class GameServerListener : RpcServer, IGameServerProvider
 	{
-
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform and world objects
 		// scope to it. Threaded as one value so the snapshot, spawn and objects agree.
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;

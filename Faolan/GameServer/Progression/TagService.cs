@@ -1,11 +1,10 @@
 using System.Threading.Tasks;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Constants;
 using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Progression

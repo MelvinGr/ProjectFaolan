@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;

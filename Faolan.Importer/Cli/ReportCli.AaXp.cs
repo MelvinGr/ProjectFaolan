@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
@@ -11,9 +10,9 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
-using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {

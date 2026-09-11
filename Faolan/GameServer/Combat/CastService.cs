@@ -10,8 +10,8 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat

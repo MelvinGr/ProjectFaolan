@@ -5,10 +5,9 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
-using Faolan.GameServer;
+using Faolan.GameServer.Wire;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {

@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;

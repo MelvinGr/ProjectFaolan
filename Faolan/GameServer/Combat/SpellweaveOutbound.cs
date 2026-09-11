@@ -2,8 +2,8 @@ using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Server.ChatServer;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Combat
 {

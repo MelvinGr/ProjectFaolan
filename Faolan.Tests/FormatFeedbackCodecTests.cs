@@ -3,7 +3,6 @@ using System.Text;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {

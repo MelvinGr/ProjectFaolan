@@ -1,16 +1,15 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
-using Faolan.Core.Extensions;
-using Faolan.Core;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat

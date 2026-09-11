@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;

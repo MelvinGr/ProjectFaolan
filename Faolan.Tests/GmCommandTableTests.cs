@@ -5,8 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.GameServer;
-using Faolan.Tests.Support;
 using Faolan.GameServer.Gm;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Faolan.Core.Network.Codecs.Pvp;
 using Faolan.Core.Network.Codecs.Team;
 using Xunit;

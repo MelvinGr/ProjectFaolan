@@ -3,11 +3,10 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.GameServer;
+using Faolan.GameServer.Wire;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Xunit;
-using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {

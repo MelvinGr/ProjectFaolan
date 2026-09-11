@@ -1,16 +1,15 @@
 using System.Threading.Tasks;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Protobuf;
-using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Codecs.Guild;
-using Faolan.Core.Network.Codecs.Text;
-using Faolan.Core.Constants;
-using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.CsPlayerAgent;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy

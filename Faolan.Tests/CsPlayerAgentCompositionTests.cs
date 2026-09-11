@@ -5,7 +5,6 @@ using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Faolan.Tests

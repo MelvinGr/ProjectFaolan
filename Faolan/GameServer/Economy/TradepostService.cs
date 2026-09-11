@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
@@ -9,11 +10,10 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
-using System.Numerics;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy

@@ -8,8 +8,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
-using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Wire;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow
 {

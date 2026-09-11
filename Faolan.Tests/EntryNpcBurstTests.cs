@@ -9,7 +9,6 @@ using Faolan.Core.Database.Repositories;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Faolan.Tests

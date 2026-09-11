@@ -1,14 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Team;
-using Faolan.Core.Network.Codecs.Text;
-using Faolan.Core.Network.Server.ChatServer;
-using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
 using Faolan.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;

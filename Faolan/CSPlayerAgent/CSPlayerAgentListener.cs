@@ -16,7 +16,6 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;

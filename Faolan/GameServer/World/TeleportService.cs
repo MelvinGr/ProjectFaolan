@@ -4,20 +4,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core;
-using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.CreateFlow;
-using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Codecs.Text;
-using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Wire;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {

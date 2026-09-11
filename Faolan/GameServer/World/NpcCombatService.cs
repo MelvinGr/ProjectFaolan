@@ -1,10 +1,6 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Constants;
 using Faolan.Core.Enums;
-using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;

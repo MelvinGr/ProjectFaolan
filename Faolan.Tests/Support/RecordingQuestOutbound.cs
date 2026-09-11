@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.GameServer.Quest;
-using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support
 {

@@ -8,8 +8,8 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Wire;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {

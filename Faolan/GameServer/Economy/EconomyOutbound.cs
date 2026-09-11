@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,14 +10,12 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Protobuf;
-using ProtoBuf;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Wire;
 using Microsoft.Extensions.Logging;
+using ProtoBuf;
 
 namespace Faolan.GameServer.Economy
 {

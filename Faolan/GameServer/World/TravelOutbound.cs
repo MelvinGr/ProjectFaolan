@@ -1,9 +1,13 @@
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Constants;
+using Faolan.Core.Crypt;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -12,14 +16,6 @@ using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Wire;
-
-using System.Threading;
-
-using Faolan.Core.Database.Tables;
-
-using Faolan.Core.Network.Codecs.Dialogue;
-
-using Faolan.Core.Crypt;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World

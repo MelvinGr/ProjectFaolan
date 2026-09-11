@@ -1,17 +1,15 @@
 using System.Threading.Tasks;
 using Faolan.Core.Constants;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.Inventory;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Crypt;
-using Faolan.Core.Protobuf;
 using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Economy

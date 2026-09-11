@@ -4,7 +4,6 @@ using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Wire;

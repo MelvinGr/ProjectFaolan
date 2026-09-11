@@ -1,6 +1,4 @@
-using Faolan.Core;
 using Faolan.Core.Cli;
-using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -20,8 +18,8 @@ using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.Session;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

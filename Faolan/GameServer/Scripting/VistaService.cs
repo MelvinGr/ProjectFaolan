@@ -6,9 +6,8 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.World;
-using Faolan.GameServer;
 using Faolan.GameServer.Progression;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Scripting

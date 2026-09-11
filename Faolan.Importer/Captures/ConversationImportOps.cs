@@ -1,21 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 

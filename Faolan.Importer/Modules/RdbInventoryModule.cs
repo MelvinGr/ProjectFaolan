@@ -3,8 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
-using Faolan.Importer.Extractors;
-using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {

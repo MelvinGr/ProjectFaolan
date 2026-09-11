@@ -4,8 +4,8 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Interfaces;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -16,23 +16,18 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Progression;
-using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
-using Faolan.Core.Database.Repositories;
-using Faolan.Core.Network.Server.CsPlayerAgent;
-using Faolan.GameServer.Session;
-using Faolan.GameServer.Quest;
 using Faolan.GameServer.Feats;
-using Faolan.GameServer.Scripting;
-using Faolan.GameServer.World;
-using Faolan.GameServer.Progression;
 using Faolan.GameServer.Inventory;
-using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Progression;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Gm
 {

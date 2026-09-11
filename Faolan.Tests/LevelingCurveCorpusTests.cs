@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Progression;
 using Faolan.Tests.Support;
 using Xunit;

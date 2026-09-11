@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Faolan.Tests

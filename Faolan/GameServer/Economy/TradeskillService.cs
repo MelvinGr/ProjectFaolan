@@ -13,8 +13,8 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy

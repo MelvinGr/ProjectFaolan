@@ -7,8 +7,8 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Importer.Extractors;
 using Faolan.Importer.Captures;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli

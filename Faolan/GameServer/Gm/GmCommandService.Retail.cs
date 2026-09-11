@@ -5,21 +5,19 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
-using Faolan.Core.Crypt;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Inventory;
-using Faolan.GameServer.Progression;
+using Faolan.GameServer.Wire;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.GameServer;
-using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Gm
 {

@@ -12,7 +12,6 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;

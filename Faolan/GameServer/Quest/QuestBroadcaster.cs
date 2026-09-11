@@ -11,8 +11,8 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.GameServer.World;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
