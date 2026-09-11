@@ -66,10 +66,13 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # EF migrations (context lives in Faolan.Core.Database; the migrations themselves are PER PROVIDER, in
 # Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations).
 # ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP (the maintainer's standing call, 2026-07-26). Both chains were
-# SQUASHED to a single `InitialCreate` on 2026-08-10, so Postgres is level with the model as of that day and does not
+# SQUASHED to a single `InitialCreate` on 2026-09-11, so Postgres is level with the model as of that day and does not
 # need replaying; it simply does not track changes made after it. The Postgres PROVIDER code stays (Faolan.Core.Database
 # is provider-agnostic and faolan.sql loads into both). Bringing Postgres back level = delete its Migrations/ and
-# scaffold ONE fresh initial migration from the current model, never a chain.
+# scaffold ONE fresh initial migration from the current model, never a chain. A squash also REBUILDS faolan.db on the
+# fresh schema (create a fresh db from the new migration, copy every row across, verify per-row parity) rather than
+# only rewriting its `__EFMigrationsHistory` row: columns that incremental migrations added via ALTER TABLE carry a
+# `DEFAULT` the model does not declare, so a merely re-pointed db is not schema-identical to a fresh one.
 # Its `InitialCreate` is VERIFIED against a real postgres:17: it applies, and faolan.sql then loads into it with
 # ON_ERROR_STOP at zero errors and full row parity. ⚠️ It only got there once `CK_ItemInstance_OneOwner` started
 # QUOTING its column names - raw CHECK SQL goes into the CREATE TABLE verbatim and Postgres folds an unquoted
