@@ -55,7 +55,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnArmedOffer_RevivesTheDeadPlayerAtTheOffersPercentage()
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 		[InlineData(75u, 750u)]
 		public async Task ThePercentageIsTheOffers(uint percent, uint expectedHealth)
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, percent);
 			Kill(entity);
 
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ItRevivesWhereThePlayerFell()
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 			var deathPosition = entity.Position;
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnOfferIsConsumedByTheResurrection()
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnAnswerNamingAnotherSpell_IsNotThisOffer()
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
@@ -131,7 +131,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ALivePlayerCannotTakeTheOffer()
 		{
-			var (sim, deaths, client, _) = Alive();
+			var (_, deaths, client, _) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 
 			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell));
@@ -141,7 +141,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task WithNoOffer_NothingHappens()
 		{
-			var (sim, deaths, client, entity) = Alive();
+			var (_, deaths, client, entity) = Alive();
 			Kill(entity);
 
 			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell));
@@ -152,7 +152,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void DecliningDropsTheOffer()
 		{
-			var (sim, deaths, _, _) = Alive();
+			var (_, deaths, _, _) = Alive();
 			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 
 			Assert.False(deaths.CancelSelfResurrection(Player, 4332780)); // another offer's id

@@ -119,15 +119,5 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				return idx.Level(iir);
 			}
 		}
-
-		private static int Rank(string level)
-		{
-			return level switch
-			{
-				"V3" => 0,
-				"V2" => 1,
-				_    => 2
-			};
-		}
 	}
 }

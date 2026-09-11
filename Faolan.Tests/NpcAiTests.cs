@@ -510,7 +510,7 @@ namespace Faolan.Tests
 			return effects.Where(e => e.Type != WorldTickEffectType.NpcAmbientAnimation);
 		}
 
-		private static WorldEntity NpcTemplate(uint handle, float x, float z, uint level = 1, bool hostile = true)
+		private static WorldEntity NpcTemplate(uint handle, float x, float z, bool hostile = true)
 		{
 			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			e.Hostile = hostile;

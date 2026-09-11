@@ -26,14 +26,6 @@ namespace Faolan.GameServer.Session
 	public sealed class LoginHandshakeService(ILogger logger, IDatabaseRepository database, IConfiguration configuration, ConnectionRegistry connections,
 		TeleportService teleport, CreateFlowService createFlow, WorldEntryService worldEntry)
 	{
-		private readonly ILogger _logger = logger;
-		private readonly IDatabaseRepository _database = database;
-		private readonly IConfiguration _configuration = configuration;
-		private readonly ConnectionRegistry _connections = connections;
-		private readonly TeleportService _teleport = teleport;
-		private readonly CreateFlowService _createFlow = createFlow;
-		private readonly WorldEntryService _worldEntry = worldEntry;
-
 		public async Task<bool> HandleAuthenticate2(INetworkClient client, FaolanStream body)
 		{
 		// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
@@ -42,7 +34,7 @@ namespace Faolan.GameServer.Session
 		// the client.
 		if (body.Length - body.Position < 12)
 		{
-			_logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", body.Length - body.Position);
+			logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", body.Length - body.Position);
 			return true;
 		}
 
@@ -50,7 +42,7 @@ namespace Faolan.GameServer.Session
 		var accountId = body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
 		var clientVersion = body.ReadString();
 
-		if (await _database.GetAccount(accountId) is not {} account)
+		if (await database.GetAccount(accountId) is not {} account)
 			throw new Exception("Account == null");
 
 		client.Session.Account = account;
@@ -58,19 +50,19 @@ namespace Faolan.GameServer.Session
 
 		// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
 		// and forgiving that makes the check look like dead code someone will helpfully delete.
-		client.Session.Character = await _database.GetCharacterForAccount(accountId, clientInstance)
+		client.Session.Character = await database.GetCharacterForAccount(accountId, clientInstance)
 			?? throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
 
-		_logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
+		logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 
 		// The build this protocol was decoded against, from config (default v5.01.0@602248 - every capture in the
 		// corpus is that one). A mismatch is not a refusal: the protocol is largely shared across builds, and rejecting
 		// on a string would lock out a working client over a trivial difference. It warns loudly because otherwise
 		// "the client behaves oddly" and "the client is a different build" look identical in the logs.
-		if (clientVersion != _configuration.ContentClientVersion)
+		if (clientVersion != configuration.ContentClientVersion)
 		{
-			_logger.LogWarning("GameServer hello: client reports build {Reported}, but the protocol was decoded against {Expected}. Unexpected behaviour past this point may be a build difference.",
-				clientVersion, _configuration.ContentClientVersion);
+			logger.LogWarning("GameServer hello: client reports build {Reported}, but the protocol was decoded against {Expected}. Unexpected behaviour past this point may be a build difference.",
+				clientVersion, configuration.ContentClientVersion);
 		}
 
 		// Character creation has two phases on this GameServer connection:
@@ -89,7 +81,7 @@ namespace Faolan.GameServer.Session
 		// normal login of the same character does not re-trigger the intro. This connection needs the
 		// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
 		// auth + the intro/cutscene), so skip the helper auth for it.
-		var isCreateWorldEntry = !isNewCharacter && _createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
+		var isCreateWorldEntry = !isNewCharacter && createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
 		// One live connection per character. A second login of a character already in the world gives two sessions
 		// writing one character's state - two world entities, two persistence writers, and a wallet and inventory that
 		// depend on which session saved last. The account may hold as many connections as it likes (that is how a
@@ -99,10 +91,10 @@ namespace Faolan.GameServer.Session
 		// changemap/teleport re-entry both open a fresh connection for a character whose old one may not have been
 		// reaped yet. Both are recognised by their pending set - CreateWorld is consumed just above, and the teleport
 		// re-entry mark is peeked here, with the login branch consuming it.
-		var reconnectHandoff = isCreateWorldEntry || _teleport.IsReentryPending(clientInstance);
-		if (!reconnectHandoff && _connections.ForCharacter(client.Session.Character.Id) is { } existingClient && !ReferenceEquals(existingClient, client))
+		var reconnectHandoff = isCreateWorldEntry || teleport.IsReentryPending(clientInstance);
+		if (!reconnectHandoff && connections.ForCharacter(client.Session.Character.Id) is { } existingClient && !ReferenceEquals(existingClient, client))
 		{
-			_logger.LogWarning("Duplicate login for character {CharacterId:X8} '{Name}' (account {AccountId:X8}): already in the world on another connection - dropping the new one.",
+			logger.LogWarning("Duplicate login for character {CharacterId:X8} '{Name}' (account {AccountId:X8}): already in the world on another connection - dropping the new one.",
 				client.Session.Character.Id, client.Session.Character.Name, accountId);
 			client.Stop();
 			return false;
@@ -159,10 +151,10 @@ namespace Faolan.GameServer.Session
 			// the player ~440 units from every beach NPC - no in-range NPCs or world objects, and an intro cutscene
 			// with no Kalanthes to bind its actor to, which the client reports as `Unable to find NPC 66` from its own
 			// controlcamera script.
-			var spawnRows = await _database.SetCreationSpawn(client.Session.Character.Id);
+			var spawnRows = await database.SetCreationSpawn(client.Session.Character.Id);
 			client.Session.Character.MapId = Map.NewPlayerSpawnSpawnPoint.MapId;
 			client.Session.Character.Position = Map.NewPlayerSpawnSpawnPoint.Position;
-			_logger.LogInformation(
+			logger.LogInformation(
 				"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
 				clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY,
 				client.Session.Character.PositionZ, client.Session.Character.MapId);
@@ -171,14 +163,14 @@ namespace Faolan.GameServer.Session
 			// live-character world plus the destiny cutscene's Scry-script overlay (SendCreateWorldWithCutscene): the
 			// created character lands on the beach as itself and the cutscene drives to IntroDone. Cutscene actors are
 			// still invisible; SendCreateWorldSceneBurst stays as the golden reference.
-			await _createFlow.SendCreateWorldWithCutscene(client);
+			await createFlow.SendCreateWorldWithCutscene(client);
 			break;
 		}
 
 		case WorldEntryMode.CreateEditor: // New character -> show the creator
 		{
-			_logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
-			await CreateEditorBursts.SendRetailCreateEditorInitialBurst(client, _database, logger: _logger);
+			logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
+			await CreateEditorBursts.SendRetailCreateEditorInitialBurst(client, database, logger: logger);
 			break;
 		}
 
@@ -189,7 +181,7 @@ namespace Faolan.GameServer.Session
 			// content is constructed from the WorldObject and NpcSpawn tables and addressed to this character, so the
 			// client builds the playfield and renders the NPCs. The 0x201c handshake is server-sent, and the player's
 			// own position, name and inventory are rebuilt from the database too. See SendWorldEntry.
-			await _worldEntry.SendWorldEntry(client);
+			await worldEntry.SendWorldEntry(client);
 			// Abilities (0x2052) are granted after 0x2024 ReadyForPlayScreen, in FlushPendingPost205FFollowUp, matching
 			// the retail login order (handshake -> 0x2024 -> 0x2052). Granting them here, before the client has polled,
 			// diverges from the captured login.
@@ -198,11 +190,11 @@ namespace Faolan.GameServer.Session
 			// direct GameServer-to-GameServer changemap reconnect sends no 0x205F, as retail confirms. It is armed here
 			// so the next 0x2020 poll flushes 0x2024 ReadyForPlayScreen and the abilities and the loading screen
 			// dismisses; otherwise the burst lands and the client loads for ever.
-			if (_teleport.ConsumeReentry(clientInstance))
+			if (teleport.ConsumeReentry(clientInstance))
 			{
 				client.Session.EntryMode = WorldEntryMode.TeleportReentry;
 				client.Session.HasPendingPost205FFollowUp = true;
-				_logger.LogInformation(
+				logger.LogInformation(
 					"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
 					clientInstance);
 			}
@@ -212,7 +204,7 @@ namespace Faolan.GameServer.Session
 
 		default:
 		{
-			_logger.LogError("Authenticate2 on an unhandled entry mode {Mode} (clientInstance={ClientInstance:X8}): no world entry was sent.", client.Session.EntryMode, clientInstance);
+			logger.LogError("Authenticate2 on an unhandled entry mode {Mode} (clientInstance={ClientInstance:X8}): no world entry was sent.", client.Session.EntryMode, clientInstance);
 			break;
 		}
 		}

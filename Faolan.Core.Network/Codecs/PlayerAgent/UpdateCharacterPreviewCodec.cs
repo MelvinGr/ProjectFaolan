@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	/// </remarks>
 	public static class UpdateCharacterPreviewCodec
 	{
-		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.UpdateCharacterPreview;
+		public const uint Method = (uint)PlayerAgentMethods.UpdateCharacterPreview;
 
 		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(UpdateCharacterPreview value)

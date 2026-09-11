@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	/// </remarks>
 	public static class AuthenticateLoggedInCodec
 	{
-		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.AuthenticateLoggedIn;
+		public const uint Method = (uint)PlayerAgentMethods.AuthenticateLoggedIn;
 
 		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(AuthenticateLoggedIn value)

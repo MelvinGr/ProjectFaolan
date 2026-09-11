@@ -50,9 +50,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 	{
 		public const byte ListType = 3; // full recipe-book list (vs 1 = single RecipeLearnt)
 
-		public const byte RoleIngredient = 0;
-		public const byte RoleResult = 1;
-
 		public const uint Opcode = (uint)IirTypes.TradeskillReplyIIR;
 		public const uint Version = 1;
 		// There is no fixed set of rdbType values, and asserting one refuses retail traffic: NecroL80's two captures carry

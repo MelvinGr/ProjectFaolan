@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Faolan.Tests
@@ -18,7 +17,6 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task FlushOnBatchDrained_SendsTheTrioExactlyOnce_OnlyAfterArmed()
 		{
-			var service = new CreateFlowService(NullLogger.Instance, null!, null!, null!, null!, null!, null!);
 			var client = new RecordingNetworkClient(Instance);
 
 			// Not armed yet (no Finish / no morph seen) -> a drained batch must not send the trio.

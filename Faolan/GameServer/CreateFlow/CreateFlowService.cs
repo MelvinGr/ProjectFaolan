@@ -143,9 +143,9 @@ namespace Faolan.GameServer.CreateFlow
 		/// </remarks>
 		internal async Task HandleCommandPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var ack = body.ReadUInt32();
+			body.ReadUInt32(); // ack
 			var clientInstance = body.ReadUInt32();
-			var reserved = body.ReadByte();
+			body.ReadByte(); // reserved
 			var msg = body.ReadProtobufUInt32Length<ProtoScryScriptIIR>();
 
 			var value = msg.IntParameter; // decoded signed value (identity ids, morph slider, ...)

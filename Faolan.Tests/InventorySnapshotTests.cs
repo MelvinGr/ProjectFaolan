@@ -172,7 +172,6 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var headerLen = body.Position; // bytes consumed before the inventory body proper
 
 			var parts = SnapshotPackets.Parse(body);
 

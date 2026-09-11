@@ -19,17 +19,6 @@ namespace Faolan.GameServer.Inventory
 	public sealed class ItemUseService(ICatalogRepository catalog, ICharacterInventoryRepository inventory, ILogger logger, BuffService buffs, IChatServerDispatcher agentServerDispatcher, WorldSimulation simulation,
 		QuestProgressionService questProgression, PlayerDeathService playerDeaths, EconomyOutbound economyOutbound, TeleportService teleport)
 	{
-		private readonly ICatalogRepository _catalog = catalog;
-		private readonly ICharacterInventoryRepository _inventory = inventory;
-		private readonly ILogger _logger = logger;
-		private readonly BuffService _buffs = buffs;
-		private readonly IChatServerDispatcher _agentServerDispatcher = agentServerDispatcher;
-		private readonly WorldSimulation _simulation = simulation;
-		private readonly QuestProgressionService _questProgression = questProgression;
-		private readonly PlayerDeathService _playerDeaths = playerDeaths;
-		private readonly EconomyOutbound _economyOutbound = economyOutbound;
-		private readonly TeleportService _teleport = teleport;
-
 		// Totem of Origins template: a non-spell on-use item that returns the player to their racial home city, not to
 		// the bind point, which is what the Path of Asura spell does. The only special-cased use left; buff consumables
 		// are data-driven through Items.OnUseSpell.
@@ -45,22 +34,22 @@ namespace Faolan.GameServer.Inventory
 			var self = client.Session.Character.Id;
 			var wireSpellId = spellBase << 8;
 
-			if (_simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
+			if (simulation.PlayerWorldEntity(client)?.ActiveBuffs.ContainsKey(wireSpellId) == true)
 			{
-				_logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
+				logger.LogInformation("UseConsumable: '{Item}' buff {Spell} already active - no-op.", item.Name, spellBase);
+				await agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"You already have the '{item.Name}' effect.");
 				return;
 			}
 
-			var spell = await _catalog.GetSpell(spellBase);
+			var spell = await catalog.GetSpell(spellBase);
 			if (spell == null)
 			{
-				_logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
+				logger.LogInformation("UseConsumable: Unknown spellBase {spellBase}.", spellBase);
 				return;
 			}
 
 			var durationCs = spell.DurationMs / 10;
-			await _buffs.SendMagicBuffIir(client, self, self, wireSpellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, BuffService.CasterLevel(client), casterIsPlayer: true));
+			await buffs.SendMagicBuffIir(client, self, self, wireSpellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, BuffService.CasterLevel(client), casterIsPlayer: true));
 
 			// A consumable that arms a self-resurrection says so on the wire immediately, while the player is alive -
 			// retail's order is the buff above, then this, then the item leaving the bag (annotated_9 f6467, all in one
@@ -69,14 +58,14 @@ namespace Faolan.GameServer.Inventory
 			if (spell.SelfResurrectionSpell is { } resurrectSpell && resurrectSpell != 0)
 			{
 				await GameWire.SendResurrectRequest(client, self, resurrectSpell);
-				_playerDeaths.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
+				playerDeaths.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
 			}
 
 			// The pool the consumable actually moves: a health potion's whole point is the instant heal - `Daggamalt`
 			// into `Health Potion Effect 10` carries +40500, i.e. 405 HP - so the buff and the consume alone would
 			// leave the bar where it was.
-			await _buffs.ApplyPoolEffects(client, self, spellBase);
-			await _economyOutbound.RemoveItemFromBackpack(client, slot, 1);
+			await buffs.ApplyPoolEffects(client, self, spellBase);
+			await economyOutbound.RemoveItemFromBackpack(client, slot, 1);
 			await SendConsumableCooldown(client, item);
 		}
 
@@ -101,12 +90,12 @@ namespace Faolan.GameServer.Inventory
 			if (item.OnUseLockSpellLine is not { } line || item.OnUseLockSeconds is not { } seconds || seconds == 0)
 				return;
 
-			var locked = await _catalog.LockedTemplateIdsForConsumableLine(line);
+			var locked = await catalog.LockedTemplateIdsForConsumableLine(line);
 			foreach (var templateId in locked)
 				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
 
-			_logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);
+			logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);
 		}
 
 		// The domain side of a player using (right-clicking) an item from a bag: the RightClickItem inbound handler
@@ -117,16 +106,16 @@ namespace Faolan.GameServer.Inventory
 		{
 			var character = client.Session.Character;
 
-			var item = (await _inventory.GetCharacterItemSlot(character.Id, container, slot))?.Template;
+			var item = (await inventory.GetCharacterItemSlot(character.Id, container, slot))?.Template;
 			if (item == null)
 			{
-				_logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);
+				logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);
 				return;
 			}
 
 			if (item.Id == TotemOfOriginsId)
 			{
-				await _teleport.RecallToRacialHomeCommand(client); // the racial home city, not the bind point
+				await teleport.RecallToRacialHomeCommand(client); // the racial home city, not the bind point
 				return;
 			}
 
@@ -139,14 +128,14 @@ namespace Faolan.GameServer.Inventory
 				// goal is an item the quest giver hands over, so counting its arrival would solve the objective before
 				// the player did anything. After the effect, so an item that is both a consumable and an objective
 				// does both.
-				await _questProgression.AdvanceUseGoals(client, item.Id);
+				await questProgression.AdvanceUseGoals(client, item.Id);
 				return;
 			}
 
 			// Surface the gap in-client (no-fallbacks rule, like the "no dialogue or shop imported yet" bubble) so an
 			// un-wired consumable says so instead of silently doing nothing.
-			_logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"('{item.Name}' has no on-use effect wired yet - id {item.Id}, no Items.OnUseSpell)");
+			logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
+			await agentServerDispatcher.SendSystemMessage(character.Id, $"('{item.Name}' has no on-use effect wired yet - id {item.Id}, no Items.OnUseSpell)");
 		}
 	}
 }

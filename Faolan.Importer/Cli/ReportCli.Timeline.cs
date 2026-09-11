@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -41,13 +40,6 @@ namespace Faolan.Importer.Cli
 	// session as it happened is the job, and an event and its consequence must not land under different headings.
 	public static partial class ReportCli
 	{
-		// The service tier each port belongs to. 7010 is the only fixed one (UniverseAgent); the rest are handed to
-		// the client in the preceding tier's payload, so these are the ports the corpus actually used.
-		private static readonly Dictionary<int, string> TimelineTiers = new Dictionary<int, string>
-		{
-			[7010] = "universe", [7011] = "playeragent", [7012] = "cs", [7001] = "chat", [7017] = "game"
-		};
-
 		// Per-frame traffic: movement, heartbeats, aggro polling, the stat/energy stream. Five of every six packets in
 		// a gameplay capture, and none of them an event. Suppressed with a printed count - never silently.
 		private static readonly HashSet<string> TimelineNoise =
@@ -57,9 +49,6 @@ namespace Faolan.Importer.Cli
 			"DispatchGameServerStats", "StatIIR", "EnergyIIR", "RegenIIR", "DispatchSyncRegenDelayed",
 			"UpdateQuestMarkerNPC", "DispatchSetQuestMarker"
 		];
-
-		private static readonly Regex RemoteFormat = new Regex("<(remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
-		private static readonly Regex XmlAttr = new Regex("(\\w+)=\"?([^\"\\s>]*)\"?", RegexOptions.Compiled);
 
 		private static async Task Timeline(string dumpPath, string rdbDir)
 		{

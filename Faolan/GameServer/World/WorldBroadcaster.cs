@@ -62,7 +62,6 @@ namespace Faolan.GameServer.World
 
 		// _tortageIntro is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
 		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
-		private readonly ComboService _combos;
 		private readonly TortageIntroService _tortageIntro;
 
 		private readonly WorldSimulation _sim;
@@ -101,7 +100,6 @@ namespace Faolan.GameServer.World
 			_database = database;
 			_logger = logger;
 			_tortageIntro = tortageIntro;
-			_combos = combos;
 			_questMarkers = questMarkers;
 			_quests = quests;
 			_zones = new ZonePopulationLoader(sim, database, database, combos, _ambient, logger);

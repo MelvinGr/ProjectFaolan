@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -104,7 +103,7 @@ namespace Faolan.Tests
 		// The parsed completed-quest journal of every capture that carries one - shared with the generation gate.
 		public static IEnumerable<(string Source, CompletedQuestJournalRegion Region)> CapturedRegions()
 		{
-			foreach (var (source, subClass, tails) in SubClasses())
+			foreach (var (source, subClass, _) in SubClasses())
 			{
 				if (subClass.CompletedQuests is { Areas.Count: > 0 } region)
 					yield return (source, region);
@@ -213,63 +212,6 @@ namespace Faolan.Tests
 			}
 
 			return -1;
-		}
-
-		// Walks area groups from `start` until the grammar breaks or `end` is reached - how far does the region
-		// actually run, and what stops it?
-		private static string Exhaust(byte[] tails, int start, int end)
-		{
-			var r = new FaolanStream(tails, false)
-			{
-				Position = checked((uint)start)
-			};
-			r.ReadUInt32(); // frame
-			int areas = 0, quests = 0;
-			try
-			{
-				while (r.Position < end)
-				{
-					r.ReadUInt32();
-					r.ReadString();
-					r.ReadString();
-					r.ReadString();
-					r.ReadUInt32();
-					r.ReadUInt32();
-					var n = r.ReadUInt32();
-					if (n > 4096)
-						return $"areas={areas} quests={quests} STOP at {r.Position}: questsInArea={n} implausible";
-
-					for (var q = 0; q < n; q++)
-					{
-						r.ReadUInt32();
-						r.ReadUInt32();
-						var f = r.ReadUInt32();
-						if (f == 0 || f % ListFrame.Unit != 0)
-							return $"areas={areas} quests={quests} STOP at {r.Position}: record frame 0x{f:X} not a list word";
-
-						for (var k = 0; k < ListFrame.CountOf(f); k++)
-							r.ReadString();
-
-						quests++;
-					}
-
-					areas++;
-				}
-
-				return $"areas={areas} quests={quests} reached end {end} CLEANLY";
-			}
-			catch (Exception ex)
-			{
-				return $"areas={areas} quests={quests} THREW at {r.Position}: {ex.Message}";
-			}
-		}
-
-		private static string Id(string xml)
-		{
-			var m = Regex.Match(xml, "id=\"([0-9]+)\"");
-			return m.Success
-				? m.Groups[1].Value
-				: "?";
 		}
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()

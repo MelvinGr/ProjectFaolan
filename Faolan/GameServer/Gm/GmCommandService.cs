@@ -58,13 +58,10 @@ namespace Faolan.GameServer.Gm
 		private readonly WorldObjectService _worldObjects;
 		private readonly QuestProgressionService _questProgression;
 		private readonly PlayerDeathService _playerDeaths;
-		private readonly PetService _pets;
 		private readonly LevelUpService _levelUp;
-		private readonly GuildBankService _guildBank;
 		private readonly FeatService _feats;
 		private readonly FactionService _factions;
 		private readonly ClaimService _claims;
-		private readonly BankService _bank;
 		private readonly PlayerPersistenceService _persistence;
 		private readonly TagService _tags;
 		private readonly TradepostService _tradepost;
@@ -78,8 +75,8 @@ namespace Faolan.GameServer.Gm
 			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, WorldSimulation simulation, WorldBroadcaster broadcaster, NpcBroadcaster npcs, RealmClock clock,
 			TeleportService teleport, TravelService travel, CombatService combat, EconomyOutbound economyOutbound, TradeskillService tradeskill,
 			KnockbackService knockback, EquipmentService equipment, BuffService buffs, WorldObjectService worldObjects, QuestProgressionService questProgression,
-			PlayerDeathService playerDeaths, PetService pets, LevelUpService levelUp, GuildBankService guildBank, FeatService feats, FactionService factions,
-			ClaimService claims, BankService bank, PlayerPersistenceService persistence, TagService tags, TradepostService tradepost,
+			PlayerDeathService playerDeaths, LevelUpService levelUp, FeatService feats, FactionService factions,
+			ClaimService claims, PlayerPersistenceService persistence, TagService tags, TradepostService tradepost,
 			AlternateAdvancementService alternateAdvancement)
 		{
 			_logger = logger;
@@ -102,13 +99,10 @@ namespace Faolan.GameServer.Gm
 			_worldObjects = worldObjects;
 			_questProgression = questProgression;
 			_playerDeaths = playerDeaths;
-			_pets = pets;
 			_levelUp = levelUp;
-			_guildBank = guildBank;
 			_feats = feats;
 			_factions = factions;
 			_claims = claims;
-			_bank = bank;
 			_persistence = persistence;
 			_tags = tags;
 			_tradepost = tradepost;

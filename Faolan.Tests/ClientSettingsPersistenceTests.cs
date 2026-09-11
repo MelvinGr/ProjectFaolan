@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task SettingsAndPreview_AreStoredIndependently_AndSurviveEachOther()
 		{
-			var (repo, options, path) = NewDb();
+			var (repo, _, path) = NewDb();
 			try
 			{
 				var settings = UpdateCharacterSettingsCodec.Parse(TestPaths.AssetBytes("playeragent-update-character-settings.bin"));

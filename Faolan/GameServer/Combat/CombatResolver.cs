@@ -152,12 +152,6 @@ namespace Faolan.GameServer.Combat
 		// Player-side mitigation is wired: the client's own armour and protection reduce incoming damage in
 		// WorldSimulation.
 
-		// Fallback NPC max health for a creature with no captured spawn HP. The real per-creature HP is the captured
-		// NpcSpawn.Health (the wire value retail sent); this is used only when that is absent (a GM-spawned template,
-		// future content). It is not in the client RDB either - the NpcSpawnDataExport stat tables are not shipped -
-		// so this curve is the only source for an un-captured creature.
-		public const uint DefaultNpcMaxHealth = 63; // the level-1 civilian baseline
-
 		// The half-mitigation point for the fallback magic-damage curve (Protection rating 0x1C3). Protection values are
 		// much smaller than armor (a high piece ~185 against armor ~1500), so the half-point is lower. Provisional; tune
 		// in-client.

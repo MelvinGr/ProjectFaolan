@@ -245,7 +245,6 @@ namespace Faolan.Importer.Extractors
 			{
 				var template = SnapshotRoot.TemplateIdOf(entry);
 				var quad = SnapshotRoot.IdentityQuadOf(entry);
-				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
 					Record(into, template.Value, CapturedItem.From(entry.Item!.ItemData!));
 
@@ -399,7 +398,7 @@ namespace Faolan.Importer.Extractors
 					// it is slotted) and the two sightings must merge on the never-downgrade rule instead of racing.
 					foreach (var (_, gem) in SnapshotRoot.SocketsOf(entry))
 					{
-						if (gem.Key1 is { } key && gem.Template1 != 0)
+						if (gem.Key1 != null && gem.Template1 != 0)
 							Record(map, gem.Template1, CapturedItem.From(gem));
 					}
 				}

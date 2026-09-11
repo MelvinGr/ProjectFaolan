@@ -28,8 +28,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchAddSpecialAbility;
 
-		public const int BodyLength = 81;
-
 		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(AddSpecialAbility value)
 		{

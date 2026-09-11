@@ -12,18 +12,12 @@ namespace Faolan.GameServer.Combat
 	///     The player stances - search, sneak/hide and the rest cast - which is what retail answers a
 	///     PerformSpecialAction press with.
 	/// </summary>
-	public sealed class StanceService(WorldSimulation simulation, WorldBroadcaster broadcaster, CastService cast, ILogger logger)
+	public sealed class StanceService(WorldSimulation simulation, WorldBroadcaster broadcaster, ILogger logger)
 	{
-		private readonly ILogger _logger = logger;
-
 		// How long the `Resting` channel runs. Not a number chosen here: it is the Spells row for 3164147 `Resting`
 		// ("Recovering health, mana, energy, and stamina"), whose 20,500 ms cast time is exactly the 2050 centiseconds
 		// retail puts in the rest behaviour record.
 		private const int RestingChannelMs = 20_500;
-
-		private readonly WorldSimulation _simulation = simulation;
-		private readonly WorldBroadcaster _broadcaster = broadcaster;
-		private readonly CastService _cast = cast;
 
 		/// <summary>
 		///     The search stance: retail's answer to PerformSpecialAction 0x064 is one player-addressed
@@ -41,17 +35,17 @@ namespace Faolan.GameServer.Combat
 			var character = client.Session.Character;
 			if (!StartingData.SearchStanceAction.TryGetValue(character.Class, out var animAction))
 			{
-				_logger.LogInformation("Search stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
+				logger.LogInformation("Search stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
 				return;
 			}
 
-			var entity = _simulation.PlayerWorldEntity(client);
+			var entity = simulation.PlayerWorldEntity(client);
 			// A stance is something other players watch you do, so the same record is relayed to everyone who can see
 			// the actor. `BehaviorControlCenterIIR` is 11 of 11 broadcast in the two-client capture
 			// (`--report broadcast-check`), and a search crouch nobody else sees is a player frozen upright to them.
 			var searchStance = BehaviorControlCenterCodec.Build(BehaviorAnimations.SearchStance(character.Id, animAction, entity?.NextBehaviorPhase() ?? 3));
 			await WorldIir.Send(client, searchStance);
-			await _broadcaster.BroadcastBehaviorToViewers(client, searchStance);
+			await broadcaster.BroadcastBehaviorToViewers(client, searchStance);
 		}
 
 		/// <summary>
@@ -70,11 +64,11 @@ namespace Faolan.GameServer.Combat
 			var character = client.Session.Character;
 			if (!StartingData.SneakHideEnterAction.TryGetValue(character.Class, out var enterAction))
 			{
-				_logger.LogInformation("Hide stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
+				logger.LogInformation("Hide stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
 				return;
 			}
 
-			var entity = _simulation.PlayerWorldEntity(client);
+			var entity = simulation.PlayerWorldEntity(client);
 			var hidden = entity?.IsHidden ?? false;
 			var phase = entity?.NextBehaviorPhase() ?? 3;
 
@@ -86,11 +80,11 @@ namespace Faolan.GameServer.Combat
 			// into the shadows only on their own screen is still standing there for everyone else.
 			var stance = BehaviorControlCenterCodec.Build(record);
 			await WorldIir.Send(client, stance);
-			await _broadcaster.BroadcastBehaviorToViewers(client, stance);
+			await broadcaster.BroadcastBehaviorToViewers(client, stance);
 			if (entity != null)
 				entity.IsHidden = !hidden;
 
-			_logger.LogInformation("Hide stance: '{Name}' {Action}.", character.Name, hidden
+			logger.LogInformation("Hide stance: '{Name}' {Action}.", character.Name, hidden
 				? "left hiding"
 				: "entered hiding");
 		}
@@ -111,13 +105,13 @@ namespace Faolan.GameServer.Combat
 		public async Task PerformRestCast(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			var entity = _simulation.PlayerWorldEntity(client);
+			var entity = simulation.PlayerWorldEntity(client);
 
 			var record = BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1);
 			// A 20-second rest cast is an animation on the actor, so it is relayed like every other player behaviour.
 			var restCast = BehaviorControlCenterCodec.Build(record);
 			await WorldIir.Send(client, restCast);
-			await _broadcaster.BroadcastBehaviorToViewers(client, restCast);
+			await broadcaster.BroadcastBehaviorToViewers(client, restCast);
 
 			// Rest is a cast, so it has to arm the cast path's cancel state or it can never be cancelled. The client
 			// ends this channel the way it ends any other: it sends the c2s cancel BCC (seq 0x0002) when the player
@@ -136,7 +130,7 @@ namespace Faolan.GameServer.Combat
 				return;
 
 			entity.RestingUntil = DateTimeOffset.UtcNow.AddMilliseconds(RestingChannelMs);
-			_logger.LogInformation("Rest: '{Name}' began resting for {Ms} ms.", character.Name, RestingChannelMs);
+			logger.LogInformation("Rest: '{Name}' began resting for {Ms} ms.", character.Name, RestingChannelMs);
 		}
 	}
 }

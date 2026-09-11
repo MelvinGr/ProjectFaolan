@@ -30,8 +30,6 @@ namespace Faolan.Importer.Rdb
 		// the catalog is a sub-650-row rump of test/debug entries.
 		public const uint FeatFlags = 0x10000005;
 
-		// One effect element: 8 fixed descriptor words then (StatId, Value).
-		private const int EffectElementLength = 40;
 		private const uint ListUnit = 0x3F1;
 
 		private const uint TemplateType = 1000020;

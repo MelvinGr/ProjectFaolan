@@ -34,9 +34,6 @@ namespace Faolan.GameServer.Scripting
 	// server-side fallback in the capture.
 	public sealed class VistaService(TagService tags, ILogger logger)
 	{
-		private readonly TagService _tags = tags;
-		private readonly ILogger _logger = logger;
-
 		// A player used a vista object. Returns false when it is not one, so the UseObject switch falls through to the
 		// harvest / door / loot paths exactly as before.
 		public async Task<bool> TryStartAchievementVista(INetworkClient client, LiveWorldObject live)
@@ -54,7 +51,7 @@ namespace Faolan.GameServer.Scripting
 				BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerViewVista(player.Id, live.Handle, BehaviorAnimations.VistaRemoteformat(vista.ObjectActionIndex))));
 
 			client.Session.ActiveVista = new ActiveVistaScene(vista, live.Handle, typeTag);
-			_logger.LogInformation("Vista: {Player} is viewing '{Vista}' 0x{Handle:X8} (path {Path}, {Duration}s).", player.Name, vista.Name, live.Handle, vista.CameraPath,
+			logger.LogInformation("Vista: {Player} is viewing '{Vista}' 0x{Handle:X8} (path {Path}, {Duration}s).", player.Name, vista.Name, live.Handle, vista.CameraPath,
 				vista.PathDurationSeconds);
 
 			// The camera starts when the gesture ends - retail's own 5.04 s gap, which is that animation's blend.
@@ -72,7 +69,7 @@ namespace Faolan.GameServer.Scripting
 				}
 				catch (Exception ex)
 				{
-					_logger.LogWarning(ex, "Vista: starting the camera path for '{Vista}' failed.", vista.Name);
+					logger.LogWarning(ex, "Vista: starting the camera path for '{Vista}' failed.", vista.Name);
 				}
 			});
 
@@ -114,8 +111,8 @@ namespace Faolan.GameServer.Scripting
 			// The buff's end twin: the same spell id with the end form selector and no data region at all.
 			await WorldIir.Send(client, MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, vista.BuffSpellBaseId, MagicBuffIds.FormEnd, null, [])));
 
-			var (granted, achievement) = await _tags.GrantTag(client, vista.AchievementTagId);
-			_logger.LogInformation("Vista: {Player} finished '{Vista}'; achievement {Tag} ({Name}) {Outcome}.", client.Session.Character.Name, vista.Name, vista.AchievementTagId,
+			var (granted, achievement) = await tags.GrantTag(client, vista.AchievementTagId);
+			logger.LogInformation("Vista: {Player} finished '{Vista}'; achievement {Tag} ({Name}) {Outcome}.", client.Session.Character.Name, vista.Name, vista.AchievementTagId,
 				achievement?.Name ?? "?", granted
 					? "awarded"
 					: "already held");

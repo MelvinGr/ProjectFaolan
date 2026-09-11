@@ -85,8 +85,7 @@ splice (`InsertBehaviorPhaseField`) reproduces the captured swing-1 ack args byt
 - **NPC combat HP** now comes from the NPC's live world entity: a burst/interest-spawned NPC carries its real
   vitals in the simulation (`WorldEntity.Vitals`, seeded in `WorldBroadcaster` from the spawn's `npc.Health`,
   falling back to `CombatResolver.NpcMaxHealthForLevel`), so a damaged mob's bar matches the HP the client
-  rendered; `GetOrAddNpcVitals` only falls back to `CombatResolver.DefaultNpcMaxHealth` for an NPC with no world
-  entity (the built-NPC test).
+  rendered.
 
 ### Mounts (summon spell found)
 Decoded from DemoL80's `...very_long_loading_screen_after_field_change` capture (the player rides: 122 MountedRun

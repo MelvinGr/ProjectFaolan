@@ -36,10 +36,9 @@ namespace Faolan.Tests
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
 			var iir = QuestFullUpdates.ForQuest(0x02165EFF, def, QuestFullUpdateCodec.DefaultQuestLevel);
-			var full = QuestFullUpdateCodec.Build(iir);
 
-			// The full-update's payload is the quest's journal record, so a slice such as `full[17..^1]` cuts out just
-			// that record's own bytes.
+			// The full-update's payload is the quest's journal record, so the comparison is against that record's own
+			// bytes rather than the framed message.
 			var block = QuestcRecordCodec.Build(iir.Record);
 
 			var region = Template[RegionStart..IndexTag];

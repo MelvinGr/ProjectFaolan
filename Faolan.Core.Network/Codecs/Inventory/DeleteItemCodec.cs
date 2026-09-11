@@ -45,9 +45,9 @@ namespace Faolan.Core.Network.Codecs.Inventory
 		public const uint Opcode = (uint)IirTypes.DeleteItemIIR;
 
 		// This body starts at the entity class rather than at the sub-opcode: it is c2s, and the opcode above is what
-		// the RPC frame carries, not the first word of the record. Declared rather than left to be inferred, because
-		// handing a codec the wrong slice reads four bytes out of step and returns plausible values instead of
-		// failing.
+		// the RPC frame carries, not the first word of the record. A slice that still carries the opcode reads four
+		// bytes out of step and returns plausible values instead of failing. Declared, because CodecSurfaceConventionTests
+		// reads this flag to know the body does not open with its opcode word.
 		public const bool OpcodeIsInTheFrame = true;
 
 		public static DeleteItemIIR Parse(in ReadOnlySpan<byte> data)

@@ -46,19 +46,6 @@ namespace Faolan.Core.Progression
 		public const uint MurdererSpellId = 3827285;
 
 		/// <summary>
-		///     The "Criminal Protection" buff - spell 3880938. Retail applies it on a team join and it is what exempts
-		///     team-mates from the criminal system. It never travels alone: every captured apply and end is
-		///     accompanied, in the same frame, by a <c>DispatchAddSpellResistance</c> /
-		///     <c>DispatchRemoveSpellResistance</c> of <c>SpellMetaTypes.CriminalTeam</c> at 100%.
-		/// </summary>
-		/// <remarks>
-		///     Nothing applies it yet - what grants and clears it is the open half of the criminal system. The pairing
-		///     above is what is measured: 17 resistance frames over 5 captures, 1:1 with the buff.
-		///     Open work tracked in Gitea #503.
-		/// </remarks>
-		public const uint CriminalProtectionSpellId = 3880938;
-
-		/// <summary>
 		///     Murder points added by one player kill, in wire units, as measured: stat <c>0x449</c> went to 3500 at
 		///     the kill. The player reported "36", so the client's display scale is about 100 - consistent with the
 		///     rest of the stat sheet, where the displayed number and the wire number differ by a per-stat scale.

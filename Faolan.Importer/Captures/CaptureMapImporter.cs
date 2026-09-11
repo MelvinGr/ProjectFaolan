@@ -25,8 +25,6 @@ namespace Faolan.Importer.Captures
 	/// </remarks>
 	public static class CaptureMapImporter
 	{
-		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
-
 		public static async Task<(int Inserted, int Reflagged)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			// mapId -> the three per-map rule words (each null when the body was too short to carry it).

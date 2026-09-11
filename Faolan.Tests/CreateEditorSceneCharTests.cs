@@ -21,13 +21,6 @@ namespace Faolan.Tests
 	// change needing an in-client check. The live avatar carries none of them.
 	public class CreateEditorSceneCharTests
 	{
-		private readonly ITestOutputHelper _o;
-
-		public CreateEditorSceneCharTests(ITestOutputHelper o)
-		{
-			_o = o;
-		}
-
 		// Each pedestal is rebuilt from the generated typed data - no captured bytes involved on the build side at all -
 		// and must reproduce the captured record exactly. This is what makes CreateEditorScene a parse of the capture
 		// rather than a transcription of it: a wrong emit cannot pass here.

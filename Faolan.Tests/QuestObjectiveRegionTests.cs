@@ -97,8 +97,6 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_ThenToArray_RoundTripsByteExact()
 		{
-			var template = File.ReadAllBytes(TemplatePath);
-
 			var region = QuestObjectiveRegionCodec.Parse(Region);
 			var consumed = Region.Length;
 

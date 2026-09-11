@@ -28,7 +28,6 @@ namespace Faolan.Importer.Extractors
 	// directly-polled templates, which are ground truth no tier of this chain contributed to.
 	public static class NpcDispositionTiers
 	{
-		public const uint Friendly = 0;
 		public const uint Hostile = 1;
 
 		// The sentinel a null `NpcStats.community` is bucketed under. null is not "no faction" - it is the bucket the

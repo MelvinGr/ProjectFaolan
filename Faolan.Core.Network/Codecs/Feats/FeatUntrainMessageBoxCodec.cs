@@ -18,9 +18,6 @@ namespace Faolan.Core.Network.Codecs.Feats
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchFeatUntrainMessageBox;
 
-		// The message box is a fixed 16 bytes; FeatUntrainAnswerCodec relies on that to frame its echo.
-		public const int Length = 16;
-
 		public static byte[] Build(FeatUntrainMessageBox value)
 		{
 			using var s = new FaolanStream();

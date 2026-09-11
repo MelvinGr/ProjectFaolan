@@ -35,7 +35,6 @@ namespace Faolan.Tests
 		// seven descriptor words, CastingLevel, ExpiryStamp.
 		private const int CounterOffset = 0;
 		private const int CounterTypeOffset = 4;
-		private const int DurationOffset = 8;
 		private const int Bool1Offset = 12;
 		private const int Bool2Offset = 13;
 

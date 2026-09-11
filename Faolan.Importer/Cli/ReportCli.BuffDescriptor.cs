@@ -269,8 +269,7 @@ namespace Faolan.Importer.Cli
 		// A rate lift and not a purity sweep, for the same reason as `MinorityRateLift`: the minority value is
 		// ~15% of spells, so an element kind that lifts it to 60% still scores below an 84% purity baseline.
 		private static void ElementKindRateLift(IReadOnlyList<(uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)> records,
-			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram,
-			Faolan.Core.Rdb.RdbReader rdb)
+			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram)
 		{
 			var minority = histogram.Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
 			if (minority == null)
@@ -736,7 +735,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"    word {b.Word,2} bit {b.Bit,2}  {b.Purity,7:P1}  ({b.Set} of {records.Count} set){(b.Purity > baseline + 0.02 ? "   <-- beats the baseline" : "")}");
 
 				MinorityRateLift(records, value, histogram);
-				ElementKindRateLift(records, value, histogram, rdb);
+				ElementKindRateLift(records, value, histogram);
 
 				// 2. the property run, by value and then bit by bit.
 				var fieldRanked = new List<(uint Field, int Covered, int Values, double Purity)>();

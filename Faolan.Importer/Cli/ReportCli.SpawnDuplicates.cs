@@ -115,7 +115,7 @@ namespace Faolan.Importer.Cli
 				                  + $"  templates={bucket.Select(p => p.A.NpcTemplateId).Distinct().Count()}");
 			}
 
-			CrossMapSightings(pairs.Keys, captures, maps);
+			CrossMapSightings(pairs.Keys, captures);
 		}
 
 		// The DECISIVE test for a cross-map pair, and it needs no timestamps. If one capture sighted the
@@ -123,7 +123,7 @@ namespace Faolan.Importer.Cli
 		// re-keyed mid-stream and one physical NPC was filed twice. If instead each side is only ever sighted by
 		// captures that saw that map alone, the two are two populations and the pair is a coincidence of geometry -
 		// which is what Tortage day/night should look like.
-		private static void CrossMapSightings(IEnumerable<(uint A, uint B)> mapPairs, IReadOnlyList<NamedCapture> captures, IReadOnlyDictionary<uint, string> maps)
+		private static void CrossMapSightings(IEnumerable<(uint A, uint B)> mapPairs, IReadOnlyList<NamedCapture> captures)
 		{
 			// (capture, template, rounded position) -> the map ids that capture filed it under.
 			var sightings = new Dictionary<(string Capture, uint Template, int X, int Z), HashSet<uint>>();
@@ -151,7 +151,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"        {kv.Key.Capture} template {kv.Key.Template} at ~({kv.Key.X * StationaryPlacementResolver.ClusterRadius}, {kv.Key.Z * StationaryPlacementResolver.ClusterRadius})");
 			}
 
-			CrossMapVotes(mapPairs, sightings, maps);
+			CrossMapVotes(mapPairs, sightings);
 		}
 
 		// A diagnostic, not a defect list. A cross-map pair is two true observations and both rows are wanted:
@@ -180,7 +180,7 @@ namespace Faolan.Importer.Cli
 		//
 		// So the vote answers "where was the observer", which is not the question, and there is no question left.
 		private static void CrossMapVotes(IEnumerable<(uint A, uint B)> mapPairs,
-			Dictionary<(string Capture, uint Template, int X, int Z), HashSet<uint>> sightings, IReadOnlyDictionary<uint, string> maps)
+			Dictionary<(string Capture, uint Template, int X, int Z), HashSet<uint>> sightings)
 		{
 			Console.WriteLine();
 			Console.WriteLine("   the per-spot vote across captures - ⛔ a DEAD END kept as a warning, not a resolution (#728):");

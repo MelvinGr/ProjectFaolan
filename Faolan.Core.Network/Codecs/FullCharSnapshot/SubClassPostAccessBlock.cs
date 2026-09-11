@@ -140,10 +140,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	/// <summary>
 	///     One element of the base reader's trailing list (FUN_00797440's tail): a byte and two 8-byte reads.
 	/// </summary>
-	public readonly record struct SnapshotTailWideEntry(byte Flag, ulong A, ulong B)
-	{
-		public const int ByteCount = 17;
-	}
+	public readonly record struct SnapshotTailWideEntry(byte Flag, ulong A, ulong B);
 
 	/// <summary>
 	///     One element of FullPlayerCharacterIIR's trailing pair list. Its ids are RDB template ids (0xF426A = 1000042,

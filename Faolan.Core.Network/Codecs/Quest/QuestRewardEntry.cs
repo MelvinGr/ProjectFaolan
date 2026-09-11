@@ -28,11 +28,5 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public const int BatchGuidLength = 8;
 		public const int CodeLength = 4;
 		public const int KeyLength = 16;
-
-		/// <summary>
-		///     The wire size of one option: two template words, the level, the code, the mirrored key and guid pairs, and the
-		///     trailing word.
-		/// </summary>
-		public const int WireLength = 4 + 4 + 8 + CodeLength + (KeyLength * 2) + (BatchGuidLength * 2) + 4;
 	}
 }

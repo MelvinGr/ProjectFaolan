@@ -126,10 +126,6 @@ namespace Faolan.Core.Network.Codecs.World
 	// `DynelVisualChange` case with its payload spelled out, so a caller says what it wants to happen.
 	public static class SimpleDynelVisualChanges
 	{
-		// The RDB type the client hardcodes for a particle effect - it reads only the record id off the wire and
-		// pairs it with 1010207 itself ("StartParticleEffect() Invalid particle resource id", FUN_0080a130).
-		public const uint ParticleEffectResourceType = 1010207;
-
 		/// <summary>Plays a base animation by name - the loot/container window's "Open", a door's "object_open" / "object_closed".</summary>
 		public static SimpleDynelVisualChangeIIR SetBaseAnim(uint typeTag, uint handle, string animation)
 		{
@@ -175,6 +171,10 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 
 		/// <summary>Starts an RDB particle effect (type 1010207) on the object.</summary>
+		/// <param name="effectResourceId">
+		///     The record id only: the client pairs it with RDB type 1010207 itself (<c>FUN_0080a130</c>, "StartParticleEffect()
+		///     Invalid particle resource id").
+		/// </param>
 		/// <param name="attractor">
 		///     The attachment point on the object's skeleton. 0 places the effect free-standing at
 		///     <paramref name="position" /> instead (the client's `if (attractor &lt; 1)` branch), which is what retail's

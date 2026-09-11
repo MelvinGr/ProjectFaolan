@@ -131,7 +131,7 @@ namespace Faolan.Importer.Rdb
 			var placedIds = byName.Select(m => (m.MapId, m.AreaNameId)).ToHashSet();
 			var byGeometry = MatchBannerRegions(
 				captured.Where(b => !placedIds.Contains((b.MapId, b.AreaNameId))).ToList(),
-				captured, placedIds, areasByMap, wanted, notes);
+				captured, placedIds, areasByMap, wanted);
 
 			var hazards = MatchLavaVolumes(areasByMap, wanted, notes);
 			var noMount = MatchNoMountVolumes(areasByMap, wanted);
@@ -471,8 +471,7 @@ namespace Faolan.Importer.Rdb
 			IReadOnlyList<CapturedBanner> allBanners,
 			HashSet<(uint, uint)> placedByName,
 			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
-			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
-			List<string> notes)
+			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted)
 		{
 			var matched = new List<(CapturedBanner, (uint, string))>();
 			foreach (var byMap in unplaced.GroupBy(b => b.MapId))

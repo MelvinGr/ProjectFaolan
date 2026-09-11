@@ -413,11 +413,6 @@ namespace Faolan.Importer.Cli
 		// The tail, read with the arithmetic BehaviorAcks documents: [u32 targetCount][targets x 8B][middle]
 		// [u32 resultCount][results x 41B](+1 trailing byte for Combat:Ranged). Returns false when the lengths do not
 		// close, which is the check that keeps this report honest rather than merely plausible.
-		private static bool TryReadAttackTail(BehaviorControlCenterIIR bcc, out uint[] middle, out int targets, out int results, out List<uint> resultTypes)
-		{
-			return TryReadAttackTail(bcc, out middle, out targets, out results, out resultTypes, out _);
-		}
-
 		private static bool TryReadAttackTail(BehaviorControlCenterIIR bcc, out uint[] middle, out int targets, out int results, out List<uint> resultTypes,
 			out List<uint> targetHandles)
 		{

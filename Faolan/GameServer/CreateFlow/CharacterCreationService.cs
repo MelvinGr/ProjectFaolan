@@ -20,9 +20,6 @@ namespace Faolan.GameServer.CreateFlow
 	// part of the create flow that touches the database.
 	public sealed class CharacterCreationService(IDatabaseRepository database, ILogger logger)
 	{
-		private readonly IDatabaseRepository _database = database;
-		private readonly ILogger _logger = logger;
-
 		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /
 		// NicknameInvalid callbacks (Captures/Stricken_soldier-guardian_create_random-actions: Stricken->taken,
 		// empty->invalid, Strickenen->ok).
@@ -53,17 +50,17 @@ namespace Faolan.GameServer.CreateFlow
 			var verdict = CharacterNameRules.Check(name, forbidden, lengths);
 			if (verdict != CharacterNameRules.Verdict.Ok)
 			{
-				_logger.LogInformation("Character-editor: name rejected as {Verdict}.", verdict);
+				logger.LogInformation("Character-editor: name rejected as {Verdict}.", verdict);
 				return NameCommitResult.Invalid;
 			}
 
 			// Check the name is free before saving (Characters.Name is unique) so a taken name is rejected cleanly as
 			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by this character does
 			// not count; an idempotent re-name to the same value is handled above.
-			var existing = await _database.GetCharacterByName(name, character.RealmId);
+			var existing = await database.GetCharacterByName(name, character.RealmId);
 			if (existing != null && existing.Id != character.Id)
 			{
-				_logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
+				logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
 				return NameCommitResult.Taken;
 			}
 
@@ -71,7 +68,7 @@ namespace Faolan.GameServer.CreateFlow
 			// Nothing to regenerate: vitals are derived from (Class, Level) at read time, so the class chosen in the
 			// final editor step is reflected the moment it is stored.
 			// Persist the whole accumulated editor graph (name + sex/race/morphs Body) as one unit of work.
-			await _database.SaveCharacter(character);
+			await database.SaveCharacter(character);
 
 			// Seed the spawn scaffold and the starter gear here, the first moment either can be right: both are
 			// generated from the class, and the scaffold also from the editor body, which are only known once the
@@ -81,15 +78,15 @@ namespace Faolan.GameServer.CreateFlow
 			// so world entry is a pure read.
 			await SeedSpawnScaffold(character);
 			await SeedStarterEquipment(character);
-			await CharacterLoadout.Seed(_database, _logger, character);
+			await CharacterLoadout.Seed(database, logger, character);
 			await SeedBind(character);
 
 			// Grant the beach starter quest (10238) once, here at character creation - retail auto-grants it on first
 			// beach entry, and persisting it now keeps the journal data-driven from CharacterQuests (delivered live on
 			// the create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It
 			// is not re-seeded on world entry, so a completed or removed quest never reappears.
-			await _database.SetCharacterQuest(character.Id, QuestContent.BeachStarterQuestId, QuestState.Active);
-			_logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id,
+			await database.SetCharacterQuest(character.Id, QuestContent.BeachStarterQuestId, QuestState.Active);
+			logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id,
 				QuestContent.BeachStarterQuestId);
 			return NameCommitResult.Committed;
 		}
@@ -101,16 +98,16 @@ namespace Faolan.GameServer.CreateFlow
 			if (_nameFilter != null)
 				return _nameFilter.Value;
 
-			var terms = await _database.GetNameFilterTerms();
+			var terms = await database.GetNameFilterTerms();
 			_nameFilter = (terms.Select(t => t.TermHash).ToHashSet(StringComparer.Ordinal), terms.Select(t => t.Length).ToHashSet());
 
 			// An empty table is a real state - the RDB module is opt-in and needs the client install - and it changes
 			// what this server enforces, so it is said out loud rather than letting a filter that filters nothing look
 			// like one that found nothing to filter.
 			if (terms.Length == 0)
-				_logger.LogInformation("Character-editor: no name-filter terms imported (`--only rdb-name-filter`); only the 4..16 length rule applies.");
+				logger.LogInformation("Character-editor: no name-filter terms imported (`--only rdb-name-filter`); only the 4..16 length rule applies.");
 			else
-				_logger.LogInformation("Character-editor: {Count} name-filter terms loaded.", terms.Length);
+				logger.LogInformation("Character-editor: {Count} name-filter terms loaded.", terms.Length);
 
 			return _nameFilter.Value;
 		}
@@ -144,8 +141,8 @@ namespace Faolan.GameServer.CreateFlow
 			if (!PlayerSpawnScaffoldRows.TrySeedFreshRows(character))
 				return;
 
-			await _database.SaveCharacterScaffold(character);
-			_logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId:X8}.", character.Id);
+			await database.SaveCharacterScaffold(character);
+			logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId:X8}.", character.Id);
 		}
 
 		// Dresses a newly created character in the starting gear: the manacles both sexes wear, the sex-specific slave
@@ -157,7 +154,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			// Only ever dress an undressed character: re-filling emptied slots later would undo the player's own
 			// unequips, which is why this cannot run on every login.
-			if ((await _database.GetEquippedItems(character.Id)).Count > 0)
+			if ((await database.GetEquippedItems(character.Id)).Count > 0)
 				return;
 
 			var female = character.Sex == Sex.Female;
@@ -182,11 +179,11 @@ namespace Faolan.GameServer.CreateFlow
 
 			foreach (var (slot, template) in gear)
 			{
-				if (template is { } id && await _database.GetItem(id) != null)
-					await _database.SetCharacterItemSlot(character.Id, ContainerKind.Equipped, (int)slot, id);
+				if (template is { } id && await database.GetItem(id) != null)
+					await database.SetCharacterItemSlot(character.Id, ContainerKind.Equipped, (int)slot, id);
 			}
 
-			_logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
+			logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
 		}
 
 		// Binds the new character to its starting map's default respawn point, so bind recalls (the Path of Asura spell,
@@ -199,18 +196,18 @@ namespace Faolan.GameServer.CreateFlow
 		// entry.
 		private async Task SeedBind(Character character)
 		{
-			var spawn = await _database.GetDefaultSpawn(character.MapId);
+			var spawn = await database.GetDefaultSpawn(character.MapId);
 			if (spawn == null)
 			{
 				// Not fatal, and not silent: a map with no respawn point is a content gap, not corruption - the
 				// character simply has nowhere to recall to until one is imported for that map.
-				_logger.LogWarning("Bind: map {Map} has no default respawn point, so {CharacterId:X8} starts unbound.", character.MapId, character.Id);
+				logger.LogWarning("Bind: map {Map} has no default respawn point, so {CharacterId:X8} starts unbound.", character.MapId, character.Id);
 				return;
 			}
 
 			character.BindRespawnPointId = spawn.Id;
-			await _database.SaveCharacterBind(character.Id, spawn.Id);
-			_logger.LogInformation("Bind: {Name} bound to respawn point {Point} on map {Map} at creation.", character.Name, spawn.Id, character.MapId);
+			await database.SaveCharacterBind(character.Id, spawn.Id);
+			logger.LogInformation("Bind: {Name} bound to respawn point {Point} on map {Map} at creation.", character.Name, spawn.Id, character.MapId);
 		}
 
 		// Says out loud when the character's own editor appearance choices will not reach its spawn. The spawn resolves
@@ -221,7 +218,7 @@ namespace Faolan.GameServer.CreateFlow
 			if (character.BodyResources is not { Count: > 0 })
 				return;
 
-			var registry = await _database.GetMorphTargetRegistry();
+			var registry = await database.GetMorphTargetRegistry();
 
 			// A reference the registry does not know is a content gap: MorphTargets ships in the seed (1072 rows), so
 			// an unknown reference means the editor sent something that was never imported. It is checked here rather
@@ -231,7 +228,7 @@ namespace Faolan.GameServer.CreateFlow
 			var unresolved = character.BodyResources.Select(r => r.Ref).Where(r => !registry.ContainsKey(r)).ToArray();
 			if (unresolved.Length > 0)
 			{
-				_logger.LogError("Character {CharacterId:X8}: appearance resource(s) {Refs} are not in MorphTargets, so its spawn cannot be built at all. Import them.",
+				logger.LogError("Character {CharacterId:X8}: appearance resource(s) {Refs} are not in MorphTargets, so its spawn cannot be built at all. Import them.",
 					character.Id, string.Join(", ", unresolved));
 			}
 		}

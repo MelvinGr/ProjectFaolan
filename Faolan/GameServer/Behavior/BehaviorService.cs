@@ -108,7 +108,7 @@ namespace Faolan.GameServer.Behavior
 			// and that single 0x0008 packet is exactly 18 bytes, i.e. the head and nothing else, which is the case the
 			// short-body bail below answers.
 			body.ReadUInt32(); // EntityClass.Character (0xC350)
-			var clientInst = body.ReadUInt32();
+			body.ReadUInt32(); // the actor's handle
 			var behaviorType = body.ReadUInt16();
 			// A terminal form carries no commandId; reading one would throw EndOfStreamException, which ReceivedPacket
 			// turns into a hard client.Stop() (disconnect).

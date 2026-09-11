@@ -65,14 +65,13 @@ namespace Faolan.Importer.Extractors
 			// two runs over the same captures produce different Discriminators and faolan.sql churns for nothing.
 			var walks = harvested.Where(h => h.Walk.NpcTemplateId != null).OrderBy(WalkKey, StringComparer.Ordinal).ToList();
 			var contentKeys = walks.ToDictionary(h => h, ContentKeyOf);
-			var options = walks.ToDictionary(h => h, OptionIdsOf);
 			var parents = LinkParents(walks, contentKeys, report);
 
 			// --- 2. partition refinement -------------------------------------------------------------------------
 			var classOf = walks.ToDictionary(h => h, h => $"{h.Walk.NpcTemplateId}\0{contentKeys[h]}");
 			for (var round = 0; round < MaxRefinementRounds; round++)
 			{
-				var refined = Refine(walks, classOf, parents, options);
+				var refined = Refine(walks, classOf, parents);
 				if (refined.All(kv => classOf[kv.Key] == kv.Value))
 					break;
 
@@ -243,17 +242,6 @@ namespace Faolan.Importer.Extractors
 				graph.Report.Add($"{orphan.NpcName}: screen {orphan.ContentKey} has no root and no inbound branch - unreachable in game");
 		}
 
-		// The option buttons of a FOLDED screen, in the order the client draws them.
-		private static List<uint> OptionIdsOf(Node node)
-		{
-			var list = node.Packets
-				.Where(p => p.SubOpcode == ConversationSubOpcode.KnubotAnswerList)
-				.OrderBy(p => p.Sequence)
-				.LastOrDefault();
-
-			return list == null ? [] : [.. list.Screens.OrderBy(s => s.Sequence).Select(s => s.ScreenId)];
-		}
-
 		// The walk each non-root walk BRANCHED from, and the LDB id of the option that was clicked.
 		//
 		// Both come off the wire (ConversationWalk.ParentContentKey / OptionId): the extractor names the screen the
@@ -356,7 +344,7 @@ namespace Faolan.Importer.Extractors
 		// a route nobody explored past this point) says nothing about the slots it never exercised, so it merges into
 		// the fuller screen instead of splitting off as a near-duplicate.
 		private static Dictionary<Harvested, string> Refine(List<Harvested> walks, Dictionary<Harvested, string> classOf,
-			Dictionary<Harvested, (Harvested Parent, uint OptionId)> parents, Dictionary<Harvested, List<uint>> options)
+			Dictionary<Harvested, (Harvested Parent, uint OptionId)> parents)
 		{
 			// slot map per walk: what each of its options leads to, in the current classification.
 			var slots = walks.ToDictionary(h => h, _ => new Dictionary<(uint, uint?, QuestState?), string>());

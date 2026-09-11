@@ -31,10 +31,6 @@ namespace Faolan.GameServer.Dialogue
 	/// </remarks>
 	public sealed class ConversationService
 	{
-		// The TypeId every server-initiated conversation node carries: a server-opened window has no BCC action to take
-		// an action id from. It doubles as the guard that keeps these out of the talk path.
-		public const uint ServerInitiatedTypeId = 0;
-
 		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
 		// per-conversation instance comes from ConversationPacket.SenderInstance.
 		private const uint DefaultSenderInstance = 0x08;
@@ -634,7 +630,7 @@ namespace Faolan.GameServer.Dialogue
 					// why the exit point is the trigger object rather than a hard-coded pair of coordinates: the object
 					// that opened this conversation is the place the escort was leading to, the same reasoning
 					// `TryOpenTriggeredConversation` uses to find the escortee at all.
-					if (ExitPointFor(client, npcHandle) is { } exit && _sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var leaving) == true && leaving != null)
+					if (ExitPointFor(client) is { } exit && _sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var leaving) == true && leaving != null)
 					{
 						_npcs.ScheduleScriptedExit(leaving, exit);
 						_logger.LogInformation("Script: {Name} fired \"{Event}\" - she heads for the gate and leaves.", node.NpcName, name);
@@ -668,7 +664,7 @@ namespace Faolan.GameServer.Dialogue
 		///     Where a leaving NPC walks to: the world object that opened this conversation. Null when the player opened it
 		///     themselves, which is the honest answer - a farewell with no door behind it has no gate to head for.
 		/// </summary>
-		private Vector3? ExitPointFor(INetworkClient client, uint npcHandle)
+		private Vector3? ExitPointFor(INetworkClient client)
 		{
 			if (client.Session.ConversationTriggerObjectId is not { } objectId)
 				return null;

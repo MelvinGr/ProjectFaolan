@@ -45,7 +45,7 @@ namespace Faolan.Tests
 				// shorter than its 0x2C length prefix, so the client reads the version byte 3 bytes late as 0x00 and
 				// asserts. TryReadCharacterMessage (a name-signature scan) does not notice.
 				var body = NpcSpawnBuilder.BuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, 0x00A0BEEF);
-				AssertVersionByteFollowsTransformPrefix(body, npc.Name);
+				AssertVersionByteFollowsTransformPrefix(body);
 				Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var read), $"{npc.Name} body did not parse");
 
 				// The built record carries the type's worn equipment and (for a humanoid) its appearance table.
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 		// exactly that many transform bytes and reads the SimpleCharFullUpdateIIR version byte, which must be 0x05. A
 		// length prefix that disagrees with the real transform length lands this read on the wrong byte - the exact
 		// "serverversion: 0" crash.
-		private static void AssertVersionByteFollowsTransformPrefix(byte[] body, string? name)
+		private static void AssertVersionByteFollowsTransformPrefix(byte[] body)
 		{
 			var i = 16;
 			var prefix = 0;

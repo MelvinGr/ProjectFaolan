@@ -25,13 +25,6 @@ namespace Faolan.GameServer.World
 	public sealed class MovementService(WorldSimulation simulation, WorldObjectService worldObjects, QuestProgressionService questProgression,
 		ConversationService conversation, EnvironmentService environment, WorldBroadcaster broadcaster)
 	{
-		private readonly WorldSimulation _simulation = simulation;
-		private readonly WorldObjectService _worldObjects = worldObjects;
-		private readonly QuestProgressionService _questProgression = questProgression;
-		private readonly ConversationService _conversation = conversation;
-		private readonly EnvironmentService _environment = environment;
-		private readonly WorldBroadcaster _broadcaster = broadcaster;
-
 		/// <summary>
 		///     Squared world distance a move must cover to count as a real translation that interrupts an in-flight
 		///     cast.
@@ -91,7 +84,7 @@ namespace Faolan.GameServer.World
 		// RegisterPlayerInWorld, which only runs on world entry. There is no entity to hold the transform, so
 		// the session Character is the right place: for an editor avatar the character row is the live state,
 		// and it is what the world entry that follows spawns from.
-		var moveEntity = _simulation.PlayerWorldEntity(client);
+		var moveEntity = simulation.PlayerWorldEntity(client);
 
 		// The pre-move position, so a real translation below can interrupt an in-flight cast.
 		var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
@@ -100,7 +93,7 @@ namespace Faolan.GameServer.World
 		// skips the request - still gets stood up. The normal path is the client's own standup request,
 		// behaviour 1 in the BCC branch. Gated on distance, because a seated client streams position syncs
 		// that must not stand it up.
-		await _worldObjects.StandUpIfMoved(client, movePosition);
+		await worldObjects.StandUpIfMoved(client, movePosition);
 
 		// The spellweave trance immobilises the caster: while IsSpellweaving the server pins the position,
 		// rejecting translation, but still accepts rotation. This handler is the enforcement point, and the
@@ -125,10 +118,10 @@ namespace Faolan.GameServer.World
 		// A move can satisfy a ReachArea quest goal, such as Shipwrecked's "Enter the jungle": solve any whose
 		// area this position falls in. An in-memory distance test, with the targets cached on the entity.
 		if (moveEntity != null)
-			await _questProgression.CheckReachGoals(client, moveEntity, livePosition);
+			await questProgression.CheckReachGoals(client, moveEntity, livePosition);
 
 		if (moveEntity != null)
-			await _conversation.CheckApproach(client, moveEntity, livePosition);
+			await conversation.CheckApproach(client, moveEntity, livePosition);
 
 		// The world's own damage sources. Fall damage is resolved here rather than on the world tick because a
 		// fall's size is only known on the record that reports the landing, and a hazard's client-named
@@ -137,7 +130,7 @@ namespace Faolan.GameServer.World
 		// position - the entity's is already committed above, and the fall's apex is seeded from
 		// WorldEntity.LastGroundedY, which the service maintains itself.
 		if (moveEntity != null)
-			await _environment.OnPlayerMoved(client, moveEntity, livePosition, moveFlags, moveVerticalSpeed);
+			await environment.OnPlayerMoved(client, moveEntity, livePosition, moveFlags, moveVerticalSpeed);
 
 		// Moving cancels an in-flight cast: a real translation invalidates the deferred resolve via the cast
 		// token. Turning in place leaves the position unchanged, so aiming a ground-target reticle never
@@ -182,7 +175,7 @@ namespace Faolan.GameServer.World
 
 		// Interest-managed broadcast: spawn this player to newly-near players and forward the move to those who
 		// already see them, carrying the same body the echo just did. A no-op with nobody else in range.
-		await _broadcaster.BroadcastPlayerMove(client, echoBody, livePosition);
+		await broadcaster.BroadcastPlayerMove(client, echoBody, livePosition);
 
 		}
 	}

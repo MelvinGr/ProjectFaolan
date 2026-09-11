@@ -201,7 +201,6 @@ namespace Faolan.GameServer.Quest
 			// Tortage beach - so it must stay one batched read rather than a query per active quest. Order is
 			// preserved, so the first match wins. The giver logic below needs the raw rows in every state (held /
 			// completed), so that stays a plain read.
-			var quests = context.Quests;
 			foreach (var (_, qDef) in context.Active)
 			{
 				// Template first, name second - the same test the talk trigger uses, so the marker and what fires on

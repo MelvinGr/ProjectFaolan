@@ -22,10 +22,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	/// </remarks>
 	public static class PfAccessWindowEntryCodec
 	{
-		// Every name in the shipped catalog carries this prefix - a property of the data the catalog tests assert, not of
-		// the grammar; the client does not validate names.
-		public const string NamePrefix = "PFAccessWindow_";
-
 		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(PfAccessWindowEntry value)
 		{

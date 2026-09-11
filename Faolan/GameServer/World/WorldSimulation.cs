@@ -112,10 +112,6 @@ namespace Faolan.GameServer.World
 		// and the tick, the only thing that uses it, does not run until Start.
 		private IWorldOutbound _output = null!;
 
-		// The spell-area and chain-edge catalog, read directly rather than through IWorldOutbound: it is a pure read over
-		// the database, so routing four table lookups through the wire port would only widen the port.
-		private readonly SpellAreaCatalog _spellAreas;
-
 		/// <summary>
 		///     Sends what <paramref name="entity" /> has walked but not yet had broadcast, and ends its move.
 		/// </summary>
@@ -150,10 +146,9 @@ namespace Faolan.GameServer.World
 		// `World` and `Players` arrive by injection rather than being created here. Both are shared with
 		// PlayerDeathService, which must not hold this class, so the state they both read is what gets passed rather than
 		// a reference back to its owner.
-		public WorldSimulation(ICharacterRepository characters, IWorldRepository worldData, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
+		public WorldSimulation(ICharacterRepository characters, IWorldRepository worldData, IChatServerDispatcher agents, ILogger logger,
 			WorldState world, PlayerRegistry players, PlayerDeathService playerDeaths, BuffTickService buffTicks, NpcCombatService npcCombat, TerrainService? terrain = null)
 		{
-			_spellAreas = spellAreas;
 			_characters = characters;
 			_worldData = worldData;
 			_agents = agents;

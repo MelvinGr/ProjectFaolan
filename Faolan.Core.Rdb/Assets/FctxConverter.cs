@@ -78,7 +78,7 @@ namespace Faolan.Core.Rdb.Assets
 				: fourCc; // MIXD maps onto DDS ATI1 (single-channel BC4)
 
 			byte[] body;
-			string? warning = null;
+			string? warning;
 			if (blockSize > 0)
 				body = ReorderMipsLargestFirst(pixels, width, height, mip, blockSize, out warning);
 			else

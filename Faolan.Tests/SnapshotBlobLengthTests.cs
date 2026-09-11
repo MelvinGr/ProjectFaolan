@@ -58,7 +58,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void GeneratedSnapshot_ReassemblesConsistently()
 		{
-			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
+			var (_, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
 
 			var held = new[]
 			{

@@ -60,7 +60,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AVictimAlreadyCarryingTheEffect_DoesNotReRunTheChain()
 		{
-			var (sim, buffTicks, output, areas, client, mob) = await Harness();
+			var (_, buffTicks, output, areas, client, mob) = await Harness();
 			areas.Chains[Stench] = await ShippedChainEdges(Stench);
 			output.AreaVictims = [MobHandle];
 

@@ -42,17 +42,6 @@ namespace Faolan.GameServer
 	/// </remarks>
 	public partial class GameServerListener : RpcServer, IGameServerProvider
 	{
-		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform and world objects
-		// scope to it. Threaded as one value so the snapshot, spawn and objects agree.
-		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
-
-		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for every character - it
-		// is the canonical beach starting quest, not a per-character artifact, across the hoxxling and randochar
-		// captures. The snapshot is replayed and the client renders that quest, so it is persisted too; otherwise
-		// CharacterQuests is empty while the journal shows a quest. See CommitCharacterName /
-		// QuestContent.BeachStarterQuestId.
-		private const uint BeachStarterQuestId = QuestContent.BeachStarterQuestId;
-
 		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
 		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). It recalls to
 		// the bound location; DoTeleport is the single-server equivalent of retail's cross-server redirect.
@@ -71,7 +60,6 @@ namespace Faolan.GameServer
 		// rating quad (see SendCombatRatings).
 		private const uint CombatToggleSpecialAction = 0x4E2;
 
-
 		// The spellweave activate/deactivate selector is per class (necromancer 0xFC, demonologist 0x10C), so it lives
 		// in StartingData.SpellweaveToggleAction, which carries the corpus evidence for each row.
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
@@ -81,7 +69,6 @@ namespace Faolan.GameServer
 		// GameCharAgent reply uses - per the one captured exchange (chat-annotated-4, the c2s 0x207B at frame 10723
 		// answered from 0xA9ECB95D/0x57 at 10726).
 		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x57);
-
 
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
@@ -95,27 +82,13 @@ namespace Faolan.GameServer
 		private readonly QuestShareOutbound _questShare;
 
 		private readonly EconomyOutbound _economyOutbound;
-		// What an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB [2][9] stat
-		// effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
-		private readonly BuffStatEffects _buffStats;
 
 		private readonly ClaimService _claims;
 		private readonly QuestRewardService _questRewards;
 
-		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
-		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
-		private readonly CombatService _combat;
-
-		// Melee combos: reads the combo id + step the client puts on every Combat:Melee swing and tracks the running
-		// attempt, so the finisher can deliver the combo's own spell. See Combat/ComboService.cs.
-		private readonly ComboService _combos;
-
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
-
-		// Khitai reputation - awards standing on a kill and restores it at world entry.
-		private readonly FactionService _factions;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow (CreateFlow/CreateFlowService.cs).
 		// The inbound create-flow handlers forward to it; it takes the burst-less world entry and the handoff pair as
@@ -126,36 +99,16 @@ namespace Faolan.GameServer
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly EquipmentService _equipment;
 
-		// Non-combat damage - fall damage + the scripted hazard volumes. See World/EnvironmentService.cs.
-		private readonly EnvironmentService _environment;
-
-		// Knockback - the server shoving an entity along a segment it did not walk. See
-
-		// Local travel - the NPCs who move a player for a fee. See World/TravelService.cs.
-		private readonly TravelService _travel;
 		private readonly FeatService _feats;
 
 		// Skill-point spends - the c2s SkillIIR transfer out of the SkillPoints pool.
 		// See Progression/SkillPointService.cs.
 		private readonly SkillPointService _skillPoints;
 
-		// Character advancement - XP in, levels out, and the whole level-up burst. Every path that moves a level goes
-		// through it (a kill's XP via CombatService, a GM `.level` set). See Progression/LevelUpService.cs.
-		private readonly LevelUpService _levelUp;
-
 		// The buff engine - apply, track, expire, remove, restore, and the stat deltas a live buff carries. The buff
 		// members of IWorldOutbound, ISpellEffectOutbound and ISpellweaveOutbound all forward here.
 		// See Combat/BuffService.cs.
 		private readonly BuffService _buffs;
-
-		// The cast pipeline - begin-ack, cast time, then resolve (server-side effects, ground AoE, the landing buff,
-		// mana, instant areas, offensive damage). See Combat/CastService.cs.
-		private readonly CastService _cast;
-
-		// What a completed melee combo does when it lands - stamina, the finisher's spell, its damage, its knockback. A
-		// layer above the combo catalog (_combos), which is why it is a separate class; see Combat/ComboFinisher.cs.
-		// Built last: it needs the knockback service.
-		private readonly ComboFinisher _comboFinisher;
 
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -177,12 +130,6 @@ namespace Faolan.GameServer
 		// Player-state persistence: the autosave loop plus the logout/teleport/.save flushes.
 		private readonly PlayerPersistenceService _persistence;
 
-		// Scripted Tortage-intro narrative: the Kalanthes create-cutscene walk and the Casilda beach rescue.
-		private readonly TortageIntroService _tortageIntro;
-
-		// The multi-stage quest-chain supersession engine, shared by the kill/loot/talk triggers.
-		private readonly QuestProgressionService _questProgression;
-
 		// Quest sharing: reaches the team roster through the CS seam and the wire through IQuestShareOutbound.
 		private readonly QuestSharingService _questSharing;
 		private readonly ApprenticeService _apprentice;
@@ -200,37 +147,14 @@ namespace Faolan.GameServer
 		// grant/take ops the shop and bank use. See Economy/TradeskillService.cs.
 		private readonly TradeskillService _tradeskill;
 
-		// Getting on and off a mount - the seat, the persisted mount, and the dismount every involuntary path shares.
-		// See World/MountService.cs.
-		private readonly MountService _mounts;
-
 		// A player dying, releasing and coming back: the death screen, the release timer, the self-resurrection a
 		// spell can arm, and the respawn. See World/PlayerDeathService.cs.
 		private readonly PlayerDeathService _playerDeaths;
 
-		// Knockback: resolve the shove, apply retail's immunity buff, put the displacement on the wire.
-		// See Combat/KnockbackService.cs.
-		private readonly KnockbackService _knockback;
-
-		// The loot lifecycle's wire side - a corpse's drop, the bag's open/close/fade - and what is in each bag.
-		// See World/LootBroadcaster.cs.
-		private readonly LootBroadcaster _lootBroadcaster;
-
-		// What an NPC does, told to everyone who can see it - aggro, combat mode, movement, patrol, follow, respawn,
-		// scripted exit - plus putting a runtime NPC or pet in the world. The broadcaster answers the other half of the
-		// question, who can see what. See World/NpcBroadcaster.cs.
-		private readonly NpcBroadcaster _npcs;
-
-		// The quest wire (journal packets + the overhead '!' / '?' markers) and the marker decision behind it. Both are
-		// shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the IQuestOutbound
-		// port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
+		// The quest wire (journal packets + the overhead '!' / '?' markers) and the marker decision behind it. Shared:
+		// the broadcaster calls into the wire on every streamed-in NPC, and QuestOutbound is the IQuestOutbound port
+		// over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
 		private readonly QuestBroadcaster _questBroadcaster;
-		private readonly QuestOutbound _questOutbound;
-
-		// Interacting with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
-		// sequences, the GM delete. Its subject is LiveWorldObject, which is what separates it from the broadcaster's
-		// WorldEntity. See World/WorldObjectService.cs.
-		private readonly WorldObjectService _worldObjects;
 
 		// The changemap handoff (GM .teleport, the recalls, the travel box, a zone line, a cross-map trip) plus the two
 		// latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
@@ -276,15 +200,8 @@ namespace Faolan.GameServer
 		// The `.command` table and its handlers (Gm/GmCommandService); the listener only routes a chat line there.
 		private readonly GmCommandService _gmCommands;
 
-		// Achievement tags (the vista award goes through it).
-		private readonly TagService _tags;
-
 		private readonly StanceService _stances;
 		private readonly VistaService _vista;
-		private readonly ItemUseService _itemUse;
-
-		// The travel confirmation box + the ACG teleport choice (TravelOutbound owns the confirm cookie).
-		private readonly TravelOutbound _travelOutbound;
 
 		// The player move and the Authenticate2 hello - the two inbound cases that are handlers rather than forwards.
 		private readonly MovementService _movement;
@@ -307,20 +224,17 @@ namespace Faolan.GameServer
 		// - rather than an artifact of DI. Shrinking it means moving handlers out, not hiding them behind a parameter
 		// object.
 		public GameServerListener(ILoggerFactory loggerFactory, IConfiguration configuration, IDatabaseRepository database, HostRealm realm,
-			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher,
-			ConnectionRegistry connections,
-			WorldSimulation simulation, PlayerDeathService playerDeaths, PlayerPersistenceService persistence, TortageIntroService tortageIntro, ComboService combos,
-			QuestBroadcaster questBroadcaster, WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster lootBroadcaster,
-			QuestOutbound questOutbound, WorldObjectService worldObjects, TeleportService teleport, CreateFlowService createFlow,
-			LevelUpService levelUp, EconomyOutbound economyOutbound, TradeService trade, QuestRewardService questRewards,
-			QuestProgressionService questProgression, BuffStatEffects buffStats, BuffService buffs, PetService pets,
-			KnockbackService knockback, FactionService factions, CombatService combat, CastService cast, EnergyService energy,
-			SpellweaveService spellweave, TravelService travel, ConversationService conversation, QuestShareOutbound questShare,
-			QuestSharingService questSharing, ApprenticeService apprentice, StockConversationService stockConversation, LootService loot,
-			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
-			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
-			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
-			WorldOutbound worldOutbound, WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, TagService tags, StanceService stances, VistaService vista, ItemUseService itemUse, TravelOutbound travelOutbound, MovementService movement, LoginHandshakeService login, BehaviorService behavior)
+			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher,
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, ConnectionRegistry connections, WorldSimulation simulation,
+			PlayerDeathService playerDeaths, PlayerPersistenceService persistence, QuestBroadcaster questBroadcaster, WorldBroadcaster broadcaster,
+			TeleportService teleport, CreateFlowService createFlow, EconomyOutbound economyOutbound, TradeService trade,
+			QuestRewardService questRewards, BuffService buffs, PetService pets, EnergyService energy, SpellweaveService spellweave,
+			ConversationService conversation, QuestShareOutbound questShare, QuestSharingService questSharing, ApprenticeService apprentice,
+			StockConversationService stockConversation, LootService loot, KeepAliveService keepAlive, ShortcutBarService shortcutBar,
+			EquipmentService equipment, ShopService shop, BankService bank, TradepostService tradepost, GuildBankService guildBank,
+			TradeskillService tradeskill, ClaimService claims, FeatService feats, SkillPointService skillPoints, WorldOutbound worldOutbound,
+			WorldEntryService worldEntry, RealmClock clock, GmCommandService gmCommands, StanceService stances, VistaService vista,
+			MovementService movement, LoginHandshakeService login, BehaviorService behavior)
 			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -330,31 +244,17 @@ namespace Faolan.GameServer
 			_simulation = simulation;
 			_playerDeaths = playerDeaths;
 			_persistence = persistence;
-			_tortageIntro = tortageIntro;
-			_combos = combos;
 			_questBroadcaster = questBroadcaster;
 			_broadcaster = broadcaster;
-			_npcs = npcs;
-			_lootBroadcaster = lootBroadcaster;
-			_questOutbound = questOutbound;
-			_worldObjects = worldObjects;
 			_teleport = teleport;
 			_createFlow = createFlow;
-			_levelUp = levelUp;
 			_economyOutbound = economyOutbound;
 			_trade = trade;
 			_questRewards = questRewards;
-			_questProgression = questProgression;
-			_buffStats = buffStats;
 			_buffs = buffs;
 			_pets = pets;
-			_knockback = knockback;
-			_factions = factions;
-			_combat = combat;
-			_cast = cast;
 			_energy = energy;
 			_spellweave = spellweave;
-			_travel = travel;
 			_conversation = conversation;
 			_questShare = questShare;
 			_questSharing = questSharing;
@@ -372,18 +272,12 @@ namespace Faolan.GameServer
 			_claims = claims;
 			_feats = feats;
 			_skillPoints = skillPoints;
-			_mounts = mounts;
-			_environment = environment;
-			_comboFinisher = comboFinisher;
 			_worldOutbound = worldOutbound;
 			_worldEntry = worldEntry;
 			_clock = clock;
 			_gmCommands = gmCommands;
-			_tags = tags;
 			_stances = stances;
 			_vista = vista;
-			_itemUse = itemUse;
-			_travelOutbound = travelOutbound;
 			_movement = movement;
 			_behavior = behavior;
 			_login = login;
@@ -586,7 +480,6 @@ namespace Faolan.GameServer
 			if (!await _tradepost.Handle(client, packet, body))
 				LogUnknownPacket(packet);
 		}
-
 
 	}
 }
