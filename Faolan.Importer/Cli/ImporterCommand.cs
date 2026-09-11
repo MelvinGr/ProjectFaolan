@@ -5,24 +5,24 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
-	// The importer's command line, declared once (System.CommandLine) instead of scanned ad hoc.
-	//
-	// What the declaration buys over the old `GetOption(args, "--x")` scans: an unknown or misspelled option is now
-	// an ERROR rather than silently ignored (`--dryrun` used to mean "not a dry run"), a missing value is an error
-	// rather than a null, `--help` lists everything, and the parse happens ONCE up front instead of each caller
-	// re-reading argv with its own idea of the grammar.
-	//
-	// Two kinds of option live here and they are handled differently:
-	//   - CONFIG KEYS (Database:ConnectionString, Database:Provider, RdbDir) name a setting that also lives in
-	//     faolan.json and the environment. They are parsed here but resolved through CliConfig, so the precedence
-	//     (env > command line > json) is unchanged and the NAME is the config path - one spelling per setting.
-	//   - COMMAND options (--only, --dry-run, --report, ...) are per-invocation and belong to the CLI alone.
+	/// <summary>
+	///     The importer's command line, declared once with System.CommandLine: an unknown or misspelled option is an
+	///     error rather than silently ignored, a missing value is an error rather than a null, <c>--help</c> lists
+	///     everything, and the parse happens once up front.
+	/// </summary>
+	/// <remarks>
+	///     Two kinds of option live here and are handled differently.
+	///     Config keys (Database:ConnectionString, Database:Provider, RdbDir) name a setting that also lives in
+	///     faolan.json and the environment. They are parsed here but resolved through <see cref="CliConfig" />, so the
+	///     precedence is unchanged and the option name is the config path - one spelling per setting.
+	///     Command options (--only, --dry-run, --report, ...) are per-invocation and belong to the CLI alone.
+	/// </remarks>
 	public static class ImporterCommand
 	{
-		// Config keys: the option name IS the configuration path, and its description, TYPE and default come from the
-		// one catalog (FaolanSettings) - these are that catalog's own options, which is why they are the non-generic
-		// Option rather than Option<string> (`--Database:Provider` is an Option<FaolanDbProvider>, so a bad engine name
-		// is a parse error listing the ones that exist).
+		// Config keys: the option name is the configuration path, and its description, type and default come from the
+		// one catalog (FaolanSettings). These are that catalog's own options, which is why they are the non-generic
+		// Option rather than Option<string> - `--Database:Provider` is an Option<FaolanDbProvider>, so a bad engine
+		// name is a parse error listing the ones that exist.
 		private static readonly Option ConnectionString = FaolanSettings.Get(Keys.DatabaseConnectionString);
 		private static readonly Option Provider = FaolanSettings.Get(Keys.DatabaseProvider);
 		private static readonly Option RdbDir = FaolanSettings.Get(Keys.ContentRdbDir);
@@ -44,8 +44,13 @@ namespace Faolan.Importer.Cli
 		private static readonly Option<string> DumpTemplates = new Option<string>("--dump-templates") { Description = "Dump decrypted item templates to this directory." };
 		private static readonly Option<string> RdbProxy = new Option<string>("--rdb-proxy") { Description = "Faolan.Web.Content mirror address for on-demand RDB fetches, e.g. http://127.0.0.1:7081 (the /gameupdate/upm/rdb route is appended)." };
 
-		// Parses argv. Returns null when the parser handled the invocation itself (--help, or a parse error, which it
-		// reports); the exit code is then in `exitCode`.
+		/// <summary>
+		///     Parses argv.
+		/// </summary>
+		/// <returns>
+		///     The parsed options, or null when the parser handled the invocation itself (--help, or a parse error,
+		///     which it reports); the exit code is then in <paramref name="exitCode" />.
+		/// </returns>
 		public static ImporterOptions? Parse(string[] args, out int exitCode)
 		{
 			var command = new RootCommand("Faolan importer - rebuilds the game data in the database from packet captures and the client RDB.")
@@ -67,9 +72,10 @@ namespace Faolan.Importer.Cli
 		}
 	}
 
-	// Everything the importer was scraping out of argv, parsed once - including the shared CONFIGURATION its three
-	// config keys contributed to, resolved once here. It used to carry the override layer instead, and every reader
-	// rebuilt the whole stack (both json files and the environment) to look one key up: eight sites did that.
+	/// <summary>
+	///     Everything the importer takes from argv, parsed once - including the shared configuration its three config
+	///     keys contributed to, resolved once here so no reader rebuilds the stack to look a key up.
+	/// </summary>
 	public sealed record ImporterOptions(
 		string? Captures, string? Only, string? Skip, string? Mode,
 		bool DryRun, bool Force, bool List,

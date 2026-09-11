@@ -4,25 +4,25 @@ using System.Text;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A primary key DERIVED from a row's natural identity, for the importer-rebuilt tables whose identity is too
+	// A primary key derived from a row's natural identity, for the importer-rebuilt tables whose identity is too
 	// wide (or too float-y) to carry down a tree as a composite key.
 	//
-	// Why these tables need one at all: the importer delete+reinserts them on every re-harvest, so an AUTOINCREMENT
+	// Why these tables need one at all: the importer delete+reinserts them on every re-harvest, so an autoincrement
 	// surrogate is reassigned every run - thousands of faolan.sql lines churn for zero semantic change, and it
 	// cascades into every child FK. A natural composite key is the first choice (see ShopItem, NpcSpawnEquipment,
-	// ...); this is the fallback for a ROOT whose identity would otherwise widen every level beneath it, or which
-	// is pointed at by a NULLABLE foreign key (a composite cannot express SetNull when one of its columns is
+	// ...); this is the fallback for a root whose identity would otherwise widen every level beneath it, or which
+	// is pointed at by a nullable foreign key (a composite cannot express SetNull when one of its columns is
 	// non-null). The id is a pure function of the identity, so a re-import reproduces it exactly.
 	//
-	// FNV-1a over a NUL-separated rendering. NUL is the separator because no identity component can contain one:
-	// they are entity names, integers, enum names and float bit patterns. Floats are rendered as their BIT PATTERN
+	// Fnv-1a over a NUL-separated rendering. NUL is the separator because no identity component can contain one:
+	// they are entity names, integers, enum names and float bit patterns. Floats are rendered as their bit pattern
 	// rather than as text - the importer stores the captured bits verbatim, and a float's decimal rendering is
 	// neither injective nor round-trip-stable, so the bits are the only honest identity.
 	//
-	// Collisions are possible in principle (32 bits). Two identities hashing alike surfaces as a PRIMARY KEY
+	// Collisions are possible in principle (32 bits). Two identities hashing alike surfaces as a primary key
 	// violation that aborts the import - never as one row silently overwriting another. ImportConversations checks
 	// for it up front as well, so its error names the two colliding screens instead of a constraint code.
-	// A row whose primary key is derived from its own identity. DatabaseContext STAMPS the id of every Added
+	// A row whose primary key is derived from its own identity. DatabaseContext stamps the id of every Added
 	// entity implementing this before it saves, so no caller has to remember to - and none can get it wrong,
 	// because the id is by definition a function of columns the row already carries. DatabaseConventionTests
 	// asserts the shipped data agrees with the function.
@@ -56,7 +56,7 @@ namespace Faolan.Core.Database.Tables
 			return hash;
 		}
 
-		// A null component renders empty - it is a MEANINGFUL part of the identity ("unconditional", "unnamed"),
+		// A null component renders empty - it is a meaningful part of the identity ("unconditional", "unnamed"),
 		// distinct from an empty string only in that no real value renders empty for the types we key on.
 		private static string Render(object? part)
 		{

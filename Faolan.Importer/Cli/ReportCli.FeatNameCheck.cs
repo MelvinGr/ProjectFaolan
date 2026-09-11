@@ -8,21 +8,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report feat-name-check`: the name we SHIP for each feat against the name the client DISPLAYS (#925).
+	// `--report feat-name-check`: the name shipped for each feat against the name the client displays.
 	//
 	// A feat's RDB template (type 1000020, the plaintext half) carries a name inline, and that is what
-	// `RdbFeatImporter.ReadNameAndDescription` returns. It is an AUTHORING name. The client draws the feat from
-	// **LDB category 50220**, keyed by the same template id - established over every row in
-	// `docs/rdb/ldb-string-index.md`, which measures 50220 naming 19,163 of the 19,777 feats and none of the items.
+	// `RdbFeatImporter.ReadNameAndDescription` returns: an authoring name. The client draws the feat from LDB
+	// category 50220, keyed by the same template id - established over every row in
+	// `docs/rdb/ldb-string-index.md`, which measures 50220 naming almost every feat and none of the items.
 	//
-	// ⚠️ The two agree on most feats, which is why this went unnoticed for so long. Where they diverge the authoring
-	// name is usually the stem before a possessive - `Devourer` for `Devourer's Might`, `At Death` for
-	// `At Death's Door` - so it reads as a string being truncated at an apostrophe. Nothing truncates anything;
-	// they are simply two different strings, and we were shipping the wrong one.
+	// The two agree on most feats. Where they diverge the authoring name is usually the stem before a possessive -
+	// `Devourer` for `Devourer's Might`, `At Death` for `At Death's Door` - so it reads as a string truncated at an
+	// apostrophe. Nothing truncates anything; they are simply two different strings.
 	//
-	// ⭐ Why a report and not a test: this compares SHIPPED DATA to a client artifact, and the populations move
-	// whenever the RDB is re-read. A test would freeze one side of that. The direction that can only ever be a
-	// defect - a feat whose displayed name we do not reproduce - is the one this returns non-zero on.
+	// It is a report and not a test because it compares shipped data to a client artifact, and the populations move
+	// whenever the RDB is re-read. The direction that can only ever be a defect - a feat whose displayed name is not
+	// reproduced - is the one it returns non-zero on.
 	public static partial class ReportCli
 	{
 		private const uint FeatNameCategory = 50220;
@@ -69,14 +68,14 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  ...DIFFERENT                   {differing.Count,7}");
 
 			// The distinct pairs, not the per-rank repetition: a feat's ranks are separate ids carrying the same name,
-			// so counting rows overstates how many NAMES are wrong by roughly the rank count.
+			// so counting rows overstates how many names are wrong by roughly the rank count.
 			var distinct = differing
 				.GroupBy(d => (d.Ours, d.Theirs))
 				.OrderByDescending(g => g.Count())
 				.ToList();
 			Console.WriteLine($"  ...distinct (ours -> theirs)   {distinct.Count,7}");
 
-			// ⭐ The 983 are not one phenomenon, and only three of the five are safe to adopt. Classified on the pair
+			// The differing pairs are not one phenomenon, and only some are safe to adopt. Classified on the pair
 			// itself rather than by eye: strip the kind prefix both sides may carry (`Spell - `, `Ability - `,
 			// `Combo - `) and ask which string contains which - then, for the disjoint remainder, whether the LDB
 			// gives that label to this feat alone (adoptable: nothing can collapse) or to several (a reused category
@@ -115,7 +114,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"          ... and {list.Count - 6} more");
 			}
 
-			// `--report-arg tsv:<path>` writes every differing ROW with its bucket, which is what an investigation
+			// `--report-arg tsv:<path>` writes every differing row with its bucket, which is what an investigation
 			// into the disjoint set needs - the console print is grouped and truncated by design.
 			if ((arg ?? "").StartsWith("tsv:", StringComparison.OrdinalIgnoreCase))
 			{
@@ -130,10 +129,10 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  wrote {differing.Count} row(s) to {path}");
 			}
 
-			// ⚠️ The exit code tracks the ADOPTABLE population, not the differing one. Most of what is left is not a
-			// defect: 88 pairs are an LDB entry that is truncated where ours is right, and ~670 are a category label
-			// the LDB shares across many ids. Returning non-zero on those would make this permanently red and
-			// therefore ignorable. It goes red when a name we could safely correct is not corrected - i.e. when
+			// The exit code tracks the adoptable population, not the differing one. Most of what is left is not a
+			// defect: some pairs are an LDB entry truncated where the shipped one is right, and many more are a
+			// category label the LDB shares across many ids. Returning non-zero on those would make this permanently
+			// red and therefore ignorable. It goes red when a name that could safely be corrected is not - i.e. when
 			// RdbFeatImporter.PreferDisplayName has not been run over the current RDB.
 			var adoptable = buckets
 				.Where(b => b.Key.EndsWith("adopt theirs", StringComparison.Ordinal))
@@ -147,11 +146,11 @@ namespace Faolan.Importer.Cli
 			return adoptable == 0 ? 0 : 1;
 		}
 
-		// ⚠️ Our `Name` keeps the RANK NUMBER the authoring name ends with (`HP 20-40 1`..`13`); the displayed name
-		// does not (`HP 20-40`). That is not a defect and must not be "fixed": each rank is its own row and its own
-		// template id, `ParseName` derives the `Rank` column from exactly that suffix, and adopting the displayed
-		// string verbatim would give all thirteen ranks one name. So the suffix is normalised away before comparing,
-		// and only what still differs is the #925 defect.
+		// The shipped `Name` keeps the rank number the authoring name ends with (`HP 20-40 1`..`13`); the displayed
+		// name does not (`HP 20-40`). That is not a defect and must not be "fixed": each rank is its own row and its
+		// own template id, `ParseName` derives the `Rank` column from exactly that suffix, and adopting the displayed
+		// string verbatim would give every rank one name. So the suffix is normalised away before comparing, and only
+		// what still differs is a defect.
 		// The client's own kind prefixes. They are part of the displayed name, but they are not what distinguishes
 		// one feat from another, so a comparison that keeps them calls `Dark Hand` and `Spell - Dark Hand` disjoint.
 		private static string StripKind(string name)

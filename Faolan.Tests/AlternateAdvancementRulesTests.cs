@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ALTERNATE-ADVANCEMENT economy (#150), against the numbers retail announced.
+	// The alternate-advancement economy, against the numbers retail announced.
 	//
-	// ⭐ Every expectation here is a value the corpus states in words: retail sends a `FormatFeedbackIIR` carrying
+	// Every expectation here is a value the corpus states in words: retail sends a `FormatFeedbackIIR` carrying
 	// `AlternateAdvancementPvEXpGranted` for each grant, with the amount as its first parameter, and the `AAPvEXP`
 	// stat push in the same frame moves by exactly that much. `--report aa-xp` re-derives the whole table from the
 	// dumps; these are its rows, pinned.
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, AlternateAdvancementRules.KillXp(MaxLevel, MaxLevel, creatureLevel, 4, 0));
 		}
 
-		// ⭐ The GREY rule, measured at its own boundary: level 71 and 72 pay nothing to a level-80 player across
+		// The grey rule, measured at its own boundary: level 71 and 72 pay nothing to a level-80 player across
 		// 30+ kills in eight sessions, and 73 pays 27. So the cutoff is the player's level minus eight, and the
 		// evidence is the pair either side of it rather than the shape of the curve.
 		[Theory]
@@ -41,9 +41,9 @@ namespace Faolan.Tests
 			Assert.Equal(0u, AlternateAdvancementRules.KillXp(MaxLevel, MaxLevel, creatureLevel, 4, 0));
 		}
 
-		// ⭐ THE ACCRUAL GATE. Every kill grant in the corpus was made by a character at the level cap, and no kill in
+		// The accrual gate. Every kill grant in the corpus was made by a character at the level cap, and no kill in
 		// any levelling capture pays at all - while a flat item redemption pays a Tortage lowbie 15,000. A kill feeds
-		// the pool only at the cap, which is why the gate is on the KILLER's level and not just on the gap.
+		// the pool only at the cap, which is why the gate is on the killer's level and not just on the gap.
 		[Theory]
 		[InlineData(6u, 6u)]
 		[InlineData(24u, 24u)]
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 		}
 
 		// The named tier pays roughly double and one flagged tier ~15% more. Both factors are approximations of a
-		// single sample each - see the remarks on Multiplier - so these assert the SHIPPED factor, and the comment
+		// single sample each - see the remarks on Multiplier - so these assert the shipped factor, and the comment
 		// carries what retail actually paid.
 		[Fact]
 		public void ANamedCreature_PaysAboutDouble()
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 			// Argus the Thief, level 79, NpcType 2: retail paid 461 against the ordinary 234 (x1.970).
 			Assert.Equal(468u, AlternateAdvancementRules.KillXp(MaxLevel, MaxLevel, 79, 2, 0));
 
-			// Eerika of the Maidens, level 80, NpcType 2 AND the 0x1C0000 flag word: retail paid 510 against 258
+			// Eerika of the Maidens, level 80, NpcType 2 and the 0x1C0000 flag word: retail paid 510 against 258
 			// (x1.977). The flag does not compound - she pays the named rate, not the named rate times 1.15.
 			Assert.Equal(516u, AlternateAdvancementRules.KillXp(MaxLevel, MaxLevel, 80, 2, 0x1C0000));
 		}

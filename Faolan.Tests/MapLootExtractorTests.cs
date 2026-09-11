@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the per-map loot pool extraction (#273): a captured loot bag's items are lifted out of its
+	// Locks the per-map loot pool extraction: a captured loot bag's items are lifted out of its
 	// LootBagFullUpdateIIR (0xF096251E) and attributed to the map the preceding MapChange selected.
 	public class MapLootExtractorTests
 	{
@@ -70,8 +70,8 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, true, 0x2000, 0xF096251E, FramePacket(payload));
 		}
 
-		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
-		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
+		// A real PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte, so a
+		// synthetic body with the map id at the right offset is not a MapChange.
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);

@@ -6,11 +6,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gates for the bounded-area naming survey (BoundedAreaClassifier, #513) - the buckets
+	// Gates for the bounded-area naming survey (BoundedAreaClassifier) - the buckets
 	// docs/rdb/bounded-areas-1000053.md's census is organised by.
 	//
-	// The classifier is ORDERED and first-match-wins, so what needs gating is not "does `lava` match lava" but the
-	// ORDERING: every name below is a real region from the corpus that two rules both match, and the assertion is which
+	// The classifier is ordered and first-match-wins, so what needs gating is not "does `lava` match lava" but the
+	// ordering: every name below is a real region from the corpus that two rules both match, and the assertion is which
 	// rule is allowed to win. Those are the cases that silently mis-sort a whole family.
 	public class BoundedAreaClassifierTests
 	{
@@ -24,13 +24,13 @@ namespace Faolan.Tests
 			(BoundedAreaBucket.Resurrection, "BA_Resurrection_TheOutcastCamp"),
 			(BoundedAreaBucket.Teleport, "TeleportToArena"),
 			(BoundedAreaBucket.Dismount, "DismountArea1"),
-			// ⚠️ The discovery family, and the reason the resurrection rule anchors on `(?<![a-z])` rather than `\b`:
+			// The discovery family, and the reason the resurrection rule anchors on `(?<![a-z])` rather than `\b`:
 			// `_` is a word character, so a `\brez` anchor lets every one of these fall through to the QuestGoal
-			// rule's `discovery` and files the family as quest regions (#682).
+			// rule's `discovery` and files the family as quest regions.
 			(BoundedAreaBucket.Resurrection, "BA_MountainGlade_RezDiscovery"),
 			(BoundedAreaBucket.Resurrection, "BA_BottomFloor_RezPointDiscover"),
 			(BoundedAreaBucket.Resurrection, "zang_xin_camp_rezpad"),
-			// ...while AREA discovery, which contains a respawn point of the same name, is NOT this family.
+			// ...while area discovery, which contains a respawn point of the same name, is not this family.
 			(BoundedAreaBucket.QuestGoal, "FrostFields_Discovery"),
 			(BoundedAreaBucket.HazardLava, "BA_Lava7"),
 			(BoundedAreaBucket.HazardTrap, "BA_SpikeTrap"),
@@ -67,15 +67,15 @@ namespace Faolan.Tests
 				Assert.Contains(bucket, Representatives.Select(r => r.Bucket));
 		}
 
-		// ⚠️ The ordering cases. Each of these names matches TWO rules, and the wrong winner mis-sorts a family:
+		// The ordering cases. Each of these names matches two rules, and the wrong winner mis-sorts a family:
 		//
-		// The audio TWIN of a gameplay region must not shadow the region it is named after - the same distinction
+		// The audio twin of a gameplay region must not shadow the region it is named after - the same distinction
 		// RdbHazardImporter draws when it refuses `BA_Lava_music` as a damage volume.
 		[Theory]
 		[InlineData("BA_Lava_music", BoundedAreaBucket.Audio)] // not HazardLava
 		[InlineData("Vanir_camp_music", BoundedAreaBucket.Audio)] // not SpawnCamp
 		[InlineData("Vanir_camp_music0", BoundedAreaBucket.Audio)]
-		// "spawn" is in despawn triggers, collision names and quest hooks alike; it is the WEAKEST camp signal and every
+		// "spawn" is in despawn triggers, collision names and quest hooks alike; it is the weakest camp signal and every
 		// stronger claim on the name wins first.
 		[InlineData("SpawnAreaBlocker1", BoundedAreaBucket.Collision)]
 		[InlineData("Boss Spawn Collision 1", BoundedAreaBucket.Collision)]

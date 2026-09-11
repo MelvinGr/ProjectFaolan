@@ -12,8 +12,8 @@ using Faolan.GameServer.Wire;
 namespace Faolan.GameServer.Apprentice
 {
 	/// <summary>
-	///     The apprentice (mentoring) wire (#826), off GameServerListener. Every op is addressed by CHARACTER ID -
-	///     mentoring always spans two connections - which is why it needed <see cref="ConnectionRegistry" /> to move.
+	///     The apprentice (mentoring) wire. Every op is addressed by character id - mentoring always spans two
+	///     connections - so the class resolves clients through <see cref="ConnectionRegistry" /> rather than a session.
 	/// </summary>
 	internal sealed class ApprenticeOutbound : IApprenticeOutbound
 	{
@@ -26,11 +26,9 @@ namespace Faolan.GameServer.Apprentice
 			_agentServerDispatcher = agentServerDispatcher;
 		}
 
-		// ---- APPRENTICESHIP (#144) ----
-		//
-		// ⚠️ Un-gated, for the same reason quest sharing's are: no capture performs an apprenticeship, so the ENDPOINT
-		// pair is taken from the neighbouring GameCharInterfaceProject dispatches that ARE observed (SyncCanSprint /
-		// UpdateSprintBar) rather than from an observation of these. The BODIES are the client's own signatures. [V0]
+		// No capture performs an apprenticeship, so these sends are not golden-gated: the endpoint pair is taken from
+		// the neighbouring GameCharInterfaceProject dispatches that are observed (SyncCanSprint / UpdateSprintBar), and
+		// the bodies are the client's own signatures. [V0]
 		public async Task<bool> SendApprenticeRequest(uint studentId, uint teacherId)
 		{
 			if (_connections.ForCharacter(studentId) is not { } client)
@@ -61,8 +59,8 @@ namespace Faolan.GameServer.Apprentice
 			if (_connections.ForCharacter(characterId) is not { } client)
 				return;
 
-			// ApprenticeLevel ALONE - not `SetLevel`, which deliberately writes Level too so the nameplate tracks a GM
-			// `.level` (#472). Here the real level is unchanged and only the mitigation term moves.
+			// ApprenticeLevel alone - not `SetLevel`, which also writes Level so the nameplate tracks a GM `.level`.
+			// Here the real level is unchanged and only the mitigation term moves.
 			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ApprenticeLevel, apprenticeLevel), characterId);
 		}
 		public Task SendApprenticeFeedback(uint characterId, string message)

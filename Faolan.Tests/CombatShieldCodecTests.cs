@@ -7,14 +7,13 @@ namespace Faolan.Tests
 {
 	// Byte-exact gate for the CombatShieldIIR (0xCFFD0519) guard broadcast, anchored on real captured records.
 	//
-	// Replaces CombatShieldBuilderTests, whose golden ("cffd05190000c3500000aa7200000000") matches NO capture: it
-	// omitted the record's length prefix AND its env byte, and carried value 0 when not one of the 86 captured
-	// records does. The builder it guarded emitted that same malformed 16-byte shape. Both are deleted - the
-	// lesson being that a golden is only a golden if the bytes came from a capture.
+	// A golden is only a golden if its bytes came from a capture. A 16-byte shape such as
+	// "cffd05190000c3500000aa7200000000" matches none: it omits the record's length prefix and its env byte, and
+	// carries value 0, which not one of the 86 captured records does.
 	public class CombatShieldCodecTests
 	{
 		// A real captured record: [u32 len=17][subop][C350][handle][u8 env=0][u32 value=111]. The leading length is the
-		// carrier's and belongs to the sender (#530 rule 2), so the codec sees it from the subop on.
+		// carrier's and belongs to the sender, so the codec sees the record from the subop on.
 		private const string Captured = "00000011cffd05190000c35000002c56000000006f";
 
 		// The decimal-packing semantics came from client RE. The captures corroborate it: every distinct value seen

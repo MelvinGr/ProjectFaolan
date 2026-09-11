@@ -12,18 +12,24 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests a consumable's ON-USE spell (Items.OnUseSpell) from a use-a-consumable capture. Using an item emits, in
-	// one frame, a self-ApplySpell (MagicBuffIIR 0x6B87E316 - the effect) immediately followed by a TemplateActionIIR
-	// (0x6C300937 - the used item's template). So the on-use spell of a template = the BASE of the self-ApplySpell that
-	// precedes its TemplateActionIIR. Verified in NecroL80_..._use-consumables: Daggamalt->Health Potion Effect,
-	// Moonspill->Mana Potion Effect, etc. See docs/subsystems/item-claims.md (item-use) / GameServerListener.UseInventoryItem.
+	/// <summary>
+	///     Harvests a consumable's on-use spell (Items.OnUseSpell) from a use-a-consumable capture.
+	/// </summary>
+	/// <remarks>
+	///     Using an item emits, in one frame, a self-ApplySpell (MagicBuffIIR - the effect) immediately followed by a
+	///     TemplateActionIIR (the used item's template). So the on-use spell of a template is the base of the
+	///     self-ApplySpell that precedes its TemplateActionIIR (e.g. Daggamalt -> Health Potion Effect in the
+	///     NecroL80 use-consumables capture). See docs/subsystems/item-claims.md (item-use) and ItemUseService.
+	/// </remarks>
 	public static class CaptureItemUseImporter
 	{
 		private const uint ApplySpellSubOpcode = MagicBuffCodec.Opcode;
 		private const uint TemplateActionSubOpcode = TemplateActionCodec.Opcode;
 
-		// (template -> on-use spell BASE) for one capture, in frame order (state resets per capture so a use in one
-		// capture can't pair with a template in the next).
+		/// <summary>
+		///     (template -> on-use spell base) for one capture, in frame order. State resets per capture so a use in one
+		///     capture cannot pair with a template in the next.
+		/// </summary>
 		public static Dictionary<uint, uint> Extract(IEnumerable<byte[]> packets)
 		{
 			var map = new Dictionary<uint, uint>();
@@ -36,11 +42,9 @@ namespace Faolan.Importer.Captures
 
 				if (sub == ApplySpellSubOpcode)
 				{
-					// [c350][applyTo][env][spellBaseId][form][c350][applyFrom][data]. This is the MagicBuffIIR content,
-					// minus its leading subop (TryReadIirBody split it off) - re-prepend the subop so the codec parses
-					// it, instead of re-deriving applyTo@8/spellId@14/applyFrom@22 by hand. Only
-					// a SELF-buff full apply (applyTo == applyFrom, and a payload present - not the ~short rank-1 removal
-					// twin) is a consumable effect.
+					// The MagicBuffIIR content minus its leading subop (TryReadIirBody split it off) - re-prepend the
+					// subop so the codec parses it. Only a self-buff full apply (applyTo == applyFrom, and a payload
+					// present - not the short removal twin) is a consumable effect.
 					if (body.Length < 22)
 						continue;
 
@@ -61,7 +65,9 @@ namespace Faolan.Importer.Captures
 			return map;
 		}
 
-		// Sets Items.OnUseSpell for every harvested (template -> spell) whose item row exists. Returns (harvested, set).
+		/// <summary>
+		///     Sets Items.OnUseSpell for every harvested (template -> spell) whose item row exists.
+		/// </summary>
 		public static async Task<(int Harvested, int Set)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> captures, ILogger? logger = null)
 		{
 			var merged = new Dictionary<uint, uint>();
@@ -72,7 +78,7 @@ namespace Faolan.Importer.Captures
 			if (merged.Count == 0)
 				return (0, 0);
 
-			// Only set spells that EXIST in Spells - OnUseSpell is a FK, so an unknown spell would fail the insert.
+			// Only set spells that exist in Spells - OnUseSpell is a FK, so an unknown spell would fail the insert.
 			var spellIds = merged.Values.Distinct().ToList();
 			var knownSpells = (await db.Spells.Where(s => spellIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
 
@@ -94,7 +100,7 @@ namespace Faolan.Importer.Captures
 			return (merged.Count, set);
 		}
 
-		// The 0x2000 IIR sub-opcode + the bytes after it, or false if not a 0x2000 IIR packet.
+		// The PassBlob IIR sub-opcode and the bytes after it, or false if not a PassBlob IIR packet.
 		private static bool TryReadIirBody(byte[] packetBytes, out uint sub, out byte[] body)
 		{
 			sub = 0;
@@ -116,7 +122,7 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// The used item's template from a TemplateActionIIR body: it is emitted TWICE in a row (template + dup), so the
+		// The used item's template from a TemplateActionIIR body: it is emitted twice in a row (template + dup), so the
 		// first u32 that equals the next u32 is it (robust to the exact header offset).
 		private static bool TryReadTemplate(byte[] body, out uint template)
 		{

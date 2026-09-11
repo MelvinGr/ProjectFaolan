@@ -10,7 +10,7 @@ namespace Faolan.Mcp
 	{
 		/// <summary>
 		///     Registers the in-process MCP server (streamable HTTP) directly on Faolan's own container, so the tools
-		///     resolve the SAME live singletons the server uses (
+		///     resolve the same live singletons the server uses (
 		///     <see cref="Faolan.Core.Database.Repositories.IDatabaseRepository" />,
 		///     the chat/game dispatchers, <see cref="ClaudeChannel" />) with no nested host and no by-instance re-import.
 		///     The host must be a <see cref="WebApplication" /> - call <see cref="MapFaolanMcp" /> on it to expose the endpoint.
@@ -37,11 +37,10 @@ namespace Faolan.Mcp
 		///     Connect Claude with:  claude mcp add --transport http faolan http://127.0.0.1:&lt;port&gt;/mcp
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The port is PER REALM (#910). `Mcp:Port` is one global key, and MCP runs only in a realm-hosting
-		///     process, so every realm host bound the same 7099 and the second one died on `address already in use` -
-		///     one Faolan process per machine could have MCP on, which is exactly the developer testing multi-realm.
-		///     Everything else about a realm host is already per-realm (the world/chat/cs ports come off the `Realm`
-		///     row); this was the one thing that was not.
+		///     The port is per realm. <c>Mcp:Port</c> is one global key and MCP runs only in a realm-hosting process, so
+		///     without the offset every realm host would bind the same port and all but the first would die on "address
+		///     already in use". Everything else about a realm host is per-realm already: the world, chat and CS ports
+		///     come off the <c>Realm</c> row.
 		/// </remarks>
 		public static WebApplication MapFaolanMcp(this WebApplication app, uint realmId = FirstRealmId)
 		{
@@ -54,16 +53,16 @@ namespace Faolan.Mcp
 		public const uint FirstRealmId = 1;
 
 		/// <summary>
-		///     The MCP port a realm host binds: the configured base plus the realm's OFFSET from the first realm.
+		///     The MCP port a realm host binds: the configured base plus the realm's offset from the first realm.
 		/// </summary>
 		/// <remarks>
-		///     The offset rather than the raw id is what keeps realm 1 on the configured port exactly - so the single-realm
-		///     dev run, which is every existing setup, still answers on 7099 and no `claude mcp add` has to change.
-		///     Realm 2 then takes 7100, and so on.
+		///     The offset rather than the raw id is what keeps realm 1 on the configured port exactly, so a single-realm
+		///     run still answers on the configured port and no <c>claude mcp add</c> has to change. Realm 2 then takes
+		///     the next port, and so on.
 		///     <para>
-		///         ⚠️ Realm ids are not promised to be small or contiguous, so a far-off id would run past a ushort. The
-		///         port is therefore CLAMPED into the ephemeral-free range rather than wrapping silently; a deployment
-		///         that hits the clamp should set <c>Mcp:Port</c> per process instead, which has always worked.
+		///         Realm ids are not promised to be small or contiguous, so a far-off id would run past a ushort. The
+		///         port is therefore clamped into the ephemeral-free range rather than wrapping silently; a deployment
+		///         that hits the clamp should set <c>Mcp:Port</c> per process instead.
 		///     </para>
 		/// </remarks>
 		public static int McpPortFor(ushort basePort, uint realmId)

@@ -9,14 +9,13 @@ using Faolan.GameServer.World;
 namespace Faolan.GameServer.Quest
 {
 	// IQuestOutbound: the narrow quest port QuestProgressionService and QuestRewardService take, as its own class
-	// (#826) rather than as an interface on WorldBroadcaster.
+	// rather than as an interface on WorldBroadcaster.
 	//
-	// It forwards to two owners because the port genuinely spans two subjects. Nine members are quest WIRE and go to
-	// QuestBroadcaster; three need the live WORLD and stay on the broadcaster - a quest-state change re-running an
+	// It forwards to two owners because the port spans two subjects. Nine members are quest wire and go to
+	// QuestBroadcaster; three need the live world and stay on the broadcaster - a quest-state change re-running an
 	// interest pass (RefreshQuestVisibility), an ambusher being put in the zone (ScheduleQuestAmbush), and an escort
 	// NPC being told to follow (SetNpcFollowByTemplate). Splitting the interface instead would hand the two quest
-	// services a second port each for no gain; this is the same shape WorldOutbound already has, which forwards to
-	// four owners.
+	// services a second port each for no gain; this is the shape WorldOutbound has, forwarding to four owners.
 	public sealed class QuestOutbound : IQuestOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;

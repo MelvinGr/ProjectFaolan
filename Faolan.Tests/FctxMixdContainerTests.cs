@@ -6,12 +6,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Robustness gate for the MIXD container parse (#293). The client's MIXDTextureLoader reads a chain of
+	// Robustness gate for the mixd container parse. The client's MIXDTextureLoader reads a chain of
 	// sub-textures ([compact-normal][BC5 normal]["ATI1"][BC4 detail] for the body atlases); the BC4 detail is the
-	// FINAL sub-texture and occupies a full smallest-first mip chain to the end. The old parse located the "ATI1"
-	// split with a blind LastIndexOf, which a coincidental "ATI1" byte-run INSIDE the compressed detail data would
-	// hijack (it falls after the real tag). The parse now anchors the tag by its computed position
-	// (length - fullBc4Chain - 4) and validates the bytes, so planted "ATI1" noise no longer shifts the result.
+	// final sub-texture and occupies a full smallest-first mip chain to the end. The "ATI1" split must be anchored by
+	// its computed position (length - fullBc4Chain - 4) and the bytes validated: a blind LastIndexOf is hijacked by a
+	// coincidental "ATI1" byte-run inside the compressed detail data, which falls after the real tag.
 	public class FctxMixdContainerTests
 	{
 		private const int Bc4Chain = 32, Bc5Top = 64;
@@ -22,9 +21,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void MixdDetail_DecodesFullChainDespiteSpuriousAti1RunInDetail()
 		{
-			// Under the old LastIndexOf split the planted tag (pixels[112]) leaves only 20 detail bytes after it -
-			// shorter than the 32-byte top mip - so the decode returned [] (failed). The computed anchor keeps the
-			// full 32-byte detail chain and decodes it correctly.
+			// A LastIndexOf split would take the planted tag (pixels[112]), leaving only 20 detail bytes after it -
+			// shorter than the 32-byte top mip - and fail the decode. The computed anchor keeps the full 32-byte detail
+			// chain and decodes it correctly.
 			Assert.True(FctxConverter.TryDecodeTopMip(BuildMixd(), out var got, out _, out _, true));
 			Assert.Equal(BcDecoder.DecodeBc4(Detail(), W, H), got);
 		}
@@ -68,7 +67,7 @@ namespace Faolan.Tests
 			var detail = new byte[Bc4Chain];
 			for (var i = 0; i < detail.Length; i++)
 				detail[i] = (byte)(0x80 + i % 53);
-			"ATI1"u8.ToArray().CopyTo(detail, 20); // a spurious tag INSIDE the detail data -> what LastIndexOf grabs
+			"ATI1"u8.ToArray().CopyTo(detail, 20); // a spurious tag inside the detail data -> what LastIndexOf grabs
 			return detail;
 		}
 	}

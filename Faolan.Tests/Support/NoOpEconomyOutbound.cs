@@ -11,12 +11,12 @@ namespace Faolan.Tests.Support
 	// `IEconomyOutbound` with every member a no-op, for the service tests that only care about one or two of them.
 	//
 	// It exists because the port is a growing surface and each addition broke every test double at once: three
-	// classes were implementing all of it by hand to record two calls each, so `SendGemSocketed` (#754) and then
-	// `SendGuildBankData`/`SendGuildBankMove` (#654) each failed three unrelated test classes that had no opinion
+	// classes were implementing all of it by hand to record two calls each, so `SendGemSocketed` and then
+	// `SendGuildBankData`/`SendGuildBankMove` each failed three unrelated test classes that had no opinion
 	// about them. Overriding what a test asserts on, and inheriting silence for the rest, is what makes the port
 	// extensible without a fan-out of edits.
 	//
-	// ⚠️ Deliberately no-ops rather than throws. A test that wires this up is exercising a SERVICE, and a service
+	// Deliberately no-ops rather than throws. A test that wires this up is exercising a service, and a service
 	// legitimately calls outbound ops the test is not about - the wallet update on a craft, say. Throwing would
 	// make every such test assert on the whole port instead of on its subject.
 	public class NoOpEconomyOutbound : IEconomyOutbound
@@ -36,7 +36,7 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
-		// #793: the completion the world tick sends when a staged craft's bar runs out. Recorded by the tradeskill
+		// The completion the world tick sends when a staged craft's bar runs out. Recorded by the tradeskill
 		// tests, ignored by everyone else.
 		public virtual Task SendTradeskillComplete(INetworkClient client, uint recipeId)
 		{

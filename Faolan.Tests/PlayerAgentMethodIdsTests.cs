@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The PlayerAgent/PlayerInterface method constants live once, as the `PlayerAgentMethods` / `PlayerInterfaceMethods`
-	// enums, and `PlayerAgentMethodIds` is the map from those to the opcodes retail was OBSERVED using (for naming: the
+	// enums, and `PlayerAgentMethodIds` is the map from those to the opcodes retail was observed using (for naming: the
 	// packet trace, the dissector and the generated docs). What goes on the wire is the constant itself - `Rpc` writes
 	// it whole as `method_instance` - so there is no encoding step left to test here; that is RpcHeaderTests' job.
 	public class PlayerAgentMethodIdsTests
@@ -24,9 +24,9 @@ namespace Faolan.Tests
 			Assert.Equal(0x5DC18991u, PlayerAgentMethodIds.PlayerInterfaceRegistration["AuthenticateAck"]);
 		}
 
-		// The observed methods are the ones the corpus shows, and every one of them READS as `0x2080 | (constant & 0x7F)`
+		// The observed methods are the ones the corpus shows, and every one of them reads as `0x2080 | (constant & 0x7F)`
 		// in a hex dump - which is how you find one in a capture, and simultaneously why that value cannot be a catalog
-		// key. `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` were deleted for exactly this reason (#613).
+		// key. `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` were deleted for exactly this reason.
 		[Fact]
 		public void EveryObservedMethod_ReadsAsItsFirstVarintGroup()
 		{
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The two dump readings that each name TWO methods (#608) - the whole reason this pair has no opcode catalog.
+		// The two dump readings that each name two methods - the whole reason this pair has no opcode catalog.
 		[Theory, InlineData(0x20EC, PlayerAgentMethods.ReceivedCharacterSettings, PlayerAgentMethods.AuthenticateLoggedIn),
 		 InlineData(0x20D6, PlayerAgentMethods.VerifyLanguageSetting, PlayerAgentMethods.UpdateCharacterPreview)]
 		public void TheCollidingPairs_ReadTheSameInADump(int reading, PlayerAgentMethods first, PlayerAgentMethods second)
@@ -50,8 +50,8 @@ namespace Faolan.Tests
 			Assert.NotEqual(first, second);
 		}
 
-		// The four login handoffs are ordinary methods, observed like the rest. They used to share one invented opcode
-		// `0x1A07` - not an opcode at all, but RpcHeader field 3's tag plus its length (#610).
+		// The four login handoffs are ordinary methods, observed like the rest. A shared `0x1A07` is not an opcode at
+		// all, but RpcHeader field 3's tag plus its length.
 		[Theory, InlineData(PlayerInterfaceMethods.ChatServerConnectReady, 0x20FA), InlineData(PlayerInterfaceMethods.CSServerConnectReady, 0x20E0),
 		 InlineData(PlayerInterfaceMethods.LoginConnectReady, 0x20F9), InlineData(PlayerInterfaceMethods.OverrideGameTweaks, 0x20E3)]
 		public void TheLoginHandoffs_AreOrdinaryMethods(PlayerInterfaceMethods method, int reading)

@@ -6,26 +6,28 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// CharDCMoveIIR_t (0x4517AA81) - the dead-reckoning move (#190, docs/re/chardcmove-grammar.md): the per-tick
-	// movement broadcast an entity streams, complementing MoveTaskCodec (the path/transform form). A leading bitfield
-	// (Flag1) gates which optional 3-float vectors are present (FUN_007ad6b0), so Build/Parse preserve every field
-	// and the record round-trips byte-exact (DeadReckoningCodecTests).
-	//
-	// Body (the u32 length prefix belongs to the SENDER, #530 rule 2 - WorldIir.Send writes it):
-	//   [subop][0x0000C350][handle][u8 env][u8 flag1][pos 3f][rotation 2 or 4f][u8 flag2][ move block ]
-	//
-	// ⚠️ The move block carries an extra u16 when `flag2 == 1`, and ONLY then (#811). The client's reader says so
-	// outright - after `param16` it does
-	//     if (flag2 == 1) <read u16 into this+0x4a>;  else  this+0x4a = 0xFFFF;
-	// so the field is not optional data but a different record SHAPE, defaulted rather than absent. It is 58 of the
-	// 53,886 captured records - the whole `flag2 == 1` population, exactly - and reading past it shifted every field
-	// after `param16` by two bytes, which is why the codec reported "2 unread bytes" at the END rather than a wrong
-	// heading: `EnsureAtEnd` is what caught it, and only because the record happens to end short.
+	/// <summary>
+	///     CharDCMoveIIR - the dead-reckoning move: the per-tick movement broadcast an entity streams, complementing
+	///     <see cref="MoveTaskCodec" />, the path and transform form. See docs/re/chardcmove-grammar.md.
+	/// </summary>
+	/// <remarks>
+	///     A leading bitfield (Flag1) gates which optional 3-float vectors are present (client reader FUN_007ad6b0), so
+	///     Build and Parse preserve every field and the record round-trips byte-exact (DeadReckoningCodecTests). The body
+	///     is <c>[subop][class][handle][u8 env][u8 flag1][pos 3f][rotation 2 or 4f][u8 flag2][move block]</c>; the u32
+	///     length prefix belongs to the framing sender.
+	///     <para>
+	///         The move block carries an extra u16 when <c>flag2 == 1</c>, and only then. The client's reader says so
+	///         outright - after <c>param16</c> it reads a u16 into this+0x4a for flag2 1 and otherwise defaults that slot to
+	///         0xFFFF - so the field is a different record shape rather than optional data. It is 58 of the 53,886 captured
+	///         records, exactly the <c>flag2 == 1</c> population, and reading past it shifts every field after
+	///         <c>param16</c> by two bytes, which shows up only as unread bytes at the end.
+	///     </para>
+	/// </remarks>
 	public static class CharDCMoveCodec
 	{
 		public const uint Opcode = (uint)IirTypes.CharDCMoveIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CharDCMoveIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -34,10 +36,12 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// The dominant 0x1e form - a stationary-ish update carrying only position + facing (no velocity/accel/heading
-		// vectors). `rotation` is the entity's orientation; in this collapsed form only its (Y, W) reach the wire,
-		// which is lossless for the upright yaw-only facings every character uses. `param19` is the per-tick scalar
-		// the client interpolates with (0 = none).
+		/// <summary>
+		///     The dominant 0x1e form: a near-stationary update carrying only position and facing, with no velocity,
+		///     acceleration or heading vectors. <paramref name="rotation" /> is the entity's orientation, of which only (Y,
+		///     W) reach the wire in this collapsed form - lossless for the upright yaw-only facings every character uses.
+		///     <paramref name="param19" /> is the per-tick scalar the client interpolates with; 0 is none.
+		/// </summary>
 		public static byte[] Build(uint handle, Vector3 position, Quaternion rotation, float param19 = 0f)
 		{
 			return Build(new CharDCMoveIIR
@@ -73,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.World
 			};
 			value.Position = r.ReadVector3Be();
 
-			// bit4 set: only (qy, qw) are on the wire (qx = qz = 0); clear: the whole quaternion, x/y/z then w.
+			// bit4 set: only (qy, qw) are on the wire, qx and qz being 0; clear: the whole quaternion, x/y/z then w.
 			value.Rotation = value.Bit4
 				? new Quaternion(0f, r.ReadF32Be(), 0f, r.ReadF32Be())
 				: r.ReadQuaternionBe();
@@ -101,7 +105,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(v.Handle).WriteByte(v.Env).WriteByte(v.Flag1).WriteVector3(v.Position);
 
-			// The rotation QUATERNION, collapsed to its yaw-only components when bit4 is set.
+			// The rotation quaternion, collapsed to its yaw-only components when bit4 is set.
 			if (v.Bit4)
 				s.WriteFloat(v.Rotation.Y);
 			else
@@ -123,7 +127,7 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// CharDCMoveIIR (0x4517AA81).
+	/// <summary>The CharDCMoveIIR body.</summary>
 	public sealed record CharDCMoveIIR
 	{
 		public Vector3 Acceleration { get; set; } // present when !bit3
@@ -131,15 +135,16 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public Vector3 Position { get; set; }
 
-		// The entity's ORIENTATION - the floats after the position, which the decompile's field names ("the
-		// post-position move vector", facingX, param6) hid: they are a unit quaternion, and the "collapse" bit4
-		// performs is dropping the two components that are zero for an upright character. Measured over the whole
-		// corpus: |q| = 1 within 1e-4 for 100% of 19,642 collapsed AND 3,250 full records, and the yaw it implies
-		// (2*atan2(qy, qw)) matches the direction of travel within 7.5 deg for 90% of sustained straight runs.
-		// The same 4 floats close StopIIR (StopCodec).
+		/// <summary>
+		///     The entity's orientation: the floats after the position are a unit quaternion, and what bit4 collapses is the
+		///     two components that are zero for an upright character. Measured over the whole corpus, the magnitude is 1
+		///     within 1e-4 for all 19,642 collapsed and 3,250 full records, and the yaw it implies (2*atan2(qy, qw)) matches
+		///     the direction of travel within 7.5 degrees for 90% of sustained straight runs. The same four floats close
+		///     StopIIR (<see cref="StopCodec" />).
+		/// </summary>
 		public Quaternion Rotation { get; set; }
 
-		// the velocity/accel/heading block, present only when Flag2 < 8:
+		// The velocity, acceleration and heading block, present only when Flag2 is below 8.
 		public Vector3 Velocity { get; set; } // present when !bit2
 		public byte Bool1 { get; set; }
 		public byte Bool2 { get; set; }
@@ -147,9 +152,11 @@ namespace Faolan.Core.Network.Codecs.World
 		public byte Flag1 { get; set; }
 		public byte Flag2 { get; set; }
 
-		// The u16 that rides between Param16 and the heading when Flag2 == 1, and the client's own default for it
-		// when the field is absent. Its 58 captured values are 0x0003 (x26), 0x0008 (x6) and 0x0009 (x26); what it
-		// selects is undecoded [V0].
+		/// <summary>
+		///     The client's own default for the u16 that rides between Param16 and the heading when Flag2 is 1, used when
+		///     the field is absent. Its 58 captured values are 0x0003 (x26), 0x0008 (x6) and 0x0009 (x26); what it selects is
+		///     undecoded. [V0]
+		/// </summary>
 		public const ushort NoFlag2Word = 0xFFFF;
 
 		public ushort Flag2Word { get; set; } = NoFlag2Word;

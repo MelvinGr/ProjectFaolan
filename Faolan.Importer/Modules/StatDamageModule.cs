@@ -16,7 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// DoT effects (StatDamageIIR 0xE9F24184) -> Spell.DotDelta/DotType (#274) + Spell.DotIntervalMs (#437).
+	/// <summary>
+	///     DoT effects (StatDamageIIR) -> Spell.DotDelta/DotType and Spell.DotIntervalMs.
+	/// </summary>
 	public sealed class StatDamageModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(SpellsModule)];
@@ -34,7 +36,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// Per-capture packet lists, not ctx.RawPackets: the interval is measured from the TIME between ticks, and
+			// Per-capture packet lists, not ctx.RawPackets: the interval is measured from the time between ticks, and
 			// the tick trains it measures are keyed by session-volatile entity handles, so they must not span captures.
 			var (spells, updated, intervals) = await CaptureStatDamageImporter.ImportAsync(ctx.Db,
 				[.. ctx.Captures.Select(c => (IReadOnlyList<CapturedPacket>)c.Packets)]);

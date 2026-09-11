@@ -5,26 +5,29 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Inventory
 {
-	// MoveInventoryItemIIR (0x2A8A1B49) - the c2s drag within/between containers. Wire:
-	//   [u32 0xC350][u32 charInstance][u32 reserved][protobuf ProtoMoveInventoryItemIIR]
-	// ProtoMoveInventoryItemIIR = { source_container_id, source_item_pos, destination_container_id,
-	// destination_item_pos } where each id is a ProtoID32 { type, instance }. All 18 captured frames carry all
-	// four fields. No s2c reply; the server persists the slot change and (for a cross-container/bank move) pushes
-	// the relevant add/remove itself. See GameServerListener.Inbound (the MoveInventoryItemIIR case).
-	//
-	// PARSE-ONLY, for the same reason as its sibling: we never emit it.
-	//
-	// The sibling DeleteItemIIR ("DropItem") shares this carrier framing but carries a DIFFERENT payload -
-	// ProtoDeleteItemIIR, three fields - and has its own DeleteItemCodec. It used to be parsed here as a move;
-	// see that codec for why the two alias on the wire and how the client settled it.
+	/// <summary>
+	///     MoveInventoryItemIIR - the c2s drag within or between containers:
+	///     <c>[u32 entityClass][u32 charInstance][u32 reserved][protobuf ProtoMoveInventoryItemIIR]</c>.
+	/// </summary>
+	/// <remarks>
+	///     <c>ProtoMoveInventoryItemIIR = { source_container_id, source_item_pos, destination_container_id,
+	///     destination_item_pos }</c>, where each id is a <c>ProtoID32 { type, instance }</c>. All 18 captured frames
+	///     carry all four fields. There is no s2c reply: the server persists the slot change and, for a cross-container
+	///     or bank move, pushes the relevant add/remove itself.
+	///     <para>
+	///         Parse-only, for the same reason as its sibling: the server never emits it. The sibling DeleteItemIIR
+	///         ("DropItem") shares this carrier framing but carries a different, three-field payload and has its own
+	///         <see cref="DeleteItemCodec" />, whose remarks explain why the two alias on the wire.
+	///     </para>
+	/// </remarks>
 	public static class MoveInventoryItemCodec
 	{
 		public const uint Opcode = (uint)IirTypes.MoveInventoryItemIIR;
 
-		// This body starts at the ENTITY CLASS, not at the sub-opcode: it is c2s, and the opcode above is what
-		// the RPC FRAME carries, not the first word of the record. Declared rather than left to be inferred -
+		// This body starts at the entity class rather than at the sub-opcode: it is c2s, and the opcode above is what
+		// the RPC frame carries, not the first word of the record. Declared rather than left to be inferred, because
 		// handing a codec the wrong slice reads four bytes out of step and returns plausible values instead of
-		// failing, so where a body begins has to be part of what the type says (Gitea #531).
+		// failing.
 		public const bool OpcodeIsInTheFrame = true;
 
 		public static MoveInventoryItemIIR Parse(in ReadOnlySpan<byte> data)
@@ -46,6 +49,6 @@ namespace Faolan.Core.Network.Codecs.Inventory
 		}
 	}
 
-	// EntityClass / Reserved are carried, not asserted - see DeleteItemIIR.
+	/// <remarks><c>EntityClass</c> and <c>Reserved</c> are carried rather than asserted; see <c>DeleteItemIIR</c>.</remarks>
 	public sealed record MoveInventoryItemIIR(uint EntityClass, uint CharInstance, uint Reserved, ProtoMoveInventoryItemIIR Move);
 }

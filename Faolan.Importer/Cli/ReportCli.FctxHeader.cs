@@ -7,24 +7,20 @@ using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report fctx-header`: what the two u32s after an FCTX texture's magic are (#464).
+	// `--report fctx-header`: what the two u32s after an FCTX texture's magic are.
 	//
-	// #464 lists them as *"an RDB asset format, needs an RDB-wide census rather than captures"* - i.e. the one entry
-	// on that census whose evidence is not the capture corpus at all, and which therefore has no reason to be stuck.
-	// This is that census.
+	// Both are named, and the names come from the client's loader rather than from this census. `FUN_00de0f00` reads
+	// "FCTX" then dispatches on the word at +4 - 1 legacy loader, 2 current - so it is the container version; and the
+	// v2 loader (`FUN_00de0bd0`) popcounts bits 0x1|0x2|0x4 of the word at +8 for the number of map chains to read,
+	// so it is a maps-present bitmask (1 = base image alone; MIXD's 6 = two extra maps, its rare 2 = one - the 1.36x
+	// payload-per-pixel split a 6-versus-2 count could never make). The header's bytes +16/+17 are
+	// m_nNumMips / m_nNumMipsInFile (asserted equal), and +18 is a u16 read and discarded. FctxConverter carries the
+	// named fields; this report stays as the measuring instrument.
 	//
-	// ⭐ RESOLVED (2026-08-31), and the census was the right instrument but could only characterise: the NAMES came
-	// from the client's loader. `FUN_00de0f00` reads "FCTX" then dispatches on the word at +4 - 1 legacy loader /
-	// 2 current - so it is the container VERSION; and the v2 loader (`FUN_00de0bd0`) popcounts bits 0x1|0x2|0x4 of
-	// the word at +8 for the number of map chains to read, so it is a MAPS-PRESENT BITMASK (1 = base image alone;
-	// MIXD's 6 = two extra maps, its rare 2 = one - the 1.36x payload/px split a 6-vs-2 COUNT could never make).
-	// The header's bytes +16/+17 are m_nNumMips / m_nNumMipsInFile (asserted equal), +18 u16 read-and-discarded.
-	// FctxConverter carries the renamed fields; this report stays as the measuring instrument.
-	//
-	// ⚠️ The whole point is to read the two words AGAINST the header fields around them, not on their own. A value
-	// census would report "0x18 on most textures" and leave it there; what settles a header word is whether it
-	// PREDICTS something the rest of the header already states (the payload's length, its block size, its mip
-	// chain), because that is what a size or an offset does.
+	// The point is to read the two words against the header fields around them, not on their own. A value census
+	// would report "0x18 on most textures" and leave it there; what settles a header word is whether it predicts
+	// something the rest of the header already states (the payload's length, its block size, its mip chain), because
+	// that is what a size or an offset does.
 	public static partial class ReportCli
 	{
 		// The RDB types whose payloads are FCTX textures - RdbAssetExtractor's own list, so this walks exactly what
@@ -35,9 +31,9 @@ namespace Faolan.Importer.Cli
 		{
 			using var rdb = OpenRdb(rdbDir);
 
-			// ⚠️ SAMPLED, and it has to be. Reading a texture's 24-byte header means INFLATING the whole texture -
+			// Sampled, and it has to be. Reading a texture's 24-byte header means inflating the whole texture -
 			// the RDB has no partial-decompress - so a full walk is tens of thousands of multi-megabyte zlib streams
-			// and runs for the better part of an hour. The sample is per TYPE so a rare format cannot be crowded out
+			// and runs for the better part of an hour. The sample is per type so a rare format cannot be crowded out
 			// by a common one, the cap is printed with the total beside it, and `--report-arg <n>` raises it.
 			var perType = uint.TryParse((arg ?? "").Trim(), out var wanted) ? (int)wanted : DefaultFctxSample;
 
@@ -82,8 +78,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {name,-12} {counts.Count,6:N0} distinct   {top}{(counts.Count > 6 ? "  …" : "")}");
 			}
 
-			// ⭐ The question a value census cannot ask. A header word that equals the payload length, or the length
-			// minus the header, or the pixel-data length, is a SIZE - and that is checkable per row rather than
+			// The question a value census cannot ask. A header word that equals the payload length, or the length
+			// minus the header, or the pixel-data length, is a size - and that is checkable per row rather than
 			// argued from a distribution.
 			Console.WriteLine();
 			Console.WriteLine("  does either word PREDICT something the rest of the header states?");
@@ -106,7 +102,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"    {word} == {name,-18} on {hits,6:N0} / {rows.Count:N0} = {100.0 * hits / rows.Count:0.0}%");
 			}
 
-			// And the cross-tab that says whether a word is a per-FORMAT constant rather than per-texture data.
+			// And the cross-tab that says whether a word is a per-format constant rather than per-texture data.
 			Console.WriteLine();
 			Console.WriteLine($"  {"fourcc",-8} {"textures",8} {"u1 distinct",12} {"u2 distinct",12}  most common (u1, u2)");
 			foreach (var group in rows.GroupBy(r => r.FourCc).OrderByDescending(g => g.Count()))
@@ -116,11 +112,10 @@ namespace Faolan.Importer.Cli
 				                  + $" {group.Select(r => r.U2).Distinct().Count(),12:N0}  (0x{modal.Key.U1:X}, 0x{modal.Key.U2:X}) x{modal.Count():N0}");
 			}
 
-			// ⭐ The one thing #464 left open on this header: `unknown2` is 6 on every MIXD but one, which carries 2.
-			// A value that varies WITHIN a format is a count rather than a label, and "the number of sub-maps" is the
-			// reading to test - so every fourcc whose word is not constant gets broken out by that word, with the
-			// dimensions and payload beside it. A count of sub-maps has to show up as a SIZE difference; a label
-			// does not.
+			// `unknown2` is 6 on every MIXD but one, which carries 2. A value that varies within a format is a count
+			// rather than a label, and "the number of sub-maps" is the reading to test - so every fourcc whose word is
+			// not constant gets broken out by that word, with the dimensions and payload beside it. A count of
+			// sub-maps has to show up as a size difference; a label does not.
 			Console.WriteLine();
 			Console.WriteLine("  formats whose unknown2 is NOT constant, broken out - a sub-map COUNT must move the payload:");
 			var split = rows.GroupBy(r => r.FourCc).Where(g => g.Select(r => r.U2).Distinct().Count() > 1).ToList();

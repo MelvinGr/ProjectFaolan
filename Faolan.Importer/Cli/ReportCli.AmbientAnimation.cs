@@ -11,7 +11,7 @@ using ProtoBuf;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report ambient-animation`: what retail streams to make a standing NPC LOOK alive (Gitea #766 / #225).
+	// `--report ambient-animation`: what retail streams to make a standing NPC look alive.
 	//
 	// Two `BehaviorControlCenterIIR` commands carry it, and between them they are 63,743 of the corpus' 76,262 BCC
 	// records - the busiest thing on the wire after movement:
@@ -20,17 +20,17 @@ namespace Faolan.Importer.Cli
 	//   * `BehaviorId.Emote` (0x05) with a VARYING one plus an `activation_time` - the ambient random animation
 	//     (a citizen scratching, looking round, leaning on a wall).
 	//
-	// Both are `CommandMessage` args with an EMPTY tail, so a record is fully described by its command, its
-	// animation id and its timing. That is what this report measures, per creature TYPE and per actor: which
+	// Both are `CommandMessage` args with an empty tail, so a record is fully described by its command, its
+	// animation id and its timing. That is what this report measures, per creature type and per actor: which
 	// animation ids retail sends for which creature, how often one actor gets one, and how `activation_time`
 	// relates to the record's spacing.
 	//
-	// The point of measuring per ACTOR rather than per capture: our own heartbeat (#225) pulses every visible NPC on
+	// The point of measuring per actor rather than per capture: our own heartbeat pulses every visible NPC on
 	// a shared timer, which is a per-capture rate that looks nothing like retail's. The question a fidelity fix needs
-	// answered is what ONE creature receives, and how often.
+	// answered is what one creature receives, and how often.
 	public static partial class ReportCli
 	{
-		// How long after a MoveTask its actor is still counted as MOVING. A patrol path takes many seconds to walk and
+		// How long after a MoveTask its actor is still counted as moving. A patrol path takes many seconds to walk and
 		// the record that starts it is the only signal, so a window is the only way to ask the question at all; 10s is
 		// comfortably inside the p50 gap between one actor's MoveTasks.
 		private const double MovingWindowSeconds = 10.0;
@@ -44,17 +44,17 @@ namespace Faolan.Importer.Cli
 			// (command, template) -> the animation ids retail sent for that creature, with counts.
 			var perTemplate = new Dictionary<(BehaviorId Command, uint Template), Dictionary<uint, int>>();
 			// (command, capture, actor) -> that actor's records (time + the activation_time it stated), so a cadence is
-			// per-ENTITY not per-capture, and so the NEXT record's delay can be measured against the LAST one's stated
+			// per-entity not per-capture, and so the next record's delay can be measured against the last one's stated
 			// duration - the question that decides whether the data times the cadence or the server does.
 			var perActor = new Dictionary<(BehaviorId Command, string Capture, uint Actor), List<(long Ticks, uint? Activation)>>();
 			var activations = new Dictionary<BehaviorId, List<uint>>();
 			// animation id -> the activation_time values retail stated for it. One value means the duration belongs to
-			// the ANIMATION and can be stored beside it; many means it is decided per record.
+			// the animation and can be stored beside it; many means it is decided per record.
 			var perAnimation = new Dictionary<(BehaviorId Command, uint Animation), Dictionary<uint, int>>();
 			var counterSteps = new Dictionary<BehaviorId, List<long>>();
 			var players = new Dictionary<BehaviorId, int>();
 			var unattributed = new Dictionary<BehaviorId, int>();
-			// Does retail play an ambient animation at an actor it is also MOVING? The runtime has to decide whether to
+			// Does retail play an ambient animation at an actor it is also moving? The runtime has to decide whether to
 			// suppress one on a walking patroller, and the answer is in whether an ambient record ever lands between two
 			// of the same actor's MoveTasks.
 			var whileMoving = new Dictionary<BehaviorId, int>();
@@ -65,11 +65,11 @@ namespace Faolan.Importer.Cli
 				if (!string.IsNullOrEmpty(nameFilter) && !c.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
 					continue;
 
-				// Who is who, per capture. A retail character id sits BELOW the handle bases, so the number line
+				// Who is who, per capture. A retail character id sits below the handle bases, so the number line
 				// cannot answer this - the spawn's `player_stats` is the only reliable test (the BccAttackTail rule).
 				var npcTemplates = new Dictionary<uint, uint>();
 				var playerHandles = new HashSet<uint>();
-				// actor -> the times it was told to MOVE. An ambient record within MovingWindowSeconds after one is
+				// actor -> the times it was told to move. An ambient record within MovingWindowSeconds after one is
 				// "while moving": a MoveTask is an instruction to walk, so the walk is under way for a while after it.
 				var moves = new Dictionary<uint, List<long>>();
 				foreach (var p in c.Packets)

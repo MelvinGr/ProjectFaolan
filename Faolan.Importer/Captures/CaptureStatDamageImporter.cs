@@ -11,21 +11,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests damage-over-time (DoT) effects from captured StatDamageIIR (0xE9F24184) records and writes them onto
-	// the Spell table as Spell.DotDelta / Spell.DotType (#274) and Spell.DotIntervalMs (#437). StatDamageIIR is the
-	// health-effect carrier: its affected stat (inner +29) is 0x1B = HealthCurrent, inner +37 is the signed per-tick
-	// delta, inner +41 the damage-school flag, inner +61 the BASE spell id (wire id >> 8, == Spell.Id). A bleed debuff
-	// fires it once per tick, so the same (spell -> delta) recurs; we take the most common delta per spell. Only
-	// spells already in the Spell table are updated (the base ids are RDB-cataloged). Idempotent.
-	//
-	// The record carries no period, so the INTERVAL is measured rather than read: consecutive ticks of one spell on
-	// one target are one tick train, and the gap between them IS that spell's interval. The judgement about which
-	// gaps establish an interval lives in DotIntervalEstimator; this class only has to build the trains correctly.
-	//
-	// ⚠️ A train is scoped to ONE capture. The key includes the target and caster entity handles, and handles are
-	// SESSION-VOLATILE and recycled - the same handle in two captures is two different creatures, so pooling ticks
-	// across captures would splice unrelated trains and invent gaps that were never observed. Pooling the resulting
-	// GAPS across captures is safe and is what gives most spells their sample count: a gap is a duration.
+	/// <summary>
+	///     Harvests damage-over-time (DoT) effects from captured StatDamageIIR records and writes them onto the Spell
+	///     table as Spell.DotDelta / Spell.DotType and Spell.DotIntervalMs.
+	/// </summary>
+	/// <remarks>
+	///     StatDamageIIR is the health-effect carrier: it carries the signed per-tick delta, the damage-school flag and
+	///     the base spell id (wire id >> 8, which is Spell.Id). A bleed debuff fires it once per tick, so the same
+	///     (spell -> delta) recurs; the most common delta per spell wins. Only spells already in the Spell table are
+	///     updated (the base ids are RDB-cataloged). Idempotent.
+	///     The record carries no period, so the interval is measured rather than read: consecutive ticks of one spell on
+	///     one target are one tick train, and the gap between them is that spell's interval. The judgement about which
+	///     gaps establish an interval lives in <see cref="DotIntervalEstimator" />; this class only builds the trains.
+	///     A train is scoped to one capture. The key includes the target and caster entity handles, and handles are
+	///     session-volatile and recycled - the same handle in two captures is two different creatures, so pooling ticks
+	///     across captures would splice unrelated trains and invent gaps that were never observed. Pooling the resulting
+	///     gaps across captures is safe: a gap is a duration.
+	/// </remarks>
 	public static class CaptureStatDamageImporter
 	{
 		private const uint StatDamageSubOpcode = StatDamageCodec.Opcode;
@@ -35,7 +37,7 @@ namespace Faolan.Importer.Captures
 		public static async Task<(int Spells, int Updated, int Intervals)> ImportAsync(IDatabaseContext db, IReadOnlyList<IReadOnlyList<CapturedPacket>> captures,
 			ILogger? logger = null)
 		{
-			// spellId -> (delta -> count), (type -> count) so we pick the dominant reading.
+			// spellId -> (delta -> count), (type -> count), so the dominant reading can be picked.
 			var deltas = new Dictionary<uint, Dictionary<int, int>>();
 			var types = new Dictionary<uint, Dictionary<uint, int>>();
 
@@ -45,7 +47,7 @@ namespace Faolan.Importer.Captures
 			var seen = 0;
 			foreach (var capture in captures)
 			{
-				// (spell, target, caster) -> the tick times of that ONE train, within THIS capture only.
+				// (spell, target, caster) -> the tick times of that one train, within this capture only.
 				var trains = new Dictionary<(uint Spell, uint Target, uint Caster), List<long>>();
 				foreach (var packet in capture)
 					TryRead(packet, deltas, types, trains, ref seen);
@@ -85,9 +87,9 @@ namespace Faolan.Importer.Captures
 					changed = true;
 				}
 
-				// Only WRITE an interval the gaps actually establish. A spell whose train was too short or too ragged
+				// Only write an interval the gaps actually establish. A spell whose train was too short or too ragged
 				// keeps whatever it already had - a weak measurement must never overwrite a good one, and must never
-				// clear one back to the 2 s fallback.
+				// clear one back to the fallback.
 				if (gaps.TryGetValue(spellId, out var g) && DotIntervalEstimator.Estimate(g) is { } ms && spell.DotIntervalMs != ms)
 				{
 					spell.DotIntervalMs = ms;
@@ -121,8 +123,6 @@ namespace Faolan.Importer.Captures
 
 				seen++;
 
-				// The StatDamageIIR content is exactly what StatDamageCodec models (delta@37 / statId@41 /
-				// spellBaseId@61) - parse it typed instead of re-reading those three offsets by hand.
 				var dmg = StatDamageCodec.Parse(inner);
 				if (dmg.SpellBaseId == 0 || dmg.Delta == 0)
 					return;

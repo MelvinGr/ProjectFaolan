@@ -11,8 +11,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The MagicBuffIIR apply payload's @46 u64 is an ABSOLUTE EXPIRY on the server's UPTIME clock in milliseconds, and
-	// the only way the client ever learns that clock is the DispatchPong reply we send to its LatencyCheck poll (#480).
+	// The MagicBuffIIR apply payload's @46 u64 is an absolute expiry on the server's uptime clock in milliseconds, and
+	// the only way the client ever learns that clock is the DispatchPong reply we send to its LatencyCheck poll.
 	// So the two senders are one subsystem, and this is the gate that keeps them one:
 	//
 	//   client:  ServerTime_c   = pongMicroseconds / 1000                      (FUN_007a0ea0, the signal slot)
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 	//
 	// Nothing on the wire looks wrong if these drift apart - the client just silently discards the stamp and counts
 	// down the Duration field, which is exactly the state this field sat in for as long as it was written as an
-	// "effect nonce". So the assertions here run the CLIENT's arithmetic over what our two real senders produce.
+	// "effect nonce". So the assertions here run the client's arithmetic over what our two real senders produce.
 	//
 	// The identity is corpus-verified, not only read out of the client: across the 94 captures carrying both a pong and
 	// a 54-byte apply, `stamp - (uptimeMs + duration_cs*10)` has a median of +6 ms and lands within 250 ms for 2551 of
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 	{
 		private const uint Instance = 0x0802E5D4;
 
-		// The two units must come off ONE origin, by the same division the client does. A second Stopwatch root
+		// The two units must come off one origin, by the same division the client does. A second Stopwatch root
 		// anywhere would put the pong and the buff stamp on clocks that differ by however long apart they started.
 		[Fact]
 		public void MillisecondsIsTheMicrosecondCounterDividedByAThousand()
@@ -56,12 +56,12 @@ namespace Faolan.Tests
 			Assert.InRange(stamp - durationMs, before, after);
 		}
 
-		// The whole chain, end to end, through the REAL pong handler and the REAL buff factory: take the clock the
+		// The whole chain, end to end, through the real pong handler and the real buff factory: take the clock the
 		// client would be holding, then run Activate's formula over the payload we would send it.
 		[Fact]
 		public async Task ClientsOwnArithmeticRecoversTheDuration_FromTheRealPongAndTheRealBuffPayload()
 		{
-			const uint durationCs = 700; // Rend: 7s, one of the in-client-calibrated durations (#274)
+			const uint durationCs = 700; // Rend: 7s, one of the in-client-calibrated durations
 
 			// 1. What the client stores, taken from the bytes KeepAliveService actually puts on the wire.
 			var client = new RecordingNetworkClient(Instance);
@@ -76,23 +76,23 @@ namespace Faolan.Tests
 			// 2. What we send it, through the factory every live cast uses.
 			var payload = MagicBuffDatas.ApplyNow(0x31EB15, durationCs, casterLevel: 80, casterIsPlayer: true);
 			var stamp = MagicBuffDataCodec.Parse(MagicBuffDataCodec.Build(payload)).ExpiryStamp;
-			// Bracket the second clock read from the outside, so the gap between the two senders' reads is MEASURED
+			// Bracket the second clock read from the outside, so the gap between the two senders' reads is measured
 			// rather than assumed short: a fixed window would depend on machine load, and did fail under a loaded
-			// full-suite run (#624).
+			// full-suite run.
 			var gapCs = (long)(ServerUptimeClock.Milliseconds - serverTimeMs) / 10;
 
 			// 3. MagicBuffIIR_c::Activate. Signed, because the client's __alldiv is - a stamp behind the clock has to
-			// come out NEGATIVE and be rejected, not wrap to a huge positive remaining time.
+			// come out negative and be rejected, not wrap to a huge positive remaining time.
 			var remainingCs = ((long)stamp - (long)serverTimeMs) / 10;
 
 			Assert.True(remainingCs > 0, $"the client would reject a non-positive remaining time ({remainingCs}cs)");
-			// The pong's read comes FIRST, so the recovered remaining time is the duration plus however long the
+			// The pong's read comes first, so the recovered remaining time is the duration plus however long the
 			// factory's read trailed it - never less, and never more than the bracket. Rooted differently, the two
 			// would be apart by however long the two origins started apart, which is unbounded in either direction.
 			Assert.InRange(remainingCs, durationCs, durationCs + gapCs);
 		}
 
-		// A payload built for a buff that is already partly elapsed must produce a SHORTER remaining time than its
+		// A payload built for a buff that is already partly elapsed must produce a shorter remaining time than its
 		// Duration field - that is the branch Activate takes to resume a buff, and the only branch that changes what
 		// the client renders. Built the way the restore path builds it: Duration = the remaining time.
 		[Fact]
@@ -106,18 +106,16 @@ namespace Faolan.Tests
 			var serverTimeMs = ServerUptimeClock.Milliseconds;
 			var recovered = ((long)resumed.ExpiryStamp - (long)serverTimeMs) / 10;
 
-			// Here the factory's read comes FIRST, so the recovered time falls SHORT by the gap - bracketed, not a
-			// fixed window (#624).
+			// Here the factory's read comes first, so the recovered time falls short by the gap - bracketed, not a
+			// fixed window.
 			//
-			// ⚠️ The bound ROUNDS UP, and that is the whole of #860. `recovered` is `(10*R - d) / 10` for a gap `d`
-			// in milliseconds, and C# truncation of a subtraction makes that `R - ceil(d/10)`; a bound written as
-			// `R - g/10` is `R - floor(g/10)`. So the two straddle a centisecond boundary in OPPOSITE directions and
-			// the bound comes out one centisecond too tight whenever the elapsed gap is not a multiple of 10 ms.
-			// Normally all three clock reads land inside one millisecond and the gap is 0, which is why it passed;
-			// under a loaded full-suite run it does not, and the test failed for a reason that had nothing to do with
-			// what it measures.
+			// The bound has to round up. `recovered` is `(10*R - d) / 10` for a gap `d` in milliseconds, and C#
+			// truncation of a subtraction makes that `R - ceil(d/10)`, while a bound written as `R - g/10` is
+			// `R - floor(g/10)`. The two straddle a centisecond boundary in opposite directions, so such a bound comes
+			// out one centisecond too tight whenever the elapsed gap is not a multiple of 10 ms. All three clock reads
+			// usually land inside one millisecond and the gap is 0; under a loaded full-suite run they do not.
 			//
-			// ⭐ Its neighbour above looks symmetric and is NOT affected, which is the tell: that one ADDS the gap
+			// Its neighbour above looks symmetric and is not affected, which is the tell: that one adds the gap
 			// (`stamp - serverTime` with the pong read first), so both sides floor and the inequality survives. Only
 			// the subtracting direction flips the rounding.
 			var gapCs = (long)(serverTimeMs - before + 9) / 10; // ceil, to match `recovered`'s own truncation
@@ -126,7 +124,7 @@ namespace Faolan.Tests
 			Assert.Equal(remainingCs, resumed.Duration);
 		}
 
-		// The stamp is ABSOLUTE, so it is a 64-bit field with a real high half once the server has been up past
+		// The stamp is absolute, so it is a 64-bit field with a real high half once the server has been up past
 		// 2^32 ms (49.7 days). The old "nonce" only ever occupied the low word, which is what made it fail Activate's
 		// `0 < x <= Duration` test in every session: the whole u64 read as a value far in the past.
 		[Fact]

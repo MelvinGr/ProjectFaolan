@@ -16,8 +16,8 @@ namespace Faolan.Importer.Extractors
 	/// <param name="DestMapId">The playfield it leads to (`DestinationPlayfieldID`).</param>
 	public sealed record RdbTeleport(uint SourceMapId, float X, float Y, float Z, uint DestMapId);
 
-	// RDB **1000087** is the client's COMPLETE cross-playfield teleport table, and it is one plain-text XML record
-	// (id 0, ~140 KB) rather than a per-playfield resource (Gitea #883):
+	// RDB 1000087 is the client's complete cross-playfield teleport table, and it is one plain-text XML record
+	// (id 0, ~140 KB) rather than a per-playfield resource:
 	//
 	//   <teleportdata><teleports>
 	//     <teleportplayfield ExportUser="..." SourcePlayfieldID="1">
@@ -29,12 +29,12 @@ namespace Faolan.Importer.Extractors
 	// (`WorldTeleportExtractor`) holds 160 links over 24 source maps - it can only ever see a door somebody actually
 	// walked through on camera.
 	//
-	// ⚠️ **It carries NO destination coordinates and NO door name** - the `<teleport>` element has exactly four
+	// It carries no destination coordinates and no door name - the `<teleport>` element has exactly four
 	// attributes, censused across all 675, not read off the first one. Both absences matter downstream:
 	//   * no arrival -> the runtime falls back to the destination map's default spawn, which is a path
-	//     `WorldTeleportsModule` already has and already documents. A captured link, which DOES carry the arrival,
+	//     `WorldTeleportsModule` already has and already documents. A captured link, which does carry the arrival,
 	//     must therefore always win over an RDB one.
-	//   * no name -> the match back to a `WorldObject` row is POSITION-ONLY, where the captured tier can also
+	//   * no name -> the match back to a `WorldObject` row is position-only, where the captured tier can also
 	//     require the name to agree. That is a weaker key, so the caller has to handle two doors near one point
 	//     rather than pick the closer.
 	public static class RdbTeleportExtractor

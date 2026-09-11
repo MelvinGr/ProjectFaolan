@@ -7,20 +7,20 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// A harvested creature death animation: an NPC TYPE (by name), the death-animation behaviorId retail sent in its
-	// death BccIIR, and how long that animation runs for THIS creature. Keyed by name (the stable NpcTemplate join
+	// A harvested creature death animation: an NPC type (by name), the death-animation behaviorId retail sent in its
+	// death BccIIR, and how long that animation runs for this creature. Keyed by name (the stable NpcTemplate join
 	// key) because the wire handle is session-volatile.
 	//
 	// `ActivationTime` is 0 when no record of this creature stated one - see the extractor for why a zero is dropped
 	// rather than harvested.
 	public sealed record NpcDeathBehavior(string Name, uint BehaviorId, uint ActivationTime = 0);
 
-	// Harvests the per-creature death animation from captured NPC kills (#362). When an NPC dies, retail sends a
+	// Harvests the per-creature death animation from captured NPC kills. When an NPC dies, retail sends a
 	// death-behavior BccIIR (0x642CD3D6) on its handle: seq 0x0004, behaviorId 0x0000001F, protobuf field-1 = the death
-	// animation id. That id is CREATURE-TYPE specific (decoded across the corpus: 41877 = humanoid biped, 17036 =
+	// animation id. That id is creature-type specific (decoded across the corpus: 41877 = humanoid biped, 17036 =
 	// demon/large caster, 215333 = quadruped/beast) - it selects which death animation plays; field-3 and field-12
-	// vary per kill (hit-direction / ragdoll) and are NOT harvested. The dying handle is resolved to a creature NAME
-	// via the FA015807 spawns streamed in the SAME capture (NpcSpawnExtractor's identity logic), so it maps onto the
+	// vary per kill (hit-direction / ragdoll) and are not harvested. The dying handle is resolved to a creature name
+	// via the FA015807 spawns streamed in the same capture (NpcSpawnExtractor's identity logic), so it maps onto the
 	// NpcTemplate. Only creatures actually killed in a capture are recoverable; the rest default to the humanoid id.
 	public static class NpcDeathBehaviorExtractor
 	{
@@ -61,13 +61,13 @@ namespace Faolan.Importer.Extractors
 				if (behaviorId == 0)
 					continue;
 
-				// ⚠️ A ZERO `ActivationTime` is dropped rather than harvested (#781). It is not a length: 20 of the 186
-				// captured humanoid deaths carry one, on five creatures - three of which carry NOTHING else, so a zero
+				// A zero `ActivationTime` is dropped rather than harvested. It is not a length: 20 of the 186
+				// captured humanoid deaths carry one, on five creatures - three of which carry nothing else, so a zero
 				// is some other state of the record rather than that creature's timing. Harvesting it would send a
 				// 0-length death animation where the animation default is at least right for its family.
 				var activation = ActivationTime(bcc.Args);
 
-				// Attribute only to a KNOWN npc handle (a player death carries the same behaviour record but its handle
+				// Attribute only to a known npc handle (a player death carries the same behaviour record but its handle
 				// is in the instance range, so it never appears in handleName).
 				if (handleName.TryGetValue(bcc.Actor, out var name))
 					results.Add(new NpcDeathBehavior(name, behaviorId, activation));
@@ -76,10 +76,10 @@ namespace Faolan.Importer.Extractors
 			return results;
 		}
 
-		// Merge harvests across captures to one behaviorId per NAME. A creature's death id is consistent in the corpus;
+		// Merge harvests across captures to one behaviorId per name. A creature's death id is consistent in the corpus;
 		// if a name were ever seen with two ids, the MAJORITY wins (defensive - none observed).
 		//
-		// The TIMING merges the same way but over the NON-ZERO values only, so a creature whose records are a mix
+		// The TIMING merges the same way but over the non-zero values only, so a creature whose records are a mix
 		// (Pillager: 240 x24 and 0 x11, Scavenger Lackey: 240 x3 and 0 x3) keeps the length it stated rather than
 		// having a zero out-vote it. A creature with nothing but zeros ends up at 0, which the writer reads as
 		// "un-harvested" and leaves to the animation default.
@@ -108,7 +108,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// `CommandMessage.ActivationTime` (field 12) out of the same args - the death animation's length in
-		// centiseconds, and it is the CREATURE's rather than the animation's (#781). Unlike the animation id this one
+		// centiseconds, and it is the creature's rather than the animation's. Unlike the animation id this one
 		// is not the first field, so it goes through the schema rather than a hand-walk; 0 when absent.
 		private static uint ActivationTime(byte[] args)
 		{

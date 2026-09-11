@@ -4,77 +4,76 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// s2c FriendAdded (0x0028) - one friend's state. The friend list lives on the CHAT server, not the game server,
-	// which is why this sits beside the other chat-text codecs. First seen in login_2-clients_group-trade-friend,
-	// where the player states the design in chat: *"both friends added, friends are one sided, no accept needed"*;
-	// then pinned by `addfriends` + `login-with-friends`, six friends of six different levels and classes, one of
-	// them offline.
-	//
-	//   [u32 characterId][u8 status][u8 level][u32 stamp][u8 class]
-	//
-	// ⭐ The CLIENT states that layout, so it is no longer read off the captures alone (#796): the `S2C_ADD_BUDDY`
-	// case of `FUN_00a71e00` unpacks the message with the format string **`"IBBIB"`** - u32, u8, u8, u32, u8, in
-	// exactly this order.
-	//
-	// LEVEL and CLASS are BOTH here, which is what the client's hover tooltip shows. The level byte was read as a
-	// constant 0x05 until six friends of differing levels made it obvious, and that also settled the trailing byte:
-	// all six values are valid Class ids (HeraldOfXotli, BearShaman, Demonologist, TempestOfSet, Demonologist,
-	// Barbarian) while the level byte reads 7/10/5/8/10/5.
-	//
-	// ⭐⭐ The STAMP is a UNION on the online flag, and the CLIENT SPLITS IT ITSELF (#796). The same parser stores
-	// it in two DIFFERENT members of `ppj::Buddy_t` depending on the flag - offline into `[10]`, online into `[12]`.
-	// Two slots is the client saying "two meanings", which is what turns the union from a reading into a fact:
-	//   OFFLINE -> a unix LAST-SEEN. The captured offline friend's 0x6A64AD51 is 2026-07-25 12:34:25 UTC, 2h06 before
-	//              that capture was taken, which is what identified it. We send Character.LastConnection.
-	//   ONLINE  -> that friend's PLAYFIELD-INSTANCE TOKEN. Not a time (0x01EDA8B2 reads as 1971), and no longer a
-	//              structural guess (#888): each of the five online friends' stamps appears again inside THAT SAME
-	//              FRIEND's record in the same capture's who-result, ~72 bytes in - where TeamMemberRecord's embedded
-	//              PlayfieldProxy keeps its token. Four carry 0x01EDA8B2 and one 0x01EDAF93, and the who-result
-	//              reproduces the split friend-for-friend, so it is not one session constant seen twice. The player's
-	//              own LoginConnectReady ends in a PlayfieldProxy carrying the same 0x01EDA8B2 (one instance), and
-	//              another capture's two online friends carry values found NOWHERE else in it - friends elsewhere.
-	//
-	// ⚠️ The ONLINE half is NOT what the friend-list node renders. `FriendListNode_c`'s buddy-apply (`FUN_006ca170`)
-	// reads `[8]` (level), `[11]` (online) and `[10]` (the OFFLINE last-seen) and never touches `[12]`. It also does
-	// one map lookup, and that lookup was once mis-attributed to this stamp: it keys on `[9]`, the CLASS byte, against
-	// the `RDBPlayerClassData_c` class registry, and renders the class NAME (`"unknown"` on a miss). So the online
-	// token is consumed somewhere else entirely, and `"unknown"` in the friend list is a class-id problem, never a
-	// stamp one.
-	//
-	// ⛔ **And "somewhere else" is NOWHERE - the client never reads `[12]` back** (#796). `ppj::Buddy_t` is
-	// `sizeof == 0x34`, held in a plain vector spanning `[chatClient+0x110] .. [+0x114]` (the add path walks it with
-	// `ADD ESI,0x34`), so every reachable consumer either iterates that vector or is handed a record by the
-	// buddy-changed signal. Both were swept (`tools/ghidra/DumpBuddyFieldReaders.java`, all 139,441 functions):
-	// four functions in the chat client iterate the vector and none of them touches `+0x30`, and the co-read sweep
-	// for `+0x2c` (the online flag - the union's own discriminator) beside `+0x30` returns only the STORE
-	// (`FUN_00a71e00`), the record COPY (`FUN_00a73b20`) and `FriendListNode_c`, whose `+0x30` is a different
-	// struct's field. So the client parses the online stamp, files it, and drops it - and no further reading is
-	// recoverable from the client, which is why the playfield-token reading stays [V0].
-	//
-	// ⭐⭐ **`online` is NOT a boolean, and 2 and 3 are now NAMED (#892).** `FriendListNode_c::PresenceCategory`
-	// (`FUN_006ca510`) copies the byte to node `+0x30` and switches on it: **1 -> category 0, 2 -> category 1,
-	// 3 -> category 2**, and anything else falls through to the offline branch (category 3). The social-list row
-	// builder `FUN_016bf320` then routes the row into one of five sub-lists by that category and INCREMENTS its
-	// online counter (`+0x438`) for 0/1/2 while DECREMENTING it for 3 - so all three of 1/2/3 are ONLINE states and
-	// only they are.
-	//
-	// This was carried as a `bool` while the corpus only ever showed 1/0, with the note that "what 2 and 3 mean is
-	// simply not in the corpus". They are `SocialStatus.LookingForGroup` and `SocialStatus.Away`: the friends-list
-	// ICON table names the categories in exactly this order (offline, online, lfg, away, ...), and the client's c2s
-	// `SetSocialStatus` sends **2** at the instant its LFG flag goes on and **1** when it goes off. So the field is
-	// the same presence enum in both directions, and it is typed as one here.
-	//
-	// Retail still sends 1/0 in every captured record and so do we for a plain login/logout, which is why widening
-	// the type changed no captured byte - `Online` remains as a bool-shaped overload for the callers that genuinely
-	// only know "is there a connection".
-	//
-	// GuildService's member record already carries the same online/last-seen union off the same column.
+	/// <summary>
+	///     s2c <c>FriendAdded</c> - one friend's state:
+	///     <c>[u32 characterId][u8 status][u8 level][u32 stamp][u8 class]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The friend list lives on the chat server rather than the game server, which is why this sits beside the other
+	///     chat-text codecs. First seen in login_2-clients_group-trade-friend, where the player states the design in chat
+	///     ("both friends added, friends are one sided, no accept needed"), then pinned by <c>addfriends</c> and
+	///     <c>login-with-friends</c> - six friends of six different levels and classes, one of them offline.
+	///     <para>
+	///         The client states that layout: the <c>S2C_ADD_BUDDY</c> case of <c>FUN_00a71e00</c> unpacks the message
+	///         with the format string <c>"IBBIB"</c> - u32, u8, u8, u32, u8, in exactly this order.
+	///     </para>
+	///     <para>
+	///         Level and class are both here, which is what the client's hover tooltip shows. All six captured trailing
+	///         bytes are valid class ids (HeraldOfXotli, BearShaman, Demonologist, TempestOfSet, Demonologist, Barbarian)
+	///         while the level byte reads 7/10/5/8/10/5.
+	///     </para>
+	///     <para>
+	///         The stamp is a union on the online flag, and the client splits it itself: the same parser stores it in two
+	///         different members of <c>ppj::Buddy_t</c> depending on the flag - offline into <c>[10]</c>, online into
+	///         <c>[12]</c>. Offline it is a unix last-seen (the captured offline friend's 0x6A64AD51 is 2026-07-25
+	///         12:34:25 UTC, 2h06 before that capture was taken), and <c>Character.LastConnection</c> is what is sent.
+	///         Online it is that friend's playfield-instance token: not a time, and each of the five online friends'
+	///         stamps appears again inside that same friend's record in the same capture's who-result, ~72 bytes in,
+	///         where <c>TeamMemberRecord</c>'s embedded PlayfieldProxy keeps its token. Four carry 0x01EDA8B2 and one
+	///         0x01EDAF93, and the who-result reproduces the split friend for friend, so it is not one session constant
+	///         seen twice.
+	///     </para>
+	///     <para>
+	///         The online half is not what the friend-list node renders. <c>FriendListNode_c</c>'s buddy-apply
+	///         (<c>FUN_006ca170</c>) reads <c>[8]</c> (level), <c>[11]</c> (online) and <c>[10]</c> (the offline
+	///         last-seen) and never touches <c>[12]</c>. Its one map lookup keys on <c>[9]</c>, the class byte, against
+	///         the <c>RDBPlayerClassData_c</c> class registry, and renders the class name ("unknown" on a miss), so
+	///         "unknown" in the friend list is a class-id problem and never a stamp one.
+	///     </para>
+	///     <para>
+	///         The client never reads <c>[12]</c> back at all. <c>ppj::Buddy_t</c> is <c>sizeof == 0x34</c>, held in a
+	///         plain vector spanning <c>[chatClient+0x110] .. [+0x114]</c>, so every reachable consumer either iterates
+	///         that vector or is handed a record by the buddy-changed signal. Both were swept
+	///         (tools/ghidra/DumpBuddyFieldReaders.java, all 139,441 functions): four functions in the chat client
+	///         iterate the vector and none touches <c>+0x30</c>, and the co-read sweep for <c>+0x2c</c> - the online
+	///         flag, the union's own discriminator - beside <c>+0x30</c> returns only the store
+	///         (<c>FUN_00a71e00</c>), the record copy (<c>FUN_00a73b20</c>) and <c>FriendListNode_c</c>, whose
+	///         <c>+0x30</c> is a different struct's field. The client therefore parses the online stamp, files it and
+	///         drops it, which is why the playfield-token reading stays [V0].
+	///     </para>
+	///     <para>
+	///         <c>online</c> is not a boolean. <c>FriendListNode_c::PresenceCategory</c> (<c>FUN_006ca510</c>) copies the
+	///         byte to node <c>+0x30</c> and switches on it: 1 gives category 0, 2 category 1, 3 category 2, and anything
+	///         else falls through to the offline branch (category 3). The social-list row builder <c>FUN_016bf320</c>
+	///         routes the row into one of five sub-lists by that category and increments its online counter
+	///         (<c>+0x438</c>) for 0/1/2 while decrementing it for 3, so all three of 1/2/3 are online states and only
+	///         they are. They are <c>SocialStatus.LookingForGroup</c> and <c>SocialStatus.Away</c>: the friends-list icon
+	///         table names the categories in exactly this order (offline, online, lfg, away, …), and the client's c2s
+	///         <c>SetSocialStatus</c> sends 2 the instant its LFG flag goes on and 1 when it goes off. The field is the
+	///         same presence enum in both directions and is typed as one here.
+	///     </para>
+	///     <para>
+	///         Retail sends 1/0 in every captured record, and so does this for a plain login or logout; <c>Online</c>
+	///         remains as a bool-shaped overload for the callers that only know whether a connection exists.
+	///         <c>GuildService</c>'s member record carries the same online/last-seen union off the same column.
+	///     </para>
+	/// </remarks>
 	public static class FriendStateCodec
 	{
-		// The captured token, kept as the FALLBACK only: the chat tier sources the friend's real one from the game
-		// host through IGameServerDispatcher, and this is what an online friend the game host has no live zone for
-		// gets instead. Sending a stale token is still better than sending a last-seen time on the online branch,
-		// which is what the client would then read as one.
+		// The captured token, kept as the fallback only: the chat tier sources the friend's real one from the game host
+		// through IGameServerDispatcher, and this is what an online friend the game host has no live zone for gets instead.
+		// Sending a stale token is still better than sending a last-seen time on the online branch, which is what the client
+		// would then read as one.
 		public const uint OnlineStamp = 0x01EDA8B2;
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.FriendAdded;
 
@@ -115,8 +114,11 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// `Status` is the presence enum (SocialStatus), not a flag - see the class remark. `Online` is the question the
-	// STAMP union asks (last-seen vs playfield token), and all three of the online statuses answer it the same way.
+	/// <remarks>
+	///     <c>Status</c> is the presence enum (<c>SocialStatus</c>) rather than a flag - see the codec's remarks.
+	///     <c>Online</c> is the question the stamp union asks (last-seen versus playfield token), and all three of the
+	///     online statuses answer it the same way.
+	/// </remarks>
 	public sealed record FriendState(uint CharacterId, SocialStatus Status, byte Level, ConanClass Class, uint Stamp)
 	{
 		public bool Online => Status != SocialStatus.Offline;

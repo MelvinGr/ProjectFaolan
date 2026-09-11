@@ -9,31 +9,31 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// What `QuestGoalDefinition.Extra0..Extra6` - the goal record's seven "reserved" words - actually hold (#546).
+	// What `QuestGoalDefinition.Extra0..Extra6` - the goal record's seven "reserved" words - actually hold.
 	//
-	// The seven are a lead word plus THREE optional `(marker, identity)` REFERENCE slots at [1..2] / [3..4] / [5..6],
-	// and the marker is a TYPE TAG on the identity:
+	// The seven are a lead word plus three optional `(marker, identity)` reference slots at [1..2] / [3..4] / [5..6],
+	// and the marker is a type tag on the identity:
 	//
 	//   * `50003` - a real LDB category (`nc_trade.tradename`, named by the client's own descriptor table), and the
-	//     identity is an LDB refId. All three goals that carry one hold the goal's OWN `TrailingRefId` verbatim,
+	//     identity is an LDB refId. All three goals that carry one hold the goal's own `TrailingRefId` verbatim,
 	//     which is the Rosetta stone for the whole slot: it says the slot is another spelling of the goal's target.
-	//   * `70099` - the client's "unset id" SENTINEL. `FUN_006dd970`, the `GameCode/Criteria` evaluator, guards every
+	//   * `70099` - the client's "unset id" sentinel. `FUN_006dd970`, the `GameCode/Criteria` evaluator, guards every
 	//     id compare with `!= 0x111d3` and logs "user criteria failed" when a criterion's id equals it. So
 	//     `(70099, token)` means "not an LDB reference" and the identity is the object's 4-character ACGHash name.
 	//
-	// WHAT THEY REFER TO is what these gates pin, because it is not visible in any single row:
-	//   * slot [1..2] is the goal's TARGET - the item/object the goal is about, the same object `TrailingCategory` /
+	// What they refer to is what these gates pin, because it is not visible in any single row:
+	//   * slot [1..2] is the goal's target - the item/object the goal is about, the same object `TrailingCategory` /
 	//     `TrailingRefId` names.
-	//   * slot [5..6] is its NPC - every `TrailingCategory` 51000 goal carries one, and the only ITEM goals that do
+	//   * slot [5..6] is its NPC - every `TrailingCategory` 51000 goal carries one, and the only item goals that do
 	//     are all twelve `Separator` 20 (Deliver) goals, i.e. exactly the goals that need a recipient.
-	//   * the token is a FUNCTION of the referenced object, not a per-entry random: it is a bijection with the item on
+	//   * the token is a function of the referenced object, not a per-entry random: it is a bijection with the item on
 	//     the 50200 goals and with the NPC on the 51000 goals.
 	//
-	// ⚠️ The slots FLOAT - goal 11252 uses [1] and [3] - so these gates are written over "whichever slots are
-	// occupied", never over a fixed position. The lead word [0] is still undecoded - Gitea #550.
+	// The slots float - goal 11252 uses [1] and [3] - so these gates are written over "whichever slots are
+	// occupied", never over a fixed position. The lead word [0] is still undecoded; open work tracked in Gitea #550.
 	//
-	// A token -> object map is CLOSED as not recoverable (#547): the client never dereferences a token, so the
-	// twelve Deliver recipients are read out of the objective TEXT by design rather than as a stopgap. See
+	// A token -> object map is closed as not recoverable: the client never dereferences a token, so the
+	// twelve Deliver recipients are read out of the objective text by design rather than as a stopgap. See
 	// QuestObjectiveGoalCodec's Reserved comment for the evidence.
 	public class QuestGoalReferenceSlotTests
 	{
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 			return await db.QuestGoalDefinitions.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);
 		}
 
-		// The marker is a CLOSED type tag, and each type implies the shape of the identity beside it. If a re-harvest
+		// The marker is a closed type tag, and each type implies the shape of the identity beside it. If a re-harvest
 		// ever introduces a third marker this fails rather than silently widening the "two types" claim above.
 		[Fact]
 		public async Task Markers_AreOneOfTwoTypes_AndTypeTheIdentity()
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 		}
 
 		// The Rosetta stone: where the goal spells the reference as an LDB ref instead of a token, it is the goal's
-		// OWN trailing reference. This is what makes slot [1..2] "the goal's target" rather than an unknown id.
+		// own trailing reference. This is what makes slot [1..2] "the goal's target" rather than an unknown id.
 		[Fact]
 		public async Task LdbRefSlots_HoldTheGoalsOwnTrailingRefId()
 		{
@@ -98,7 +98,7 @@ namespace Faolan.Tests
 			Assert.True(bad.Count == 0, "a 50003 slot restates the goal's own target reference:\n  " + string.Join("\n  ", bad));
 		}
 
-		// The token identifies the OBJECT, so it must agree wherever the same object is referenced and must not be
+		// The token identifies the object, so it must agree wherever the same object is referenced and must not be
 		// shared between two of them. A per-entry random token would fail both directions.
 		[Theory]
 		[InlineData(ItemCategory)]
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 			Assert.True(twoObjects.Count == 0, $"one token in category {category} names two objects: " + string.Join(", ", twoObjects));
 		}
 
-		// The NPC slot: mandatory on an NPC goal, and on an ITEM goal it appears only where a recipient is needed.
+		// The NPC slot: mandatory on an NPC goal, and on an item goal it appears only where a recipient is needed.
 		// This is the whole evidence that slot [5..6] is the NPC rather than a second target.
 		[Fact]
 		public async Task NpcSlot_IsOnEveryNpcGoal_AndOnlyOnDeliverItemGoals()

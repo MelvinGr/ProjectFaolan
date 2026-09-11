@@ -21,9 +21,9 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedBody, Convert.ToHexString(CoreClaimCodec.Build(new CoreClaimNewClaimsIIR(0x01307874))).ToLowerInvariant());
 		}
 
-		// #816: sub 0x000A, the payload-less c2s the client sends the moment the claim list lands. Refused before the
+		// Sub 0x000A, the payload-less c2s the client sends the moment the claim list lands. Refused before the
 		// fix, which made a real claims-window session unreadable. xxx_mage-necromancer_login_play4 frame 11237 - the
-		// only capture in the corpus of the window being OPENED rather than replayed.
+		// only capture in the corpus of the window being opened rather than replayed.
 		[Fact]
 		public void ParseListAck_RoundTripsTheCapturedBody()
 		{
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(CoreClaimCodec.Build(parsed)));
 		}
 
-		// An unmodelled sub must still throw - #816 adds the one retail sends, it does not make the switch tolerant.
+		// An unmodelled sub must throw: the switch models the subs retail sends and is not tolerant of the rest.
 		[Fact]
 		public void Parse_StillRejectsAnUnmodelledSub()
 		{

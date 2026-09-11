@@ -10,19 +10,19 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #464: the four REWARD lists inside every captured `Quest_c` journal record - the ones the codec carried as
+	// The four reward lists inside every captured `Quest_c` journal record - the ones the codec carried as
 	// "16 raw u32s, unvalidated" until the whole corpus was swept.
 	//
-	// ⭐ Why the corpus and not a golden: the beach starter carries NONE of these lists, and the beach template is the
+	// Why the corpus and not a golden: the beach starter carries none of these lists, and the beach template is the
 	// only journal record a golden covers. That is exactly why they went unread - the one record anybody looked at
-	// was the one record with nothing in them. The gate is therefore breadth by construction (the #384/#390 pattern).
+	// was the one record with nothing in them. The gate is therefore breadth by construction.
 	//
-	// ⚠️ The DECRYPTION proof - that each element's key opens the template it names - lives in
+	// The decryption proof - that each element's key opens the template it names - lives in
 	// `--report quest-rewards`, not here: it needs the client's RDB, which the suite must run without. What is
 	// asserted here is the grammar the decode rests on, which is a property of the wire and of our reader.
 	public class QuestRewardListTests
 	{
-		// The client's item-template catalog, RDBH variant. Every captured element names it on both halves.
+		// The client's item-template catalog, rdbh variant. Every captured element names it on both halves.
 		private const uint ItemTemplateCatalogType = 1000620;
 
 		[Fact]
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 					elements++;
 					templates.Add(e.TemplateId);
 
-					// The questId ECHO. It is what ties an element to the record that carries it, and it is the
+					// The questId echo. It is what ties an element to the record that carries it, and it is the
 					// cheapest thing that would break first if the 16-word carve were off by a word.
 					Assert.Equal(record.QuestId, e.QuestId);
 
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 
 			// The gate would go vacuous if the corpus slice ever lost these records - the failure mode a
 			// derived-extract regeneration has (CorpusExtract.ExpectedCounts is the ratchet for the other half).
-			// ⚠️ The floors are the SLICE's numbers, not the dumps'. `--report quest-rewards` over the real corpus
+			// The floors are the slice's numbers, not the dumps'. `--report quest-rewards` over the real corpus
 			// sees 7,347 elements / 3,741 records / 101 templates; the committed extract holds 4,989 / 2,626 / 100.
 			// Writing the dumps' figure into a test is the standing trap here - it fails on a clean clone.
 			Assert.True(elements > 4500, $"only {elements} reward elements over {records} journal records - the corpus slice has narrowed");
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 
 		// Round-trip: a record carrying reward lists must re-emit byte-for-byte. The four lists sit in the middle of
 		// the record, so a mis-sized element would desync everything after it - which is precisely what made the
-		// interleaved objective region so hard to find (#384).
+		// interleaved objective region so hard to find.
 		[Fact]
 		public void ARecordWithRewards_ReEmitsByteExact()
 		{

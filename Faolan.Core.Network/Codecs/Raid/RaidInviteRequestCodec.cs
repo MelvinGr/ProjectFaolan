@@ -5,12 +5,15 @@ using Faolan.Core.Network.Codecs.Team;
 
 namespace Faolan.Core.Network.Codecs.Raid
 {
-	// c2s RaidInviteCharacter (CSPlayerAgent 0x71) - `RaidInviteCharacter(const ID32& i_cCharID,
-	// const std::string& i_cMessage)`. The team twin is TeamInviteRequestCodec, one trailing flag longer: the raid
-	// invite has no `i_bCheckCriminalStatus`.
-	//
-	// No capture carries it (#669) - the parameter list and the ID32 / string encodings are the client's, both of
-	// them pinned by the captured team traffic that uses the same primitives.
+	/// <summary>
+	///     c2s <c>RaidInviteCharacter(const ID32&amp; i_cCharID, const std::string&amp; i_cMessage)</c>. The team twin
+	///     is <see cref="Team.TeamInviteRequestCodec" />, one trailing flag longer: the raid invite has no
+	///     <c>i_bCheckCriminalStatus</c>.
+	/// </summary>
+	/// <remarks>
+	///     No capture carries it. The parameter list and the ID32 and string encodings are the client's, both pinned by
+	///     the captured team traffic that uses the same primitives.
+	/// </remarks>
 	public static class RaidInviteRequestCodec
 	{
 		public const uint Method = (uint)CSPlayerAgentMethods.RaidInviteCharacter;

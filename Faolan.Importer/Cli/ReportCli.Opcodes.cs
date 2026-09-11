@@ -10,7 +10,7 @@ namespace Faolan.Importer.Cli
 	public static partial class ReportCli
 	{
 		// Matrix CSV, one row per capture, cell = packet count. Columns are the (direction, opcode) summary first
-		// (sub-opcode collapsed, ~122), then EVERY (direction, opcode, sub-opcode) appended at the end (header
+		// (sub-opcode collapsed, ~122), then every (direction, opcode, sub-opcode) appended at the end (header
 		// "S2C 0x2000:0x737A6DF9"). Wide (~10k sub columns, many are one-off entity handles) but a full pivot table.
 		private static void OpcodeCsv(IReadOnlyList<NamedCapture> captures)
 		{
@@ -108,7 +108,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  total={count}  in {globalDumps[k].Count} dumps");
 		}
 
-		// Matrix CSV for ONE opcode (arg, e.g. "0x2000"; default 0x2000): one row per capture, one column per
+		// Matrix CSV for one opcode (arg, e.g. "0x2000"; default 0x2000): one row per capture, one column per
 		// (direction, sub-opcode) seen under that opcode, cell = packet count. This is the drill-down of opcodes-csv -
 		// e.g. every S2C 0x2000 IIR type as its own column. High-cardinality opcodes (0x2008/0x2020 handles) will be wide.
 		private static void SubOpcodeCsv(IReadOnlyList<NamedCapture> captures, string? arg)

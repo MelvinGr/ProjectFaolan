@@ -26,13 +26,13 @@ namespace Faolan.Importer.Cli
 			public string? Note;
 		}
 
-		// Does an NPC spawn carry any per-NPC STAT array? (#401's player->NPC half needs an armour source, and the
-		// stat-update IIR carries none - tools/capture/scan_npc_armor_stat.py.) The spawn's character message has a
+		// Does an NPC spawn carry any per-NPC stat array? An NPC armour model needs a source and the stat-update IIR
+		// carries none (tools/capture/scan_npc_armor_stat.py). The spawn's character message has a
 		// `generic_stats` repeated-uint32 field; this censuses it over every captured NPC spawn using the real
 		// protobuf decoder, because hand-scanning the wire for the field tag matches inside strings.
 		// --report spawn-diff [--report-arg <name substring>]
 		//
-		// Rebuilds every CAPTURED NPC spawn from the DB row it was imported into and compares the two - the question
+		// Rebuilds every captured NPC spawn from the DB row it was imported into and compares the two - the question
 		// "does the NPC we send look like the NPC retail sent", asked of the shipped data rather than of a golden
 		// fixture. That is what an in-client "this NPC renders wrong" report needs, and what the equipment-row and
 		// stat-core queries cannot answer on their own: both can be faithful while the record assembled from them is
@@ -40,17 +40,17 @@ namespace Faolan.Importer.Cli
 		//
 		// It compares the two parts that DESCRIBE the entity and that we claim to reproduce - the embedded
 		// CoreCharacter message (identity, stats, worn equipment) and the post-IIR appearance/morph table - plus the
-		// CoreChar header word. It deliberately does NOT compare whole records: our pre-IIR is the generated minimal
-		// scaffold by design (#243), so a byte-exact record comparison reports every spawn in the corpus as different
+		// CoreChar header word. It deliberately does not compare whole records: our pre-IIR is the generated minimal
+		// scaffold by design, so a byte-exact record comparison reports every spawn in the corpus as different
 		// and says nothing about appearance.
 		//
-		// The match is exact: a captured record is found by the row's OWN derived key (map + position), over the login
+		// The match is exact: a captured record is found by the row's own derived key (map + position), over the login
 		// burst only - the window the importer imports through, since a mid-session spawn is the same NPC at wherever
 		// it had WANDERED to and keys to no row. A row we cannot find, or a type with no lifted stat core, is reported
 		// rather than skipped: "not compared" is a different answer from "matches".
 		//
-		// ⚠️ NOROW is not by itself a data gap. The key is built with a NULL class, so every placement on a
-		// CLASS-SPECIFIC map (the city armories, where the class is part of the identity) keys to nothing here - the
+		// NOROW is not by itself a data gap. The key is built with a null class, so every placement on a
+		// class-SPECIFIC map (the city armories, where the class is part of the identity) keys to nothing here - the
 		// quartermasters are all NOROW for that reason alone. Read a NOROW as "go look", not as "missing".
 		private static void SpawnDiff(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
@@ -65,7 +65,7 @@ namespace Faolan.Importer.Cli
 				.AsSplitQuery()
 				.ToDictionary(s => s.Id);
 
-			// Per template: how the captured records for it compared. Keyed by NAME because that is what an in-client
+			// Per template: how the captured records for it compared. Keyed by name because that is what an in-client
 			// report names, and a name can span several template ids (two "Poacher" types stand on one map).
 			var tally = new SortedDictionary<string, SpawnVerdict>();
 			var seen = new HashSet<(uint, float, float, float)>();
@@ -115,12 +115,10 @@ namespace Faolan.Importer.Cli
 					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
 						continue;
 
-					// ⚠️ The Word2 census runs HERE - before the name filter, the position dedup and the DB-row
-					// lookup - because it is a claim about retail's BYTES, not about the spawns we can compare. It
-					// used to sit at the bottom of the loop, past all three gates, and reported "2 of 756 tables"
-					// while the importer's own lift found a THIRD carrying spawn (Valkyrie Skalla) that the dedup had
-					// dropped. A census that silently answers a narrower question than it states is the failure mode
-					// this whole field's history is made of.
+					// The Word2 census runs here - before the name filter, the position dedup and the DB-row lookup -
+					// because it is a claim about retail's bytes, not about the spawns we can compare. Behind those
+					// gates it would answer a narrower question than it states: the dedup alone drops a carrying
+					// spawn the importer's own lift finds.
 					if (captured.Post?.Slot is { Appearance.Count: > 0, Skills.Count: 0, Pets.Count: 0 } census)
 					{
 						word2Tables++;
@@ -178,7 +176,7 @@ namespace Faolan.Importer.Cli
 					var ourMsg = ours.Character?.ToProtobuf() ?? [];
 					if (!theirMsg.AsSpan().SequenceEqual(ourMsg))
 					{
-						// WHICH fields, not just "the message differs". Named fields are what turn a diff into a lead:
+						// which fields, not just "the message differs". Named fields are what turn a diff into a lead:
 						// "we send MonsterScale 100 where retail sends 97" is actionable, "758B vs 758B" is not.
 						var fields = FieldDiff(captured.Character, ours.Character);
 						faults.Add($"message {theirMsg.Length}B vs {ourMsg.Length}B"
@@ -209,7 +207,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// #672: the classifier declines a whole appearance table on ONE entry with a non-zero Word2, and every
+			// the classifier declines a whole appearance table on one entry with a non-zero Word2, and every
 			// bald NPC found so far declines for exactly that. So census the field across every captured table: if
 			// it were runtime noise it would be scattered, and if it is part of the appearance it will have shape.
 			Console.WriteLine();
@@ -219,18 +217,17 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  Word2 values: {string.Join(", ", word2Values.OrderByDescending(kv => kv.Value).Take(10).Select(kv => $"{kv.Key} x{kv.Value}"))}");
 			Console.WriteLine($"  and on a carrying table, the non-zero entries are its FIRST {string.Join("/", word2Prefix.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} ({kv.Value})"))}");
 
-			// ⚠️ Cross-check against what the IMPORTER lifted, because this report can only see the LOGIN BURST and
-			// the importer sees more. That gap is not hypothetical: the burst window shows two carrying placements
+			// Cross-check against what the importer lifted, because this report can only see the login burst and the
+			// importer sees more. That gap is not hypothetical: the burst window shows two carrying placements
 			// (Turach, Kincaid) and the DB holds three - `Valkyrie Skalla` carries one from a send this window never
-			// reaches. Reporting only the burst figure would state a floor as if it were the count, which is exactly
-			// the error #672 was opened about.
+			// reaches. Reporting only the burst figure would state a floor as if it were the count.
 			var carriedInDb = rows.Values.Where(r => r.Morphs.Any(m => m.Word2 != 0)).Select(r => r.NpcTemplate?.Name ?? $"#{r.NpcTemplateId}").Order().ToList();
 			Console.WriteLine($"  the DB (which the importer lifts from a WIDER window than this report sees) holds "
 			                  + $"{carriedInDb.Count} carrying placement(s): {string.Join(", ", carriedInDb)}");
 
-			// ⭐ WHAT it is attached to. The ordinal shape alone says "not runtime state"; this says what it IS.
+			// what it is attached to. The ordinal shape alone says "not runtime state"; this says what it is.
 			// Resolving each carrying morph id against MorphTargets: every one is a `*texscript_*`, never a face/body
-			// slider or a hair mesh. And no single-texscript table carries it, which is what an ORDER needs two of -
+			// slider or a hair mesh. And no single-texscript table carries it, which is what an order needs two of -
 			// though most multi-texscript tables do not carry it either, so it is not simply "the layer order".
 			var morphNames = db.MorphTargets.AsNoTracking().ToDictionary(t => t.Id, t => t.Name);
 			var carryingKinds = rows.Values
@@ -267,7 +264,7 @@ namespace Faolan.Importer.Cli
 
 			// The appearance table as (morph id, value) pairs. Empty for an animal, whose post-IIR carries no entry
 			// slot of this shape - so "0 vs 0" is a match, not two absences papering over each other.
-			// #672: WHY a captured appearance table did not become morph rows. `NpcSpawnAppearance.TryLiftLenient` is
+			// why a captured appearance table did not become morph rows. `NpcSpawnAppearance.TryLiftLenient` is
 			// deliberately narrower than the reader it runs on and declines the whole table on any of four
 			// conditions; a spawn that lands here renders BALD, so which condition fired is the whole question. It
 			// re-states the classifier's conditions rather than calling it, because the classifier answers bool - and
@@ -282,9 +279,8 @@ namespace Faolan.Importer.Cli
 				if (post.Slot.Appearance.Count == 0)
 					return "the table is empty (the minimal no-morph form)";
 
-				// Word2 came OFF this veto with #672 - it is an ordinal, not runtime state, and the column now
-				// carries it. (The old never-observed-Flag veto died with the field: it was the u16 string length's
-				// high byte, #466.) A non-empty skill or pet list marks a PLAYER stream.
+				// Word2 is not vetoed here: it is an ordinal rather than runtime state, and the column carries it.
+				// A non-empty skill or pet list marks a player stream.
 				if (post.Slot.Skills.Count > 0 || post.Slot.Pets.Count > 0)
 					return $"the slot carries skills/pets ({post.Slot.Skills.Count}/{post.Slot.Pets.Count}) - a player stream";
 				if (post.EndPairs.Count > 0 || post.EndPairs2.Count > 0 || post.EndPairs3.Count > 0)
@@ -305,44 +301,44 @@ namespace Faolan.Importer.Cli
 		// than a hand-written field list because the message is generated: a field added to the schema has to show up
 		// here without anyone remembering to add it, or the diff quietly under-reports.
 		//
-		// Repeated fields report only their COUNT - element-wise diffing them is the caller's job when it matters
+		// Repeated fields report only their count - element-wise diffing them is the caller's job when it matters
 		// (worn equipment already has its own line) - and a null-vs-set sub-message is named rather than walked.
 		// --report field-stability [--report-arg <name substring>]
 		//
-		// For every field of the captured NPC CoreCharacter message: is its value a property of the NPC TYPE, or of
+		// For every field of the captured NPC CoreCharacter message: is its value a property of the NPC type, or of
 		// the individual placement? Asked of retail's own bytes, with no DB involved.
 		//
-		// This is the question `--report spawn-diff` raises but cannot answer (Gitea #602). A spawn-diff difference
+		// This is the question `--report spawn-diff` raises but cannot answer. A spawn-diff difference
 		// says our value disagrees with retail's; it does not say whether the disagreement is a bad lift or a field
 		// that has no type-level value to lift. `NpcStatCoreColumns.Lift` is faithful to the message it is handed -
-		// the fault, where there is one, is that a per-PLACEMENT field was lifted to the TYPE at all, and then every
+		// the fault, where there is one, is that a per-PLACEMENT field was lifted to the type at all, and then every
 		// placement of that type inherits whichever value the representative spawn happened to carry.
 		//
-		// The test is a GROUP BY, not a threshold: group the captured spawns by TYPE, keep the types sighted more
+		// The test is a group by, not a threshold: group the captured spawns by type, keep the types sighted more
 		// than once, and count in how many of them the field holds one distinct value. A type-stable field is
 		// constant in ~all of them; a per-placement field is constant only where the type happens to have been
 		// sighted in one state. Reported as that ratio plus the worst offender, so "83% stable" is readable as
 		// "nearly type-stable, with a real exception to look at" rather than as a pass mark.
 		//
-		// ⚠️ The group key is retail's own `npc_stats.TemplateId`, NOT the name. Grouping by name was the first cut
+		// The group key is retail's own `npc_stats.TemplateId`, not the name. Grouping by name was the first cut
 		// and it is wrong: a name spans several templates (the same report scored `TemplateId` itself at 70% stable
 		// under a name key - "Halen van Dummy" alone covers 22 of them), so every field inherits that conflation and
 		// reads as more placement-varying than it is. A field cannot be less stable than the key it is grouped by.
 		//
-		// ⚠️ Only types sighted MORE THAN ONCE can say anything: a type seen once is trivially "constant" and would
+		// Only types sighted more than once can say anything: a type seen once is trivially "constant" and would
 		// inflate every field toward 100%. The single-sighting types are counted and reported separately.
 		private static void FieldStability(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
 
-			// field name -> npc TEMPLATE -> the distinct values seen for it
+			// field name -> npc template -> the distinct values seen for it
 			var fields = new SortedDictionary<string, Dictionary<uint, HashSet<string>>>(StringComparer.Ordinal);
 			var sightings = new Dictionary<uint, int>();
 			var templateNames = new Dictionary<uint, string>();
 
 			// ...and the same thing keyed by PHYSICAL PLACEMENT (map + position), which is the second half of the
-			// question and the one that decides whether a per-placement field can live in a table AT ALL. A field
+			// question and the one that decides whether a per-placement field can live in a table at all. A field
 			// that varies between sightings of one placement is not placement-scoped either - it is rolled per spawn
-			// EVENT, and no column can hold it. This accumulator deliberately does NOT dedup by position: repeated
+			// event, and no column can hold it. This accumulator deliberately does not dedup by position: repeated
 			// sightings of one placement are exactly its evidence.
 			var byPlacement = new SortedDictionary<string, Dictionary<(uint, float, float, float), HashSet<string>>>(StringComparer.Ordinal);
 			var placementSightings = new Dictionary<(uint, float, float, float), int>();
@@ -390,7 +386,7 @@ namespace Faolan.Importer.Cli
 					if (name.Length == 0 || (!string.IsNullOrEmpty(filter) && !name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
 						continue;
 
-					// The TYPE, from retail's own message - see the group-key warning above.
+					// The type, from retail's own message - see the group-key warning above.
 					var template = captured.Character?.npc_stats?.TemplateId ?? 0;
 					if (template == 0)
 						continue;
@@ -407,7 +403,7 @@ namespace Faolan.Importer.Cli
 						(perPlacement.TryGetValue(placement, out var pv) ? pv : perPlacement[placement] = []).Add(value);
 					}
 
-					// One reading per PHYSICAL spawn for the TYPE table, the same dedup spawn-diff uses: the same NPC
+					// One reading per PHYSICAL spawn for the type table, the same dedup spawn-diff uses: the same NPC
 					// is re-sent on every login in every capture, and counting those would score a field by how often
 					// a zone was visited.
 					if (!seen.Add(placement))
@@ -449,7 +445,7 @@ namespace Faolan.Importer.Cli
 			foreach (var s in scored.OrderBy(s => s.Pct).ThenBy(s => s.Field))
 				Console.WriteLine($"{(s.Field.Length > 39 ? s.Field[..39] : s.Field),-40} {s.Stable,7} {s.Total,5}  {s.Pct,5:F1}%  {s.Worst}");
 
-			// Second table: the SAME physical NPC, sighted on more than one login. A field unstable here cannot be
+			// Second table: the same physical NPC, sighted on more than one login. A field unstable here cannot be
 			// stored at all - not on the type, not on the placement.
 			var repeatedPlacements = placementSightings.Where(k => k.Value > 1).Select(k => k.Key).ToHashSet();
 			Console.WriteLine();
@@ -476,17 +472,16 @@ namespace Faolan.Importer.Cli
 			foreach (var s in placementScored.OrderBy(s => s.Pct).ThenBy(s => s.Field).Take(25))
 				Console.WriteLine($"{(s.Field.Length > 39 ? s.Field[..39] : s.Field),-40} {s.Stable,7} {s.Total,5}  {s.Pct,5:F1}%  {s.Worst}");
 
-			// Third table: the VALUE DISTRIBUTION of the fields the two tables above condemn. Knowing a field is
-			// rolled per spawn event says a column cannot hold it; it does not say what WE should send instead. For a
-			// clock the expected answer is 0 - but that is a measurement, not an assumption (Gitea #602 item 2), and
-			// this is the measurement: if the field is an animation PHASE, retail's own values are spread across the
-			// whole range and 0 is simply one of them, so sending 0 is inside retail's distribution rather than a
-			// value retail never sends.
+			// Third table: the value distribution of the fields the two tables above condemn. Knowing a field is
+			// rolled per spawn event says a column cannot hold it; it does not say what to send instead. For a clock
+			// the expected answer is 0, and this is the measurement rather than the assumption: if the field is an
+			// animation phase, retail's own values are spread across the whole range and 0 is simply one of them, so
+			// sending 0 is inside retail's distribution rather than a value retail never sends.
 			var placementPct = placementScored.ToDictionary(s => s.Field, s => s.Pct);
-			// THREE conditions, and dropping any one of them fills the table with fields that belong in neither of the
+			// three conditions, and dropping any one of them fills the table with fields that belong in neither of the
 			// two above. `placement <= type + 2pp` is the per-spawn-event test proper; `type < 100` requires the field
-			// to BE unstable before asking at which scope; and `placement < 100` is what separates a field that varies
-			// WITHIN one placement from one that is perfectly placement-stable and merely varies between placements
+			// to be unstable before asking at which scope; and `placement < 100` is what separates a field that varies
+			// within one placement from one that is perfectly placement-stable and merely varies between placements
 			// (`PetOwnerInstance` is 98.2% / 100.0% - the 2pp band admits it, and it is placement-scoped, not rolled).
 			var perEvent = scored
 				.Where(s => s.Pct < 100.0
@@ -513,11 +508,11 @@ namespace Faolan.Importer.Cli
 				// Continuous or enumerated? A clock reads as hundreds of distinct floats with no value dominating; an
 				// enum reads as a handful. That difference is what decides whether 0 is "the start of a cycle" or a
 				// state the client would have to interpret.
-				// ⚠️ TWO traps here, and the second one cost a wrong conclusion once already.
+				// two traps here, and the second one cost a wrong conclusion once already.
 				//
-				// (1) "parses as a float" is NOT the clock test - every integer id parses as a float, which reads
+				// (1) "parses as a float" is not the clock test - every integer id parses as a float, which reads
 				//     `npc_stats.TemplateId` (560 distinct ids) as a continuous phase.
-				// (2) Counting DISTINCT values is not the clock test either. `AnimIdleTimer` has 94 distinct values
+				// (2) Counting distinct values is not the clock test either. `AnimIdleTimer` has 94 distinct values
 				//     of which 92 lie strictly between 0 and 1, which reads as an obviously-continuous phase - but
 				//     those 92 are seen 1-13 times each while the two ENDPOINTS are seen 264 and 269 times. Weighted
 				//     by how often retail actually sends them, the field is ~90% bimodal 0/1 with a rare transient,
@@ -546,10 +541,10 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Flattens a protobuf message to name -> printed value, one entry per scalar leaf. Collections are
-		// reported by COUNT: their contents are a separate question (equipment has its own lifted table) and a
+		// reported by count: their contents are a separate question (equipment has its own lifted table) and a
 		// per-element key would drown the per-field one this report exists to answer.
 		//
-		// ⚠️ PRESENCE IS A VALUE, and it has to be read through `ShouldSerializeX()` rather than off the property.
+		// presence is A value, and it has to be read through `ShouldSerializeX()` rather than off the property.
 		// protobuf-net generates `get => __pbn__X.GetValueOrDefault()`, so an UNSET optional field reads back as 0
 		// and is indistinguishable from one retail actually sent as 0. Both reports were scoring it that way, which
 		// silently merged "the type does not carry this field" into "the type sends zero" - for
@@ -611,25 +606,25 @@ namespace Faolan.Importer.Cli
 
 		// --report field-predictors [--report-arg <field name>]   (default: MovementMode)
 		//
-		// `field-stability` says WHERE a captured NPC field lives - type, placement, or neither. This asks the question
+		// `field-stability` says where a captured NPC field lives - type, placement, or neither. This asks the question
 		// that comes next, and only for the fields it condemns: a field that is rolled per spawn event belongs in no
-		// column, but it still has to be SENT, so is it COMPUTED from something else the same spawn already carries?
-		// (Gitea #605.) If it is, the answer is not "store it" or "send the mode" but "derive it", and no column should
-		// exist at all.
+		// column, but it still has to be sent, so is it computed from something else the same spawn already carries?
+		// If it is, the answer is not "store it" or "send the mode" but "derive it", and no column should exist at
+		// all.
 		//
 		// The measure is PURITY: group every sighting by the candidate predictor's value and ask, within each group,
 		// what share of sightings agree on the target's value. 100% means the predictor DETERMINES the target over the
 		// corpus. The baseline to beat is printed first - it is the target's own modal share, i.e. what a constant
 		// scores - because a predictor that merely reaches the baseline has explained nothing.
 		//
-		// ⚠️ THE TRAP, and it is the whole reason cardinality is in the table: purity rises for free with the number of
+		// the TRAP, and it is the whole reason cardinality is in the table: purity rises for free with the number of
 		// distinct predictor values. A predictor as fine-grained as the sample itself (a handle, a position, a float
 		// timer) partitions every sighting into its own group and scores 100% while explaining nothing at all. So a
-		// hit is only interesting when it is BOTH pure and coarse, and the report sorts by purity but prints the
+		// hit is only interesting when it is both pure and coarse, and the report sorts by purity but prints the
 		// distinct-value count next to it and marks anything above a twentieth of the sample count as `(fine)`.
 		//
-		// ⚠️ Candidates are NOT only the character message's own fields. The spawn body also carries the entity's
-		// MOVE TASK (SpawnPostIir.MoveTask, #477), which is the one part of a spawn that describes what the NPC is
+		// Candidates are not only the character message's own fields. The spawn body also carries the entity's
+		// move task (SpawnPostIir.MoveTask), which is the one part of a spawn that describes what the NPC is
 		// DOING rather than what it is - so the move plan's mode, its path flags and its waypoint count are added as
 		// synthetic predictors. For a movement/gait field those are the hypothesis worth testing first, and they are
 		// invisible to a report that only walks the protobuf.
@@ -637,8 +632,8 @@ namespace Faolan.Importer.Cli
 		{
 			target = string.IsNullOrWhiteSpace(target) ? "MovementMode" : target.Trim();
 
-			// One row per SIGHTING - deliberately not deduped by placement, unlike the type table in field-stability.
-			// The fields this report is for are rolled per spawn EVENT, so every event is a separate observation of
+			// One row per sighting - deliberately not deduped by placement, unlike the type table in field-stability.
+			// The fields this report is for are rolled per spawn event, so every event is a separate observation of
 			// the thing being explained; collapsing them would throw away the variation being measured.
 			var rows = new List<(string Target, Dictionary<string, string> Predictors)>();
 			var names = new List<(string Target, string Name)>();
@@ -682,11 +677,11 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⭐ The SPAWN PHASE census, and it runs on BOTH phases where the measurement below runs only on
-					// the login burst (#607). That restriction is right for "is this field computed from something
+					// The spawn PHASE census, and it runs on both phases where the measurement below runs only on
+					// the login burst. That restriction is right for "is this field computed from something
 					// else the spawn carries" - the burst is the set the importer lifts through - but it makes the
 					// most obvious hypothesis about a field like `npc_stats.SpawnAnimation` UNTESTABLE by
-					// construction: "play the spawn-in animation" is a property of the spawn EVENT, i.e. of whether
+					// construction: "play the spawn-in animation" is a property of the spawn event, i.e. of whether
 					// the NPC is APPEARING or was already standing there, and every row here is the second case.
 					if (captured is { Handle: < EntityHandles.CharacterInstanceBase, Character.player_stats: null })
 					{
@@ -700,8 +695,8 @@ namespace Faolan.Importer.Cli
 
 					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
 					{
-						// PLAYERS are excluded from the measurement - their scaffold is a different grammar and they
-						// would swamp the NPC sample - but they are the independent SECOND family, so a candidate
+						// players are excluded from the measurement - their scaffold is a different grammar and they
+						// would swamp the NPC sample - but they are the independent second family, so a candidate
 						// found on NPCs is worth re-checking against them. Kept as a bare (candidate, target) tally.
 						var pv = FieldValues(captured.Character).ToDictionary(v => v.Field, v => v.Value, StringComparer.Ordinal);
 						if (pv.TryGetValue(target, out var pt) && pt != "(absent)")
@@ -726,7 +721,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// Printed FIRST, because when it separates it answers the question the purity table cannot even ask.
+			// Printed first, because when it separates it answers the question the purity table cannot even ask.
 			if (byPhase.Count > 0)
 			{
 				Console.WriteLine($"`{target}` by SPAWN PHASE - is it a property of the spawn EVENT rather than of the entity? (#607)");
@@ -771,7 +766,7 @@ namespace Faolan.Importer.Cli
 				var agreeing = groups.Sum(g => g.GroupBy(r => r.Target, StringComparer.Ordinal).Max(t => t.Count()));
 				var purity = 100.0 * agreeing / rows.Count;
 
-				// Print the mapping only when it is small enough to READ - a 500-row map is noise, and a candidate
+				// Print the mapping only when it is small enough to read - a 500-row map is noise, and a candidate
 				// that needs one is failing the coarseness test anyway.
 				var mapping = groups.Count <= 6
 					? string.Join(" ", groups.OrderByDescending(g => g.Count()).Select(g =>
@@ -794,10 +789,10 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"`(fine)` = more than {fineThreshold} distinct values over {rows.Count} sightings; its purity is an artefact of");
 			Console.WriteLine("granularity, not an explanation. A real answer is a COARSE candidate at ~100%.");
 
-			// The EXCEPTIONS to the best coarse candidate, in full. A candidate at 99.98% is either a rule with a
+			// The exceptions to the best coarse candidate, in full. A candidate at 99.98% is either a rule with a
 			// mechanism behind its exception or a coincidence, and the count alone cannot tell them apart - so print
-			// every disagreeing sighting rather than its tally (the #549 lesson: a report has to let you re-cut an
-			// anomaly by a field you did not think to print).
+			// every disagreeing sighting rather than its tally, so an anomaly can be re-cut by a field the report
+			// did not think to print.
 			var best = scored.Where(s => s.Cardinality <= fineThreshold).OrderByDescending(s => s.Purity).FirstOrDefault();
 			if (best is { Name: not null, Purity: > 90.0 and < 100.0 })
 			{
@@ -824,7 +819,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// The PLAYER family, as a cross-check on the post-IIR header word. A candidate measured on one family and
+			// The player family, as a cross-check on the post-IIR header word. A candidate measured on one family and
 			// confirmed on the other is a protocol fact; one measured on NPCs alone could be an NPC convention.
 			if (players.Count > 0)
 			{
@@ -840,7 +835,7 @@ namespace Faolan.Importer.Cli
 			// displaced by whatever the entity is doing. The two are told apart by re-running the type grouping over
 			// FRESH sightings only - an empty move-task slot and no active buffs, i.e. an entity that has just been
 			// spawned and is doing nothing. If the field is type-stable there, a resting value exists and the type row
-			// may hold it; if it is not, no column can (Gitea #605).
+			// may hold it; if it is not, no column can.
 			var fresh = rows
 				.Select((r, i) => (Row: r, Template: r.Predictors.GetValueOrDefault("npc_stats.TemplateId", "")))
 				.Where(x => x.Row.Predictors.GetValueOrDefault("[movetask].Mode") == "(empty slot)"
@@ -862,7 +857,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// WHO sends each value. A purity table says a candidate explains the field; it cannot say what the field
-			// MEANS. The NPCs behind each value can - "every sighting of value 3 is a mounted rider" is the kind of
+			// means. The NPCs behind each value can - "every sighting of value 3 is a mounted rider" is the kind of
 			// statement no cross-tab produces, and it is what turns a correlation into a name.
 			Console.WriteLine();
 			Console.WriteLine($"--- who sends each `{target}` value ---");
@@ -875,7 +870,7 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// The synthetic predictors that come from the spawn's MOVE TASK rather than from its character message. Every
+		// The synthetic predictors that come from the spawn's move TASK rather than from its character message. Every
 		// one of these is a fact about what the entity is DOING at the instant of the spawn - which is the only kind of
 		// candidate that can explain a per-spawn-event field - and the move plan is the sole such fact the body holds.
 		//

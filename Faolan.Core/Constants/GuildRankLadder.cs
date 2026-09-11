@@ -3,30 +3,29 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Constants
 {
-	// The guild rank LADDER, per governing form - the names the guild window shows, how many rungs each form has,
-	// and what each rung is ALLOWED to do. Lifted from the client's own GuildRankDataTable (RDB 1000518): 38 records
+	// The guild rank ladder, per governing form - the names the guild window shows, how many rungs each form has,
+	// and what each rung is allowed to do. Lifted from the client's own GuildRankDataTable (RDB 1000518): 38 records
 	// of [u32 rank][u32 form][u32 limit][u32 permissions][string], the `form` column indexing GuildGoverningForm
 	// exactly (values 0..6, seven groups, no gaps). See docs/rdb/client-data-tables.md.
 	//
-	// ⚠️ THE LADDERS ARE DIFFERENT LENGTHS, which is the whole reason this exists. Stygian has four rungs, Cimmerian
-	// and Harem five, the other four six - so "the leader" is rank 3, 4 or 5 depending on the form, and there is no
-	// single value that means leader. GuildRank.Leader was a flat 4, proven from the create-guild capture - and that
-	// capture's guild was form 6 (its CreateGuild body is `0006 "Faolan" 06 00 00`, i.e. Harem), whose leader index
-	// IS 4. One form's ladder had been generalised to all seven.
+	// The ladders are different lengths. Stygian has four rungs, Cimmerian and Harem five, the other four six - so
+	// "the leader" is rank 3, 4 or 5 depending on the form, and there is no single value that means leader.
+	// GuildRank.Leader (4) is only the Harem/Cimmerian leader index (the create-guild capture's CreateGuild body is
+	// `0006 "Faolan" 06 00 00`, i.e. form 6, Harem).
 	//
-	// ⭐ The permission column is the client's answer to "which rungs may withdraw / kick / promote" (#799). Its bits
-	// are named by `GuildPermission`, recovered from the guild-management view that renders them, so the masks below
+	// The permission column is the client's answer to "which rungs may withdraw / kick / promote". Its bits are
+	// named by `GuildPermission`, recovered from the guild-management view that renders them, so the masks below
 	// are transcribed from the shipped table and not a policy of ours. The shape they give:
 	//
-	//   - the top TWO rungs may withdraw from the bank on six forms of seven; on **Stygian** only the leader may,
+	//   - the top two rungs may withdraw from the bank on six forms of seven; on Stygian only the leader may,
 	//     because its second rung carries 6430 (which lacks `WithdrawMoney`) rather than 7518;
 	//   - invite/kick/promote/demote reach one to two rungs further down (masks 30 / 286 / 6430 all carry them);
 	//   - the top rung of every form carries `0x7FFFFFFF`, i.e. everything.
 	public static class GuildRankLadder
 	{
 		// One rung: the name the guild window shows and the permission mask the client ships for it. The `limit`
-		// column of the same table (a per-rank member cap) is not carried here - nothing enforces caps yet, and it
-		// is recorded in the doc.
+		// column of the same table (a per-rank member cap) is not carried here - nothing enforces caps, and it is
+		// recorded in the doc.
 		public readonly record struct Rung(string Name, GuildPermission Permissions);
 
 		private const GuildPermission Everything = (GuildPermission)0x7FFFFFFF;
@@ -85,8 +84,8 @@ namespace Faolan.Core.Constants
 			]
 		};
 
-		// The top rung of `form` - the rank a guild's leader holds. Falls back to the Harem/Cimmerian 4 for a form
-		// outside the table, which is what the wire carried before this was per-form.
+		// The top rung of `form` - the rank a guild's leader holds. Falls back to the Harem/Cimmerian 4
+		// (GuildRank.Leader) for a form outside the table.
 		public static byte LeaderRank(GuildGoverningForm form)
 		{
 			return Ladders.TryGetValue(form, out var rungs)
@@ -110,7 +109,7 @@ namespace Faolan.Core.Constants
 				: 0;
 		}
 
-		// What `rank` may do on `form`'s ladder. A form or a rank outside the table gets NOTHING rather than a
+		// What `rank` may do on `form`'s ladder. A form or a rank outside the table gets nothing rather than a
 		// default set: an unknown rung is not evidence of a right, and the caller is deciding whether to let someone
 		// drain a guild bank.
 		public static GuildPermission PermissionsOf(GuildGoverningForm form, byte rank)

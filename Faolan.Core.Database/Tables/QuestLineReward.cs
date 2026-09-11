@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One ITEM reward of a quest line, from the client's quest catalog (RDB 1000104, `MainQuest.reward` /
+	// One item reward of a quest line, from the client's quest catalog (RDB 1000104, `MainQuest.reward` /
 	// `optional_reward`; see docs/rdb/quest-catalog-1000104.md). 1098 of the catalog's 2181 lines carry at least one
 	// required reward and 619 carry optional ones.
 	//
-	// Natural composite key (QuestLineId, Pos) on a plain class - no AUTOINCREMENT surrogate. The importer
+	// Natural composite key (QuestLineId, Pos) on a plain class - no autoincrement surrogate. The importer
 	// delete+reinserts this whole set from the fixed client RDB, and a surrogate would be reassigned on every
 	// re-harvest, churning thousands of faolan.sql lines for zero semantic change (see the model conventions in
 	// CLAUDE.md). `Pos` is the reward's slot within its line, which is the only identity it has.
@@ -21,7 +21,7 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Pos { get; set; }
 
-		// The rewarded item's TEMPLATE id. ⚠️ Deliberately not an FK to Items: the catalog names templates the
+		// The rewarded item's template id. Deliberately not an FK to Items: the catalog names templates the
 		// importer's item harvest has never seen (it harvests what captures reference), so an FK would reject the
 		// client's own data - and EF Core 10's SQLite provider runs `foreign_key_check` after the table rebuild, so
 		// it would abort the migration outright rather than fail later.
@@ -33,10 +33,10 @@ namespace Faolan.Core.Database.Tables
 		// 27 values present. The groups read as exactly that - 30011 khopesh/broadsword, 30012 greatsword, 30017 bow,
 		// 30018 crossbow, 30020 necklace, 30021 ring, 30023 cloak, 30029 ale, 30047 companion.
 		//
-		// ⚠️ Not `Items.Type`, which is the coarse 104 (or 113 for the Phoenix Medallion) on every one of them and
+		// Not `Items.Type`, which is the coarse 104 (or 113 for the Phoenix Medallion) on every one of them and
 		// therefore separates nothing. The pairing only shows up if you compare against SearchCategory.
 		//
-		// ⭐ What it buys: 2,308 of the 3,943 rewards name templates the item harvest has never seen (1,367 distinct),
+		// What it buys: 2,308 of the 3,943 rewards name templates the item harvest has never seen (1,367 distinct),
 		// and this gives every one of them a search category with no capture needed.
 		//
 		// The name is kept for now because renaming it is a schema change - tracked as its own follow-up rather than
@@ -48,15 +48,15 @@ namespace Faolan.Core.Database.Tables
 		// appears in no capture, so the pairing is unverified.
 		public bool Optional { get; set; }
 
-		// How many of the item the line pays - the `quantity` word of the journal record's obj3/obj4 element (#893).
-		// NULL = no capture has carried this line's reward list; the catalog itself states no quantity. It is constant
-		// per (line, template) on 125 of 125 captured pairs and per TEMPLATE on 86 of 89 - the three that vary are
+		// How many of the item the line pays - the `quantity` word of the journal record's obj3/obj4 element.
+		// Null = no capture has carried this line's reward list; the catalog itself states no quantity. It is constant
+		// per (line, template) on 125 of 125 captured pairs and per template on 86 of 89 - the three that vary are
 		// currency tokens (Imperial Insignia, Esteem Token, Mark of Acclaim) whose amount differs per line, which is
-		// why this sits here rather than on Items. A builder reading a NULL uses 1, the value 61% of captured elements
+		// why this sits here rather than on Items. A builder reading a null uses 1, the value 61% of captured elements
 		// carry and the only one a non-token item has ever carried.
 		public uint? Quantity { get; set; }
 
-		// The reward's position in the journal record's obj3/obj4 list AS THE WIRE ORDERS IT (#893). NULL = never
+		// The reward's position in the journal record's obj3/obj4 list as the wire orders it. Null = never
 		// captured. The catalog's `Pos` is the client's serialization order and the wire's is retail's own row order;
 		// they agree on neither a reversal nor an id/type/name sort (12 captured lines, 5 counterexamples to each),
 		// so the order is harvested rather than derived. A builder orders by `WirePos ?? Pos`.

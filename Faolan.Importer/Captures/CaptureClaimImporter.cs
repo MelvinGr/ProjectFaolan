@@ -12,15 +12,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Imports the account's Claims/Redeem list (CoreClaimIIR 0x06EC1255, sub 0x0001) into AccountClaim rows. The item
-	// IDENTITIES those claims reference (the per-item TEA key) are harvested separately, into Items, by the items
-	// module (ItemHashHarvester's claim-list source) - so this must run after it. Attaches to the shared "captured"
-	// account (where imported captured characters live); a clean rebuild per account (overwrite). See
-	// docs/subsystems/item-claims.md.
+	/// <summary>
+	///     Imports the account's Claims/Redeem list (CoreClaimIIR, sub 0x0001) into AccountClaim rows. See
+	///     docs/subsystems/item-claims.md.
+	/// </summary>
+	/// <remarks>
+	///     The item identities those claims reference (the per-item TEA key) are harvested separately, into Items, by
+	///     the items module (ItemHashHarvester's claim-list source) - so this must run after it. Attaches to the import
+	///     account (where imported captured characters live); a clean rebuild per account (overwrite).
+	/// </remarks>
 	public static class CaptureClaimImporter
 	{
-		// Every claim row recovered from a capture's CoreClaimIIR list (deduped by template - one capture is a single
-		// account snapshot).
+		/// <summary>
+		///     Every claim row recovered from a capture's CoreClaimIIR list (deduped by template - one capture is a single
+		///     account snapshot).
+		/// </summary>
 		public static IReadOnlyList<ClaimEntry> Extract(IEnumerable<byte[]> rawPackets)
 		{
 			var byTemplate = new Dictionary<uint, ClaimEntry>();
@@ -60,8 +66,10 @@ namespace Faolan.Importer.Captures
 			return byTemplate.Values.OrderBy(c => c.Index).ToList();
 		}
 
-		// Rebuilds `accountId`'s claims from the captured list (clears the account's existing rows first). Returns
-		// (parsed, written).
+		/// <summary>
+		///     Rebuilds <paramref name="accountId" />'s claims from the captured list (clears the account's existing rows
+		///     first).
+		/// </summary>
 		public static async Task<(int Parsed, int Written)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, uint accountId, ILogger? logger = null)
 		{
 			var claims = Extract(rawPackets);

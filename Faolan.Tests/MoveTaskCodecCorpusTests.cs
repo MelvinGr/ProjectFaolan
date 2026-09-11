@@ -9,8 +9,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Round-trip gate for the full recursive MoveTaskIIR codec (MoveTaskCodec): Parse -> Build reproduces EVERY
-	// captured MoveTask record byte-exact, across all capture JSONs (#53 grammar, #190 construction). This is the
+	// Round-trip gate for the full recursive MoveTaskIIR codec (MoveTaskCodec): Parse -> Build reproduces every
+	// captured MoveTask record byte-exact, across all capture JSONs. This is the
 	// production-language proof that any MoveTask form - incl. the recursive ListMoveTask (mode 4) that dominates the
 	// cutscene burst - can be constructed, not just replayed.
 	public class MoveTaskCodecCorpusTests
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 		private static IEnumerable<byte[]> AllMoveTaskRecords()
 		{
 			// From the committed corpus extract, so this runs without the capture repo. Verified equivalent: all
-			// 18,455 MoveTask records in the corpus are TOP-LEVEL packets - none is nested inside another packet's
+			// 18,455 MoveTask records in the corpus are top-level packets - none is nested inside another packet's
 			// body - so filtering by IIR loses nothing versus scanning every body.
 			foreach (var (_, raw) in CorpusExtract.OfType((uint)IirTypes.MoveTaskIIR))
 			{

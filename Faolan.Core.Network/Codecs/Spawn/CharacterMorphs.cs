@@ -5,21 +5,34 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// The editor-slider <-> spawn-morph mapping (cracked 2026-06-10 against the Hoxxling all-sliders create
-	// capture and confirmed on Dikketest/Strickenen):
-	//
-	//  - The editor's SetMorphValue numeric value is a ZIGZAG-encoded signed slider value (so "arse"=31 means
-	//    -16, "arm"=200 means +100). CharacterBody stores the DECODED signed value.
-	//  - The spawn scaffold's morph entry float is simply signedValue / 1000 (all 35 captured slider values
-	//    reproduce bit-exact).
-	//  - Face sliders arrive slot-prefixed ("33_NoseCrookedRight"); the slot number IS the wire sliderId of
-	//    the type-0x00 entry. Body sliders arrive bare ("arm") and map to type-0x01 entries with fixed ids -
-	//    except "ears", which rides as type 0x00 sliderId 0xFF.
-	//  - The wire entry order is the editor's send order: face sliders by ascending slot, then body sliders
-	//    alphabetically (this is what every capture shows, and Sequence must reproduce it).
+	/// <summary>
+	///     The editor-slider to spawn-morph mapping, decoded against the Hoxxling all-sliders create capture and confirmed
+	///     on two others.
+	/// </summary>
+	/// <remarks>
+	///     <list type="bullet">
+	///         <item>
+	///             The editor's SetMorphValue numeric value is a zigzag-encoded signed slider value, so "arse" 31 means -16
+	///             and "arm" 200 means +100. CharacterBody stores the decoded signed value.
+	///         </item>
+	///         <item>
+	///             The spawn scaffold's morph entry float is signedValue / 1000; all 35 captured slider values reproduce
+	///             bit-exact.
+	///         </item>
+	///         <item>
+	///             Face sliders arrive slot-prefixed ("33_NoseCrookedRight") and the slot number is the wire slider id of the
+	///             type-0x00 entry. Body sliders arrive bare ("arm") and map to type-0x01 entries with fixed ids, except
+	///             "ears", which rides as type 0x00 slider id 0xFF.
+	///         </item>
+	///         <item>
+	///             The wire entry order is the editor's send order: face sliders by ascending slot, then body sliders
+	///             alphabetically. Every capture shows this, and the generated sequence must reproduce it.
+	///         </item>
+	///     </list>
+	/// </remarks>
 	public static class CharacterMorphs
 	{
-		// In wire order: face by slot ascending, then body alphabetical.
+		/// <summary>In wire order: face by slot ascending, then body alphabetical.</summary>
 		private static readonly Slider[] Sliders =
 		[
 			new Slider("BrowLow", 0x00, 2, b => b.EyebrowScale, (b, v) => b.EyebrowScale = v), new Slider("CheekForward", 0x00, 4, b => b.CheekDepth, (b, v) => b.CheekDepth = v),
@@ -39,10 +52,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			new Slider("thigh", 0x01, 5, b => b.Thigh, (b, v) => b.Thigh = v)
 		];
 
-		// Generates the spawn-scaffold morph entries for the body's non-default sliders, in the retail wire order.
-		// A null body (character never touched a slider) yields none - exactly the captured shape of an unmorphed
-		// character. Word2 (the per-character slot ordinal) is stamped by BuildAppearanceEntries over the whole
-		// table, so it is left 0 here.
+		/// <summary>
+		///     Generates the spawn-scaffold morph entries for the body's non-default sliders, in the retail wire order. A
+		///     null body - a character that never touched a slider - yields none, which is the captured shape of an unmorphed
+		///     character. The per-character slot ordinal is stamped by BuildAppearanceEntries over the whole table, so it is
+		///     left 0 here.
+		/// </summary>
 		public static List<AppearanceEntry> BuildEntries(CharacterBody? body)
 		{
 			var entries = new List<AppearanceEntry>();
@@ -65,9 +80,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return entries;
 		}
 
-		// Whether an appearance element's key is one of the morph sliders (rather than a weighted appearance entry).
-		// The type byte alone will NOT do: type 0x01 is shared - the weighted rows use it too, with slider ids
-		// outside the slider table - so the whole (type, id) pair has to match.
+		/// <summary>
+		///     Whether an appearance element's key is one of the morph sliders rather than a weighted appearance entry. The
+		///     type byte alone will not do: type 0x01 is shared with the weighted rows, which use slider ids outside the
+		///     slider table, so the whole (type, id) pair has to match.
+		/// </summary>
 		public static bool IsMorphKey(uint key)
 		{
 			if (key > ushort.MaxValue)
@@ -78,17 +95,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return Sliders.Any(s => s.Type == type && s.SliderId == sliderId);
 		}
 
-		// The INVERSE of BuildEntries: reads captured scaffold entries back into the body's columns.
-		//
-		// Needed because a captured character came in with its morphs stored ONLY as scaffold rows, and CharacterBody -
-		// which is the single model everything else reads - left at zero. That was not merely cosmetic. The spawn the
-		// client gets is replayed from the scaffold, so the character looked right in game; but Faolan.Web renders from
-		// CharacterBody, so the viewer showed an unmorphed character, and worse, RefreshAppearance REGENERATES the
-		// scaffold's morph entries from CharacterBody - so the first appearance edit of an imported character would
-		// have silently wiped the captured morphs it never knew about.
-		//
-		// Elements that are not morph sliders (the weighted appearance rows) simply do not match a slider and are
-		// skipped. Returns how many landed.
+		/// <summary>
+		///     The inverse of <see cref="BuildEntries" />: reads captured scaffold entries back into the body's columns, and
+		///     returns how many landed. Elements that are not morph sliders - the weighted appearance rows - match no slider
+		///     and are skipped.
+		/// </summary>
+		/// <remarks>
+		///     An imported character whose morphs exist only as scaffold rows must have them lifted into CharacterBody, which
+		///     is the model everything else reads. The spawn is replayed from the scaffold, so the character looks right in
+		///     game either way, but Faolan.Web renders from CharacterBody and RefreshAppearance regenerates the scaffold's
+		///     morph entries from it - so without this the first appearance edit silently wipes the captured morphs.
+		/// </remarks>
 		public static int ApplyEntries(CharacterBody body, IEnumerable<AppearanceEntry> entries)
 		{
 			var applied = 0;
@@ -115,10 +132,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return applied;
 		}
 
-		// Stores one editor SetMorphValue into the body: strips the face slot prefix ("33_NoseCrookedRight") and
-		// writes the signed slider value to the matching column. `value` is the ALREADY-DECODED field-3 int (the
-		// caller zigzag-decodes once at read). Returns false for names not in the table (resource refs / sliders
-		// not yet modelled - the caller logs those).
+		/// <summary>
+		///     Stores one editor SetMorphValue into the body: strips the face slot prefix ("33_NoseCrookedRight") and writes
+		///     the signed slider value to the matching column. <paramref name="value" /> is the already-decoded field-3 int,
+		///     the caller zigzag-decoding once at read. Returns false for names not in the table - resource references, or
+		///     sliders not yet modelled - which the caller logs.
+		/// </summary>
 		public static bool TryApply(CharacterBody body, string morphName, int value)
 		{
 			var name = morphName.Length > 3 && morphName[0] is >= '0' and <= '9' && morphName[1] is >= '0' and <= '9' && morphName[2] == '_'

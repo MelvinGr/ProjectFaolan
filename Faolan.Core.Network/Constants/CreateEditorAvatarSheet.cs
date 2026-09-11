@@ -3,27 +3,29 @@ using Faolan.Core.Network.Codecs.Spawn;
 
 namespace Faolan.Core.Network.Constants
 {
-	// AUTO-GENERATED (#651) from the captured create-editor avatar snapshot - the two StatList_t the editor avatar's
-	// FullChar (0x737A6DF9) record carries. Replaces the embedded CreateEditorAvatarSnapshot.bin, the same treatment
-	// #258 gave the access-window table: the record was never opaque (FullPlayerCharacterCodec parses and re-encodes
-	// it byte-exact), and once the grammar is typed the only thing a blob still carried was these values.
-	//
-	// The rest of the record needs no data at all - the root is subscription_flags plus four EMPTY containers, the
-	// quest regions are empty (an unnamed avatar has no journal), the access-window table is the game-static
-	// AccessWindowCatalog, and there is NO spellbook list and no wide/pair tail (the create-editor snapshot ends at
-	// StatList#2, which is what distinguishes it from a login snapshot). So CreateEditorAvatarSnapshot.Build is the
-	// whole record from typed data.
-	//
-	// ⚠️ This is a BASELINE sheet in its own right and is NOT SubClassStatBlock.FreshSheet(): the two carry the same
-	// 17 + 148 stat ids in the same order and differ on ~15 VALUES (health/stamina/mana pools, 0x113, 0x3A/0x3B,
-	// 0x6A, the 0x398..0x39D resist run at -300, 0x25F). The beach baseline is a level-1 character standing in the
-	// world; this one is the editor pedestal avatar.
-	//
-	// The playfield token is the named CreateEditorCharBuilder.EditorPlayfieldInstance rather than a literal - it is
-	// the same 0x00502276 the editor's MapChange and scene props are addressed with, not a coincidence of capture.
+	/// <summary>
+	///     The two <c>StatList_t</c> the create-editor avatar's FullChar record carries, generated from the captured
+	///     create-editor avatar snapshot.
+	/// </summary>
+	/// <remarks>
+	///     The rest of that record needs no data: the root is the subscription flags plus four empty containers, the
+	///     quest regions are empty (an unnamed avatar has no journal), the access-window table is the game-static
+	///     <see cref="AccessWindowCatalog" />, and there is no spellbook list and no wide/pair tail - the create-editor
+	///     snapshot ends at the second StatList, which is what distinguishes it from a login snapshot.
+	///     <para>
+	///         This is a baseline sheet in its own right and is not <c>SubClassStatBlock.FreshSheet()</c>: the two carry
+	///         the same 17 + 148 stat ids in the same order but differ on ~15 values (health/stamina/mana pools, 0x113,
+	///         0x3A/0x3B, 0x6A, the 0x398..0x39D resist run at -300, 0x25F). That sheet is a level-1 character standing
+	///         in the world; this one is the editor pedestal avatar.
+	///     </para>
+	///     <para>
+	///         The playfield token is the named <c>CreateEditorCharBuilder.EditorPlayfieldInstance</c> rather than a
+	///         literal: it is the same value the editor's MapChange and scene props are addressed with.
+	///     </para>
+	/// </remarks>
 	public static class CreateEditorAvatarSheet
 	{
-		// StatList#1 - the 17 DISPLAYED stats.
+		// StatList#1 - the 17 displayed stats.
 		public static readonly IReadOnlyList<(uint Id, uint Value)> Displayed =
 		[
 			(0x252, 0u),
@@ -45,8 +47,8 @@ namespace Faolan.Core.Network.Constants
 			(0x0A9, 0u),
 		];
 
-		// StatList#2 - the full sheet: 74 unique pairs written TWICE (both copies are on the wire and both must
-		// agree), so this is 148 entries rather than 74 with a doubling rule.
+		// StatList#2 - the full sheet: 74 unique pairs written twice. Both copies are on the wire and both must
+		// agree, so this is 148 entries rather than 74 with a doubling rule.
 		public static readonly IReadOnlyList<(uint Id, uint Value)> Sheet =
 		[
 			(0x534, 0u),

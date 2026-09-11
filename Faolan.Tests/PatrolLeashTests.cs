@@ -5,17 +5,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #565: the #266 wander and the leash used to fight each other. The wander assigns an anchor outright; if that
-	// anchor sat beyond NpcLeashRange of the SPAWN, the very next tick read it as "led too far from home" and walked
-	// the NPC straight back off its own route, cycle after cycle (331 of 900 captured routes have such an anchor).
-	// The leash now measures against the entity's TERRITORY - its spawn PLUS its route - so a far anchor is a
-	// destination, not a drag, while an NPC dragged off the whole route still leashes.
+	// The leash measures against the entity's territory - its spawn plus its route - so a far wander anchor is a
+	// destination, not a drag, while an NPC dragged off the whole route still leashes. Measured against the spawn
+	// alone, an anchor beyond NpcLeashRange reads as "led too far from home" on the very next tick and walks the NPC
+	// straight back off its own route, cycle after cycle (331 of 900 captured routes have such an anchor).
 	public class PatrolLeashTests
 	{
 		[Fact]
 		public void Patroller_DraggedOffItsWholeRoute_StillLeashes()
 		{
-			// The leash's real job: a player who drags a patroller away from spawn AND every anchor is still refused.
+			// The leash's real job: a player who drags a patroller away from spawn and every anchor is still refused.
 			var npc = Patroller(new Vector3(0, 0, 0), [new Vector3(0, 0, 0), new Vector3(200, 0, 0)]);
 			npc.Position = new Vector3(0, 0, 500); // far from spawn and from both anchors
 
@@ -25,7 +24,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Patroller_OnAFarAnchor_IsNotLeashedHome()
 		{
-			// The Casilda case: standing ON a route anchor 200u from spawn is exactly where the wander put it.
+			// The Casilda case: standing on a route anchor 200u from spawn is exactly where the wander put it.
 			var npc = Patroller(new Vector3(0, 0, 0), [new Vector3(0, 0, 0), new Vector3(200, 0, 0)]);
 			npc.Position = new Vector3(200, 0, 0);
 
@@ -58,7 +57,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void StationaryNpc_BeyondLeash_StillReturnsHome()
 		{
-			// No route: territory is the spawn alone, so the leash behaves exactly as it did before #565.
+			// No route: territory is the spawn alone, so the leash measures from the spawn.
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(10, 2040, Vector3.Zero, Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			world.Place(npc, 2040, Vector3.Zero, Quaternion.Identity);
@@ -72,8 +71,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void WanderingPatroller_IsNeverSetReturning_ByItsOwnAnchor()
 		{
-			// End to end through the tick: park the NPC on its far anchor and run a stretch of ticks. Before #565 the
-			// first tick flipped Returning and it started walking back off its route.
+			// End to end through the tick: park the NPC on its far anchor and run a stretch of ticks. A spawn-only leash
+			// flips Returning on the first tick and starts walking it back off its route.
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Quaternion.Identity, "Wanderer", EntityVitals.FromMax(100, 0, 100));
 			world.Place(npc, 2040, npc.Position, Quaternion.Identity);

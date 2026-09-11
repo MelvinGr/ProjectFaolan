@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gate for the 0x2010 DispatchCharacterSearchResult body (#460).
+	// Byte-exact gate for the 0x2010 DispatchCharacterSearchResult body.
 	//
-	// The oracle is a retail body carrying THREE characters, which is what made this message worth decoding: the "who"
+	// The oracle is a retail body carrying three characters, which is what made this message worth decoding: the "who"
 	// result reuses TeamMemberRecord verbatim, and three characters at three different levels identified the field the
 	// team captures could not - both of their members were level 5, so the word sat in the codec as a constant.
 	public class CharacterSearchResultCodecTests
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, CharacterSearchResultCodec.Build(CharacterSearchResultCodec.Parse(captured)));
 		}
 
-		// The trailing byte is i_bMoreHits, not a terminator (#889). It is 0 in every captured body - each captured
+		// The trailing byte is i_bMoreHits, not a terminator. It is 0 in every captured body - each captured
 		// search fitted in one page - so the two readings agree on the corpus and only differ on a truncated page,
 		// which is exactly the case the flag exists for.
 		[Fact]
@@ -84,8 +84,8 @@ namespace Faolan.Tests
 			Assert.Equal(3, CharacterSearchResultCodec.Parse(truncated).Characters.Count); // and nothing else moved
 		}
 
-		// An empty result still carries the frame AND the trailer - dropping the trailer is the #408 failure mode that
-		// made the client run off the end of the body and drop the whole CSPlayerAgent route.
+		// An empty result still carries the frame and the trailer - dropping the trailer makes the client run off the
+		// end of the body and drop the whole CSPlayerAgent route.
 		[Fact]
 		public void EmptyResult_KeepsTheFrameAndTheTrailer()
 		{

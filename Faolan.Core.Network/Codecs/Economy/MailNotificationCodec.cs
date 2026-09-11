@@ -4,18 +4,19 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchYouGotMailNotification(nMailId) - CSPlayerInterface 0xAB. The unsolicited "you have mail" push (#871).
-	//
-	//   [u64 nMailId]
-	//
-	// Eight bytes, and the first four are `0x20D82B63` on every captured frame - retail's item-id EPOCH
-	// (`FullCharacterRoots.ItemIdEpoch`), so a mail id lives in the same 64-bit id space as an item instance id and
-	// is carried whole rather than as a pair. Only the low half varies across the four captured frames, which is the
-	// server's allocation counter.
-	//
-	// ⚠️ It rides **CSPlayerInterface**, not the tradepost interface - the router tier, which is why it reaches a
-	// player who is nowhere near a mailbox. That is the whole point of the message: the mailbox itself is polled, so
-	// without this a player only learns about mail by opening one.
+	/// <summary>
+	///     <c>DispatchYouGotMailNotification(nMailId)</c> - the unsolicited "you have mail" push: <c>[u64 nMailId]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Eight bytes, and the first four are <c>0x20D82B63</c> on every captured frame - retail's item-id epoch
+	///     (<c>FullCharacterRoots.ItemIdEpoch</c>) - so a mail id lives in the same 64-bit id space as an item instance id
+	///     and is carried whole rather than as a pair. Only the low half varies across the four captured frames, which is
+	///     the server's allocation counter.
+	///     <para>
+	///         It rides CSPlayerInterface rather than the tradepost interface: the router tier, which is why it reaches a
+	///         player who is nowhere near a mailbox. That is the point of the message, since the mailbox itself is polled.
+	///     </para>
+	/// </remarks>
 	public static class MailNotificationCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchYouGotMailNotification;

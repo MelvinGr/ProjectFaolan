@@ -15,13 +15,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Runs EquipmentService's real equip/unequip against a temp DB and verifies the change is visible in a SEPARATE
-	// context - i.e. it actually hit disk. This used to REPLICATE the service's EF operations inline, which could only
-	// ever prove that the replica worked; the service is small enough to call, so it is called.
+	// Runs EquipmentService's real equip/unequip against a temp DB and verifies the change is visible in a separate
+	// context - i.e. it actually hit disk. Replicating the service's EF operations inline would only ever prove that
+	// the replica worked; the service is small enough to call, so it is called.
 	//
-	// The invariant that matters since #750 is that an equip is a MOVE: the instance that was in the bag is the one now
-	// worn, so its id, its crafter and its SOCKETED GEMS come with it. Under the old wide-row model an equip re-created
-	// the item at its destination from whatever the code remembered to copy, and the gems were exactly what it did not.
+	// The invariant that matters is that an equip is a move: the instance that was in the bag is the one now worn, so
+	// its id, its crafter and its socketed gems come with it. Re-creating the item at its destination copies whatever
+	// the code remembers to copy, and the gems are exactly what it does not.
 	public class EquipmentPersistenceTests
 	{
 		[Fact]
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 				const int bagSlot = 4;
 				uint instanceId;
 
-				// Arrange: import items from a capture, seed a character, and put a CRAFTED, GEMMED signet in the bag.
+				// Arrange: import items from a capture, seed a character, and put a crafted, gemmed signet in the bag.
 				await using (var db = NewContext(dbPath))
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 
 				await service.PersistEquip(client, CharacterEquipmentSlot.LeftRing, royalSignet, bagSlot);
 
-				// Assert: worn, SAME instance, crafter and gem intact - and the bag cell empty.
+				// Assert: worn, same instance, crafter and gem intact - and the bag cell empty.
 				var worn = await repo.GetEquippedItems(characterId);
 				var ring = worn[CharacterEquipmentSlot.LeftRing];
 				Assert.Equal((instanceId, royalSignet, "NecroL80"), (ring.Id, ring.TemplateId, ring.CreatorName));
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// A swap: equipping into an OCCUPIED slot puts the piece that was worn into the bag cell the new one came from,
+		// A swap: equipping into an occupied slot puts the piece that was worn into the bag cell the new one came from,
 		// which is what the client shows. Both instances survive - neither is re-minted.
 		[Fact]
 		public async Task Equip_IntoAnOccupiedSlot_SwapsBothInstances()

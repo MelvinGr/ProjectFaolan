@@ -5,15 +5,15 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildMemberJoined (0x202F) - [member ID32][member record]. Retail fans it out to every online guild
-	// member, the joiner included (right after their own 0x203F).
-	//
-	// Moved in from `GuildService.SendGuildMemberJoined` in #530 wave 7.
+	/// <summary>
+	///     <c>DispatchGuildMemberJoined</c> - <c>[member ID32][member record]</c>. Retail fans it out to every online
+	///     guild member, the joiner included, right after their own full update.
+	/// </summary>
 	public static class GuildMemberJoinedCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildMemberJoined;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GuildMemberJoined value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -54,6 +54,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// DispatchGuildMemberJoined (0x202F).
+	/// <summary>The DispatchGuildMemberJoined body.</summary>
 	public sealed record GuildMemberJoined(uint CharacterId, GuildMemberRecord Member);
 }

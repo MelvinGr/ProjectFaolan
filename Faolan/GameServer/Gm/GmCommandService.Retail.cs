@@ -25,25 +25,32 @@ namespace Faolan.GameServer.Gm
 {
 	public sealed partial class GmCommandService
 	{
-		// Where a character stood before /summon moved them, so /unsummon can put them back.
-		//
-		// ⚠️ This is REQUIRED, not a convenience: DoTeleport persists the destination (SaveCharacterTransform), so by
-		// the time /unsummon runs, the character's "last saved location" IS the summoned position - and dismissing
-		// them would return them to exactly where they already stand. Retail's wording ("dismisses a character to the
-		// last saved location") works there because their summon presumably does not save; ours does, so the return
-		// point has to be captured at summon time or it is gone.
-		//
-		// Not persisted, so it does not survive a server restart - the fallback below (the stored position) then
-		// applies, which is the same answer a character we never summoned gets.
+		/// <summary>
+		///     Where a character stood before /summon moved them, so /unsummon can put them back.
+		/// </summary>
+		/// <remarks>
+		///     Required, not a convenience: DoTeleport persists the destination (SaveCharacterTransform), so by the time
+		///     /unsummon runs the character's "last saved location" is the summoned position, and dismissing them would
+		///     return them to exactly where they already stand. The return point has to be captured at summon time or
+		///     it is gone.
+		///     <para>
+		///         Not persisted, so it does not survive a server restart - the fallback below (the stored position)
+		///         then applies, which is the same answer a character that was never summoned gets.
+		///     </para>
+		/// </remarks>
 		private readonly ConcurrentDictionary<uint, (uint MapId, Vector3 Position)> _summonReturns = new();
 
-		// The spell id a GM /resurrect offer is filed under. Self-resurrection offers are keyed by (character, spell)
-		// so that declining one potion's offer cannot drop another's; a GM offer needs an id of its own for the same
-		// reason, and 0 is the one value no real resurrection spell uses.
+		/// <summary>
+		///     The spell id a GM /resurrect offer is filed under. Self-resurrection offers are keyed by
+		///     (character, spell) so that declining one potion's offer cannot drop another's; a GM offer needs an id of
+		///     its own for the same reason, and 0 is the one value no real resurrection spell uses.
+		/// </summary>
 		private const uint GmResurrectionSpellId = 0;
 
-		// The target a GM command acts on. Most of retail's observability verbs are written as "... for your target"
-		// and declare no parameters at all, so this is the single most reused step in the whole family.
+		/// <summary>
+		///     The target a GM command acts on. Most of retail's observability verbs are written as "... for your
+		///     target" and declare no parameters at all, so this is the single most reused step in the whole family.
+		/// </summary>
 		private bool TryResolveTarget(INetworkClient client, out WorldEntity target, out string failure)
 		{
 			target = null!;
@@ -73,8 +80,8 @@ namespace Faolan.GameServer.Gm
 			return true;
 		}
 
-		// /distance  - "Prints the 2D and 3D distance between you and your target". Declares NO parameters.
-		// ⭐ The 2D/3D split is the point of the command: they diverge exactly where a height difference is doing the
+		// /distance  - "Prints the 2D and 3D distance between you and your target". Declares no parameters.
+		// The 2D/3D split is the point of the command: they diverge exactly where a height difference is doing the
 		// work, which is what makes it the instrument for an aggro or interaction range that behaves differently on a
 		// slope or a rooftop than it does on flat ground.
 		private async Task DistanceCommand(INetworkClient client)
@@ -212,8 +219,8 @@ namespace Faolan.GameServer.Gm
 			]));
 		}
 
-		// /system  - "System info." ⚠️ Retail registers this at mask 0x0, i.e. UNRESTRICTED - the only verb besides
-		// our own `.help` that is, and we match retail rather than inventing a bit for it.
+		// /system  - "System info." Retail registers this at mask 0x0, i.e. unrestricted - the only verb besides
+		// `.help` that is, and that registration is matched rather than inventing a bit for it.
 		private async Task SystemInfoCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -231,10 +238,10 @@ namespace Faolan.GameServer.Gm
 
 		// /hatedbylist  - "Command for listing which NPCs hate the target". Declares no parameters.
 		//
-		// ⚠️ We have no persistent threat table: aggro is decided per tick from proximity plus an irritation source,
-		// so the honest answer is "who is engaging this entity RIGHT NOW", and the reply says so rather than implying
-		// a stored hate list we do not keep. That distinction is exactly what makes this useful for #577 - an empty
-		// list next to a hostile NPC standing 5m away is an aggro-gate finding, not a missing-data one.
+		// There is no persistent threat table: aggro is decided per tick from proximity plus an irritation source, so
+		// the answer is "who is engaging this entity right now", and the reply says so rather than implying a stored
+		// hate list. That distinction is what makes the command an aggro-gate instrument - an empty list next to a
+		// hostile NPC standing 5 m away is a finding, not missing data.
 		private async Task HatedByListCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -252,9 +259,9 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// What the tick actually uses is proximity plus hostility, so that is what gets reported - split into the
-			// two populations that matter for an aggro complaint: who is ENGAGED, and who is close enough to engage
-			// and has not. A hostile NPC sitting in the second list a few metres away IS the #577 finding.
+			// What the tick uses is proximity plus hostility, so that is what gets reported - split into the two
+			// populations that matter for an aggro complaint: who is engaged, and who is close enough to engage and has
+			// not. A hostile NPC sitting a few metres away in the second list is the finding.
 			var nearby = zone.Entities
 				.Where(e => !e.IsPlayer && e.Hostile && e.Aggressive)
 				.Select(e => (Npc: e, Distance: Vector3.Distance(e.Position, subject.Position)))
@@ -272,8 +279,8 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// ⚠️ Said out loud because it changes how the output is read: we keep no persistent hate list, so this is
-			// derived state, not a stored one. "Engaged" means the tick has it in combat right now.
+			// Said out loud because it changes how the output is read: there is no persistent hate list, so this is
+			// derived state. "Engaged" means the tick has it in combat right now.
 			var lines = new List<string>
 			{
 				$"Hostiles near '{subject.Name}' (derived - we keep no stored hate list):",
@@ -286,12 +293,9 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. lines]));
 		}
 
-		// /settime <hour:minutes>  - "Set time on the current client and server".
-		//
-		// ⭐ This IS what our `.time <hh:mm>` did, and it is why `.time` is gone (#914's rule 1). Retail's own `/time`
-		// is a different command entirely - it manipulates FRAME times ("speeds up or slows the deltatimer system on
-		// server and client") - so keeping our time-of-day setter under that name was a verb with retail's name and
-		// someone else's meaning. The `reset` form moved to `/gametime reset`, which is where retail puts it.
+		// /settime <hour:minutes>  - "Set time on the current client and server". This is the time-of-day setter;
+		// retail's `/time` is a different command entirely (it manipulates frame times, "speeds up or slows the
+		// deltatimer system on server and client"), and the `reset` form belongs to `/gametime reset`.
 		private async Task SetTimeCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -305,7 +309,7 @@ namespace Faolan.GameServer.Gm
 					return;
 				}
 
-				// Shift the phase so the CURRENT instant reads as the requested time of day.
+				// Shift the phase so the current instant reads as the requested time of day.
 				var wanted = (long)(hours * 3600 + minutes * 60);
 				_clock.OffsetGameSeconds = (_clock.OffsetGameSeconds + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _clock.OffsetGameSeconds) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
 			}
@@ -319,9 +323,9 @@ namespace Faolan.GameServer.Gm
 
 		// /gametime * <factor> | / <factor> | reset  - "Speeds up or slows the game timer".
 		//
-		// ⭐ This one rides a REAL wire field rather than a server-side fudge: GameTimeIIR's trailing f32 `rate` feeds
-		// the client clock's own multiplier (+0xD4 in GameTime_t, see GameClock), so the client speeds its day/night
-		// cycle up to match instead of drifting against ours. `reset` puts BOTH the rate and the phase offset back to
+		// This rides a real wire field rather than a server-side fudge: GameTimeIIR's trailing f32 `rate` feeds the
+		// client clock's own multiplier (+0xD4 in GameTime_t, see GameClock), so the client speeds its day/night cycle
+		// up to match instead of drifting against the server's. `reset` puts both the rate and the phase offset back to
 		// default, which is what retail's "back in the default values" means.
 		private async Task GameTimeCommand(INetworkClient client, string arguments)
 		{
@@ -349,11 +353,11 @@ namespace Faolan.GameServer.Gm
 				$"Game time rate {_clock.Rate:0.###}x - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _clock.Rate:0.##} real hours (offset {_clock.OffsetGameSeconds}s).");
 		}
 
-		// Finds a live player by character id or by NAME. ⭐ Retail's own help for /summon and /assist warns that
-		// "only a small cache of names is kept, so summon on name may fail if the name is no longer cached" - so
-		// resolution by id is the reliable form there and by name is best-effort. Ours has no such cache (the world
-		// model holds every online player), so the by-name form is exact; the id form is still accepted because that
-		// is what the client's own UI is most likely to send.
+		// Finds a live player by character id or by name. Retail's own help for /summon and /assist warns that "only a
+		// small cache of names is kept, so summon on name may fail if the name is no longer cached", so there the id
+		// form is the reliable one. There is no such cache here (the world model holds every online player), so the
+		// by-name form is exact; the id form is still accepted because that is what the client's UI is most likely to
+		// send.
 		private WorldEntity? FindOnlinePlayer(string idOrName)
 		{
 			if (uint.TryParse(idOrName, out var id))
@@ -397,7 +401,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Captured BEFORE the teleport, which overwrites the persisted position.
+			// Captured before the teleport, which overwrites the persisted position.
 			var subjectId = subject.Client.Session.Character.Id;
 			_summonReturns[subjectId] = (subject.MapId, subject.Position);
 
@@ -407,9 +411,8 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(subjectId, $"You have been summoned by '{me.Name}'.");
 		}
 
-		// /unsummon <name>  - "Dismisses a character to the last saved location". ⭐ Note what retail means by that:
-		// not "send them home" and not "remove them", but back to the position PERSISTED for them - i.e. undo the
-		// summon by returning them to wherever they were last saved. That is a DB read, not a bind point.
+		// /unsummon <name>  - "Dismisses a character to the last saved location". That means neither "send them home"
+		// nor "remove them", but back to the position persisted for them - a DB read, not a bind point.
 		private async Task UnsummonCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -452,8 +455,8 @@ namespace Faolan.GameServer.Gm
 				+ " No summon of ours to undo, so this is the persisted position.");
 		}
 
-		// /assist <id | name>  - "Assists a player by teleporting to his/her position." The mirror of /summon: it
-		// moves YOU, not them.
+		// /assist <id | name>  - "Assists a player by teleporting to his/her position." The mirror of /summon: it moves
+		// the caller, not the target.
 		private async Task AssistCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -503,9 +506,9 @@ namespace Faolan.GameServer.Gm
 		}
 
 		// /cash [ [+|-]amount ]  - "Without arguments it gets the current cash value, with an absolute value it sets
-		// the cash, with + in front of the value it adds to the cash". ⚠️ The recovered parameter help for `+` and `-`
-		// is retail's own COPY-PASTE slip - it reads "Lists all the known tradeskill recipes" / "Learn a recipe",
-		// lifted from the tradeskill command. The long description above is the accurate one.
+		// the cash, with + in front of the value it adds to the cash". The recovered parameter help for `+` and `-` is
+		// retail's own copy-paste slip - it reads "Lists all the known tradeskill recipes" / "Learn a recipe", lifted
+		// from the tradeskill command - so the long description above is the accurate one.
 		private async Task CashCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -535,8 +538,8 @@ namespace Faolan.GameServer.Gm
 					_ => amount
 				};
 
-				// ⚠️ The reason word is decided against the PREVIOUS balance, so it has to be read before the
-				// assignment overwrites it - comparing `updated` to an already-updated field is always "gain".
+				// The reason word is decided against the previous balance, so it has to be read before the assignment
+				// overwrites it - comparing `updated` to an already-updated field is always "gain".
 				var reason = updated >= character.Money ? UpdateCashReason.Gain : UpdateCashReason.Spend;
 				character.Money = updated;
 				await _database.SetCharacterMoney(characterId, updated);
@@ -546,10 +549,9 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Cash: {character.Money} tin.");
 		}
 
-		// /inflict <damage>  - "Inflicts damage of the specified damage type on your target."
-		//
-		// ⚠️ Not a duplicate of our `.hurt`, and neither is removed: `.hurt [percent]` lowers YOUR OWN three pools by
-		// a proportion, while /inflict deals a flat amount to your TARGET. Same subsystem, opposite ends of it.
+		// /inflict <damage>  - "Inflicts damage of the specified damage type on your target." Not a duplicate of
+		// `.hurt`: that lowers the caller's own three pools by a proportion, while /inflict deals a flat amount to the
+		// target.
 		private async Task InflictCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -580,19 +582,14 @@ namespace Faolan.GameServer.Gm
 		// /areaknockback <distance>  - "Performs an area knockback on everybody within the distance parameter of your
 		// target".
 		//
-		// ⚠️ Retail's own two descriptions of the single parameter CONTRADICT each other: the summary calls it the
-		// radius ("everybody within the distance parameter of your target") while the parameter's own help calls it
-		// the force ("How far targets will be knocked back").
-		//
-		// ⭐ SETTLED from the client (#919), and the parameter help wins. `FanaticAreaKnockbackCommand_c`'s parameter
-		// descriptor (vftable 0x1fba5c4 slot 5, `FUN_00626e60`) declares exactly ONE parameter -
-		//     name "distance", help "Float: How far targets will be knocked back"
-		// - and the sibling `FanaticKnockbackCommand_c` (`FUN_00626bb0`) declares the identical one, differing only in
-		// "target" vs "targets". So there is no radius parameter to have meant: both verbs take one FORCE, and the
-		// summary's "within the distance parameter" is the loose half of retail's own text.
-		//
-		// The AREA therefore has to come from somewhere else, and it takes the same aggro radius the rest of the
-		// simulation uses.
+		// Retail's two descriptions of the single parameter contradict each other: the summary calls it the radius
+		// ("everybody within the distance parameter of your target") while the parameter's own help calls it the force
+		// ("How far targets will be knocked back"). The client settles it in favour of the parameter help:
+		// `FanaticAreaKnockbackCommand_c`'s parameter descriptor (vftable 0x1fba5c4 slot 5, `FUN_00626e60`) declares
+		// exactly one parameter - name "distance", help "Float: How far targets will be knocked back" - and the sibling
+		// `FanaticKnockbackCommand_c` (`FUN_00626bb0`) declares the identical one, differing only in "target" vs
+		// "targets". So both verbs take one force, and the area comes from elsewhere: it uses the same aggro radius the
+		// rest of the simulation does.
 		private async Task AreaKnockbackCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -617,7 +614,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Everyone around the epicentre is pushed AWAY from it, so the source is the subject's own position.
+			// Everyone around the epicentre is pushed away from it, so the source is the subject's own position.
 			var knocked = 0;
 			foreach (var victim in zone.EntitiesInRange(subject.Position, WorldState.NpcAggroRange, subject.Handle).ToArray())
 			{
@@ -631,10 +628,10 @@ namespace Faolan.GameServer.Gm
 
 		// /resurrect <strength>  - "Resurrects the character with a strength between 1 and 100."
 		//
-		// ⭐ Strength maps exactly onto the restore PERCENTAGE our resurrection offers already carry (a Potion
-		// restores 100, a Minor Elixir 25), so this arms the same self-resurrection path a consumable does rather
-		// than inventing a second revive. The player still takes the offer, which is what keeps the revive on the one
-		// code path that knows how to put a dead character back on its feet.
+		// Strength maps onto the restore percentage the resurrection offers already carry (a Potion restores 100, a
+		// Minor Elixir 25), so this arms the same self-resurrection path a consumable does rather than a second revive.
+		// The player still takes the offer, which keeps the revive on the one code path that knows how to put a dead
+		// character back on its feet.
 		private async Task ResurrectCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -662,7 +659,7 @@ namespace Faolan.GameServer.Gm
 				await _agentServerDispatcher.SendSystemMessage(subjectId, $"A resurrection ({strength}%) has been offered to you.");
 		}
 
-		// A stat named either as a number (decimal or 0x-hex) or by its CLIENT name - retail's whole stat family takes
+		// A stat named either as a number (decimal or 0x-hex) or by its client name - retail's whole stat family takes
 		// `statid | statname`, and the enum carries all 1,515 names, so the name form costs nothing to support.
 		private static bool TryResolveStat(string text, out CharacterStatId stat)
 		{
@@ -677,8 +674,8 @@ namespace Faolan.GameServer.Gm
 		// the fully buffed live value.
 		private static (int Base, int Item, int Full) StatViews(WorldEntity entity, CharacterStatId stat)
 		{
-			// ⚠️ ClassBase is the RAW WIRE value while the gear bonus is already divided by the stat's scale, so the
-			// base has to be converted before the two are comparable - the same trap AttributeScore documents.
+			// ClassBase is the raw wire value while the gear bonus is already divided by the stat's scale, so the base
+			// has to be converted before the two are comparable - the same rule AttributeScore documents.
 			var scaled = entity.ClassBase.GetValueOrDefault(stat) / (int)stat.GetScale();
 			var item = entity.GearBonuses.GetValueOrDefault(stat);
 			var full = entity.BuffedStats.TryGetValue(stat, out var buffed) ? (int)buffed : scaled + item;
@@ -708,8 +705,8 @@ namespace Faolan.GameServer.Gm
 			var wants = tokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
 			if (wants.Contains("client"))
 			{
-				// ⚠️ Said plainly rather than answered with the server's number wearing a "client" label: the client's
-				// own copy of a stat is not readable from here - we only ever WRITE it. `/setlocal` is what pushes one.
+				// Said plainly rather than answered with the server's number wearing a "client" label: the client's own
+				// copy of a stat is not readable from here, only writable. `/setlocal` is what pushes one.
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					ChatMarkup.Color("orange", "The CLIENT's copy of a stat cannot be read from the server - only written (.setlocal). Showing nothing rather than the server value mislabelled."));
 				return;
@@ -731,12 +728,12 @@ namespace Faolan.GameServer.Gm
 
 		// /set and /setlocal: `statid | statname [+ | - | t | c | s]value`
 		//
-		// ⭐ The two are ONE class in the client, told apart by the registry record's mode WORD at [0xC] (0 = /set, 1 =
-		// /setlocal) - see docs/re/gm-command-args.tsv. So they are one implementation with a flag here too.
+		// The two are one class in the client, told apart by the registry record's mode word at [0xC] (0 = /set,
+		// 1 = /setlocal) - see docs/re/gm-command-args.tsv - so they are one implementation with a flag here too.
 		//
-		// ⭐⭐ `t`, `c` and `s` are BIT operations - toggle, clear and set a flag on the stat. That is worth noticing
-		// on its own: retail's stat setter assumes stats are routinely BITFIELDS, not just scalars, which is the same
-		// shape the GM privilege mask and the vanity mask already have.
+		// `t`, `c` and `s` are bit operations - toggle, clear and set a flag on the stat. Retail's stat setter assumes
+		// stats are routinely bitfields, not just scalars, the same shape the GM privilege mask and the vanity mask
+		// have.
 		private async Task SetStatValueCommand(INetworkClient client, string arguments, bool localOnly)
 		{
 			var characterId = client.Session.Character.Id;
@@ -765,8 +762,8 @@ namespace Faolan.GameServer.Gm
 			}
 
 			var (_, _, current) = StatViews(subject, stat);
-			// ⚠️ The bit operators take the operand as a BIT INDEX, not a mask - "toggles a flag on the stat" is one
-			// flag, and a mask would make `t1` and `t2` the same edit for adjacent bits.
+			// The bit operators take the operand as a bit index, not a mask - "toggles a flag on the stat" is one flag,
+			// and a mask would make `t1` and `t2` the same edit for adjacent bits.
 			var bit = operand < 32 ? 1u << (int)operand : 0u;
 			var updated = op switch
 			{
@@ -790,8 +787,9 @@ namespace Faolan.GameServer.Gm
 		// /getskill <statid | statname>  - "Prints the skillvalue buffed and base, max skill value and the float, rank
 		// and level."
 		//
-		// ⚠️ Retail prints six things and we hold four. The float and the rank are not modelled (#507), so they are
-		// named as missing rather than printed as zero - a zero rank would read as a real answer.
+		// Retail prints six things and four are held here. The float and the rank are not modelled, so they are named
+		// as missing rather than printed as zero - a zero rank would read as a real answer.
+		// Open work tracked in Gitea #507.
 		private async Task GetSkillCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -819,13 +817,13 @@ namespace Faolan.GameServer.Gm
 		}
 
 		// /teleporttarget <posx> <posz> [y <posy>] [<playfield>]  - the same grammar as the rest of the family, on the
-		// TARGET instead of yourself. ⭐ It is the mode WORD in the registry record that says so: /teleporttarget is
-		// mode 0 while /teleport, /teleportself and /tp are all mode 1.
+		// target instead of the caller. The mode word in the registry record says so: /teleporttarget is mode 0 while
+		// /teleport, /teleportself and /tp are all mode 1.
 		//
-		// Retail's own description says the family teleports "self or another DYNEL", so the target may be an NPC.
-		// The two halves are different mechanisms (#917): a player teleport is a changemap handoff that re-runs world
-		// entry on a new connection; an NPC has neither character nor connection and is moved in the world model,
-		// with every viewer in the zone re-resolved around it.
+		// Retail's description says the family teleports "self or another dynel", so the target may be an NPC. The two
+		// halves are different mechanisms: a player teleport is a changemap handoff that re-runs world entry on a new
+		// connection; an NPC has neither character nor connection and is moved in the world model, with every viewer in
+		// the zone re-resolved around it.
 		private async Task TeleportTargetCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -863,16 +861,16 @@ namespace Faolan.GameServer.Gm
 
 			var destination = new Vector3(x, y, z);
 
-			// ⭐ Retail describes the whole family as teleporting "self or another DYNEL", and a dynel is any world
-			// entity - so an NPC target is in scope (#917). The two halves are genuinely different mechanisms, not one
-			// with a branch: a PLAYER teleport is a changemap handoff that re-runs world entry on a new connection,
-			// while an NPC has no character and no connection - it is moved in the world model and the viewers are
-			// re-resolved around it.
+			// Retail describes the whole family as teleporting "self or another dynel", and a dynel is any world
+			// entity, so an NPC target is in scope. The two halves are genuinely different mechanisms, not one with a
+			// branch: a player teleport is a changemap handoff that re-runs world entry on a new connection, while an
+			// NPC has no character and no connection - it is moved in the world model and the viewers are re-resolved
+			// around it.
 			if (!target.IsPlayer)
 			{
 				if (mapId != target.MapId)
 				{
-					// Cross-map for a non-player would mean taking the handle out of one Zone and into another while
+					// Cross-map for a non-player would mean taking the handle out of one zone and into another while
 					// every viewer of the old one still holds it. Refused by name rather than half-done.
 					await _agentServerDispatcher.SendSystemMessage(characterId,
 						ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - it can only be moved within its own playfield (map {target.MapId}), not to map {mapId} (#917)."));
@@ -895,9 +893,9 @@ namespace Faolan.GameServer.Gm
 
 		// /broadcast, /servcast and /sitecast: `[duration pause] message`
 		//
-		// ⭐ THE THREE SCOPES, in the client's own words (#919). All three are one class, and the registry dump
-		// records "mode 0" for each - but that dump reads a BYTE and the field is a WORD, so it truncated the
-		// discriminator away. The registration sites write `word [obj+0xC]` distinctly:
+		// The three scopes, in the client's own words. All three are one class, and the discriminator is the word at
+		// [obj+0xC] (a byte-wide read of it truncates the distinction away). The registration sites write it
+		// distinctly:
 		//
 		//     /servcast   0x0000     /broadcast  0x0100     /sitecast  0x0001
 		//
@@ -908,11 +906,10 @@ namespace Faolan.GameServer.Gm
 		//     [0xC]=1 [0xD]=0  ->  "Broadcasts a message to the dimension"
 		//     anything else    ->  "ERROR, impossible combination of flags"
 		//
-		// So the hierarchy is PLAYFIELD < SERVER < DIMENSION, and `/broadcast` - which we treated as the widest - is
-		// the NARROWEST of the three.
+		// So the hierarchy is playfield < server < dimension, and `/broadcast` is the narrowest of the three.
 		//
-		// ⚠️ `/sitecast`'s dimension is wider than one realm, and a realm host only holds its own players (#324), so
-		// it reaches this realm and says so rather than implying a cross-realm fanout that does not exist.
+		// `/sitecast`'s dimension is wider than one realm and a realm host only holds its own players, so it reaches
+		// this realm and says so rather than implying a cross-realm fan-out that does not exist.
 		private async Task BroadcastCommand(INetworkClient client, string arguments, string verb)
 		{
 			var characterId = client.Session.Character.Id;
@@ -923,7 +920,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// `[duration pause]` is optional and positional, so it is present only when the line STARTS with two
+			// `[duration pause]` is optional and positional, so it is present only when the line starts with two
 			// integers. A message beginning with a number is therefore ambiguous in retail's own grammar too; two
 			// leading integers win, which is what the declaration order says.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -938,7 +935,7 @@ namespace Faolan.GameServer.Gm
 			var repeats = pause > 0 ? Math.Min(MaxBroadcastRepeats, duration / pause) : 0;
 			var announcement = ChatMarkup.Color("yellow", message);
 
-			// The recovered scope of THIS verb (see the remark above).
+			// The scope of this verb (see the remark above).
 			var playfieldOnly = verb.Equals("broadcast", StringComparison.OrdinalIgnoreCase);
 			var scope = playfieldOnly
 				? "in this playfield"
@@ -972,9 +969,8 @@ namespace Faolan.GameServer.Gm
 			});
 		}
 
-		// `inPlayfieldOf` non-null narrows the fan-out to that client's own playfield - `/broadcast`'s recovered
-		// scope (#919). Null is the realm, which is `/servcast` and as much of `/sitecast`'s dimension as a realm
-		// host can reach.
+		// `inPlayfieldOf` non-null narrows the fan-out to that client's own playfield, which is `/broadcast`'s scope.
+		// Null is the realm, which is `/servcast` and as much of `/sitecast`'s dimension as a realm host can reach.
 		private async Task<int> FanOutBroadcast(ChatMarkup announcement, INetworkClient? inPlayfieldOf = null)
 		{
 			var recipients = _simulation.Players.Values.Where(p => p.IsPlayer).ToList();
@@ -994,11 +990,9 @@ namespace Faolan.GameServer.Gm
 			return recipients.Count;
 		}
 
-		// /mobs off | on [id | name]  - "Enables/disables InvisibleToMonsters".
-		//
-		// ⚠️ This REPLACES our `.invisible` (#914 rule 1): same flag, same persistence, and retail's form is strictly
-		// richer - it is explicit on/off rather than a toggle, and it can be aimed at another character.
-		// ⚠️ Retail's own note "only works on debugservers" is about THEIR deployment, not a limit here.
+		// /mobs off | on [id | name]  - "Enables/disables InvisibleToMonsters". Explicit on/off rather than a toggle,
+		// and it can be aimed at another character. Retail's note "only works on debugservers" is about their
+		// deployment, not a limit here.
 		private async Task MobsCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1021,7 +1015,7 @@ namespace Faolan.GameServer.Gm
 
 			subject.Invisible = wanted;
 
-			// Persisted on the ACCOUNT, as the toggle it replaces was, so it survives relog and map changes (#279).
+			// Persisted on the account, so it survives relog and map changes.
 			var account = subject.Client.Session.Account;
 			if (account != null)
 			{
@@ -1035,8 +1029,8 @@ namespace Faolan.GameServer.Gm
 		}
 
 		// /char  - "Flags the character so all IIRs will be logged." Declares no parameters, so it is a toggle on the
-		// caller's own session. ⭐ The point is SCOPE, not volume: one flagged character logs at information level
-		// while everyone else stays at debug, which is what makes a trace usable on a populated server.
+		// caller's own session. The point is scope, not volume: one flagged character logs at information level while
+		// everyone else stays at debug, which is what makes a trace usable on a populated server.
 		private async Task CharLogCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1046,11 +1040,8 @@ namespace Faolan.GameServer.Gm
 				: $"IIR logging {ChatMarkup.Color("red", "OFF")} for this character."));
 		}
 
-		// /feat  - "Lists all the feats on your target." READ-ONLY, mask GetStats.
-		//
-		// ⚠️ This is a second name/meaning mismatch of the `.time` kind, and it is why our `.feat` was renamed:
-		// retail's `/feat` only LISTS, and does so for your TARGET; the manipulation verb is `/feats` (mask SetStats).
-		// Ours was the manipulator wearing the reader's name and mask.
+		// /feat  - "Lists all the feats on your target." Read-only, mask GetStats: retail's `/feat` only lists, and
+		// does so for the target; the manipulation verb is `/feats` (mask SetStats).
 		private async Task FeatListCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1067,21 +1058,21 @@ namespace Faolan.GameServer.Gm
 				: $"'{subject.Name}' has {feats.Length} feat(s): {string.Join(", ", feats)}");
 		}
 
-		// /kickban [Character Name] minutes  - "Kicks a player for the specified amount of time (minutes)."
+		// /kickban [Character Name] minutes  - "Kicks a player for the specified amount of time (minutes)." Not a
+		// duplicate of `.ban`, which is indefinite and account-wide until someone runs `.unban`; this is a timed kick
+		// that lifts itself.
 		//
-		// ⚠️ NOT a duplicate of our `.ban`, so that one stays: `.ban` is indefinite and account-wide until someone
-		// runs `.unban`, while this is a TIMED kick that lifts itself.
-		// ⭐ The lift is a DB property, not a background task (#918): `Account.BanExpiresAt` is written with the state
-		// in one go, and the next login attempt lifts it if the moment has passed (`ClearExpiredBan`, called from the
+		// The lift is a DB property, not a background task: `Account.BanExpiresAt` is written with the state in one go,
+		// and the next login attempt lifts it if the moment has passed (`ClearExpiredBan`, called from the
 		// UniverseAgent's login gate). So a restart inside the window still holds the ban, and one that spans the whole
-		// window releases it - both of which the old in-process `Task.Delay` got wrong in one direction each.
+		// window releases it.
 		private async Task KickBanCommand(INetworkClient client, string arguments)
 		{
 			var gmId = client.Session.Character.Id;
 			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-			// The name is OPTIONAL in retail's grammar (`[Character Name] minutes`), so with one token it is the
-			// duration and the subject is your target.
+			// The name is optional in retail's grammar (`[Character Name] minutes`), so with one token it is the
+			// duration and the subject is the caller's target.
 			string? name = null;
 			int minutes;
 			if (tokens.Length == 1 && int.TryParse(tokens[0], out minutes))
@@ -1147,9 +1138,9 @@ namespace Faolan.GameServer.Gm
 
 		// /getfaction <faction id>  - "Get the faction points for the player with the specified faction id."
 		//
-		// ⭐ The pair of these says something structural about factions: retail's getter takes a faction id and its
-		// setter takes id + POINTS, with no rank argument anywhere. So standing is a flat `faction id -> points` map
-		// and the rank is DERIVED from the point total, not stored (#310) - which is exactly how FactionLadder works.
+		// The pair of these says something structural about factions: retail's getter takes a faction id and its setter
+		// takes id + points, with no rank argument anywhere. Standing is a flat `faction id -> points` map and the rank
+		// is derived from the point total, not stored - which is how FactionLadder works.
 		private async Task GetFactionCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1186,10 +1177,10 @@ namespace Faolan.GameServer.Gm
 
 		// /magic list | learn <spellid> | forget <spellid> | forgetall | ...  - "Spellbook/magic handling".
 		//
-		// ⚠️ Retail's full grammar also carries `npccast` and three token-state-counter verbs; those name machinery we
-		// do not have, and they say so rather than failing silently. `forget`/`forgetall` ARE backed since #915: the
-		// repository can now shrink the spellbook, and the client is told with `DispatchForgetSpell` (0x200B), whose
-		// body the client's own dispatch reader settles (see SpellBookChangeCodec).
+		// Retail's full grammar also carries `npccast` and three token-state-counter verbs; that machinery does not
+		// exist here, and those verbs say so rather than failing silently. `forget`/`forgetall` are backed: the
+		// repository can shrink the spellbook, and the client is told with `DispatchForgetSpell` (0x200B), whose body
+		// the client's own dispatch reader settles (see SpellBookChangeCodec).
 		private async Task MagicCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1245,7 +1236,7 @@ namespace Faolan.GameServer.Gm
 
 				case "forgetall":
 				{
-					// Read the set BEFORE the delete: the client is told per spell, so the ids have to survive the wipe.
+					// Read the set before the delete: the client is told per spell, so the ids have to survive the wipe.
 					var known = await _database.GetCharacterSpells(characterId);
 					var removed = await _database.ClearCharacterSpells(characterId);
 					foreach (var spell in known)
@@ -1266,9 +1257,8 @@ namespace Faolan.GameServer.Gm
 
 		// /inventory delete <slot> [bag name] | deleteall [bag name] | equipall | unequipall
 		//
-		// ⚠️ This REPLACES our `.removeitem <bagSlot>` (#914 rule 1) - same job, and retail's form carries the
-		// deleteall and equip-all verbs ours never had. All four are backed since #916, which recovered the slot
-		// resolver from the client's own item-template fields (`EquipSlotResolver`).
+		// All four verbs are backed; the equip-all pair resolves its destination slots from the client's own
+		// item-template fields (`EquipSlotResolver`).
 		private async Task InventoryCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1357,9 +1347,9 @@ namespace Faolan.GameServer.Gm
 		// /gethash <templateid>  - "Does a lookup in the CategoryTree to try and match the templateid and a HASH. It
 		// prints the HASH if it's found."
 		//
-		// ⭐ Ours does not need a CategoryTree walk: the relationship retail looks up is the one AcgHash MINTS, so the
-		// answer is computed rather than searched (#899). The item's name comes along when the template is one we
-		// have, which is what makes the output checkable instead of a bare number.
+		// No CategoryTree walk is needed: the relationship retail looks up is the one AcgHash mints, so the answer is
+		// computed rather than searched. The item's name comes along when the template is a known one, which is what
+		// makes the output checkable instead of a bare number.
 		private async Task GetHashCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1376,14 +1366,13 @@ namespace Faolan.GameServer.Gm
 				$"Template {templateId}{(item == null ? " (not in our catalogue)" : $" '{item.Name}'")} -> HASH {minted} (0x{minted:X8}).");
 		}
 
-		// /quest ...  - retail's quest debug, which addresses goals and tasks by HASH:
+		// /quest ...  - retail's quest debug, which addresses goals and tasks by hash:
 		//   clearlog | solvegoal <hash> | failgoal <hash> | solvetask <hash> | failtask <hash> | nextphase <hash>
 		//   | increasecount <hash> | clearallcooldowns
 		//
-		// ⚠️ Only `solvegoal` has a server path here (#559). The rest name real machinery - failing a goal, solving a
-		// whole task, advancing a phase, bumping a repeat count - that our quest progression does not expose, and
-		// each says so by name rather than the whole verb reporting itself absent. That distinction matters: the
-		// command IS partly usable.
+		// Only `solvegoal` has a server path here. The rest name real machinery - failing a goal, solving a whole task,
+		// advancing a phase, bumping a repeat count - that quest progression does not expose, and each says so by name
+		// rather than the whole verb reporting itself absent, because the command is partly usable.
 		private async Task QuestDebugCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1426,9 +1415,9 @@ namespace Faolan.GameServer.Gm
 		// /settimescale <value>  - "Set time scale on the current client and server", parameter help "Float: Time
 		// scale (default is 1)".
 		//
-		// ⭐ The distinction from /gametime is worth keeping straight, because both drive the same field: /gametime
-		// MULTIPLIES the current rate (`* 2` then `* 2` gives 4), while /settimescale ASSIGNS it. Retail ships both,
-		// so it wants both spellings, and running them through one stored rate keeps them consistent with each other.
+		// The distinction from /gametime matters, because both drive the same field: /gametime multiplies the current
+		// rate (`* 2` then `* 2` gives 4), while /settimescale assigns it. Retail ships both, and running them through
+		// one stored rate keeps them consistent with each other.
 		private async Task SetTimeScaleCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1451,9 +1440,9 @@ namespace Faolan.GameServer.Gm
 
 		// /showclassstatadjustments  - "Get the list of npc class stat adjustments for the target npc." No parameters.
 		//
-		// ⭐ What retail calls a class stat adjustment is what we import as the class/level attribute BASE (#444) - the
-		// per-(class, level) table the client otherwise computes locally off its own feat templates. So the answer is
-		// the target's ClassBase map, which is exactly the population #471 wanted to compare against.
+		// What retail calls a class stat adjustment is imported here as the class/level attribute base - the
+		// per-(class, level) table the client otherwise computes locally off its own feat templates - so the answer is
+		// the target's ClassBase map.
 		private async Task ShowClassStatAdjustmentsCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1466,7 +1455,7 @@ namespace Faolan.GameServer.Gm
 
 			if (subject.ClassBase.Count == 0)
 			{
-				// ⚠️ An empty table is a real, informative answer here - it means we have not decoded a base for this
+				// An empty table is a real, informative answer here - it means no base is decoded for this
 				// (class, level), which is the shortfall AttributeScore documents rather than a zero base.
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					$"'{subject.Name}' ({subject.CharacterClass}, level {subject.Level}) has NO decoded class stat adjustments - attribute-driven formulas fall back to gear + buffs and read low.");
@@ -1486,9 +1475,9 @@ namespace Faolan.GameServer.Gm
 
 		// /update  - "Updates the Attackrating for your target." No parameters.
 		//
-		// ⚠️ Ours recomputes the caller's OWN derived stats, not an arbitrary target's: the reseed runs off a
-		// connected client's gear and buffs, and an NPC has no client to reseed from. Said in the reply rather than
-		// silently doing the wrong entity.
+		// This recomputes the caller's own derived stats, not an arbitrary target's: the reseed runs off a connected
+		// client's gear and buffs, and an NPC has no client to reseed from. Said in the reply rather than silently
+		// acting on the wrong entity.
 		private async Task UpdateRatingCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;

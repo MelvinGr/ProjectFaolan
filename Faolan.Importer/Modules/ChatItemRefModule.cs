@@ -11,26 +11,26 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Modules
 {
-	// Item identities harvested from `itemref://` CHAT LINKS (#751) - a THIRD key source beside the inventory
-	// snapshot and DispatchAddItem, and one of a different kind.
+	// Item identities harvested from `itemref://` chat links - a third key source beside the inventory snapshot and
+	// DispatchAddItem, and one of a different kind.
 	//
-	// #203 proved there is no CLIENT-side source for an item's TEA key: the quads are random per-item and held by
-	// Funcom's server, so full-catalog decryption stays impossible and that verdict is not reopened here. What a
-	// chat link adds is BREADTH. Every other harvester reads items the capturing character HELD or browsed; a
+	// There is no client-side source for an item's TEA key: the quads are random per item and held by Funcom's
+	// server, so full-catalog decryption is impossible. What a chat link adds is breadth. Every other harvester
+	// reads items the capturing character held or browsed; a
 	// trade-channel link describes whatever a stranger was selling, so it reaches items nobody in the corpus ever
 	// owned. And the key is the whole payoff - `RdbItemImporter` can only decrypt a template we hold a key for,
 	// however present the RDB record is, so a link is not an id+name stub but the thing that unlocks the stats,
 	// quality, value, damage and category behind it.
 	//
-	// ⚠️ Read straight out of the *.tshark.json, like `npc-chatter` and for the same reason: the shared reader keeps
+	// Read straight out of the *.tshark.json, like `npc-chatter` and for the same reason: the shared reader keeps
 	// only the Conan stream, and most of these ride the CHAT server (ChannelChat 0x0041 - the trade channel).
 	// Carriers seen in the corpus are ChatServer 0x0041, ChatServer 0x0022 and the c2s Conan 0x2002, so this scans
 	// every body for the scheme rather than allow-listing three opcodes: `itemref` is the only item-bearing href in
 	// the whole corpus, and a fourth carrier should be harvested, not missed.
 	//
-	// ⚠️ A link is PLAYER-TYPED text. The client composes it, but the importer must not treat it as authoritative
+	// A link is player-TYPED text. The client composes it, but the importer must not treat it as authoritative
 	// over a snapshot-sourced row - so this goes through `CaptureItemImporter.UpsertAsync`, whose every rule is
-	// never-downgrade: a name only fills an EMPTY one, the hash is left alone (a link carries none), and a level
+	// never-downgrade: a name only fills an empty one, the hash is left alone (a link carries none), and a level
 	// only fills a 0.
 	public sealed class ChatItemRefModule : IImportModule
 	{
@@ -80,17 +80,17 @@ namespace Faolan.Importer.Modules
 		}
 
 		// One link folded into the harvest set. First sighting wins on everything the quad states - a template's key
-		// is per-template and stable, so two links to the same item are the same record - and the PAIR fills on the
+		// is per-template and stable, so two links to the same item are the same record - and the pair fills on the
 		// same never-downgrade rule the packet sources use, because only 1 of the corpus's 26 links carries one.
 		private static void Record(IDictionary<uint, ItemHashHarvester.CapturedItem> into, ItemRefLink link)
 		{
-			// ⚠️ Key1, never key3. `key3` is sometimes the NullIdentity sentinel (both corpus sightings are
-			// pre-existence items), and key2 belongs to the pair's SECOND template.
+			// Key1, never key3. `key3` is sometimes the NullIdentity sentinel (both corpus sightings are
+			// pre-existence items), and key2 belongs to the pair's second template.
 			var pair = link.HasPair
 				? new ItemHashHarvester.CapturedPair(link.TemplateId2, link.Key2.Key1, link.Key2.Key2, link.Key2.Key3, link.Key2.Key4)
 				: (ItemHashHarvester.CapturedPair?)null;
 
-			// Hash 0: the URL form drops the hash word the loot-chat body carries. Fine - #723 mints a token at send
+			// Hash 0: the URL form drops the hash word the loot-chat body carries. The send path mints a token at send
 			// time, and a 0 here is the provenance record saying this identity came from a link.
 			var captured = new ItemHashHarvester.CapturedItem(link.Key1.Key1, link.Key1.Key2, link.Key1.Key3, link.Key1.Key4, 0, link.Level, pair);
 

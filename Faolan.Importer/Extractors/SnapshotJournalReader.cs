@@ -8,23 +8,18 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Extractors
 {
 	// Reads the Quest_c JOURNAL region out of a captured FullChar snapshot (0x737A6DF9) - the character's live
-	// J-panel at login, one record per HELD quest, each carrying the quest's title/summary/area/region text refs and
+	// J-panel at login, one record per held quest, each carrying the quest's title/summary/area/region text refs and
 	// its record scalars.
 	//
 	// This is the authoritative source for two things nothing else in the corpus provides:
-	//   - which quests a character actually HOLDS (the incremental QuestLogList/QuestIIR packets only show quests
+	//   - which quests a character actually holds (the incremental QuestLogList/QuestIIR packets only show quests
 	//     touched during that capture session);
-	//   - the journal CONTENT for those quests, so their definitions can be generated rather than replayed.
+	//   - the journal content for those quests, so their definitions can be generated rather than replayed.
 	//
-	// Both were previously lost. CaptureQuestImporter regex-scanned the whole snapshot for
-	// `<remoteformat id="N" category="50301">` title records and entered every hit as COMPLETED - but the Quest_c
-	// records carry title records in exactly that form, so a character's ACTIVE journal was swept into the completed
-	// archive wholesale (NecroL80: all 27 of her held quests stored as Completed, while the 17 marked Active were
-	// incidental session packets). QuestDefinitionExtractor, meanwhile, only read the QuestFullUpdate/QuestJournal
-	// packets, which covered 2 of her 27.
-	//
-	// Reading this region only became possible on 2026-07-20: QuestcRegion threw on any progressed journal until the
-	// per-record objective interleaving was fixed (Gitea #384).
+	// Neither is recoverable by scanning the snapshot for `<remoteformat id="N" category="50301">` title records:
+	// the Quest_c records of the ACTIVE journal carry title records in exactly that form, so a text scan sweeps a
+	// character's held quests into the completed archive wholesale. The region has to be parsed, per record, with
+	// the objectives interleaved as the format states them.
 	public static class SnapshotJournalReader
 	{
 
@@ -41,9 +36,9 @@ namespace Faolan.Importer.Extractors
 			return TryRead(packet, out characterId, out records, out _);
 		}
 
-		// As above, but also surfaces the quest INDEX region that follows the journal. The index carries the per-quest
+		// As above, but also surfaces the quest index region that follows the journal. The index carries the per-quest
 		// goal-table word and goal-step ids, which the Quest_c record itself does not - both are needed before a quest
-		// can ride the login snapshot (#389).
+		// can ride the login snapshot.
 		public static bool TryRead(byte[] packet, out uint characterId, out IReadOnlyList<QuestcRecord> records, out QuestIndexRegion? index)
 		{
 			characterId = 0;
@@ -56,13 +51,13 @@ namespace Faolan.Importer.Extractors
 
 			try
 			{
-				// The full record: the journal lives in the SUB-CLASS (tails), so the root-only reader will not do.
+				// The full record: the journal lives in the sub-class (tails), so the root-only reader will not do.
 				var parts = FullPlayerCharacterCodec.Parse(record);
 				characterId = parts.Instance; // the snapshot is addressed to its own player
 				records = parts.SubClass.Quests.Records;
-				// The quest index follows the journal; since #391 it parses for every held-quest snapshot, so surface
-				// it (QuestLineExtractor reads the per-block area 4CCs from it - areas an ACTIVE quest reaches but no
-				// completed journal shows).
+				// The quest index follows the journal and parses for every held-quest snapshot, so surface it:
+				// QuestLineExtractor reads the per-block area 4CCs from it - areas an active quest reaches but no
+				// completed journal shows.
 				index = parts.SubClass.QuestIndex;
 				return records.Count > 0;
 			}
@@ -73,7 +68,7 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// The COMPLETED-quest journal a snapshot packet carries (#390) - the area-grouped region after the active
+		// The COMPLETED-quest journal a snapshot packet carries - the area-grouped region after the active
 		// journal. Returns false for any packet that is not a parseable player snapshot, or that carries no
 		// completed quests (a fresh character has none, which is why the region is absent from the beach template).
 		public static bool TryReadCompleted(byte[] packet, out CompletedQuestJournalRegion? completed)

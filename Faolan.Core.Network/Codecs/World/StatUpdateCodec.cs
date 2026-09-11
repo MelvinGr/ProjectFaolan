@@ -10,14 +10,14 @@ namespace Faolan.Core.Network.Codecs.World
 	// pushed whenever an entity's stats/vitals change (combat, the regen tick, the world-entry replay, GM commands).
 	// Confirmed wire layout (docs/re/quests-and-combat.md):
 	//   [subop 96B8DC59][0000C350][entityHandle:4][00000000:4][CharacterStatBlock]
-	// This is the pure IIR body only - no RPC header / length prefix (#530 rule 2). The host frames it per recipient
+	// This is the pure IIR body only - no RPC header or length prefix. The host frames it per recipient
 	// (VitalsPacket for a single addressed send, SendWorldIir when broadcasting to nearby viewers). Proven
 	// byte-exact by the round-trip in CharacterStatBlockTests.
 	public static class StatUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.StatUpdateIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(StatUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -56,6 +56,5 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// StatUpdateIIR (0x96B8DC59).
 	public sealed record StatUpdateIIR(uint EntityHandle, CharacterStatBlock Stats);
 }

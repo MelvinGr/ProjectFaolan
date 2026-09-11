@@ -7,30 +7,43 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// The Khitai REPUTATION engine (Gitea #310): what a kill is worth to a character's standing, and telling the
-	// client about it.
-	//
-	// Every number it applies is the client's own - the payout matrix from `data/FactionRelations.xml` (RDB 1010701)
-	// and the bounds/thresholds from the tuning sheet (RDB 1000516, `FactionLadder`). #310 was filed as blocked on
-	// Khitai captures; it never was, and the corpus still carries zero faction packets in either direction, so the
-	// wire form comes from the client's method table rather than from a dump. See docs/subsystems/factions.md.
-	//
-	// ⚠️ ONE trigger is wired: a kill. The client also drives standing from SCRY SCRIPTS (`changefactionpoints`,
-	// `changefactionrank`) and from a `ApplyFactionRankGameAction` element, i.e. quests - those ride machinery that
-	// exists but has no faction consumer yet, and are deliberately not invented here.
+	/// <summary>
+	///     The Khitai reputation engine: what a kill is worth to a character's standing, and telling the client about
+	///     it.
+	/// </summary>
+	/// <remarks>
+	///     Every number it applies is the client's own - the payout matrix from <c>data/FactionRelations.xml</c>
+	///     (RDB 1010701) and the bounds and thresholds from the tuning sheet (RDB 1000516, see
+	///     <see cref="FactionLadder" />). The corpus carries no faction packets in either direction, so the wire form
+	///     comes from the client's method table rather than from a dump. See docs/subsystems/factions.md.
+	///     <para>
+	///         One trigger is wired: a kill. The client also drives standing from scry scripts
+	///         (<c>changefactionpoints</c>, <c>changefactionrank</c>) and from an
+	///         <c>ApplyFactionRankGameAction</c> element, which is quests; both ride machinery that exists but has no
+	///         faction consumer, and are deliberately not invented here.
+	///     </para>
+	/// </remarks>
 	public sealed class FactionService(IFactionRepository database, ILogger logger, FactionService.SendStanding send)
 	{
-		// The one outbound op this service needs, as a delegate seam rather than a whole listener - the shape
-		// CLAUDE.md prescribes for a single shared op (`ClientForCharacter` into GuildService is the precedent).
-		// It sends BOTH messages, because the client keeps the standing bar and the rank TITLE in different places
-		// and a server that moved only one would leave the other showing whatever it was last told.
+		/// <summary>
+		///     The one outbound op this service needs, as a delegate seam rather than a whole listener.
+		/// </summary>
+		/// <remarks>
+		///     It sends both messages, because the client keeps the standing bar and the rank title in different
+		///     places, and moving only one leaves the other showing whatever it was last told.
+		/// </remarks>
 		public delegate Task SendStanding(INetworkClient client, uint factionId, int points, uint rank);
 
-		// The encounter tier a plain solo kill pays at. Tiers 1..5 (solo boss, group normal/boss, raid normal/boss)
-		// are in the table and are NOT selectable yet: the tier is a property of the ENCOUNTER - how many players
-		// engaged it and whether the creature is a boss - and the simulation models neither. Paying tier 0 for
-		// everything under-grants a group kill rather than over-granting it, which is the safe direction, and the
-		// file's own "proportional to 60" rule means tier 0 is exactly one player's share of the group rate.
+		/// <summary>
+		///     The encounter tier a plain solo kill pays at.
+		/// </summary>
+		/// <remarks>
+		///     Tiers 1 to 5 - solo boss, group normal and boss, raid normal and boss - are in the table but not
+		///     selectable: the tier is a property of the encounter, being how many players engaged it and whether the
+		///     creature is a boss, and the simulation models neither. Paying tier 0 for everything under-grants a group
+		///     kill rather than over-granting it, and the file's own "proportional to 60" rule makes tier 0 exactly one
+		///     player's share of the group rate.
+		/// </remarks>
 		public const int SoloNormalTier = 0;
 
 		/// <summary>
@@ -38,8 +51,8 @@ namespace Faolan.GameServer.World
 		///     belongs to no faction, which is every base-game NPC - the faction ids are Khitai's.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ A kill moves SEVERAL factions, not one: the payout list costs the victim's own faction and grants the
-		///     same amount to its rival. That is the whole mechanic, and it is why this takes the award LIST rather
+		///     A kill moves several factions rather than one: the payout list costs the victim's own faction and grants
+		///     the same amount to its rival. That is the whole mechanic, and why this works from the award list rather
 		///     than a single delta.
 		/// </remarks>
 		public async Task<IReadOnlyList<(uint FactionId, int Points, uint Rank)>> AwardForKill(INetworkClient killer, uint? victimFactionId, int tier = SoloNormalTier)
@@ -59,7 +72,7 @@ namespace Faolan.GameServer.World
 				var before = standings.GetValueOrDefault(award.FactionId);
 				var after = FactionLadder.Apply(before, award.Points);
 
-				// A standing already pinned at a bound does not move, and a no-op must not be written OR sent: the
+				// A standing already pinned at a bound does not move, and a no-op must be neither written nor sent: the
 				// client would redraw an unchanged bar, and the row would churn on every kill at the ceiling.
 				if (after == before)
 					continue;
@@ -83,9 +96,9 @@ namespace Faolan.GameServer.World
 		///     populated before the player opens it.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Sends only the factions the character has a ROW for. A faction at neutral has no row and needs no
+		///     Sends only the factions the character has a row for. A faction at neutral has no row and needs no
 		///     message: zero is what the client shows for one it has never been told about, so seeding sixteen zeroes
-		///     would be sixteen packets to say nothing.
+		///     would be sixteen packets saying nothing.
 		/// </remarks>
 		public async Task SendAll(INetworkClient client)
 		{

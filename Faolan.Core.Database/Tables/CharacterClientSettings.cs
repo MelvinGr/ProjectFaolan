@@ -3,12 +3,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// The two blobs the CLIENT authors for a character and uploads on its mid-session PlayerAgent socket
-	// (UpdateCharacterSettings / UpdateCharacterPreview, Gitea #611). The server never reads inside them - its whole job
+	// The two blobs the client authors for a character and uploads on its mid-session PlayerAgent socket
+	// (UpdateCharacterSettings / UpdateCharacterPreview). The server never reads inside them - its whole job
 	// is to hand each back verbatim: the settings at LoginCharacter (SendCharacterSettings) and the preview before the
 	// character list (SendCharacterPreview), so a player's UI layout and select-screen pose survive a relog.
 	//
-	// ⚠️ Stored COMPRESSED, exactly as received. The checksum the client compares against
+	// Stored compressed, exactly as received. The checksum the client compares against
 	// (SendCharacterSettingsCheckSumMap) is an MD5 over the compressed payload, and a deflate stream is not a function
 	// of its contents - so re-encoding these bytes would change the checksum and make every cached client copy look
 	// stale. Both columns are nullable because either half can exist without the other (the preview is uploaded on its

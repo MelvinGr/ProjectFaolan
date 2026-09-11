@@ -37,7 +37,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x1FD6412B` | `ClimbingDynelFullUpdateIIR_c` ✓ | `ClimbingDynelFullUpdateIIR` | ClimbingDynelFullUpdateIIR_c  (x87) |
 | `0x2550C99A` | `GuildUpdateIIR_c` ✓ | `GuildUpdateIIR` | GuildUpdateIIR_c  (x3) |
 | `0x28D0AC99` | `RegenIIR_c` ✓ | `RegenIIR` | RegenIIR_c  (x554) |
-| `0x28DA68A0` | `FeatIIR` ✓ | `FeatIIR` | FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack (#251) |
+| `0x28DA68A0` | `FeatIIR` ✓ | `FeatIIR` | FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack |
 | `0x2A8A1B49` | `MoveInventoryItemIIR_t` ✓ | `MoveInventoryItemIIR` | MoveInventoryItemIIR_t  (x16) - "MoveItemInInventory" |
 | `0x30536411` | `UpdateSimpleDynelIIR_c` ✓ | `UpdateSimpleDynelIIR` | UpdateSimpleDynelIIR_c  (x30) |
 | `0x33A56FB0` | `DoorFullUpdateIIR_c` ✓ | `DoorFullUpdateIIR` | DoorFullUpdateIIR_c  (x89) - world door/object full update |
@@ -67,10 +67,10 @@ external doc; the enum + the hash function are the whole source.
 | `0x737A6DF9` | `FullPlayerCharacterIIR` ✓ | `FullPlayerCharacterIIR` | FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below |
 | `0x7446F3FA` | `KnubotFinishTradeIIR_c` ✓ | `KnubotFinishTradeIIR` | KnubotFinishTradeIIR_c  (x2) |
 | `0x79F8C7A1` | `QuestJournalIIR_c` ✓ | `QuestJournalIIR` | QuestJournalIIR_c  (x17) |
-| `0x80138D7B` | `QuestRewardSelectionIIR_c` ✓ | `QuestRewardSelectionIIR` | QuestRewardSelectionIIR_c - c2s: the reward the player picked (#815) |
+| `0x80138D7B` | `QuestRewardSelectionIIR_c` ✓ | `QuestRewardSelectionIIR` | QuestRewardSelectionIIR_c - c2s: the reward the player picked |
 | `0x864CFEF8` | `CharInPlayIIR_t` ✓ | `CharInPlayIIR` | CharInPlayIIR_t  (x74) - "ReadyForPlayScreen" |
 | `0x8A01E5A1` | `HateListUpdateIIR` ✓ | `HateListUpdateIIR` | HateListUpdateIIR  (x61) |
-| `0x8BB2799C` | `QuestRewardNotifyIIR_c` ✓ | `QuestRewardNotifyIIR` | QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward OFFER, and its confirm (#815) |
+| `0x8BB2799C` | `QuestRewardNotifyIIR_c` ✓ | `QuestRewardNotifyIIR` | QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward offer, and its confirm |
 | `0x8D5A8B6B` | `FormatFeedbackIIR_t` ✓ | `FormatFeedbackIIR` | FormatFeedbackIIR_t  (x68) |
 | `0x9062D559` | `TradeskillReplyIIR_c` ✓ | `TradeskillReplyIIR` | TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94) |
 | `0x96B8DC59` | `StatUpdateIIR_c` ✓ | `StatUpdateIIR` | StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/re/quests-and-combat.md |
@@ -88,7 +88,7 @@ external doc; the enum + the hash function are the whole source.
 | `0xCE30BE4E` | `AreaFormulaIIR_t` ✓ | `AreaFormulaIIR` | AreaFormulaIIR_t  (x42) |
 | `0xCFFD0519` | `CombatShieldIIR_c` ✓ | `CombatShieldIIR` | CombatShieldIIR_c  (x79) |
 | `0xD06568C8` | `NewCurrentLooterIIR_c` ✓ | `NewCurrentLooterIIR` | NewCurrentLooterIIR_c  (x60) |
-| `0xD558FF16` | `SkillIIR_t` ✓ | `SkillIIR` | SkillIIR_t  (x4) - c2s skillpoint spend: a (statId, delta) list (#739) |
+| `0xD558FF16` | `SkillIIR_t` ✓ | `SkillIIR` | SkillIIR_t  (x4) - c2s skillpoint spend: a (statId, delta) list |
 | `0xD6C1F0CC` | `SetShadowCoverageIIR_c` ✓ | `SetShadowCoverageIIR` | SetShadowCoverageIIR_c (BKDR-31 of "SetShadowCoverageIIR_c") - environment/lighting update |
 | `0xD751EBB4` | `StopIIR_c` ✓ | `StopIIR` | StopIIR_c  (x2097) - stop moving |
 | `0xE0B51102` | `ChatTextIIR_t` ✓ | `ChatTextIIR` | ChatTextIIR_t  (x1) |

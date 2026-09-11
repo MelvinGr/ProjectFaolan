@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct of retail's `FeatRequired` refusal (#779) - the on-screen line a player gets when they
+	// Byte-exact construct of retail's `FeatRequired` refusal - the on-screen line a player gets when they
 	// swing at a resource node their gathering rank does not reach. Oracle:
 	// `demol80-demonologist_login_gameplay_annotated_1`, frames 5644 and 5726, both naming feat template 894305
 	// (`Stonecutting Adept`) after a swing at a Marble node, and both beside the player's own chat annotation
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_NamesAnyFeat_AndParsesBack()
 		{
-			// The generalisation the plaintext feat-name category buys (#779): only the id changes.
+			// The generalisation the plaintext feat-name category buys: only the id changes.
 			var body = FormatFeedbackCodec.Build(0x12345678, new FeatRequired(893925));
 			var parsed = FormatFeedbackCodec.Parse(body);
 

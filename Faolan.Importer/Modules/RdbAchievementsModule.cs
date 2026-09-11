@@ -10,7 +10,7 @@ namespace Faolan.Importer.Modules
 {
 	public sealed class RdbAchievementsModule : IImportModule
 	{
-		// No dependency: the catalog is keyed by the client's own tag ids and joins to nothing.
+		/// <remarks>No dependency: the catalog is keyed by the client's own tag ids and joins to nothing.</remarks>
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>

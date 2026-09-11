@@ -6,41 +6,51 @@ using System.Text;
 
 namespace Faolan.Core.Progression
 {
-	// Whether a chosen character name is allowed. Two independent rules, and only one of them is retail's own
-	// stated number:
-	//
-	//   * LENGTH. The client says it verbatim - *"The length of your character name is invalid. The length of the
-	//     name must be between 4 and 16 characters."* (LDB 211711[2780]) - and enforces it locally, so a stock
-	//     client never sends a name outside it. This is the server-side half of the same rule.
-	//   * CONTENT. The client ships a forbidden-word list (RDB 1065100, imported as `NameFilterTerm`); a name that
-	//     CONTAINS one is refused.
-	//
-	// ⚠️ Retail's own MATCHING rule is not observable - no capture rejects a name, and the client's refusal text
-	// ("The name %s is not valid, please choose another.", LDB 211711[2154]) states no rule. So the rule below is
-	// OURS, and it was CALIBRATED rather than guessed, against an oracle the client supplies: the words it ships in
-	// its own NPC and item names are by construction acceptable English, so a rule that refuses them is too blunt.
-	// Refusals over that 2,779-word vocabulary, as the substring floor moves:
-	//
-	//     >=3: 36 words refused (`assassin`, `ambassador`, `occultist`, `acumen`, ...)
-	//     >=4: 16      >=5: 5      >=6: 3      >=7: 3
-	//
-	// It plateaus at 6, which is why 6 and not a rounder number. Below the floor a term must match the WHOLE name,
-	// which is weak - `xxassxx` passes - but a filter that refuses `Assassin` is worse than one that misses a
-	// padded three-letter word, and the client's own content is the evidence for which. The three that survive at
-	// 6 are `bastardsword`, `bite` and `hack`, none of them a name.
-	//
-	// Reproduce with `dotnet run --project Faolan.Importer -- --report name-filter-check`.
-	//
-	// The terms are stored HASHED, so the match runs the other way round from the obvious one: rather than
-	// scanning terms for a substring of the name, this hashes each of the NAME's own substrings and asks the set.
-	// A 16-character name has 136 of them, and `NameFilterTerm.Length` narrows that to the lengths that occur.
+	/// <summary>
+	///     Whether a chosen character name is allowed.
+	/// </summary>
+	/// <remarks>
+	///     Two independent rules, and only one of them is retail's own stated number:
+	///     <list type="bullet">
+	///         <item>
+	///             Length. The client says it verbatim - "The length of your character name is invalid. The length of
+	///             the name must be between 4 and 16 characters." (LDB 211711[2780]) - and enforces it locally, so a
+	///             stock client never sends a name outside it. This is the server-side half of the same rule.
+	///         </item>
+	///         <item>
+	///             Content. The client ships a forbidden-word list (RDB 1065100, imported as <c>NameFilterTerm</c>); a
+	///             name that contains one is refused.
+	///         </item>
+	///     </list>
+	///     Retail's own matching rule is not observable - no capture rejects a name, and the client's refusal text
+	///     ("The name %s is not valid, please choose another.", LDB 211711[2154]) states no rule. The rule below is
+	///     ours, calibrated against an oracle the client supplies: the words it ships in its own NPC and item names
+	///     are by construction acceptable English, so a rule that refuses them is too blunt. Refusals over that
+	///     2,779-word vocabulary, as the substring floor moves:
+	///     <code>
+	///     &gt;=3: 36 words refused (assassin, ambassador, occultist, acumen, ...)
+	///     &gt;=4: 16      &gt;=5: 5      &gt;=6: 3      &gt;=7: 3
+	///     </code>
+	///     It plateaus at 6, which is why the floor is 6 and not a rounder number. Below the floor a term must match
+	///     the whole name, which is weak - <c>xxassxx</c> passes - but a filter that refuses <c>Assassin</c> is worse
+	///     than one that misses a padded three-letter word, and the client's own content is the evidence for which.
+	///     The three that survive at 6 are <c>bastardsword</c>, <c>bite</c> and <c>hack</c>, none of them a name.
+	///     Reproduce with <c>dotnet run --project Faolan.Importer -- --report name-filter-check</c>.
+	///     <para />
+	///     The terms are stored hashed, so the match runs the other way round from the obvious one: rather than
+	///     scanning terms for a substring of the name, this hashes each of the name's own substrings and asks the set.
+	///     A 16-character name has 136 of them, and <c>NameFilterTerm.Length</c> narrows that to the lengths that
+	///     occur.
+	/// </remarks>
 	public static class CharacterNameRules
 	{
 		public const int MinLength = 4;
 		public const int MaxLength = 16;
 
-		// Terms at least this long are matched anywhere in the name; shorter ones must BE the whole name. See the
-		// class remarks for the measurement behind the number.
+		/// <summary>
+		///     Terms at least this long are matched anywhere in the name; shorter ones must be the whole name. See the
+		///     class remarks for the measurement behind the number.
+		/// </summary>
 		public const int SubstringMinLength = 6;
 
 		public enum Verdict
@@ -60,10 +70,13 @@ namespace Faolan.Core.Progression
 		}
 
 		/// <summary>
-		///     Checks a chosen name against the length rule and the hashed forbidden-term set. `forbiddenLengths` is
-		///     the set of term LENGTHS present in `forbidden`; pass an empty set (with an empty `forbidden`) to run
-		///     the length rule alone, which is what a server with no imported list does.
+		///     Checks a chosen name against the length rule and the hashed forbidden-term set.
 		/// </summary>
+		/// <param name="forbiddenLengths">
+		///     The set of term lengths present in <paramref name="forbidden" />. Pass an empty set (with an empty
+		///     <paramref name="forbidden" />) to run the length rule alone, which is what a server with no imported
+		///     list does.
+		/// </param>
 		public static Verdict Check(string? name, IReadOnlySet<string> forbidden, IReadOnlySet<int> forbiddenLengths)
 		{
 			ArgumentNullException.ThrowIfNull(forbidden);

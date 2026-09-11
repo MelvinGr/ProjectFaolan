@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #217: closing an NPC dialogue must leave it CLOSED. The retail client signals the close with its own
+	// Closing an NPC dialogue must leave it closed. The retail client signals the close with its own
 	// KnubotCloseChatWindow (0xC4AF39EB, c2s - decoded from the gameplay captures, the client double-sends it);
 	// our server now tears down the conversation session state on it instead of dropping it into the unknown-opcode
-	// default (which left the state live AND spammed a system message). With the state cleared, the next click
+	// default (which left the state live and spammed a system message). With the state cleared, the next click
 	// starts a fresh conversation rather than re-entering the closed one.
 	public class ConversationCloseTests
 	{
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			Assert.Empty(client.Session.ConversationOptions);
 			Assert.Null(client.Session.ConversationNpcName);
 			Assert.Null(client.Session.ConversationNpcHandle);
-			Assert.Empty(client.Sent); // a client-initiated close gets NO reply (the window is already closed)
+			Assert.Empty(client.Sent); // a client-initiated close gets no reply (the window is already closed)
 		}
 	}
 }

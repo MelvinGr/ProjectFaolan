@@ -9,17 +9,17 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// How retail tells an OBSERVER about buffs on an entity streaming into view (#677).
+	// How retail tells an observer about buffs on an entity streaming into view.
 	//
 	// The ticket's blocker was *"decide the trigger: the spawn body itself, or a MagicBuffIIR fan-out right after
 	// the spawn. Needs a capture check first - the corpus should show whether retail attaches buffs to the spawn or
 	// sends them separately, and this must not be guessed."*
 	//
 	// It does not need a new check: the answer was already decoded and round-tripping. The spawn's post-IIR carries
-	// a count-framed `BuffRecords` list, and it is populated on real spawns. So retail ATTACHES them, and there is
+	// a count-framed `BuffRecords` list, and it is populated on real spawns. So retail attaches them, and there is
 	// no fan-out to design.
 	//
-	// ⚠️ And each record carries `TimerRemaining`, which settles the ticket's other half. It reasoned that an
+	// And each record carries `TimerRemaining`, which settles the ticket's other half. It reasoned that an
 	// observer arriving mid-buff has no event to count down from, so *"an absolute `@46` expiry on the server's
 	// uptime clock earns its place"* - and that the observer's client would therefore need `ServerTime_c` live from
 	// a `DispatchPong`. None of that is needed: retail states the remaining time in the spawn record itself.
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			Assert.Contains(buffs, b => b.TimerRemaining > 0);
 		}
 
-		// The remaining time is a REMAINDER, not a restatement of the duration: if the two were always equal the
+		// The remaining time is a remainder, not a restatement of the duration: if the two were always equal the
 		// field would be the total under another name and an observer would still learn nothing about elapsed time.
 		[Fact]
 		public void RemainingIsNotJustTheTotalAgain()
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 				$"a buff has {b.TimerRemaining} remaining of {b.TimerTotal} - a remainder cannot exceed its total"));
 		}
 
-		// The record names WHO applied it, which is what lets an observer attribute the icon rather than just draw
+		// The record names who applied it, which is what lets an observer attribute the icon rather than just draw
 		// it. Without this the fan-out design would have had to carry the caster separately.
 		[Fact]
 		public void ABuffRecordNamesItsSourceAndTarget()

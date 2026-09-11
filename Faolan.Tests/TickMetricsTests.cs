@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// TickMetrics is the gauge behind the client's dev "Server Framerate" overlay (GameServerStats 0x2009). Its whole
-	// value is that the number MOVES with the loop's real health, so these pin the three readings that matter: healthy,
+	// value is that the number moves with the loop's real health, so these pin the three readings that matter: healthy,
 	// degraded, and dead. Timing-driven by construction - the gauge measures wall clock - so the bands are wide enough
 	// to survive a loaded CI box while still separating the three cases by an order of magnitude.
 	public class TickMetricsTests
@@ -45,16 +45,16 @@ namespace Faolan.Tests
 				metrics.RecordTick(busyPerTick);
 			}
 
-			// Asserted as INVARIANTS, not as target numbers. Sleep is a floor, not a schedule - on a loaded box the
+			// Asserted as invariants, not as target numbers. Sleep is a floor, not a schedule - on a loaded box the
 			// window closes early and at a lower rate, so pinning "~20 Hz over 24 ticks" is a flake generator (it
 			// caught itself: the first version asserted the snapshot's cumulative count was 20-24 and read 19, because
-			// the count is the total at PUBLISH time, with the remaining ticks accruing into the next window).
+			// the count is the total at publish time, with the remaining ticks accruing into the next window).
 			var snapshot = metrics.Current;
 			Assert.True(snapshot.TicksPerSecond > 0, "a closed window must report a rate");
 			Assert.InRange(snapshot.TotalTicks, 1ul, 24ul); // cumulative, never more than what was recorded
 
 			// The one exact relationship that holds whatever the scheduler does: rate and busy fraction are computed
-			// over the SAME window, so busy = rate x busy-per-tick. This is what would break if either were divided by
+			// over the same window, so busy = rate x busy-per-tick. This is what would break if either were divided by
 			// the nominal period instead of the measured elapsed time - the bug class this whole change exists to fix.
 			Assert.Equal(snapshot.TicksPerSecond * busyPerTick, snapshot.BusyFraction, 6);
 		}
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void AStaleSnapshotDecaysToZero()
 		{
-			// The reading that catches a DEAD world loop. A published snapshot is only a measurement while it is fresh;
+			// The reading that catches a dead world loop. A published snapshot is only a measurement while it is fresh;
 			// once the loop stops feeding the gauge, serving the last healthy number forever would make a stalled
 			// server look perfectly fine in-client. The cumulative tick count survives - it is a total, not a rate.
 			var metrics = new TickMetrics(10.0);

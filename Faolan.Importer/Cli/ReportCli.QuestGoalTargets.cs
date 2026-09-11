@@ -8,19 +8,19 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report quest-goal-targets` - resolve every goal's TRAILING typed reference against the client's plaintext LDB
-	// and say, per goal, whether that string can serve as `TargetName` (#521).
+	// and say, per goal, whether that string can serve as `TargetName`.
 	//
-	// The trailing reference is the client's own statement of what the goal is ABOUT, and its category names the table:
+	// The trailing reference is the client's own statement of what the goal is about, and its category names the table:
 	// 50200 `item.name`, 51000 `npc_template.name`, 51100 `categorytree.description`, 51200 `bounded_areas.bounded_area`
-	// (docs/rdb/ldb-string-index.md). All four are on the PLAINTEXT side of the LDB, so nothing here needs a wire key -
-	// only a page walk, which is what #561's PlaintextLdbStringsFor does.
+	// (docs/rdb/ldb-string-index.md). All four are on the plaintext side of the LDB, so nothing here needs a wire key -
+	// only a page walk, which is what `PlaintextLdbStringsFor` does.
 	//
-	// ⚠️ This report exists because resolving the string is NOT the same as being able to store it. `TargetName` is a
-	// MATCH key, compared against a live entity's `NpcTemplate.Name` (QuestProgress.MatchingKillGoal's name fallback,
-	// QuestMarkerResolver.MarkerStateFor). `NpcTemplate.Name` is the INTERNAL name; LDB 51000 is the DISPLAY name. Where the two
+	// This report exists because resolving the string is not the same as being able to store it. `TargetName` is a
+	// match key, compared against a live entity's `NpcTemplate.Name` (QuestProgress.MatchingKillGoal's name fallback,
+	// QuestMarkerResolver.MarkerStateFor). `NpcTemplate.Name` is the INTERNAL name; LDB 51000 is the display name. Where the two
 	// coincide the fill works; where they do not it silently stops matching while LOOKING resolved - strictly worse
 	// than the empty column it replaced. So the useful output here is not the strings, it is the per-category
-	// AGREEMENT RATE between the resolved string and the catalog the runtime actually matches against.
+	// AGREEMENT rate between the resolved string and the catalog the runtime actually matches against.
 	public static partial class ReportCli
 	{
 		// The four trailing categories the goal catalog uses, and what each one's id space points at.
@@ -59,7 +59,7 @@ namespace Faolan.Importer.Cli
 				.ToListAsync();
 
 			// The two catalogs a resolved string would have to agree with: NPC templates (what a kill/talk trigger
-			// matches on) and items (what a collect goal counts). Names are NOT unique in either - 1,018 templates carry
+			// matches on) and items (what a collect goal counts). Names are not unique in either - 1,018 templates carry
 			// 834 distinct names - so the by-name lookup is one-to-MANY and an ambiguous hit is reported, never picked.
 			var templatesById = await db.NpcTemplates.AsNoTracking().ToDictionaryAsync(t => t.TemplateId, t => t.Name);
 			var templatesByName = templatesById
@@ -67,8 +67,8 @@ namespace Faolan.Importer.Cli
 				.ToDictionary(g => g.Key, g => g.Select(kv => kv.Key).ToArray(), StringComparer.OrdinalIgnoreCase);
 			var itemsById = await db.Items.AsNoTracking().Select(i => new { i.Id, i.Name }).ToDictionaryAsync(i => i.Id, i => i.Name);
 
-			// Which NPC names are actually STANDING somewhere. A name that resolves but is spawned nowhere makes a goal
-			// look wired while still being uncompletable - the failure mode #521's Deliver half already hit.
+			// Which NPC names are actually standing somewhere. A name that resolves but is spawned nowhere makes a goal
+			// look wired while still being uncompletable.
 			var spawnedNames = (await db
 					.NpcSpawns.AsNoTracking()
 					.Select(s => s.NpcTemplate.Name)
@@ -99,7 +99,7 @@ namespace Faolan.Importer.Cli
 				var verdict = Verdict(g.TrailingCategory, g.TrailingRefId, resolved ? text! : null, templatesById, templatesByName, itemsById,
 					spawnedNames, c);
 
-				// NULL = the goal has never been on the wire (a catalog-only goal), so it has no kind - distinct from
+				// null = the goal has never been on the wire (a catalog-only goal), so it has no kind - distinct from
 				// a kind the corpus has not mapped, which prints as `?<value>`.
 				var kind = g.Separator is not { } sep
 					? "-"
@@ -129,7 +129,7 @@ namespace Faolan.Importer.Cli
 			CatalogAgreement(plaintext, ItemNameCategory, "Items.Name", itemsById);
 		}
 
-		// The same id+name agreement over the WHOLE catalog rather than the handful of ids the goals happen to reference.
+		// The same id+name agreement over the whole catalog rather than the handful of ids the goals happen to reference.
 		// This is what makes the goal-level number mean anything: six agreeing refs could be luck, and the question the
 		// fill turns on - "is LDB[cat][id] the same string the runtime matches on?" - is a property of the two id spaces,
 		// not of the goals. It is an INDEPENDENT check because our name column is capture-derived (the name the retail
@@ -170,7 +170,7 @@ namespace Faolan.Importer.Cli
 		};
 
 		// Per-goal verdict + the tally the summary reads. The question a verdict answers is always the same one: can
-		// this string be written into a column the server MATCHES on, or would it only look right?
+		// this string be written into a column the server matches on, or would it only look right?
 		private static string Verdict(uint category, uint refId, string? text, Dictionary<uint, string> templatesById,
 			Dictionary<string, uint[]> templatesByName, Dictionary<uint, string> itemsById, HashSet<string> spawnedNames, Counters c)
 		{
@@ -211,7 +211,7 @@ namespace Faolan.Importer.Cli
 					return "refId IS the item; name agrees";
 				}
 
-				// A monster GROUP and a region are not rows in either catalog, so there is nothing to agree with - the
+				// A monster group and a region are not rows in either catalog, so there is nothing to agree with - the
 				// string is the only thing the reference yields. Still reported by name against the templates, because
 				// that is the only way to see whether a group description could serve as a kill-goal name fallback.
 				case CategoryTreeCategory:

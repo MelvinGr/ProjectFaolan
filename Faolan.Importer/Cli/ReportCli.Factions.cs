@@ -6,25 +6,22 @@ using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report factions`: the Khitai faction & reputation catalog, out of the client (Gitea #310).
+	// `--report factions`: the Khitai faction & reputation catalog, out of the client.
 	//
-	// #310 filed the system as *"Blocked on: expansion (Khitai) content + captures of the faction UI/standing packets
-	// to decode the wire form — none today."* Neither half survives contact with the shipped client:
+	// The whole system is recoverable from the shipped client, with no expansion content and no faction captures:
 	//
-	//   the WIRE   `FactionsList` = a `ListFrame` over `{u32 factionId, u32 points}` pairs, recovered from
+	//   the wire   `FactionsList` = a `ListFrame` over `{u32 factionId, u32 points}` pairs, recovered from
 	//              `DispatchInviteWithInviterFactionPoints`' own bail-out strings.
-	//   the IDS    `data/FactionRelations.xml` (RDB 1010701/1) — 16 factions with their ids, icons and the full
+	//   the ids    `data/FactionRelations.xml` (RDB 1010701/1) - 16 factions with their ids, icons and the full
 	//              opposing-faction point matrix, plus a 5-tier encounter override table for 12 of them.
-	//   the NAMES  `LDB[254]` — each faction twice (with and without the article) and its FOUR RANK TITLES.
-	//   the TEXT   `LDB[254]` again: "You have lost %d faction standing points with %s."
+	//   the names  `LDB[254]` - each faction twice (with and without the article) and its four rank titles.
+	//   the text   `LDB[254]` again: "You have lost %d faction standing points with %s."
 	//
-	// ⚠️ 1010701 was opened once before and set aside: `docs/subsystems/combat.md` records it as "chased for [NPC
-	// disposition] and is player REPUTATION in a different id space". That verdict was right for that question and is
-	// exactly the wrong thing to carry forward — a table that is not what one ticket wanted is still the table
-	// another ticket is blocked on.
+	// 1010701 is player reputation in its own id space, not the NPC-disposition table `docs/subsystems/combat.md`
+	// describes; the two are different questions over the same RDB record.
 	//
-	// ⚠️ What is genuinely NOT here: the POINT THRESHOLDS between ranks. The client ships the four rank names per
-	// faction and the per-kill payouts, and nothing that says how many points Rank 2 costs. The report says so rather
+	// What is genuinely not here: the point thresholds between ranks. The client ships the four rank names per
+	// faction and the per-kill payouts, and nothing that says how many points rank 2 costs. The report says so rather
 	// than interpolating a ladder, because a guessed threshold would be indistinguishable from a decoded one the
 	// moment it is written down.
 	public static partial class ReportCli
@@ -32,7 +29,7 @@ namespace Faolan.Importer.Cli
 		// LDB category 254 - faction display names, rank titles and the standing messages.
 		private const uint FactionTextCategory = 254;
 
-		// The two name blocks, both stepping by 16 in the SAME faction order as the rank blocks.
+		// The two name blocks, both stepping by 16 in the same faction order as the rank blocks.
 		private const uint FactionNameWithArticle = 60435760;
 		private const uint FactionNameBare = 61205296;
 		private const uint FactionNameStep = 16;
@@ -117,7 +114,7 @@ namespace Faolan.Importer.Cli
 			var tierNames = new[] { "solo normal", "solo boss", "group normal", "group boss", "raid normal", "raid boss" };
 			foreach (var group in byTier)
 			{
-				// The award against the victim's OWN faction is the negative one; it is the same magnitude in every
+				// The award against the victim's own faction is the negative one; it is the same magnitude in every
 				// entry of a tier, which is what makes the tier a rate rather than a per-faction number.
 				var own = group.Select(r => r.Awards.FirstOrDefault(a => a.FactionId == r.Faction)?.Points).Distinct().ToList();
 				var name = group.Key < tierNames.Length ? tierNames[group.Key] : "?";

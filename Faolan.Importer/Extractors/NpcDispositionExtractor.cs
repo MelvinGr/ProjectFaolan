@@ -9,18 +9,18 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// Harvests the retail overhead-name DISPOSITION (cCategory) per NPC from the captured RequestAggroStatus
-	// responses - the SOLE correct hostility source (an NPC's Community is faction MEMBERSHIP, not hostility:
-	// community 1 is the civilian/default faction shared by Citizens, vendors and guards, so the old
-	// `Community > 0` aggro test wrongly made every townsperson hostile). See #256/aggro.
+	// Harvests the retail overhead-name disposition (cCategory) per NPC from the captured RequestAggroStatus
+	// responses - the only correct hostility source. An NPC's Community is faction membership, not hostility:
+	// community 1 is the civilian/default faction shared by Citizens, vendors and guards, so a `Community > 0` aggro
+	// test makes every townsperson hostile.
 	//
 	// The response is GameCharAgentProject (sender class 0x5B9756FC) -> GameCharInterfaceProject, opcode 0x2000,
-	// server->client, with a body of EXACTLY [u32 0xC350][u32 targetInstance][u32 cCategory], cCategory being
+	// server->client, with a body of exactly [u32 0xC350][u32 targetInstance][u32 cCategory], cCategory being
 	// 0 = friendly (green), 1 = hostile (red), 2 = neutral (yellow).
 	//
-	// ⚠️ The target handle is correlated to the NPC's TEMPLATE, not to its NAME (#731). A name is not an identity
+	// The target handle is correlated to the NPC's template, not to its name. A name is not an identity
 	// here: 37 templates ship as "Halen van Dummy" - a training-dummy placeholder that wins over the real name -
-	// and a dozen of those are real vendors. Keyed by name, every vote for any of them landed on ONE of them, and
+	// and a dozen of those are real vendors. Keyed by name, every vote for any of them landed on one of them, and
 	// the module's name -> community step then attributed the whole pile to whichever faction that one happened to
 	// belong to. The spawn record carries the template id right next to the name, so this correlation never needed
 	// the name at all.
@@ -34,12 +34,12 @@ namespace Faolan.Importer.Extractors
 		// FACTION across all captures.
 		public static IEnumerable<(uint TemplateId, uint Category)> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
-			// handle -> the NPC TEMPLATE spawned on it, IN ORDER. A handle with no template is a PLAYER, and players
+			// handle -> the NPC template spawned on it, in order. A handle with no template is a player, and players
 			// have no disposition row.
 			//
-			// ⚠️ HANDLES ARE RECYCLED - 91 of them carry two different templates within one capture - so this is
+			// HANDLES are RECYCLED - 91 of them carry two different templates within one capture - so this is
 			// replayed as the packets are walked rather than collapsed into one map up front. Taking the first (or
-			// the last) spawn per handle attributes every poll in the OTHER window to the wrong NPC, which is how a
+			// the last) spawn per handle attributes every poll in the other window to the wrong NPC, which is how a
 			// town crier ends up voting like the mob that later inherited its handle.
 			var spawns = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).ToArray();
 			var templates = new Dictionary<uint, uint>();
@@ -92,13 +92,13 @@ namespace Faolan.Importer.Extractors
 		}
 
 		/// <summary>
-		///     The NPC TEMPLATES this capture saw ATTACK something - an independent hostility signal for a creature the
+		///     The NPC templates this capture saw attack something - an independent hostility signal for a creature the
 		///     client never happened to poll.
 		/// </summary>
 		/// <remarks>
 		///     The poll harvest above can only speak for creatures a player's client asked about, and its faction
 		///     fallback only for factions some member of which was asked about. 154 templates - 645 placements - came
-		///     out of it with NO disposition at all, and a null disposition is read as FRIENDLY by the world model, so
+		///     out of it with no disposition at all, and a null disposition is read as friendly by the world model, so
 		///     every one of them stood around green and passive. The beach crocodiles (14049) are the reported case:
 		///     they never aggro because nothing ever told us they were hostile.
 		///     <para>

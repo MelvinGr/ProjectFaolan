@@ -16,11 +16,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The LFG registry behind DispatchTeamSearchResult (#889): which teams a SearchForTeam answers with, and which of
+	// The lfg registry behind DispatchTeamSearchResult: which teams a SearchForTeam answers with, and which of
 	// the client's criteria actually bite.
 	//
 	// The wire grammar is gated separately (TeamSearchResultCodecTests); this is the half the corpus cannot show at
-	// all, because every captured search matched nothing - so what is asserted here is the RULE, stated once in
+	// all, because every captured search matched nothing - so what is asserted here is the rule, stated once in
 	// TeamService.SearchTeams: a team appears when its leader advertised it and every criterion the client sent
 	// admits it.
 	public class TeamSearchServiceTests
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 		}
 
 		// The point of the flag: a team that never advertised is not in anyone's search results. This is what makes
-		// the empty body the RIGHT answer on a server where nobody has flagged, rather than a missing feature.
+		// the empty body the right answer on a server where nobody has flagged, rather than a missing feature.
 		[Fact]
 		public async Task AnUnadvertisedTeam_IsNotReturned()
 		{
@@ -166,7 +166,7 @@ namespace Faolan.Tests
 			Assert.False(Search(teams, skip: 1).MoreHits);
 			Assert.False(Search(teams).MoreHits); // one match, one page - nothing left behind
 
-			// The skip is a client-supplied u32: an out-of-range one must page PAST the end, not wrap negative and
+			// The skip is a client-supplied u32: an out-of-range one must page past the end, not wrap negative and
 			// hand back everything.
 			Assert.Empty(Search(teams, skip: uint.MaxValue).Rows);
 			Assert.False(Search(teams, skip: uint.MaxValue).MoreHits);
@@ -183,14 +183,14 @@ namespace Faolan.Tests
 			Assert.True(set.Looking);
 			Assert.Equal("healer lfg", teams.LookingForTeamStatusOf(Searcher).Message);
 
-			// It is the CHARACTER's flag, not a team advert - it puts nothing in the team search.
+			// It is the character's flag, not a team advert - it puts nothing in the team search.
 			Assert.Empty(Search(teams).Rows);
 
 			teams.ForgetLookingForTeam(Searcher);
 			Assert.False(teams.LookingForTeamStatusOf(Searcher).Looking);
 		}
 
-		// The apply button on a result row tells the LEADER, and nobody else.
+		// The apply button on a result row tells the leader, and nobody else.
 		[Fact]
 		public async Task Apply_TellsTheLeader()
 		{

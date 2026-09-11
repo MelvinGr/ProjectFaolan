@@ -9,11 +9,11 @@ namespace Faolan.Importer.Cli
 {
 	// `--report buff-descriptor [--report-arg tsv]`
 	//
-	// The evidence view behind #658: every captured `MagicBuffIIR` APPLY's `descriptor[0]` @14 and `bool2` @13,
-	// grouped by SPELL and cross-tabbed against the `Spells` columns we hold. `MagicBuffCorpusTests` measured both as
-	// *nearly a property of the spell* (varying within a spell on 7 and 3 of 256 spells respectively), which is the
-	// shape that says the value comes off the spell's own record rather than from per-cast state - so this prints the
-	// per-spell table plus, for every candidate column, how well it PARTITIONS the two values.
+	// Every captured `MagicBuffIIR` apply's `descriptor[0]` @14 and `bool2` @13, grouped by spell and cross-tabbed
+	// against the `Spells` columns we hold. Both are nearly a property of the spell - they vary within a spell on only
+	// a handful of the spells in the corpus - which is the shape that says the value comes off the spell's own record
+	// rather than from per-cast state. So this prints the per-spell table plus, for every candidate column, how well
+	// it partitions the two values.
 	//
 	// The purity number is the one to read: for a candidate column, group the spells by that column's value and score
 	// the share that land in each group's majority `descriptor[0]`. A column that predicts the field scores 100%; the
@@ -21,7 +21,7 @@ namespace Faolan.Importer.Cli
 	// baseline is not an answer however plausible its name.
 	//
 	// `--report-arg tsv` dumps the per-spell rows instead, for ad-hoc cross-tabs against sources the report does not
-	// join (the RDB record's unread head, #632).
+	// join, such as the RDB record's unread head.
 	public static partial class ReportCli
 	{
 		private static void BuffDescriptor(IReadOnlyList<NamedCapture> captures, string? mode)
@@ -33,31 +33,31 @@ namespace Faolan.Importer.Cli
 			}
 
 			var applies = new List<(uint SpellId, uint Descriptor0, byte Bool2)>();
-			// #658: (caster, target, spell, value) per apply - the input to the SCOPE statement below, which is the
+			// (caster, target, spell, value) per apply - the input to the scope statement below, which is the
 			// measurement that named `bool2` and which no per-spell table can make.
 			var scoped = new List<(uint Caster, uint Target, uint SpellId, uint Descriptor0)>();
-			// #658: the same applies with enough CONTEXT to ask whether descriptor[0] is per-cast STATE rather than a
+			// the same applies with enough CONTEXT to ask whether descriptor[0] is per-cast state rather than a
 			// property of the spell - which capture, in what order, on whom, and the whole 54 bytes so the question
-			// "does d0 gate any OTHER byte" can be asked of all of them instead of only [1] and [4].
+			// "does d0 gate any other byte" can be asked of all of them instead of only [1] and [4].
 			var sequenced = new List<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)>();
 			var crossTab = new Dictionary<string, int>();
 			var nonZeroSlots = new List<string>();
 			var descriptor4 = new Dictionary<uint, int>();
 			var descriptor4Spells = new Dictionary<uint, int>();
-			// #658: what PRECEDED each apply, keyed by descriptor[0]. Every field OF the spell record is now swept
-			// flat against this value while the SCOPE statement says it is spell-owned - which points at a RELATIONAL
-			// property (how this apply reached this target) that no record sweep can see by construction.
+			// What preceded each apply, keyed by descriptor[0]. Every field of the spell record sweeps flat against
+			// this value while the scope statement says it is spell-owned, which points at a relational property (how
+			// this apply reached this target) that no record sweep can see by construction.
 			var preceding = new Dictionary<string, int>();
 			var afterMapChange = new List<(uint Descriptor0, int SincePackets, uint SpellId)>();
 			var sinceFresh = new List<(uint Descriptor0, int Nth)>();
 			var applyOrdinal = new Dictionary<(string, uint, uint, int), int>();
 			foreach (var capture in captures)
 			{
-				// The last non-buff packet seen on this capture, as "0xIIR" or "m0xMETHOD". ⚠️ Reset PER CAPTURE:
+				// The last non-buff packet seen on this capture, as "0xIIR" or "m0xMETHOD". Reset per capture:
 				// carrying it across would attribute one capture's last packet to the next one's first apply.
 				var previous = "(nothing)";
-				// #658: how many packets since the last MapChange in this capture, or -1 if none has
-				// been seen yet. A buff RE-SENT as part of playfield entry arrives in the burst right after one; a
+				// how many packets since the last MapChange in this capture, or -1 if none has
+				// been seen yet. A buff RE-sent as part of playfield entry arrives in the burst right after one; a
 				// live application does not.
 				var sinceMapChange = -1;
 				var mapChanges = 0;
@@ -98,7 +98,7 @@ namespace Faolan.Importer.Cli
 
 				afterMapChange.Add((payload.Descriptor[0], sinceMapChange, buff.SpellBaseId));
 
-				// #658: how many times this (target, spell) has been applied SINCE THE LAST MAP CHANGE. ⚠️ The reset
+				// how many times this (target, spell) has been applied SINCE the last map change. The reset
 				// is what makes this different from the ticket's dead "first apply in the capture" test: a capture can
 				// open with a buff that has been running since before it started, so "first seen" is not "first
 				// applied". A map change rebuilds the client's buff state, so counting from there is a real ordinal.
@@ -176,7 +176,7 @@ namespace Faolan.Importer.Cli
 			DescriptorZeroReapplySequence(sequenced, spells);
 			DescriptorProvenance(db, applies);
 
-			// The candidate columns, each as a coarse KEY over the spell. Deliberately coarse: a key with as many
+			// The candidate columns, each as a coarse key over the spell. Deliberately coarse: a key with as many
 			// values as there are spells scores 100% for free and says nothing (the `field-predictors` report's
 			// "(fine)" trap).
 			var candidates = new (string Name, Func<Core.Database.Tables.Spell, string> Key)[]
@@ -225,7 +225,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			Console.WriteLine("* = the spell is SPLIT: retail sent more than one value for it, so no per-spell source can be the whole story.");
 
-			// ⚠️ Printed as the RATE of the minority value per predecessor, not as raw counts. Raw counts just rank
+			// Printed as the rate of the minority value per predecessor, not as raw counts. Raw counts just rank
 			// the predecessors by how common they are - both values sit behind the same busy IIRs - and the question
 			// is whether any predecessor CONCENTRATES the rare value.
 			MapChangeProximity(afterMapChange);
@@ -240,34 +240,33 @@ namespace Faolan.Importer.Cli
 
 		// `--report buff-descriptor --report-arg rdb`
 		//
-		// The other half of #658's route: the two fields are nearly per-SPELL, so ask the spell's own RDB 1040005
-		// record whether anything in it partitions them. Same shape as `spell-mana-mode`'s sweep - the record's fixed
-		// HEAD at word granularity (where #630's flag turned out to live, after three sweeps of the property run found
-		// nothing) and every property field, both by value and bit by bit.
+		// The two fields are nearly per-spell, so ask the spell's own RDB 1040005 record whether anything in it
+		// partitions them. Same shape as `spell-mana-mode`'s sweep - the record's fixed head at word granularity, which
+		// is where a packed flag lives, and every property field, both by value and bit by bit.
 		//
-		// ⚠️ A record carries a property field or it does not, and ABSENT is not zero. Absent records are dropped from
+		// A record carries a property field or it does not, and absent is not zero. Absent records are dropped from
 		// that field's tally rather than folded into the clear side, where they would manufacture agreement.
 
-		// The FLAGS word's bits against the MINORITY value, as a RATE rather than as purity.
+		// The FLAGS word's bits against the MINORITY value, as a rate rather than as purity.
 		//
-		// ⚠️ **A purity sweep structurally cannot see this**, which is why it sits beside one rather than inside it.
+		// A purity sweep structurally cannot see this, which is why it sits beside one rather than inside it.
 		// `descriptor[0]` is 2 on ~15% of spells, so a bit that lifts that to 60% - a decisive association - still
-		// leaves 40% of its records in the majority class and scores BELOW an 84% baseline. Purity answers "does this
-		// bit SPLIT the population cleanly"; the question here is "does it CONCENTRATE the rare value", and the two
+		// leaves 40% of its records in the majority class and scores below an 84% baseline. Purity answers "does this
+		// bit split the population cleanly"; the question here is "does it CONCENTRATE the rare value", and the two
 		// come apart exactly when the value is rare. See the `purity_sweep_cannot_see_a_rate_lift` note.
 		//
-		// Word 13 is the flags word (#632, `docs/rdb/spell-record-fields.md`), so its bits are the ones with named
-		// meanings to test against - bit 26 in particular, which marks the propagated/derived COPY of a buff and is
-		// the obvious candidate for "this apply is not the cast a player performed".
+		// Word 13 is the flags word (`docs/rdb/spell-record-fields.md`), so its bits are the ones with named meanings
+		// to test against - bit 26 in particular, which marks the propagated/derived copy of a buff and is the obvious
+		// candidate for "this apply is not the cast a player performed".
 
-		// ⭐ The spell's GAMEACTION ELEMENTS against the minority value, as a rate lift (#658 / #632).
+		// The spell's GAMEACTION ELEMENTS against the minority value, as a rate lift.
 		//
-		// `--report spell-record-coverage` measured that the elements are **45.9%** of a spell record - by far the
+		// `--report spell-record-coverage` measured that the elements are 45.9% of a spell record - by far the
 		// largest thing it carries, and the only substantial surface this sweep did not touch. It sweeps head words
-		// and property fields; a field that is nearly spell-owned and whose `3` form is ALREADY known to pair with a
+		// and property fields; a field that is nearly spell-owned and whose `3` form is already known to pair with a
 		// combo id (an element-carried thing) has an obvious reason to be element-derived.
 		//
-		// ⚠️ A rate lift and not a purity sweep, for the same reason as `MinorityRateLift`: the minority value is
+		// A rate lift and not a purity sweep, for the same reason as `MinorityRateLift`: the minority value is
 		// ~15% of spells, so an element kind that lifts it to 60% still scores below an 84% purity baseline.
 		private static void ElementKindRateLift(IReadOnlyList<(uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)> records,
 			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram,
@@ -345,31 +344,31 @@ namespace Faolan.Importer.Cli
 		}
 
 
-		// ⭐ The SCOPE statement: does `descriptor[0]` belong to the SPELL, the CASTER, or the pair?
+		// The scope statement: does `descriptor[0]` belong to the spell, the caster, or the pair?
 		//
 		// This is the measurement that named `bool2` on this ticket after every content-based sweep had come back at
 		// baseline, and it is worth having as a report rather than as a one-off because it answers a question no
 		// per-spell table can ask. A per-spell table can only say "the spell does not determine it"; it cannot say
-		// WHOSE field it is, and those are different findings.
+		// whose field it is, and those are different findings.
 		//
 		// The form is a pair of conditional-variation rates:
-		//   * of the casters that cast MORE THAN ONE distinct spell, how many vary the value?   -> 0 means caster-owned
-		//   * of the spells cast by MORE THAN ONE distinct caster, how many vary it?            -> 0 means spell-owned
+		//   * of the casters that cast more than one distinct spell, how many vary the value?   -> 0 means caster-owned
+		//   * of the spells cast by more than one distinct caster, how many vary it?            -> 0 means spell-owned
 		//
-		// ⚠️ **Both restrictions matter.** An entity that only ever casts one spell, or a spell only ever cast by one
+		// Both restrictions matter. An entity that only ever casts one spell, or a spell only ever cast by one
 		// entity, is consistent with EITHER owner and contributes nothing - counting it inflates whichever side you
 		// were hoping for. `bool2` came out 0-of-159 caster-side against 4-of-128 spell-side, which is what a
 		// caster-owned field looks like; a field owned by neither shows variation on both sides.
 
-		// ⭐ Does `descriptor[0]`'s minority value mark ONE MEMBER of a same-NAME family?
+		// Does `descriptor[0]`'s minority value mark one MEMBER of a same-name family?
 		//
-		// The same measurement that named the spell record's flags bit 26 (#632): a value that marks the derived copy
-		// of a spell shows up as "almost every record carrying it has a same-name sibling that does NOT". Several of
+		// The same measurement that named the spell record's flags bit 26: a value that marks the derived copy
+		// of a spell shows up as "almost every record carrying it has a same-name sibling that does not". Several of
 		// the `descriptor[0]=2` spells here are one of several ids sharing a name - `Blessed Blade` is four ids,
 		// `Furious Inspiration` five - so the question is whether that is the rule or just what a rank family looks
 		// like.
 		//
-		// ⚠️ The baseline is what makes it readable: rank families are common in this catalog, so a high twin rate is
+		// The baseline is what makes it readable: rank families are common in this catalog, so a high twin rate is
 		// only evidence if the value's twin rate BEATS the catalog's. Printed together for that reason.
 		private static void TwinRate(IReadOnlyList<SpellDescriptor> perSpell)
 		{
@@ -392,51 +391,51 @@ namespace Faolan.Importer.Cli
 		}
 
 
-		// What PRECEDED each apply, as the rate of the minority `descriptor[0]` (#658).
+		// What PRECEDED each apply, as the rate of the minority `descriptor[0]`.
 		//
-		// The relational question no record sweep can ask: every field OF the spell record is swept flat against this
+		// The relational question no record sweep can ask: every field of the spell record is swept flat against this
 		// value while the scope statement says it is spell-owned, which points at how the apply was PRODUCED rather
 		// than at what the spell is.
 		//
-		// ⚠️ The immediate predecessor is a weak proxy for that and this reports it as such. A buff applied as part of
+		// The immediate predecessor is a weak proxy for that and this reports it as such. A buff applied as part of
 		// an effect chain can be several packets after whatever caused it, and the corpus interleaves every entity in
-		// range - so a flat result here rules out "the packet directly before it" and NOT "how it was produced".
+		// range - so a flat result here rules out "the packet directly before it" and not "how it was produced".
 
-		// ⭐ Is the minority `descriptor[0]` a FOLLOW-ON in a burst on the same target? (#658)
+		// Is the minority `descriptor[0]` a FOLLOW-on in a burst on the same target?
 		//
 		// The relational reading, tested at the level the corpus actually supports: a buff applied as one link of an
-		// effect chain arrives immediately after another apply on the SAME target, while a directly-cast one does
-		// not. That is a causal WINDOW rather than the literal previous packet, which came back flat.
+		// effect chain arrives immediately after another apply on the same target, while a directly-cast one does
+		// not. That is a causal window rather than the literal previous packet, which came back flat.
 		//
-		// ⚠️ "Same target, adjacent in the apply stream" is the window, and it is per CAPTURE - an entity handle is
+		// "Same target, adjacent in the apply stream" is the window, and it is per capture - an entity handle is
 		// session-scoped, so comparing targets across captures would merge unrelated entities.
 
-		// ⭐ One SPLIT spell's applies in capture order, so the divergence can be READ rather than scored (#658).
+		// One split spell's applies in capture order, so the divergence can be read rather than scored.
 		//
 		// Six statistical surfaces are flat against `descriptor[0]`, and the remaining lead is the one thing a
 		// per-apply statistic structurally cannot do: look at a contiguous run. `--report-arg spell:<name>` prints
-		// every apply of a spell whose value retail SPLITS, grouped by capture and in order, with the target and the
+		// every apply of a spell whose value retail splits, grouped by capture and in order, with the target and the
 		// caster - which is the shape that named `bool2` (a scope observation, not another content sweep).
 
-		// ⭐ Is the minority `descriptor[0]` a buff RE-SENT on playfield entry? (#658)
+		// Is the minority `descriptor[0]` a buff RE-sent on playfield entry?
 		//
 		// The hypothesis came from READING the split rather than scoring it: of the captures that carry both values
 		// of `Stagger` (3911037, 819x1 / 144x2), the two that open on `2` and change to `1` are named
 		// `changemap-accept_quest` and `randomActions-very_long_loading_screen_after_field_change`, and one capture
-		// that is ALL `2` is a mid-session login. That says the value is about how the buff ARRIVED - re-sent with
+		// that is all `2` is a mid-session login. That says the value is about how the buff ARRIVED - re-sent with
 		// the playfield entry burst, versus applied live.
 		//
-		// So this measures distance in packets from the last `PlayfieldFIIR` (MapChange). ⚠️ `-1` means no map change
-		// has been seen yet in that capture, which is NOT the same as "far from one" - a capture that opens
+		// So this measures distance in packets from the last `PlayfieldFIIR` (MapChange). `-1` means no map change
+		// has been seen yet in that capture, which is not the same as "far from one" - a capture that opens
 		// mid-session has its whole first burst in that bucket, and lumping it in with the far bucket would hide
 		// exactly the population this is looking for.
 
-		// ⭐ Is the minority `descriptor[0]` a RE-APPLICATION of a buff already running? (#658)
+		// Is the minority `descriptor[0]` a RE-APPLICATION of a buff already running?
 		//
 		// This ticket recorded "not a re-apply / refresh marker" on the grounds that the value appears on both the
-		// FIRST apply of a (capture, target, spell) and on later ones. ⚠️ That test is confounded: a capture can open
+		// first apply of a (capture, target, spell) and on later ones. That test is confounded: a capture can open
 		// with a buff that has been running since before it started, so "first seen in the capture" is not "first
-		// applied". `MapChangeProximity` is what exposes it - the minority value is essentially ABSENT in the first
+		// applied". `MapChangeProximity` is what exposes it - the minority value is essentially absent in the first
 		// 200 packets after a MapChange, which is exactly the window where the client's buff state is genuinely
 		// fresh. So the ordinal is counted from the last map change rather than from the start of the capture.
 		private static void RepeatOrdinal(IReadOnlyList<(uint Descriptor0, int Nth)> rows)
@@ -496,8 +495,8 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				var rate = (double)inBucket.Count(r => r.Descriptor0 == minority.Key) / inBucket.Count;
-				// ⚠️ THE CONTROL, and without it this table is unreadable. `descriptor[0]` is nearly spell-owned, so
-				// a bucket full of spells that NEVER take the minority value would show 0% for a reason that has
+				// the control, and without it this table is unreadable. `descriptor[0]` is nearly spell-owned, so
+				// a bucket full of spells that never take the minority value would show 0% for a reason that has
 				// nothing to do with the bucket. `eligible` is the share of the bucket whose spell takes that value
 				// somewhere in the corpus - if it tracks the rate, the bucket is a population artefact.
 				var eligible = (double)inBucket.Count(r => capable.Contains(r.SpellId)) / inBucket.Count;
@@ -539,7 +538,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {capture.Key}  {capture.Count():N0} apply(ies), value(s) {string.Join("/", values)}"
 				                  + (values.Count > 1 ? "   <-- SPLITS INSIDE THIS CAPTURE" : ""));
 
-				// ⚠️ A capture carrying only one value cannot show the transition, so only the splitting ones are
+				// A capture carrying only one value cannot show the transition, so only the splitting ones are
 				// worth printing per-apply; the rest are summarised by the line above.
 				if (values.Count == 1)
 					continue;
@@ -559,7 +558,7 @@ namespace Faolan.Importer.Cli
 			var lead = new List<bool>();
 			for (var i = 0; i < ordered.Count; i++)
 			{
-				// A FOLLOW-ON is an apply whose immediate predecessor in the same capture hit the same target.
+				// A FOLLOW-on is an apply whose immediate predecessor in the same capture hit the same target.
 				var follow = i > 0 && ordered[i - 1].Capture == ordered[i].Capture && ordered[i - 1].Target == ordered[i].Target;
 				lead.Add(follow);
 			}
@@ -625,7 +624,7 @@ namespace Faolan.Importer.Cli
 				         ("target", a => a.Target, a => a.SpellId)
 			         })
 			{
-				// Only groups that actually VARY the other dimension can testify.
+				// Only groups that actually vary the other dimension can testify.
 				var groups = scoped.GroupBy(key).Where(g => g.Select(other).Distinct().Count() > 1).ToList();
 				var varying = groups.Count(g => g.Select(a => a.Descriptor0).Distinct().Count() > 1);
 				Console.WriteLine($"  of the {groups.Count,4} {label,-6} that span >1 other, {varying,4} vary descriptor[0]"
@@ -712,8 +711,8 @@ namespace Faolan.Importer.Cli
 				foreach (var h in headRanked.OrderByDescending(h => h.Purity).ThenBy(h => h.Values).Take(6))
 					Console.WriteLine($"    word {h.Word,2}  {h.Purity,7:P1}  ({h.Values} distinct){(h.Purity > baseline + 0.02 ? "   <-- beats the baseline" : "")}");
 
-				// The head word BY BIT, which is the shape #630's flag turned out to have: a packed flags word takes
-				// dozens of values and reads as noise until you ask the bits one at a time.
+				// The head word bit by bit: a packed flags word takes dozens of values and reads as noise until the
+				// bits are asked one at a time.
 				var headBits = new List<(int Word, int Bit, double Purity, int Set)>();
 				for (var w = 0; w < HeadWords; w++)
 				{
@@ -776,7 +775,8 @@ namespace Faolan.Importer.Cli
 				foreach (var b in bitRanked.OrderByDescending(b => b.Purity).ThenByDescending(b => b.Covered).Take(8))
 					Console.WriteLine($"    field {b.Field,4} bit {b.Bit,2}  {b.Purity,7:P1}  on {b.Covered,3} records");
 
-				// 3. every WORD of the whole record, head and tail alike (#632: ~87% of a record is outside the run).
+				// 3. every word of the whole record, head and tail alike - most of a record sits outside the property
+				// run.
 				var maxWords = records.Min(r => r.Body.Length) / 4;
 				var wordRanked = new List<(int Word, int Values, double Purity)>();
 				for (var w = 0; w < maxWords; w++)
@@ -800,12 +800,12 @@ namespace Faolan.Importer.Cli
 			return values.GroupBy(v => v).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).First().Key;
 		}
 
-		// #658: does `descriptor[0]` gate ANY other byte of the payload? The existing cross-tab asks that of slots
+		// does `descriptor[0]` gate any other byte of the payload? The existing cross-tab asks that of slots
 		// [1] and [4] only, because those are the two that are near-zero rather than zero - which cannot see a byte
-		// that is populated on BOTH values and merely differs. This asks it of all 54: for each byte, the value sets
+		// that is populated on both values and merely differs. This asks it of all 54: for each byte, the value sets
 		// under d0=1 and d0=2, and whether they are disjoint.
 		//
-		// ⚠️ A byte that varies freely (the level, the duration, the stamp) is NOISE here, not a discriminator - it
+		// A byte that varies freely (the level, the duration, the stamp) is NOISE here, not a discriminator - it
 		// is printed only when the two value sets do not overlap at all, which is what "gates" means.
 		private static void DescriptorZeroByteDiff(List<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> applies)
 		{
@@ -833,7 +833,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 		}
 
-		// #658: is `descriptor[0]` a per-cast STACK COUNT? The spells that carry 2 read like the game's stacking
+		// is `descriptor[0]` a per-cast STACK count? The spells that carry 2 read like the game's stacking
 		// buffs (Wrath, Momentum, Furious Inspiration, Mutilation, Blessed Blade), and two of them are named with the
 		// stack in the name - `Furious Inspiration (6)`, `Mutilation (1)`. If it counts, a RE-application to the same
 		// target while the buff is up should carry a higher number than the one before it.
@@ -873,16 +873,16 @@ namespace Faolan.Importer.Cli
 			return false;
 		}
 
-		// #658: how each value of `descriptor[0]` / `bool2` splits on the spell's PROVENANCE - can the caster cast it,
-		// or does it only arrive through something else? Measured as a RATE OVER APPLIES rather than as the purity of
+		// how each value of `descriptor[0]` / `bool2` splits on the spell's PROVENANCE - can the caster cast it,
+		// or does it only arrive through something else? Measured as a rate over APPLIES rather than as the purity of
 		// a partition over spells, which is why the existing sweep could not see it: with an 83.5% baseline a purity
 		// score needs a near-perfect partition, and a 3x rate lift scores at the baseline.
 		//
-		// ⚠️ A rate lift is a LEAD, not a decode. None of these is a partition, so the builder still writes the
+		// A rate lift is a LEAD, not a decode. None of these is a partition, so the builder still writes the
 		// constant - what they buy is a reading with numbers behind it instead of a list of spell names.
 		private static void DescriptorProvenance(Core.Database.DatabaseContext db, List<(uint SpellId, uint Descriptor0, byte Bool2)> applies)
 		{
-			// "Reachable as another spell's EFFECT" is the cut the earlier membership sweep did not include: it swept
+			// "Reachable as another spell's effect" is the cut the earlier membership sweep did not include: it swept
 			// ClassSpells, Combos.GameActionId, SpellEffects, SpellStatEffects, NpcSpells and FeatSpellGrants, but not
 			// the chain/area target column, which is the one that separates.
 			var chained = db.SpellAreaEffects.Where(e => e.EffectSpellId != 0).Select(e => e.EffectSpellId).Distinct().ToHashSet();

@@ -4,23 +4,23 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	/// <summary>
-	///     ⭐ One CONDITION on a <see cref="SpellStatEffect" /> — the `[id][value][operator]` triple the element
-	///     carries, in wire order (Gitea #790/#791).
+	///     One condition on a <see cref="SpellStatEffect" /> — the `[id][value][operator]` triple the element
+	///     carries, in wire order.
 	/// </summary>
 	/// <remarks>
 	///     <para>
 	///         Without these rows a conditional effect is applied unconditionally, because the import dropped the
-	///         run: 987 of the 1,117 elements that look like exact duplicates in the spell catalog differ ONLY here,
+	///         run: 987 of the 1,117 elements that look like exact duplicates in the spell catalog differ only here,
 	///         so a bonus that retail grants "while wielding a two-hander" or "on a random roll" was granted always.
 	///         <c>CriteriaEvaluator</c> is what reads them back.
 	///     </para>
 	///     <para>
-	///         ⭐ Its AREA/CHAIN twin is <see cref="SpellAreaEffectCriterion" /> (#861), added once it turned out that
+	///         Its AREA/CHAIN twin is <see cref="SpellAreaEffectCriterion" />, added once it turned out that
 	///         a rank table's whole selection rule lives in the criteria on its <c>CastNano</c> edges. The parser
 	///         produced both halves all along; only this one was persisted.
 	///     </para>
 	///     <para>
-	///         ⚠️ Stored VERBATIM, including the operators nothing can evaluate yet. `CriteriaOperator` names ~40 of
+	///         Stored verbatim, including the operators nothing can evaluate yet. `CriteriaOperator` names ~40 of
 	///         the 201 the client's switch handles; dropping the rest on import would make the table look complete
 	///         while silently deciding those conditions are absent, which is the one reading the bytes do not support.
 	///     </para>
@@ -36,7 +36,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey($"{nameof(SpellId)},{nameof(Sequence)}")]
 		public virtual SpellStatEffect Effect { get; set; } = null!;
 
-		/// <summary>This criterion's ordinal within the element's run. The run is a postfix EXPRESSION, so the order
+		/// <summary>This criterion's ordinal within the element's run. The run is a postfix expression, so the order
 		/// is load-bearing rather than incidental.</summary>
 		public uint Pos { get; set; }
 

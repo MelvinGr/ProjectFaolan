@@ -12,16 +12,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// "Created by <player>" on a player-crafted item (#727). The ticket predicted the carrier was the ItemOrigin
+	// "Created by <player>" on a player-crafted item. The ticket predicted the carrier was the ItemOrigin
 	// stat (0x554), on the reasoning that the tooltip label lives in the client's tooltip string block and a stat is
 	// the only per-instance channel we knew of. The crafting capture refutes that: it is
-	// ProtoInventoryGameEntry.creator_name - field 5, a plain Latin1 STRING on the entry itself, no stat involved.
+	// ProtoInventoryGameEntry.creator_name - field 5, a plain Latin1 string on the entry itself, no stat involved.
 	//
 	// Oracle: NecroL80_mage-necromancer_login_gameplay_annotated_5, the one captured craft. The maintainer linked the item in
 	// /say before (18:45:24) and after (18:46:09) and narrated "done"; the server's DispatchAddItem lands between
 	// them at 18:45:30 (frame 17401) and is the only add in all 125 dumps that carries field 5.
 	//
-	// ⚠️ The chat link's THIRD quad is what made this look like a key problem: pre-craft it reads
+	// The chat link's third quad is what made this look like a key problem: pre-craft it reads
 	// `b290805c:29e627ca` twice and post-craft it becomes a copy of the identity quad. That is not a creator slot -
 	// it is ProtoAcgItem.key3 holding the NullIdentity sentinel (Faolan.Core.Network/Constants/NullIdentity.cs)
 	// because the item did not exist yet. On the wire key3 == key2 == key1 on all 175 captured adds, crafted or not,
@@ -42,22 +42,21 @@ namespace Faolan.Tests
 		private const uint CharId = 0x0802e5d4;
 		private const uint ItemPos = 28;
 
-		// "Bloodsilver Khopesh" - the crafted weapon. Its level 40 is a free cross-check on #725: the same 40 shows
-		// up as the itemref link's fourth path segment.
+		// "Bloodsilver Khopesh" - the crafted weapon. Its level 40 is a free cross-check: the same 40 shows up as the
+		// itemref link's fourth path segment.
 		private const uint BloodsilverKhopeshId = 157123;
 		private const ulong ItemId = 2366689309355364344;
 		private const ulong RecordId = 896060;
-		// ⚠️ This is RETAIL BYTES, not a fixture value - the crafter's name is INSIDE the captured hex above, so
-		// the literal has to be whatever that hex spells. Pseudonymised equal-length in #465 (`NecroL80` squeezed to
-		// the six bytes the wire fixes), which is why the hex and the literal moved together. The entry ends
+		// This is retail bytes, not a fixture value - the crafter's name is inside the captured hex above, so
+		// the literal has to be whatever that hex spells. Pseudonymised at equal length (`NecroL80` squeezed to the
+		// six bytes the wire fixes), so the hex and the literal agree. The entry ends
 		// `2a 06 4e 65 63 72 38 30`, so a different literal would stop matching the length prefix and the byte-exact
 		// assertion below would be asserting a different string.
 		private const string Crafter = "Necr80";
 
 		// The shipped template + the captured per-instance state rebuild the retail add byte for byte, creator line
 		// included. Note the crafted add's stat list is its own shape again - 0x00=17, Duration 0, no StackSize,
-		// ItemSource 0 - so it is passed explicitly here rather than through LiveAddEntry (that shape is #722's
-		// business; this gate is about field 5).
+		// ItemSource 0 - so it is passed explicitly here rather than through LiveAddEntry; this gate is about field 5.
 		[Fact]
 		public void CraftedAddItem_CarriesCreatorName_MatchesCapture()
 		{
@@ -75,7 +74,7 @@ namespace Faolan.Tests
 			Assert.Equal(CraftedBody, Convert.ToHexStringLower(AddItemCodec.Build(new AddItem(ContainerKind.Bag, CharId, ItemPos, entry))));
 		}
 
-		// The field is PRESENT only on player-made items: 619 of the corpus' inventory entries carry one (5 distinct
+		// The field is present only on player-made items: 619 of the corpus' inventory entries carry one (5 distinct
 		// crafters) and every other entry ends at the item block with no `2a` tag at all. So an absent/empty creator
 		// must emit nothing rather than an empty string - protobuf-net would happily write `2a 00` and lengthen every
 		// entry we send. (ProtoInventoryGameEntry.CreatorName reads back as "" when unset, hence the ShouldSerialize
@@ -115,7 +114,7 @@ namespace Faolan.Tests
 			var entry = SnapshotItems.ListEntry(0, ItemId, RecordId, 1, item, item.Hash, creatorName: Crafter).Item;
 
 			Assert.Equal(Crafter, entry.CreatorName);
-			// The expectation IS the captured tail - see the Crafter remark.
+			// The expectation is the captured tail - see the Crafter remark.
 			Assert.EndsWith(Convert.ToHexStringLower("\x2a\x06Necr80"u8.ToArray()), Convert.ToHexStringLower(entry.ToProtobuf()));
 
 			// The stat triple is untouched - creator_name rides beside it, not instead of it.

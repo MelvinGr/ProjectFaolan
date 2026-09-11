@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #754: putting a gem into an item's socket.
+	// Putting a gem into an item's socket.
 	//
 	// The whole transaction is pinned by one captured socketing -
 	// NecroL80_mage-necromancer_login_gameplay_annotated_8 fr8215-8248, with the player linking the item in /say
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 	//   s2c  DispatchAddToItemSlot  bag slot 24, socket 0, the gem's identity
 	//   s2c  DispatchRemoveItem     bag slot 23  (the gem leaving)
 	//
-	// ⚠️ Socketing CONSUMES the gem, so the refusals matter as much as the success and are tested as such.
+	// Socketing consumes the gem, so the refusals matter as much as the success and are tested as such.
 	public class GemSocketingTests : IDisposable
 	{
 		private const uint Owner = 0x0802E5D4;
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 				TestDb.Delete(path);
 		}
 
-		// The c2s tail, byte-exact against the capture - and the CRAFT form beside it, because the whole point of
+		// The c2s tail, byte-exact against the capture - and the craft form beside it, because the whole point of
 		// the decode is that one command carries both and the leading byte is what tells them apart.
 		[Fact]
 		public void TheTradeskillTail_RoundTripsBothOperations()
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 			var told = Assert.Single(outbound.Socketed);
 			Assert.Equal(((uint)HostSlot, 0u, GemTemplate, (uint)GemSlot), told);
 
-			// The rows: the socket exists and the gem is GONE - a socket without the removal would duplicate it.
+			// The rows: the socket exists and the gem is gone - a socket without the removal would duplicate it.
 			var host = await database.GetCharacterItemSlot(Owner, ContainerKind.Bag, HostSlot);
 			Assert.Equal(GemTemplate, Assert.Single(host!.Sockets).GemItemId);
 			Assert.Null(await database.GetCharacterItemSlot(Owner, ContainerKind.Bag, GemSlot));
@@ -124,8 +124,8 @@ namespace Faolan.Tests
 			Assert.Equal([0u, 1u], host!.Sockets.Select(x => x.SocketIndex).Order().ToArray());
 		}
 
-		// THE ONE THAT MATTERS. Socketing destroys the gem, so an item with no sockets must refuse rather than eat
-		// it - and refuse SILENTLY, which is what retail does for any rejected tradeskill.
+		// The one that matters. Socketing destroys the gem, so an item with no sockets must refuse rather than eat
+		// it - and refuse silently, which is what retail does for any rejected tradeskill.
 		[Fact]
 		public async Task AnItemWithNoSockets_RefusesAndKeepsTheGem()
 		{
@@ -195,7 +195,7 @@ namespace Faolan.Tests
 			return (new TradeskillService(database, database, database, outbound, null!, null!, NullLogger.Instance), client, outbound, database);
 		}
 
-		// Records what a socketing asked the wire to say, so the test asserts on the TRANSACTION rather than bytes
+		// Records what a socketing asked the wire to say, so the test asserts on the transaction rather than bytes
 		// (the bytes have their own golden above).
 		private sealed class Recorder : NoOpEconomyOutbound
 		{

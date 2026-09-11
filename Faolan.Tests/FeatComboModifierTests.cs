@@ -6,14 +6,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #593: kind 53209 `UpgradeCombo`, `[187 combo, 66, 67]` - 3,235 records, the largest single block in the feat
-	// catalog and the last of the "shape decoded, payload not" kinds.
+	// Kind 53209 `UpgradeCombo`, `[187 combo, 66, 67]` - 3,235 records, the largest single block in the feat catalog.
 	//
-	// The gate that matters is that BOTH magnitude slots are read. The legacy pair view returns payload words 0 and 1,
-	// i.e. (combo, key 66), so every cooldown feat read as a no-op with value 0 - which is exactly how the catalog
-	// looked before the slots were named, and why the code comment used to call the record "a pure reference".
+	// The gate that matters is that both magnitude slots are read. A pair view returns payload words 0 and 1, i.e.
+	// (combo, key 66), which makes every cooldown feat read as a no-op with value 0.
 	//
-	// The names are the client's own: its item-tooltip builder branches on the SIGN of key 66 to pick between
+	// The names are the client's own: its item-tooltip builder branches on the sign of key 66 to pick between
 	// `UpgradeCombo_IncreaseDamage` / `_DecreaseDamage` and on key 67 for the Cooldown pair.
 	//
 	// Pure by design: synthetic template bodies, no RDB, so they run from a plain clone.
@@ -56,7 +54,7 @@ namespace Faolan.Tests
 			Assert.Equal(-300, mod.CooldownPercentHundredths);
 		}
 
-		// A record that moves NEITHER axis is a combo reference with no magnitude - nothing can consume it, and
+		// A record that moves neither axis is a combo reference with no magnitude - nothing can consume it, and
 		// importing it would put a row in the table that says a feat upgrades a combo by nothing.
 		[Fact]
 		public void UpgradeCombo_WithNoMagnitude_IsDropped()
@@ -64,7 +62,7 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseComboModifiers(Template(UpgradeCombo, [228651, 0, 0])));
 		}
 
-		// …and a record with no COMBO is a mis-sliced element, not an upgrade of combo 0.
+		// …and a record with no combo is a mis-sliced element, not an upgrade of combo 0.
 		[Fact]
 		public void UpgradeCombo_WithNoComboReference_IsDropped()
 		{

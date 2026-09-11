@@ -8,13 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// The ACHIEVEMENT catalog (#748), read straight out of the client's LDB: category 55701 is the achievement's NAME
-	// and 55700 what earns it, both keyed by the id the wire calls a TAG (`GameCharInterface.DispatchAddTag`, one u32).
+	// The ACHIEVEMENT catalog, read straight out of the client's LDB: category 55701 is the achievement's name
+	// and 55700 what earns it, both keyed by the id the wire calls a tag (`GameCharInterface.DispatchAddTag`, one u32).
 	//
 	// That keying is what makes this a decode rather than a guess: every tag the corpus awards resolves, and resolves to
 	// something that matches what the capture was DOING. 3509 "Pet Collector" / *"Collect and summon your first pet"* is
 	// awarded in `..._login_summon_pet` at the instant a pet is summoned; 716 "Old Tarantia Docks" the instant the vista
-	// fly-through of #740 ends; 2562 "Spider Caverns" / *"Defeat the Lurking Horror in the Spider Caverns"* beside 2563
+	// fly-through ends; 2562 "Spider Caverns" / *"Defeat the Lurking Horror in the Spider Caverns"* beside 2563
 	// "Lurking Horror".
 	//
 	// English pages only, decided by the client's own language records (`LdbLanguageIndex`) rather than by scoring the
@@ -65,7 +65,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// The NAME is the identity: an id with only a description is not an achievement we can name, so it is not a
+			// The name is the identity: an id with only a description is not an achievement we can name, so it is not a
 			// row. The reverse is normal and kept - about half the catalog ships no description.
 			var existing = await db.Achievements.ToDictionaryAsync(a => a.Id);
 			var written = 0;

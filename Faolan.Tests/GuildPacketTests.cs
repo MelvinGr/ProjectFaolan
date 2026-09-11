@@ -27,18 +27,18 @@ namespace Faolan.Tests
 		// The DemoL80 create capture's 0x2044 body, byte-for-byte. Verified against Golden/GuildCreated.bin (338
 		// bytes, since deleted) before removal.
 		//
-		// ⚠️ RE-DERIVED on 2026-08-29 when the creator's name became a pseudonym (#465), and the derivation is what
-		// keeps this a RETAIL pin rather than a self-referential one. The old pin
+		// RE-derived on 2026-08-29 when the creator's name became a pseudonym, and the derivation is what
+		// keeps this a retail pin rather than a self-referential one. The preceding pin
 		// `3ca011a4a036200d4a9e1547dc0c3e90ea2604227b66e77f987604a054298a5b` asserted `Build(...) == retail's 338
-		// bytes` and was GREEN immediately before the change - that is the proof that our build IS retail's body.
+		// bytes` and was green immediately before the change - that is the proof that our build is retail's body.
 		// The name is six latin1 bytes in a fixed-width field, so substituting it changes exactly those six and
 		// nothing else; the new pin is therefore the SHA of *retail's body with those six bytes substituted*, which
-		// is what the archive's own equal-length substitution did to every other copy of the name. It is NOT "the
-		// hash of whatever our builder now emits": had the build drifted in any other byte, the old pin would have
-		// failed BEFORE the rename and the re-derivation could not have been made.
+		// is what the archive's own equal-length substitution did to every other copy of the name. It is not "the
+		// hash of whatever our builder emits": had the build drifted in any other byte, the preceding pin would have
+		// failed before the rename and the re-derivation could not have been made.
 		private const string CapturedGuildCreatedSha256 = "7c33147e8a3af2b94c57b1bc08c5742ada95797b00dfb35560ed5c78209bbfa9";
 
-		// #306: the 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
+		// The 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
 		// (DemoL80 creating "Faolan"): [creator member record][guild header (form byte = request's 0x06)][225-byte
 		// create-time tail]. Reproduces the whole 338-byte body from the guild + creator + form.
 		[Fact]
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 				Description = "",
 				MessageOfTheDay = ""
 			};
-			// The creator as the capture recorded them, PSEUDONYMISED (#465): the retail name was substituted for an
+			// The creator as the capture recorded them, pseudonymised: the retail name was substituted for an
 			// equal-length one everywhere it rides in committed bytes, and this literal moved with it because the pin
 			// below is over a body that contains it. `Demo80` is `DemoL80` - the display pseudonym this repo already
 			// uses for that character - squeezed to the six bytes the wire fixes.
@@ -67,9 +67,9 @@ namespace Faolan.Tests
 
 			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, 0x2B20, 0), GuildHeaders.ForGuildCreate(guild, 0x06)));
 
-			// The retail body's SHA-256 rather than the retail body: the blob is gone from the repo (#555). Equally
+			// The retail body's SHA-256 rather than the retail body: the blob is gone from the repo. Equally
 			// binding and one-way - and this gate never read the bytes, it only compared against them, which is what
-			// makes the substitution lossless here (contrast the goldens that are PARSE inputs; those have to stay).
+			// makes the substitution lossless here (contrast the goldens that are parse inputs; those have to stay).
 			Assert.Equal(338, body.Length);
 			Assert.Equal(CapturedGuildCreatedSha256, Convert.ToHexStringLower(SHA256.HashData(body)));
 		}
@@ -107,9 +107,9 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberRecordCodec.Build(GuildMemberRecordCodec.Parse(Convert.FromHexString(CapturedMemberRecord)))));
 		}
 
-		// #463: DispatchGuildName (0x2041) - the reply to ClientRequestGuildName. Capture-verified as a PAIR in
+		// DispatchGuildName (0x2041) - the reply to ClientRequestGuildName. Capture-verified as a pair in
 		// xxx_2clients_jumping: frame 1120 asks for guild 0x00075E9A ([0000deb7][00075e9a]) and frame 1131 answers
-		// with these bytes. Note the reply carries a BARE guild id, not the ID32 the request used.
+		// with these bytes. Note the reply carries a bare guild id, not the ID32 the request used.
 		[Fact]
 		public void GuildNameBody_Matches_CapturedBytes()
 		{
@@ -147,9 +147,9 @@ namespace Faolan.Tests
 
 			Assert.Throws<CodecParseException>(() => GuildUpdateCodec.Parse(body));
 		}
-		// ---- the management fan-out (#104) ----------------------------------------------------------------
+		// ---- the management fan-out ----------------------------------------------------------------
 		//
-		// No capture performs a kick, a promotion or a departure, so these are pinned against the CLIENT's readers
+		// No capture performs a kick, a promotion or a departure, so these are pinned against the client's readers
 		// instead - which is the only evidence there is, and is enough to catch the two field widths that would
 		// otherwise be guessed wrong (see below).
 
@@ -158,12 +158,12 @@ namespace Faolan.Tests
 		{
 			var body = GuildMemberLeftCodec.Build(0x01316E71, "Hoxxling");
 
-			// [0000c350][01316e71][0008 "Hoxxling"] - a STRING, unlike the joined twin's whole member element.
+			// [0000c350][01316e71][0008 "Hoxxling"] - a string, unlike the joined twin's whole member element.
 			Assert.Equal("0000c35001316e710008" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("Hoxxling")), Convert.ToHexStringLower(body));
 			Assert.Equal(new GuildMemberLeft(0x01316E71, "Hoxxling"), GuildMemberLeftCodec.Parse(body));
 		}
 
-		// ⚠️ The ranks here are ONE BYTE each. The client reads both with the raw-byte primitive, not the u32 reader
+		// The ranks here are one byte each. The client reads both with the raw-byte primitive, not the u32 reader
 		// its neighbours use, so a four-byte rank would run the client six bytes past the end of the body.
 		[Fact]
 		public void GuildRankChangedBody_IsTwoBytes_NewThenOld()
@@ -203,7 +203,7 @@ namespace Faolan.Tests
 			Assert.Equal(new GuildInviteNoSuchName("Nosuchguy"), GuildInviteNoSuchNameCodec.Parse(body));
 		}
 
-		// The member UPDATE is the member element alone - no leading id, unlike the joined twin. It must therefore
+		// The member update is the member element alone - no leading id, unlike the joined twin. It must therefore
 		// round-trip to the same bytes the joined body carries after its ID32.
 		[Fact]
 		public void GuildMemberUpdateBody_IsTheMemberElementAlone()
@@ -212,18 +212,18 @@ namespace Faolan.Tests
 			var body = GuildMemberUpdateCodec.Build(record);
 
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(body));
-			// Compared as BYTES: GuildMemberRecord carries a byte[] of counters, so record equality is reference
+			// Compared as bytes: GuildMemberRecord carries a byte[] of counters, so record equality is reference
 			// equality on it and would pass for two records that agree on nothing else.
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberUpdateCodec.Build(GuildMemberUpdateCodec.Parse(body))));
 		}
 
-		// ⭐ The guild-name refusals (#737). Every one of 0x45-0x48 is a NO-ARG dispatch, so there is no body to
-		// build a golden from - the whole message IS the method id, which is what this pins. `annotated_6` records
-		// the taken-name case as `0x2047` with an EMPTY body, and `WireOpcode.Of` is what turns the enum member
+		// The guild-name refusals. Every one of 0x45-0x48 is a no-arg dispatch, so there is no body to
+		// build a golden from - the whole message is the method id, which is what this pins. `annotated_6` records
+		// the taken-name case as `0x2047` with an empty body, and `WireOpcode.Of` is what turns the enum member
 		// into the number a dump prints.
 		//
 		// The two middle members are recovered from the client (`CSClientIncoming_c`'s override of the interface
-		// slot each dispatches to, and the LDB category-100 token it shows), and the two OUTER ones are the
+		// slot each dispatches to, and the LDB category-100 token it shows), and the two outer ones are the
 		// control: they already carried these names, and the same read reproduces both.
 		[Theory]
 		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNonAlphanumericName, 0x2045)]

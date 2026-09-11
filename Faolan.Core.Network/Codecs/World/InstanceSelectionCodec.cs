@@ -5,33 +5,34 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// `DispatchInstanceSelectionForCurrentPlayfield` (GameCharInterface 0x80) - the answer to the client's
-	// `GetInstanceListForCurrentPlayfield` (GameCharAgent 0x7B, an EMPTY body), i.e. what fills the "Select instance"
-	// window (#309).
-	//
-	//   [u32 count][PlayfieldProxy x count]
-	//
-	// ⚠️ The count is a PLAIN u32, not the `(n+1) * 0x3F1` list frame most of our lists use. That is the client's own
-	// reader, not an inference: `FUN_00a6d1b0` reads one big-endian word through `FUN_0048f900` and loops it as a
-	// countdown, with no multiply or divide anywhere near it. A one-element list here really is `00000001`, where a
-	// framed list would have been `000007E2`.
-	//
-	// Each element is the ordinary `PlayfieldProxy` stream (`FUN_00a6a600`, version byte 'b') already composed by the
-	// teleport records, the team-member record and PlayfieldFIIR - so an instance in this list carries its map, its
-	// owner (nobody / a character / a team) and its difficulty mode in exactly the slots those do. The client's own
-	// name for the parameter is `i_cInstanceList`.
-	//
-	// Goldens: TWO captured replies, each a one-element list naming the live instance the player was standing in -
-	// Ymir's Pass (map 1090) and Poitain (map 2070). Both are 38 bytes, and the second is annotated "tried to
-	// 'select instace', no others where available", which is what a one-element list means. Two different maps and
-	// two different tokens pin the layout by independent observation rather than by one sample.
-	// [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json frame 10726]
-	// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_6.tshark.json frame 4059]
+	/// <summary>
+	///     DispatchInstanceSelectionForCurrentPlayfield - the answer to the client's GetInstanceListForCurrentPlayfield,
+	///     which has an empty body, and what fills the "Select instance" window. The body is
+	///     <c>[u32 count][PlayfieldProxy x count]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The count is a plain u32, not the <see cref="ListFrame" /> word most of our lists use. That is the client's own
+	///     reader rather than an inference: FUN_00a6d1b0 reads one big-endian word through FUN_0048f900 and loops it as a
+	///     countdown, with no multiply or divide anywhere near it, so a one-element list here really is 1.
+	///     <para>
+	///         Each element is the ordinary <see cref="PlayfieldProxy" /> stream (FUN_00a6a600, version byte 'b') already
+	///         composed by the teleport records, the team-member record and PlayfieldFIIR, so an instance in this list
+	///         carries its map, its owner - nobody, a character or a team - and its difficulty mode in exactly those slots.
+	///         The client's own name for the parameter is <c>i_cInstanceList</c>.
+	///     </para>
+	///     <para>
+	///         Two captured replies pin the layout, each a one-element list naming the live instance the player was standing
+	///         in: Ymir's Pass (map 1090) and Poitain (map 2070). Both are 38 bytes, and the second is annotated as an
+	///         attempt to select an instance with no others available, which is what a one-element list means.
+	///         [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json frame 10726]
+	///         [V2: NecroL80_mage-necromancer_login_gameplay_annotated_6.tshark.json frame 4059]
+	///     </para>
+	/// </remarks>
 	public static class InstanceSelectionCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchInstanceSelectionForCurrentPlayfield;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(InstanceSelection value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -61,16 +62,20 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// The instances of the player's current playfield they may pick between. Empty is a legitimate answer and is what
-	// an uninstanced playfield yields - the client opens the window with nothing in it rather than stalling.
+	/// <summary>
+	///     The instances of the player's current playfield they may pick between. Empty is a legitimate answer and is what
+	///     an uninstanced playfield yields: the client opens the window with nothing in it rather than stalling.
+	/// </summary>
 	public sealed record InstanceSelection(IReadOnlyList<PlayfieldProxy> Instances);
 
-	// The forms this list takes, beside the codec rather than as `Build` overloads (#530 rule 5a).
+	/// <summary>The forms this list takes, beside the codec rather than as Build overloads.</summary>
 	public static class InstanceSelections
 	{
-		// The only shape a capture pins: the one live instance the player is standing in. Retail answered the click
-		// with a single pinned proxy for the current map, so a server that hosts one copy of each playfield says
-		// exactly this and nothing more.
+		/// <summary>
+		///     The only shape a capture pins: the one live instance the player is standing in. Retail answered the click with
+		///     a single pinned proxy for the current map, so a server that hosts one copy of each playfield says exactly this
+		///     and nothing more.
+		/// </summary>
 		public static InstanceSelection Current(uint mapId, uint instanceToken)
 		{
 			return new InstanceSelection([PlayfieldProxy.ForInstance(mapId, instanceToken)]);

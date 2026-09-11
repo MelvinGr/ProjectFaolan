@@ -6,16 +6,16 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// BankIIR (0x0BA1C1CB) - the personal-bank content record: the kind-105 inventory container, delivered on demand
-	// when the bank window opens and framed exactly like the FullChar 0x737A6DF9 snapshot:
-	//   [subop][class=0xC350][charInstance][u8 flag][u32 containerLen][ProtoInventoryGame]
-	// Decoded from NecroL80_..._Has-inventory-at-trader-bank (memory protocol_bank_storage); golden-tested byte-exact
-	// against the captured bank (BankStorageTests).
-	//
-	// The per-slot registrations retail sends first are a different message (`SetItemStatCodec`) - they used to live
-	// here as a `WriteBankSlotRegistration` helper, which hid that they were stat updates (#530 wave 7).
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     <c>BankIIR</c> - the personal-bank content record: the kind-105 inventory container, delivered on demand when
+	///     the bank window opens and framed exactly like the FullChar snapshot:
+	///     <c>[subop][entityClass][charInstance][u8 flag][u32 containerLen][ProtoInventoryGame]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Decoded from NecroL80_..._Has-inventory-at-trader-bank and golden-tested byte-exact against the captured bank
+	///     (<c>BankStorageTests</c>). The per-slot registrations retail sends first are a different message
+	///     (<see cref="SetItemStatCodec" />). The u32 carrier length belongs to the sender.
+	/// </remarks>
 	public static class BankCodec
 	{
 		public const uint Opcode = (uint)IirTypes.BankIIR;
@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// The lead flag every captured record carries.
 		public const byte LeadFlag = 0x01;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(BankIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -58,6 +58,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// BankIIR (0x0BA1C1CB).
+	/// <summary>The BankIIR body.</summary>
 	public sealed record BankIIR(uint CharInstance, ProtoInventoryGame Container);
 }

@@ -8,14 +8,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The SpellEffect seed (#439): the decoded facts that used to be hardcoded spell ids in the server - the necro's
-	// pet summons and Frozen Hatred's fatality proc - now live as rows, so these gate the rows rather than constants.
+	// The SpellEffect seed: the necro's pet summons and Frozen Hatred's fatality proc live as rows rather than as
+	// spell ids hardcoded in the server, so these gate the rows.
 	public class SpellEffectSeedTests
 	{
-		// The summon roster is DERIVED from the catalog now (#640), so the gate is the derivation, not a list. The
-		// twelve pets one necro capture showed - NecroL80_..._mount-horse_all-necro-summons_dismiss-all, every one
-		// summoned and mass-dismissed - are exactly what the old hand-typed table held, so they are the regression
-		// floor: whatever else the rule finds, it must still find these.
+		// The summon roster is derived from the catalog, so the gate is the derivation, not a list. The twelve pets one
+		// necro capture showed - NecroL80_..._mount-horse_all-necro-summons_dismiss-all, every one summoned and
+		// mass-dismissed - are the regression floor: whatever else the rule finds, it must still find these.
 		[Fact]
 		public async Task Summons_StillCarryTheTwelveCapturedPets()
 		{
@@ -31,7 +30,7 @@ namespace Faolan.Tests
 			Assert.Equal("Life-stealer", summons.Single(s => s.SpellId == 0x0004F817).Template);
 			Assert.Single(summons.Where(s => !s.Combat), s => s.Template == "Pleasurable Company");
 
-			// A cast summon has no lifetime - the necro's pets stand until dismissed. Only a TIMED summon carries one.
+			// A cast summon has no lifetime - the necro's pets stand until dismissed. Only a timed summon carries one.
 			Assert.All(summons, s => Assert.Null(s.DurationMs));
 
 			// The eleven combat pets of that capture, plus the social companion.
@@ -39,14 +38,14 @@ namespace Faolan.Tests
 			Assert.Empty(captured.Except(summons.Select(s => s.SpellId)));
 		}
 
-		// The naming rule, stated on retail's own spell names. This is the whole derivation of WHICH creature a summon
+		// The naming rule, stated on retail's own spell names. This is the whole derivation of which creature a summon
 		// spawns, so it is worth pinning separately from the rows it produces.
 		[Theory]
 		[InlineData("Undead Minion: Corruptor", "Corruptor")]
 		[InlineData("Deathless Acolyte: Arcanist", "Arcanist")]
 		[InlineData("Companion: Pleasurable Company", "Pleasurable Company")]
 		[InlineData("Mini-Pet: Serpent Man Oldblood", "Serpent Man Oldblood")]
-		[InlineData("Ancient Soul", "Ancient Soul")] // no prefix: the whole name IS the pet
+		[InlineData("Ancient Soul", "Ancient Soul")] // no prefix: the whole name is the pet
 		public void PetNameOf_TakesTheNameAfterThePrefix(string spellName, string expected)
 		{
 			Assert.Equal(expected, SpellEffectsModule.PetNameOf(spellName));
@@ -75,8 +74,8 @@ namespace Faolan.Tests
 		// Frozen Hatred's proc, in the client's own words (spell 4377209's description, LDB 50211): "When you or your
 		// group perform a fatality and this buff is active, the Frozen Hatred pet appears and is under your control for
 		// 60 seconds. If you already have a Frozen Hatred pet, the duration of the pet will increase by another 60
-		// seconds. This timer is capped at 5 minutes." Both halves hang off the BUFF (4377209 - the effect record the
-		// castable 4377207 points at, #434), not off the castable, and both fire on the fatality trigger.
+		// seconds. This timer is capped at 5 minutes." Both halves hang off the buff (4377209 - the effect record the
+		// castable 4377207 points at), not off the castable, and both fire on the fatality trigger.
 		[Fact]
 		public void Seed_ArmsFrozenHatredOnAFatality()
 		{
@@ -95,7 +94,7 @@ namespace Faolan.Tests
 			Assert.Equal(300_000u, procs[1].MaxDurationMs);
 		}
 
-		// The shipped rows ARE the seed. Without this the module and faolan.sql can drift silently: the server reads
+		// The shipped rows are the seed. Without this the module and faolan.sql can drift silently: the server reads
 		// the database, so a seed nobody re-ran is a set of effects that never fire.
 		[Fact]
 		public async Task ShippedRows_MatchTheSeed()

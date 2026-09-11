@@ -4,17 +4,17 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Two rules about what the server tells a player about their OWN pools, both measured off the corpus in #902.
+	// Two rules about what the server tells a player about their own pools, both measured off the corpus.
 	//
-	// ⭐ 1. A push carries what MOVED. On the player's own handle retail's `StatUpdateIIR` is a SINGLE-stat block far
+	// 1. A push carries what moved. On the player's own handle retail's `StatUpdateIIR` is a single-stat block far
 	//    more often than not - `[0x01FA]` x1171, `[0x001B]` x211, `[0x01F8]` x121 against only x12 for the
-	//    three-current form, which is the shape it uses about OTHER entities (x4,676). #586 named this rule and did not
-	//    implement it: it sent all three currents on every push.
+	//    three-current form, which is the shape it uses about other entities (x4,676). Sending all three currents on
+	//    every push does not match that.
 	//
-	// ⭐ 2. Health regen is bounded by a share of the MAX POOL. Retail's own-handle `RegenIIR` ticks at a median 1.01s
+	// 2. Health regen is bounded by a share of the MAX pool. Retail's own-handle `RegenIIR` ticks at a median 1.01s
 	//    carrying a median 3.90% of max health per second (p25 3.07%, p75 4.63%). That is identifiable rather than an
 	//    artifact of one pool size: the captured pools span 17.2x and the share-of-pool reading is the tighter of the
-	//    two candidate rules (CV 0.49 against 0.75 for a flat HP/s).
+	//    two candidate rules (cv 0.49 against 0.75 for a flat HP/s).
 	public class VitalsPushShapeTests
 	{
 		// A level-4 character: 202 max health, the case that exposed this. The flat `HealthFlatRate` alone is 10% of
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, block.Records.Count);
 		}
 
-		// The one that matters in a fight: HP regen is halted in combat but STAMINA's is not, so the regen tick keeps
+		// The one that matters in a fight: HP regen is halted in combat but stamina's is not, so the regen tick keeps
 		// firing every second. Before this, each of those ticks restated `HealthCurrent` - announcing a health change
 		// that had not happened, once a second, for the whole fight.
 		[Fact]
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, vitals.ToChangedCurrentsBlock().Records.Count);
 		}
 
-		// ⛔ The regression this exists for: a flat rate does not scale down. `HealthFlatRate` is 20 HP/s read off the
+		// The regression this exists for: a flat rate does not scale down. `HealthFlatRate` is 20 HP/s read off the
 		// client's own stat 278, which is 10% of a level-4's pool every second.
 		[Fact]
 		public void HealthRegenOnAStarterPoolIsHeldToRetailsShareOfTheMaxPool()
@@ -83,9 +83,9 @@ namespace Faolan.Tests
 				+ $"{100 * RegenRates.HealthRegenMaxFractionPerSecond:F2}%");
 		}
 
-		// ...and the cap must not touch the band the corpus DOES cover. A level-80 Necromancer computes ~106 HP/s on a
-		// 2,371 pool = 4.5%, just under the ceiling, against the 92 HP/s the corpus measures for it - so #442's
-		// attribute formula is left exactly as it was verified.
+		// ...and the cap must not touch the band the corpus does cover. A level-80 Necromancer computes ~106 HP/s on a
+		// 2,371 pool = 4.5%, just under the ceiling, against the 92 HP/s the corpus measures for it - so the attribute
+		// formula is left exactly as it was verified.
 		[Fact]
 		public void TheCapDoesNotBiteWhereTheCorpusVerifiedTheFormula()
 		{

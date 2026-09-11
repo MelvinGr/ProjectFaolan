@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Resource harvesting (#494). The nodes themselves already shipped as WorldObjects and already streamed to the
+	// Resource harvesting. The nodes themselves already shipped as WorldObjects and already streamed to the
 	// client; what was missing was the payoff, which the capture shows is the ordinary item path. These gate the two
 	// halves that can silently rot: the catalog agreeing with the shipped item rows, and the shipped nodes all being
 	// covered by it.
@@ -17,16 +17,16 @@ namespace Faolan.Tests
 		// The destructible class every harvest node arrives as (0x6BD56736).
 		private const uint DestructibleClass = 0x6BD56736;
 
-		// The trailer word that carries a destructible's MAX health - Kind 1, ordinal 1 of WorldObjectWords.
+		// The trailer word that carries a destructible's max health - Kind 1, ordinal 1 of WorldObjectWords.
 		private const int MaxHealthOrdinal = 1;
 
 		// The three rows a capture actually measured, each landing beside its own annotation. If the item ids drift,
 		// the identification is what broke.
 		//
-		// ⚠️ The counts here used to be 40 / 60 / 40, read off the 4th u32 of the DispatchDisplayItemLootChatMessage
-		// that follows a harvest. That word is the item's LEVEL, not a count - and Items.Level for Granite, Oak and
-		// Iron is 40, 60 and 40, which is why the misread looked like three independent measurements. The count is on
-		// the ADD, in stat_list 26, and it is 1 on every captured harvest in both mining captures.
+		// The count is on the add, in stat_list 26, and it is 1 on every captured harvest in both mining captures. The
+		// 4th u32 of the DispatchDisplayItemLootChatMessage that follows a harvest is the item's level, not a count -
+		// and Items.Level for Granite, Oak and Iron is 40, 60 and 40, which reads convincingly like three independent
+		// measurements.
 		[Theory]
 		[InlineData(3237642u, "Granite Rock", 161206u)] // `just mined`
 		[InlineData(3237647u, "Oak Tree", 161213u)] // `gethering wood` - the tree the maintainer chopped down
@@ -38,8 +38,8 @@ namespace Faolan.Tests
 			Assert.Equal(HarvestCatalog.YieldPerSwing, HarvestCatalog.YieldFor(displayId));
 		}
 
-		// The level of each node's resource - the value the old yield table had actually captured. Kept as a gate so
-		// the coincidence that made the misread convincing cannot quietly come back as a "measurement".
+		// The level of each node's resource - the numbers a yield read off the loot message would produce. Gated so
+		// that coincidence cannot quietly come back as a "measurement".
 		[Theory]
 		[InlineData(161206u, 40)]
 		[InlineData(161213u, 60)]
@@ -71,12 +71,12 @@ namespace Faolan.Tests
 			Assert.Equal(0u, HarvestCatalog.NodeMaxHealth % HarvestCatalog.SwingCost);
 		}
 
-		// An LDB id is only unique WITHIN its category, so both halves of the display reference are required. The
+		// An LDB id is only unique within its category, so both halves of the display reference are required. The
 		// guild-city destructibles next door are category 50050 with ids as low as 73, and the PvP objectives are
 		// 55000 - matching on the id alone would eventually hand a resource out for hitting a wall.
 		[Theory]
 		[InlineData(50050u, 121u)] // "Location Object - Walls" - a guild-city piece
-		[InlineData(55000u, 4356532u)] // "Capturable Objective" - a PvP objective, and it DOES carry max health 1000
+		[InlineData(55000u, 4356532u)] // "Capturable Objective" - a PvP objective, and it does carry max health 1000
 		[InlineData(null, null)]
 		[InlineData(HarvestCatalog.NodeDisplayCategory, 3966659u)] // "Supply Crate" - right category, not a node
 		public void NonNodes_AreNotHarvestable(uint? category, uint? displayId)
@@ -87,8 +87,8 @@ namespace Faolan.Tests
 		}
 
 		// Every resource the catalog points at must be a real item: a missing Items row cannot be added to a bag, so
-		// the harvest would fail at the grant with the node already consumed. A missing HASH used to disqualify an
-		// item here too - it no longer does, since the wire token is minted when no capture harvested one (#723).
+		// the harvest would fail at the grant with the node already consumed. A missing hash does not disqualify an
+		// item: the wire token is minted when no capture harvested one.
 		[Fact]
 		public async Task EveryResource_IsARealGrantableItem()
 		{
@@ -106,15 +106,15 @@ namespace Faolan.Tests
 			Assert.True(broken.Count == 0, "Harvest resources that cannot be granted: " + string.Join("; ", broken));
 		}
 
-		// ⚠️ THE #734 GATE, and the reason this one is keyed on the DISPLAY id.
+		// Keyed on the display id, not on the name.
 		//
-		// It used to filter shipped rows by NAME suffix (" Tree" / " Rock" / " Node" / " Vein" / " Shrub"), which made
-		// it blind to exactly the rows the catalog was blind to: a silver vein whose name string says "Martial Ring",
+		// Filtering shipped rows by name suffix (" Tree" / " Rock" / " Node" / " Vein" / " Shrub") is blind to exactly
+		// the rows the catalog is blind to: a silver vein whose name string says "Martial Ring",
 		// a copper node called "Vitalic Bronze-studded Armbands", an ash tree called "Bloodsilver-studded Gloves", a
 		// cotton shrub called "Blacksmithing Hammer TESTITEM" and three raw NPC_Global_leather_… asset names. Every one
-		// of those is a real, streamed, inert node, and the old gate passed with all seven uncovered.
+		// of those is a real, streamed, inert node, and a name gate passes with all seven uncovered.
 		//
-		// The discriminator here is structural instead: a DESTRUCTIBLE whose max-health trailer word is exactly
+		// The discriminator here is structural instead: a destructible whose max-health trailer word is exactly
 		// NodeMaxHealth, in the node display category. That is the client's own definition of a harvest node, so a
 		// re-import that adds a node type fails here rather than shipping something inert.
 		[Fact]
@@ -136,8 +136,8 @@ namespace Faolan.Tests
 		}
 
 		// The catalog's name for a node has to be the name the client shows, and the shipped rows are the only check
-		// available without the client LDB: retail's own name string is right on MOST rows of a node type and wrong on
-		// a few, so the catalog name must appear among them. A typo, or a name copied off one of the WRONG rows, fails
+		// available without the client LDB: retail's own name string is right on most rows of a node type and wrong on
+		// a few, so the catalog name must appear among them. A typo, or a name copied off one of the wrong rows, fails
 		// here.
 		[Fact]
 		public async Task EveryCatalogName_AppearsOnAShippedRowOfThatNode()
@@ -159,7 +159,7 @@ namespace Faolan.Tests
 			Assert.True(wrong.Count == 0, "Catalog names that no shipped row of that node carries:\n  " + string.Join("\n  ", wrong));
 		}
 
-		// The content gap may not rot: a node listed with no resource item whose item HAS since been imported should be
+		// The content gap may not rot: a node listed with no resource item whose item has since been imported should be
 		// promoted to a real payout rather than left inert. This is the old "gap list" check, moved off a test-local
 		// string array and onto the catalog's own null entries.
 		[Fact]
@@ -181,10 +181,10 @@ namespace Faolan.Tests
 				"These nodes now HAVE a grantable resource item - give them a ResourceItemId instead of null: " + string.Join(", ", resolvable));
 		}
 
-		// #746: and the same check by ID, which is the one that will actually fire. Each null now NAMES its item id off
+		// And the same check by ID, which is the one that will actually fire. Each null now names its item id off
 		// the client's plaintext item-name LDB (`--report ldb-search --report-arg 50200:Ironwood`), so what stands
-		// between the node and a payout is only the encrypted TEMPLATE - and a template becomes readable the moment a
-		// capture supplies the item's key (#203). At that point an `Items` row appears at the id and this fails, which
+		// between the node and a payout is only the encrypted template - and a template becomes readable the moment a
+		// capture supplies the item's key. At that point an `Items` row appears at the id and this fails, which
 		// is the cue to wire it.
 		//
 		// The name check above cannot see that: an imported row can arrive before `rdb-ldb-names` has given it a name,
@@ -214,7 +214,7 @@ namespace Faolan.Tests
 			Assert.True(arrived.Count == 0,
 				"These resources now have an Items row - wire them into HarvestCatalog.Nodes instead of null: " + string.Join(", ", arrived));
 
-			// ...and the three that ARE wired must stay, so this pair of gates cannot both pass vacuously.
+			// ...and the three that are wired must stay, so this pair of gates cannot both pass vacuously.
 			foreach (var itemId in new uint[] { 3927910, 3927913, 3927918 })
 				Assert.True(await db.Items.AnyAsync(i => i.Id == itemId, ct), $"resource item {itemId} (Birch / Lead / Pyrite) has gone from the DB");
 		}

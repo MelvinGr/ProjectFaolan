@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The pick-one-of-N quest reward exchange (#815) - two IIR types the opcode catalog could not even NAME before
+	// The pick-one-of-N quest reward exchange - two IIR types the opcode catalog could not even name before
 	// this, so the whole subsystem read as raw hex in a timeline.
 	//
 	// Oracle: xxx_mage-necromancer_login_play3, quest 10928 "The Trainer of Mages" (Destiny 05 Mage). The maintainer
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(QuestRewardNotifyCodec.Build(parsed)));
 		}
 
-		// What pins the entry layout is not a plausible-looking alignment but the KEYS: each option's 16 bytes are the
+		// What pins the entry layout is not a plausible-looking alignment but the keys: each option's 16 bytes are the
 		// item's real ProtoDecryptionKey, so they must equal the shipped Items rows exactly or the client would render
 		// the option as "No name". A layout that were off by a field would not reproduce three of these.
 		[Theory]
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(QuestRewardSelectionCodec.Build(parsed)));
 		}
 
-		// The index is 0-BASED: the capture's pick of 2 was answered with the THIRD option's template.
+		// The index is 0-based: the capture's pick of 2 was answered with the third option's template.
 		[Fact]
 		public void TheSelectedIndexAddressesTheOfferedListZeroBased()
 		{
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			Assert.Equal(3394679u, offer.Options[(int)pick.Index].ItemTemplateId);
 		}
 
-		// The confirm is the SAME grammar with an empty option list - which is what makes one codec correct for both.
+		// The confirm is the same grammar with an empty option list - which is what makes one codec correct for both.
 		[Fact]
 		public void ParseConfirm_IsTheSameGrammarWithNoOptions()
 		{

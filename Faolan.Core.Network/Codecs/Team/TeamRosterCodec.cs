@@ -6,16 +6,23 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// The client's `cTeam` - a whole team: who it is, who leads it, everyone in it, and how it splits loot. It is the
-	// body of THREE methods, which is why it declares HandledMethods: s2c DispatchYouJoinedTeam (0x0E, capture-proven)
-	// and the two raid ones, DispatchRaidTeamJoined (0x94) / DispatchRaidTeamUpdate (0x96). All three read through the
-	// client's `FUN_00557960` (#669) - a raid is the team system one level up, so a raid announcing one of its member
-	// teams sends the same record a player gets on joining a team.
-	//
-	//   [ID32 team][ID32 leader][u32 (count+1)*0x3F1][ members ][ TeamSettings ]
-	//
-	// The member list is COUNT-FRAMED (ListFrame) - the captured two-member roster's "0x00000BD3" is 3 * 0x3F1, not a
-	// constant. The leader's own record comes first in every capture.
+	/// <summary>
+	///     The client's <c>cTeam</c> - a whole team: who it is, who leads it, everyone in it, and how it splits loot.
+	/// </summary>
+	/// <remarks>
+	///     It is the body of three methods, which is why it declares <c>HandledMethods</c>: s2c
+	///     <c>DispatchYouJoinedTeam</c> (capture-proven) and the two raid ones, <c>DispatchRaidTeamJoined</c> and
+	///     <c>DispatchRaidTeamUpdate</c>. All three read through the client's <c>FUN_00557960</c> - a raid is the team
+	///     system one level up, so a raid announcing one of its member teams sends the same record a player gets on
+	///     joining a team.
+	///     <code>
+	///     [ID32 team][ID32 leader][list frame][ members ][ TeamSettings ]
+	///     </code>
+	///     <para>
+	///         The member list is count-framed through <c>ListFrame</c>; the word a two-member roster carries is that
+	///         count, not a constant. The leader's own record comes first in every capture.
+	///     </para>
+	/// </remarks>
 	public static class TeamRosterCodec
 	{
 		public static readonly CSPlayerInterfaceMethods[] HandledMethods =
@@ -85,18 +92,20 @@ namespace Faolan.Core.Network.Codecs.Team
 		}
 	}
 
-	// The 18 bytes that close a `cTeam`. They were carried verbatim as a `DefaultLootSettings` blob because every
-	// captured roster ships the same bytes; the client's reader splits them (#669), and the split is corroborated
-	// from the other end: the first, second and last field are exactly `TeamSetLootOption(int i_eLootMode,
-	// bool i_bUseNeedGreed, int i_nNewLootThreshold)`, whose captured c2s body is `00000000 01 00000002` - the same
-	// 0 / true / 2 this block carries.
-	//
-	// `MasterLooter` is read with the ID32 idiom (a class word then an instance word, the same pair shape the team
-	// and leader ids at the head of the record use), and `TeamSetMasterLooter(const ID32& i_cCharacterID)` /
-	// DispatchTeamMasterLooterChanged exist for exactly this slot. It is (0, 0) in every captured roster - master
-	// looter unset - so the reading is structural rather than observed. [V0]
-	//
-	// `Flag` is a second bool beside `UseNeedGreed`, zero in every capture and with no c2s counterpart. [V0]
+	/// <summary>The 18 bytes that close a <c>cTeam</c>.</summary>
+	/// <remarks>
+	///     The client's reader splits them, and the split is corroborated from the other end: the first, second and last
+	///     field are exactly <c>TeamSetLootOption(int i_eLootMode, bool i_bUseNeedGreed, int i_nNewLootThreshold)</c>,
+	///     whose captured c2s body is <c>00000000 01 00000002</c> - the same 0 / true / 2 this block carries.
+	///     <para>
+	///         <c>MasterLooter</c> is read with the ID32 idiom (a class word then an instance word, the same pair shape
+	///         the team and leader ids at the head of the record use), and <c>TeamSetMasterLooter(const ID32&amp;
+	///         i_cCharacterID)</c> / <c>DispatchTeamMasterLooterChanged</c> exist for exactly this slot. It is (0, 0) in
+	///         every captured roster - master looter unset - so the reading is structural rather than observed. [V0]
+	///     </para>
+	///     <para><c>Flag</c> is a second bool beside <c>UseNeedGreed</c>, zero in every capture and with no c2s
+	///     counterpart. [V0]</para>
+	/// </remarks>
 	public sealed record TeamSettings(uint LootMode, bool UseNeedGreed, bool Flag, EntityId MasterLooter, uint LootThreshold)
 	{
 		// What every captured roster carries: free-for-all, need/greed on, no master looter, threshold 2.

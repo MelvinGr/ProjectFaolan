@@ -14,9 +14,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Regenerates `CreateEditorScene.cs` - the create-editor pedestals as TYPED DATA - from the captured initial
-	// burst (#364). The same shape `FAOLAN_UPDATE_DOCS` has for the generated protocol pages: normally this only
-	// CHECKS that the committed file still reproduces the capture, and rewrites it when `FAOLAN_UPDATE_SCENE=1`.
+	// Regenerates `CreateEditorScene.cs` - the create-editor pedestals as typed data - from the captured initial
+	// burst. The same shape `FAOLAN_UPDATE_DOCS` has for the generated protocol pages: normally this only
+	// checks that the committed file still reproduces the capture, and rewrites it when `FAOLAN_UPDATE_SCENE=1`.
 	//
 	//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
 	//
@@ -24,7 +24,7 @@ namespace Faolan.Tests
 	// be editing a measurement. The byte-exact gate in CreateEditorSceneCharTests is what makes that safe - a wrong
 	// emit cannot pass it.
 	//
-	// ⚠️ Presence is decided by `ShouldSerializeX()` where protobuf-net generated one, NOT by "is it non-default".
+	// Presence is decided by `ShouldSerializeX()` where protobuf-net generated one, not by "is it non-default".
 	// An optional protobuf field that retail explicitly sent as 0 is indistinguishable from an unset one through the
 	// getter, and dropping it would change the bytes.
 	public class CreateEditorSceneGeneratorTests
@@ -57,22 +57,22 @@ namespace Faolan.Tests
 
 				namespace Faolan.Core.Network.Constants
 				{
-					// AUTO-GENERATED (#364) from the captured create-editor initial burst - the five archetype pedestals and the
-					// live avatar preview, as TYPED DATA. Regenerate with:
-					//
-					//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
-					//
-					// Replaces the inline hex bodies `CreateFlowService` used to carry and `CreateEditorCharBuilder.Reconstruct`
-					// parsed back out of themselves - the same treatment #258 gave the access-window table and #651 the editor
-					// avatar's stat sheet. The record was never opaque (SimpleCharFullUpdateCodec parses and re-encodes it
-					// byte-exact), so once the grammar is typed the only thing the blob still carried was these values.
-					//
-					// ⚠️ Some pre-IIR words are the retail server's own UNINITIALISED MEMORY, not content: the slots they sit in
-					// resolve to `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`, `Onslaught2SpecialsKilled` and
-					// the like, and a create-editor pedestal has no seasonal PvP record. They are reproduced because the gate is
-					// byte-exactness against retail and dropping them would be a behavioural change needing an in-client check -
-					// NOT because they mean anything. Do not read them as data, and do not carry them to a new record.
-					// See Gitea #364.
+					/// <summary>
+					///     The create-editor initial burst as typed data: the five archetype pedestals and the live avatar preview.
+					/// </summary>
+					/// <remarks>
+					///     Generated from the captured create-editor burst. Regenerate with:
+					///     <code>
+					///     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
+					///     </code>
+					///     <para>
+					///         Some pre-IIR words are the retail server's own uninitialised memory rather than content: the slots they
+					///         sit in resolve to <c>PvPAnnihilationMatchesWonSeasonal</c>, <c>PvPCTFMatchesLostSeasonal</c>,
+					///         <c>Onslaught2SpecialsKilled</c> and the like, and a create-editor pedestal has no seasonal PvP record.
+					///         They are reproduced because the gate is byte-exactness against retail, not because they mean anything.
+					///         Do not read them as data, and do not carry them to a new record.
+					///     </para>
+					/// </remarks>
 					public static class CreateEditorScene
 					{
 
@@ -91,7 +91,7 @@ namespace Faolan.Tests
 				s.Append(";\n\t\t}\n\n");
 			}
 
-			// The fixed pedestals, in the order retail streams them. The live avatar preview is deliberately NOT in
+			// The fixed pedestals, in the order retail streams them. The live avatar preview is deliberately not in
 			// this list: it carries the session's own client instance as its handle, so it is not a constant.
 			s.Append("\t\t// The five fixed pedestals, in the order retail streams them. `LiveAvatarPreview` is not here on\n");
 			s.Append("\t\t// purpose - it takes the session's client instance as its handle, so it is not a constant of the scene.\n");
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 				: cleaned;
 		}
 
-		// C# object-initialiser syntax for `value`, emitting only what is actually SET.
+		// C# object-initialiser syntax for `value`, emitting only what is actually set.
 		private static string Emit(object value, int depth)
 		{
 			var type = value.GetType();

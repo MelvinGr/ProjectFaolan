@@ -13,16 +13,16 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Tests
 {
-	// A setting is declared ONCE - in FaolanSettings - and everything else is a view of that: a *Command's `--help`
-	// line, the DEFAULTS layer at the bottom of the configuration stack, and the generated faolan.json.
+	// A setting is declared once - in FaolanSettings - and everything else is a view of that: a *Command's `--help`
+	// line, the defaults layer at the bottom of the configuration stack, and the generated faolan.json.
 	//
-	// The bug this pins is the one that shape removes. A setting used to be spelled out twice, in a `*Command.cs`
-	// (name + description) and again in `IConfigurationExtensions` (name + `?? "faolan.log"`), with nothing tying
-	// them together: `--help` could describe a default the code did not use, and Content:ClientVersion had a fallback
-	// and NO declaration at all, so no --help in the tree mentioned it.
+	// That single declaration is what this pins. Spelling a setting out twice - a command's name + description in one
+	// place, a name + `?? "faolan.log"` fallback in another, with nothing tying them together - lets `--help` describe
+	// a default the code does not use, and lets a key carry a fallback and no declaration at all, so no `--help` in
+	// the tree mentions it.
 	//
-	// So the gate is: every accessor must resolve against the catalog ALONE. An accessor reading a key nobody
-	// catalogued now throws, and it throws HERE rather than at whatever startup first needs the value.
+	// So the gate is: every accessor must resolve against the catalog alone. An accessor reading a key nobody
+	// catalogued now throws, and it throws here rather than at whatever startup first needs the value.
 	public class FaolanSettingsTests
 	{
 		// The catalog is the whole configuration: with no faolan.json, no user file, no command line and no
@@ -51,10 +51,10 @@ namespace Faolan.Tests
 			Assert.Equal(7099, config.McpPort);
 			Assert.Equal("http://127.0.0.1:7099/mcp", config.McpUrl); // ...derived from that port, not a second literal
 			Assert.Equal("./cdn-store", config.CdnStore);
-			Assert.Equal("0.0.0.0", config.CdnListenAddress.ToString()); // the interface the mirror BINDS, not an address to dial
+			Assert.Equal("0.0.0.0", config.CdnListenAddress.ToString()); // the interface the mirror binds, not an address to dial
 			Assert.Equal(7081, config.CdnListenPort);
 
-			// The one that is OPTIONAL rather than defaulted, and stays null on purpose - it names a game install.
+			// The one that is optional rather than defaulted, and stays null on purpose - it names a game install.
 			// Its readers handle the null; nothing else may. (The two Login: keys are optional too, but their
 			// accessors hand back a parsed BigInteger?, so they are checked with the rest of the keypair rather
 			// than here.)
@@ -62,17 +62,17 @@ namespace Faolan.Tests
 			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress); // the loopback mirror, at its own port
 		}
 
-		// The MCP endpoint's URL is DERIVED from Mcp:Port and is not a setting, so moving the port moves every reader
-		// of it (Faolan.Web's live-session probe) with it. It used to be one - `Mcp:Url`, then `ChatBridge:Url` -
-		// holding a second copy of the port: `Mcp:Port 7098` left its readers dialling 7099, which is a client that
-		// connects to nothing with the port written correctly in the config that broke it. There is no override,
+		// The MCP endpoint's URL is derived from Mcp:Port and is not a setting, so moving the port moves every reader
+		// of it (Faolan.Web's live-session probe) with it. A URL setting of its own would hold a second copy of the
+		// port: `Mcp:Port 7098` would leave its readers dialling 7099, i.e. a client that connects to nothing with the
+		// port written correctly in the config that broke it. There is no override,
 		// because the endpoint binds loopback: an address a port cannot express is one nothing can reach.
 		[Theory]
 		[InlineData(null, "http://127.0.0.1:7099/mcp")]
 		[InlineData("7098", "http://127.0.0.1:7098/mcp")]
 		public void TheMcpEndpointsUrl_FollowsTheServersMcpPort(string? port, string expected)
 		{
-			// A null here means the key is ABSENT, not present-and-null: an in-memory null would override the defaults
+			// A null here means the key is absent, not present-and-null: an in-memory null would override the defaults
 			// layer with nothing, which is a state no config file can produce.
 			var over = new List<KeyValuePair<string, string?>>();
 			if (port != null)
@@ -86,12 +86,12 @@ namespace Faolan.Tests
 			Assert.Equal(expected, config.McpUrl);
 		}
 
-		// The login endpoint a CLIENT dials is DERIVED the same way, from the address the login tier ADVERTISES and the
+		// The login endpoint a client dials is derived the same way, from the address the login tier advertises and the
 		// port the UniverseAgent binds - so `Faolan.ClientLauncher --universeaddr`, which writes it into the client's
 		// LocalConfig.xml, points at the server this configuration describes instead of at a host:port typed on the
 		// launch line, which is the same endpoint spelled twice with only the client's copy able to be wrong.
 		//
-		// Server:ListenAddress is deliberately NOT the source: it is the interface the server BINDS, and its default
+		// Server:ListenAddress is deliberately not the source: it is the interface the server binds, and its default
 		// 0.0.0.0 is unreachable as a destination - so it would be wrong in exactly the deployment that sets it.
 		[Theory]
 		[InlineData(null, null, "127.0.0.1:7010")]
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 				.ServerUniverseAddress);
 		}
 
-		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
+		// A malformed value now fails instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
 		// to mean 10 - a setting that reads as applied and is not - because the fallback and the parse were the same
 		// expression. The message has to name the key, or the operator is hunting a value they cannot see.
 		//
@@ -144,12 +144,11 @@ namespace Faolan.Tests
 			Assert.Contains(value, error.Message);
 		}
 
-		// A key is spelled ONCE, as a const in FaolanSettings.Keys, and both halves of the class read it from there -
-		// the catalog entry and the accessor. So the two cannot name different keys, and the failure that used to be
-		// possible (an accessor indexing a key nothing declares, resolving to null and failing at whatever startup
-		// first needed the value) is a compile error.
+		// A key is spelled once, as a const in FaolanSettings.Keys, and both halves of the class read it from there -
+		// the catalog entry and the accessor. So the two cannot name different keys: an accessor indexing a key nothing
+		// declares - resolving to null and failing at whatever startup first needs the value - is a compile error.
 		//
-		// This pins the other direction, which the compiler cannot: the consts and the catalog are the SAME set. A
+		// This pins the other direction, which the compiler cannot: the consts and the catalog are the same set. A
 		// const with no entry is a key that has no default and no --help line; an entry whose key is not a const is a
 		// literal that got past the extraction.
 		[Fact]
@@ -162,17 +161,17 @@ namespace Faolan.Tests
 
 			Assert.Equal(FaolanSettings.All.Select(FaolanSettings.Key).Order(), consts.Values.Order());
 
-			// And the const is NAMED for its key, so `Keys.LogFile` sits beside the `config.LogFile` that reads it and
+			// And the const is named for its key, so `Keys.LogFile` sits beside the `config.LogFile` that reads it and
 			// a grep for either finds both. Without this the set can match while the names drift apart.
 			foreach (var (name, key) in consts)
 				Assert.Equal(name, key.Replace(":", ""));
 		}
 
-		// The catalog is ORDERED, ordinal by key - the same order as the Keys constants and the accessors beside them,
+		// The catalog is ordered, ordinal by key - the same order as the Keys constants and the accessors beside them,
 		// so the three views of the list read side by side and a missing one shows up as a gap. It is also what the
 		// generated faolan.json and every `--help` inherit, so an unordered catalog is an unordered config file: a new
 		// setting appended at the end lands in the middle of an unrelated section, which is how `Server:ListenAddress`
-		// went missing from the committed file unnoticed. `[NoReorder]` keeps an editor from regrouping the ACCESSORS
+		// went missing from the committed file unnoticed. `[NoReorder]` keeps an editor from regrouping the accessors
 		// (ReSharper sorts by return type, which interleaves the sections); nothing but a test can pin this half.
 		[Fact]
 		public void TheCatalog_IsInKeyOrder()
@@ -191,8 +190,8 @@ namespace Faolan.Tests
 			Assert.NotEmpty(FaolanSettings.Options(Keys.DatabaseConnectionString));
 		}
 
-		// --help shows the default it will actually use. It cannot do otherwise now - the option the parser prints IS
-		// the one the defaults layer is built from - and this pins that the description is the SETTING's, not a
+		// --help shows the default it will actually use. It cannot do otherwise now - the option the parser prints is
+		// the one the defaults layer is built from - and this pins that the description is the setting's, not a
 		// paraphrase, and that the default is rendered by System.CommandLine rather than pasted into the description.
 		[Fact]
 		public void AnOptionsHelpText_CarriesTheCatalogsDefault()
@@ -206,12 +205,12 @@ namespace Faolan.Tests
 		}
 
 		// The type is the point of the catalog entry being an Option<T>. A value the setting cannot hold is refused by
-		// the PARSER, naming the option - not accepted here and then thrown at whatever startup first reads it, which
-		// is where `--Mcp:Port banana` used to land (every setting reached the parser as an Option<string>).
+		// the parser, naming the option - not accepted here and then thrown at whatever startup first reads it, which
+		// is where `--Mcp:Port banana` lands if every setting reaches the parser as an Option<string>.
 		[Theory]
 		[InlineData(Keys.McpPort, "banana", "UInt16")]
 		[InlineData(Keys.AccountPremiumCharSlots, "ten", "UInt32")]
-		[InlineData(Keys.ServerUniverseAgentPort, "70000", "UInt16")] // in range for the int it used to be declared as
+		[InlineData(Keys.ServerUniverseAgentPort, "70000", "UInt16")] // in range for an int, out of range for a port
 		[InlineData(Keys.DatabaseProvider, "mysql", "FaolanDbProvider")]
 		public void AMalformedValueOnTheCommandLine_IsAParseError(string key, string value, string type)
 		{
@@ -225,7 +224,7 @@ namespace Faolan.Tests
 		}
 
 		// ...and the value the parser produces reaches the configuration stack spelled the way the catalog spells its
-		// defaults: the enum by its own NAME whatever case was typed (so the accessor never sees `postgres`), a bool
+		// defaults: the enum by its own name whatever case was typed (so the accessor never sees `postgres`), a bool
 		// lower-cased, a port as digits. One renderer for both layers is what makes that true.
 		[Theory]
 		[InlineData(Keys.McpPort, "7098", "7098")]
@@ -241,8 +240,8 @@ namespace Faolan.Tests
 			Assert.Equal(new Dictionary<string, string?> { [key] = expected }, FaolanCommandLine.Overrides(result, option));
 		}
 
-		// A bool setting is a FLAG: `--Mcp:Enabled` on its own means true (as Option<string> it demanded a value), and
-		// an explicit false is still allowed. What it must NOT do is contribute an override when it was not passed -
+		// A bool setting is a flag: `--Mcp:Enabled` on its own means true (as Option<string> it demanded a value), and
+		// an explicit false is still allowed. What it must not do is contribute an override when it was not passed -
 		// an absent bool has an implicit result carrying its default, so a `GetResult(...) != null` reading of "was it
 		// given?" would shadow faolan.json with the default on every single run.
 		[Fact]
@@ -255,7 +254,7 @@ namespace Faolan.Tests
 			Assert.Equal("true", FaolanCommandLine.Overrides(command.Parse([option.Name]), option)[Keys.McpEnabled]);
 			Assert.Equal("false", FaolanCommandLine.Overrides(command.Parse([option.Name, "false"]), option)[Keys.McpEnabled]);
 
-			// A word that is neither is still refused - but as an UNMATCHED TOKEN rather than a type error, because a
+			// A word that is neither is still refused - but as an unmatched token rather than a type error, because a
 			// flag's value is optional and the parser simply does not take it. The complaint names the word, not the
 			// option, which is why it is pinned here instead of beside the typed values above.
 			var confused = command.Parse([option.Name, "yes"]);
@@ -264,7 +263,7 @@ namespace Faolan.Tests
 		}
 
 		// Every default in the catalog survives the round trip through its own option: the defaults layer carries it as
-		// TEXT, so a default the option's own parser cannot read back would be a setting that works until someone
+		// text, so a default the option's own parser cannot read back would be a setting that works until someone
 		// passes it explicitly. This is what catches a default declared at the wrong width - `70000` as a port is an
 		// int the catalog accepts and an Option<ushort> does not.
 		[Fact]
@@ -280,7 +279,7 @@ namespace Faolan.Tests
 		}
 
 		// The generated file round-trips: written out, read back through the configuration stack, every setting is
-		// the value the catalog holds. A file that merely LOOKS right is the failure mode here - a stray comma or a
+		// the value the catalog holds. A file that merely looks right is the failure mode here - a stray comma or a
 		// quoted port would load as something else, or not at all.
 		[Fact]
 		public void TheGeneratedDefaultJson_ReadsBackAsTheCatalog()
@@ -294,12 +293,12 @@ namespace Faolan.Tests
 				// Case-insensitive because a JSON `true` comes back through the reader as "True", which is the same
 				// value to every parser that reads it - the catalog spells it lower-case because JSON does.
 				//
-				// An OPTIONAL setting reads back as null: it is written as a commented-out line, so the file names it
+				// An optional setting reads back as null: it is written as a commented-out line, so the file names it
 				// without setting it.
 				foreach (var setting in FaolanSettings.All)
 					Assert.Equal(FaolanSettings.DefaultText(setting), config[setting.Key()], StringComparer.OrdinalIgnoreCase);
 
-				// The login keypair is the case that motivates all of this: it has NO default, so a server that
+				// The login keypair is the case that motivates all of this: it has no default, so a server that
 				// configures nothing has no key and checks no passwords. It must not acquire one from the defaults
 				// layer - a built-in key is a key everybody has.
 				var defaults = new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build();
@@ -312,11 +311,11 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The committed faolan.json IS that generated file (this checkout's own deviations live in the gitignored
-		// faolan.user.json), so every key in it must be a catalog key. This is what catches a setting RENAMED in code and left behind in the
+		// The committed faolan.json is that generated file (this checkout's own deviations live in the gitignored
+		// faolan.user.json), so every key in it must be a catalog key. This is what catches a setting renamed in code and left behind in the
 		// config: the stale key loads fine, is read by nobody, and the deployment silently runs on the default.
 		//
-		// ⚠️ `Realms` is the ONE exemption, and it is a whole section rather than a key: a LIST of records fits
+		// `Realms` is the one exemption, and it is a whole section rather than a key: a list of records fits
 		// neither the catalog's flat key/accessor shape nor its one-option-per-key command line, so it is owned by
 		// FaolanRealms instead. It is still generated into this file from the same kind of built-in default, and
 		// TheCommittedConfig_DeclaresTheDefaultRealms below is what keeps the committed block honest - so exempting it here
@@ -335,10 +334,10 @@ namespace Faolan.Tests
 				FaolanSettings.Get(key); // throws, naming the key, if the catalog does not have it
 		}
 
-		// The committed block IS the built-in default, read back through the configuration stack - the same
-		// round-trip TheGeneratedDefaultJson_ReadsBackAsTheCatalog does for the catalog half. A hand-edit to the
-		// Realms block that no longer parses, or that quietly declares something other than what the code falls back
-		// to, is the failure this catches.
+		// The committed block is the built-in default, read back through the configuration stack - the same
+		// round-trip TheGeneratedDefaultJson_ReadsBackAsTheCatalog does for the catalog half. A hand-edit to the Realms
+		// block that does not parse, or that quietly declares something other than what the code falls back to, is the
+		// failure this catches.
 		[Fact]
 		public void TheCommittedConfig_DeclaresTheDefaultRealms()
 		{

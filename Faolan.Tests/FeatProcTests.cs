@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #593: the last two decodable feat kinds - 53212 `AddComboProc` and 53070 `AddSpellLineProc` - plus the per-SPELL
+	// The last two decodable feat kinds - 53212 `AddComboProc` and 53070 `AddSpellLineProc` - plus the per-spell
 	// hit-percent kind 53030, the twin of the long-imported 53075.
 	//
-	// All three were hidden the same way and it is worth stating once: the legacy PAIR view returns payload words 0
+	// All three were hidden the same way and it is worth stating once: the legacy pair view returns payload words 0
 	// and 1 whatever they mean. On 53212 that is (key 88, key 236), so the kind read as "a spell template id, also a
-	// grant... value 0 throughout" - the zero being the second proc spell, empty on most records, and the COMBO the
-	// proc hangs off sitting three slots further along, unseen. These gates are therefore about reading BY KEY.
+	// grant... value 0 throughout" - the zero being the second proc spell, empty on most records, and the combo the
+	// proc hangs off sitting three slots further along, unseen. These gates are therefore about reading by key.
 	//
 	// Pure by design: synthetic template bodies, no RDB, so they run from a plain clone.
 	public class FeatProcTests
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(ComboProc, proc.Kind);
 			Assert.Equal(3137720u, proc.ComboId);
-			Assert.Null(proc.SpellLineId); // the line slot belongs to the OTHER kind
+			Assert.Null(proc.SpellLineId); // the line slot belongs to the other kind
 			Assert.Equal(793092u, proc.SelfSpellId);
 			Assert.Null(proc.TargetSpellId); // key 236 empty - an absent proc, not a proc on spell 0
 			Assert.Equal(1u, proc.Trigger);
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 		}
 
 		// The client renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` by testing keys 88 and 236
-		// INDEPENDENTLY, so a record may carry either spell or both. Target-only is 140 of the 560 shipped kind-53212
+		// independently, so a record may carry either spell or both. Target-only is 140 of the 560 shipped kind-53212
 		// rows - not an edge case, and a parser that required key 88 would drop every one of them.
 		[Theory]
 		[InlineData(793092u, 0u)]       // Self
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 		}
 
 		// The line form is the same payload with the target space swapped - which is why the two share a table, and
-		// why the KIND has to be what picks the column.
+		// why the kind has to be what picks the column.
 		[Fact]
 		public void SpellLineProc_FillsTheLineTargetInstead()
 		{
@@ -76,8 +76,8 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseProcs(Template(ComboProc, [self, target, combo, 1, 120])));
 		}
 
-		// 53030 `ChangeHitPercent` is the per-SPELL twin of 53075, the same three slots with the line slot (key 1)
-		// swapped for the spell slot (key 187). The target lands in a DIFFERENT column, and the kind is the only
+		// 53030 `ChangeHitPercent` is the per-spell twin of 53075, the same three slots with the line slot (key 1)
+		// swapped for the spell slot (key 187). The target lands in a different column, and the kind is the only
 		// thing that says so - the two are indistinguishable by shape.
 		[Fact]
 		public void SpellHitPercent_TargetsASpellWhereItsLineTwinTargetsALine()
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 			Assert.Equal((LineHitPercent, 41000u, 3500), (perLine.Kind, perLine.TargetId, perLine.PercentHundredths));
 		}
 
-		// …and the magnitude is SIGNED on both: the catalog carries a -20/-40/-60% ladder, which read unsigned is
+		// …and the magnitude is signed on both: the catalog carries a -20/-40/-60% ladder, which read unsigned is
 		// 4.29 billion.
 		[Fact]
 		public void SpellHitPercent_MagnitudeIsSigned()

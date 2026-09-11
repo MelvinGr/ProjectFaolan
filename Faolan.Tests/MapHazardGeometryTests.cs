@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The evidence tying the client's hazard GEOMETRY to the server behaviour retail actually fired (#504) - the test
+	// The evidence tying the client's hazard geometry to the server behaviour retail actually fired - the test
 	// the `[V2:]` citation in docs/rdb/bounded-areas-1000053.md resolves to.
 	//
 	// `BA_Lava7` is the lava volume on Ymir's Pass (map 1090) that killed the player in
@@ -14,11 +14,11 @@ namespace Faolan.Tests
 	// are the client's own, straight out of RDB type 1000053; the positions below are the player's own CharDCMove track
 	// through the moment the server sent its `GenericHazardiousBoundedArea` feedback at 20:25:58.706.
 	//
-	// The polygon is inlined rather than read from faolan.db on purpose: this gate is about the GEOMETRY agreeing with
+	// The polygon is inlined rather than read from faolan.db on purpose: this gate is about the geometry agreeing with
 	// the wire, so it must keep failing if a re-import changes the shape, and it must run from a plain clone with no
 	// client RDB present.
 	//
-	// The volume is a `MapRegion` and not a `MapHazard` since #679: a hazard is the BEHAVIOUR half (what it applies,
+	// The volume is a `MapRegion`, not a `MapHazard`: a hazard is the behaviour half (what it applies,
 	// whether it kills) hanging off the client's volume, so the geometry this gate is about lives on the region.
 	public class MapHazardGeometryTests
 	{
@@ -78,9 +78,9 @@ namespace Faolan.Tests
 		//
 		//   20:25:57.783  outside
 		//   20:25:58.281  outside (0.30 units short of the edge)
-		//   20:25:58.444  INSIDE   <- first sample in
+		//   20:25:58.444  inside   <- first sample in
 		//   20:25:58.706           <- the GenericHazardiousBoundedArea feedback, 262 ms later
-		//   20:25:58.745+ INSIDE
+		//   20:25:58.745+ inside
 		[Theory]
 		[InlineData(1286.6f, 241.2f, 489.5f, false)] // 20:25:56.309, still well outside
 		[InlineData(1286.7f, 240.4f, 478.0f, false)] // 20:25:57.783
@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, EnvironmentService.Contains(Lava7(), new Vector3(x, y, z)));
 		}
 
-		// The prism's HEIGHT range is load-bearing, not decoration: Ymir's Pass lava sits at 232..269 across its 22
+		// The prism's height range is load-bearing, not decoration: Ymir's Pass lava sits at 232..269 across its 22
 		// volumes and there is walkable ground above some of it, so an (x, z)-only test would kill players overhead.
 		[Theory]
 		[InlineData(300f)] // far above the flow
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 		}
 
 		// The ring is implicitly closed. Dropping the wrap-around edge leaks the polygon open along it, so this asserts
-		// the closing edge is walked: a point that is only excluded BY that edge must read as outside.
+		// the closing edge is walked: a point that is only excluded by that edge must read as outside.
 		[Fact]
 		public void TheRingIsClosed_AndAHazardWithoutEnoughVerticesIsInert()
 		{

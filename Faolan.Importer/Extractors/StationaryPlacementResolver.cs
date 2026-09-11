@@ -8,37 +8,35 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// Which near-identical STATIONARY spawns are one placement seen twice (#718 / #765), decided from the corpus rather
-	// than from a distance.
+	// Which near-identical stationary spawns are one placement seen twice, decided from the corpus rather than from
+	// a distance.
 	//
-	// #713 solved the PATROLLER case: a harvested beat identifies the placement, and rows sharing one are that
-	// placement's variant pool. A stationary NPC has no beat. Its position is nearly - but not exactly - stable across
-	// sessions, so the importer's (MapId, XYZ) key mints a second placement whenever a sighting lands a few
-	// centimetres off, and 344 same-map/same-template pairs sit within 5u of each other.
+	// A patroller's harvested beat identifies its placement, and rows sharing one are that placement's variant pool.
+	// A stationary NPC has no beat. Its position is nearly - but not exactly - stable across sessions, so the
+	// importer's (MapId, XYZ) key mints a second placement whenever a sighting lands a few centimetres off, and
+	// hundreds of same-map/same-template pairs sit within 5u of each other.
 	//
-	// ⚠️ Neither proximity NOR "identical in every other column" can separate the two populations. Retail really does
+	// Neither proximity nor "identical in every other column" can separate the two populations. Retail really does
 	// place same-name NPCs a metre apart - Black Dragon Guards flanking a Tarantia doorway, a pack of Enraged Boars -
 	// and those rows are identical in every column by construction, being the same creature at the same level in the
-	// same kit. Measured: of 191 candidate clusters, **181 are real** concurrent placements. A distance rule would have
-	// collapsed all of them, which is the mistake the old name/cell heuristic made.
+	// same kit. Most candidate clusters are real concurrent placements, so a distance rule would collapse them all.
 	//
-	// **The HANDLE decides it.** Two real placements are two entities and retail mints them two handles; one NPC
-	// harvested twice is ONE entity at two moments. So the positive test is: was a single handle ever sighted at two of
-	// the cluster's positions? If it was, that entity WALKED between them and they are one placement. This is the
-	// stationary analogue of #713's route-occupancy check, and like it, it is a fact about the corpus rather than a
+	// The handle decides it. Two real placements are two entities and retail mints them two handles; one NPC
+	// harvested twice is one entity at two moments. So the positive test is: was a single handle ever sighted at two
+	// of the cluster's positions? If it was, that entity walked between them and they are one placement. It is the
+	// stationary analogue of the patroller's route-occupancy check, and like it a fact about the corpus rather than a
 	// tolerance.
 	//
-	// ⚠️ "The same CAPTURE saw two of these positions" is NOT the test, and getting that wrong inverts the answer: a
+	// "The same capture saw two of these positions" is not the test, and getting that wrong inverts the answer: a
 	// creature that moves is re-streamed by interest within one session, so one capture holding both sightings is
-	// precisely the duplicate case seen from the other side. Read that way, the corpus calls the Scruffy trio of #765
-	// two real placements; read by handle, it says one handle stood on two of them in two separate captures.
+	// precisely the duplicate case seen from the other side.
 	public static class StationaryPlacementResolver
 	{
-		// How close a captured spawn must sit to a row's stored position to count as a sighting OF that row. Only has to
-		// beat the gaps WITHIN a cluster, and those are metres.
+		// How close a captured spawn must sit to a row's stored position to count as a sighting of that row. Only has to
+		// beat the gaps within a cluster, and those are metres.
 		public const float SightingTolerance = 0.75f;
 
-		// What makes two stationary rows candidates for being one placement. 5u, matching the #718 census.
+		// What makes two stationary rows candidates for being one placement, matching the cluster census.
 		public const float ClusterRadius = 5f;
 
 		// Why a cluster was or was not collapsed. Reported as-is - the two negative verdicts are different evidence and
@@ -53,10 +51,10 @@ namespace Faolan.Importer.Extractors
 
 		public sealed record Cluster(IReadOnlyList<NpcSpawn> Rows, Verdict Verdict, int Evidence, int CapturesSeeingOne)
 		{
-			// The key every row of a COLLAPSED cluster carries, so the world stands ONE entity up and draws its
+			// The key every row of a COLLAPSED cluster carries, so the world stands one entity up and draws its
 			// appearance from the pool (the runtime half is already built - see WorldBroadcaster and NpcSpawn.PlacementId).
 			//
-			// Derived, never generated: FNV-1a over the template and the cluster's LOWEST spawn id. That id is itself
+			// Derived, never generated: FNV-1a over the template and the cluster's lowest spawn id. That id is itself
 			// derived from (map, position, class), so it is stable across re-imports and across machines - which
 			// `string.GetHashCode` explicitly is not, and this value is persisted.
 			public uint PlacementKey()
@@ -75,14 +73,14 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Every candidate cluster with its verdict. `rows` is the whole spawn set; `routed` the spawn ids that carry a
-		// harvested beat (those are #713's case and are skipped).
+		// harvested beat, which the patroller rule already answers and which are skipped here.
 		public static List<Cluster> Resolve(IReadOnlyList<NpcSpawn> rows, ISet<uint> routed, IReadOnlyList<NamedCapture> captures)
 		{
 			ArgumentNullException.ThrowIfNull(rows);
 			ArgumentNullException.ThrowIfNull(routed);
 			ArgumentNullException.ThrowIfNull(captures);
 
-			// (map, template) -> every captured sighting, carrying the HANDLE it arrived on.
+			// (map, template) -> every captured sighting, carrying the handle it arrived on.
 			var sightings = new Dictionary<(uint Map, uint Template), List<(string Capture, uint Handle, Vector3 At)>>();
 			foreach (var c in captures)
 			{
@@ -105,10 +103,10 @@ namespace Faolan.Importer.Extractors
 			return clusters;
 		}
 
-		// Same map + same template + same CLASS, no harvested beat, single-linked within ClusterRadius.
+		// Same map + same template + same class, no harvested beat, single-linked within ClusterRadius.
 		//
-		// ⚠️ ClassId is part of the grouping, not a detail. On a class-specific playfield (the city armories) each
-		// class's copy has its own population, so rows can sit at the SAME point legitimately - `Quartermaster Haji` on
+		// ClassId is part of the grouping, not a detail. On a class-specific playfield (the city armories) each
+		// class's copy has its own population, so rows can sit at the same point legitimately - `Quartermaster Haji` on
 		// map 5007 is three rows at spread 0.00u, one per captured class. Grouping those would report the tidiest
 		// imaginable duplicate and be entirely wrong.
 		private static List<List<NpcSpawn>> Candidates(IReadOnlyList<NpcSpawn> rows, ISet<uint> routed)
@@ -145,7 +143,7 @@ namespace Faolan.Importer.Extractors
 
 		private static Cluster Judge(List<NpcSpawn> cluster, List<(string Capture, uint Handle, Vector3 At)> seen)
 		{
-			// Which cluster members each (capture, handle) - i.e. each ENTITY-in-a-session - was seen standing at.
+			// Which cluster members each (capture, handle) - i.e. each entity-in-a-session - was seen standing at.
 			var perEntity = new Dictionary<(string Capture, uint Handle), HashSet<uint>>();
 			var perCapture = new Dictionary<string, HashSet<uint>>();
 			foreach (var (capture, handle, at) in seen)
@@ -169,7 +167,7 @@ namespace Faolan.Importer.Extractors
 				// Order by id so PlacementKey and the reported pool are deterministic.
 				return new Cluster(cluster.OrderBy(r => r.Id).ToList(), Verdict.OneWalked, walked, perCapture.Count);
 
-			// Two DIFFERENT entities on two DIFFERENT members inside one capture: both were in the world at once.
+			// Two different entities on two different members inside one capture: both were in the world at once.
 			var concurrent = perCapture.Count(c =>
 			{
 				var entities = perEntity.Where(e => e.Key.Capture == c.Key).ToList();

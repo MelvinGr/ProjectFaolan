@@ -6,29 +6,43 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Resolves an equipped item to the worn armour MESHINDEXFILE(s) the client skins onto the character body (#275 gear).
-	//
-	// The worn mesh is NOT the item's look-id (template offset 16 - that is a dye/appearance grouping that happens to
-	// collide with unrelated resource ids). It is carried by field-id 9 inside the item template's trailing binary
-	// sub-record: a byte-packed `... 09 00 00 00 <meshIndexId u32> ...` entry whose value resolves to a MESHINDEXFILE
-	// (type 1010030) under `items\armor`. An item can carry several field-9 entries (e.g. male + female variants of one
-	// garment, or a garment plus a shared base body); the caller filters by the character's sex via the mesh path.
-	//
-	// This is authoritative (the client reads the same template) and fully offline - no login cache / Preview.bin / live
-	// client is involved, so any character's real gear renders from faolan.db alone. See docs/rdb/gear-rendering.md.
+	/// <summary>
+	///     Resolves an equipped item to the worn armour MESHINDEXFILEs the client skins onto the character body. See
+	///     docs/rdb/gear-rendering.md.
+	/// </summary>
+	/// <remarks>
+	///     The worn mesh is not the item's look-id (template offset 16 is a dye/appearance grouping that happens to
+	///     collide with unrelated resource ids). It is carried by field-id 9 inside the item template's trailing binary
+	///     sub-record: a byte-packed <c>... 09 00 00 00 &lt;meshIndexId u32&gt; ...</c> entry whose value resolves to a
+	///     MESHINDEXFILE (type 1010030) under <c>items\armor</c>. An item can carry several field-9 entries — male and
+	///     female variants of one garment, or a garment plus a shared base body — so the caller filters by the
+	///     character's sex via the mesh path.
+	///     <para>
+	///         The client reads the same template, so this is authoritative, and it is fully offline: no login cache,
+	///         Preview.bin or live client is involved, and any character's real gear renders from faolan.db alone.
+	///     </para>
+	/// </remarks>
 	public static class ItemLookResolver
 	{
-		// The field-id that tags a worn-mesh reference in the template's trailing sub-record.
+		/// <summary>
+		///     The field-id that tags a worn-mesh reference in the template's trailing sub-record.
+		/// </summary>
 		private const uint WornMeshField = 9;
 
-		// Extract every distinct worn armour meshindex tagged by field 9 in a DECRYPTED item template (the raw bytes from
-		// RdbReader.ReadDecrypted, including the 12-byte RDB-Id header). Ordered by first appearance.
+		/// <summary>
+		///     Extracts every distinct worn armour meshindex tagged by field 9 in a decrypted item template, ordered by
+		///     first appearance.
+		/// </summary>
+		/// <param name="decrypted">
+		///     The raw bytes from <see cref="RdbReader.ReadDecrypted" />, including the 12-byte RDB-Id header.
+		/// </param>
 		public static IReadOnlyList<WornMesh> FromTemplate(RdbReader rdb, ReadOnlySpan<byte> decrypted)
 		{
 			var result = new List<WornMesh>();
 			var seen = new HashSet<uint>();
 
-			// Byte-packed sub-record, so scan every byte offset (not word-aligned): a field-9 tag followed by the value.
+			// The sub-record is byte-packed rather than word-aligned, so every byte offset has to be probed for a
+			// field-9 tag followed by its value.
 			for (var i = 4; i + 4 <= decrypted.Length; i++)
 			{
 				if (decrypted.ReadU32Le(i - 4) != WornMeshField)
@@ -84,18 +98,27 @@ namespace Faolan.Core.Rdb.Assets
 			return picked;
 		}
 
-		// The worn meshindex ids for one item, with same-garment male/female variants collapsed to the wanted gender.
-		// An item can legitimately carry several DIFFERENT pieces (e.g. the slave manacles carry both the handcuff mesh
-		// and a base cotton body) - those are kept; only a genuine M/F pair of the SAME garment is a variant choice.
-		// wantGender is "Female"/"Male" (null => keep everything). Falls back to the opposite/neutral variant when the
-		// wanted gender is absent, so an item that only ships one gender still renders.
+		/// <summary>
+		///     The worn meshindex ids for one item, with same-garment male/female variants collapsed to the wanted
+		///     gender.
+		/// </summary>
+		/// <param name="wantGender">"Female" or "Male"; null keeps every mesh.</param>
+		/// <remarks>
+		///     An item can legitimately carry several different pieces — the slave manacles carry both the handcuff
+		///     mesh and a base cotton body — and those are all kept; only a genuine male/female pair of the same
+		///     garment is a variant choice. When the wanted gender is absent the opposite or neutral variant is used,
+		///     so an item that only ships one gender still renders.
+		/// </remarks>
 		public static IReadOnlyList<uint> WornMeshIds(RdbReader rdb, ReadOnlySpan<byte> decrypted, string? wantGender)
 		{
 			return SelectForGender(FromTemplate(rdb, decrypted), wantGender);
 		}
 
-		// Normalise a mesh export path to a garment identity so male/female variants of one garment collapse together:
-		// drop the directory, the .max, the set numbers, and the male/female + boilerplate tokens (set/global/mats).
+		/// <summary>
+		///     Normalises a mesh export path to a garment identity so male/female variants of one garment collapse
+		///     together: the directory, the .max, the set numbers and the male/female and boilerplate tokens
+		///     (set/global/mats) are all dropped.
+		/// </summary>
 		private static string Garment(string sourcePath)
 		{
 			var name = sourcePath.Replace('/', '\\');
@@ -103,8 +126,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (slash >= 0)
 				name = name[(slash + 1)..];
 			name = name.ToLowerInvariant().Replace(".max", "");
-			// Separators + digits to spaces FIRST so the \b gender/boilerplate strip works (underscore is a \w char, so
-			// "\bmale\b" would never match inside "cloth_male").
+			// Separators and digits must become spaces before the \b gender/boilerplate strip runs: underscore is a
+			// \w character, so "\bmale\b" would never match inside "cloth_male".
 			name = Regex.Replace(name, @"[\d_\-]+", " ");
 			name = Regex.Replace(name, @"\b(fe)?male\b|\b(set|global|mats|conan)\b", " ");
 			return Regex.Replace(name, @"\s+", " ").Trim();
@@ -113,8 +136,10 @@ namespace Faolan.Core.Rdb.Assets
 
 		public readonly record struct WornMesh(uint MeshIndexId, string SourcePath, bool Skinned)
 		{
-			// The gender the mesh's export path names, or null when the asset is gender-neutral. "female" is tested
-			// first because it contains "male" as a substring.
+			/// <summary>
+			///     The gender the mesh's export path names, or null when the asset is gender-neutral. "female" is
+			///     tested first because it contains "male" as a substring.
+			/// </summary>
 			public string? Gender
 			{
 				get

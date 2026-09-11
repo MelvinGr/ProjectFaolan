@@ -4,26 +4,30 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// One Quest_c journal RECORD - the client's per-quest journal entry, read by FUN_0091df50. Composed by
-	// QuestcRegionCodec (the snapshot's journal list) and by QuestFullUpdateCodec, which carries exactly ONE of these
-	// as its whole payload (#530 wave 5 - the live full-update used to hand-roll the same 12 scalars + 5 strings + 4
-	// object lists + objective region under a different set of names).
-	//
-	// Wire:
-	//   [u32 listKey(=questId)][u32 ver(=1)][u32 questId][u32 state][u32 field114][u32 field118][u32 n]
-	//   [string title][string summary][string area][string region1][string region2]
-	//   [u32 fieldEc][u32 areaId][u32 field2c][u32 field11c][u64 money][u32 xpReward]
-	//   [objlist1][objlist2][u32 fieldF0][u64 fieldF8][objlist3][objlist4]
-	//   [objective region]
-	// where each objlist = [u32 count] then count × ObjRec (16 raw u32s, unvalidated - empty for the beach starter).
-	//
-	// The objective region is part of the RECORD (interleaved per quest, #384), not a separate top-level region: the
-	// reader used to skip it and desynced on the SECOND record of any multi-quest journal with "marker 0x2 != 0x412".
+	/// <summary>
+	///     One Quest_c journal record - the client's per-quest journal entry, read by FUN_0091df50. Composed by
+	///     <see cref="QuestcRegionCodec" /> for the snapshot's journal list, and by <see cref="QuestFullUpdateCodec" />,
+	///     which carries exactly one of these as its whole payload.
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     [u32 listKey(=questId)][u32 ver(=1)][u32 questId][u32 level][u32 bandTolerance][u32 bandLevel][u32 n]
+	///     [string title][string summary][string area][string region1][string region2]
+	///     [u32 fieldEc][u32 questLineId][u32 field2c][u32 field11c][u64 money][u32 xpReward]
+	///     [rewardList1][rewardList2][u32 fieldF0][u64 fieldF8][rewardList3][rewardList4]
+	///     [objective region]
+	///     </code>
+	///     Each reward list is a plain u32 count followed by that many <see cref="QuestRewardItem" /> elements.
+	///     <para>
+	///         The objective region is part of the record, interleaved per quest, and not a separate top-level region: a
+	///         reader that skips it desyncs on the second record of any multi-quest journal.
+	///     </para>
+	/// </remarks>
 	public static class QuestcRecordCodec
 	{
 		public const uint RecordVersion = 1;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestcRecord value)
 		{
 			using var s = new FaolanStream();
@@ -133,15 +137,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 			WriteRewardList(s, v.Obj3);
 			WriteRewardList(s, v.Obj4);
 
-			// NULL means "this record's objective region is composed by the caller", which is how the beach goldens
-			// slice the journal at @609 and compare the objective region separately. A record READ off the wire always
-			// carries one, so the asymmetry only reaches hand-built values.
+			// Null means the caller composes this record's objective region, which is how the beach goldens slice the
+			// journal at @609 and compare the objective region separately. A record read off the wire always carries
+			// one, so the asymmetry only reaches hand-built values.
 			if (v.Objectives != null)
 				QuestObjectiveRegionCodec.Write(s, v.Objectives);
 		}
 
-		// ⚠️ A PLAIN count, not a ListFrame - the client reads it with a bare u32 and clamps it to 100
-		// (`FUN_0091df50`), so the `(count + 1) * 0x3F1` rule does not apply here.
+		/// <summary>
+		///     Reads one reward list. The count is a plain u32, not a <see cref="ListFrame" /> word: the client reads it bare
+		///     and clamps it to 100 (FUN_0091df50).
+		/// </summary>
 		private static List<QuestRewardItem> ReadRewardList(ref SpanReader r)
 		{
 			var count = r.ReadU32Be();
@@ -160,105 +166,122 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// One quest's journal record. See QuestcRecords for the DB-row factory.
+	/// <summary>One quest's journal record. See QuestcRecords for the database-row factory.</summary>
 	public sealed record QuestcRecord
 	{
 		public uint QuestLineId { get; init; } // @+0xcc (matches the Area string's id)
 		public uint QuestId { get; init; }
 
-		// The quest's four REWARD lists (#464). Each entry is one reward ITEM - see QuestRewardItem, whose key
-		// half is proven by decrypting the template it names. They are EMPTY for the beach starter, which is why
-		// they went unread for so long: the golden template is the one record that carries none. Over the dumps
-		// 7,347 elements are populated across 3,741 journal records (`--report quest-rewards`).
-		//
-		// ⭐ What the four lists MEAN is settled (#893, from the client's journal renderer + its quest catalog, see
-		// QuestRewardLists): obj1/obj2 are THIS quest's own granted / choose-one items, obj3/obj4 the LINE's, previewed
-		// on every step but the line's last. The wire order `[obj1][obj2][fieldF0][fieldF8][obj3][obj4]` pairs each
-		// list pair with its XP/money words the same way. The positional names stay on the record so it reads like
-		// the wire; the meaning lives with the factory.
+		/// <summary>
+		///     The quest's four reward lists. Each entry is one reward item (see <see cref="QuestRewardItem" />, whose key
+		///     half is proven by decrypting the template it names). They are empty for the beach starter, the one record the
+		///     golden template covers; over the dumps 7,347 elements are populated across 3,741 journal records
+		///     (<c>--report quest-rewards</c>).
+		/// </summary>
+		/// <remarks>
+		///     obj1 and obj2 are this quest's own granted and choose-one items, obj3 and obj4 the line's, previewed on every
+		///     step but the line's last - see <see cref="QuestRewardLists" />. The wire order
+		///     <c>[obj1][obj2][fieldF0][fieldF8][obj3][obj4]</c> pairs each list pair with its XP and money words the same
+		///     way. The positional names stay on the record so it reads like the wire; the meaning lives with the factory.
+		/// </remarks>
 		public List<QuestRewardItem> Obj1 { get; init; } = [];
 		public List<QuestRewardItem> Obj2 { get; init; } = [];
 		public List<QuestRewardItem> Obj3 { get; init; } = [];
 		public List<QuestRewardItem> Obj4 { get; init; } = [];
 
-		// The quest's @609 OBJECTIVE region, which on the wire follows this record's obj4 - the journal record and its
-		// objective region are INTERLEAVED per quest, not two separate top-level regions (#384). Null only for a record
-		// built without one (see the Write comment). See tools/capture/decode_questc_progress.py, which validates the
-		// interleaved grammar across all 141 captured snapshots.
+		/// <summary>
+		///     The quest's @609 objective region, which on the wire follows this record's obj4: the journal record and its
+		///     objective region are interleaved per quest rather than two separate top-level regions. Null only for a record
+		///     built without one. tools/capture/decode_questc_progress.py validates the interleaved grammar across all 141
+		///     captured snapshots.
+		/// </summary>
 		public QuestObjectiveRegion? Objectives { get; set; }
 		public string Area { get; init; } = ""; // <remoteformat category=50300>
 		public string Region1 { get; init; } = ""; // <remoteformat category=52000>
 		public string Region2 { get; init; } = ""; // <remoteformat category=52000>
 		public string Summary { get; init; } = ""; // <remoteformat category=50302>
 		public string Title { get; init; } = ""; // <remoteformat category=50301>
-		// @+0x114 - the TOLERANCE of the quest's level band, and @+0x118 the level it is centred on - named for what
-		// their one consumer does with them (#464; they were `Field114`/`Field118` until 2026-09-03). Recovered from
-		// the client's own band function `FUN_0091f6f0(quest, characterLevel)` (#802), which is the ONE consumer of
-		// either field and returns a 5-way difficulty code:
-		//     H = quest.BandLevel != 0 ? quest.BandLevel : quest.Level     // @+0x10 is the fallback
-		//     L = quest.BandTolerance;  low = H - L - 1;  top = H + L + 3
-		//     level in [low, top] -> 2  |  above: 1 within 3 more, else 0  |  below: 3 within 1 less, else 4
-		// i.e. the quest's colour in the journal (on-level, slightly/far above, slightly/far below). Its caller is the
-		// journal panel at `FUN_012ce1c0`. That is also what pins BandLevel as "the level this quest is FOR" from the
-		// client side, independently of the reward-scaling measurement in QuestDefinition.BandLevel.
+		/// <summary>
+		///     @+0x114 is the tolerance of the quest's level band and @+0x118 the level it is centred on, named for what
+		///     their one consumer does with them: the client's band function FUN_0091f6f0(quest, characterLevel), which
+		///     returns a five-way difficulty code.
+		///     <code>
+		///     H = quest.BandLevel != 0 ? quest.BandLevel : quest.Level     // @+0x10 is the fallback
+		///     L = quest.BandTolerance;  low = H - L - 1;  top = H + L + 3
+		///     level in [low, top] -&gt; 2  |  above: 1 within 3 more, else 0  |  below: 3 within 1 less, else 4
+		///     </code>
+		///     That is the quest's colour in the journal - on level, slightly or far above, slightly or far below - and its
+		///     caller is the journal panel at FUN_012ce1c0. It also pins BandLevel as the level the quest is for from the
+		///     client side, independently of the reward-scaling measurement in QuestDefinition.BandLevel.
+		/// </summary>
 		public uint BandTolerance { get; init; } // @+0x114 (=0 on the beach template)
 		public uint BandLevel { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
-		// @+0x28 - the quest's EXPERIENCE reward: the number the journal's detail pane renders as "XP:". Proven
-		// in-client by driving one quest's value to 5553, 0 and 7777 and reading the panel back. See
-		// QuestDefinition.XpReward. (=0 on the beach template; 0x50 in the live full-update.)
+		/// <summary>
+		///     @+0x28 - the quest's experience reward, the number the journal's detail pane renders as "XP:". Proven
+		///     in-client by driving one quest's value to 5553, 0 and 7777 and reading the panel back; see
+		///     QuestDefinition.XpReward. It is 0 on the beach template and 0x50 in the live full-update.
+		/// </summary>
 		public uint XpReward { get; init; }
-		// @+0x2c - the CHAIN HEAD: the first quest of the series this quest belongs to, which is the quest's own id for
-		// a standalone one. Measured over the 99 quests with a captured record: 84 carry their own id and every one of
-		// the other 15 carries an earlier quest that is a step of the same chain - 10915 and 12371 both carry 10238
-		// (the beach starter, and both appear in ITS IndexQuestLineQuestIds list), 12068 carries 12067, 13986 carries 13984.
-		// ⚠️ QuestcRecords.ForQuest still emits `def.QuestId` unconditionally, which is right for 84 of them and wrong
-		// for a chain member - the head is not derivable from what we store (only the head itself carries
-		// IndexQuestLineQuestIds), so it needs harvesting into its own column. Tracked in Gitea #566.
+		/// <summary>
+		///     @+0x2c - the chain head: the first quest of the series this quest belongs to, which is the quest's own id for
+		///     a standalone one. Measured over the 99 quests with a captured record, 84 carry their own id and each of the
+		///     other 15 carries an earlier quest that is a step of the same chain: 10915 and 12371 both carry 10238, the
+		///     beach starter, and both appear in its own area catalog; 12068 carries 12067; 13986 carries 13984. Generation
+		///     takes it from QuestDefinition.ChainHeadQuestId, falling back to the quest's own id, since the head is not
+		///     derivable from anything else we store.
+		/// </summary>
 		public uint Field2c { get; init; }
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
-		// @+0xf0 - NOT the journal's XP (that is XpReward above, verified in-client) and not its Money either.
-		// Correlates with the client catalog's line-level `xp_reward`, which is suggestive and not established -
-		// see QuestDefinition.FieldF0. Also selects the objective region's text spelling.
-		// (=0x96 in the template, 0x64 in the live full-update.)
-		//
-		// ⛔ **The client has no consumer for this field or for FieldF8** (#802). Exactly three functions in the image
-		// touch `Quest_c+0xf0`/`+0xf8`: the constructor `FUN_0091cf10` (zeroes them), the stream reader `FUN_0091df50`
-		// (fills them) and the stream WRITER `FUN_0091d260` (puts them back) - nothing reads them to compute or draw
-		// anything, which is why driving them to 8888/999999 in-client moved no label. ⚠️ Not vacuous: the
-		// neighbouring `BandTolerance`/`BandLevel` DO have a consumer (the band function above), so this is a real
-		// difference between the fields, not "the client reads none of them". They are values the journal round-trips
-		// on retail's behalf, and our sender's job is to echo what was captured per quest.
+		/// <summary>
+		///     @+0xf0 - not the journal's XP (that is <see cref="XpReward" />, verified in-client) and not its money either.
+		///     It correlates with the client catalog's line-level <c>xp_reward</c>, which is suggestive rather than
+		///     established; see QuestDefinition.FieldF0. It also selects the objective region's text spelling. It is 0x96 in
+		///     the template and 0x64 in the live full-update.
+		/// </summary>
+		/// <remarks>
+		///     The client has no consumer for this field or for <see cref="FieldF8" />. Exactly three functions in the image
+		///     touch Quest_c+0xf0 and +0xf8: the constructor FUN_0091cf10 zeroes them, the stream reader FUN_0091df50 fills
+		///     them and the stream writer FUN_0091d260 puts them back; nothing reads them to compute or draw anything, which
+		///     is why driving them in-client moves no label. That is a real difference between fields rather than a property
+		///     of the record - the neighbouring BandTolerance and BandLevel do have a consumer - so they are values the
+		///     journal round-trips on retail's behalf and the sender's job is to echo what was captured per quest.
+		/// </remarks>
 		public uint FieldF0 { get; init; }
 
-		// @+0x10 - the quest's LEVEL, not a state. It equals the DB `Level` on 96 of the 99 quests with a captured
-		// record (the three that differ - 12373, 17402, 17403 - differ by 1-2, i.e. the row took its level from a
-		// different capture), and both writers already fed it a level: QuestFullUpdates passed `level` and
-		// QuestDefinitionExtractor assigned it straight to `def.Level`. It was called `State` until 2026-08-01, which
-		// made QuestcRegionTests assert `Equal(1u, q.State) // active` on the beach starter - passing only because
-		// that quest happens to be LEVEL 1. Distinct from QuestCodec.State (StateActive/StateCompleted), which is a
-		// real state on a different message.
+		/// <summary>
+		///     @+0x10 - the quest's level, not a state. It equals the database Level on 96 of the 99 quests with a captured
+		///     record, the three that differ (12373, 17402, 17403) differing by 1 or 2 because the row took its level from a
+		///     different capture. Distinct from QuestCodec's state codes, which are a real state on a different message.
+		/// </summary>
 		public uint Level { get; set; } // settable: world entry patches the lead quest's word
 
-		// @+0x14 - a BITFIELD of the quest LINE, inherited by each of its steps: constant per quest across 2626
-		// captured records AND constant across every quest of the same line (90 of 90). NOT a goal count, despite
-		// carrying that name until 2026-07-20 - emitting it as one desynced the client and crashed it in StatList_t.
-		// NOT a ListFrame word either (1042 is not a multiple of 1009).
-		//
-		// bit 4 (0x10) = the quest may not be SHARED - the journal greys its `Share` button. Proven in-client; bits
-		// 3 and 10 change nothing in that panel. See QuestDefinition.QuestLineFlags.
+		/// <summary>
+		///     @+0x14 - a bitfield of the quest line, inherited by each of its steps: constant per quest across 2,626
+		///     captured records and constant across every quest of the same line (90 of 90). It is neither a goal count -
+		///     emitting it as one desyncs the client and crashes it in StatList_t - nor a <see cref="ListFrame" /> word.
+		/// </summary>
+		/// <remarks>
+		///     Bit 4 (0x10) means the quest may not be shared, and the journal greys its Share button; proven in-client, where
+		///     bits 3 and 10 change nothing in that panel. See QuestDefinition.QuestLineFlags.
+		/// </remarks>
 		public uint QuestLineFlags { get; init; }
-		// @+0x20 - the quest's MONEY reward, and the twin of XpReward at @+0x28 (u64 money, then u32 xp - the two
-		// sit adjacent in the struct). The journal's detail pane prints it on the `Money:` line. The unit is TIN,
-		// with 100 tin = 1 copper and 100 copper = 1 silver: 214 renders "2C 14T" and 250000 renders "25S".
-		//
-		// ⚠️ It was called `Accept` and documented as "likely acceptTime" - it is not a time. 21 of the 99 captured
-		// quests carry a non-zero value, constant per quest across every character and capture, and the set is a
-		// subset of the quests carrying an XP reward (some quests pay XP only). Proven in-client by driving it and
-		// reading the panel back; see QuestDefinition.MoneyReward.
+		/// <summary>
+		///     @+0x20 - the quest's money reward, and the twin of <see cref="XpReward" /> at @+0x28, the two sitting adjacent
+		///     in the struct. The journal's detail pane prints it on the "Money:" line. The unit is tin, with 100 tin to a
+		///     copper and 100 copper to a silver, so 214 renders "2C 14T" and 250000 renders "25S".
+		/// </summary>
+		/// <remarks>
+		///     It is not a timestamp. 21 of the 99 captured quests carry a non-zero value, constant per quest across every
+		///     character and capture, and that set is a subset of the quests carrying an XP reward, some quests paying XP
+		///     only. Proven in-client by driving it and reading the panel back; see QuestDefinition.MoneyReward.
+		/// </remarks>
 		public ulong MoneyReward { get; init; }
-		// @+0xf8 - NOT the journal's Money: setting it to 999999 left that label blank. Tracks FieldF0 through a
-		// level-dependent factor that 99 samples do not close - do NOT derive one from the other.
+		/// <summary>
+		///     @+0xf8 - not the journal's money: setting it to 999999 leaves that label blank. It tracks
+		///     <see cref="FieldF0" /> through a level-dependent factor that 99 samples do not close, so neither may be
+		///     derived from the other.
+		/// </summary>
 		public ulong FieldF8 { get; init; } // (=15 in the template, 0 in the live full-update)
 	}
 }

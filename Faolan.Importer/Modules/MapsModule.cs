@@ -16,7 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Maps (MapChange) + the #31 tooling-suffix name sanitize backfill.
+	/// <summary>
+	///     Maps from MapChange packets, plus the tooling-suffix name sanitize backfill.
+	/// </summary>
 	public sealed class MapsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

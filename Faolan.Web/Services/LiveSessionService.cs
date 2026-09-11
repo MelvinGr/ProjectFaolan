@@ -14,7 +14,7 @@ using ModelContextProtocol.Protocol;
 namespace Faolan.Web.Services
 {
 	// One live connected player, as reported by the game server's MCP `list_sessions` tool. Mirrors the flat identity
-	// projection that tool serializes (we deserialize the tool's JSON rather than referencing the server types).
+	// projection that tool serializes: the tool's JSON is deserialized rather than the server types referenced.
 	public sealed record LiveSession(uint? CharacterId, string? CharacterName, ushort? CharacterLevel, uint? AccountId, string? AccountName);
 
 	// One live entity in a zone (player/npc/loot), as reported by the MCP list_zone_entities tool. Mirrors
@@ -24,10 +24,10 @@ namespace Faolan.Web.Services
 	// A connected character's live map + position (subset of CharacterLiveState).
 	public sealed record CharLive(uint MapId, float X, float Y, float Z);
 
-	// Queries the RUNNING game server's in-process MCP endpoint (http://127.0.0.1:{McpPort}/mcp) for live presence.
-	// Faolan.Web is a separate process, so the only window into the server's in-memory sessions is this MCP call
-	// (DB-only data can't see who is connected right now). Returns null when the server/MCP endpoint is unreachable
-	// (server offline) so the page can distinguish "offline" from "online, nobody connected".
+	// Queries the running game server's in-process MCP endpoint (http://127.0.0.1:{McpPort}/mcp) for live presence.
+	// Faolan.Web is a separate process, so this MCP call is the only window into the server's in-memory sessions; the
+	// database alone cannot say who is connected right now. Returns null when the endpoint is unreachable, so the page
+	// can distinguish "offline" from "online, nobody connected".
 	public sealed class LiveSessionService
 	{
 		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
@@ -45,8 +45,8 @@ namespace Faolan.Web.Services
 			_endpoint = new Uri(config.McpUrl);
 		}
 
-		// A connected character's LIVE map + position (from get_character's Live block), or null if not connected /
-		// server offline. Used to teleport one character to another.
+		// A connected character's live map and position (from get_character's Live block), or null when the character is
+		// not connected or the server is offline. Used to teleport one character to another.
 		public async Task<CharLive?> GetCharacterLiveAsync(uint characterId, CancellationToken ct = default)
 		{
 			var text = await CallAsync("get_character", new Dictionary<string, object?>
@@ -103,8 +103,8 @@ namespace Faolan.Web.Services
 			try
 			{
 				var list = JsonSerializer.Deserialize<List<ZoneEntity>>(text, JsonOptions) ?? [];
-				// The zone query unions every live instance of the map (#268), so each entity repeats per copy —
-				// dedupe by handle for the radar.
+				// The zone query unions every live instance of the map, so each entity repeats per copy - dedupe by
+				// handle for the radar.
 				return list.GroupBy(e => e.Handle).Select(g => g.First()).ToList();
 			}
 			catch

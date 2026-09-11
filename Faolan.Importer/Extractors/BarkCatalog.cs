@@ -8,19 +8,19 @@ using Faolan.Core.Rdb;
 namespace Faolan.Importer.Extractors
 {
 	// The client's own ambient-BARK line catalog: LDB category 50015 (`sayinchat`), read straight out of the RDB
-	// (#331).
+	// .
 	//
 	// Two properties make this readable at all, and both are the opposite of what the neighbouring subsystems do:
 	//
-	//   * the category is PLAINTEXT (page `flags=0`), unlike the eleven encrypted ones, so a line needs no key. The
+	//   * the category is plaintext (page `flags=0`), unlike the eleven encrypted ones, so a line needs no key. The
 	//     20-character `key=` a captured bark carries is inert here - the client's decrypt is guarded on the string's
 	//     own encrypted flag, so it never reads a key on a flags=0 page (`docs/rdb/ldb-string-index.md`). A HARVESTED
 	//     line is therefore servable without a capture of it.
-	//   * a line's string id is a pure function of its TOKEN - the client's 28-bit ELF hash of
+	//   * a line's string id is a pure function of its token - the client's 28-bit ELF hash of
 	//     `sayinchat(N)|<channel>(K)|<Group>` - so a group's whole line set is enumerable by sweeping N rather than
 	//     waiting for a capture of each line.
 	//
-	// ⚠️ This CANNOT discover group names, and the obvious way to try does not work: see `docs/subsystems/chat.md`.
+	// This cannot discover group names, and the obvious way to try does not work: see `docs/subsystems/chat.md`.
 	// Sweeping is only useful for a group some capture has already named.
 	public sealed class BarkCatalog
 	{
@@ -33,7 +33,7 @@ namespace Faolan.Importer.Extractors
 
 		// A bark's template slot - `{TopGloryName}`, `{DetectedChar.name}`, `{AdvertiseMinutes - AdvertiseCounter}`.
 		// A line carrying one cannot simply be served: its wire form needs a matching <parameter> element whose value
-		// comes from live server state, which is separate work from harvesting the TEXT.
+		// comes from live server state, which is separate work from harvesting the text.
 		private static readonly Regex SlotRx = new Regex("\\{[^}]+\\}", RegexOptions.Compiled);
 
 		private readonly Dictionary<uint, byte[]> _blobs;

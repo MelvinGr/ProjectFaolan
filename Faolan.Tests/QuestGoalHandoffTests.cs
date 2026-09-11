@@ -17,18 +17,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #527: the ORDER of quest packets a multi-goal quest emits, against what retail actually sends.
+	// The order of quest packets a multi-goal quest emits, against what retail actually sends.
 	//
-	// Retail has three shapes and no others, and the difference between them is entirely in what the QUEST is doing -
+	// Retail has three shapes and no others, and the difference between them is entirely in what the quest is doing -
 	// not what the goal is:
 	//
 	//   goal short of its count            QuestGoal(Progress)
 	//   goal met, quest still has a goal   QuestGoal(Satisfied), QuestGoal(Advanced)
 	//   goal met, quest done               QuestGoal(Satisfied), QuestIIR(Active 2), QuestIIR(Completed 4)
 	//
-	// Advanced is the hand-off marker on the goal being LEFT BEHIND - it rides in the same frame as that goal's own
+	// Advanced is the hand-off marker on the goal being left behind - it rides in the same frame as that goal's own
 	// Satisfied, and the successor's Satisfied lands whenever it is solved (34 s to 8 min later in the corpus). And a
-	// QuestIIR appears ONLY on the third shape: the corpus has 14 Progress/Advanced frames and not one carries one.
+	// QuestIIR appears only on the third shape: the corpus has 14 Progress/Advanced frames and not one carries one.
 	//
 	// [V2: 12371 g3495 (Progress x2 -> Satisfied+Advanced) then g3497 in
 	// xxx_mage-necromancer_login_play2_tortage_city_first-quests fr4247/4815/4872/5488 and

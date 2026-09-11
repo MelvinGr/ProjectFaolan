@@ -34,16 +34,16 @@ namespace Faolan.Web.Services
 		}
 	}
 
-	// Builds a character's 3D model (glTF/glb) on demand from the client RDB, reusing the Faolan.Core asset pipeline
-	// (#275). Holds one RdbReader for the process (it memory-maps the index + keeps the data files open). Race/sex ->
-	// body monsterdata id is a hardcoded table (BodyMonster) resolved via the CHARACTERCREATOR data (1010700, replacing
-	// the old mesh-index table); per-character head/equipment is resolved from the stored appearance (#275). Bodies that
-	// are CDN-only fall back to a local one so the viewer always renders something.
+	// Builds a character's 3D model (glTF/glb) on demand from the client RDB, reusing the Faolan.Core asset pipeline.
+	// Holds one RdbReader for the process, which memory-maps the index and keeps the data files open. Race and sex map
+	// to a body monsterdata id through the CHARACTERCREATOR data (1010700); per-character head and equipment are
+	// resolved from the stored appearance. A body that is CDN-only falls back to a local one so the viewer always
+	// renders something.
 	public sealed class CharacterModelService
 	{
-		// Head base mesh by sex. The 3 European starting races (Aquilonian/Cimmerian/Stygian) share one head mesh and
-		// differ by morphs + face texscript, not by mesh (only Khitai has its own head). These are the shared European
-		// heads (female = beautiful_famale_heads.max, male = male_heads_old.max); per-character morph/texture is #275.
+		// Head base mesh by sex. The three European starting races (Aquilonian, Cimmerian, Stygian) share one head mesh
+		// and differ by morphs and face texscript rather than by mesh; only Khitai has its own head. These are the
+		// shared European heads (female = beautiful_famale_heads.max, male = male_heads_old.max).
 		private const uint FemaleHead = 4502887;
 		private const uint MaleHead = 4821637;
 
@@ -51,16 +51,14 @@ namespace Faolan.Web.Services
 
 		// (race, sex) -> the body's CHARACTERCREATOR monsterdata id (RDB type 1010700 <body monsterdataid>, the
 		// authoritative per-race/sex body). The MonsterData in turn names the body's skinned RenderMesh, resolved via
-		// RdbAssetExtractor.ResolveBodyRenderMesh (a <mesh> is either a 1010030 mesh-index - the male bodies - or a 1010001
-		// RenderMesh directly - the female bodies). This replaces the old hardcoded MESHINDEXFILE table, which pointed the
-		// FEMALE bodies at a censored/wrong atlas (no nipples + a torso/limb tone seam) and at CDN-only meshes; the
-		// monsterdata bodies are the correct, locally-present ones (#275).
+		// RdbAssetExtractor.ResolveBodyRenderMesh: a <mesh> is either a 1010030 mesh-index (the male bodies) or a
+		// 1010001 RenderMesh directly (the female bodies). A MESHINDEXFILE table is not a substitute - it points the
+		// female bodies at a censored atlas with a torso/limb tone seam and at CDN-only meshes, while the monsterdata
+		// bodies are the correct, locally present ones.
 		//
-		// SOURCED from AppearanceChoices now, not hardcoded. The `body` element was one of three the appearance importer
-		// never read, so the six values had to be transcribed by hand; they are imported as of #469 and the table below
-		// is built from them. The transcription was right - all six match - but it could not carry KHITAN, whose bodies
-		// (male 4189400 / female 4189398) only appeared once the element was actually imported. Cached for the process:
-		// it is eight rows of static client content.
+		// Sourced from AppearanceChoices rather than hard-coded, which is what carries Khitan (male 4189400, female
+		// 4189398) as well as the six European bodies. Cached for the process: it is eight rows of static client
+		// content.
 		private Dictionary<(Race, Sex), uint>? _bodyMonster;
 
 		private Dictionary<(Race, Sex), uint> BodyMonster
@@ -112,9 +110,9 @@ namespace Faolan.Web.Services
 			_rdbDir = config.ContentRdbDir is { Length: > 0 } dir
 				? dir
 				: throw new InvalidOperationException("RdbDir not configured - set it to the client's RDB folder in appsettings.Development.json or the RdbDir env var");
-			// The ContentMirror for on-demand (CDN-only) resources - the CDN race bodies that aren't in the local RDB.
-			// Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
-			// The SHARED `Cdn` answer, not a Faolan.Web-only key: one name per setting, so pointing the viewer
+			// The ContentMirror for on-demand, CDN-only resources - the CDN race bodies that are not in the local RDB.
+			// Store-and-forward, so requesting one archives it for the future.
+			// The shared `Cdn` setting rather than a Faolan.Web-only key: one name per setting, so pointing the viewer
 			// and the importer at a mirror on another box is the same single override.
 			_cdnUrl = config.CdnPublicAddress;
 		}
@@ -146,9 +144,9 @@ namespace Faolan.Web.Services
 			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyRm, headId, hairRmId);
 		}
 
-		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
-		// chosen hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id). Head morph/face texscript still pending
-		// the CHARACTERCREATOR (1010700) decode (#275); HeadMesh is a creator index, not a resource id.
+		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - the chosen
+		// hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id) among them. HeadMesh is a creator index, not a
+		// resource id.
 		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null, bool rig = false, IReadOnlySet<string>? hiddenSlots = null)
 		{
 			using var db = _dbFactory.CreateDbContext();
@@ -165,28 +163,28 @@ namespace Faolan.Web.Services
 				? (BodyMorphDeformer.Morphs?)null
 				: new BodyMorphDeformer.Morphs(body.Arm, body.Chest, body.Bosom, body.Stomach, body.Arse, body.Thigh, body.Leg);
 
-			// CharacterBody.HeadMesh is stored in editor 2x units; the real CHARACTERCREATOR head monsterdataid is
-			// HeadMesh/2 ([[CaptureCharacterImporter]]).
+			// CharacterBody.HeadMesh is stored in editor 2x units; the CHARACTERCREATOR head monsterdataid is
+			// HeadMesh/2.
 			var headMonster = body is { HeadMesh: > 0 }
 				? body.HeadMesh / 2
 				: (uint?)null;
 
-			// No explicit overlay => dress the character in their ACTUAL equipped gear, resolved from the item templates
-			// (#275, ItemLookResolver). Worn armour meshes are authored in body bind-pose space, so they overlay in the
-			// static view and skin to the body skeleton in the rig path alike. hiddenSlots drops individual pieces (the
-			// viewer's per-slot show/hide toggle).
+			// No explicit overlay means dressing the character in their actual equipped gear, resolved from the item
+			// templates (ItemLookResolver). Worn armour meshes are authored in body bind-pose space, so they overlay in
+			// the static view and skin to the body skeleton in the rig path alike. hiddenSlots drops individual pieces,
+			// which is the viewer's per-slot show/hide toggle.
 			equipMeshIndexIds ??= ResolveEquippedMeshes(characterId, character.Sex, hiddenSlots);
 
 			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
 		}
 
-		// Build a character glb from an EXPLICIT appearance spec instead of the stored one - the live-preview path for the
-		// web appearance editor (nothing is persisted; the editor calls this on every control change). texRefs are the
-		// chosen *hairmesh_/*texscript_ resource refs; morphs are the 7 body-proportion sliders; headMonster is the
-		// CHARACTERCREATOR head monsterdataid (HeadMesh/2). Gear is intentionally omitted so skin/tattoos are visible.
+		// Build a character glb from an explicit appearance spec instead of the stored one - the live-preview path for
+		// the web appearance editor, which persists nothing and calls this on every control change. texRefs are the
+		// chosen *hairmesh_ and *texscript_ resource refs; morphs are the seven body-proportion sliders; headMonster is
+		// the CHARACTERCREATOR head monsterdataid (HeadMesh/2). Gear is omitted so skin and tattoos are visible.
 		//
-		// STRICT (no fallbacks): if a required asset is missing, returns the reason in Error instead of silently
-		// substituting a default/local body - so the editor surfaces exactly what is unavailable (e.g. a CDN-only body).
+		// Strict, with no fallbacks: a missing asset returns the reason in Error rather than silently substituting a
+		// default or local body, so the editor surfaces exactly what is unavailable, such as a CDN-only body.
 		public (byte[]? Glb, string? Error) BuildCharacterCustom(Sex sex, Race race, uint? hairRmId, uint? headMonster, BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs)
 		{
 			var rdb = Reader();
@@ -214,7 +212,7 @@ namespace Faolan.Web.Services
 
 		// Build a character as a posable rig (skinned glb): the full assembled character - body (morphs + skin + decals) +
 		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body
-		// skins to its own bones; the rigid head/hair are bound to the Head bone. (Gear skinning is the separate #275 work.)
+		// skins to its own bones; the rigid head and hair are bound to the Head bone.
 		public byte[]? BuildCharacterRig(uint characterId, IReadOnlySet<string>? hiddenSlots = null)
 		{
 			return BuildCharacterById(characterId, null, true, hiddenSlots);
@@ -230,7 +228,7 @@ namespace Faolan.Web.Services
 				: null;
 		}
 
-		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
+		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head, eye and hair meshes.
 		public byte[]? BuildRenderMesh(uint renderMeshId)
 		{
 			var rdb = Reader();
@@ -240,8 +238,8 @@ namespace Faolan.Web.Services
 				: null;
 		}
 
-		// Build a SKINNED glb for a skinned model (body / equipment piece): geometry + the character skeleton as a glTF
-		// skin, so the result is posable (#275). skeletonId null => auto-select the rig matching the mesh's bone palette.
+		// Build a skinned glb for a skinned model (a body or equipment piece): geometry plus the character skeleton as a
+		// glTF skin, so the result is posable. A null skeletonId auto-selects the rig matching the mesh's bone palette.
 		public byte[]? BuildRig(uint meshIndexId, uint? skeletonId = null)
 		{
 			return RdbAssetExtractor.BuildSkinnedModelGlb(Reader(), meshIndexId, skeletonId);
@@ -358,9 +356,7 @@ namespace Faolan.Web.Services
 		// is keyed by these labels) lines up with what the doll shows.
 		//
 		// Slot 3 is labelled "Bag" because that is what it is: the equipped bag whose Item.BagExtraSlots sizes the
-		// backpack. It used to read "Tokens" - the old mislabel - with "Bag" taken by the legacy FirstPosBag nav, an
-		// item that rendered at bag cell 1 with no row behind it. That nav is retired (#750): the starter item is an
-		// ordinary bag item now, so it shows up under Inventory like everything else and the label is free.
+		// backpack. The starter bag is an ordinary bag item, so it shows up under Inventory like everything else.
 		private static readonly (CharacterEquipmentSlot Slot, string Label)[] PaperDollSlots =
 		[
 			(CharacterEquipmentSlot.Head, "Head"), (CharacterEquipmentSlot.Neck, "Neck"), (CharacterEquipmentSlot.Shoulder, "Shoulder"), (CharacterEquipmentSlot.Cape, "Cloak"),
@@ -539,7 +535,7 @@ namespace Faolan.Web.Services
 			});
 		}
 
-		// The authentic ANIMSYS clips available for a skeleton (#292), for the viewer's animation dropdown. Defaults to
+		// The ANIMSYS clips available for a skeleton, for the viewer's animation dropdown. Defaults to
 		// the humanoid rig the viewer skins to; CDN-only clips resolve through the ContentMirror via Reader(). Returns
 		// (name, rdbname, duration) sorted by name.
 		public IReadOnlyList<AnimationCatalog.ClipInfo> ListAnimations(uint? skeletonId = null)
@@ -614,7 +610,7 @@ namespace Faolan.Web.Services
 			return RdbAssetExtractor.RawText(Reader(), type, id);
 		}
 
-		// Resolve a character's worn armour MESHINDEXFILE ids from their equipped items (#275). Each equipped item's
+		// Resolve a character's worn armour MeshIndexFile ids from their equipped items. Each equipped item's
 		// decrypted template carries its worn mesh(es) in field 9 (ItemLookResolver); weapons/jewellery carry none.
 		// Male/female variants of one garment collapse to the character's sex. Login-independent - RDB + faolan.db only.
 		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex, IReadOnlySet<string>? hiddenSlots = null)
@@ -653,10 +649,8 @@ namespace Faolan.Web.Services
 		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
 		// reads these back so the change sticks. Returns false when the character does not exist.
 		//
-		// These two rows ARE the appearance (#483). The edit used to need a second write - PropagateToScaffold,
-		// rebuilding the spawn's CharacterAttribute entry table from them - or the change showed in the viewer and
-		// never in game. The game now derives that table from these rows when it builds the spawn, so saving here is
-		// the whole edit.
+		// These two rows are the appearance: the game derives the spawn's CharacterAttribute entry table from them when
+		// it builds the spawn, so saving here is the whole edit.
 		public bool SaveAppearance(uint characterId, AppearanceSpec spec)
 		{
 			using var db = _dbFactory.CreateDbContext();
@@ -733,9 +727,10 @@ namespace Faolan.Web.Services
 				.ToList();
 		}
 
-		// Shared assembler for the stored-character path (BuildCharacterById): resolve the TexScripts (skin/hair tint, eye
-		// iris, body tattoo - by mesh target, #275), the head meshes and the body RenderMesh (BodyRenderMesh, which itself
-		// falls back to the same-sex Aquilonian body), then build the glb; falls back to a bare body when parts are missing.
+		// Shared assembler for the stored-character path (BuildCharacterById): resolve the TexScripts (skin and hair
+		// tint, eye iris, body tattoo, by mesh target), the head meshes and the body RenderMesh (BodyRenderMesh, which
+		// itself falls back to the same-sex Aquilonian body), then build the glb; falls back to a bare body when parts
+		// are missing.
 		private byte[]? BuildFromSpec(RdbReader rdb, Sex sex, Race race, uint? hairRmId, uint? headMonster, BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs,
 			IReadOnlyList<uint>? equipMeshIndexIds, bool rig)
 		{
@@ -786,8 +781,8 @@ namespace Faolan.Web.Services
 
 		// The body's skinned RenderMesh id for a race/sex, via its CHARACTERCREATOR monsterdata (BodyMonster ->
 		// ResolveBodyRenderMesh). Falls back to the same-sex Aquilonian body if a race body can't be resolved (all three
-		// race bodies are locally present today, so the fallback is belt-and-braces, and it keeps the correct sex). Returns
-		// 0 only when even the fallback is unavailable. Lenient by design - the STRICT editor path resolves without this.
+		// race bodies are locally present today, so the fallback is a safety net, and it keeps the correct sex). Returns
+		// 0 only when even the fallback is unavailable. Lenient by design; the strict editor path resolves without this.
 		private uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
 		{
 			if (BodyMonster.TryGetValue((race, sex), out var monster) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, monster) is { } rm)
@@ -835,8 +830,8 @@ namespace Faolan.Web.Services
 
 		// Classify a character's *texscript_NNN resources by their mesh target: -3 skin tint, -4 hair tint, -5 eye iris
 		// (a projected texture), -2 body tattoo decals (placed projecttextures composited onto the body atlas).
-		// mesh="-1" is the HEAD/face mesh slot, not the body - its projecttextures are face tattoos (a separate
-		// ticket) and must NOT be pasted onto the body atlas (else a face decal lands on the chest).
+		// mesh="-1" is the head and face mesh slot rather than the body: its projecttextures are face tattoos and must
+		// not be pasted onto the body atlas, or a face decal lands on the chest.
 		private static (RdbAssetExtractor.Tint? Skin, RdbAssetExtractor.Tint? Hair, uint? EyeTexture, IReadOnlyList<RdbAssetExtractor.BodyDecal> Decals) ResolveTexScripts(RdbReader rdb,
 			IEnumerable<string> resources)
 		{
@@ -902,9 +897,8 @@ namespace Faolan.Web.Services
 		// monsterdataid); Color = the swatch hex for colour lists (null otherwise).
 		public sealed record AppearanceOption(string Value, string Label, string? Color);
 
-		// Beard/Piercings/Voices/FaceMorphLimits are as real as the rest and were simply never surfaced - the importer
-		// did not read their XML elements until #469, so there was nothing to offer. Note Piercings is Stygian-male
-		// only and Beard male only, so both are legitimately EMPTY for most (sex, race) pairs; that is data, not a gap.
+		// Beard, Piercings, Voices and FaceMorphLimits are as real as the rest. Piercings is Stygian-male only and
+		// Beard male only, so both are legitimately empty for most (sex, race) pairs; that is data, not a gap.
 		public sealed record AppearanceOptions(
 			IReadOnlyList<AppearanceOption> HairStyle,
 			IReadOnlyList<AppearanceOption> HairColor,

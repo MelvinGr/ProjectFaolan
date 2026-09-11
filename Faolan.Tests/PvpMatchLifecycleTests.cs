@@ -19,11 +19,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The END of a PvP minigame match (Gitea #146): who may hit whom, what a kill scores, and what the two
+	// The end of a PvP minigame match: who may hit whom, what a kill scores, and what the two
 	// client-recovered end messages carry.
 	//
-	// ⚠️ None of this is captured - no captured session ever finishes a minigame - so what is gated here is the
-	// STATE MACHINE, not bytes. The messages' own layouts are pinned by the client instead
+	// None of this is captured - no captured session ever finishes a minigame - so what is gated here is the
+	// state machine, not bytes. The messages' own layouts are pinned by the client instead
 	// (docs/re/minigame-massivepvp-messages.md); the one thing this file does pin about the wire is the
 	// `MinigameResult` word, whose three values come off the client's own results-page branch.
 	public class PvpMatchLifecycleTests : IDisposable
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 			Assert.Equal(2, h.World.Ended.Count);
 			Assert.All(h.World.Ended, e => Assert.Equal(Blue, e.WinningSide));
 
-			// ...and each member's OWN result: the client renders MatchWon/MatchLost from this word alone.
+			// ...and each member's own result: the client renders MatchWon/MatchLost from this word alone.
 			Assert.Equal(MinigameResult.Won, h.World.Ended.Single(e => e.Character == 1).Result);
 			Assert.Equal(MinigameResult.Lost, h.World.Ended.Single(e => e.Character == 2).Result);
 
@@ -141,7 +141,7 @@ namespace Faolan.Tests
 			Assert.Empty(h.World.Ended);
 		}
 
-		// The CLOCK end - the one a match reaches on its own. A custom match carries the client's own ruleset, so a
+		// The clock end - the one a match reaches on its own. A custom match carries the client's own ruleset, so a
 		// one-second time limit is a legitimate one to build; the point is that the end fires off the ruleset without
 		// anybody asking, and that with no score on either side it is a draw for everyone (winning side 0, which is
 		// the value the client's own reset leaves in the field and which it renders as MatchTie).

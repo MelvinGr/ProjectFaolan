@@ -5,26 +5,32 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// CombatShieldIIR (0xCFFD0519) - the directional-combat guard broadcast: an entity's blue shield-arc distribution
-	// (#20 decode 2, FUN_0113e000). Semantics RE'd from the client's Activate (FUN_0113de90, vtable 0x02041910 slot 2):
-	// the u32 is stored as the entity's STAT 0xA5 (165), which the shield UI (CombatRoseView_c / ShieldDirection_n)
-	// reads to draw the arcs, and it is DECIMAL-PACKED per direction - hundreds = Left, tens = Mid, units = Right
-	// (210 = 2 left, 1 mid, 0 right). The client clamps a digit sum above 3 back to 111.
-	//
-	// CAPTURE-CONFIRMED, not merely client-RE: all 86 captured records are 21 bytes
-	// ([u32 len=17][subop][C350][handle][u8 env=0][u32 value]) and carry REAL distributions - 111, 102, 210, 21,
-	// 12, 30, 120, 3 - every one of which decodes to three slices summing to exactly 3. (A now-deleted sibling
-	// builder claimed "every captured instance carries value 0"; not one does.)
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     CombatShieldIIR - the directional-combat guard broadcast, an entity's blue shield-arc distribution
+	///     (client reader FUN_0113e000).
+	/// </summary>
+	/// <remarks>
+	///     Semantics from the client's Activate (FUN_0113de90, vtable 0x02041910 slot 2): the u32 is stored as the entity's
+	///     stat 0xA5 (165), which the shield UI (CombatRoseView_c / ShieldDirection_n) reads to draw the arcs, and it is
+	///     decimal-packed per direction - hundreds Left, tens Mid, units Right, so 210 is two left, one mid, none right. The
+	///     client clamps a digit sum above 3 back to 111.
+	///     <para>
+	///         Capture-confirmed as well: all 86 captured records are 21 bytes
+	///         ([u32 len=17][subop][class][handle][u8 env=0][u32 value]) and carry real distributions - 111, 102, 210, 21,
+	///         12, 30, 120, 3 - each decoding to three slices summing to exactly 3.
+	///     </para>
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class CombatShieldCodec
 	{
-		// The retail default the client's own overflow clamp resets stat 0xA5 to: one shield per arc. The most
-		// common captured value (17 of 86).
+		/// <summary>
+		///     The default the client's own overflow clamp resets stat 0xA5 to: one shield per arc. It is also the most common
+		///     captured value, 17 of 86.
+		/// </summary>
 		public const uint DefaultDistribution = 111;
 		public const uint Opcode = (uint)IirTypes.CombatShieldIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CombatShieldIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -61,12 +67,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// CombatShieldIIR (0xCFFD0519).
+	/// <summary>The CombatShieldIIR body.</summary>
 	public sealed record CombatShieldIIR(uint Handle, byte Env, uint Value);
 
-	// The three guard arcs the client's shield rose draws, in the digit order the packed `Value` uses. Named for the
-	// client's own `ShieldDirection_e` / `Combat_Shield_{Left,Mid,Right}` (AgeOfConan.exe); the LDB renders them
-	// `ShieldLeft%1%` / `ShieldUp%1%` / `ShieldRight%1%`, so `Mid` is the overhead arc.
+	/// <summary>
+	///     The three guard arcs the client's shield rose draws, in the digit order the packed value uses. Named for the
+	///     client's own ShieldDirection_e / Combat_Shield_{Left,Mid,Right}; the LDB renders them ShieldLeft%1% /
+	///     ShieldUp%1% / ShieldRight%1%, so Mid is the overhead arc.
+	/// </summary>
 	public enum ShieldArc
 	{
 		Left,
@@ -74,19 +82,32 @@ namespace Faolan.Core.Network.Codecs.Combat
 		Right
 	}
 
-	// The FIVE zones a swing comes from, which is a finer alphabet than the three arcs that GUARD them (#673). This
-	// is the client's own enum, in its own order, recovered three ways from AgeOfConan.exe:
-	//   * `FUN_005e3b30` maps an internal 1..5 direction to the wire code - `1 -> 0xC9, 2 -> 0xCA, default -> 0xCB,
-	//     4 -> 0xCC, 5 -> 0xCD` (and `10` means "pick one": `rand() % 6 + 1`, so overhead, being cases 3 AND 6,
-	//     draws double);
-	//   * the config keys it registers are `attack_dir_bm_upper_left` / `_upper_right` / `_head` / `_lower_left` /
-	//     `_lower_right`, in that block order (`FUN_0152f740`) - the same 1..5;
-	//   * `FUN_005edd90`, the combo step-list parser, rewrites `0xCC -> 0xC9` and `0xCD -> 0xCA` when the definition's
-	//     level is below 40, i.e. folds each lower zone onto the upper one ON THE SAME SIDE. That is the retail
-	//     mechanic - a character swings in three directions and unlocks the two lower ones later - and it pins which
-	//     side each lower code is on without relying on the order argument.
-	// The first three are independently pinned to their `Abilities` rows by the capture corpus, with zero exceptions
-	// over 499 directed player swings (#661).
+	/// <summary>
+	///     The five zones a swing comes from - a finer alphabet than the three arcs that guard them. This is the client's
+	///     own enum, in its own order.
+	/// </summary>
+	/// <remarks>
+	///     Recovered three ways from AgeOfConan.exe:
+	///     <list type="bullet">
+	///         <item>
+	///             FUN_005e3b30 maps an internal 1..5 direction to the wire code - 1 to 0xC9, 2 to 0xCA, default to 0xCB, 4 to
+	///             0xCC, 5 to 0xCD. A direction of 10 means "pick one" (<c>rand() % 6 + 1</c>), so overhead, being cases 3 and
+	///             6, draws double.
+	///         </item>
+	///         <item>
+	///             The config keys it registers are attack_dir_bm_upper_left / _upper_right / _head / _lower_left /
+	///             _lower_right, in that block order (FUN_0152f740) - the same 1..5.
+	///         </item>
+	///         <item>
+	///             FUN_005edd90, the combo step-list parser, rewrites 0xCC to 0xC9 and 0xCD to 0xCA when the definition's
+	///             level is below 40, folding each lower zone onto the upper one on the same side. That is the retail mechanic
+	///             - three directions to start with, the two lower ones unlocked later - and it pins which side each lower
+	///             code is on independently of the order argument.
+	///         </item>
+	///     </list>
+	///     The first three are independently pinned to their Abilities rows by the capture corpus, with no exceptions over
+	///     499 directed player swings.
+	/// </remarks>
 	public enum SwingDirection
 	{
 		UpperLeft,
@@ -96,12 +117,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 		LowerRight
 	}
 
-	// The decimal packing of the guard `Value`. Not encoding - it is how one field's digits mean three arcs, which is
-	// the client's own convention, so it stays off the codec's surface (#530 rule 1).
+	/// <summary>
+	///     The decimal packing of the guard value. Not encoding but the client's own convention for how one field's digits
+	///     mean three arcs, so it stays off the codec's surface.
+	/// </summary>
 	public static class CombatShieldDistribution
 	{
-		// The digit sum must not exceed 3 or the client clamps the whole thing back to
-		// CombatShieldCodec.DefaultDistribution.
+		/// <summary>
+		///     Packs three arc counts into the wire value. The digit sum must not exceed 3, or the client clamps the whole
+		///     value back to <see cref="CombatShieldCodec.DefaultDistribution" />.
+		/// </summary>
 		public static uint Pack(uint left, uint mid, uint right)
 		{
 			return left * 100 + mid * 10 + right;
@@ -112,7 +137,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return (value / 100 % 10, value / 10 % 10, value % 10);
 		}
 
-		// How many shields cover one arc.
+		/// <summary>How many shields cover one arc.</summary>
 		public static uint Count(uint value, ShieldArc arc)
 		{
 			var (left, mid, right) = Unpack(value);

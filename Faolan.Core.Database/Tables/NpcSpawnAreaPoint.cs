@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One PRIMARY spawn-point anchor of an NpcSpawnArea (the exact retail spot a creature spawns at, decoded from RDB
-	// 1010506, #332/#363). A child of NpcSpawnArea - the per-group facts (bounds, count, creature) live once on the
+	// One primary spawn-point anchor of an NpcSpawnArea (the exact retail spot a creature spawns at, decoded from RDB
+	// 1010506). A child of NpcSpawnArea - the per-group facts (bounds, count, creature) live once on the
 	// area; this table is only the geometry. Kept for spawn-position fidelity; an ambient spawner may instead scatter
 	// within the area's bounds, in which case these become optional.
 	// Compound key (NpcSpawnAreaId, PointIndex). No surrogate Id: a point has no identity beyond its slot within its

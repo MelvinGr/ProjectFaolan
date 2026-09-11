@@ -7,15 +7,15 @@ using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
 {
-	// Statically patch the AgeOfConan.exe FILE: swap the embedded Funcom DH pubkey for the one the caller hands in (so
+	// Statically patch the AgeOfConan.exe file: swap the embedded Funcom DH pubkey for the one the caller hands in (so
 	// the server can validate the real password, docs/protocol/01-crypto.md) and optionally redirect the launcher-notes
-	// URL. The key is a PARAMETER of PatchPublicKey rather than something this class resolves from configuration: which
+	// URL. The key is a parameter of PatchPublicKey rather than something this class resolves from configuration: which
 	// key belongs in a client is the launcher's decision (derived from Server:PrivateKey, or an explicit
-	// Server:PublicKey for somebody else's server), and it is stated at the call site. Plain
-	// byte edits - no ptrace, no process memory, so it works IDENTICALLY on every platform (the old /proc/<pid>/mem
-	// in-memory patch was Linux-only). It persists on disk, so it runs BEFORE the exe launches and before the
-	// -clienthash md5 (so the hash matches the file we run); the launcher backs the exe up to .bak first, so --restore
-	// is a copy-back. Retail's ConanPatcher would re-verify/revert the exe, but we bypass it, so nothing clobbers it.
+	// Server:PublicKey for somebody else's server), and it is stated at the call site. Plain byte edits - no ptrace, no
+	// process memory - so it works identically on every platform. It persists on disk, so it runs before the exe
+	// launches and before the -clienthash md5 (so the hash matches the file we run); the launcher backs the exe up to
+	// .bak first, so --restore is a copy-back. Retail's ConanPatcher would re-verify/revert the exe, but we bypass it,
+	// so nothing clobbers it.
 	internal static class ClientExePatcher
 	{
 		// The client's hardcoded launcher-notes URL - a printf FORMAT string with two %s (UniverseName + Language),
@@ -65,12 +65,11 @@ namespace Faolan.ClientLauncher
 
 		// Writes `newBytes` into every DH public-key slot in the exe.
 		//
-		// ⚠️ The slot is found by SHAPE, not by the value retail ships. Searching for retail's key meant an exe could be
-		// patched exactly once: after that it carries OUR key, so a second patch - which is what rotating the server
-		// key needs (`--generate-login-key`) - found nothing and reported NotFound. You had to --restore from the .bak
-		// first, and nothing said so.
+		// The slot is found by shape, never by the value retail ships: searching for retail's key would let an exe be
+		// patched exactly once, because after that it carries the server's key, so a second patch - which is what
+		// rotating the server key needs (`--generate-login-key`) - would find nothing and report NotFound.
 		//
-		// The shape is exact and was read off the file: a NUL-delimited run of exactly 256 ASCII hex characters. There
+		// The shape is exact and read off the file: a NUL-delimited run of exactly 256 ASCII hex characters. There
 		// are precisely two such runs in AgeOfConan.exe (and in AgeOfConanDX10.exe) - the public key at 0x01bf6c18 and
 		// the DH prime 0x108 bytes after it - so "the 256-hex string that is not the prime" names the key slot whatever
 		// value is currently in it. Excluding the prime is the part that matters: it is the same width and the same

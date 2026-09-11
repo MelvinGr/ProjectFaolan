@@ -8,18 +8,18 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report npc-debuff`: when an NPC lands a spell on the PLAYER, does retail re-send the `MagicBuffIIR` on every
-	// swing, and does it ever send the END twin? (#907)
+	// `--report npc-debuff`: when an NPC lands a spell on the player, does retail re-send the `MagicBuffIIR` on every
+	// swing, and does it ever send the end twin?
 	//
 	// The reported symptom is a `Butcher` debuff stuck at 0s on the player's bar for ever, surviving a map change.
 	// Ours sends one `MagicBuffIIR` per hit (372 sends for 352 hits in one fight) and never an end, because
 	// `SendMagicBuffIir`'s dedup+register is gated on `applyTo == applyFrom` - a SELF buff - so an NPC-onto-player
 	// record gets no registry entry, no expiry and no end twin.
 	//
-	// ⚠️ Two DIFFERENT defects could produce that icon, and the fix differs:
+	// Two different defects could produce that icon, and the fix differs:
 	//   1. retail applies once and we re-send per swing  -> the re-send is the bug, the missing expiry is secondary;
-	//   2. retail re-sends per swing too                 -> the re-send is correct and the missing END is the bug.
-	// The corpus decides it, so this counts APPLY records per (subject, caster, spell) run and looks for the END
+	//   2. retail re-sends per swing too                 -> the re-send is correct and the missing end is the bug.
+	// The corpus decides it, so this counts apply records per (subject, caster, spell) run and looks for the end
 	// (`form` 1) that closes it.
 	public static partial class ReportCli
 	{
@@ -70,7 +70,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// The direction this ticket is about: a MOB's spell landing on a PLAYER.
+					// The direction this ticket is about: a MOB's spell landing on a player.
 					if (!npcs.Contains(buff.ApplyFrom.Value) || !players.Contains(buff.ApplyTo))
 						continue;
 
@@ -103,7 +103,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  pairings that ever receive the END twin (form 1): {withEnd} of {runs.Count}");
 			Console.WriteLine();
 
-			// ⭐ The discriminating number. If retail applies ONCE per engagement, almost every pairing is a single
+			// The discriminating number. If retail applies once per engagement, almost every pairing is a single
 			// apply however long the fight ran; if it re-sends per swing, the counts climb with fight length.
 			foreach (var bucket in new[] { 1, 2, 5, 10, 50 })
 			{

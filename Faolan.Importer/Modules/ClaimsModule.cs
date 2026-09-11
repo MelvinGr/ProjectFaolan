@@ -16,10 +16,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Account CLAIMS (CoreClaimIIR 0x06EC1255) -> AccountClaim rows, attached to the import account. Opt-in
-	// like the other account-state seeds. The item TEA keys the claims reference are harvested into Items by the items
-	// module (ItemHashHarvester's claim-list source), so this depends on `items` for the FK + the key the server
-	// re-sends on the wire. Overwrite = rebuild the account's claim set cleanly. See docs/subsystems/item-claims.md.
+	/// <summary>
+	///     Account claims (CoreClaimIIR) -> AccountClaim rows, attached to the import account. Opt-in like the other
+	///     account-state seeds. See docs/subsystems/item-claims.md.
+	/// </summary>
+	/// <remarks>
+	///     The item TEA keys the claims reference are harvested into Items by the items module (ItemHashHarvester's
+	///     claim-list source), so this depends on `items` for the FK and the key the server re-sends on the wire.
+	///     Overwrite rebuilds the account's claim set cleanly.
+	/// </remarks>
 	public sealed class ClaimsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];

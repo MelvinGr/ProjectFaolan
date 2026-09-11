@@ -7,26 +7,26 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report professions` - resolve every `NpcStatCore.ProfessionName` against the client's own plaintext LDB, and
-	// print the profession catalog it produces: type -> name -> the templates that carry it (Gitea #649).
+	// print the profession catalog it produces: type -> name -> the templates that carry it.
 	//
 	// `ProfessionName` (`ProtoCoreCharacterIIR.NpcStats.profession_name`, field 11) is the ELF hash of the profession's
-	// NAME string - identified in #647 by two exact wordlist hits, `elf("Merchant") == 210363236` and
-	// `elf("Trainer") == 193463442`. An ELF-hashed id is how the LDB addresses its strings, so the hash is an LDB ID
-	// and the name is a lookup rather than a brute force. This report performs that lookup.
+	// name string - `elf("Merchant") == 210363236`, `elf("Trainer") == 193463442`. An ELF-hashed id is how the LDB
+	// addresses its strings, so the hash is an LDB id and the name is a lookup rather than a brute force. This report
+	// performs that lookup.
 	//
-	// It exists as a REPORT rather than a scratch script because the answer is a survey, not a one-off: the useful
-	// output is the per-TYPE grouping (does the resolved name agree with what the templates carrying it look like?)
+	// It exists as a report rather than a scratch script because the answer is a survey, not a one-off: the useful
+	// output is the per-type grouping (does the resolved name agree with what the templates carrying it look like?)
 	// and the RESIDUE (which hashes still resolve to nothing, and why). Both change as the LDB coverage and the
 	// imported world change, so re-running it has to be one command.
 	//
-	// **Result: all 88 resolve, and LDB category 253 is the table.** It holds the profession/shop-kind label - "Trader",
-	// "Merchant", "Local Travel", "Guard", "Armorsmith", "Master Potions", "Cimmerian Pathfinder", ... - which is what
+	// Result: all 88 resolve, and LDB category 253 is the table. It holds the profession/shop-kind label - "Trader",
+	// "Merchant", "Local Travel", "Guard", "Armorsmith", "Master Potions", "Cimmerian Pathfinder",... - which is what
 	// names `NpcProfession`'s members and what identifies a vendor's shop category.
 	//
-	// ⚠️ Eight of the ids are TINY (1, 2, 22, 28, 44, 46, 53, 56), far below any 28-bit ELF hash of a real word, and
-	// they resolve in category 253 as well. So the column is NOT uniformly hashed: category 253 carries small
+	// Eight of the ids are TINY (1, 2, 22, 28, 44, 46, 53, 56), far below any 28-bit ELF hash of a real word, and
+	// they resolve in category 253 as well. So the column is not uniformly hashed: category 253 carries small
 	// sequential ids beside the hashed ones, and an id resolves the same way either way. They are called out because
-	// assuming one encoding is exactly the mistake this report should prevent - a small id also resolves in every OTHER
+	// assuming one encoding is exactly the mistake this report should prevent - a small id also resolves in every other
 	// category, so it is only unambiguous once the category is pinned.
 	public static partial class ReportCli
 	{

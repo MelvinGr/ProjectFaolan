@@ -14,45 +14,43 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Modules
 {
 	/// <summary>
-	///     Fills <see cref="ClassAttributeBase" /> - the class/level BASE a character's stats start from (#444).
+	///     Fills <see cref="ClassAttributeBase" /> - the class/level base a character's stats start from.
 	/// </summary>
 	/// <remarks>
 	///     The base is not on the wire (retail sends a flat 10 for every attribute), and it is not in any of the client's
-	///     named data tables either. It lives in RDB type <b>1000020</b>, the ITEM-template type, as 80 PLAINTEXT templates
+	///     named data tables either. It lives in RDB type <b>1000020</b>, the item-template type, as 80 plaintext templates
 	///     per class - one per level - whose stat records are read by the ordinary item parser
 	///     (<see cref="ItemTemplateStatModifiers" />).
 	///     <para>
 	///         <b>The level is recovered from the template, not from its id.</b> Each one names itself
-	///         <c>"&lt;Class&gt; Class Feat &lt;NNN&gt;"</c>, and <c>NNN</c> is the first level of a TEN-LEVEL BLOCK: 001,
+	///         <c>"&lt;Class&gt; Class Feat &lt;NNN&gt;"</c>, and <c>NNN</c> is the first level of a ten-level block: 001,
 	///         011, 021 … 071. The ten members of a block are ordered within it by their values - the five attributes rise
 	///         strictly with level - so <c>level = NNN + rank-inside-the-block</c>.
 	///     </para>
 	///     <para>
-	///         ⚠️ <b><c>id = anchor + (level - 1)</c> is WRONG</b>, which is what the first cut of this module assumed. A
-	///         class's 80 ids are consecutive, but the eight blocks sit inside that range in an arbitrary per-class ORDER:
-	///         the Ranger's run is <c>[31-40][41-50][11-20][71-80][61-70][51-60][21-30][1-10]</c>. That is why its levels
-	///         appeared to stop dead at 10 (the level-1 block is LAST) and why the Priest of Mitra was importing level
-	///         61-70's values as levels 11-20. Nothing about the id ordering is load-bearing now.
+	///         <b><c>id = anchor + (level - 1)</c> is wrong.</b> A class's 80 ids are consecutive, but the eight
+	///         blocks sit inside that range in an arbitrary per-class order: the Ranger's run is
+	///         <c>[31-40][41-50][11-20][71-80][61-70][51-60][21-30][1-10]</c>. Reading the id as the level makes the
+	///         Ranger's levels stop dead at 10 (its level-1 block is last) and files the Priest of Mitra's level
+	///         61-70 values as levels 11-20. Nothing about the id ordering is load-bearing.
 	///     </para>
 	///     <para>
-	///         The block name also settles the old "the name is not the level" note: it is not the level, it is the level
-	///         DECADE - three consecutive Assassin templates all reading "Class Feat 021" are levels 21, 22 and 23.
+	///         The block name is not the level, it is the level decade - three consecutive Assassin templates all
+	///         reading "Class Feat 021" are levels 21, 22 and 23.
 	///     </para>
-	///     <see cref="ClassAnchors" /> - the level-1 template each class was OBSERVED loading in-client - is kept purely as
+	///     <see cref="ClassAnchors" /> - the level-1 template each class was observed loading in-client - is kept purely as
 	///     a cross-check: the decode must place it at level 1. See docs/subsystems/player-stats.md.
 	/// </remarks>
 	public sealed partial class ClassAttributeBaseModule : IImportModule
 	{
 		/// <summary>
-		///     Every template a character of a KNOWN class and level was observed loading in-client (2026-07-26), with the
+		///     Every template a character of a known class and level was observed loading in-client (2026-07-26), with the
 		///     <c>GameCode/ItemData</c> + <c>ClientInterface</c> debug channels on. Nothing is located from these - the
 		///     decode is name-driven - but the import fails loudly if it cannot reproduce every one of them.
 		///     <para>
-		///         ⚠️ These are the OBSERVATIONS ONLY. An earlier cut of this module also carried a level-1 id for the
-		///         Herald of Xotli, the Necromancer and the Demonologist, but those three were BACK-COMPUTED as
-		///         <c>observed - (level - 1)</c> under the since-disproved id rule, and all three are wrong: the arithmetic
-		///         silently absorbed the unreadable ids in between (the Herald's by 2) or crossed into another block
-		///         entirely (the Necromancer's landed on level 15). Do not re-derive an observation - re-observe it.
+		///         These are observations only. A level-1 id back-computed as <c>observed - (level - 1)</c> is not an
+		///         observation and is wrong: the arithmetic silently absorbs the unreadable ids in between, or crosses
+		///         into another id block entirely. Do not re-derive an observation - re-observe it.
 		///     </para>
 		/// </summary>
 		public static readonly IReadOnlyList<(ConanClass Class, uint Level, uint TemplateId)> ClientObservations =
@@ -97,7 +95,7 @@ namespace Faolan.Importer.Modules
 
 		// The stats a base row is allowed to carry. The five attributes and MaxHealth are on every class; 0x0118 (Non
 		// Combat Mana Regen) only on the casters, and it is what makes their regen base 2200 rather than the 2000 the
-		// client seeds (#442). Anything else in a template is a false-positive signature hit and is dropped.
+		// client seeds. Anything else in a template is a false-positive signature hit and is dropped.
 		private static readonly HashSet<CharacterStatId> Kept =
 		[
 			CharacterStatId.Strength, CharacterStatId.Constitution, CharacterStatId.Intelligence, CharacterStatId.Wisdom, CharacterStatId.Dexterity,
@@ -108,7 +106,7 @@ namespace Faolan.Importer.Modules
 			[CharacterStatId.Strength, CharacterStatId.Constitution, CharacterStatId.Intelligence, CharacterStatId.Wisdom, CharacterStatId.Dexterity];
 
 		// The client seeds each attribute 804/806/808/810/814 alongside a parallel ODD-id twin (805/807/809/811/815, plus
-		// the 812/813 pair) which it sets to 100 - a percentage, not a score (#444). A class-BASE template never touches
+		// the 812/813 pair) which it sets to 100 - a percentage, not a score. A class-base template never touches
 		// the twins; a template that does belongs to some other feat series that happens to share the class name, and its
 		// attribute amounts are single digits rather than the base's multiples of ten. Rejecting on the twins is what
 		// keeps those out of the level blocks - 5 strays in the Ranger's block 001, 10 in the Herald of Xotli's block 021.
@@ -178,7 +176,7 @@ namespace Faolan.Importer.Modules
 		}
 
 		/// <summary>
-		///     Every class-feat template in the RDB, grouped by class - the RAW candidate set, strays included. Use
+		///     Every class-feat template in the RDB, grouped by class - the raw candidate set, strays included. Use
 		///     <see cref="LevelsOf" /> to turn one class's candidates into its level map.
 		/// </summary>
 		public static Dictionary<ConanClass, List<Template>> ScanRuns(RdbReader rdb)
@@ -214,9 +212,9 @@ namespace Faolan.Importer.Modules
 			return levels;
 		}
 
-		// A class-base template is a PLAINTEXT type-1000020 entry (the canonical 12-byte RDB-Id header survives only when
+		// A class-base template is a plaintext type-1000020 entry (the canonical 12-byte RDB-Id header survives only when
 		// the entry is not TEA-encrypted, so it doubles as the "is this readable at all" check) that names itself
-		// "<Class> Class Feat <NNN>" AND carries all five attributes at sane amounts. Both halves are load-bearing: the
+		// "<Class> Class Feat <NNN>" and carries all five attributes at sane amounts. Both halves are load-bearing: the
 		// name alone also matches other feat series whose records parse as garbage in the hundreds of millions, and the
 		// records alone cannot say which class or which decade.
 		private static bool TryReadTemplate(RdbReader rdb, RdbReader.Entry entry, out Template template)
@@ -248,14 +246,14 @@ namespace Faolan.Importer.Modules
 			return true;
 		}
 
-		// The name is embedded mid-blob and is NOT null-terminated on every class - the Bear Shaman's and Tempest of
+		// The name is embedded mid-blob and is not null-terminated on every class - the Bear Shaman's and Tempest of
 		// Set's run straight into the following "No description given." string - so the match is anchored at the start of
 		// a printable run and left open at the end.
 		[GeneratedRegex(@"^(.+?) Class Feat (\d+)")]
 		private static partial Regex ClassFeatName();
 
 		// Printable ASCII runs of 4+ chars in a blob - the class-feat name is one of them. Stays private: ReportCli
-		// had a byte-identical copy, but it was DEAD (left behind when this scan moved out of the CLI into this
+		// had a byte-identical copy, but it was dead (left behind when this scan moved out of the CLI into this
 		// module), so deleting it leaves one caller - and a single-use helper belongs next to its caller.
 		private static IEnumerable<string> AsciiRuns(byte[] blob)
 		{

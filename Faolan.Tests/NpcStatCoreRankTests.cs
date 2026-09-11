@@ -7,17 +7,17 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// `NpcStatCore.NpcType` is the client's `npc_type` (NpcStats field 14) - the NPC kind that decides the nameplate
-	// rank decoration (#508).
+	// rank decoration.
 	//
-	// ⚠️ The pin below is on TWO NPCs and that is ALL it establishes. The claim "3 is the skull rank" was retracted:
+	// The pin below is on two NPCs and that is all it establishes. The claim "3 is the skull rank" was retracted:
 	// the same value covers `Tamed Puma` and `Pleasurable Company`, so it is broader than the skull. Keaira and King
 	// Conan carrying 3 remains a real, annotation-backed fact worth gating - it just does not generalise to the
 	// other 57. See NpcStatCore.NpcType and docs/protocol/gaps.md.
 	//
-	// ⭐ The SKULL itself is `normalset` (stat 205), pinned from the client's own target-portrait updater - and the
+	// The skull itself is `normalset` (stat 205), pinned from the client's own target-portrait updater - and the
 	// same two NPCs fall in that set too, which is the gate below. Two independent routes, one answer.
 	//
-	// It is already emitted by the live spawn path, so the only way this regresses is through the DATA: a NULL
+	// It is already emitted by the live spawn path, so the only way this regresses is through the data: a null
 	// silently drops the rank and the boss renders as an ordinary mob, with nothing anywhere to say so. That is the
 	// failure this gates. The importer harvests the column from captured spawn bodies, so a re-harvest against a
 	// narrower corpus is exactly how a row would lose it.
@@ -53,8 +53,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ #758: the three values the client TITLES are 1 Minion / 2 Mini Boss / 3 Boss, and 4 is untitled. Gated by
-		// MEMBERSHIP rather than by the count, because the count is what a re-harvest changes and the membership is
+		// The three values the client titles are 1 Minion / 2 Mini Boss / 3 Boss, and 4 is untitled. Gated by
+		// membership rather than by the count, because the count is what a re-harvest changes and the membership is
 		// what the identification rests on: if King Conan ever stopped being 3, or a Rabbit stopped being 1, the
 		// reading is what broke.
 		[Theory]
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, core!.NpcType);
 		}
 
-		// ...and 4 - the value the client renders NO title for - has to stay the majority, because a boss title over
+		// ...and 4 - the value the client renders no title for - has to stay the majority, because a boss title over
 		// most of the world's NPCs is the visible failure this identification would cause if the mapping inverted.
 		[Fact]
 		public async Task TheUntitledValueIsTheMajority()
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 
 		// The skull set, straight from the client: FUN_0163eec0 reads GetStat(0xCD) and shows SkullLeft/SkullRight
 		// for exactly these values. Gated on the shipped rows so a re-harvest that loses `normalset` - the column is
-		// NULL for 972 of 1,194 templates already - cannot silently take the skulls off the two NPCs an annotation
+		// null for 972 of 1,194 templates already - cannot silently take the skulls off the two NPCs an annotation
 		// says had them.
 		[Fact]
 		public async Task KeairaAndKingConan_FallInTheClientsSkullSet()

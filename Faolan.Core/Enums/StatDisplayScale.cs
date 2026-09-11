@@ -5,7 +5,7 @@ using System.Linq;
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     The client's own WIRE -> DISPLAY divisor for a stat id, transcribed from <c>AgeOfConan.exe</c> (#251).
+	///     The client's own wire-to-display divisor for a stat id, transcribed from <c>AgeOfConan.exe</c>.
 	/// </summary>
 	/// <remarks>
 	///     <para>
@@ -31,32 +31,29 @@ namespace Faolan.Core.Enums
 	///         decompiler output stays readable.
 	///     </para>
 	///     <para>
-	///         <b>Why this supersedes hand-measuring.</b> #251 had reached "a scale can only come from a number a human
-	///         reads - a tooltip or the character sheet, against the wire value we hold", which made every stat its own
-	///         in-client experiment and left ten of them unreachable because a level-1 character's sheet does not render
-	///         them. This settles all of them at once, offline. It is not a competing method: it REPRODUCES all 27
-	///         values that were measured that way (see <c>StatDisplayScaleTests</c>), including the two the old table
-	///         called out as counter-intuitive - <c>0x0177 FatalityChance</c> renders raw while <c>0x017C
-	///         SpellFatalityChance</c> is a ×100 - and it answers the ten that could not be probed:
-	///         Attack/Defense/Magic Rating and Magical Resist, Miss Chance, Healing Efficiency and Magic Damage
-	///         Modifier are ×100; Damage Deflection, Knockback Resistance and Chance of Being Staggered are ×1.
+	///         The table reproduces all 27 values that can be measured in-client against a tooltip or the character
+	///         sheet (see <c>StatDisplayScaleTests</c>), including the two counter-intuitive ones - <c>0x0177
+	///         FatalityChance</c> renders raw while <c>0x017C SpellFatalityChance</c> is a x100 - and it also covers
+	///         the ten a level-1 character's sheet never renders: Attack/Defense/Magic Rating and Magical Resist, Miss
+	///         Chance, Healing Efficiency and Magic Damage Modifier are x100; Damage Deflection, Knockback Resistance
+	///         and Chance of Being Staggered are x1.
 	///     </para>
 	///     <para>
-	///         ⚠️ <b>×10000 is real, not a transcription slip.</b> Five ids are in BOTH predicate sets and the client
+	///         <b>x10000 is real, not a transcription slip.</b> Five ids are in both predicate sets and the client
 	///         multiplies the two divisors: <c>0x00FF</c> Evade Level Growth, <c>0x013C</c> Variance, <c>0x013D</c>,
 	///         <c>0x0140</c> Magic Variance and <c>0x0397</c> Critical Blast Chance. The composition is a
 	///         <c>MULSS</c> against the same 100.0 constant, so it is explicit in the instruction stream.
 	///     </para>
 	///     <para>
-	///         ⚠️ A divisor of 1 means the client prints the raw integer - it takes a different formatter, so "×1" is a
-	///         genuine answer here and not the absent-from-the-table default it used to be.
+	///         A divisor of 1 means the client prints the raw integer through a different formatter, so x1 is a
+	///         genuine answer here rather than an absent entry.
 	///     </para>
 	///     <para>
-	///         ⚠️ <b>This is only half of rendering a value.</b> The other half is the UNIT the client writes after it,
-	///         which is a DIFFERENT function over a DIFFERENT id set - <see cref="StatUnitSuffix" />, transcribed from
-	///         <c>FUN_01119f20</c> (#775). Neither is a function of the other: <c>0x001 HealthMax</c> is a ÷100 that
-	///         draws nothing and <c>0x348 DamageMultiplier</c> a ÷1 that draws <c>%</c>. It also answers the note on
-	///         <c>0x0177 FatalityChance</c> below - its trailing percent sign is that suffix, not a scale.
+	///         <b>This is only half of rendering a value.</b> The other half is the unit the client writes after it,
+	///         which is a different function over a different id set - <see cref="StatUnitSuffix" />, transcribed from
+	///         <c>FUN_01119f20</c>. Neither is a function of the other: <c>0x001 HealthMax</c> is a divide-by-100 that
+	///         draws nothing and <c>0x348 DamageMultiplier</c> a divide-by-1 that draws <c>%</c>. That suffix is also
+	///         where <c>0x0177 FatalityChance</c>'s trailing percent sign comes from - it is not a scale.
 	///     </para>
 	/// </remarks>
 	public static class StatDisplayScale
@@ -94,8 +91,8 @@ namespace Faolan.Core.Enums
 			}
 			.ToFrozenSet();
 
-		// The ×10 ids: the five character attributes (every other id across 0x324-0x32E) plus 0x57B Ferocity, which
-		// the sheet lists as the sixth attribute. The client hardcodes exactly these seven and this branch OVERRIDES
+		// The x10 ids: the five character attributes (every other id across 0x324-0x32E) plus 0x57B Ferocity, which
+		// the sheet lists as the sixth attribute. The client hardcodes exactly these seven, and this branch overrides
 		// the percent divisors above rather than composing with them.
 		private static readonly FrozenSet<uint> Tenths = new uint[] { 0x324, 0x326, 0x328, 0x32A, 0x32C, 0x32E, 0x57B }.ToFrozenSet();
 

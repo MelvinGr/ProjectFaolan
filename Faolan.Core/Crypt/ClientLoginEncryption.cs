@@ -11,26 +11,24 @@ namespace Faolan.Core.Crypt
 
 	// AoC login crypto: Diffie-Hellman (prime N, g=5) key agreement + TEA-CBC. The client sends
 	// "<clientPub hex>-<TEA-CBC ciphertext hex>"; the low 128 bits of the DH shared secret are the TEA key. The
-	// server reproduces the secret with its OWN private key - which only works if the client used OUR public key, i.e.
+	// server reproduces the secret with its own private key - which only works if the client used our public key, i.e.
 	// a patched/launched client (see docs/protocol/01-crypto.md + Faolan.ClientLauncher/ClientExePatcher.cs).
 	// An unpatched retail client uses Funcom's public key, so Decrypt returns garbage that fails the challenge check
-	// -> the caller falls back to accept-any. A server with no Server:PrivateKey at all reaches that same fallback for
-	// every client, by design. Algorithm validated by round-trip (docs plan, 2026-06-08).
+	// and the caller falls back to accept-any. A server with no Server:PrivateKey at all reaches that same fallback for
+	// every client, by design.
 	//
-	// The DH parameters and the key handling used to be a separate DhKeys class holding the configured private key in
-	// STATIC state, applied by a Configure(IConfiguration) that every executable had to remember to call. That made the
-	// key an ambient global: forget the call and Decrypt silently degrades every login to accept-any, with nothing at
-	// the call site to say the key was missing. It is all one stateless class now - the key is a PARAMETER of the two
-	// operations that need it (Decrypt, PublicHexFor), so a caller cannot fail to supply it.
+	// The class is stateless: the private key is a parameter of the two operations that need it (Decrypt,
+	// PublicHexFor), so a caller cannot fail to supply it. Ambient key state would let a forgotten setup call silently
+	// degrade every login to accept-any with nothing at the call site to say the key was missing.
 	//
 	// This lives in Faolan.Core deliberately: the launcher patches the public half into AgeOfConan.exe and does not
 	// reference Faolan.Core.Network, and a hand-copied second copy of the keypair is a silent failure waiting to happen
 	// (change the private key and every login falls back to accept-any while the patched client carries the old public
-	// key). Here the public half is DERIVED from the private one, so they cannot drift.
+	// key). Here the public half is derived from the private one, so they cannot drift.
 	public static class ClientLoginEncryption
 	{
 		/// <summary>
-		///     The hex length a private key is written at - <see cref="GeneratePrivate" /> samples 256 BITS, so its
+		///     The hex length a private key is written at - <see cref="GeneratePrivate" /> samples 256 bits, so its
 		///     value is 32 bytes and its hex is 64 characters, left-padded where a leading nibble is zero.
 		/// </summary>
 		public const int PrivateHexLength = 64;
@@ -52,20 +50,20 @@ namespace Faolan.Core.Crypt
 
 		/// <summary>
 		///     Server side: decrypt a client <c>AnswerChallenge</c> body (<c>"clientPubHex-ciphertextHex"</c>) into
-		///     the <c>username|challenge|password</c> triple. Returns null if the body is malformed or the block can't
+		///     the <c>username|challenge|password</c> triple. Returns null if the body is malformed or the block cannot
 		///     be parsed - which is the normal case for an unpatched client (its block is undecryptable to us), so the
-		///     caller should treat null (or a mismatched challenge) as "unpatched" and fall back to the legacy path.
+		///     caller should treat null (or a mismatched challenge) as "unpatched" and fall back to accept-any.
 		/// </summary>
 		/// <param name="loginKey">The client's <c>AnswerChallenge</c> body.</param>
 		/// <param name="privateKey">
-		///     This deployment's <c>Server:PrivateKey</c>, or null when it has none. A PARAMETER rather than the static
-		///     state it used to be: a keyless server is a legitimate configuration, so "we cannot decrypt" has to be
-		///     something the caller states rather than something it can forget to set up.
+		///     This deployment's <c>Server:PrivateKey</c>. A parameter rather than ambient state: a keyless server is a
+		///     legitimate configuration, so "we cannot decrypt" has to be something the caller states rather than
+		///     something it can forget to set up.
 		/// </param>
 		/// <remarks>
-		///     With no <c>Server:PrivateKey</c> there is nothing to decrypt WITH, so every block reads as undecryptable.
+		///     With no <c>Server:PrivateKey</c> there is nothing to decrypt with, so every block reads as undecryptable.
 		///     That is the same null a genuinely unpatched client produces - which is why the caller decides what to
-		///     do about an unpatched client on the KEY rather than on this null: a keyless server that denied them
+		///     do about an unpatched client on the key rather than on this null: a keyless server that denied them
 		///     would refuse everyone.
 		/// </remarks>
 		public static LoginCredentials? Decrypt(string loginKey, BigInteger privateKey)
@@ -153,7 +151,7 @@ namespace Faolan.Core.Crypt
 		///     what a brute-force costs, and 256 bits is past reach.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Generating one is HALF the job: a client still carries the public key it was patched with, so every
+		///     Generating one is half the job: a client still carries the public key it was patched with, so every
 		///     client has to be re-patched (<c>Faolan.ClientLauncher --patch-login</c>) or its login block stops
 		///     decrypting - which does not fail loudly, it falls back to accept-any. The two move together.
 		/// </remarks>
@@ -178,7 +176,7 @@ namespace Faolan.Core.Crypt
 
 		/// <summary>
 		///     <see cref="PublicFor" /> as the <see cref="PublicHexLength" />-char ASCII hex field the exe stores it in -
-		///     the value the launcher patches into a client. Always DERIVED from the private key, so the two halves of
+		///     the value the launcher patches into a client. Always derived from the private key, so the two halves of
 		///     one keypair cannot be made to disagree.
 		/// </summary>
 		public static string PublicHexFor(BigInteger serverPrivate)

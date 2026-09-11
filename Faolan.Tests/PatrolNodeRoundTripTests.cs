@@ -6,10 +6,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #316 columnarization gate: every committed patrol body (Golden/PatrolBodies.bin - the 136 PatrolPath.Body blobs)
-	// must survive MoveTaskIIR -> PatrolNode tree -> MoveTaskIIR byte-for-byte. This proves the DB
-	// columnarization (PatrolNode/PatrolNodeMapper) loses nothing, so the runtime can build patrols from columns
-	// instead of replaying the captured Body.
+	// Columnarization gate: every committed patrol body (the 136 PatrolPath.Body blobs in the PatrolBodies golden)
+	// must survive MoveTaskIIR -> PatrolNode tree -> MoveTaskIIR byte-for-byte. That is what lets the runtime build
+	// patrols from PatrolNode columns instead of replaying the captured Body: the mapping loses nothing.
 	public class PatrolNodeRoundTripTests
 	{
 		[Theory, MemberData(nameof(Bodies))]

@@ -13,22 +13,23 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Faolan.Importer.Captures
 {
-	// Upgrades the game CONTENT of a database that already has data, from faolan.sql (#412). The seed loads itself
-	// into an empty database (DatabaseInitializer), but that is keyed on emptiness - pulling a newer seed does
-	// nothing to a database you have already been playing on. This is the missing path.
-	//
-	// It is a MERGE, not a truncate-and-reload. Per table: INSERT what is new, UPDATE what changed, DELETE what the
-	// seed no longer has - keyed on the primary key. That works precisely because the seed is content-only: every
-	// table it covers that is referenced from OUTSIDE it (Items, Spells, QuestDefinitions, QuestGoalDefinitions,
-	// RespawnPoints, Maps) has a NATURAL, stable key, so a live character's inventory item or bound respawn point
-	// keeps pointing at the same row. The generated-id tables that remain in the seed (WorldObjects, ...) are
-	// internal to it - nothing outside points into them, so their renumbering is invisible. The conversation tree
-	// is no longer among them: its keys are derived from each node's identity and each child's position, so a
-	// re-harvest reproduces them exactly and this merge sees only genuine content changes.
-	//
-	// The one thing a merge cannot decide for you is a row the new seed DROPS while something still references it -
-	// a character holding an item the catalog no longer has. That is reported and the upgrade REFUSES; silently
-	// deleting the character's row or nulling the reference are both policy choices that belong to a human.
+	/// <summary>
+	///     Upgrades the game content of a database that already has data, from faolan.sql. DatabaseInitializer's load
+	///     is keyed on emptiness, so it does nothing to a database that has been played on; this is that path.
+	/// </summary>
+	/// <remarks>
+	///     It is a merge, not a truncate-and-reload. Per table: insert what is new, update what changed, delete what
+	///     the seed no longer has, keyed on the primary key. That works because the seed is content-only: every table
+	///     it covers that is referenced from outside it (Items, Spells, QuestDefinitions, QuestGoalDefinitions,
+	///     RespawnPoints, Maps) has a natural, stable key, so a live character's inventory item or bound respawn point
+	///     keeps pointing at the same row. Generated-id tables in the seed (WorldObjects,...) are internal to it -
+	///     nothing outside points into them, so their renumbering is invisible. The conversation tree's keys are
+	///     derived from each node's identity and each child's position, so a re-harvest reproduces them exactly and
+	///     this merge sees only genuine content changes.
+	///     The one case a merge cannot decide is a row the new seed drops while something still references it - a
+	///     character holding an item the catalog no longer has. That is reported and the upgrade refuses; deleting the
+	///     character's row or nulling the reference are policy choices that belong to a human.
+	/// </remarks>
 	public static class SqlSeedApplier
 	{
 		public sealed record TableChange(string Table, int Inserted, int Updated, int Deleted)
@@ -46,8 +47,8 @@ namespace Faolan.Importer.Captures
 
 		public static Report Apply(DatabaseContext target, string seedPath, bool dryRun)
 		{
-			// The seed is SQL, so the desired state is materialised by LOADING it - into a throwaway SQLite database
-			// rather than parsing the file. Same statements the real load runs, so the two cannot diverge.
+			// The seed is SQL, so the desired state is materialised by loading it into a throwaway SQLite database
+			// rather than parsing the file: the same statements the real load runs, so the two cannot diverge.
 			var staging = Path.Combine(Path.GetTempPath(), $"faolan-seed-{Guid.NewGuid():N}.db");
 			try
 			{
@@ -114,7 +115,9 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Rows that would be deleted but are still referenced from a table the seed does NOT own (i.e. player state).
+		/// <summary>
+		///     Rows that would be deleted but are still referenced from a table the seed does not own (player state).
+		/// </summary>
 		private static IEnumerable<string> ReferencesTo(DatabaseContext target, IGrouping<string, IEntityType> group, List<object?[]> deleting, List<string> key,
 			List<string> columns)
 		{

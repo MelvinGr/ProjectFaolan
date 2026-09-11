@@ -5,7 +5,7 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// Harvests QUEST DEFINITIONS from the completed-quest journal of captured snapshots (#390). That region carries,
+	// Harvests quest DEFINITIONS from the completed-quest journal of captured snapshots. That region carries,
 	// per completed quest, its title (category 50301) and journal sub-line (50303) plus the area/map/region header of
 	// the group it sits in - which is exactly what the client's Completed tab renders, and what generating the region
 	// back needs.
@@ -13,7 +13,7 @@ namespace Faolan.Importer.Extractors
 	// The corpus holds 1975 distinct completed quest ids this way, against the 107 definitions the
 	// QuestFullUpdate/QuestJournal packets yield - those only cover quests touched during a capture session.
 	//
-	// ⚠️ These definitions are PARTIAL by nature: the completed journal has no summary, objective, goals or level.
+	// These definitions are PARTIAL by nature: the completed journal has no summary, objective, goals or level.
 	// They must be merged additively, never through ImportQuestDefinitions, which replaces a quest's text refs
 	// wholesale and would strip the richer rows the full-update path built.
 	public static class CompletedQuestExtractor
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Extractors
 			return new Harvest([.. quests.Values], areas);
 		}
 
-		// A <remoteformat .../> or <localized .../> record as the region carries it.
+		// A <remoteformat.../> or <localized.../> record as the region carries it.
 		public static TextRef? ParseRecord(string xml)
 		{
 			return Parse(xml);

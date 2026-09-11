@@ -5,8 +5,12 @@ using Faolan.Importer.Cli;
 
 namespace Faolan.Importer.Modules
 {
-	// Item identities from inventory/snapshot packets. Wraps CaptureItemImporter (upsert by item key).
-	// TODO(importer step 2a): thread ctx.Mode into CaptureItemImporter so Insert skips existing keys.
+	/// <summary>
+	///     Item identities from inventory/snapshot packets. Wraps CaptureItemImporter.
+	/// </summary>
+	/// <remarks>
+	///     CaptureItemImporter upserts by item key regardless of the selected mode; Insert does not skip existing keys.
+	/// </remarks>
 	public sealed class ItemsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];
@@ -25,7 +29,7 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (total, inserted) = await CaptureItemImporter.ImportAsync(ctx.Db, ctx.RawPackets);
-			var excluded = await LootImportOps.ApplyRandomLootExclusions(ctx.Db); // #273: quest/resource + curated uniques
+			var excluded = await LootImportOps.ApplyRandomLootExclusions(ctx.Db); // quest/resource + curated uniques
 			return new ImportResult($"{total} item-candidate packets, {inserted} new, {excluded} newly excluded from random loot.");
 		}
 	}

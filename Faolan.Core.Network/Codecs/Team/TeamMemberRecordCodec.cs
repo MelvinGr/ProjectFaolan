@@ -7,29 +7,34 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// The TEAM MEMBER descriptor: the one repeating record almost every team message carries, and the reason the
-	// whole team subsystem is a small amount of code once this exists. Decoded byte-exact from
-	// login_2-clients_group-trade-friend (two retail clients on one host, so both sides of every exchange are on
-	// tape); TeamTradeFriendCodecTests pins both players' records against that captured hex and gates every message
-	// built from it.
-	//
-	//   [u32 0xC350][u32 characterId][u16 len][name LATIN1] then twenty u32 and a u16.
-	//
-	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of eleven RPC
-	// methods - the three team ones plus every raid message that names a single character - which is why it declares
-	// HandledMethods rather than a single Opcode.
-	//
-	// The client calls it `cCharacter` and its reader is `FUN_005574d0` (#669), which is what turned the three
-	// carried-verbatim regions below into named fields: the record's LAST field before the playfield proxy is a
-	// BOOL that gates the proxy, and its tail is four u32 and a bool rather than "two words and nine zero bytes".
-	// Every captured record still round-trips byte-for-byte - this renames bytes, it does not move any.
+	/// <summary>
+	///     The team member descriptor: the one repeating record almost every team message carries.
+	/// </summary>
+	/// <remarks>
+	///     Decoded byte-exact from login_2-clients_group-trade-friend (two retail clients on one host, so both sides of
+	///     every exchange are on tape); <c>TeamTradeFriendCodecTests</c> pins both players' records against that captured
+	///     hex and gates every message built from it.
+	///     <code>
+	///     [u32 entityClass][u32 characterId][u16 len][name Latin1] then twenty u32 and a u16.
+	///     </code>
+	///     <para>
+	///         It is both a sub-record - every other team message composes it - and, on its own, the whole body of eleven
+	///         RPC methods: the three team ones plus every raid message that names a single character. That is why it
+	///         declares <c>HandledMethods</c> rather than a single opcode.
+	///     </para>
+	///     <para>
+	///         The client calls it <c>cCharacter</c> and its reader is <c>FUN_005574d0</c>, which is what names the
+	///         regions below: the record's last field before the playfield proxy is a bool that gates the proxy, and its
+	///         tail is four u32 and a bool.
+	///     </para>
+	/// </remarks>
 	public static class TeamMemberRecordCodec
 	{
-		// Every method whose whole body is a bare member record. The two team ones are capture-proven; the eight raid
-		// ones are the client's own reader - `DispatchRaid*(i_cWho)` / `(i_cCharacter)` all call `FUN_005574d0`,
-		// the same reader the team member vector uses (#669). DispatchTeamCharacterApplied - the LFG "X applied to
-		// your team" the search's apply button raises - is the same read: its dispatcher `FUN_0133ccf0` calls
-		// `FUN_005574d0` and asserts "stream bad after 'i_cWho'" (#889).
+		// Every method whose whole body is a bare member record. The two team ones are capture-proven; the eight raid ones
+		// are the client's own reader - `DispatchRaid*(i_cWho)` / `(i_cCharacter)` all call `FUN_005574d0`, the same reader
+		// the team member vector uses. DispatchTeamCharacterApplied - the LFG "X applied to your team" the search's apply
+		// button raises - is the same read: its dispatcher `FUN_0133ccf0` calls `FUN_005574d0` and asserts "stream bad after
+		// 'i_cWho'".
 		public static readonly CSPlayerInterfaceMethods[] HandledMethods =
 		[
 			CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam, CSPlayerInterfaceMethods.DispatchTeamCharacterApplied,
@@ -80,8 +85,8 @@ namespace Faolan.Core.Network.Codecs.Team
 			m.FlagA = r.ReadU8() != 0;
 			m.FlagB = r.ReadU8() != 0;
 
-			// The third bool GATES the proxy - the client reads one only when it is set, so a member with no
-			// playfield is a shorter record rather than a record carrying a zeroed proxy.
+			// The third bool gates the proxy: the client reads one only when it is set, so a member with no playfield is a
+			// shorter record rather than a record carrying a zeroed proxy.
 			if (r.ReadU8() != 0)
 				m.Playfield = PlayfieldProxy.Read(ref r);
 
@@ -105,25 +110,29 @@ namespace Faolan.Core.Network.Codecs.Team
 		}
 	}
 
-	// 102 bytes for a 10-character name. The first trailing u32 is the CLASS: the two captured members carry 0x29 and
-	// 0x2C, which are exactly Class.Necromancer and Class.Demonologist, and the chat server's friend-add reply ends
-	// with the same byte for the same character. (Read as a LEVEL at first, because 0x29/0x2C are also plausible levels
-	// and the friend reply "confirmed" it - two independent sightings of the same wrong field. The enum match settles
-	// it, and the client agrees: fed a level here, it took the invite, answered it, and refused to raise the invite
-	// window, because it cannot build one for a class that does not exist.)
-	//
-	// Then the LEVEL, the map id, and the per-character value below. The rest are identical across both captured
-	// characters and every message, and are carried as captured; naming them from one two-character capture would be
-	// invention.
-	//
-	// The level was the one field this record could NOT identify on its own: it sat here as a constant `Field1 = 5`
-	// because both captured team members happened to be level 5. DispatchCharacterSearchResult (0x2010) carries the
-	// SAME record for several characters at once, and across the five captured bodies that word reads 5, 7, 8 and 10 -
-	// every value inside the 5..10 range the client's CharacterSearch asked for, and `Nefalis` appears at 7 in one
-	// capture and 8 in a later one. That is a level (#460).
+	/// <summary>
+	///     One team member as the wire carries it - 102 bytes for a 10-character name.
+	/// </summary>
+	/// <remarks>
+	///     The first trailing u32 is the class: the two captured members carry 0x29 and 0x2C, which are exactly
+	///     <c>ConanClass.Necromancer</c> and <c>ConanClass.Demonologist</c>, and the chat server's friend-add reply ends
+	///     with the same byte for the same character. The client agrees: fed a level here it takes the invite, answers it,
+	///     and then refuses to raise the invite window, because it cannot build one for a class that does not exist.
+	///     <para>
+	///         Then the level, the map id, and the per-character value below. The rest are identical across both captured
+	///         characters and every message and are carried as captured; naming them from one two-character capture would
+	///         be invention.
+	///     </para>
+	///     <para>
+	///         The level cannot be identified from the team captures alone, where both members happen to be level 5.
+	///         <c>DispatchCharacterSearchResult</c> carries the same record for several characters at once, and across the
+	///         five captured bodies that word reads 5, 7, 8 and 10 - every value inside the 5..10 range the client's
+	///         CharacterSearch asked for, with <c>Nefalis</c> appearing at 7 in one capture and 8 in a later one.
+	///     </para>
+	/// </remarks>
 	public sealed record TeamMemberRecord
 	{
-		// The playfield-instance token both captured members carry. They are two DIFFERENT characters in the same map
+		// The playfield-instance token both captured members carry. They are two different characters in the same map
 		// (4020) carrying the same value, which is what identifies it as an instance token rather than anything
 		// per-character. Retained as the default so a from-columns member still builds the captured bytes.
 		public const uint CapturedPlayfieldToken = 0x01EDA8B2;
@@ -131,65 +140,62 @@ namespace Faolan.Core.Network.Codecs.Team
 		public uint CharacterId { get; set; }
 		public string Name { get; set; } = "";
 
-		// Class.Necromancer / Class.Demonologist in the capture. The client needs a REAL class here - it builds the
-		// invite window's class icon from it - so a wrong value silently costs you the window.
+		// ConanClass.Necromancer / ConanClass.Demonologist in the capture. The client needs a real class here - it builds
+		// the invite window's class icon from it - so a wrong value silently costs the window.
 		public ConanClass Class { get; set; }
 
 		// The playfield the member is in - the client shows it in the team window and greys out members elsewhere.
 		public uint MapId { get; set; }
 
-		// The character's LEVEL - see the class comment. Sent as a constant 5 until the character-search bodies
-		// identified it, which meant every team roster, invite and search result described everyone as level 5.
+		// The character's level; see the record's remarks for how it was identified.
 		public uint Level { get; set; }
 
 		// Differs per character (2 and 3 for the two captured members) while everything around it is constant, so it is
-		// per-character. Not the class (that is Class above), not the level (that is Level above), and not identifiable
-		// from the captures: sex and race are still candidates. [V0]
+		// per-character. Not the class and not the level, both of which have their own fields, and not identifiable from the
+		// captures: sex and race are still candidates. [V0]
 		public uint PerCharacterWord { get; set; }
 
-		// Two bools the client reads immediately before the playfield gate, zero in every captured record. They are
-		// the leading two bytes of what used to be carried as `Field7Head = 00 00 01`; the third byte of that run is
-		// the gate itself and is not a field. Named by position because a constant-zero flag names nothing. [V0]
+		// Two bools the client reads immediately before the playfield gate, zero in every captured record. Named by
+		// position because a constant-zero flag names nothing. [V0]
 		public bool FlagA { get; set; }
 		public bool FlagB { get; set; }
 
-		// The playfield the member's client is looking at, as a PlayfieldProxy - the SAME stream the teleport records
-		// carry (client FUN_00a6a600), embedded here rather than being a run of constants (Gitea #454). It reads
-		// misaligned if you take the record as all-u32, which is how it was modelled: `Field7 = 0x00000162` had
-		// swallowed the proxy's version byte ('b' = 0x62). Read aligned, both captured members decode into all ten
-		// proxy fields exactly - class word 0xC79C, this MapId, the ready flag, 0x9C50, and a token.
+		// The playfield the member's client is looking at, as a PlayfieldProxy - the same stream the teleport records carry
+		// (client FUN_00a6a600) - embedded here rather than being a run of constants. It reads misaligned if the record is
+		// taken as all-u32, which swallows the proxy's version byte; read aligned, both captured members decode into all ten
+		// proxy fields exactly.
 		//
-		// ⚠️ The token is carried VERBATIM (CapturedPlayfieldToken) rather than sourced from the member's live
-		// playfield, so our rosters ship the captured session's value. That is deliberate for now: the reading is
-		// structural (two codecs agreeing, plus the same value showing up as FriendListCodec's "online stamp") and has
-		// not been checked in-client. Gitea #454 / #426. [V0]
+		// The token is carried verbatim (CapturedPlayfieldToken) rather than sourced from the member's live playfield, so
+		// rosters ship the captured session's value. The reading is structural - two codecs agreeing, plus the same value
+		// showing up as FriendListCodec's "online stamp" - and has not been checked in-client. [V0]
 		public PlayfieldProxy Playfield { get; set; } = null!;
 
-		// FOUR per-character opaque words and a trailing flag - the client's `FUN_005574d0` reads exactly that after
-		// the proxy, which is what split the old "[u32][u32] then nine zero bytes" (#669). C, D and the flag are zero
-		// in every captured record; A and B are not, and appear NOWHERE else in the capture - not in login, not in
-		// the snapshot - so they are CS-tier state we cannot derive from anything we send, and there is no basis for
-		// computing them. Carried so a captured member round-trips byte-exact; our own members send zero until an
-		// in-client check says otherwise.
-		//
-		// The A/B boundary moved by one byte when the PlayfieldProxy above was framed correctly: what used to be
-		// OpaqueA's leading byte is the proxy's trailing bool. The two captured values are (0x00000301, 0x59EA5C54)
-		// and (0x00018181, 0x3BC035EC). Still opaque, but off the right offset. [V0]
+		// Four per-character opaque words and a trailing flag, which is exactly what the client's `FUN_005574d0` reads after
+		// the proxy. C, D and the flag are zero in every captured record; A and B are not, and appear nowhere else in the
+		// capture - not in login, not in the snapshot - so they are CS-tier state that cannot be derived from anything the
+		// server sends. They are carried so a captured member round-trips byte-exact; members built here send zero until an
+		// in-client check says otherwise. The two captured values are (0x00000301, 0x59EA5C54) and (0x00018181, 0x3BC035EC).
+		// [V0]
 		public uint OpaqueA { get; set; }
 		public uint OpaqueB { get; set; }
 		public uint OpaqueC { get; set; }
 		public uint OpaqueD { get; set; }
 		public bool TrailingFlag { get; set; }
 
-		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
-		// cannot derive (see gaps.md), so we send nothing rather than something invented.
-		//
-		// `mapId` and `playfieldToken` are passed in so the caller can use the member's LIVE playfield: Character.MapId
-		// is only written at save points, so it lags a player who has since changed map, and the instance TOKEN is not
-		// a column at all - it is minted per playfield instance by the running world (#454). The client shows the
-		// playfield in the team window and treats members in another one differently, so both are worth taking from
-		// the live world where there is one. A null token keeps the captured constant, which is what a member the game
-		// host does not have in a zone has to fall back to.
+		/// <summary>A member record from a character row.</summary>
+		/// <remarks>
+		///     The per-character opaque words are left at zero: they are CS-tier state that cannot be derived (see
+		///     docs/protocol/gaps.md), so nothing invented is sent.
+		/// </remarks>
+		/// <param name="mapId">
+		///     Taken from the member's live playfield rather than the row, because <c>Character.MapId</c> is only written at
+		///     save points and lags a player who has since changed map.
+		/// </param>
+		/// <param name="playfieldToken">
+		///     The instance token, which is not a column at all - it is minted per playfield instance by the running world. A
+		///     null token keeps the captured constant, which is what a member the game host does not have in a zone falls back
+		///     to.
+		/// </param>
 		public static TeamMemberRecord FromCharacter(Character character, uint mapId, uint? playfieldToken = null)
 		{
 			return new TeamMemberRecord

@@ -4,21 +4,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
 {
-	// The SINGLE place the packet-trace log line is SHAPED. Both directions reach it through the channel's PacketTracer,
-	// so an RX line and a TX line differ only in their direction tag and in what the wire actually carried. Direction is
-	// from the SERVER's perspective: RX (received = client -> server, inbound), TX (transmitted = server -> client,
-	// outbound). The raw byte dump is appended via PacketLogOptions (gated by the LogPacketBytes switch), so disabling
-	// packet bytes silences it in both directions.
-	//
-	// This type shapes lines; it does NOT decide what a packet is called or which line shape it gets - that is the
-	// tracer's job (see PacketTracer / ConanPacketTracer / ChatPacketTracer), which is why there are no direction-specific
-	// helpers here anymore.
+	/// <summary>
+	///     The single place the packet-trace log line is shaped. Both directions reach it through the channel's
+	///     <see cref="PacketTracer" />, so an RX line and a TX line differ only in their direction tag and in what the
+	///     wire carried.
+	/// </summary>
+	/// <remarks>
+	///     Direction is from the server's perspective: RX (received = client to server, inbound), TX (transmitted =
+	///     server to client, outbound). The raw byte dump is appended via <see cref="PacketLogOptions" />, gated by the
+	///     <c>Log:PacketBytes</c> switch, so disabling packet bytes silences it in both directions.
+	///     <para>
+	///         This type shapes lines; it does not decide what a packet is called or which line shape it gets. That is
+	///         the tracer's job - see <see cref="PacketTracer" />, <see cref="ConanPacketTracer" /> and
+	///         <see cref="ChatPacketTracer" />.
+	///     </para>
+	/// </remarks>
 	public static class PacketLogFormatter
 	{
 		public const string Received = "RX"; // client -> server (inbound, received by the server)
 
-		// Direction tags are from the SERVER's perspective (the node writing the log): TX = the server transmitted it
-		// (server -> client, outbound), RX = the server received it (client -> server, inbound).
+		// Direction tags are from the server's perspective (the node writing the log).
 		public const string Transmitted = "TX"; // server -> client (outbound, sent by the server)
 
 		extension(ILogger logger)
@@ -45,8 +50,8 @@ namespace Faolan.Core.Network.Logging
 					channel, opcodeName, subOpcodeName, payloadLength, bodyLength, packetLength, PacketLogOptions.BodySuffix(body));
 			}
 
-			// An inbound (RX) packet whose opcode the listener didn't handle: same line shape as LogPacket, at Warning
-			// level with an UNHANDLED marker. `opcodeName` already carries its "(0xHEX)" (via OpcodeName).
+			// An inbound packet whose opcode the listener did not handle: the same line shape as LogPacket, at Warning
+			// level with an UNHANDLED marker. `opcodeName` already carries its "(0xHEX)" via OpcodeName.
 			public void LogUnknownPacket(string channel, string opcodeName, long bodyLength, long packetLength, ReadOnlyMemory<byte> body)
 			{
 				logger.LogWarning("{Direction} [{Channel} {OpcodeName}] UNHANDLED, bodyLength={BodyLength}, packetLength={PacketLength}{Bytes}", Received, channel, opcodeName, bodyLength,

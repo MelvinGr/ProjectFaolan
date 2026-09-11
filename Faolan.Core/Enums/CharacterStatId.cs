@@ -8,15 +8,15 @@ namespace Faolan.Core.Enums
 	///     <para>
 	///         Member names are held to the client's own LDB 615 names by
 	///         <c>Faolan.Importer --report ldb-stat-names</c>, which prints every divergence. The divergences it still
-	///         reports are DELIBERATE, so don't "fix" them:
+	///         reports are deliberate, so do not "fix" them:
 	///         <list type="bullet">
 	///             <item>
-	///                 <b>Health / Stamina / Mana.</b> LDB gives the current and max ids the SAME name ("Health" for
+	///                 <b>Health / Stamina / Mana.</b> LDB gives the current and max ids the same name ("Health" for
 	///                 both 0x0001 and 0x001B), which C# cannot express - hence the Current/Max suffixes.
 	///             </item>
 	///             <item>
 	///                 <b>Names carrying a decode the client's label does not.</b> 0x0014 is "BCC State" to the
-	///                 client and <see cref="CombatMode" /> here because that is what it was proven to DO;
+	///                 client and <see cref="CombatMode" /> here because that is what it is proven to do;
 	///                 0x00BF "Last Concrete Playfield Instance" is <see cref="PlayfieldToken" />; 0x015E "Next XP"
 	///                 is <see cref="MaxExp" />; 0x0039 "Last XP" is <see cref="ExpCurrentLevelBase" />.
 	///             </item>
@@ -27,37 +27,33 @@ namespace Faolan.Core.Enums
 	public enum CharacterStatId : uint
 	{
 		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. The current/max id assignment
-		// is **proven in-client** (2026-06-14, live .setstat probes on Darktemplarchar): setting 0x0001 moved the
-		// player's MAX health bar, 0x001B moved CURRENT; 0x01F8 moved stamina CURRENT, 0x01FA moved mana CURRENT.
-		// So current = {0x001B health, 0x01F8 stamina, 0x01FA mana}; max = {0x0001, 0x01F9, 0x01FB}. (The old
-		// "larger id = max" heuristic was backwards - a full-health capture has current == max, so the announce
-		// packet that uses 0x001B/0x01F8/0x01FA was the CURRENT ids all along; see CharacterStatBlockTests.)
+		// is proven in-client by live .setstat probes: setting 0x0001 moves the player's max health bar, 0x001B moves
+		// current; 0x01F8 moves stamina current, 0x01FA moves mana current. So current = {0x001B health, 0x01F8
+		// stamina, 0x01FA mana}; max = {0x0001, 0x01F9, 0x01FB}. A full-health capture has current == max, so the
+		// ids cannot be told apart by value there; see CharacterStatBlockTests.
 		HealthCurrent = 0x001B,
 		HealthMax = 0x0001,
 
-		// ⭐ The entity's BEHAVIOUR-TREE STATE - the client calls this slot "BCC State" and it is right; our name is
-		// the narrow one, kept only because every caller so far uses it for the weapon stance. Pushed in a 0x96B8DC59
-		// update; `4` the tick before a mob's first swing is what DRAWS its weapon, and without it an NPC swings
-		// empty-handed (#218).
+		// The entity's behaviour-tree state - the client calls this slot "BCC State" and it is right; our name is
+		// the narrow one, kept because every caller uses it for the weapon stance. Pushed in a 0x96B8DC59 update;
+		// `4` the tick before a mob's first swing is what draws its weapon, and without it an NPC swings empty-handed.
 		//
-		// ⭐ **The values are STATE ids out of the client's own behaviour trees** (RDB 1010203, plain-text XML -
-		// `--report bcc-trees --report-arg <ids>`), which decodes every value the corpus carries (#905):
+		// The values are state ids out of the client's own behaviour trees (RDB 1010203, plain-text XML -
+		// `--report bcc-trees --report-arg <ids>`), which decodes every value the corpus carries:
 		//
 		//    1  Idle          28 trees      9  Sitting       16 trees      39  Spellweaving   Character
 		//    2  Movement      11 trees     29  Limbo         24 trees      41  Drunk          Character
 		//    4  Fighting      22 trees     69  Evade          3 trees      72  Talking_idle   Character
 		//
-		// - `1` is **Idle**, NOT "the player is in combat" as this comment used to say. The player's captured 1 is the
-		//   client sitting in its idle state.
-		// - `29` is **Limbo**, which is the client's own name for death (protocol_death_resurrect).
-		// - `9` is **Sitting** (#355's `/sit`), `39` **Spellweaving** - the state `combos.md` already keys the
-		//   `Spellweaving Remover` criterion off (`!= 39`) without knowing what the number was.
+		// - `1` is Idle, not "in combat". The player's captured 1 is the client sitting in its idle state.
+		// - `29` is Limbo, which is the client's own name for death (protocol_death_resurrect).
+		// - `9` is Sitting (`/sit`), `39` Spellweaving - the state the `Spellweaving Remover` criterion keys off
+		//   (`!= 39`, combos.md).
 		//
-		// ⚠️ **`0` is not a state.** No shipped tree declares id 0, so pushing 0 to sheathe a weapon - which this
-		// comment used to prescribe, inferred from "idle entities carry no record at all" - was sending a value retail
-		// has no meaning for. The sheathe value is `1` (Idle).
+		// `0` is not a state: no shipped tree declares id 0, so pushing 0 sends a value retail has no meaning for.
+		// The sheathe value is `1` (Idle).
 		//
-		// ⚠️ State ids COLLIDE across trees (11 is `LoopingEmote` in Animal/Character and `SneakHiding` in seven
+		// State ids collide across trees (11 is `LoopingEmote` in Animal/Character and `SneakHiding` in seven
 		// others), so a value only resolves against the tree the entity actually runs. The table above lists the ids
 		// whose reading is unambiguous or whose tree is named.
 		CombatMode = 0x0014,
@@ -65,15 +61,14 @@ namespace Faolan.Core.Enums
 		Exp = 0x0034,
 		Level = 0x0036,
 
-		// "Apprentice Level" (LDB 965). The apprentice/mentor system's effective level, and it is NOT cosmetic: the
-		// client divides BY it when it normalises armour mitigation by level - `(2.0 - Level / ApprenticeLevel) *
+		// "Apprentice Level" (LDB 965). The apprentice/mentor system's effective level, and it is not cosmetic: the
+		// client divides by it when it normalises armour mitigation by level - `(2.0 - Level / ApprenticeLevel) *
 		// totalArmor` (FUN_0113ba00, docs/subsystems/combat.md). Unset it defaults to 1, so a level-80 character gets
-		// `2 - 80/1` = -78 and the whole mitigation computation goes hugely negative. Proven from the client's own
-		// GameCode/ArmorMitigation trace (2026-07-26): with it unset, NecroL80 logged
-		// `ApprenticeLevel Adjusted ArmorValue:-168246`, `Mitigation Modification:-1532.57`, then
-		// `No mitigation entry found ... [AdjustedRoll:1632.57]` - so the table lookup missed entirely and the client
-		// fell through to a closed-form fallback. Sending it EQUAL TO the character's level makes the term 1.0, which
-		// is what an un-mentored character should have.
+		// `2 - 80/1` = -78 and the whole mitigation computation goes hugely negative: the client's own
+		// GameCode/ArmorMitigation trace then logs `ApprenticeLevel Adjusted ArmorValue:-168246`,
+		// `Mitigation Modification:-1532.57` and `No mitigation entry found ... [AdjustedRoll:1632.57]` - the table
+		// lookup misses entirely and the client falls through to a closed-form fallback. Sending it equal to the
+		// character's level makes the term 1.0, which is what an un-mentored character should have.
 		ApprenticeLevel = 0x03C5,
 		PvpLevel = 0x0046,
 		MaxExp = 0x015E,
@@ -82,27 +77,25 @@ namespace Faolan.Core.Enums
 		StaminaMax = 0x01F9,
 		ManaCurrent = 0x01FA,
 		ManaMax = 0x01FB,
-		// The PvP CAREER counters. ⭐ Renamed from `Kills`/`Deaths` in #625, on three independent statements that
-		// they are the PvP totals and not general ones:
+		// The PvP career counters - the PvP totals, not general ones, on three independent statements:
 		//   * the exe's compiled registry calls them `PvPTotalKills` / `PvPTotalDeaths` (docs/re/aoc-client-stat-names.tsv),
-		//     and this ticket established that the registry beats LDB 615 wherever they differ;
-		//   * CONTIGUITY - 0x291 `PvPFinishingBlows`, 0x293 `PvPMatchesWon` and 0x294 `PvPMatchesLost` are ids this
-		//     enum ALREADY agreed with the registry on, so a bare `Deaths` at 0x292 was a hole punched in an
-		//     otherwise-matching run. That is the same argument that settled the 0x45B-0x461 misplacement;
-		//   * ⭐ RETAIL'S OWN BLOCK - the captured `SubClassStatBlock` pairs each of these with its `*Seasonal` twin
+		//     and the registry beats LDB 615 wherever they differ;
+		//   * contiguity - 0x291 `PvPFinishingBlows`, 0x293 `PvPMatchesWon` and 0x294 `PvPMatchesLost` are ids this
+		//     enum already agrees with the registry on, so a general `Deaths` at 0x292 would be a hole punched in an
+		//     otherwise-matching run (the same argument that settles the 0x45B-0x461 placement);
+		//   * retail's own block - the captured `SubClassStatBlock` pairs each of these with its `*Seasonal` twin
 		//     (0x566 `PvPTotalKillsSeasonal`, 0x567 `PvPTotalDeathsSeasonal`) four slots apart. A seasonal twin's
-		//     partner is the career total of the SAME thing, which is wire evidence rather than a name.
+		//     partner is the career total of the same thing, which is wire evidence rather than a name.
 		//
-		// ⚠️ The server increments these on EVERY kill and death, PvE included, while the client has separate
-		// `NPCKills` (0x298) / `NPCDeaths` (0x299) counters - see #808. The names are correct; what rides them is not.
+		// PvE kills and deaths ride the separate `NPCKills` (0x298) / `NPCDeaths` (0x299) counters, never these.
 		PvPTotalKills = 0x0290,
 		PvPTotalDeaths = 0x0292,
 		AnnihilationWins = 0x029A,
 		AnnihilationLosses = 0x029B,
 		CaptureSkullWins = 0x029C,
 		CaptureSkullLosses = 0x029D,
-		// The out-of-combat regen rows the character sheet shows (#442). The client SEEDS 278 -> 2000 and 279 -> 1000
-		// (display 20.00 / 10.00) and adds an attribute "trickledown" on top at display time; 280's base is CLASS data,
+		// The out-of-combat regen rows the character sheet shows. The client seeds 278 -> 2000 and 279 -> 1000
+		// (display 20.00 / 10.00) and adds an attribute "trickledown" on top at display time; 280's base is class data,
 		// carried by the class-feat template (0 for a class with no mana base, 2000/2200 for the casters).
 		NonCombatHealthRegen = 0x0116,
 		NonCombatStaminaRegen = 0x0117,
@@ -114,7 +107,7 @@ namespace Faolan.Core.Enums
 		Wisdom = 0x032A,
 		Dexterity = 0x032E,
 
-		// Sheet stats measured with `.setstat` (2026-07-27), named from LDB 615. Their SCALES are in GetScale, and the
+		// Sheet stats measured with `.setstat`, named from LDB 615. Their scales are in GetScale, and the
 		// two fatality stats are the warning against inferring one from a neighbour: despite the names, 0x0177 renders
 		// its raw value verbatim (×1) while 0x017C is a ×100 percent.
 		HateModifier = 0x00AA, // LDB 170 - the sheet's "Hate Modification"
@@ -122,26 +115,26 @@ namespace Faolan.Core.Enums
 		FatalityChance = 0x0177, // LDB 375
 		SpellFatalityChance = 0x017C, // LDB 380
 
-		// The SIXTH attribute the character sheet lists under the five above (LDB 615 names it "Ferocity"). Nothing on
+		// The sixth attribute the character sheet lists under the five above (LDB 615 names it "Ferocity"). Nothing on
 		// our side grants it: zero rows in ClassAttributeBases / ItemStatModifiers / FeatEffects, 3 in SpellStatEffects,
 		// and the client's own live stat table carries no entry for it either - so the sheet renders 0 for every
 		// character, which is what it should read until something sets it. Named here so the id is not re-derived.
 		Ferocity = 0x057B,
 
-		// Combat ratings carried by the item-template stat-modifier region (docs/rdb/item-template-stats.md, #3).
+		// Combat ratings carried by the item-template stat-modifier region (docs/rdb/item-template-stats.md).
 		// Decoded 3/3 against the in-client Royal Signet tooltip (+52 Magic Damage / +15 Hit Rating): Magic Damage is
 		// wire-scaled ×100 (5200 -> 52), Hit Rating ×1 (15 -> 15).
 		HitRating = 0x0136,
 		MagicDamage = 0x035D,
 
-		// The PHYSICAL armor rating (#401): the client's armor-mitigation routine (FUN_0113ba00,
+		// The physical armor rating: the client's armor-mitigation routine (FUN_0113ba00,
 		// GameCode/ArmorMitigation) reads stat 0x1C0 as the base armor for every physical damage type (Slashing/
-		// Piercing/Crushing/…), scaled by Strength through the TotalArmorValue formula. Carried per-item in the
-		// [2][9] region (armor-specific: on 26% of armor pieces vs 7% elsewhere), ×1 scale. The magical-protection
-		// sibling (0x1C3, Int/Wis-scaled) is left unnamed until it's consumed.
+		// Piercing/Crushing/...), scaled by Strength through the TotalArmorValue formula. Carried per-item in the
+		// [2][9] region (armor-specific: on 26% of armor pieces vs 7% elsewhere), x1 scale. The magical-protection
+		// sibling is Protection (0x1C3, Int/Wis-scaled).
 		Armor = 0x01C0,
 
-		// Item stat-modifier ratings named from in-game tooltip screenshots (2026-07-21), matched by value:
+		// Item stat-modifier ratings named from in-game tooltip screenshots, matched by value:
 		//   Combat Rating (0x36B, x1): Defiler Belt 14; the single most common region rating (63 items).
 		//   Combat Rating - Fire (0x3EF, x1): Red Edge 11 (a per-damage-type Combat Rating variant).
 		//   Offhand Rating (0x44B, x1): Red Edge 5.
@@ -155,8 +148,8 @@ namespace Faolan.Core.Enums
 		NaturalStaminaRegen = 0x0385,
 		ImmunityRating = 0x01EA,
 
-		// More region ratings named from tooltip screenshots (2026-07-21), matched by value across several items:
-		//   Critical Rating 0x138 (crit CHANCE): Skirmisher 75, Helm 45. Critical Damage Rating 0x2C7 (crit MAGNITUDE):
+		// More region ratings named from tooltip screenshots, matched by value across several items:
+		//   Critical Rating 0x138 (crit chance): Skirmisher 75, Helm 45. Critical Damage Rating 0x2C7 (crit magnitude):
 		//   Skirmisher 95, Poderes 50. Protection 0x1C3 (magical mitigation, the armor-fn sibling): Helm 184->185.
 		//   Hate Decrease 0x1E8 / Hate Increase 0x1EB. Magic Damage (Holy) 0x36E x100: Poderes 2400->24.
 		//   The PvP-* ratings only apply in PvP (named, not consumed): PvP Combat 0xE1, PvP Magic Dmg 0xE2 x100,
@@ -173,9 +166,9 @@ namespace Faolan.Core.Enums
 		PvpArmor = 0x01C6,
 		PvpProtection = 0x01CA,
 
-		// Further region ratings named from granted-item tooltips (2026-07-22), matched by value. Fatality/Heal/XP/
+		// Further region ratings named from granted-item tooltips, matched by value. Fatality/Heal/XP/
 		// movement are their own (unmodelled) systems; Combat Rating and Protection have per-weapon-type / per-element
-		// variants (0x362-0x369 = Combat Rating by weapon; 0x39x = Protection by element) - only the CONFIRMED ids are
+		// variants (0x362-0x369 = Combat Rating by weapon; 0x39x = Protection by element) - only the confirmed ids are
 		// named here (Polearm 0x367, Bow 0x368; Protection(Electrical) 0x39f).
 		FatalityRating = 0x01DB,
 		HealRating = 0x02C9,
@@ -183,28 +176,28 @@ namespace Faolan.Core.Enums
 		CombatRatingPolearm = 0x0367,
 		ProtectionElectrical = 0x039F,
 
-		// The remaining inputs of the client's ARMOUR-MITIGATION pipeline (FUN_0113ba00), all named by LDB category 615
+		// The remaining inputs of the client's armour-mitigation pipeline (FUN_0113ba00), all named by LDB category 615
 		// and all confirmed by reading which stat the client asks for on each branch - so these are consumed ids, not
 		// speculative ones. See docs/subsystems/combat.md.
 		//
-		// The two "Bonus" ids are PERCENT modifiers, not flat: the client computes
+		// The two "Bonus" ids are percent modifiers, not flat: the client computes
 		// `(bonus * 0.01 + 1.0) * <armour|protection>`, so a value of 25 means +25%. BonusArmor feeds the physical
 		// branch and BonusProtection the magical one - which is what identifies them, since the LDB names alone do not
 		// say they are percentages.
-		// The rest of the ids the item [2][9] region actually carries, named from LDB 615 in one pass (#464). They
-		// were the tail of `--report region-stat-census`: every id ANY item grants, whether or not we import it.
-		// Nothing reads them yet and none are whitelisted for import - naming is not importing - but an id with a
-		// name is one nobody has to re-derive, and several answer questions that were open in prose:
+		// The rest of the ids the item [2][9] region actually carries, named from LDB 615. They are the tail of
+		// `--report region-stat-census`: every id any item grants, whether or not we import it. Nothing reads them
+		// and none are whitelisted for import - naming is not importing - but an id with a name is one nobody has to
+		// re-derive:
 		//
-		//   - the per-SCHOOL Combat Ratings complete the family we already had (Cold/Electrical/Holy/Unholy),
-		//   - the TAP ratings are the leech family (health/mana/stamina/magic-life),
+		//   - the per-school Combat Ratings complete the family (Cold/Electrical/Holy/Unholy),
+		//   - the tap ratings are the leech family (health/mana/stamina/magic-life),
 		//   - Evade Rating is the counterpart of the EvadeChance percent GetScale already knows about,
 		//   - and three are not combat stats at all (Hair Render Type, Scale, Sprinting Stamina Drain) - a reminder
 		//     that the region is an item's whole property list, not a damage sheet.
 		CombatRatingCold = 0x00A2, // LDB 162
 		AttackRange = 0x011F, // LDB 287
 		CrossbowRangeModifier = 0x0124, // LDB 292
-		EvadeRating = 0x0134, // LDB 308 - the RATING beside EvadeChance (0xFE), which is the percent
+		EvadeRating = 0x0134, // LDB 308 - the rating beside EvadeChance (0xFE), which is the percent
 		Scale = 0x0168, // LDB 360 - render scale, not a combat stat
 		MagicLifeTapRating = 0x01DC, // LDB 476
 		HealthTapRating = 0x01DD, // LDB 477
@@ -222,12 +215,12 @@ namespace Faolan.Core.Enums
 		HairRenderType = 0x002F, // LDB 47 - appearance, not combat
 		SprintingStaminaDrain = 0x0025, // LDB 37
 
-		// ⚠️ TWO region ids have NO LDB 615 entry and stay unnamed: 10 (on 89 items, values 0..6 - the most common
+		// Two region ids have no LDB 615 entry and stay unnamed: 10 (on 89 items, values 0..6 - the most common
 		// unnamed id by a wide margin) and 1669. LDB 615 is the client's own stat-name catalog, so an id missing
 		// from it will not be named by reading harder - it needs a consumer in the client to identify it.
-		// The FOURTH most common stat on an item's [2][9] region - 249 of 3,317 templates carry it, more than
-		// HealthMax - and it sat unnamed while rarer neighbours had names. Found by censusing the region rather than
-		// the whitelist (`--report region-stat-census`), then read straight out of LDB 615.
+
+		// The fourth most common stat on an item's [2][9] region - 249 of 3,317 templates carry it, more than
+		// HealthMax (`--report region-stat-census`).
 		KnockbackResistance = 0x040D, // LDB 1037
 
 		BonusArmor = 0x01C2, // LDB 450 "Bonus Armor" - percent, physical branch
@@ -239,54 +232,53 @@ namespace Faolan.Core.Enums
 		ProtectionFire = 0x039E, // LDB 926
 		ProtectionHoly = 0x03A0, // LDB 928
 		ProtectionUnholy = 0x03A1, // LDB 929
-		Perception = 0x033E, // LDB 830; the "Skill" suffix was ours, the client names it plain Perception
+		Perception = 0x033E, // LDB 830
 		OutOfCombatMovementSpeed = 0x00F1,
 		BowRangeModifier = 0x0123,
 		XpModifier = 0x013F,
 
-		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
+		// The value at this slot in the FullChar-snapshot stat sheet is the playfield-instance token (framed by stat ids
 		// 0xBF..0x40B in the snapshot; see N3ToClientQuitCodec) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
 		PlayfieldToken = 0x00BF,
 
-		// The mounted-state stats retail pushes with the ride buff (#27, mount-dismount capture frame 520): Mount = the
+		// The mounted-state stats retail pushes with the ride buff (mount-dismount capture frame 520): Mount = the
 		// mount id/appearance the player is riding (0 = dismounted), MountSpeed = the mount speed value (100). Cleared to
 		// 0 on dismount (frame 1449).
 		Mount = 0x00BA,
 		MountSpeed = 0x00BB,
 
-		// The current LEVEL's base experience: the total XP at which the current level began, so the in-client XP bar
+		// The current level's base experience: the total XP at which the current level began, so the in-client XP bar
 		// fills (Exp - ExpCurrentLevelBase) / (MaxExp - ExpCurrentLevelBase). Decoded by value-correlation across 29
-		// archetype snapshots (#393): ExpCurrentLevelBase <= Exp <= MaxExp everywhere, it equals Exp for a freshly-
-		// dinged char (loot L2: base==Exp==100), and level 24's base (263640) is EXACTLY level 23's MaxExp (263640) -
+		// archetype snapshots: ExpCurrentLevelBase <= Exp <= MaxExp everywhere, it equals Exp for a freshly-
+		// dinged char (loot L2: base==Exp==100), and level 24's base (263640) is exactly level 23's MaxExp (263640) -
 		// each level's base is the previous level's cap. See docs/re/fullplayer-snapshot-reader.md.
 		ExpCurrentLevelBase = 0x0039,
 
-		// A UNIX EPOCH timestamp slot (#393). Every non-zero value in the corpus decodes to a valid 2010 date
-		// (1263095211 = 2010-01-10, 1280838357 = 2010-08-03), the SAME value recurs across DIFFERENT characters, and
+		// A Unix epoch timestamp slot. Every non-zero value in the corpus decodes to a valid 2010 date
+		// (1263095211 = 2010-01-10, 1280838357 = 2010-08-03), the same value recurs across different characters, and
 		// one character carries different values in different captures - so it is a shared session/server time, not a
 		// per-character property (0 in most snapshots). Which event it stamps (save/login/server clock) is not pinned;
 		// the epoch decode is the grounded part.
 		Timestamp = 0x044A,
 
-		// The remaining slots of the 0x737A6DF9 tails stat sheet. These were numbered Unknown{i} until the client's own
-		// stat-name table was found: LDB (RDB 1030002) **category 615** is an id -> name map keyed by the WIRE STAT ID
-		// (891 ids, in 7 localized pages - the English one is cribbed against the names we already had, not picked by
-		// order). It agrees with every id we had already named the hard way (310 Hit Rating, 312 Critical Rating,
-		// 0x324 Strength, 0x398 Attack Rating from Ghidra…), so the names below are the client's, not a guess.
-		// Regenerate with
+		// The remaining slots of the 0x737A6DF9 tails stat sheet, named from the client's own stat-name table: LDB
+		// (RDB 1030002) category 615 is an id -> name map keyed by the wire stat id (891 ids, in 7 localized pages -
+		// the English one is cribbed against the names already known, not picked by order). It agrees with every id
+		// named independently (310 Hit Rating, 312 Critical Rating, 0x324 Strength, 0x398 Attack Rating from
+		// Ghidra, ...), so the names below are the client's, not a guess. Regenerate with
 		// `dotnet run --project Faolan.Importer -- --report ldb-stat-names`; the full table is docs/re/ldb-stat-names.md.
 		// A few ids remain Unknown##: the client's table has no entry for them at all.
 		//
 		// The Anarchy Online leftovers (Nano Interval, Awarded Omni-Tek Tokens, Memorize Delay) are named as the client
 		// names them - they are dead slots in Conan, and a made-up "better" name would not match the client's table.
 		//
-		// ⚠️ #393 finding: this sheet is a BASELINE SKELETON, not the character's live stats. The attributes are the
-		// fixed base (Strength 0x324 / Intelligence 0x328 == 10 for EVERY char, L1 through L80), and ~two-thirds of the
-		// slots are 0/constant across all 29 archetype captures. Only vitals (HP/mana/stamina), XP/level, the PvP
-		// counters, PlayfieldToken and a handful below actually vary per character - the real leveled stats arrive via
-		// the live StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. Naming a slot does NOT mean the server
-		// fills it; what varies per character is characterised there.
+		// This sheet is a baseline skeleton, not the character's live stats. The attributes are the fixed base
+		// (Strength 0x324 / Intelligence 0x328 == 10 for every char, L1 through L80), and ~two-thirds of the slots are
+		// 0/constant across all 29 archetype captures. Only vitals (HP/mana/stamina), XP/level, the PvP counters,
+		// PlayfieldToken and a handful below actually vary per character - the real leveled stats arrive via the live
+		// StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. Naming a slot does not mean the server fills
+		// it; what varies per character is characterised there.
 		TempSaveTeamId = 0x252,
 		TempSavePlayfield = 0x253,
 		TempSaveX = 0x254,
@@ -322,9 +314,9 @@ namespace Faolan.Core.Enums
 		Expansions = 0x185,
 		PlayerId = 0x25F,
 		PowerSessionRemaining = 0x06A,
-		// The SKILL-POINT pool (#507) - the number the client reports as "gained N skillpoints". Identified from the
-		// annotation `gained 1892 skillpoints after the relog`: exactly ONE stat in that login's 630 KB
-		// FullPlayerCharacterIIR equals 1892, and it is this one. Purely LEVEL-derived - see SkillPointCurve for the
+		// The skill-point pool - the number the client reports as "gained N skillpoints". Identified from the
+		// annotation `gained 1892 skillpoints after the relog`: exactly one stat in that login's 630 KB
+		// FullPlayerCharacterIIR equals 1892, and it is this one. Purely level-derived - see SkillPointCurve for the
 		// measured values and why there is no formula. It has no LDB name (the stat-name table jumps 242 -> 248), which
 		// fits an internal pool the UI labels itself rather than a displayed stat.
 		SkillPoints = 0x0F3,
@@ -337,10 +329,10 @@ namespace Faolan.Core.Enums
 		MagicalResist = 0x39D,
 		MagicRating = 0x39B,
 
-		// The level-scaled rating quad (0x398/0x39A/0x39B/0x39D), now named end to end: two came from the client's code
-		// (Ghidra 2026-07-21 - CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A) and the
-		// other two from its stat-name table (0x39B Magic Rating, 0x39D Magical Resist, declared just above). So the
-		// quad is attack/defense/magic-attack/magic-defense - which is why all four move together with level.
+		// The level-scaled rating quad (0x398/0x39A/0x39B/0x39D): two are named from the client's code
+		// (CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A) and the other two from its
+		// stat-name table (0x39B Magic Rating, 0x39D Magical Resist, declared just above). So the quad is
+		// attack/defense/magic-attack/magic-defense - which is why all four move together with level.
 		AttackRating = 0x398,
 		DefenseRating = 0x39A,
 		MemorizeDelay = 0x07F,
@@ -364,14 +356,14 @@ namespace Faolan.Core.Enums
 		PvPTotalDeathsSeasonal = 0x567,
 		PvPTotalKillsSeasonal = 0x566,
 
-		// ---- Named from the CLIENT's own stat-name table, LDB category 615 (`--report ldb-stat-names`). ----
-		// These are the stats the FEAT catalog modifies (FeatEffect) that nothing else had made us name: items touch
-		// 17 stat ids, feats touch 158. The names are the client's, not ours - which is also why several read oddly
-		// ("Anim", "BCC", "Volume Mass"): the stat space carries engine fields alongside player-facing stats.
+		// ---- Named from the client's own stat-name table, LDB category 615 (`--report ldb-stat-names`). ----
+		// These are the stats the feat catalog modifies (FeatEffect): items touch 17 stat ids, feats touch 158. The
+		// names are the client's, not ours - which is also why several read oddly ("Anim", "BCC", "Volume Mass"): the
+		// stat space carries engine fields alongside player-facing stats.
 		//
-		// 17 further feat stat ids remain UNNAMED because LDB 615 has no entry for them - the 1084..1094 family
-		// (values 100..900, plainly a real group) plus a handful of singletons with implausible values (44231 at
-		// -5000, 1253 at 860633420) that are more likely over-reads by the effect parser than real stats.
+		// A handful of feat stat ids remain unnamed because LDB 615 has no entry for them: singletons with implausible
+		// values (44231 at -5000, 1253 at 860633420) that are more likely over-reads by the effect parser than real
+		// stats. (The 1083..1094 family is named from the exe's registry below.)
 		VolumeMass = 0x002,
 		Anim = 0x00D,
 		BCC = 0x015,
@@ -483,25 +475,25 @@ namespace Faolan.Core.Enums
 		WeaponDamageMelee = 0x447,
 		WeaponDamageRanged = 0x448,
 
-		// ---- The SPELL half of the same space (#593), likewise named from LDB 615. ----
-		// A stat id does not have to name something a CHARACTER carries: the `SpellStatModifier` /
-		// `SpellLineStatModifier` feat records (kinds 53054 / 53062) target a SPELL's own properties - its mana cost,
-		// its casting time, its splash radius - through this one id space. Two of the fourteen they use were already
-		// here from elsewhere (<see cref="SpellColumnRadius" /> 0x0DE, <see cref="AttackRange" /> 0x11F), which is what
-		// says it IS one space rather than a parallel one; the twelve below are the rest.
+		// ---- The spell half of the same space, likewise named from LDB 615. ----
+		// A stat id does not have to name something a character carries: the `SpellStatModifier` /
+		// `SpellLineStatModifier` feat records (kinds 53054 / 53062) target a spell's own properties - its mana cost,
+		// its casting time, its splash radius - through this one id space. Two of the fourteen they use are named
+		// elsewhere in this enum (<see cref="SpellColumnRadius" /> 0x0DE, <see cref="AttackRange" /> 0x11F), which is
+		// what says it is one space rather than a parallel one; the twelve below are the rest.
 		//
 		// Confirmed by the client: its item-tooltip builder resolves this word through
 		// `GetLocalisedString(615, stat)` - LDB category 615 is `0x267`, the literal it pushes at 014a2714 - so the
 		// name the client would print for the id is the name it has.
-		// ⚠️ `Duration` is the name LDB category 615 gives stat 8, and 615 is the right source: it is the DISPLAY name,
+		// `Duration` is the name LDB category 615 gives stat 8, and 615 is the right source: it is the display name,
 		// shipped in seven languages, and it is what the client's own tooltip prints. The exe's static stat-name table
-		// and LDB 633 call it `TimeExist` instead - those carry INTERNAL identifiers and are not a safe citation for
-		// semantics (#625). `1037` is the proof: 615 says `Knockback Resistance` in all seven languages while 633/the
-		// exe table say `Weight`, and our KnockbackService depends on that reading.
+		// and LDB 633 call it `TimeExist` instead - those carry internal identifiers and are not a safe citation for
+		// semantics. `1037` is the proof: 615 says `Knockback Resistance` in all seven languages while 633/the exe
+		// table say `Weight`, and KnockbackService depends on that reading.
 		//
-		// Separately, and independent of the name: a `Set` of this stat (GameAction 53026, 100 rows) does NOT set the
+		// Separately, and independent of the name: a `Set` of this stat (GameAction 53026, 100 rows) does not set the
 		// carrier's own `Spell.DurationMs` - 16 of 100 agree even allowing a centisecond scale, and there is zero
-		// overlap with the 335 spells carrying a summon. What it does set is open in #711.
+		// overlap with the 335 spells carrying a summon.
 		Duration = 0x008,
 		SpellCriticalDamage = 0x081,
 		ManaCost = 0x084,
@@ -515,27 +507,27 @@ namespace Faolan.Core.Enums
 		ChanceOfBreakOnAttack = 0x1A6,
 		ChannelingInterval = 0x1BF,
 
-		// ---- The ENERGY pool: the yellow sprint/spellweave bar (#141). ----
-		// Named by the CLIENT, not by us and not by the LDB - LDB category 615 names none of the 1000000+ range, but
+		// ---- The energy pool: the yellow sprint/spellweave bar. ----
+		// Named by the client, not by us and not by the LDB - LDB category 615 names none of the 1000000+ range, but
 		// the client registers every stat id against a name string in a static metadata table
 		// (`tools/ghidra/DumpStatNameTable.java`; `MaxEnergy` is the literal at 0x01f72a00, bound to 0xF425D at
 		// 0x01de6e20). The table's low half round-trips against ids we already had from an entirely different
 		// direction - 0x324 `Strength`, 0x42F `OffhandChance`, 0x547 `NaturalEnergyRegeneration` - which is what says
 		// these four names are the client's own and not a guess.
 		//
-		// The four together ARE the client's energy simulation (`FUN_0112ad70` listens on exactly these ids and caches
+		// The four together are the client's energy simulation (`FUN_0112ad70` listens on exactly these ids and caches
 		// them at +0x30/+0x34/+0x38/+0x3c): it holds the pool, its ceiling, and the two rates that move it. That is why
-		// sprinting drains the bar with no server traffic at all - the drain is the CLIENT running this model - and why
-		// only the SPELLWEAVE drain, which the server drives, shows up on the wire as `DispatchUpdateSprintbar`.
+		// sprinting drains the bar with no server traffic at all - the drain is the client running this model - and why
+		// only the spellweave drain, which the server drives, shows up on the wire as `DispatchUpdateSprintbar`.
 		//
-		// ⚠️ Of the four, retail is only ever observed sending <see cref="Energy" /> (1,650 records across the 120-capture
+		// Of the four, retail is only ever observed sending <see cref="Energy" /> (1,650 records across the 120-capture
 		// corpus, on `StatUpdateIIR` 0x96B8DC59, per entity). `MaxEnergy`, `EnergySprintDrain` and
-		// `NaturalEnergyRegeneration` appear ZERO times in any stat block - the only 0x000F425D bytes in the corpus sit
-		// inside the retail server's leaked scaffold region on 0xFA015807 spawns (#603), which is not a value it wrote.
+		// `NaturalEnergyRegeneration` appear zero times in any stat block - the only 0x000F425D bytes in the corpus sit
+		// inside the retail server's leaked scaffold region on 0xFA015807 spawns, which is not a value it wrote.
 		// So the client sources the ceiling and the rates itself; do not invent a push for them.
 		Energy = 0xF425C,
 
-		// The DENOMINATOR of the sprint/spellweave bar. `SprintBarView::Update` (FUN_0155b390) re-reads it on every
+		// The denominator of the sprint/spellweave bar. `SprintBarView::Update` (FUN_0155b390) re-reads it on every
 		// update and the renderer (FUN_0155b570) computes `current / max * 100` only `if (max > 0)` - so a MaxEnergy of
 		// zero draws the bar at 0% no matter what current is pushed. Read with kind 2 (base + modifiers), unlike
 		// <see cref="Energy" /> which is read raw (kind 0).
@@ -549,21 +541,17 @@ namespace Faolan.Core.Enums
 		NaturalEnergyRegeneration = 0x547,
 
 		// ---- The rest of the client's own stat-name table (docs/re/aoc-client-stat-names.md). ----
-		// AgeOfConan.exe binds every stat id to a NAME in a static metadata table, recovered by
+		// AgeOfConan.exe binds every stat id to a name in a static metadata table, recovered by
 		// tools/ghidra/DumpStatNameTable.java. It is a far wider name source than LDB category 615, which names none of
 		// the 1000000+ range and most of the 0x545..0x593 run not at all - and it is self-checking, because its low half
-		// reproduces ids we already had from unrelated directions (0x324 Strength, 0x42F OffhandChance, 0x547
-		// NaturalEnergyRegeneration). The members ABOVE this block keep the names they were given by whatever decoded
+		// reproduces ids known from unrelated directions (0x324 Strength, 0x42F OffhandChance, 0x547
+		// NaturalEnergyRegeneration). The members above this block keep the names they were given by whatever decoded
 		// them; only ids the enum did not already carry are added here, so nothing is renamed out from under a caller.
 		//
-		// ⚠ A name here is strong evidence, not a citation. The sweep pairs a PUSH of a string with the following
-		// store of an id, so a name is only as good as that adjacency; ids below 768 were dominated by false pairs from
-		// an unrelated audio-preset init and are excluded entirely. Verify before relying on one for wire semantics.
-		//
-		// ⚠ The sub-768 exclusion is LIFTED - see the block at the bottom of this enum (#625). And the note that used
-		// to sit here, "the client uses `Deaths` for BOTH 0x292 and 0x542", was an artifact of the old sweep's
-		// mispairing: the client calls 0x292 `PvPTotalDeaths` and 0x542 `Deaths`, two distinct names. Both are now
-		// carried under those names - 0x292 above, 0x542 in the minigame scoreboard run below.
+		// A name here is strong evidence, not a citation: the sweep keys on the descriptor slot the id is written to
+		// (see the sub-768 block at the bottom of this enum), and a name is only as good as that pairing. Verify
+		// before relying on one for wire semantics. The client calls 0x292 `PvPTotalDeaths` and 0x542 `Deaths`, two
+		// distinct names - 0x292 above, 0x542 in the minigame scoreboard run below.
 		HasKnubotData = 0x300,
 		GameAction_Icon = 0x301,
 		GameAction_Sex = 0x302,
@@ -790,10 +778,10 @@ namespace Faolan.Core.Enums
 		WeaponTrailTime = 0x439,
 		AttackIgnoreLevel = 0x43A,
 
-		// ⭐ 0x43B..0x446 (1083..1094) are SIX consecutive value/Max PAIRS - Endurance, Runspeed, Subtlety,
-		// Recovery, FastRecovery, Skulk - and that structure is the point (#468). Feat records carry the family with
+		// 0x43B..0x446 (1083..1094) are six consecutive value/Max pairs - Endurance, Runspeed, Subtlety,
+		// Recovery, FastRecovery, Skulk - and that structure is the point. Feat records carry the family with
 		// values 100..900, and because LDB 615 (a stale Anarchy Online display table) names none of them they read as
-		// junk that a stat WHITELIST would silence. The exe's own descriptor registry names all twelve
+		// junk that a stat whitelist would silence. The exe's own descriptor registry names all twelve
 		// (docs/re/aoc-client-stat-names.tsv), so they are deliberate stealth/movement stats, not noise.
 		Endurance = 0x43B,
 		MaxEndurance = 0x43C,
@@ -819,29 +807,27 @@ namespace Faolan.Core.Enums
 		GemFamily = 0x457,
 		GameAction_ToClient = 0x45A,
 
-		// ⭐ 0x45B..0x461 are `GameAction_*`, restored 2026-08-11 (#625). They were renamed to a
-		// `PvP*InvulnerabilityRating` series on 2026-08-05 on the authority of **LDB 615** - which is the source that
-		// loses. The exe's descriptor registry (`FUN_01db2740`, compiled with this build) names them
+		// 0x45B..0x461 are `GameAction_*`. LDB 615 labels them a `PvP*InvulnerabilityRating` series, and it is the
+		// source that loses: the exe's descriptor registry (`FUN_01db2740`, compiled with this build) names them
 		// `MinLevel`/`MaxLevel`/`MonsterData`/`Cluster`/`Level`/`Seed`/`AttractorID`, and two independent things say
 		// the LDB is simply wrong here rather than merely differently worded:
 		//
-		//   CONTIGUITY  0x454..0x57C is an unbroken `GameAction_*` run - 200+ consecutive ids where this enum and the
-		//               registry agree exactly. Seven `PvP*` names punched into the middle of it is a discontinuity;
-		//               seven more GameAction parameters are not.
-		//   COMPLETENESS The PvP invulnerability family has NINE damage schools plus siege, and the registry has all
-		//               of them, at 0xE4..0xEA + 0xEC + 0x119 + 0x11A (where this enum carries the bare school names
-		//               `Slashing`/`Piercing`/... instead). The LDB's copy at 0x45B stops after seven, with no Unholy
-		//               and no Poison - an incomplete duplicate of a family that already has a home.
+		//   Contiguity   0x454..0x57C is an unbroken `GameAction_*` run - 200+ consecutive ids where this enum and the
+		//                registry agree exactly. Seven `PvP*` names punched into the middle of it is a discontinuity;
+		//                seven more GameAction parameters are not.
+		//   Completeness The PvP invulnerability family has nine damage schools plus siege, and the registry has all
+		//                of them, at 0xE4..0xEA + 0xEC + 0x119 + 0x11A (where this enum carries the bare school names
+		//                `Slashing`/`Piercing`/... instead). The LDB's copy at 0x45B stops after seven, with no Unholy
+		//                and no Poison - an incomplete duplicate of a family that already has a home.
 		//
-		// So LDB 615 has this family MISPLACED, labelling the GameAction block with names belonging 900 ids earlier.
+		// So LDB 615 has this family misplaced, labelling the GameAction block with names belonging 900 ids earlier.
 		// That is the sharpest example of the staleness documented in docs/re/aoc-client-stat-names.md, and it is why
 		// the registry is the source to take a stat name from.
 		//
-		// ⚠️ `GameAction_MinLevel` was a live FALSE LEAD and still is - the name is right, the inference from it was
-		// not. #298 was hunting a second, level-based usability gate behind "Your class cannot use this item until
-		// level %d" and this slot was the one datum it had. There is no such gate: that message is the LDB token
-		// `YouCanNotUseYet`, emitted by the FEAT criterion (`FUN_006dd970` case 0x5d), which compares no level at all.
-		// A correct NAME is not a decode of what the field is used for.
+		// `GameAction_MinLevel` is a false lead for a level-based item usability gate: the name is right, but there is
+		// no such gate. "Your class cannot use this item until level %d" is the LDB token `YouCanNotUseYet`, emitted
+		// by the feat criterion (`FUN_006dd970` case 0x5d), which compares no level at all. A correct name is not a
+		// decode of what the field is used for.
 		GameAction_MinLevel = 0x45B,
 		GameAction_MaxLevel = 0x45C,
 		GameAction_MonsterData = 0x45D,
@@ -1070,11 +1056,11 @@ namespace Faolan.Core.Enums
 		DamageAbsorbed = 0x53F,
 		EnemyFlagsTaken = 0x540,
 		KillingBlows = 0x541,
-		// ⭐ The MINIGAME scoreboard's death column, and the id the client actually calls `Deaths` (#625). Its
+		// The minigame scoreboard's death column, and the id the client calls `Deaths`. Its
 		// neighbours are what say so: 0x53C-0x543 is one run of per-match scoreboard columns (`DamageDone`,
 		// `HealingDone`, `CrowdControlDone`, `DamageAbsorbed`, `EnemyFlagsTaken`, `KillingBlows`, this, and
-		// `TimeInDominationZone`), and this enum already carried the two either side of it under the registry's own
-		// names. It is a per-match column, NOT the career total - that is `PvPTotalDeaths` (0x292).
+		// `TimeInDominationZone`), and this enum carries the two either side of it under the registry's own
+		// names. It is a per-match column, not the career total - that is `PvPTotalDeaths` (0x292).
 		Deaths = 0x542,
 		TimeInDominationZone = 0x543,
 		ItemEquipSkill = 0x544,
@@ -1231,20 +1217,17 @@ namespace Faolan.Core.Enums
 		SelectedTag = 0x1E86AE,
 		TagId = 0x1E86B0,
 
-		// ---- The SUB-768 half of the client's stat-name table (#625). ----
-		// The block above stopped at 768 because the sweep keyed on the stored VALUE looking like a stat id, and below
-		// 768 the false pairs from a neighbouring audio-preset init dominated it. The sweep now keys on the descriptor
-		// SLOT instead - the address the id is written to, at a fixed offset inside a 0xA0-byte record in one of two
-		// known global regions - which is a bound on the TABLE rather than a guess about the data, and it yields 1511
-		// ids with no duplicates. It also reproduces all 747 of the old names with ZERO disagreements, so this is a
-		// strict widening rather than a re-reading. See docs/re/aoc-client-stat-names.md.
+		// ---- The sub-768 half of the client's stat-name table. ----
+		// The sweep keys on the descriptor slot - the address the id is written to, at a fixed offset inside a
+		// 0xA0-byte record in one of two known global regions - which is a bound on the table rather than a guess
+		// about the data (keying on the stored value looking like a stat id is swamped below 768 by false pairs from a
+		// neighbouring audio-preset init). It yields 1511 ids with no duplicates. See docs/re/aoc-client-stat-names.md.
 		//
-		// Same rule as the block above: an id the enum ALREADY carries keeps the name whatever decoded it first, so
-		// nothing is renamed out from under a caller - unless the existing name is a GUESS or a stale-source reading,
-		// which is what #625 spent its passes separating. `0x292` was the sharp one and is settled: it is
-		// `PvPTotalDeaths` (above), which freed the name `Deaths` for the id that actually carries it, `0x542`.
+		// Same rule as the block above: an id the enum already carries keeps the name whatever decoded it first, so
+		// nothing is renamed out from under a caller - unless the existing name is a guess or a stale-source reading.
+		// `0x292` is `PvPTotalDeaths` (above); `Deaths` is the id that actually carries it, `0x542`.
 		//
-		// ⚠ A name here is strong evidence, not a citation - the same caveat the block above carries.
+		// A name here is strong evidence, not a citation - the same caveat the block above carries.
 		AttackSpeed = 0x3,
 		Breed = 0x4,
 		Team = 0x6,
@@ -1363,8 +1346,8 @@ namespace Faolan.Core.Enums
 		TrackFrostDamage = 0xA6,
 		Attackable = 0xA8,
 		MinCastingTimeForExecute = 0xAB,
-		// ⭐ On a DYNEL this stat IS the map pin (#921): the client's stat-apply `FUN_0080acd0` places a typed
-		// waypoint when it is set non-zero and removes it when it is set to 0, with no waypoint MESSAGE involved at
+		// On a dynel this stat is the map pin: the client's stat-apply `FUN_0080acd0` places a typed
+		// waypoint when it is set non-zero and removes it when it is set to 0, with no waypoint message involved at
 		// any point. Retail pushes it 672 times across the corpus, values 0x0F-0x12 / 0x1B / 0x1D - the same set the
 		// placer accepts, complaining "The waypoint type stat has a strange value." about anything else. The values
 		// are the client's `RMWaypoint_c` type table, `WaypointType` (0x0F-0x12/0x1B = a harvest node's resource-kind
@@ -1858,22 +1841,17 @@ namespace Faolan.Core.Enums
 	}
 
 	/// <summary>
-	///     The wire scale a stat's player-facing value is multiplied by - vitals and most percents ×100, attributes
-	///     ×10, five composed ids ×10000, the rest ×1. <see cref="CharacterStatBlock" />.Set applies it, so callers
-	///     pass DISPLAY values.
+	///     The wire scale a stat's player-facing value is multiplied by - vitals and most percents x100, attributes
+	///     x10, five composed ids x10000, the rest x1. <see cref="CharacterStatBlock" />.Set applies it, so callers
+	///     pass display values.
 	/// </summary>
 	/// <remarks>
-	///     <b>This is no longer a hand-maintained list.</b> It forwards to <see cref="StatDisplayScale" />, which is the
-	///     client's own rule transcribed from <c>AgeOfConan.exe</c>'s tooltip renderer (#251) and therefore covers every
-	///     stat id, not just the ones somebody has hovered. The remark this used to carry - "assume an id absent from
-	///     this switch is UNMEASURED rather than known to be ×1", after
-	///     <see cref="CharacterStatId.WeaponDamageMelee" /> sat in the enum but not the table and would have applied
-	///     +3800% where the client draws +38% - no longer applies: an id not in either percent set is ×1 because the
-	///     client prints it through its integer formatter.
+	///     Forwards to <see cref="StatDisplayScale" />, which is the client's own rule transcribed from
+	///     <c>AgeOfConan.exe</c>'s tooltip renderer and therefore covers every stat id, not just the ones somebody has
+	///     hovered: an id not in either percent set is x1 because the client prints it through its integer formatter.
 	///     <para>
-	///         The 27 values that WERE established by hand (the character sheet via <c>.setstat</c>, and item/feat
-	///         tooltips) are kept as the cross-check in <c>StatDisplayScaleTests</c> - all 27 reproduce, which is what
-	///         licenses replacing the measured table with the transcribed one.
+	///         The 27 values established by hand (the character sheet via <c>.setstat</c>, and item/feat tooltips)
+	///         are kept as the cross-check in <c>StatDisplayScaleTests</c>.
 	///     </para>
 	/// </remarks>
 	public static class CharacterStatIdExtensions

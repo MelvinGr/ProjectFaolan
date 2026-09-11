@@ -15,11 +15,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #784: WALKING the `CastNano` chain. #783 imported the edge - "when this spell lands, also run X on the same
-	// subject" - and deliberately stopped there, so `Gangrenous Stench`'s 221069 reached `Physical Wrack` 3963058 in
-	// the database and nowhere else. The data was reachable; the mechanic was not.
+	// Walking the `CastNano` chain - "when this spell lands, also run X on the same subject". Importing the edge
+	// without walking it leaves `Gangrenous Stench`'s 221069 reaching `Physical Wrack` 3963058 in the database and
+	// nowhere else: the data is reachable, the mechanic is not.
 	//
-	// These drive the MOB half (`WorldSimulation.ApplyEffectToEntity`, the subject an area's effect lands on) because
+	// These drive the mob half (`WorldSimulation.ApplyEffectToEntity`, the subject an area's effect lands on) because
 	// that is where the headline case lives. The player half is the same walk in `GameServerListener.ApplySpell`.
 	public class SpellChainWalkTests
 	{
@@ -30,8 +30,8 @@ namespace Faolan.Tests
 		private const uint Wrack = 3963058; // Physical Wrack - the -10% Slashing/Piercing/Crushing/Poison debuff
 		private const uint CastNanoKind = 53051;
 
-		// The headline case end to end: the effect lands on a mob AND the spell its chain edge names lands on the SAME
-		// mob. Both carriers go out, both are tracked, and the chain edge is the SHIPPED row rather than a fabricated
+		// The headline case end to end: the effect lands on a mob and the spell its chain edge names lands on the same
+		// mob. Both carriers go out, both are tracked, and the chain edge is the shipped row rather than a fabricated
 		// one - fed from the database so a re-harvest that drops it fails here.
 		[Fact]
 		public async Task AnEffectLandingOnAMob_AlsoLandsTheSpellItsChainEdgeNames()
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			Assert.Equal([Stench << 8, Wrack << 8], output.Applications.Select(a => a.WireSpellId));
 			Assert.All(output.Applications, a =>
 			{
-				Assert.Equal(MobHandle, a.ApplyTo); // the SAME subject - a chain edge states no area of its own
+				Assert.Equal(MobHandle, a.ApplyTo); // the same subject - a chain edge states no area of its own
 				Assert.Equal(PlayerHandle, a.ApplyFrom);
 			});
 
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 
 		// The re-apply guard covers the chain too. An aura re-emits its area every period, and a victim already
 		// carrying the effect is not a fresh landing - re-running the edge there would re-assert the chained debuff on
-		// every tick, which is the icon-stacking failure of #274 one record further down.
+		// every tick, which is the icon-stacking failure one record further down.
 		[Fact]
 		public async Task AVictimAlreadyCarryingTheEffect_DoesNotReRunTheChain()
 		{
@@ -68,11 +68,11 @@ namespace Faolan.Tests
 			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
 			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
 
-			Assert.Equal(2, output.Applications.Count); // the carrier and its chained debuff, ONCE each
+			Assert.Equal(2, output.Applications.Count); // the carrier and its chained debuff, once each
 			Assert.Equal([Stench << 8, Wrack << 8], mob.ActiveBuffs.Keys.Order());
 		}
 
-		// ⚠️ The guard is not defensive tidiness - the shipped catalog contains 56 cycles, so an unguarded walk does
+		// The guard is not defensive tidiness - the shipped catalog contains 56 cycles, so an unguarded walk does
 		// not terminate on real data. A back-edge applies each spell once and stops.
 		[Fact]
 		public async Task ACycleInTheChain_TerminatesWithEachSpellAppliedOnce()
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 			Assert.Equal(2, mob.ActiveBuffs.Count);
 		}
 
-		// The fan-out bound, on the walk itself: a chain wide enough to flood the wire stops at the cap and SAYS it
+		// The fan-out bound, on the walk itself: a chain wide enough to flood the wire stops at the cap and says it
 		// stopped, rather than truncating silently. Closure sizes are a median of 2, but the largest in the catalog is
 		// 78 and one landing does not get to emit 78 ApplySpell carriers.
 		[Fact]
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 		}
 
 		// ...and a spell already applied on this walk is refused without spending the cap, which is what makes a
-		// DIAMOND (two carriers chaining the same debuff) cost one application rather than two.
+		// diamond (two carriers chaining the same debuff) cost one application rather than two.
 		[Fact]
 		public void TheWalk_RefusesASpellItHasAlreadyApplied()
 		{
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 			Assert.False(walk.Truncated);
 		}
 
-		// The chain edges the SHIPPED catalog states for `spellId`, so the gates above walk retail's own data.
+		// The chain edges the shipped catalog states for `spellId`, so the gates above walk retail's own data.
 		private static async Task<IReadOnlyList<SpellAreaEffect>> ShippedChainEdges(uint spellId)
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));

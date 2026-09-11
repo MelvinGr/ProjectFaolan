@@ -266,9 +266,9 @@ namespace Faolan.Core.Database
 
 			// PostgreSQL has no unsigned integer types and Npgsql refuses to map uint/ulong (it would pick oid/xid8),
 			// so store them as signed wider types: uint -> bigint, ulong -> numeric(20) (holds the full u64 range).
-			// The model uses uint for every id (BaseEntity.Id) and ulong for money/renown/wire-ids. This runs ONLY on
-			// Npgsql - EF caches the model per provider - so the SQLite schema (the committed faolan.db seed) is left
-			// byte-for-byte unchanged, where uint/ulong already store as INTEGER natively.
+			// The model uses uint for every id (BaseEntity.Id) and ulong for money/renown/wire-ids. This runs only on
+			// Npgsql (EF caches the model per provider), so the SQLite schema is unchanged: uint/ulong already store as
+			// integer natively there.
 			if (Database.IsNpgsql())
 			{
 				configurationBuilder.Properties<uint>().HaveConversion<long>();
@@ -277,20 +277,27 @@ namespace Faolan.Core.Database
 		}
 
 		// No OnConfiguring: the context is created short-lived from a pooled DbContextFactory (one per persistence
-		// unit of work), so lazy-loading proxies are deliberately NOT used - they tether entities to a live context
+		// unit of work), so lazy-loading proxies are deliberately not used - they tether entities to a live context
 		// and break once it is disposed. Navigations are loaded explicitly with Include where needed.
 
-		// Stamp every NEW IDerivedKey row with the id its identity computes to, so what lands in the database always
-		// matches ComputeId even if the caller never set it. Stamping can never be wrong - the id is a pure function
-		// of columns the row already carries - and DatabaseConventionTests gates the shipped data on the two
-		// agreeing. Added only: an existing row keeps its key. The importers upsert by IDENTITY, so a tracked row's
-		// identity columns never change under it; a different identity IS a different row.
-		//
-		// This CANNOT be the only guard: these tables have no store-generated key, so an unset Id is 0, and two new
-		// rows both at 0 collide on the change tracker's identity map at Add - well before SaveChanges. That is a
-		// loud failure rather than a silent one, which is why it is acceptable; a caller adding several rows at once
-		// (the importers, the test fixtures) sets the id itself. What this backstop covers is the single-row case
-		// and any row whose identity columns were filled in after it was added.
+		/// <summary>
+		///     Stamps every added <see cref="IDerivedKey" /> row with the id its identity computes to before saving, so
+		///     what lands in the database always matches <see cref="IDerivedKey.ComputeId" /> even if the caller never
+		///     set it.
+		/// </summary>
+		/// <remarks>
+		///     Stamping is always correct: the id is a pure function of columns the row already carries, and
+		///     <c>DatabaseConventionTests</c> gates the shipped data on the two agreeing. Only added rows are stamped; an
+		///     existing row keeps its key. The importers upsert by identity, so a tracked row's identity columns never
+		///     change under it; a different identity is a different row.
+		///     <para>
+		///         This cannot be the only guard: these tables have no store-generated key, so an unset Id is 0, and
+		///         two new rows both at 0 collide on the change tracker's identity map at Add, well before SaveChanges.
+		///         That failure is loud rather than silent, so a caller adding several rows at once (the importers,
+		///         the test fixtures) sets the id itself. This backstop covers the single-row case and any row whose
+		///         identity columns were filled in after it was added.
+		///     </para>
+		/// </remarks>
 		public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
 		{
 			StampDerivedKeys();
@@ -314,23 +321,22 @@ namespace Faolan.Core.Database
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
-			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
-			// the enum, so it stays in sync). CharacterStatId is intentionally left OPEN (Unknown fillers for undecoded
-			// ids) and so must never carry the attribute - a rule that was stated here and on the attribute and
-			// violated in two tables anyway, so it is now GATED by
-			// ConstrainToEnumValuesTests.NoOpenEnumColumnIsConstrained rather than restated (#452).
+			// Enum columns marked [ConstrainToEnumValues] get a generated check constraint (the allowed list is built from
+			// the enum, so it stays in sync). CharacterStatId is intentionally left open (Unknown fillers for undecoded
+			// ids) and so must never carry the attribute; ConstrainToEnumValuesTests.NoOpenEnumColumnIsConstrained
+			// gates that.
 			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder, Database.IsNpgsql());
 
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).
 			modelBuilder.Entity<Ability>().Property(a => a.Id).ValueGeneratedNever();
-			modelBuilder.Entity<Achievement>().Property(a => a.Id).ValueGeneratedNever(); // the client's TAG id (#748)
+			modelBuilder.Entity<Achievement>().Property(a => a.Id).ValueGeneratedNever(); // the client's tag id
 			modelBuilder.Entity<Feat>().Property(f => f.Id).ValueGeneratedNever(); // the RDB template id, the same id space the wire uses
-			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter (#646)
-			modelBuilder.Entity<FeatClassEntry>().Property(f => f.Id).ValueGeneratedNever(); // the client's own row id in RDB 1000043 (#862)
+			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter
+			modelBuilder.Entity<FeatClassEntry>().Property(f => f.Id).ValueGeneratedNever(); // the client's own row id in RDB 1000043
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
-			modelBuilder.Entity<Faction>().Property(f => f.Id).ValueGeneratedNever(); // the client's own faction id (10, 20, ... 330), #310
+			modelBuilder.Entity<Faction>().Property(f => f.Id).ValueGeneratedNever(); // the client's own faction id (10, 20, ... 330)
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
@@ -338,13 +344,13 @@ namespace Faolan.Core.Database
 
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
 
-			// The item's SECOND template's key (#752) - the same 128-bit TEA key type, so the same owned mapping under
-			// its own prefix. Columns PairKey1..4; it cannot reuse OwnKey, whose columns are Key1..4.
+			// The item's second template's key: the same 128-bit TEA key type, so the same owned mapping under its own
+			// prefix. Columns PairKey1..4; it cannot reuse OwnKey, whose columns are Key1..4.
 			modelBuilder.Entity<Item>().OwnsOne(i => i.PairKey, k => OwnNamedKey(k, "PairKey"));
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
 
-			// The LDB per-string decryption keys (#520) are the SAME 128-bit TEA key type, so they get the same owned
-			// mapping - just prefixed, since these owners carry more than one. Columns are <Name>1..<Name>4.
+			// The LDB per-string decryption keys are the same 128-bit TEA key type, so they get the same owned mapping,
+			// prefixed because these owners carry more than one. Columns are <Name>1..<Name>4.
 			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.ObjectiveKey, k => OwnNamedKey(k, "ObjectiveKey"));
 			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.TrailingKey, k => OwnNamedKey(k, "TrailingKey"));
 			modelBuilder.Entity<QuestTextRef>().OwnsOne(r => r.KeyText, k => OwnNamedKey(k, "KeyText"));
@@ -358,71 +364,71 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<WorldObject>().OwnsOne(o => o.DisplayKey, k => OwnNamedKey(k, "DisplayKey"));
 			modelBuilder.Entity<Map>().OwnsOne(m => m.TravelConfirmKey, k => OwnNamedKey(k, "TravelConfirmKey"));
 
-			// The item's equipped stat bonuses (#3); cascade-delete with the item.
+			// The item's equipped stat bonuses cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
-			// #791: a criterion belongs to its effect, so a re-harvest that drops the effect drops its conditions with it.
+			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade);
+			// A criterion belongs to its effect, so a re-harvest that drops the effect drops its conditions with it.
 			modelBuilder.Entity<SpellStatEffect>().HasMany<SpellStatEffectCriterion>().WithOne(c => c.Effect).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<SpellAreaEffect>().HasMany<SpellAreaEffectCriterion>().WithOne(c => c.Effect).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Spell>().HasMany<SpellAreaEffect>().WithOne(a => a.Spell).OnDelete(DeleteBehavior.Cascade); // #772
+			modelBuilder.Entity<Spell>().HasMany<SpellAreaEffect>().WithOne(a => a.Spell).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
 
-			// #150: an AA perk's price belongs to the featclass ROW it prices, so a re-harvest of the client's
-			// featclass table takes its cost rows with it rather than orphaning them.
+			// An AA perk's price belongs to the featclass row it prices, so a re-harvest of the client's featclass
+			// table takes its cost rows with it rather than orphaning them.
 			modelBuilder.Entity<FeatClassEntry>().HasMany<FeatPerkCost>().WithOne(c => c.Entry).OnDelete(DeleteBehavior.Cascade);
 
-			// A mount's key IS its summon spell's id (#627), so the row goes with the spell.
+			// A mount's key is its summon spell's id, so the row goes with the spell.
 			modelBuilder.Entity<Spell>().HasMany<Mount>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Mount>().Property(m => m.Id).ValueGeneratedNever();
 
 			// A region's boundary polygon; cascade-delete with the region so a re-import of the RDB volumes never leaves
-			// orphan vertices behind. One-to-one MapRegion <-> MapHazard (#504/#679): the geometry is the client's and
-			// the behaviour is ours, so a hazard is a side table on the volume and dies with it.
+			// orphan vertices behind. One-to-one MapRegion <-> MapHazard: the geometry is the client's and the
+			// behaviour is ours, so a hazard is a side table on the volume and dies with it.
 			modelBuilder.Entity<MapRegion>().HasMany(r => r.Vertices).WithOne(v => v.Region).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<MapRegion>().HasOne(r => r.Hazard).WithOne(h => h.Region).OnDelete(DeleteBehavior.Cascade);
 
-			// Both ends cascade: deleting a character drops its own list AND its entries in everyone else's, so no
+			// Both ends cascade: deleting a character drops its own list and its entries in everyone else's, so no
 			// friend row can outlive either character. Fluent because no attribute expresses OnDelete, and NoAction on
 			// the second FK would be needed on a provider that rejects two cascade paths to one table - SQLite and
 			// Postgres both accept it.
 			modelBuilder.Entity<CharacterFriend>().HasOne(f => f.Character).WithMany().OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<CharacterFriend>().HasOne(f => f.Friend).WithMany().OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
-			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
-			// characters with their map/realm; a map or realm with characters cannot be deleted instead.
+			// MapId/RealmId are required, so SetNull is not possible, and cascading would delete characters with
+			// their map/realm; a map or realm with characters cannot be deleted instead.
 			modelBuilder.Entity<Character>().HasOne(c => c.Realm).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<Character>().HasOne(c => c.Map).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// Character ids double as the on-wire client instance. They MUST stay <= 0x0FFFFFFF (4-byte protobuf
+			// Character ids double as the on-wire client instance. They must stay <= 0x0FFFFFFF (4-byte protobuf
 			// varint): the live instance is substituted into the FullChar snapshot's fixed 4-byte varint instance
-			// slots (the non-Strie snapshot path), so a 5-byte id (> 2^28) can't fit the slot - it would leave the
+			// slots (the non-Strie snapshot path), so a 5-byte id (> 2^28) cannot fit the slot - it would leave the
 			// wrong instance in the snapshot and crash the client.
-			// SQLite max+1 alone is NOT safe: a high-id captured character imported from a 5-byte-instance capture (e.g.
+			// SQLite max+1 alone is not safe: a high-id captured character imported from a 5-byte-instance capture (e.g.
 			// 0x110099BD) poisons the sequence. So DatabaseRepository.CreateCharacter allocates the id explicitly from
 			// the in-range max; the id is settable (not DB-generated).
 			modelBuilder.Entity<Character>().Property(c => c.Id).ValueGeneratedNever();
 
 			// RespawnPoint.Id is the client RDB resurrection-point Guid (the spawnPointId the 0x2024 release screen
-			// sends + the client echoes in RespawnMe), so it must be the real RDB value, not EF-generated (#214).
+			// sends + the client echoes in RespawnMe), so it must be the real RDB value, not EF-generated.
 			modelBuilder.Entity<RespawnPoint>().Property(r => r.Id).ValueGeneratedNever();
 
-			// The authoritative open-world ambient spawn groups from RDB 1010506 (#332/#363), keyed by the stable
+			// The authoritative open-world ambient spawn groups from RDB 1010506, keyed by the stable
 			// (playfield, group ordinal) pair. Restrict on the map FK (a map referenced by an area can't be deleted out
 			// from under it); SetNull on the resolved-creature FK (removing a type reverts the area to unresolved, never
 			// deletes it). The child anchor points cascade-delete with their area.
 			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.Map).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.NpcTemplate).WithMany().OnDelete(DeleteBehavior.SetNull);
 			modelBuilder.Entity<NpcSpawnArea>().HasMany(a => a.Points).WithOne(p => p.Area).OnDelete(DeleteBehavior.Cascade);
-			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
-			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
+			// ItemType.Normal (104) is the default classification; the importer reclassifies quest/resource items by
+			// the container they were seen in.
 			// The enum has no 0 member, so the CLR default 0 is a safe sentinel: an Item left at Type==0 (e.g. a
 			// .additem-created row) gets the DB default Normal, never a literal 0. Declaring the sentinel explicitly
 			// confirms that intent to EF and silences the model-validation warning.
 			modelBuilder.Entity<Item>().Property(i => i.Type).HasDefaultValue(ItemType.Normal).HasSentinel(0);
 
 			// Every Tradepost (AH) listing is filed under a real catalog Item (FK ItemId -> Items.Id). Restrict: an
-			// item referenced by a listing can't be deleted out from under it. Guards the #212 placeholder-ItemId import
-			// bug (listings with a bogus ItemId=30000 that the client collapsed into one "Torn Rags" row).
+			// item referenced by a listing cannot be deleted out from under it, and a listing with a placeholder
+			// ItemId fails the import loudly (the client collapses such listings into one row).
 			modelBuilder.Entity<TradepostListing>().HasOne(t => t.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A shop ware references its Items row (the harvested ProtoAcgItem identity); Restrict so an item can't be
@@ -440,24 +446,24 @@ namespace Faolan.Core.Database
 			// an un-harvested referenced item fails the import loudly instead of a recipe with a dangling ingredient.
 			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// A mail attachment / AH listing carries a concrete item INSTANCE, but the instance's TEA key is
-			// per-TEMPLATE and lives once in Items; both reference it by Template (Restrict). For TradepostListing this
-			// is a SECOND FK to Items distinct from the ItemId search-key FK above (ItemId is the search category, the
+			// A mail attachment / AH listing carries a concrete item instance, but the instance's TEA key is
+			// per-template and lives once in Items; both reference it by Template (Restrict). For TradepostListing this
+			// is a second FK to Items distinct from the ItemId search-key FK above (ItemId is the search category, the
 			// listed instance's Template usually differs). The codec reads Key1..4 through these navs; ItemHash stays a
 			// row column (the captured wire hash, 0 for AH, differs from Items.Hash).
 			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// An ITEM the character holds (#750) - worn and carried alike. It dies with the character (nobody else can
+			// An item the character holds, worn and carried alike. It dies with the character (nobody else can
 			// reach it), its template is Restrict (a catalog item cannot be deleted out from under a live item), and
-			// its sockets die with it: dropping a gemmed item drops its gems, which is the whole reason the socket
-			// contents live in their own table rather than being carried by hand through every move.
+			// its sockets die with it: dropping a gemmed item drops its gems, which is why the socket contents live in
+			// their own table rather than being carried by hand through every move.
 			//
-			// ⚠️ The UNIQUE index is what enforces "one item per cell". Without it a lost UPDATE in a move/swap leaves
+			// The unique index is what enforces "one item per cell". Without it a lost update in a move/swap leaves
 			// two rows addressing one (owner, container, slot) and the snapshot renders whichever the query returns
-			// first - a duplicated item that looks like a render bug. A NULL owner is exempt by SQL's own rules (NULLs
-			// don't collide), which is exactly right for the not-in-a-character's-possession case the nullable owner
-			// is reserved for.
+			// first - a duplicated item that looks like a render bug. A null owner is exempt by SQL's own rules (NULLs
+			// do not collide), which is right for the not-in-a-character's-possession case the nullable owner is
+			// reserved for.
 			modelBuilder.Entity<Character>().HasMany(c => c.Items).WithOne(i => i.OwnerCharacter).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ItemInstance>().HasOne(i => i.Template).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<ItemInstance>().HasMany(i => i.Sockets).WithOne(s => s.ItemInstance).OnDelete(DeleteBehavior.Cascade);
@@ -469,13 +475,12 @@ namespace Faolan.Core.Database
 				i.Slot
 			}).IsUnique();
 
-			// The guild-bank vault's own cell uniqueness (#654). A SEPARATE index rather than a wider one, because
-			// SQLite treats NULLs as distinct: the character index above does not constrain guild-owned rows (their
+			// The guild-bank vault's own cell uniqueness. A separate index rather than a wider one, because SQLite
+			// treats NULLs as distinct: the character index above does not constrain guild-owned rows (their
 			// OwnerCharacterId is null), so without this two guild items could share a cell.
 			//
-			// The guild does NOT cascade-delete its items - Restrict. Disbanding a guild with a stocked vault should
-			// fail loudly rather than silently destroy everyone's deposits; what to do with them is a product
-			// decision nobody has made.
+			// The guild does not cascade-delete its items (Restrict). Disbanding a guild with a stocked vault must
+			// fail loudly rather than silently destroy everyone's deposits.
 			modelBuilder.Entity<ItemInstance>().HasOne(i => i.OwnerGuild).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<ItemInstance>().HasIndex(i => new
 			{
@@ -484,18 +489,15 @@ namespace Faolan.Core.Database
 				i.Slot
 			}).IsUnique();
 
-			// EXACTLY ONE owner, enforced rather than merely documented. An item owned by both a character and a
+			// Exactly one owner, enforced rather than merely documented. An item owned by both a character and a
 			// guild would be in two places at once and each unique index would police only its own half; an item
-			// owned by neither is unreachable by every read path there is. Both are bugs a comment does not stop.
+			// owned by neither is unreachable by every read path there is.
 			//
-			// ⚠️ The column names are QUOTED, and that is not cosmetic: this string is raw SQL that goes into the
-			// CREATE TABLE verbatim, and Postgres FOLDS an unquoted identifier to lower case. Unquoted, the whole
-			// initial migration died on `column "ownercharacterid" does not exist` - while SQLite, being
-			// case-insensitive about identifiers, created the table happily and hid it. It is the same trap
-			// `SqlSeedWriter` quotes every identifier for, and the one `ConstrainToEnumValuesAttribute` already pays
-			// (it quotes on Npgsql); this is the one hand-written CHECK in the model, and it was not paying it.
-			// Quoted UNCONDITIONALLY rather than per provider, because a quoted identifier is equally correct on
-			// SQLite - verified by the constraint still rejecting a two-owner and a no-owner row there.
+			// The column names must stay quoted: this string is raw SQL that goes into the create table verbatim,
+			// and Postgres folds an unquoted identifier to lower case (`column "ownercharacterid" does not exist`),
+			// while SQLite is case-insensitive about identifiers and hides the mistake. `SqlSeedWriter` and
+			// `ConstrainToEnumValuesAttribute` quote for the same reason. Quoted unconditionally rather than per
+			// provider, because a quoted identifier is equally correct on SQLite.
 			modelBuilder.Entity<ItemInstance>().ToTable(t =>
 				t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(\"OwnerCharacterId\" IS NULL) <> (\"OwnerGuildId\" IS NULL)"));
 
@@ -514,16 +516,16 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasMany(c => c.Tags).WithOne(t => t.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.RespawnPoints).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);
 
-			// Learned spells delete with the character (a character knows a given spell at most once - now the
-			// (CharacterId, SpellId) compound primary key).
+			// Learned spells delete with the character; a character knows a given spell at most once, which the
+			// (CharacterId, SpellId) compound primary key enforces.
 			modelBuilder.Entity<CharacterSpell>().HasOne(s => s.Character).WithMany(c => c.Spells).OnDelete(DeleteBehavior.Cascade);
 
-			// Persisted self-buffs (#274) delete with the character; keyed by (CharacterId, BuffId). Unlike CharacterSpell
-			// the BuffId is NOT a catalog FK - the spell BASE (BuffId >> 8) is what the Spells catalog holds, and a live
+			// Persisted self-buffs delete with the character; keyed by (CharacterId, BuffId). Unlike CharacterSpell
+			// the BuffId is not a catalog FK - the spell base (BuffId >> 8) is what the Spells catalog holds, and a live
 			// buff can carry an id with no persisted duration, so this is pure per-character savegame state.
 			modelBuilder.Entity<CharacterBuff>().HasOne(b => b.Character).WithMany(c => c.Buffs).OnDelete(DeleteBehavior.Cascade);
 
-			// The token wallets (#150) delete with the character; keyed by (CharacterId, Pool).
+			// The token wallets delete with the character; keyed by (CharacterId, Pool).
 			modelBuilder.Entity<CharacterToken>().HasOne(t => t.Character).WithMany(c => c.Tokens).OnDelete(DeleteBehavior.Cascade);
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
@@ -532,11 +534,11 @@ namespace Faolan.Core.Database
 			// A shop's wares delete with the shop (the importer replaces a shop's items wholesale on re-import).
 			modelBuilder.Entity<Shop>().HasMany(s => s.Items).WithOne(i => i.Shop).OnDelete(DeleteBehavior.Cascade);
 
-			// MorphTarget.Id IS the wire tag - the id that LEADS each RDB 1000076 record, verbatim (not offset;
+			// MorphTarget.Id is the wire tag - the id that leads each RDB 1000076 record, verbatim (not offset;
 			// see RdbMorphTargetImporter) - assigned by the importer, never generated.
 			modelBuilder.Entity<MorphTarget>().Property(t => t.Id).ValueGeneratedNever();
 
-			// The dialogue tree (node -> packet -> screen -> parameter) is keyed by POSITION all the way down, so a
+			// The dialogue tree (node -> packet -> screen -> parameter) is keyed by position all the way down, so a
 			// re-import - the importer delete+reinserts the whole tree - reproduces the same keys instead of
 			// renumbering surrogates and churning faolan.sql (see ConversationNode for the full why). The node's own
 			// id is derived from its identity and never store-generated; each child's key is its parent's key plus
@@ -545,7 +547,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<ConversationEdge>().Property(e => e.Id).ValueGeneratedNever();
 			modelBuilder.Entity<ConversationEntry>().Property(e => e.Id).ValueGeneratedNever();
 
-			// The other DERIVED-id roots (see DerivedKey): each id is a pure function of the row's identity, so a
+			// The other derived-id roots (see DerivedKey): each id is a pure function of the row's identity, so a
 			// re-harvest reproduces it instead of renumbering the table and every child FK under it. Configured
 			// fluently rather than by attribute only because the Id they override is inherited (Base3DEntity/
 			// BaseEntity) - an attribute cannot be applied to an inherited property.
@@ -557,50 +559,49 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationScreen>().HasMany(s => s.Parameters).WithOne(sp => sp.Screen).OnDelete(DeleteBehavior.Cascade);
 
-			// A class<->spell access row is unique per (Class, SpellId) - now the compound primary key.
+			// A class<->spell access row is unique per (Class, SpellId), the compound primary key.
 			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a
-			// spell can't be deleted out from under a class loadout.
+			// spell cannot be deleted out from under a class loadout.
 			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// A humanoid NPC's appearance/morph table (#185), ordered, cascade-deletes with its NpcSpawn.
+			// A humanoid NPC's appearance/morph table, ordered, cascade-deletes with its NpcSpawn.
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Morphs).WithOne(m => m.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 
-			// An NPC's worn equipment (CharacterIIR f23, #185), cascade-deletes with its NpcSpawn.
+			// An NPC's worn equipment (CharacterIIR f23), cascade-deletes with its NpcSpawn.
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Equipment).WithOne(e => e.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 
-			// #363: a captured spawn's membership of an ambient spawn AREA. SetNull so wiping the areas (a re-import)
+			// A captured spawn's membership of an ambient spawn area. SetNull so wiping the areas (a re-import)
 			// un-links these rows rather than deleting them; `.graduatenpcgroup` deletes the linked rows explicitly.
 			modelBuilder.Entity<NpcSpawn>().HasOne(n => n.NpcSpawnArea).WithMany().OnDelete(DeleteBehavior.SetNull);
 
-			// The NPC TYPE table (#244): one row per TemplateId, deduping the type identity duplicated across every
-			// placement. A spawn (instance) and a spell point at their type by the NpcTemplate PK (NpcTemplateId); SetNull keeps the
-			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
-			// TemplateId (the RDB NpcStats.f4 id) IS the primary key - a natural-key catalog like Item/Spell/Map, set
-			// from the RDB by the importer and never DB-generated (#350).
+			// The NPC type table: one row per TemplateId, deduping the type identity duplicated across every
+			// placement. A spawn (instance) and a spell point at their type by the NpcTemplate PK (NpcTemplateId).
+			// TemplateId (the RDB NpcStats.f4 id) is the primary key - a natural-key catalog like Item/Spell/Map, set
+			// from the RDB by the importer and never DB-generated.
 			modelBuilder.Entity<NpcTemplate>().Property(n => n.TemplateId).ValueGeneratedNever();
 
-			// QuestDefinition is a natural-key catalog too (#350): QuestId (the RDB quest id) IS the PK, never
-			// DB-generated. Its Goals/TextRefs FK to QuestId (populated via the nav on import).
+			// QuestDefinition is a natural-key catalog too: QuestId (the RDB quest id) is the PK, never DB-generated.
+			// Its Goals/TextRefs FK to QuestId (populated via the nav on import).
 			modelBuilder.Entity<QuestDefinition>().Property(q => q.QuestId).ValueGeneratedNever();
 
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.Restrict);
 
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.SetNull);
 
-			// A vendor shop points at its NPC TYPE (#244) - keyed by template (unique), not the non-unique internal
-			// name, so it's one-to-one (NpcTemplate.Shop). Restrict like the other NpcTemplate references: the type is
+			// A vendor shop points at its NPC type - keyed by template (unique), not the non-unique internal name, so
+			// it is one-to-one (NpcTemplate.Shop). Restrict like the other NpcTemplate references: the type is
 			// reference data, not a cascade parent.
 			modelBuilder.Entity<Shop>().HasOne(s => s.NpcTemplate).WithOne(t => t.Shop).OnDelete(DeleteBehavior.Restrict);
 
-			// A conversation node points at its NPC TYPE (#244) - many nodes per type, keyed by template so a same-named
-			// NPC (25 share "Halen van Dummy") can't open another's dialogue. Nullable (create-flow scripted screens have
-			// no captured spawn/template); Restrict, the type is reference data.
+			// A conversation node points at its NPC type - many nodes per type, keyed by template so a same-named
+			// NPC (25 share "Halen van Dummy") cannot open another's dialogue. Nullable (create-flow scripted screens
+			// have no captured spawn/template); Restrict, the type is reference data.
 			modelBuilder.Entity<ConversationNode>().HasOne(n => n.NpcTemplate).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.NpcTemplate).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// The dialogue GRAPH (#642). An edge leaves one node and enters another, so the two ends need different
-			// delete behaviour or the model has two cascade paths into the same row: the OUT end cascades (deleting a
-			// screen takes its own branches with it), the IN end does NOT (an edge pointing AT a deleted screen is a
+			// The dialogue graph. An edge leaves one node and enters another, so the two ends need different
+			// delete behaviour or the model has two cascade paths into the same row: the out end cascades (deleting a
+			// screen takes its own branches with it), the in end does not (an edge pointing at a deleted screen is a
 			// dangling branch the importer must resolve, not something to silently delete twice over). The importer's
 			// rebuild drops edges and entries before nodes for the same reason.
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.OutgoingEdges).WithOne(e => e.From).OnDelete(DeleteBehavior.Cascade);
@@ -612,24 +613,23 @@ namespace Faolan.Core.Database
 			// unknown", not delete the dialogue (see ConversationEntry.TriggerWorldObjectId).
 			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.TriggerWorldObject).WithMany().OnDelete(DeleteBehavior.SetNull);
 
-			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
-			// #741: BOTH ends point at NpcTemplate, so the pairing has to be named explicitly - EF cannot tell which
-			// FK backs which navigation on its own. Cascade from the FOLLOWER (its rows are its own) and Cascade from
-			// the LEADER too: a pair whose leader is gone describes nothing.
+			// A follow pair has both ends pointing at NpcTemplate, so the pairing has to be named explicitly - EF
+			// cannot tell which FK backs which navigation on its own. Cascade from the follower (its rows are its own)
+			// and from the leader too: a pair whose leader is gone describes nothing.
+			// A summon-only creature's type-level equipment + appearance table cascade-deletes with its NpcTemplate.
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Follows).WithOne(f => f.FollowerTemplate).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcFollowPair>().HasOne(f => f.LeaderTemplate).WithMany().OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 
-			// One-to-one NpcTemplate <-> NpcStatCore (#244), keyed by NpcTemplateId; the type-level stat core lifted off the Data blob
-			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
+			// One-to-one NpcTemplate <-> NpcStatCore, keyed by NpcTemplateId: the type-level stat core a spawn body is
+			// constructed from. Cascades with the type.
 			modelBuilder.Entity<NpcTemplate>().HasOne(n => n.StatCore).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 
-			// The patrol route hangs directly off the NpcSpawn that walks it (#316) - the PatrolPath table between
-			// them held nothing but the spawn id and this collection, so it was a join carrying no content.
-			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
-			// shape is the self-reference ParentPath (NoAction - every node is already deleted via its PatrolPathId, so
-			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.
+			// The patrol route hangs directly off the NpcSpawn that walks it: all of a patrol's nodes cascade-delete
+			// with the spawn, and the tree shape is the self-reference Parent (NoAction - every node is already
+			// deleted via its NpcSpawnId, so the self-reference must not add a second cascade path). Each node's
+			// waypoints and words cascade with it.
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.PatrolNodes).WithOne(n => n.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).OnDelete(DeleteBehavior.NoAction);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).OnDelete(DeleteBehavior.Cascade);
@@ -637,17 +637,16 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<WorldObject>().HasMany(o => o.Words).WithOne(w => w.WorldObject).OnDelete(DeleteBehavior.Cascade);
 			return;
 
-			// The 128-bit TEA DecryptionKey (ProtoAcgItem.key1) is an EF OWNED type, shared by every table that carries an
-			// item/ability identity. Mapped to FLAT columns Key1..Key4 on the owner's table (no "Key_" prefix), matching
-			// the wire ProtoDecryptionKey.Key1..4. Reflection-scans keep coverage.md honest; this keeps ONE definition of
-			// "these four words are a key" instead of five copies of Data1..4.
+			// The 128-bit TEA DecryptionKey (ProtoAcgItem.key1) is an EF owned type, shared by every table that carries an
+			// item/ability identity. Mapped to flat columns Key1..Key4 on the owner's table (no "Key_" prefix), matching
+			// the wire ProtoDecryptionKey.Key1..4, so there is one definition of "these four words are a key".
 			static void OwnKey<T>(OwnedNavigationBuilder<T, ProtoDecryptionKey> k) where T : class
 			{
 				OwnNamedKey(k, "Key");
 			}
 
-			// The same, under a chosen column prefix, for the owners that carry SEVERAL keys (a quest goal has an
-			// objective key and a trailing one; a quest area has three).
+			// The same, under a chosen column prefix, for the owners that carry several keys (a quest goal has an
+			// objective key and a trailing one; a quest line has three).
 			static void OwnNamedKey<T>(OwnedNavigationBuilder<T, ProtoDecryptionKey> k, string name) where T : class
 			{
 				k.Property(p => p.Key1).HasColumnName(name + "1");

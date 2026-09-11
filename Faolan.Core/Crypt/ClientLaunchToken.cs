@@ -3,13 +3,13 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Crypt
 {
-	// The ConanPatcher "-key" launch token. Recovered by RE of ConanPatcher.exe (2026-06-09): the patcher reads
-	// t = time(NULL) (sub_4bcf93: GetSystemTimeAsFileTime -> minus the 1601 epoch -> /10^7 = unix seconds), sets a
-	// 64-bit block to {t, t}, TEA-encrypts it (sub_439140: 32 rounds, delta 0x9e3779b9, the hardcoded key below),
-	// and formats the two result words as %08x%08x. So `-key` is a launch-FRESHNESS token: decrypting it yields
-	// {t, t} (equal halves) and the timestamp must be recent. AgeOfConan.exe bounces to ConanPatcher.exe when
-	// launched without a valid fresh -key (the no-flags case). Validated: the captured `495cd3b8c7047b47` decrypts
-	// to t = 1781038901 (= the launch time), and re-encrypting reproduces it exactly.
+	// The ConanPatcher "-key" launch token, as ConanPatcher.exe computes it: the patcher reads t = time(NULL)
+	// (sub_4bcf93: GetSystemTimeAsFileTime -> minus the 1601 epoch -> /10^7 = unix seconds), sets a 64-bit block to
+	// {t, t}, TEA-encrypts it (sub_439140: 32 rounds, delta 0x9e3779b9, the hardcoded key below), and formats the
+	// two result words as %08x%08x. So `-key` is a launch-freshness token: decrypting it yields {t, t} (equal halves)
+	// and the timestamp must be recent. AgeOfConan.exe bounces to ConanPatcher.exe when launched without a valid
+	// fresh -key (the no-flags case). The captured `495cd3b8c7047b47` decrypts to t = 1781038901 (the launch time),
+	// and re-encrypting reproduces it exactly.
 	public static class ClientLaunchToken
 	{
 		// k0..k3, the TEA key baked into the patcher (the magic constants in sub_439140).
@@ -51,7 +51,7 @@ namespace Faolan.Core.Crypt
 		public static string Now()
 		{
 			// The 32-bit unix seconds the wire/DB use (mirrors Global.NowUnixTimeSeconds; inlined so this crypto
-			// leaf doesn't depend on the Faolan.Core umbrella).
+			// leaf does not depend on the Faolan.Core umbrella).
 			return ForUnixTime((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 		}
 	}

@@ -41,53 +41,53 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	// NOTE: this class implements NO outbound port any more (#826). Every one of them was a facade over the composed
-	// services - WorldOutbound, EconomyOutbound, TradeOutbound, QuestShareOutbound, ApprenticeOutbound, LevelUpOutbound,
-	// EnvironmentOutbound, TravelOutbound, SpellweaveOutbound and SpellEffectOutbound are all their own classes, built
-	// in the ctor below and handed to the services that need them. It takes no `this` pass either.
+	/// <remarks>
+	///     This class implements no outbound port. WorldOutbound, EconomyOutbound, TradeOutbound, QuestShareOutbound,
+	///     ApprenticeOutbound, LevelUpOutbound, EnvironmentOutbound, TravelOutbound, SpellweaveOutbound and
+	///     SpellEffectOutbound are each their own class, built in the constructor below and handed to the services that
+	///     need them; nothing is handed <c>this</c>.
+	/// </remarks>
 	public partial class GameServerListener : RpcServer, IGameServerProvider
 	{
 
-		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
-		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
+		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform and world objects
+		// scope to it. Threaded as one value so the snapshot, spawn and objects agree.
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
 
-		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
-		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
-		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
-		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
-		// see snapshot_embeds_strie_quest). See CommitCharacterName / QuestContent.BeachStarterQuestId.
+		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for every character - it
+		// is the canonical beach starting quest, not a per-character artifact, across the hoxxling and randochar
+		// captures. The snapshot is replayed and the client renders that quest, so it is persisted too; otherwise
+		// CharacterQuests is empty while the journal shows a quest. See CommitCharacterName /
+		// QuestContent.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = QuestContent.BeachStarterQuestId;
 
 		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
 		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). It recalls to
-		// the BOUND location (our single-server DoTeleport is the equivalent of retail's cross-server redirect).
-		// ⚠️ Do NOT conflate it with the Totem of Origins: the Totem returns to the RACIAL home city instead
-		// (StartingData.RacialHomeMap). Two different destinations, two different handlers.
+		// the bound location; DoTeleport is the single-server equivalent of retail's cross-server redirect.
+		// Not to be confused with the Totem of Origins, which returns to the racial home city instead
+		// (StartingData.RacialHomeMap) - two different destinations, two different handlers.
 		private const uint PathOfAsuraSpecialAction = 0x4E1;
 
-		// The two stance selectors we answer (#505). Like every 0x205A selector these ARE the granted ability's
-		// `Ability.Slot`: 0x064 is `Search` (100) and 0x068 is `Hide` (104).
+		// The two answered stance selectors. Like every 0x205A selector these are the granted ability's `Ability.Slot`:
+		// 0x064 is `Search` (100) and 0x068 is `Hide` (104).
 		private const uint SearchSpecialAction = 0x064;
 		private const uint SneakHideSpecialAction = 0x068;
 		private const uint RestSpecialAction = 0x06A;
 
-		// The COMBAT TOGGLE - sheathe / draw (#505). Its `Transition` animation action is per WEAPON and nothing we
-		// hold maps a weapon to one, so the animation is deliberately NOT sent; what IS derivable is the half retail
-		// pairs with it, the rating quad (see SendCombatRatings).
+		// The combat toggle - sheathe / draw. Its `Transition` animation action is per weapon and no imported data maps
+		// a weapon to one, so the animation is deliberately not sent; the derivable half retail pairs with it is the
+		// rating quad (see SendCombatRatings).
 		private const uint CombatToggleSpecialAction = 0x4E2;
 
 
-		// (The spellweave activate/deactivate selector used to live here as a single 0xFC constant. It is PER CLASS -
-		// necromancer 0xFC, demonologist 0x10C - so it moved to StartingData.SpellweaveToggleAction, which carries the
-		// corpus evidence for each row.)
+		// The spellweave activate/deactivate selector is per class (necromancer 0xFC, demonologist 0x10C), so it lives
+		// in StartingData.SpellweaveToggleAction, which carries the corpus evidence for each row.
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
 		// (the character's real id) woven into the sender/receiver conversation id.
 
-		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
-		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
-		// 10723 answered from 0xA9ECB95D/0x57 at 10726). Copying the 0x58 of its neighbours would have been the obvious
-		// guess and is wrong.
+		// The instance-selection reply comes from GameCharAgent at instance 0x57, not the 0x58 nearly every other
+		// GameCharAgent reply uses - per the one captured exchange (chat-annotated-4, the c2s 0x207B at frame 10723
+		// answered from 0xA9ECB95D/0x57 at 10726).
 		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x57);
 
 
@@ -95,16 +95,16 @@ namespace Faolan.GameServer
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;
 
-		// #826: everything the world tick sends or triggers. Was 42 explicit IWorldOutbound members on this class.
+		// Everything the world tick sends or triggers.
 		private readonly WorldOutbound _worldOutbound;
 
-		// #826: the quest-share wire, off this class and onto the ConnectionRegistry seam. Also the single owner of
-		// the live-character view - GetCharacterLiveState below forwards here.
+		// The quest-share wire, over the ConnectionRegistry seam. Also the single owner of the live-character view -
+		// GetCharacterLiveState below forwards here.
 		private readonly QuestShareOutbound _questShare;
 
 		private readonly EconomyOutbound _economyOutbound;
-		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
-		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
+		// What an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB [2][9] stat
+		// effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
 		private readonly BuffStatEffects _buffStats;
 
 		private readonly ClaimService _claims;
@@ -114,63 +114,61 @@ namespace Faolan.GameServer
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
 		private readonly CombatService _combat;
 
-		// Melee combos (#139): reads the combo id + step the client puts on every Combat:Melee swing and tracks the
-		// running attempt, so the finisher can deliver the combo's own spell. See Combat/ComboService.cs.
+		// Melee combos: reads the combo id + step the client puts on every Combat:Melee swing and tracks the running
+		// attempt, so the finisher can deliver the combo's own spell. See Combat/ComboService.cs.
 		private readonly ComboService _combos;
 
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
 
-		// #310: Khitai reputation - awards standing on a kill and restores it at world entry.
+		// Khitai reputation - awards standing on a kill and restores it at world entry.
 		private readonly FactionService _factions;
 
-		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
-		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
-		// burst-less world entry it needs is injected as a Func seam, and the handoff pair comes off _teleport.
+		// The character-creation -> editor -> destiny-cutscene -> enter-world flow (CreateFlow/CreateFlowService.cs).
+		// The inbound create-flow handlers forward to it; it takes the burst-less world entry and the handoff pair as
+		// constructor dependencies.
 		private readonly CreateFlowService _createFlow;
 
 		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly EquipmentService _equipment;
 
-		// Composed collaborator: non-combat damage - fall damage + the scripted hazard volumes (#495/#504). See
-		// World/EnvironmentService.cs.
+		// Non-combat damage - fall damage + the scripted hazard volumes. See World/EnvironmentService.cs.
 		private readonly EnvironmentService _environment;
 
-		// Composed collaborator: knockback - the server shoving an entity along a segment it did not walk (#496). See
+		// Knockback - the server shoving an entity along a segment it did not walk. See
 
-		// Composed collaborator: local travel - the NPCs who move a player for a fee (#506). See World/TravelService.cs.
+		// Local travel - the NPCs who move a player for a fee. See World/TravelService.cs.
 		private readonly TravelService _travel;
 		private readonly FeatService _feats;
 
-		// Composed collaborator: skillpoint spends - the c2s SkillIIR transfer out of the SkillPoints pool (#739).
+		// Skill-point spends - the c2s SkillIIR transfer out of the SkillPoints pool.
 		// See Progression/SkillPointService.cs.
 		private readonly SkillPointService _skillPoints;
 
-		// Composed collaborator: character advancement - XP in, levels out, and the whole level-up burst (#209). Every
-		// path that moves a level goes through it (a kill's XP via CombatService, a GM `.level` set).
-		// See Progression/LevelUpService.cs.
+		// Character advancement - XP in, levels out, and the whole level-up burst. Every path that moves a level goes
+		// through it (a kill's XP via CombatService, a GM `.level` set). See Progression/LevelUpService.cs.
 		private readonly LevelUpService _levelUp;
 
-		// Composed collaborator: the BUFF ENGINE (#274/#367/#784) - apply, track, expire, remove, restore, and the stat
-		// deltas a live buff carries. The three outbound ports whose buff members used to BE the implementation
-		// (IWorldOutbound, ISpellEffectOutbound, ISpellweaveOutbound) now forward here. See Combat/BuffService.cs.
+		// The buff engine - apply, track, expire, remove, restore, and the stat deltas a live buff carries. The buff
+		// members of IWorldOutbound, ISpellEffectOutbound and ISpellweaveOutbound all forward here.
+		// See Combat/BuffService.cs.
 		private readonly BuffService _buffs;
 
-		// Composed collaborator: the CAST PIPELINE (#236/#271/#767) - begin-ack, cast time, then resolve (server-side
-		// effects, ground AoE, the landing buff, mana, instant areas, offensive damage). See Combat/CastService.cs.
+		// The cast pipeline - begin-ack, cast time, then resolve (server-side effects, ground AoE, the landing buff,
+		// mana, instant areas, offensive damage). See Combat/CastService.cs.
 		private readonly CastService _cast;
 
-		// Composed collaborator: what a completed melee COMBO does when it lands (#139) - stamina, the finisher's
-		// spell, its damage, its knockback. A layer ABOVE the combo catalog (_combos), which is why it is a separate
-		// class - see Combat/ComboFinisher.cs. Built last: it needs the knockback service.
+		// What a completed melee combo does when it lands - stamina, the finisher's spell, its damage, its knockback. A
+		// layer above the combo catalog (_combos), which is why it is a separate class; see Combat/ComboFinisher.cs.
+		// Built last: it needs the knockback service.
 		private readonly ComboFinisher _comboFinisher;
 
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// Composed collaborator: the live player-trade sessions - see TradeService.
+		// The live player-trade sessions - see TradeService.
 		private readonly TradeService _trade;
 
 		// Seam into the CsPlayerAgent listener, which owns the team roster (ICsPlayerAgentProvider).
@@ -184,16 +182,16 @@ namespace Faolan.GameServer
 		// item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
 		private readonly LootService _loot;
 
-		// Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
+		// Player-state persistence: the autosave loop plus the logout/teleport/.save flushes.
 		private readonly PlayerPersistenceService _persistence;
 
-		// Scripted Tortage-intro narrative (Kalanthes create-cutscene walk + Casilda beach rescue), #353.
+		// Scripted Tortage-intro narrative: the Kalanthes create-cutscene walk and the Casilda beach rescue.
 		private readonly TortageIntroService _tortageIntro;
 
-		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
+		// The multi-stage quest-chain supersession engine, shared by the kill/loot/talk triggers.
 		private readonly QuestProgressionService _questProgression;
 
-		// Quest SHARING (#101): reaches the team roster through the CS seam and the wire through IQuestShareOutbound.
+		// Quest sharing: reaches the team roster through the CS seam and the wire through IQuestShareOutbound.
 		private readonly QuestSharingService _questSharing;
 		private readonly ApprenticeService _apprentice;
 
@@ -201,16 +199,17 @@ namespace Faolan.GameServer
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
 
-		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
+		// The player action bar / hotbar persistence + login restore. See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
+
+		private readonly GuildBankService _guildBank;
 
 		// Crafting: turns a recipe's ingredients into its product. Reaches the wire through the same IEconomyOutbound
 		// grant/take ops the shop and bank use. See Economy/TradeskillService.cs.
-		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
-		// Getting ON and OFF a mount (#26 / #142 / #428) - the seat, the persisted mount, and the dismount every
-		// involuntary path shares. See World/MountService.cs.
+		// Getting on and off a mount - the seat, the persisted mount, and the dismount every involuntary path shares.
+		// See World/MountService.cs.
 		private readonly MountService _mounts;
 
 		// A player dying, releasing and coming back: the death screen, the release timer, the self-resurrection a
@@ -221,39 +220,39 @@ namespace Faolan.GameServer
 		// See Combat/KnockbackService.cs.
 		private readonly KnockbackService _knockback;
 
-		// The loot LIFECYCLE's wire side - a corpse's drop, the bag's open/close/fade - and what is IN each bag.
+		// The loot lifecycle's wire side - a corpse's drop, the bag's open/close/fade - and what is in each bag.
 		// See World/LootBroadcaster.cs.
 		private readonly LootBroadcaster _lootBroadcaster;
 
-		// What an NPC DOES, told to everyone who can see it - aggro, combat mode, movement, patrol, follow, respawn,
-		// scripted exit - plus putting a runtime NPC or pet in the world. The broadcaster answers the other half of
-		// the question, who can see what. See World/NpcBroadcaster.cs.
+		// What an NPC does, told to everyone who can see it - aggro, combat mode, movement, patrol, follow, respawn,
+		// scripted exit - plus putting a runtime NPC or pet in the world. The broadcaster answers the other half of the
+		// question, who can see what. See World/NpcBroadcaster.cs.
 		private readonly NpcBroadcaster _npcs;
 
-		// The quest WIRE (journal packets + the overhead '!' / '?' markers) and the marker DECISION behind it. Both
-		// are shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the
-		// IQuestOutbound port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
+		// The quest wire (journal packets + the overhead '!' / '?' markers) and the marker decision behind it. Both are
+		// shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the IQuestOutbound
+		// port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
 		private readonly QuestBroadcaster _questBroadcaster;
 		private readonly QuestOutbound _questOutbound;
 
-		// INTERACTING with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
+		// Interacting with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
 		// sequences, the GM delete. Its subject is LiveWorldObject, which is what separates it from the broadcaster's
 		// WorldEntity. See World/WorldObjectService.cs.
 		private readonly WorldObjectService _worldObjects;
 
-		// The CHANGEMAP handoff (GM .teleport, the recalls, the travel box, a zone line, a cross-map trip) plus the
-		// two latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
-		// arrives on a NEW connection. See World/TeleportService.cs.
+		// The changemap handoff (GM .teleport, the recalls, the travel box, a zone line, a cross-map trip) plus the two
+		// latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
+		// arrives on a new connection. See World/TeleportService.cs.
 		private readonly TeleportService _teleport;
 
-		// A player's summoned PET (#307): summon, the timed variant's extend-or-summon, and the pet bar's dismiss.
-		// Reached from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler. See
-		// Combat/PetService.cs.
+		// A player's summoned pet: summon, the timed variant's extend-or-summon, and the pet bar's dismiss. Reached
+		// from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler.
+		// See Combat/PetService.cs.
 		private readonly PetService _pets;
 
-		// The per-session ENERGY pool + the sprint booleans (the yellow bar sprint drains and spellweaving spends).
-		// Its state is entirely on INetworkClientSession, so it is a plain collaborator over per-connection state -
-		// which is what let the loop leave this class. See Combat/EnergyService.cs.
+		// The per-session energy pool + the sprint booleans (the yellow bar sprint drains and spellweaving spends). Its
+		// state lives entirely on INetworkClientSession, so it is a plain collaborator over per-connection state.
+		// See Combat/EnergyService.cs.
 		private readonly EnergyService _energy;
 
 		private readonly SpellweaveService _spellweave;
@@ -267,18 +266,16 @@ namespace Faolan.GameServer
 		private readonly TradepostService _tradepost;
 
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
-		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
-		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
+		// and quest-journal packets). Reads the world model via the simulation. See World/WorldBroadcaster.cs.
 		private readonly WorldBroadcaster _broadcaster;
 
-		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
-		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
-		// IWorldOutbound port is handed to it at Start, not at construction. See World/WorldSimulation.cs.
+		// The live world simulation: owns the world model, the connected players' authoritative entities, and the 10 Hz
+		// tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). Its IWorldOutbound port is
+		// handed to it at Start, not at construction. See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
 
-		// World entry - the login/teleport/create ready bursts, the snapshot, the spawn poll - is a composed service
-		// since the world-entry move (the last behaviour this listener owned that a service needed; see
-		// CreateFlowService, which used to reach it through a bound seam).
+		// World entry - the login/teleport/create ready bursts, the snapshot, the spawn poll. CreateFlowService takes
+		// it as an ordinary dependency, which is why it is a service rather than a partial of this class.
 		private readonly WorldEntryService _worldEntry;
 
 		// The GM-bendable game clock the GameTime sends read (RealmClock).
@@ -290,7 +287,6 @@ namespace Faolan.GameServer
 		// Achievement tags (the vista award goes through it).
 		private readonly TagService _tags;
 
-		// The three former partials of this class that were single-domain (#928 item 6).
 		private readonly StanceService _stances;
 		private readonly VistaService _vista;
 		private readonly ItemUseService _itemUse;
@@ -298,7 +294,7 @@ namespace Faolan.GameServer
 		// The travel confirmation box + the ACG teleport choice (TravelOutbound owns the confirm cookie).
 		private readonly TravelOutbound _travelOutbound;
 
-		// The player move and the Authenticate2 hello - the two inbound cases that were handlers rather than forwards (#928 item 11).
+		// The player move and the Authenticate2 hello - the two inbound cases that are handlers rather than forwards.
 		private readonly MovementService _movement;
 		private readonly BehaviorService _behavior;
 		private readonly LoginHandshakeService _login;
@@ -308,17 +304,16 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts = null!;
 
-		// Everything below arrives by INJECTION (#826): the ~61 services this ctor used to hand-`new` are registered
-		// in GameServerRealmServices.AddRealmGameServer, and the fourteen that were held only in order to build
-		// something else are not fields here at all any more.
+		// Every collaborator arrives by injection; they are registered in
+		// GameServerRealmServices.AddRealmGameServer.
 		//
-		// ⚠️ It takes an ILoggerFactory rather than an ILogger because the category is REALM-TAGGED
-		// ("...GameServerListener-<realmId>"), and the base initializer has to build it before `Logger` exists. Every
+		// The constructor takes an ILoggerFactory rather than an ILogger because the category is realm-tagged
+		// ("...GameServerListener-<realmId>") and the base initializer has to build it before `Logger` exists. Every
 		// composed service gets the same category through the bare `ILogger` the realm registration provides.
 		//
-		// ⚠️ The parameter count is the honest size of this class's collaborator surface, not an artifact of DI - it
-		// is what the partials below actually call. Shrinking it means moving handlers out, which is #826's remaining
-		// direction of travel, not hiding them behind a parameter object.
+		// The parameter count is the size of this class's collaborator surface - what the partials below actually call
+		// - rather than an artifact of DI. Shrinking it means moving handlers out, not hiding them behind a parameter
+		// object.
 		public GameServerListener(ILoggerFactory loggerFactory, IConfiguration configuration, IDatabaseRepository database, HostRealm realm,
 			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher,
 			ConnectionRegistry connections,
@@ -404,8 +399,8 @@ namespace Faolan.GameServer
 		}
 
 		// The realm-tagged log category, resolved twice in the base initializer above (once for the listener, once for
-		// its packet tracer) - which costs nothing, because ILoggerFactory caches by category name and both calls
-		// therefore return the same ILogger instance.
+		// its packet tracer). That costs nothing: ILoggerFactory caches by category name, so both calls return the same
+		// ILogger instance.
 		private static ILogger RealmLogger(ILoggerFactory loggerFactory, HostRealm realm)
 		{
 			return loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}");
@@ -421,8 +416,8 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// IGameServerProvider (the MCP session tool). One implementation, on QuestShareOutbound - this used to be a
-		// second copy of the same world-model walk.
+		// IGameServerProvider (the MCP session tool). The world-model walk has one implementation, on
+		// QuestShareOutbound.
 		public CharacterLiveState? GetCharacterLiveState(uint characterId)
 		{
 			return _questShare.LiveStateOf(characterId);
@@ -430,8 +425,8 @@ namespace Faolan.GameServer
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
-			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities
-			// regardless of which copy they're in.
+			// Observer view: union every live instance (copy) of the map, so the MCP tool sees all entities regardless
+			// of which copy they are in.
 			return _simulation
 				.World.ZonesForMap(mapId)
 				.SelectMany(z => z.Entities)
@@ -444,9 +439,9 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
-		// The CS tier's entry into a world teleport (#511: the group finder putting a formed team into its
-		// instance). The same DoTeleport the travel box and the GM path resume into, so the retail change-map
-		// sequence (announce + handoff + reconnect) is the only teleport shape this server has.
+		// The CS tier's entry into a world teleport (the group finder putting a formed team into its instance). The
+		// same DoTeleport the travel box and the GM path resume into, so the retail change-map sequence (announce +
+		// handoff + reconnect) is the only teleport shape this server has.
 		public async Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null)
 		{
 			if (ClientForCharacter(characterId) == null)
@@ -501,21 +496,22 @@ namespace Faolan.GameServer
 			var entity = _simulation.PlayerWorldEntity(client);
 			if (entity != null)
 			{
-				// Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
-				// zone, so ResolveRemove still sees the leaver's viewers - now awaited (ClientDisconnected is a Task), 				// so the despawn deterministically lands before RemovePlayer instead of racing it.
+				// Tell everyone who could see this player that it left (n3ToClientQuit) before removing it from the
+				// zone, so ResolveRemove still sees the leaver's viewers. Awaited, so the despawn lands before
+				// RemovePlayer rather than racing it.
 				await _broadcaster.BroadcastPlayerDespawn(entity);
-				// #907: a zone change tears this connection down and the re-entry builds a NEW entity (PlayerRegistry
-				// is keyed by connection), so hold the live buffs over the handoff. Without it a debuff live at the
-				// moment of the teleport has nothing left to expire it, and the client - which keeps its own icon
-				// list across a map change - shows it at 0s for ever. Only on a teleport-out: on a real logout the
-				// buffs are meant to end, and the client rebuilds its icon list from the next login's snapshot.
+				// A zone change tears this connection down and the re-entry builds a new entity (PlayerRegistry is
+				// keyed by connection), so the live buffs are held over the handoff. Without that, a debuff live at the
+				// moment of the teleport has nothing left to expire it and the client - which keeps its own icon list
+				// across a map change - shows it at 0 s for ever. Only on a teleport-out: on a real logout the buffs
+				// are meant to end, and the client rebuilds its icon list from the next login's snapshot.
 				if (client.Session.IsTeleportingOut)
 					_teleport.CarryBuffs(entity.Handle, entity.ActiveBuffs);
 
 				_simulation.RemovePlayer(client, out _);
-				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
-				// loses where they were. EXCEPT on a teleport-out: DoTeleport already saved the destination, and this
-				// connection's entity still holds the stale pre-teleport position which would clobber it (#28).
+				// Persist the player's final live state - movement is not otherwise saved, so without this a logout
+				// loses where they were. Except on a teleport-out: DoTeleport has already saved the destination, and
+				// this connection's entity still holds the stale pre-teleport position, which would clobber it.
 				if (!client.Session.IsTeleportingOut)
 					await _persistence.SavePlayerState(client, entity);
 				else
@@ -525,8 +521,8 @@ namespace Faolan.GameServer
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
 
-			// Nor can a tradeskill mid-bar (#793): it is staged and un-run, so dropping it takes nothing from the
-			// player - where letting it complete would grant an item to a session that has gone.
+			// A tradeskill mid-bar cannot outlive the connection either: it is staged and un-run, so dropping it takes
+			// nothing from the player, where letting it complete would grant an item to a session that has gone.
 			if (_tradeskill.Forget(client) is var dropped and > 0)
 				Logger.LogInformation("Tradeskill: dropped {Count} staged transaction(s) for a leaving connection.", dropped);
 
@@ -538,9 +534,9 @@ namespace Faolan.GameServer
 				// Same rule for a quest share offered TO this player: the window is gone with the connection, so the
 				// offer must be too - otherwise a reconnect could accept one made minutes ago on the other side of the map.
 				_questSharing.Forget(tradingCharacter.Id);
-				_questBroadcaster.ForgetMarkerContext(tradingCharacter.Id); // #939: the cached quest-marker state leaves with the session
+				_questBroadcaster.ForgetMarkerContext(tradingCharacter.Id); // the cached quest-marker state leaves with the session
 				// And every apprenticeship they are in, on either side: the level boost is a pushed stat, so a bond
-				// that survived a disconnect would leave the OTHER party's client holding it (#144).
+				// that survived a disconnect would leave the other party's client holding it.
 				_ = _apprentice.Forget(tradingCharacter.Id);
 			}
 
@@ -554,18 +550,16 @@ namespace Faolan.GameServer
 
 		protected override Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			// Lift the parsed frame into the structured Rpc the handlers dispatch on (Gitea #407); the total wire length
-			// (which the Rpc doesn't carry) is threaded to the dispatchers that log it as packetLength.
-
-			// This connection multiplexes several RPC classes whose 0x20xx method ids COLLIDE with ordinary opcodes, 			// so resolve the RPC CLASS (by receiver; for Tradepost also its sender) BEFORE the opcode switch - each
-			// class route consumes the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md.
-			// The two sub-0x2014 opcodes 0x2002/0x2003 are the ONLY ones that also arrive on GameCharAgent (there they
-			// are RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
-
-			// The ONE reader over the body for this packet's whole dispatch chain: BodyReader() hands out a fresh cursor
+			// This connection multiplexes several RPC classes whose 0x20xx method ids collide with ordinary opcodes, so
+			// the RPC class is resolved first (by receiver; for Tradepost also by sender) and each class route consumes
+			// the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md. The two
+			// sub-0x2014 opcodes 0x2002/0x2003 are the only ones that also arrive on GameCharAgent (there they are
+			// RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
+			//
+			// One reader over the body serves this packet's whole dispatch chain: BodyReader() hands out a fresh cursor
 			// per call, so every layer (dispatcher -> handler -> service) shares this instance and reads from its
-			// position rather than re-reading from 0. Threaded down as a `FaolanStream body` parameter. Handlers that
-			// read a sub-header first (HandleIirCarrier) leave the cursor advanced for their own sub-handlers.
+			// position rather than re-reading from 0. It is threaded down as a `FaolanStream body` parameter. Handlers
+			// that read a sub-header first (HandleIirCarrier) leave the cursor advanced for their own sub-handlers.
 			var body = packet.BodyReader();
 
 			return packet.Receiver.Type switch
@@ -573,19 +567,17 @@ namespace Faolan.GameServer
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
 				RpcInterfaces.TradepostAgentType => HandleTradepostPacket(client, packet, body),
 
-				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
-				// screen (without the reply the client retries forever + never opens chat).
+				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll gates the loading
+				// screen (without the reply the client retries forever and never opens chat).
 				//
-				// Routed on EVERY connection role, create flows included (#564). It used to be gated to an existing
-				// character's world login, on the belief that "the create flows own this class during their own
-				// handshake" - they do not: the create-editor's handshake packets are on GameAgent, and what this
-				// gate actually dropped was the poll the client fires at the five editor scene characters as soon as
-				// they are streamed (before the name is committed). Retail answers those - 55/55 in
-				// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create - so we do too.
+				// Routed on every connection role, create flows included: the create-editor's handshake packets are on
+				// GameAgent, and the client fires this poll at the five editor scene characters as soon as they are
+				// streamed, before the name is committed. Retail answers those - 55/55 in
+				// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create.
 				RpcInterfaces.GameCharAgentProjectType => HandleGameCharAgentProject(client, packet, body),
 
-				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
-				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
+				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) plus every per-character method
+				// (loot / shop / respawn / shortcut / latency / ...).
 				RpcInterfaces.GameCharAgentType => HandleGameCharAgentPacket(client, packet, body),
 
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).

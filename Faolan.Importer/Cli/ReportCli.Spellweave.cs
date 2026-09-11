@@ -8,14 +8,13 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spellweave`: the whole SPELLWEAVING ruleset, derived from the client's own spell records rather
-	// than from a capture (Gitea #141).
+	// `--report spellweave`: the whole spellweaving ruleset, derived from the client's own spell records rather
+	// than from a capture.
 	//
-	// #141 stood for two months on "the componentIndex -> effect table is per-class and we have no capture of a
-	// weave that fires with known components", with only the Necromancer profile filled in. The table is not
-	// capture-borne at all: the client declares it, in the one place a value search could never reach - as the
-	// argument list of a `StartSpellWeavingMode` (53190) GameAction element, whose five keys are
-	// `NanoTemplate, Arg1..Arg4` (docs/re/gameaction-keylists.tsv). Finding it needs a search by element KIND,
+	// The componentIndex -> effect table is per-class and no capture shows a weave firing with known components, but
+	// the table is not capture-borne at all: the client declares it, in the one place a value search could never
+	// reach - as the argument list of a `StartSpellWeavingMode` (53190) GameAction element, whose five keys are
+	// `NanoTemplate, Arg1..Arg4` (docs/re/gameaction-keylists.tsv). Finding it needs a search by element kind,
 	// which is what `--report spell-refs --report-arg kind:53190` added.
 	//
 	// The shape it recovers, per caster class:
@@ -24,16 +23,16 @@ namespace Faolan.Importer.Cli
 	//     player one rung. Each rung states the class's five weave elements (identically, so the picker survives
 	//     the advance), a `Modify BaseSpellDamage` step, a `Modify NaturalEnergyRegeneration` of -15000, and two
 	//     per-rung payload spells named `Beneficial Effect` / `Detrimental Effect`;
-	//   * a DISPATCHER (`Spellweaving`, duration 0) that every rung casts. Its own record is a descending
+	//   * a dispatcher (`Spellweaving`, duration 0) that every rung casts. Its own record is a descending
 	//     `CastNano` chain gated on `MustHavePassiveAbilityRunning <the rung below>` - the ordinary rank-table
-	//     walk (#813), here used to move the stack up by one;
-	//   * the BACKLASH. Each rung's `Detrimental Effect` record is a six-way partition of ONE roll: the first
+	//     walk, used here to move the stack up by one;
+	//   * the BACKLASH. Each rung's `Detrimental Effect` record is a six-way partition of one roll: the first
 	//     branch reads `Rnd` (stat 520), which draws the number, and every later branch compares `LastRnd`
 	//     (stat 522) against a band of it. The bands WIDEN as the stack climbs, so the odds of escaping a
 	//     backlash fall rung by rung - which is the escalating risk the mechanic is described by.
 	//
-	// ⚠️ `Spellweave Gone Bad: Weak/Moderate/Strong/Maximum` (196612-196615) is NOT the backlash. Those four sit
-	// beside `TEST Spellweave: Fire 1` in a low id band and are referenced by ZERO spell records; the live
+	// `Spellweave Gone Bad: Weak/Moderate/Strong/Maximum` (196612-196615) is not the backlash. Those four sit
+	// beside `test Spellweave: Fire 1` in a low id band and are referenced by zero spell records; the live
 	// backlash is the six-spell partition above. Recorded here so the names stop being a lead.
 	public static partial class ReportCli
 	{
@@ -100,9 +99,9 @@ namespace Faolan.Importer.Cli
 				var elementIds = profile.First().Elements;
 
 				// The ladder in stack order. The rung is stated by the record's own `Modify BaseSpellDamage` step -
-				// the ids are NOT reliably ordered (two of the four classes run their band DESCENDING, and two are
+				// the ids are not reliably ordered (two of the four classes run their band DESCENDING, and two are
 				// interleaved with unrelated records), which is exactly why a base+offset model of the stack is
-				// wrong for them. The top rung carries the whole 6..25 continuation, so its FIRST step is its rung.
+				// wrong for them. The top rung carries the whole 6..25 continuation, so its first step is its rung.
 				var rungs = profile
 					.Select(c => (c.Id, Step: FirstModify(Elements(c.Id), StatBaseSpellDamage)))
 					.OrderBy(r => r.Step)
@@ -116,14 +115,14 @@ namespace Faolan.Importer.Cli
 				var bottom = rungs[0].Id;
 				var dispatcher = dispatchers.FirstOrDefault(d => CastTargets(Elements(d)).Contains(bottom));
 
-				// ⭐ The CLASS, stated mechanically rather than inferred from the element names. Every rung carries
+				// The class, stated mechanically rather than inferred from the element names. Every rung carries
 				// `SpellLineStatModifier` elements against the class's own spell lines, and a spell line is
-				// `ConanClass * 1000 + index` (docs/subsystems/combos.md) - so the line's leading block IS the
+				// `ConanClass * 1000 + index` (docs/subsystems/combos.md) - so the line's leading block is the
 				// class id. It agrees with the element names on all four (Hell/Hand of Doom -> 44 Demonologist,
-				// Mitra's Grace -> 24 Priest of Mitra, ...), which is what makes the naming safe to rely on.
-				// ⚠️ Not every leading block is a class - the archetype-shared combos famously sit under a `20`
+				// Mitra's Grace -> 24 Priest of Mitra,...), which is what makes the naming safe to rely on.
+				// Not every leading block is a class - the archetype-shared combos famously sit under a `20`
 				// block that is not Guardian (docs/subsystems/combos.md), and the Demonologist ladder carries a
-				// `50000` line that resolves to no class at all. So the blocks are SPLIT here rather than
+				// `50000` line that resolves to no class at all. So the blocks are split here rather than
 				// averaged: the ones that are real classes name the profile, the rest are printed as what they
 				// are - unresolved - instead of being quietly folded in.
 				var blocks = profile

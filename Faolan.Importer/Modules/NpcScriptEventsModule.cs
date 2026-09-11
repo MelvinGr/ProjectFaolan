@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// The scripted events an NPC's dialogue fires (#839) - retail's `SendScryEvent` GameAction, harvested per creature.
+	// The scripted events an NPC's dialogue fires - retail's `SendScryEvent` GameAction, harvested per creature.
 	// See NpcScriptEvent for what they are and why they are keyed to the creature rather than to a conversation node.
 	//
 	// Its own module for the reason `npc-disposition` is: it attaches to NpcTemplates that already exist and nothing
@@ -74,12 +74,12 @@ namespace Faolan.Importer.Modules
 				added++;
 			}
 
-			// ⭐ The ACTION overlay - the one thing about a scry event that is NOT harvested. Retail states the event
-			// STRING and nothing else, so what the server does about it is authored here, and this table IS the
+			// The ACTION overlay - the one thing about a scry event that is not harvested. Retail states the event
+			// string and nothing else, so what the server does about it is authored here, and this table is the
 			// plug-in point: a future quest whose dialogue fires `RunToKhemi` or `SpawnBandits` is wired by adding a
 			// line below, with no change to the dialogue runtime.
 			//
-			// BOOTSTRAP-ONLY, like `Chain` in QuestGoalWiring: only an event still sitting at `None` is stamped, so a
+			// BOOTSTRAP-only, like `Chain` in QuestGoalWiring: only an event still sitting at `None` is stamped, so a
 			// hand edit (or a re-run after someone mapped one) is never clobbered. An event that is not listed stays
 			// `None` and LOGS when it fires - which is the honest state for `SpawnSheep`, `AriasMageLeave`,
 			// `ProtectiveSpell` and `knubotconarchdrunk`, none of which we can act on yet.

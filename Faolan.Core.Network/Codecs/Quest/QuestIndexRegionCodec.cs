@@ -4,41 +4,42 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the COMPLETED-quest journal
-	// (CompletedQuestJournalRegionCodec) and the access-window table. Decoded byte-exact from the beach template, the
-	// 2-quest capture (#255) AND every progressed journal in the corpus (5..30 active quests, #391), and re-carved
-	// to the CLIENT's own reader in #464 (`MainQuest_c`, `FUN_00922210` - five head words, the pair list, then a
-	// four-word trailer):
-	//   [u32 (count + 1) * 0x3F1]                 the id-list framing (count = number of held/active quests)
-	//   [u32 questId × count]                     the held quest ids
-	//   [u32 count]                               a PLAIN count (the client's MainQuest_c list uses one)
-	//   ONE goal-table BLOCK per held quest, in the same order as the ids:
-	//     [u32 areaId]                            the quest's QuestLineId - the block's OWN first word. The old carve
-	//                                             hung it off the PREVIOUS block as a "chainWord" (and block 1's off
-	//                                             the region head as "leadAreaId"), which manufactured a chain grammar
-	//                                             and a phantom "terminal word": the last block's "chainWord" was the
-	//                                             ACCESS-WINDOW TABLE's ListFrame(86) == 0x156E7, constant only
-	//                                             because every capture carries the same 86-entry catalog.
-	//     [u32 magic]                             the AREA's goal-table NAME word ("W6QT" 0x57365154, "RRL3" ...)
-	//     [u32 stepNumber][u32 stepsAfter][u32 tf3]
-	//                                             the held quest's 1-based step in its line and the number of steps
-	//                                             AFTER it (their sum is the line's length); the client's journal
-	//                                             draws them as Roman numerals (#926). PER-CHARACTER progress, not a
-	//                                             line constant - it read as `[1][count-1]` for as long as every
-	//                                             captured character stood on step 1. tf3 == 0 across the corpus
-	//     [u32 n][ (questId, sequence) × n ]      the AREA's full quest catalog; sequence is 1-based but NOT strictly
-	//                                             monotonic (branch/chapter quests repeat a sequence - so the old
-	//                                             "idx == i+1" assertion was a beach-only accident)
-	//     [u32 trailerQuestId][u32 a][u32 b][u32 c]
-	//                                             trailerQuestId = the AREA's anchor quest; a/b/c vary per quest
-	//                                             (beach 1/0/0)
-	//
-	// ⚠️ There is NO leading 0x3F1 "IndexTag" (that phantom was the empty completed-journal frame) and NO terminal
-	// word: an EMPTY index is `[0x3F1][u32 0]` and the region simply ends. The next bytes belong to the
-	// access-window table (PfAccessWindowEntryCodec), whose frame word the old grammar consumed as its "terminal".
+	/// <summary>
+	///     The quest index region of the world-entry snapshot tails - the bytes between the completed-quest journal
+	///     (<see cref="CompletedQuestJournalRegionCodec" />) and the access-window table.
+	/// </summary>
+	/// <remarks>
+	///     Decoded byte-exact from the beach template, the two-quest capture and every progressed journal in the corpus
+	///     (5 to 30 active quests), and carved to the client's own reader (MainQuest_c, FUN_00922210: five head words, the
+	///     pair list, then a four-word trailer):
+	///     <code>
+	///     [ListFrame(heldQuests)]        the id-list framing
+	///     [u32 questId x count]          the held quest ids
+	///     [u32 count]                    a plain count, as the client's MainQuest_c list uses
+	///     one goal-table block per held quest, in the same order as the ids:
+	///       [u32 areaId]                 the quest's QuestLineId - the block's own first word
+	///       [u32 magic]                  the area's goal-table name word ("W6QT", "RRL3", ...)
+	///       [u32 stepNumber][u32 stepsAfter][u32 tf3]
+	///                                    the held quest's 1-based step in its line and the number of steps after it,
+	///                                    their sum being the line's length; tf3 is 0 across the corpus
+	///       [u32 n][(questId, sequence) x n]   the area's full quest catalog
+	///       [u32 trailerQuestId][u32 a][u32 b][u32 c]   trailerQuestId is the area's anchor quest
+	///     </code>
+	///     <para>
+	///         The region has no leading tag word and no terminal word: an empty index is the empty-list frame followed by a
+	///         zero count, and the region simply ends. The next bytes belong to the access-window table
+	///         (PfAccessWindowEntryCodec), whose own frame word is easily mistaken for a terminator - it is constant only
+	///         because every capture carries the same 86-entry catalog.
+	///     </para>
+	///     <para>
+	///         Each block's leading word belongs to that block, not to the one before it; hanging it off the previous block
+	///         manufactures a chain grammar that does not exist. The catalog's sequence is 1-based but not strictly
+	///         monotonic, since branch and chapter quests repeat one, so it must be carried rather than regenerated.
+	///     </para>
+	/// </remarks>
 	public static class QuestIndexRegionCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestIndexRegion value)
 		{
 			using var s = new FaolanStream();
@@ -56,8 +57,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		internal static QuestIndexRegion Read(ref SpanReader r)
 		{
-			// The count is the frame's count - read exactly that many ids rather than peeking, so a held quest id
-			// below 0x1000 (or an area id above it) cannot mis-split the list.
+			// The count is the frame's count: read exactly that many ids rather than peeking, so a held quest id below
+			// 0x1000, or an area id above it, cannot mis-split the list.
 			var declared = r.ReadListCount();
 			var questIds = new List<uint>(declared);
 			for (var i = 0; i < declared; i++)
@@ -145,66 +146,82 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// The quest index: the held quest ids plus one area-catalog block per held quest.
+	/// <summary>The quest index: the held quest ids plus one area-catalog block per held quest.</summary>
 	public sealed record QuestIndexRegion
 	{
 		public List<Block> Blocks { get; init; } = [];
 		public List<uint> QuestIds { get; init; } = [];
 
-		// One held quest's area-catalog table. The client's MainQuest_c (FUN_00922210).
+		/// <summary>One held quest's area-catalog table - the client's MainQuest_c (FUN_00922210).</summary>
 		public sealed record Block
 		{
-			// The quest's QuestLineId - the block's first wire word. Read as the previous block's "chainWord" (and,
-			// for block 1, as the region's "leadAreaId" - the beach's 241 == 0xF1 "sentinel") until #464.
+			/// <summary>The quest's QuestLineId, and the block's own first wire word.</summary>
 			public uint AreaId { get; init; }
 
-			// The line's seq-1 quest on every captured block. The client reader (`FUN_00922210`) matches it into the
-			// pair list and stores it at MainQuest_c +0x38 - the line's current-quest slot, the SAME one the
-			// MainQuestUpdateIIR's TrackedQuestId fills on the incremental path (#464).
+			/// <summary>
+			///     The line's sequence-1 quest on every captured block. The client reader (FUN_00922210) matches it into the
+			///     pair list and stores it at MainQuest_c +0x38, the line's current-quest slot - the same one
+			///     MainQuestUpdateIIR's TrackedQuestId fills on the incremental path.
+			/// </summary>
 			public uint TrailerQuestId { get; init; }
 
-			// The AREA's full quest catalog, ordered by each quest's JournalSequence - NOT this quest's goal ids, which
-			// is what "GoalSteps" claimed until 2026-07-20. Proven: quest 10238's list is
-			// [10238,12369,12373,10320,12371,10286,10287,10915], exactly area 241's 8 quests, while its own goals are
-			// [1448,3490]. A FRESH character with no completed quests carries the whole list, so it is static area
-			// data rather than anything journal-derived.
-			//
-			// On the wire each entry is a (questId, sequence) pair. AreaQuestSequences holds the sequence parallel to
-			// AreaQuestIds; the sequence is 1-based but NOT strictly monotonic (branch/chapter quests repeat one), so
-			// it must be carried, not regenerated as i+1 (#391). Write requires the two lists to be the same length.
+			/// <summary>
+			///     The area's full quest catalog, ordered by each quest's JournalSequence, and not this quest's goal ids:
+			///     quest 10238's list is [10238, 12369, 12373, 10320, 12371, 10286, 10287, 10915], exactly area 241's eight
+			///     quests, while its own goals are [1448, 3490]. A fresh character with no completed quests carries the whole
+			///     list, so it is static area data rather than journal-derived.
+			/// </summary>
+			/// <remarks>
+			///     On the wire each entry is a (questId, sequence) pair. AreaQuestSequences holds the sequence parallel to
+			///     AreaQuestIds; the sequence is 1-based but not strictly monotonic, since branch and chapter quests repeat
+			///     one, so it must be carried rather than regenerated from the position. Write requires the two lists to be
+			///     the same length.
+			/// </remarks>
 			public List<uint> AreaQuestIds { get; init; } = [];
 			public List<uint> AreaQuestSequences { get; init; } = [];
 			public uint Magic { get; init; } // the area's goal-table name word (W6QT / RRL3 / ...)
 
-			// `MainQuest_c +0x30` / `+0x34` (#926): the HELD quest's 1-based step number within its line, and the number of
-			// steps after it - so StepNumber + StepsAfter == AreaQuestIds.Count, and on every one of the 2,626 captured
-			// blocks StepNumber is exactly the held quest's own AreaQuestSequences entry. The reader is the journal's
-			// line panel (`FUN_01617260`): it takes +0x30 as a running counter, formats it through the Roman-numeral
-			// converter (`FUN_010cfbc0`, the I/II/III the journal shows for a line's chapters) for the current step, then
-			// draws +0x34 more placeholder rows for the steps still to come and hides that section when +0x34 is 0.
-			//
-			// ⚠️ These are per-CHARACTER progress, the only two words in the block that are. They were recorded as
-			// per-quest constants (`[1][count-1]`) because every captured character stood on step 1 of the lines the
-			// early corpus covered; the beach line alone now shows 1/3/5/8 across characters. Generation derives them
-			// from the held quest's JournalSequence (QuestIndexRegions.ForQuests), which is why it stayed byte-exact.
+			/// <summary>
+			///     MainQuest_c +0x30 and +0x34: the held quest's 1-based step number within its line, and the number of steps
+			///     after it. Their sum is AreaQuestIds.Count, and on every one of the 2,626 captured blocks StepNumber is
+			///     exactly the held quest's own AreaQuestSequences entry.
+			/// </summary>
+			/// <remarks>
+			///     The reader is the journal's line panel (FUN_01617260): it takes +0x30 as a running counter, formats it
+			///     through the Roman-numeral converter (FUN_010cfbc0, the chapter numerals the journal shows) for the current
+			///     step, then draws +0x34 more placeholder rows for the steps still to come, hiding that section when +0x34 is
+			///     zero.
+			///     <para>
+			///         These are the only two words in the block that are per-character progress rather than line constants -
+			///         the beach line alone shows 1, 3, 5 and 8 across characters - so generation derives them from the held
+			///         quest's JournalSequence (QuestIndexRegions.ForQuests).
+			///     </para>
+			/// </remarks>
 			public uint StepNumber { get; init; }
 			public uint StepsAfter { get; init; }
 
-			// MainQuest_c +0x44 - the SAME slot MainQuestUpdateIIR.Unknown1 lands in (the IIR path routes it through
-			// the `FUN_00921980` ctor's third argument; the snapshot filler `FUN_00922210` stores this word there).
-			// Stored, written back out by `MainQuest_c::WriteToStream`, read by nothing; 0 on all 97 captured blocks
-			// and all 46 captured IIR lists (#464).
+			/// <summary>
+			///     MainQuest_c +0x44, the same slot MainQuestUpdateIIR.Unknown1 lands in: the IIR path routes it through the
+			///     FUN_00921980 constructor's third argument while the snapshot filler FUN_00922210 stores this word there.
+			///     It is stored, written back out by MainQuest_c::WriteToStream and read by nothing; 0 on all 97 captured
+			///     blocks and all 46 captured IIR lists.
+			/// </summary>
 			public uint TableField3 { get; init; }
 
-			// The block's trailer words after the catalog: [trailerQuestId][a][b][c]. Each is a `MainQuest_c` field
-			// (`FUN_00922210` stores them at +0x38 / +0x48 / +0x4c / +0x50), and the last three are the slots the
-			// incremental MainQuestUpdateIIR fills for the same line - TrailerA == its Unknown0,
-			// TrailerC == its Unknown2 (the IIR carries no TrailerB; the wire ctor parks the area token there).
-			// So the per-field facts live with the IIR record (MainQuestUpdateIIR remarks): TrailerA is the line's
-			// solo(1)/raid(4)/dungeon(8) category, consumed as the quest tracker's sort tiebreaker; TrailerB is 0 on
-			// every captured block; TrailerC is a per-line flag, 1 on 6 of 97 captured lines, and the SAME flag the
-			// completed journal's line group carries (CompletedQuestJournalRegion.AreaGroup.LineFlag - the two agree on
-			// every line seen in both, #926). Constant per LINE, not per quest - carried, not assumed (#391/#464).
+			/// <summary>
+			///     The block's trailer words after the catalog: [trailerQuestId][a][b][c]. Each is a MainQuest_c field
+			///     (FUN_00922210 stores them at +0x38, +0x48, +0x4c and +0x50), and the last three are the slots the
+			///     incremental MainQuestUpdateIIR fills for the same line: TrailerA is its Unknown0 and TrailerC its Unknown2.
+			///     The IIR carries no TrailerB, the wire constructor parking the area token there.
+			/// </summary>
+			/// <remarks>
+			///     The per-field facts live with <see cref="MainQuestUpdateIIR" />: TrailerA is the line's solo (1), raid (4)
+			///     or group-dungeon (8) category, consumed as the quest tracker's sort tiebreaker; TrailerB is 0 on every
+			///     captured block; TrailerC is a per-line flag, set on 6 of 97 captured lines, and the same flag the completed
+			///     journal's line group carries as CompletedQuestJournalRegion.AreaGroup.LineFlag, the two agreeing on every
+			///     line seen in both. All three are constant per line rather than per quest, and are carried rather than
+			///     assumed.
+			/// </remarks>
 			public uint TrailerA { get; init; } = 1;
 			public uint TrailerB { get; init; }
 			public uint TrailerC { get; init; }

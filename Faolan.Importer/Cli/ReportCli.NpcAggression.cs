@@ -7,15 +7,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report npc-aggression`: which hostile-COLOURED templates the #822 rule stops from attacking on sight.
+	// `--report npc-aggression`: which hostile-coloured templates the aggression rule stops from attacking on sight.
 	//
 	// Retail colours some civilians hostile without them ever fighting - the Town Crier (14572) is `cCategory = 1`
 	// unanimously and never once attacks across a whole session. Reading one flag as both the name colour and the
-	// aggro decision is what made him attack, and `NpcWeapon.Initiates` is the split: an ARMED humanoid engages, an
+	// aggro decision would make him attack, and `NpcWeapon.Initiates` is the split: an armed humanoid engages, an
 	// unarmed one is a civilian, and anything non-humanoid needs no weapon to mean it.
 	//
-	// ⭐ A report and not a test, per #729: the population is shipped DATA and it moves with the NPC harvest. What is
-	// gated in the suite is the RULE (`NpcAggressionTests`); what is printed here is who it currently selects, so a
+	// A report and not a test: the population is shipped data and it moves with the NPC harvest. What is
+	// gated in the suite is the rule (`NpcAggressionTests`); what is printed here is who it currently selects, so a
 	// harvest that pacifies something it should not is visible rather than discovered in-game.
 	public static partial class ReportCli
 	{
@@ -50,7 +50,7 @@ namespace Faolan.Importer.Cli
 				if (!byTemplate.TryGetValue(t.NpcTemplateId, out var rows))
 					continue; // no captured placement - nothing to read a kit off, so the loader never sees it either
 
-				// ANY placement being armed is enough: a template with one armed outfit is an armed template, and
+				// any placement being armed is enough: a template with one armed outfit is an armed template, and
 				// treating it otherwise would pacify a mob because one of its captured spawns was caught undressed.
 				var humanoid = rows.Any(r => r.Morphs.Count > 0);
 				var initiates = rows.Any(r => NpcWeapon.Initiates(r.Equipment, humanoid));

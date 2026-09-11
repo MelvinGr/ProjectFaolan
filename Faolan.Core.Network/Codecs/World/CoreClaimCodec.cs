@@ -7,23 +7,28 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// CoreClaimIIR (0x06EC1255) - the Claims/Redeem window's little request/response protocol, decoded byte-exact from
-	// the NecroL80 login_redeem-claim capture (docs/subsystems/item-claims.md), frame 399: 19 rows of 106 bytes.
-	//
-	// A FAMILY (#530 rule 5a): every message is [opcode][0xC350 Character][handle][u16 sub][payload], discriminated by
-	// the sub word, so one codec parses them all and returns the base CoreClaimIIR with a record per sub. The base is
-	// not fiction - the carrier and the handle really are shared.
-	//
-	// List entry = [u32 index][u32 tpl][u32 tpl(dup)][u64 level][4B code][16B key][16B key(dup)][8B guid][8B guid(dup)]
-	//              [u32 type][u32 qty][u32 qty(dup)][u32 0][u32 0][u32 0][u32 1][u32 0][u16 0].
-	// The u64 is the item LEVEL (not the stack count - see ClaimEntry); the mirrored qty pair is the amount. The
-	// 16-byte key is the item's ProtoDecryptionKey (= Item.Key1..4); the trailing tail (…,1,0,0) is a fixed
-	// availability/flags block. All preserved verbatim (byte-exact test).
+	/// <summary>
+	///     CoreClaimIIR - the Claims/Redeem window's request and response protocol, decoded byte-exact from the NecroL80
+	///     login_redeem-claim capture, frame 399: 19 rows of 106 bytes. See docs/subsystems/item-claims.md.
+	/// </summary>
+	/// <remarks>
+	///     It is a family: every message is <c>[opcode][class][handle][u16 sub][payload]</c>, discriminated by the sub
+	///     word, so one codec parses them all and returns the base <see cref="CoreClaimIIR" /> with a record per sub. The
+	///     carrier and the handle really are shared, so the base is not a fiction.
+	///     <para>
+	///         A list entry is
+	///         <c>[u32 index][u32 tpl][u32 tpl dup][u64 level][4B code][16B key][16B key dup][8B guid][8B guid dup][u32
+	///         type][u32 qty][u32 qty dup][u32 0][u32 0][u32 0][u32 1][u32 0][u16 0]</c>. The u64 is the item level rather
+	///         than a stack count (see <see cref="ClaimEntry" />), the mirrored quantity pair is the amount, the 16-byte key
+	///         is the item's ProtoDecryptionKey, and the trailing words are a fixed availability and flags block. All are
+	///         preserved verbatim, gated byte-exact.
+	///     </para>
+	/// </remarks>
 	public static class CoreClaimCodec
 	{
 		public const uint Opcode = (uint)IirTypes.CoreClaimIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CoreClaimIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -182,55 +187,65 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// The CoreClaimIIR family base: the carrier and the addressed handle every sub shares.
+	/// <summary>The CoreClaimIIR family base: the carrier and the addressed handle every sub shares.</summary>
 	public abstract record CoreClaimIIR(uint Handle)
 	{
 		public abstract CoreClaimSubOpcode Sub { get; }
 	}
 
-	// sub 0x0001 s2c - the claim list the server sends when the client opens the Claims window.
+	/// <summary>Sub 0x0001, s2c: the claim list the server sends when the client opens the Claims window.</summary>
 	public sealed record CoreClaimListIIR(uint Handle, IReadOnlyList<ClaimEntry> Claims) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.List;
 	}
 
-	// sub 0x0005 s2c - the redeem ack for a multi-charge claim: a single entry echoing the row with its decremented
-	// remaining amount (the client refreshes that row in place). Byte-exact against frames 396/540.
+	/// <summary>
+	///     Sub 0x0005, s2c: the redeem ack for a multi-charge claim - a single entry echoing the row with its decremented
+	///     remaining amount, which the client refreshes in place. Byte-exact against frames 396 and 540.
+	/// </summary>
 	public sealed record CoreClaimRedeemAckIIR(uint Handle, ClaimEntry Claim) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.RedeemAck;
 	}
 
-	// sub 0x0009 s2c - the "new claims available" GLOW push that lights the client's Claims/Redeem button. No payload.
-	// Retail sends it at world entry ONLY when the account has unseen claims: present in the Faolanx login capture
-	// (new claims), absent in the NecroL80 login_redeem-claim capture (already seen), so it is gated on an IsNew flag
-	// rather than pushed unconditionally. See docs/subsystems/item-claims.md.
+	/// <summary>
+	///     Sub 0x0009, s2c: the "new claims available" push that lights the client's Claims/Redeem button. No payload.
+	/// </summary>
+	/// <remarks>
+	///     Retail sends it at world entry only when the account has unseen claims - present in the Faolanx login capture,
+	///     which has new claims, and absent in the NecroL80 login_redeem-claim capture, whose claims have been seen - so it
+	///     is gated on an is-new flag rather than pushed unconditionally. See docs/subsystems/item-claims.md.
+	/// </remarks>
 	public sealed record CoreClaimNewClaimsIIR(uint Handle) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.NewClaims;
 	}
 
-	// sub 0x0007 c2s - "send me my claims". No payload.
+	/// <summary>Sub 0x0007, c2s: "send me my claims". No payload.</summary>
 	public sealed record CoreClaimRequestIIR(uint Handle) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.Request;
 	}
 
-	// sub 0x000A c2s - no payload; sent immediately after the List lands and before any Redeem. See
-	// CoreClaimSubOpcode.ListAck for why the name states the position rather than a decoded meaning.
+	/// <summary>
+	///     Sub 0x000A, c2s: no payload, sent immediately after the list lands and before any redeem. See
+	///     CoreClaimSubOpcode.ListAck for why the name states the position rather than a decoded meaning.
+	/// </summary>
 	public sealed record CoreClaimListAckIIR(uint Handle) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.ListAck;
 	}
 
-	// sub 0x0003 c2s - redeem the 1-based claim index into the last-sent list.
+	/// <summary>Sub 0x0003, c2s: redeem the 1-based claim index into the last-sent list.</summary>
 	public sealed record CoreClaimRedeemIIR(uint Handle, uint Index) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.Redeem;
 	}
 
-	// sub 0x0002 s2c - the once-per-login counter that shares the Redeem body. See CoreClaimSubOpcode.LoginCounter
-	// for what is and is not known about the number.
+	/// <summary>
+	///     Sub 0x0002, s2c: the once-per-login counter that shares the redeem body. See CoreClaimSubOpcode.LoginCounter for
+	///     what is and is not known about the number.
+	/// </summary>
 	public sealed record CoreClaimLoginCounterIIR(uint Handle, uint Value) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.LoginCounter;

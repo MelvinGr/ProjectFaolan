@@ -5,45 +5,45 @@ namespace Faolan.Core.Enums
 	public enum ChatServerOpcodes : ushort
 	{
 		Hello = 0x0000,
-		Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12)
-		AddFriend = 0x0028, // [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step)
+		Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00]
+		AddFriend = 0x0028, // [u32 characterId] - the friend list is chat-tier and one-sided (no accept step)
 		RemoveFriend = 0x0029, // [u32 characterId]
 
 		// The player's own presence, as a u32 SocialStatus - the chat tier owns the friend list, so it is the tier
-		// that has to be told (#892). Sits with the friend messages because that is what it feeds: the friend-list
+		// that has to be told. Sits with the friend messages because that is what it feeds: the friend-list
 		// row's icon.
 		//
 		// Named from behaviour rather than from a catalog, because chat is not RPC and has no registration strings to
-		// read: in `NecroL80_..._annotated_9` all three of its occurrences fire ~50 MICROSECONDS after the client's own
-		// `SetLookingForTeamStatus` on the CS tier, carrying 2 when that flag goes ON and 1 when it goes OFF - one UI
+		// read: in `NecroL80_..._annotated_9` all three of its occurrences fire ~50 microseconds after the client's own
+		// `SetLookingForTeamStatus` on the CS tier, carrying 2 when that flag goes on and 1 when it goes off - one UI
 		// toggle emitting to both tiers. The values are the client's presence enum, see SocialStatus.
-		SetSocialStatus = 0x002A, // [u32 SocialStatus] - the player's own presence, what a friend's list row shows (#892)
+		SetSocialStatus = 0x002A, // [u32 SocialStatus] - the player's own presence, what a friend's list row shows
 		ChannelChat = 0x0041, // client posts a message to a chat channel: [byte type][u32 channelId][string][0000]
 		ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 	}
 
 	public enum ChatServerInterfaceOpcodes : ushort
 	{
-		// The server's answer to the client's Hello (0x0000), carrying NO body. Named from POSITION, which is all an
-		// empty message can be named from - but the position is invariant across the corpus (#532): it is the 4th chat
-		// packet of every one of the 41 captures, always `Hello -> the opening ChannelSubscription burst -> THIS ->
+		// The server's answer to the client's Hello (0x0000), carrying no body. Named from position, which is all an
+		// empty message can be named from - but the position is invariant across the corpus: it is the 4th chat
+		// packet of every one of the 41 captures, always `Hello -> the opening ChannelSubscription burst -> this ->
 		// the session's own ChatSenderInfo -> the welcome_message SystemMessage`. Two-client captures carry it twice,
-		// once per client, so it is per-session rather than per-event. Not verified against the client; a future RE
-		// pass over the chat dispatcher should confirm the name rather than assume it.
+		// once per client, so it is per-session rather than per-event. Not verified against the client's chat
+		// dispatcher.
 		HelloAck = 0x0005,
 		CharacterChat = 0x0022,
 		SystemMessage = 0x0023,
 		Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
 		ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
 		ChatSenderInfo = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
-		FriendPresence = 0x0025, // [u64 0][u32 stamp][u16][u8][string name] - pushed BEFORE the add reply, by NAME
+		FriendPresence = 0x0025, // [u64 0][u32 stamp][u16][u8][string name] - pushed before the add reply, by name
 		FriendAdded = 0x0028, // [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state
 		FriendRemoved = 0x0029, // [u32 characterId] - the removal echoed back
 		ChannelSubscription = 0x003C,
 
 		// The subscription's twin: the channel you are no longer on. Body is [u8 type][u32 channelId] - byte-identical
 		// to the (type, id) pair 0x003C opens with, minus the name string and trailing flags, which is what identifies
-		// it (#532). The ids match channels subscribed earlier in the same capture: a `~Team` subscription
+		// it. The ids match channels subscribed earlier in the same capture: a `~Team` subscription
 		// (82 000f08db) is followed by 0x003D on 82 000f08db, and in the two-client group capture the "leave goup now"
 		// message on channel 82 0051dd9a is followed by 0x003D on that same channel. `~Playfield` likewise flips as the
 		// player changes playfield - the old channel is dropped, then the new one subscribed.
@@ -51,7 +51,7 @@ namespace Faolan.Core.Enums
 		ChatReadyAck = 0x0064 // echo of the client's chat-init handshake
 	}
 
-	// Client->server methods - the COMPLETE recovered CSPlayerAgent.client_to_server table. The method IS the
+	// Client->server methods - the complete recovered CSPlayerAgent.client_to_server table. The method is the
 	// position in docs/re/aoc-client-rpc-methods.json; alignment verified against the hoxxling guild capture
 	// (0x00 Authenticate, 0x1C AcceptGuildInvitation fired exactly once on the accept, 0x1E/0x2F/0x40/0x41/0x77
 	// all behave as named). See tools/capture/decode_guild.py.
@@ -82,7 +82,7 @@ namespace Faolan.Core.Enums
 		SetCommunityServerOptions = 0x16,
 		StartVoteKick = 0x17,
 		VoteKickAnswer = 0x18,
-		StartVoteRetreat = 0x19, // StartVoteRetreat(), NO params. The "observed [u32 0xC350][u32 clientInstance] at login" was 0x201E ClientRequestGuildInfo mis-attributed (#458)
+		StartVoteRetreat = 0x19, // StartVoteRetreat(), no params
 		VoteRetreatAccept = 0x1A,
 		VoteRetreatReject = 0x1B,
 		AcceptGuildInvitation = 0x1C,
@@ -193,51 +193,44 @@ namespace Faolan.Core.Enums
 		RequestItemSalesBalance = 0x85,
 		RequestItemSalesCoupons = 0x86,
 
-		// Beyond the recovered c2s table: these are the CSPlayerInterface server->client GroupFinder DISPATCH
-		// opcodes that the client ECHOES back on the upload path (names recovered from the client dispatch table +
-		// verbatim binary strings, #365). Consume-only; the real s2c pushes are the CSPlayerInterface entries.
+		// Beyond the recovered c2s table: these are the CSPlayerInterface server->client GroupFinder dispatch
+		// opcodes that the client echoes back on the upload path (names recovered from the client dispatch table +
+		// verbatim binary strings). Consume-only; the real s2c pushes are the CSPlayerInterface entries.
 		EchoGroupFinderRemoved = 0xC5, // s2c DispatchGroupFinderRemoved (args: reason, silent)
 		EchoGroupFinderUpdateFeaturedActivities = 0xD0 // s2c DispatchGroupFinderUpdateFeaturedActivities (args: activities list)
 	}
 
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
-	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
-	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
-	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
-	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
-	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md); the method is the dispatch
+	// switch index. Every slot is named, including the no-arg ones, and they are the client's own names: each
+	// interface's dispatch constructor registers `index -> name` for all of them, as a run of
+	// `<slot> = N; ...; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other (the
+	// `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad after '<arg>'!` assert strings are one-per-argument and
+	// skip every no-arg method, so they are not the source).
 	//
 	//   CSPlayerInterface        FUN_01338690   211 entries
 	//   GameCharInterface        FUN_004BABB0   180
 	//   GameInterface            FUN_004919C0    15
 	//   GameCharInterfaceProject FUN_00493800    16
 	//
-	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
-	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
-	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
-	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
-	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
-	// 0x0E; this one is `Kicked`.
-	// ⭐⭐ …and the DISPATCHER hands most of them over for free, because a no-arg method still has to SAY something
-	// (#876, 2026-08-22). The client's own override for one of these raises a FEEDBACK TOKEN, and that token is a
-	// string it pushes by address - so a method with no signature string still owns a string. Twenty-five of the
-	// twenty-eight Reserved slots on this interface named themselves in one pass:
+	// The names read off those constructors are the client's, verbatim (`DispatchAbortTrade`, `DispatchGuildTakenName`,
+	// `GameInterface` 0x0E `Kicked`), even where a behaviour-derived name would read differently.
+	// The dispatcher corroborates most of the no-arg names, because a no-arg method still has to say something: the
+	// client's own override for one of these raises a feedback token, and that token is a string it pushes by
+	// address - so a method with no signature string still owns a string. The route is `DumpVtableBodies
+	// VT=1fa4524` over `CSClientIncoming_c` (slot rule `slot = (id + 1) * 4`, control-checked against the four
+	// group-finder slots 0xC2 -> +0x78, 0xC3 -> +0x7c, 0xC4 -> +0x80, 0xC5 -> +0x88), then reading the 0x1FAxxxx
+	// pointer each body carries with `DumpStringsAt`.
 	//
-	//   `DumpVtableBodies VT=1fa4524` over `CSClientIncoming_c` (slot rule `slot = (id + 1) * 4`, control-checked
-	//   against the four the group-finder work already pinned - 0xC2→+0x78, 0xC3→+0x7c, 0xC4→+0x80, 0xC5→+0x88),
-	//   then read the 0x1FAxxxx pointer each body carries with `DumpStringsAt`.
+	// Two state the method outright rather than a token - `CSClientIncoming_c::GuildCityReachedTier3` and
+	// `CSPlayerInterface_t::PvPMatchMakingMatchRemoved:` - which is what confirms the reading for the others, and
+	// 0x81 corroborates it from our own side: it is the matchmaking withdrawal ack, and its token is
+	// `YouAreNoLongerInPvPMatchMaking`. `DispatchItemSoldNotification` keeps the client's own spelling.
 	//
-	// Two state the METHOD outright rather than a token - `CSClientIncoming_c::GuildCityReachedTier3` and
-	// `CSPlayerInterface_t::PvPMatchMakingMatchRemoved:` - which is what confirms the reading for the other
-	// twenty-three, and 0x81 corroborates it from our own side: it was already being sent as the matchmaking
-	// withdrawal ack, and its token is `YouAreNoLongerInPvPMatchMaking`. ⚠️ `DispatchItemSoldNotification` keeps
-	// the client's own spelling.
-	//
-	// ⛔ What this does NOT reach: 0x74, 0x90 and 0x91 push no string at all. Their overrides are bare signal emits
+	// What this does not reach: 0x74, 0x90 and 0x91 push no string at all. Their overrides are bare signal emits
 	// (0x74 is one instruction - `MOV ECX,0x29C7954; JMP <emit>`; 0x90 and 0x91 fire +0x44 / +0x48 on the lazily
 	// built singleton at 0x0297D358, whose subscribers sit in the chat/social window cluster around
-	// `ChatWindowController_c`). Those three need the #801 signal-subscriber route, not this one.
+	// `ChatWindowController_c`). Those three are named through their signal subscribers instead.
 	public enum CSPlayerInterfaceMethods : uint
 	{
 		DispatchAuthenticateAck = 0x00,
@@ -273,7 +266,7 @@ namespace Faolan.Core.Enums
 		DispatchTeamSummonRequestFailedInvalidPF = 0x1E,
 		DispatchTeamSummonRequestFailedAlreadyInSameInstance = 0x1F,
 		DispatchWarningTeamSizeTooLarge = 0x20,
-		DispatchTeamIsFull = 0x21, // its override raises the feedback token of the same name (#876)
+		DispatchTeamIsFull = 0x21, // its override raises the feedback token of the same name
 		DispatchYouGotKickedFromTeam = 0x22,
 		DispatchVoteKickStarted = 0x23,
 		DispatchVoteKickFailed = 0x24,
@@ -283,9 +276,9 @@ namespace Faolan.Core.Enums
 		DispatchDeleteCanceledMail = 0x28,
 		DispatchDeleteCanceledMailItem = 0x29,
 		DispatchGuildInvite = 0x2A,
-		DispatchGuildKick = 0x2B, // its override raises the feedback token of the same name (#876)
-		DispatchGuildDisbanded = 0x2C, // its override raises the feedback token of the same name (#876)
-		DispatchGuildLeave = 0x2D, // its override raises the feedback token of the same name (#876)
+		DispatchGuildKick = 0x2B, // its override raises the feedback token of the same name
+		DispatchGuildDisbanded = 0x2C, // its override raises the feedback token of the same name
+		DispatchGuildLeave = 0x2D, // its override raises the feedback token of the same name
 		DispatchGuildMemberLeft = 0x2E,
 		DispatchGuildMemberJoined = 0x2F,
 		DispatchGuildMemberUpdate = 0x30,
@@ -293,7 +286,7 @@ namespace Faolan.Core.Enums
 		DispatchGuildGMPromoteFeedback = 0x32,
 		DispatchGuildGMDemoteFeedback = 0x33,
 		DispatchGuildInviteNoSuchName = 0x34,
-		DispatchGuildInviteTargetOffline = 0x35, // its override raises the feedback token of the same name (#876)
+		DispatchGuildInviteTargetOffline = 0x35, // its override raises the feedback token of the same name
 		DispatchGuildPvPPointInfo = 0x36,
 		DispatchGuildRenownInfo = 0x37,
 		DispatchGuildRankingsUpdate = 0x38,
@@ -311,10 +304,10 @@ namespace Faolan.Core.Enums
 		DispatchGuildCreated = 0x44,
 		DispatchGuildNonAlphanumericName = 0x45,
 
-		// ⭐ The two NO-ARG members of the guild-name refusal block, recovered from the client rather than named
-		// (#737). A no-arg dispatch has no argument signature for the string catalog to have recorded, which is why
-		// they sat as `Reserved` - but the dispatcher hands each one to an interface VTABLE SLOT, and
-		// `CSClientIncoming_c`'s override of that slot fetches the LDB category-100 token it shows:
+		// The two no-arg members of the guild-name refusal block, recovered from the client rather than named. A
+		// no-arg dispatch has no argument signature for the string catalog to have recorded, but the dispatcher hands
+		// each one to an interface vtable slot, and `CSClientIncoming_c`'s override of that slot fetches the LDB
+		// category-100 token it shows:
 		//
 		//   0x45 -> slot +0x118 -> "NonAlphanumericGuildName"     (already named - the control)
 		//   0x46 -> slot +0x11C -> "WrongLengthGuildName"
@@ -326,21 +319,21 @@ namespace Faolan.Core.Enums
 		DispatchGuildTakenName = 0x47,
 		DispatchGuildBadName = 0x48,
 		DispatchGuildNameWaitTime = 0x49,
-		DispatchGuildCurrentlyInGuild = 0x4A, // its override raises the feedback token of the same name (#876)
-		DispatchGuildLevelRequirementFailed = 0x4B, // its override raises the feedback token of the same name (#876)
-		DispatchGuildStandingInvitation = 0x4C, // its override raises the feedback token of the same name (#876)
-		DispatchGuildAlreadyGuilded = 0x4D, // its override raises the feedback token of the same name (#876)
+		DispatchGuildCurrentlyInGuild = 0x4A, // its override raises the feedback token of the same name
+		DispatchGuildLevelRequirementFailed = 0x4B, // its override raises the feedback token of the same name
+		DispatchGuildStandingInvitation = 0x4C, // its override raises the feedback token of the same name
+		DispatchGuildAlreadyGuilded = 0x4D, // its override raises the feedback token of the same name
 		DispatchGuildOnInviteCooldown = 0x4E,
-		DispatchGuildCantDemote = 0x4F, // its override raises the feedback token of the same name (#876)
+		DispatchGuildCantDemote = 0x4F, // its override raises the feedback token of the same name
 		DispatchGuildTaxError = 0x50,
 		DispatchGuildInvalidGoverningForm = 0x51,
 		DispatchGuildUpdateCash = 0x52,
-		DispatchSubscriptionRequirementFailed = 0x53, // its override raises the feedback token of the same name (#876)
+		DispatchSubscriptionRequirementFailed = 0x53, // its override raises the feedback token of the same name
 		DispatchGuildTaxChanged = 0x54,
 		DispatchGuildGoverningFormChanged = 0x55,
 		DispatchGuildRecruitmentModeChanged = 0x56,
 		DispatchGuildMessageOfTheDayChanged = 0x57,
-		DispatchGuildDescriptionChanged = 0x58, // its override raises the feedback token of the same name (#876)
+		DispatchGuildDescriptionChanged = 0x58, // its override raises the feedback token of the same name
 		DispatchGuildNameChanged = 0x59,
 		DispatchGMGuildNameChanged = 0x5A,
 		DispatchGuildMemberList = 0x5B,
@@ -355,14 +348,14 @@ namespace Faolan.Core.Enums
 		DispatchRemoveGuildFeat = 0x64,
 		DispatchGuildRankChanged = 0x65,
 		DispatchGuildApplicationRequest = 0x66,
-		DispatchGuildNoInvitersOnline = 0x67, // its override raises the feedback token of the same name (#876)
+		DispatchGuildNoInvitersOnline = 0x67, // its override raises the feedback token of the same name
 		DispatchGuildApplicationRejected = 0x68,
 		DispatchGuildMergeRequest = 0x69,
 		DispatchGuildMergeRequestFailed = 0x6A,
 		DispatchGuildCityBooked = 0x6B,
 		DispatchGuildCityBookingFailed = 0x6C,
 		DispatchNewVulnerabilityWindowData = 0x6D,
-		DispatchGuildCityReachedTier3 = 0x6E, // the override's own log string NAMES it (#876)
+		DispatchGuildCityReachedTier3 = 0x6E, // the override's own log string names it
 		DispatchGuildIsMassivePvPCityOwner = 0x6F,
 		DispatchGuildIsMassivePvPCityAttacker = 0x70,
 		DispatchFeedbackMessage = 0x71,
@@ -376,31 +369,30 @@ namespace Faolan.Core.Enums
 		DispatchPvPMatchMakingPlayerKicked = 0x79,
 		DispatchPvPMatchMakingErrorCode = 0x7A,
 		DispatchPvPMatchMakingYouJoinedMatch = 0x7B,
-		DispatchPvPMatchMakingMatchRemoved = 0x7C, // the override's own log string NAMES it (#876)
+		DispatchPvPMatchMakingMatchRemoved = 0x7C, // the override's own log string names it
 		DispatchPvPMatchMakingMatchInfo = 0x7D,
 		DispatchPvPMatchMakingSearchResult = 0x7E,
 		DispatchPvPMatchMakingStartClicked = 0x7F,
 		DispatchPvPMatchMakingYouAreInMatchMaking = 0x80,
-		// #882: the answer to `PvPMatchMakingRemoveFromMatchMaking`. Empty body, and 4 sends for the capture's 4
+		// The answer to `PvPMatchMakingRemoveFromMatchMaking`. Empty body, and 4 sends for the capture's 4
 		// removals - the player leaves matchmaking and this lands ~200 ms later, right where the annotation says
-		// "left matchmaking". Named by BEHAVIOUR only: it is a no-arg slot, so the client's string catalog has no
-		// name to recover (see the block comment above), and its position beside 0x80
-		// `DispatchPvPMatchMakingYouAreInMatchMaking` is what the pairing says it is.
-		DispatchPvPMatchMakingRemovedFromMatchMaking = 0x81, // its override raises the feedback token of the same name (#876)
-		DispatchPvPMatchMakingCowardRemovedFromMatchMaking = 0x82, // its override raises the feedback token of the same name (#876)
+		// "left matchmaking". Its position beside 0x80 `DispatchPvPMatchMakingYouAreInMatchMaking` and its feedback
+		// token (see the block comment above) agree.
+		DispatchPvPMatchMakingRemovedFromMatchMaking = 0x81, // its override raises the feedback token of the same name
+		DispatchPvPMatchMakingCowardRemovedFromMatchMaking = 0x82, // its override raises the feedback token of the same name
 		DispatchPvPMatchMakingMatchSay = 0x83,
 		DispatchPvPMatchMakingCollectingMorePlayers = 0x84,
 		DispatchPvPMatchMakingNewMatchLeader = 0x85,
 		DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking = 0x86,
-		DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier = 0x87, // its override raises the feedback token of the same name (#876)
-		DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader = 0x88, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier = 0x87, // its override raises the feedback token of the same name
+		DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader = 0x88, // its override raises the feedback token of the same name
 		DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide = 0x89,
 		DispatchPvPMatchMakingCantLockToSideMustPickASideFirst = 0x8A,
 		DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide = 0x8B,
 		DispatchPvPMatchMakingCharacterNowLockedToSide = 0x8C,
 		DispatchPvPMatchMakingCharacterNoLongerLockedToSide = 0x8D,
-		DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch = 0x8E, // its override raises the feedback token of the same name (#876)
-		DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier = 0x8F, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch = 0x8E, // its override raises the feedback token of the same name
+		DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier = 0x8F, // its override raises the feedback token of the same name
 		DispatchPvPMatchMakingTeamJoined = 0x90,
 		DispatchPvPMatchMakingRaidJoined = 0x91,
 		DispatchPvPMatchMakingInfoRequestReturn = 0x92,
@@ -418,9 +410,9 @@ namespace Faolan.Core.Enums
 		DispatchRaidInvitationTimedOut = 0x9E,
 		DispatchRaidTargetDeclinedRaidInvite = 0x9F,
 		DispatchRaidYouAreNoLongerInvited = 0xA0,
-		DispatchRaidYouWereKickedFromRaid = 0xA1, // its override raises the feedback token of the same name (#876)
+		DispatchRaidYouWereKickedFromRaid = 0xA1, // its override raises the feedback token of the same name
 		DispatchRaidCantInviteInvalidSubscriptionFlags = 0xA2,
-		DispatchRaidCantJoinInvalidSubscriptionFlags = 0xA3, // its override raises the feedback token of the same name (#876)
+		DispatchRaidCantJoinInvalidSubscriptionFlags = 0xA3, // its override raises the feedback token of the same name
 		DispatchRaidCantCreateInvalidMemberSubscriptionFlags = 0xA4,
 		DispatchMassivePvpInfoRequestReturn = 0xA5,
 		DispatchMassivePvPBattleQueueFeedback = 0xA6,
@@ -429,7 +421,7 @@ namespace Faolan.Core.Enums
 		DispatchBattleKeepInfoRequestReturnPhase1And2 = 0xA9,
 		DispatchBattleKeepInfoRequestReturnPhase3And4 = 0xAA,
 		DispatchYouGotMailNotification = 0xAB,
-		DispatchItemSoldNotification = 0xAC, // its override raises the feedback token of the same name (#876)
+		DispatchItemSoldNotification = 0xAC, // its override raises the feedback token of the same name
 		DispatchDebugFullGameServerList = 0xAD,
 		DispatchDebugGameServerConnected = 0xAE,
 		DispatchDebugGameServerDisconnected = 0xAF,
@@ -449,12 +441,12 @@ namespace Faolan.Core.Enums
 		DispatchDebugRemoveIDFromMatchMaking = 0xBD,
 		DispatchItemSalesUpdateBalance = 0xBE,
 		DispatchItemSalesCoupons = 0xBF,
-		DispatchItemSalesReportNoConnectionToBillingServer = 0xC0, // the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this NAME is ours (#876)
+		DispatchItemSalesReportNoConnectionToBillingServer = 0xC0, // the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this name is ours
 		DispatchCSFeedback = 0xC1,
 		DispatchGroupFinderSignupFailed = 0xC2,
-		// #801: no-arg, so the string catalog has no name for it - the name is the client's OWN, read off the
-		// subscriber. `CSClientIncoming_c`'s override of vtable +0x310 fires the signal at `CSIncoming+0x7c`
-		// (⚠️ the DECOMPILATION is identical to 0xC8's - the `LEA ECX` that picks the signal is dropped, and on
+		// No-arg, so the string catalog has no name for it - the name is read off the subscriber.
+		// `CSClientIncoming_c`'s override of vtable +0x310 fires the signal at `CSIncoming+0x7c`
+		// (the decompilation is identical to 0xC8's - the `LEA ECX` that picks the signal is dropped, and on
 		// a body this short that is the whole method); the group-finder GUI subscribes to it at
 		// `FUN_014ed2f0` with the handler `FUN_014ee020`, which opens the client window `groupFinder_roleSelect`
 		// when no roles have been picked yet, and otherwise re-pushes the already-chosen role bitmask to the UI.
@@ -466,14 +458,14 @@ namespace Faolan.Core.Enums
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
-		// #801: the third no-arg method in this block, and the ONE nameable by the ordinary route rather than by
+		// The third no-arg method in this block, and the one nameable by the ordinary route rather than by
 		// its subscriber - its handler (vtable +0x320 -> `FUN_00538220`) is not a signal-only stub but 400 bytes
 		// that fetch an LDB category-100 token and put it on screen: `PUSH 0x64; MOV ESI,0x1fa406c` =
 		// **`VoteRetreatStarted`**. It then arms a timer callback (`FUN_0053ef20(..., FUN_005383b0, ...)`), which is
 		// the vote window. Sweeping every `Reserved*` slot of this interface for the same `PUSH 0x64` + token shape
 		// finds only this one, so the rest genuinely put nothing on screen.
 		DispatchGroupFinderVoteRetreatStarted = 0xC7,
-		// #801: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, subscribed by the same GUI
+		// The twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, subscribed by the same GUI
 		// block with the handler `FUN_014f07c0`, which sets the "in a group-finder activity" flag
 		// (`DAT_0297d14d`, cleared again by `DispatchGroupFinderRemoved`) and raises the ActionScript signal
 		// whose registered name is `SignalClientStartedGroupFinderActivity`. In the capture it fires
@@ -492,8 +484,8 @@ namespace Faolan.Core.Enums
 	}
 
 	// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
-	// --- docs/re/aoc-client-rpc-methods.json (the method IS the table position). Most are not handled yet;
-	// --- they are here so future packets can be identified and routed by (class id, method).
+	// --- docs/re/aoc-client-rpc-methods.json (the method is the table position). Most are not handled;
+	// --- they are here so any packet can be identified and routed by (class id, method).
 
 	// GameAgent (caller GameInterface) - the connection-level service: auth, ping, the PassBlob IIR carrier.
 	public enum GameAgentMethods : uint
@@ -709,8 +701,8 @@ namespace Faolan.Core.Enums
 	// recovered by RE'ing AgeOfConan.exe (docs/re/aoc-opcode-ids.md). Members are named
 	// after the real client type (with the _t/_c template suffix dropped); the comment gives the exact type and
 	// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
-	// (server->client AND client->server - the id is the message type, direction-independent), even ones the
-	// server doesn't emit yet. The few descriptive aliases the server code uses are at the bottom.
+	// (server->client and client->server - the id is the message type, direction-independent), even ones the
+	// server does not emit. The few descriptive aliases the server code uses are at the bottom.
 	public enum IirTypes : uint
 	{
 		AddToGroupIIR = 0x0DF44B73, // AddToGroupIIR_c  (x16) - a member joined a team; pushed to every member's WORLD connection
@@ -733,7 +725,7 @@ namespace Faolan.Core.Enums
 		DestructibleFullUpdateIIR = 0x6BD56736, // DestructibleFullUpdateIIR_c  (x189)
 		DoorFullUpdateIIR = 0x33A56FB0, // DoorFullUpdateIIR_c  (x89) - world door/object full update
 		EnergyIIR = 0x40749B8A, // EnergyIIR  (x1039)
-		FeatIIR = 0x28DA68A0, // FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack (#251)
+		FeatIIR = 0x28DA68A0, // FeatIIR (BKDR-31 of "FeatIIR") - feat train/unlock: 0x3F1-framed feat-id list; c2s state 0x04 request, s2c 0x05 ack
 		FeedbackIIR = 0xBA1FD222, // FeedbackIIR_t  (x5)
 		FormatFeedbackIIR = 0x8D5A8B6B, // FormatFeedbackIIR_t  (x68)
 		FullPlayerCharacterIIR = 0x737A6DF9, // FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below
@@ -746,7 +738,7 @@ namespace Faolan.Core.Enums
 		// FanaticCommandIIR_t - what the client sends on `/gm`. "Fanatic" is its own name for the GM/admin command
 		// channel. Body decoded from the client's reader (FUN_00663860): [u32 command][u32 targetA][u32 targetB][string].
 		// Seen on the wire from our own client, never in the corpus (the retail traces are ordinary play, not GM
-		// sessions), so the server's REPLY is still undecoded - #448/#449.
+		// sessions), so the server's reply is undecoded.
 		FanaticCommandIIR = 0xEE4AA85C,
 
 		IntendedTeleportIIR = 0x10D27BC0, // IntendedTeleportIIR_c  (x15)
@@ -773,11 +765,11 @@ namespace Faolan.Core.Enums
 		QuestGoalIIR = 0x0774C8C1, // QuestGoalIIR_c  (x27)
 		QuestIIR = 0x97E02314, // QuestIIR_c  (x34) - "DeleteQuest"
 		QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
-		QuestRewardNotifyIIR = 0x8BB2799C, // QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward OFFER, and its confirm (#815)
-		QuestRewardSelectionIIR = 0x80138D7B, // QuestRewardSelectionIIR_c - c2s: the reward the player picked (#815)
-		// MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel. Named QuestLogListIIR here until
-		// #545, which is a name we INVENTED (BKDR-31("QuestLogListIIR") == 0xB80D3852, not this id); the client's own
-		// class name hashes exactly, and its Activate() switch is what the leading word selects.
+		QuestRewardNotifyIIR = 0x8BB2799C, // QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward offer, and its confirm
+		QuestRewardSelectionIIR = 0x80138D7B, // QuestRewardSelectionIIR_c - c2s: the reward the player picked
+		// MainQuestUpdateIIR_c - the active-quest list that populates the J-panel. The client's own class name hashes
+		// exactly to this id (an invented "QuestLogListIIR" would hash to 0xB80D3852), and its Activate() switch is
+		// what the leading word selects.
 		MainQuestUpdateIIR = 0x504B7924, // MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel
 		RegenIIR = 0x28D0AC99, // RegenIIR_c  (x554)
 		RemoveFromGroupIIR = 0xE4FF0C85, // RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement
@@ -790,7 +782,7 @@ namespace Faolan.Core.Enums
 		SimpleCharKilledByUpdateIIR = 0xB066AFC2, // SimpleCharKilledByUpdateIIR_t  (x2) - kill/death
 		SimpleDynelFullUpdateIIR = 0x66AEDD50, // SimpleDynelFullUpdateIIR_c  (x1575) - world object spawn ("SpawnObject")
 		SimpleDynelVisualChangeIIR = 0xE7F4F8F8, // SimpleDynelVisualChangeIIR_c  (x548)
-		SkillIIR = 0xD558FF16, // SkillIIR_t  (x4) - c2s skillpoint spend: a (statId, delta) list (#739)
+		SkillIIR = 0xD558FF16, // SkillIIR_t  (x4) - c2s skillpoint spend: a (statId, delta) list
 		SpellBookIIR = 0x6BA10936, // SpellBookIIR_t  (x1)
 		StatDamageIIR = 0xE9F24184, // StatDamageIIR_t  (x450)
 		StatIIR = 0xF98E10B3, // StatIIR_t  (x8167)
@@ -809,17 +801,17 @@ namespace Faolan.Core.Enums
 		// container blocks, 83-byte item tails): the RE notes live in docs/re/fullplayer-snapshot-reader.md.
 
 		// ---------------------------------------------------------------------------------------------------------
-		// BACKLOG: *IIR classes the client (AgeOfConan.exe RTTI) defines but we have NOT added above NOR seen in a
-		// capture. Generated by tools/capture/find_missing_opcodes.py. NOT enum members yet. Hashes marked
-		// [auth] are AUTHORITATIVE - the class's ReadSubClass vtable-reader (slot 8) recovered by Ghidra
+		// *IIR classes the client (AgeOfConan.exe RTTI) defines that are neither members above nor seen in a
+		// capture. Generated by tools/capture/find_missing_opcodes.py; not enum members. Hashes marked [auth] are
+		// authoritative - the class's ReadSubClass vtable-reader (slot 8) recovered by Ghidra
 		// (tools/ghidra/DumpVtableReaders.java -> docs/re/iir-readers-binary-only.md has each reader + grammar).
-		// [unverified] = reader not dumped yet: both candidate BKDR-31 forms (bare / name+"_c") shown - extend
+		// [unverified] = reader not dumped: both candidate BKDR-31 forms (bare / name+"_c") shown - extend
 		// DumpVtableReaders.java to resolve. Add the authoritative one to the enum once dumped or seen on the wire.
 		//
-		// GAMEPLAY (40) - the real backlog of unseen record types:
+		// Gameplay (40) - unseen record types:
 		//   AutoToggleCombatIIR          0x107E921F  [auth: AutoToggleCombatIIR_c]
 		//   BccIIR                       [alias] = BehaviorControlCenterIIR 0x642CD3D6 (Bcc), already emitted
-		//   ClonedFeatsIIR               0xF7BF33DC  [auth: ClonedFeatsIIR_c]  (candidate: full feat set at login, #251)
+		//   ClonedFeatsIIR               0xF7BF33DC  [auth: ClonedFeatsIIR_c]  (candidate: full feat set at login)
 		//   ConstructionMenuIIR          0xAF084AA6  [auth: ConstructionMenuIIR_c]
 		//   ConstructionOrderIIR         0x8AD083D9  [auth: ConstructionOrderIIR_c]
 		//   ContainerAddItemIIR          [alias] we deliver via the DispatchAddItem METHOD 0x2020 (AddItemBody), not this IIR
@@ -858,19 +850,18 @@ namespace Faolan.Core.Enums
 		//   ToolMessageInternalIIR       0x3188C31B  [auth: ToolMessageInternalIIR_t]
 		//   UpdateClientVisualIIR        0x356184B3  [auth: UpdateClientVisualIIR_t]
 		//
-		// ⚠️ PatrolIIR's id is COMPUTED, not observed - the one entry here that is. `PatrolIIR_c` is attested by exactly
+		// PatrolIIR's id is computed, not observed - the one entry here that is. `PatrolIIR_c` is attested by exactly
 		// one string in the whole image, the assert `PatrolIIR_c::PollStatus[%d:%u], invalid id!` at 01fdf970 (used by
-		// FUN_00919cc0), and unlike all 141 IIR classes below it has NO RTTI type descriptor - so it is compiled in but
+		// FUN_00919cc0), and unlike all 141 IIR classes below it has no RTTI type descriptor - so it is compiled in but
 		// never instantiated polymorphically. 0x34DA37AA is what BKDR-31 of the `_c` name gives, which is the rule every
 		// other id follows, but nothing here confirms the client ever puts it on the wire: 0 of 120 captures carry it
-		// (control: MainQuestUpdateIIR appears in 31). It was previously listed as "[alias] ... (no distinct wire
-		// record)" with no id at all, which stated the inference as fact in the other direction.
+		// (control: MainQuestUpdateIIR appears in 31).
 		//
-		// Do not try to confirm an id by scanning the image for it as a constant: these ids are NEVER immediates. The
+		// Do not try to confirm an id by scanning the image for it as a constant: these ids are never immediates. The
 		// client registers each class by NAME and hashes it at runtime, so even 0x504B7924 - live, captured and
 		// implemented - appears in no instruction. Absence of the constant is not evidence about a type.
 		//
-		// BASE / PROTO / ABSTRACT (19) - mostly C++ base classes + Proto* wrappers, likely not concrete wire subops:
+		// Base / proto / abstract (19) - mostly C++ base classes + Proto* wrappers, likely not concrete wire subops:
 		//   CoreCharacterFullUpdateIIR   bare 0x828E35F0  _c 0x17D885D4  [unverified]
 		//   CoreCharacterIIR             bare 0x618AF4C8  _c 0x2AA0EEAC  [unverified]
 		//   CoreDoorFullUpdateIIR        bare 0x43A5D8ED  _c 0xF1935D91  [unverified]
@@ -879,8 +870,8 @@ namespace Faolan.Core.Enums
 		//   GameCodeDynelFullUpdateIIR   0x16294E79  [auth: GameCodeDynelFullUpdateIIR]
 		//   GameCodeDynelIIR             bare 0xB9287491  _c 0x10DDA035  [unverified]
 		//   ProtoCoreCharacterIIR        bare 0xB00B3E90  _c 0xDA35E674  [unverified]
-		//   ProtoDeleteItemIIR           bare 0x6F9E4A2C  _c 0x01347B10  [unverified]  (the MESSAGE is confirmed as
-		//       DeleteItemIIR_t's payload via the client ctor's vftable - it is these NAME HASHES that stay unverified)
+		//   ProtoDeleteItemIIR           bare 0x6F9E4A2C  _c 0x01347B10  [unverified]  (the message is confirmed as
+		//       DeleteItemIIR_t's payload via the client ctor's vftable - it is these name hashes that stay unverified)
 		//   ProtoFullCharacterIIR        bare 0xAA47C980  _c 0x377B7564  [unverified]
 		//   ProtoGameCodeDynelIIR        bare 0x07A8BE59  _c 0xC07297FD  [unverified]
 		//   ProtoLootBagIIR              bare 0x6862F2DA  _c 0xDB71B03E  [unverified]
@@ -892,19 +883,19 @@ namespace Faolan.Core.Enums
 		//   VToolMessageInternalIIR      bare 0xDB21C47C  _c 0x99C2A160  [unverified]
 		//   Vn3PlayfieldFullUpdateIIR    bare 0xF53E418F  _c 0x9EB425B3  [unverified]
 		//
-		// DEBUG (5) - dev-only records, not expected on the retail wire:
+		// Debug (5) - dev-only records, not expected on the retail wire:
 		//   HiveDebugIIR                 0xAC1383D3  [auth: HiveDebugIIR_c]
 		//   NPCDebugManagerIIR           0x9F2C283B  [auth: NPCDebugManagerIIR_c]
 		//   PlayfieldDebugManagerIIR     0xEE7F5776  [auth: PlayfieldDebugManagerIIR_c]
 		//   RequestDebugInfoIIR          0x09F159E4  [auth: RequestDebugInfoIIR_c]
 		//   ServerPosDebugInfoIIR        0xAFE243E6  [auth: ServerPosDebugInfoIIR_c]
 		//
-		// RTTI SWEEP (2026-08-01) - every `.?AV*IIR*@@` type descriptor in the image, hashed. It recovered 141 IIR
-		// classes and is the reason to trust the ids above: 80 of the 80 IirTypes members below hash EXACTLY to one of
+		// RTTI sweep - every `.?AV*IIR*@@` type descriptor in the image, hashed. It recovered 141 IIR
+		// classes and is the reason to trust the ids above: 80 of the 80 IirTypes members below hash exactly to one of
 		// those class names, so neither the names nor the hash rule are guesswork. The 13 ids the sweep found that this
 		// file did not mention at all, grouped by what they are:
 		//
-		//   nested PROTOBUF sub-messages (a field of another IIR's payload, never a wire sub-opcode of their own):
+		//   nested protobuf sub-messages (a field of another IIR's payload, never a wire sub-opcode of their own):
 		//     ProtoCoreCharacterIIR_CharacterBcc        0xF3CFB5C8
 		//     ProtoCoreCharacterIIR_CharacterStats      0x3FB0B4A5
 		//     ProtoCoreCharacterIIR_InventoryEntry      0x27A68225
@@ -914,36 +905,35 @@ namespace Faolan.Core.Enums
 		//     ProtoGameCodeDynelIIR_RunningEffects      0x06B5B509
 		//     ProtoLootBagIIR_SpecialLootOwnerEntry     0xF810A79B
 		//     ProtoScryScriptIIR_Variable               0x05E16A33
-		//   CLIENT-SIDE view classes (UI, not wire):
+		//   client-side view classes (UI, not wire):
 		//     IIRDebugView                              0x52076086
 		//     IIRStatListViewItem                       0x9D5F1DDC
 		//   genuine IIR classes we have never seen on the wire:
 		//     n3PlayfieldFullUpdateIIR_t                0x5D7884EE
 		//     n3ToServerUnBlockIIR_t                    0x87A3B396
 		//
-		// ⚠️ The client spells the n3* classes with a LOWERCASE n3 - `n3TeleportIIR_t`, `n3ToClientFadeIIR_t`,
-		// `n3ToClientQuitIIR_t`. The members below are `N3…` for C# convention; the ids are hashes of the CLIENT
+		// The client spells the n3* classes with a lowercase n3 - `n3TeleportIIR_t`, `n3ToClientFadeIIR_t`,
+		// `n3ToClientQuitIIR_t`. The members below are `N3...` for C# convention; the ids are hashes of the client
 		// spelling, so do not "fix" a member name into the hash input.
 		// ---------------------------------------------------------------------------------------------------------
 	}
 
-	// The PlayerAgent (c2s) / PlayerInterface (s2c) METHOD CONSTANTS - the 32-bit value the client registers each method
+	// The PlayerAgent (c2s) / PlayerInterface (s2c) method constants - the 32-bit value the client registers each method
 	// with, and the thing that actually names a method on this interface pair. Read off the client's own registration
 	// table (`DumpPlayerAgentCtor.java` / `StrXrefs.java`), so every name is the client's; 25 c2s + 26 s2c is the
 	// complete interface.
 	//
-	// These are the SOURCE the wire encoding is derived from, not a parallel catalog: the RPC header's method field is
+	// These are the source the wire encoding is derived from, not a parallel catalog: the RPC header's method field is
 	// `varint(constant)`, which `Rpc` writes whole. `PlayerAgentMethodIds` reads these enums for both directions of that.
 	//
-	// ⚠️ **This pair has no opcodes, and there is no opcode enum for it** (Gitea #613). Every other class registers its
-	// methods by INDEX, small enough that the whole constant is the varint's first group - which is why those enums
-	// name the index directly (#615) and a hex dump shows it as the method tag `0x20` followed by that byte. Here the
-	// constants are 32-bit HASHES, so the same two bytes keep only 7 of 32 and name two methods at once: `0x20EC` is
-	// BOTH `ReceivedCharacterSettings` and `AuthenticateLoggedIn`, `0x20D6` BOTH `VerifyLanguageSetting` and
-	// `UpdateCharacterPreview` - all four in the corpus. There used to be `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes`
-	// enums listing those observed two-byte values; they were deleted because a value that names two methods cannot be
-	// a catalog key. Dispatch, naming and the docs all read these constants (#608/#610). To find one of these in a hex
-	// dump, `PlayerAgentMethodIds.ObservedOpcode` computes the two bytes you would see.
+	// This pair has no opcodes, and there is no opcode enum for it. Every other class registers its methods by
+	// index, small enough that the whole constant is the varint's first group - which is why those enums name the
+	// index directly and a hex dump shows it as the method tag `0x20` followed by that byte. Here the constants are
+	// 32-bit hashes, so the same two bytes keep only 7 of 32 and name two methods at once: `0x20EC` is both
+	// `ReceivedCharacterSettings` and `AuthenticateLoggedIn`, `0x20D6` both `VerifyLanguageSetting` and
+	// `UpdateCharacterPreview` - all four in the corpus. A value that names two methods cannot be a catalog key, so
+	// dispatch, naming and the docs all read these constants. To find one of these in a hex dump,
+	// `PlayerAgentMethodIds.ObservedOpcode` computes the two bytes you would see.
 	public enum PlayerAgentMethods : uint
 	{
 		Authenticate = 0x9CB2CB03,
@@ -951,7 +941,7 @@ namespace Faolan.Core.Enums
 		LoginFromCrash = 0xCBDE126E,
 		CreateCharacter = 0xBE735486,
 
-		// Retail sends THIS one, not plain `CreateCharacter` - the client has both, and `CreateCharacter` has never
+		// Retail sends this one, not plain `CreateCharacter` - the client has both, and `CreateCharacter` has never
 		// been seen on the wire.
 		CreateCharacterWithData = 0xCA2C4E5E,
 		LoginCharacter = 0xEF616EB6,
@@ -976,35 +966,32 @@ namespace Faolan.Core.Enums
 		ClientReplyKeepCookie = 0x43D90C1B
 	}
 
-	// Server->client. Nine of these names were INVENTED from observed behaviour until #320 recovered the client's own
-	// registration table; each one that changed carries the old name, because that is what the rest of the tree called
-	// it and what older notes and captures refer to.
+	// Server->client, named from the client's own registration table.
 	public enum PlayerInterfaceMethods : uint
 	{
-		OnFacebookTokenResult = 0x52454C9C,   // was "Ox209C" - the reply to c2s LoadFacebookToken
+		OnFacebookTokenResult = 0x52454C9C,   // the reply to c2s LoadFacebookToken
 		OnUpdateFacebookFriends = 0x88750390,
 		OnFacebookFriendSignedUp = 0x7955BD80,
-		AuthenticateAck = 0x5DC18991,         // was "InitAuth"
+		AuthenticateAck = 0x5DC18991,
 
-		// The four login handoffs. They additionally carry a `full_routing_context` (RpcHeader field 3), which is what
-		// the codebase used to read as one invented opcode `0x1A07` plus an opaque 13-byte "session blob" (#610).
+		// The login handoffs. They additionally carry a `full_routing_context` (RpcHeader field 3).
 		LoginConnectReady = 0xD8B66C79,
 		CSServerConnectReady = 0x5AED2A60,
 		ChatServerConnectReady = 0x23A632FA,
 
-		UpdateClientPlayerData = 0xC414C5EF,  // was "SendCharacterList"
-		SetDimensionList = 0xF899B14C,        // was "SendRealmList" (a dimension IS a realm)
+		UpdateClientPlayerData = 0xC414C5EF,  // the character list
+		SetDimensionList = 0xF899B14C,        // the realm list (a dimension is a realm)
 		SetStats = 0xA7C86A29,
 		SuggestNicknameResult = 0xE8EAD4F8,
-		PlayerSetupComplete = 0x4F91A58C,     // was "SendCharacterRealmData"
+		PlayerSetupComplete = 0x4F91A58C,
 		LoginQueuePosition = 0x0FE09F03,
 		OfflineLevelApplied = 0x3E8F0623,
-		CharacterUnlocked = 0x5CE97913,       // was "Ox2093" - the reply to c2s UnlockCharacter
+		CharacterUnlocked = 0x5CE97913,       // the reply to c2s UnlockCharacter
 		HardcoreLevelSet = 0x1562CE84,
 		SendSubscriptionSettings = 0x15F7AF22,
-		SendCharacterSettings = 0x233605B9,   // was "Ox20B9"
-		SendCharacterPreview = 0x206B6EE5,    // was "Ox20E5"
-		SendCharacterSettingsCheckSumMap = 0x0C09CA25, // was "SmallCharList"
+		SendCharacterSettings = 0x233605B9,
+		SendCharacterPreview = 0x206B6EE5,
+		SendCharacterSettingsCheckSumMap = 0x0C09CA25,
 		VerifyClientStillConnected = 0x00C46317,
 		OverrideGameTweaks = 0x7C47F763,
 		CharacterNeedsNewName = 0x9625EB4A,
@@ -1024,35 +1011,19 @@ namespace Faolan.Core.Enums
 	// 0x2005 sets the region state - both match observed behavior), unlike the bigger drifting interfaces.
 	public enum UniverseInterfaceMethods : uint
 	{
-		DispatchChallenge = 0x00, // (was "InitiateAuthentication" - it carries the DH challenge reply)
-		DispatchAckAuthenticate = 0x01, // carries the PlayerAgent realm handoff (was "SendPlayerAgentRealm")
+		DispatchChallenge = 0x00, // carries the DH challenge reply
+		DispatchAckAuthenticate = 0x01, // carries the PlayerAgent realm handoff
 		DispatchLoginProblem = 0x02,
 		DispatchSetUpdateManager = 0x03,
 		DispatchSetUniverseManagerError = 0x04,
-		DispatchSetRegionState = 0x05 // (was "SetRegion")
+		DispatchSetRegionState = 0x05
 	}
 
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
-	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
-	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
-	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
-	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
-	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md); the method is the dispatch
+	// switch index, and every slot carries the client's own name - see the CSPlayerInterfaceMethods header.
 	//
-	//   CSPlayerInterface        FUN_01338690   211 entries
-	//   GameCharInterface        FUN_004BABB0   180
-	//   GameInterface            FUN_004919C0    15
-	//   GameCharInterfaceProject FUN_00493800    16
-	//
-	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
-	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
-	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
-	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
-	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
-	// 0x0E; this one is `Kicked`.
-	//
-	// ⭐ #792: a no-arg slot is nameable through the INTERFACE VTABLE, because its dispatch branch is a bare stub -
+	// A no-arg slot is nameable through the interface vtable, because its dispatch branch is a bare stub -
 	// `slot index = method id + 1` on this interface family, so 0x04 is vtable +0x14, and `GameInterface_t`'s
 	// override of it logs `GameInterface_t::OnQuitGame` in the client's own words. Retail sends it 4 times in 4
 	// captures; the handler runs the disconnect/redirect path.
@@ -1062,7 +1033,7 @@ namespace Faolan.Core.Enums
 		DispatchAckAuthenticate = 0x01,
 		DispatchRedirectToServer = 0x02,
 		DispatchOnDisconnectGame = 0x03,
-		DispatchQuitGame = 0x04, // GameInterface_t::OnQuitGame (#792)
+		DispatchQuitGame = 0x04, // GameInterface_t::OnQuitGame
 		DispatchPong = 0x05,
 		DispatchPongWithPacketTiming = 0x06,
 		DispatchInfoToUser = 0x07,
@@ -1072,29 +1043,13 @@ namespace Faolan.Core.Enums
 		DispatchReportDimesionID = 0x0B,
 		DispatchReportServerID = 0x0C,
 		DispatchDataSink = 0x0D,
-		DispatchKicked = 0x0E, // ⚠️ was DispatchClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked` (#876)
+		DispatchKicked = 0x0E, // not ClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked`
 		DispatchDisplayPlayfieldAccessPopup = 0x0F
 	}
 
 	// GameCharInterfaceProject server->client dispatch table (16 methods; +1 inserted).
-	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
-	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
-	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
-	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
-	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
-	//
-	//   CSPlayerInterface        FUN_01338690   211 entries
-	//   GameCharInterface        FUN_004BABB0   180
-	//   GameInterface            FUN_004919C0    15
-	//   GameCharInterfaceProject FUN_00493800    16
-	//
-	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
-	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
-	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
-	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
-	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
-	// 0x0E; this one is `Kicked`.
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md); the method is the dispatch
+	// switch index, and every slot carries the client's own name - see the CSPlayerInterfaceMethods header.
 	public enum GameCharInterfaceProjectMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,
@@ -1116,8 +1071,8 @@ namespace Faolan.Core.Enums
 	}
 
 	// TradepostAgent client->server methods (the AH + mail selector after the endpoints) - the complete
-	// recovered TradepostAgent.client_to_server table (the method IS the table position; alignment verified on
-	// ItemSearch/BuyItem/Close). The method ids COLLIDE with ordinary GameServer opcodes, so tradepost packets
+	// recovered TradepostAgent.client_to_server table (the method is the table position; alignment verified on
+	// ItemSearch/BuyItem/Close). The method ids collide with ordinary GameServer opcodes, so tradepost packets
 	// route by RPC class id (RpcInterfaces.TradepostAgentType), never by opcode alone. Behaviour that differs
 	// from the name is noted per line (docs/subsystems/tradepost-protocol.md).
 	public enum TradepostAgentMethods : uint
@@ -1145,24 +1100,8 @@ namespace Faolan.Core.Enums
 	}
 
 	// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
-	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
-	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
-	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
-	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
-	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
-	//
-	//   CSPlayerInterface        FUN_01338690   211 entries
-	//   GameCharInterface        FUN_004BABB0   180
-	//   GameInterface            FUN_004919C0    15
-	//   GameCharInterfaceProject FUN_00493800    16
-	//
-	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
-	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
-	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
-	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
-	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
-	// 0x0E; this one is `Kicked`.
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md); the method is the dispatch
+	// switch index, and every slot carries the client's own name - see the CSPlayerInterfaceMethods header.
 	public enum TradepostInterfaceMethods : uint
 	{
 		DispatchOpenTradepost = 0x00,
@@ -1176,24 +1115,8 @@ namespace Faolan.Core.Enums
 	}
 
 	// GameCharInterface server->client dispatch table (181 methods; +24 inserted no-arg). The main world s2c surface: inventory (DispatchAddItem 0x20), shop, loot, quests, trade, spells/feats, formations.
-	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
-	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
-	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
-	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
-	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
-	//
-	//   CSPlayerInterface        FUN_01338690   211 entries
-	//   GameCharInterface        FUN_004BABB0   180
-	//   GameInterface            FUN_004919C0    15
-	//   GameCharInterfaceProject FUN_00493800    16
-	//
-	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
-	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
-	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
-	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
-	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
-	// 0x0E; this one is `Kicked`.
+	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md); the method is the dispatch
+	// switch index, and every slot carries the client's own name - see the CSPlayerInterfaceMethods header.
 	public enum GameCharInterfaceMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,
@@ -1223,15 +1146,11 @@ namespace Faolan.Core.Enums
 		DispatchResurrectRequest = 0x18,
 		DispatchSetDbDebugCategory = 0x19,
 		DispatchSetDbDebugLevel = 0x1A,
-		// ⚠️ #792: NOT nameless for want of looking - `GamecodeClient_t`'s override of its vtable slot (+0x70) is an
-		// EMPTY function, so the client does nothing with it. Retail sends it 102 times across 59 of 132 captures,
-		// immediately before every IntendedTeleportIIR, and the client ignores every one. So the zone-change
-		// handshake is not missing a step we fail to perform - this one is a no-op on the receiving end.
-		//
-		// ⭐ The "immediately before every" is now MEASURED and exact: of the 102 frames, the next s2c frame is an
-		// `IntendedTeleportIIR` (`0x10D27BC0`) **102 times, with no exceptions** - cross-map handoffs and same-map
-		// revives alike. That is what makes it safe to send unconditionally from the teleport senders, which we now
-		// do (`GameServerListener.SendTeleportPending`) for byte-stream fidelity and nothing else.
+		// `GamecodeClient_t`'s override of its vtable slot (+0x70) is an empty function, so the client does nothing
+		// with it. Retail sends it 102 times across 59 of 132 captures, and of those 102 frames the next s2c frame is
+		// an `IntendedTeleportIIR` (`0x10D27BC0`) 102 times with no exceptions - cross-map handoffs and same-map
+		// revives alike. The zone-change handshake is therefore not missing a step on the receiving end, and the
+		// teleport senders emit it unconditionally (`SendTeleportPending`) for byte-stream fidelity and nothing else.
 		DispatchTeleportStarted = 0x1B,
 		DispatchSetItemStat = 0x1C,
 		DispatchAddToItemSlot = 0x1D,
@@ -1309,23 +1228,23 @@ namespace Faolan.Core.Enums
 		DispatchCraftUntrainMessageBox = 0x65,
 		DispatchUnbindItemReply = 0x66,
 		DispatchBroadcastMessage = 0x67,
-		// ⭐ #792: the TRADE block's four no-arg slots, named through the interface VTABLE. On this family the
+		// The trade block's four no-arg slots, named through the interface vtable. On this family the
 		// dispatch branch of a no-arg method is a bare stub calling one virtual slot, and `slot = (method + 1) * 4`
-		// holds on all eight measured (0x1B, 0x6A, 0x6B, 0x6C, 0x6D, 0x71, 0x72, 0x75) - the four that DO have a name
+		// holds on all eight measured (0x1B, 0x6A, 0x6B, 0x6C, 0x6D, 0x71, 0x72, 0x75) - the four that do have a name
 		// are the controls. `GamecodeClient_t` is the implementing class; `GameCharInterface_t`'s overrides are empty.
 		//
 		//   0x6A -> +0x1AC -> `CoreTradeHolder::TradeAbort()`, the client's own assert string ("is closing all
-		//                     trades"). ⭐ Its TRIGGER is measured: 152 of the 153 frames in the corpus are the
+		//                     trades"). Its trigger is measured: 152 of the 153 frames in the corpus are the
 		//                     immediate reply to `CloseShop` (the odd one follows an `UpdateQuestMarkerNPC` - a shop
 		//                     closed by walking away). A vendor session is a trade to the client, which is why one
 		//                     message serves both. We answer `CloseShop` with it (`SendTradeAbort`).
 		//   0x6B -> +0x1B0 -> the LOCAL holder's `accepted` byte set + the trade window refreshed. Byte for byte the
 		//                     same body as 0x6C's, which is named DispatchPartnerAcceptedTrade and differs only in
-		//                     taking the ID32 of whose holder to stamp - so 0x6B is the argument-less YOU half.
+		//                     taking the ID32 of whose holder to stamp - so 0x6B is the argument-less "you" half.
 		//   0x6D -> +0x1B8 -> the holder's own vtable slot 2: clear the character's in-trade flag, zero the accepted
 		//                     byte and both cash slots, free both item lists, then the trade-ended signal with 1
-		//                     where TradeAbort sends 0. ⭐ The CAPTURES say the same thing independently - it lands on
-		//                     BOTH connections, empty, as the trade commits (ITradeOutbound.SendTradeCompleted).
+		//                     where TradeAbort sends 0. The captures say the same thing independently - it lands on
+		//                     both connections, empty, as the trade commits (ITradeOutbound.SendTradeCompleted).
 		//   0x71 -> +0x1C8 -> the exact inverse of 0x6B: the accepted byte set back to 0. Never sent in the corpus.
 		DispatchRequestTrade = 0x68,
 		DispatchStartTrade = 0x69,
@@ -1337,11 +1256,11 @@ namespace Faolan.Core.Enums
 		DispatchTradePartnerAddedItem = 0x6F,
 		DispatchTradeAddedItem = 0x70,
 		DispatchClientNoLongerAcceptedTrade = 0x71,
-		DispatchPartnerNoLongerAcceptedTrade = 0x72, // #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus.
+		DispatchPartnerNoLongerAcceptedTrade = 0x72, // fires the trade-window refresh signal and nothing else. Never sent in the corpus.
 
 		DispatchTradePartnerRemovedItem = 0x73,
 		DispatchTradeRemovedItem = 0x74,
-		// #792: the client logs "DeleteCachedLDBData remote method was called." under its `LDB` category, then builds
+		// The client logs "DeleteCachedLDBData remote method was called." under its `LDB` category, then builds
 		// the LDB cache object and resets it. Never sent in the corpus.
 		DispatchDeleteCachedLDBData = 0x75,
 		DispatchShortcutBarReply = 0x76,

@@ -4,10 +4,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// 0x20AA DispatchBattleKeepInfoRequestReturnPhase3And4 - the per-battlekeep status reply (#147). Bodies below
+	// 0x20AA DispatchBattleKeepInfoRequestReturnPhase3And4 - the per-battlekeep status reply. Bodies below
 	// are retail's, verbatim from NecroL80_mage-necromancer_login_gameplay_annotated_9, where four request/reply
 	// pairs were captured and each reply was followed by a guild-name update ("Vendetta", "Hand of Stygia",
-	// "Fleurs de Lys") - the corpus DOES carry battlekeep traffic, contrary to #147's older "zero messages".
+	// "Fleurs de Lys").
 	public class BattleKeepInfoCodecTests
 	{
 		// keep 4 (Vendetta, guild 0x7B726), keep 2 (Hand of Stygia, guild 0x7C6A6), keep 3 (guild 0x7DFCA).
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 		{
 			// The reply CSPlayerAgentListener sends to a keep query while no siege layer exists: zero entries, i.e.
 			// the ListFrame(0) word alone. Uncaptured as such (every retail reply carried an owned keep), but it is
-			// the same honest-empty shape as the zero-guild Massive-PvP board (#147).
+			// the same honest-empty shape as the zero-guild Massive-PvP board.
 			Assert.Equal("000003f1", Convert.ToHexStringLower(BattleKeepInfoCodec.Build(BattleKeepInfo.Empty)));
 
 			var parsed = BattleKeepInfoCodec.Parse(Convert.FromHexString("000003f1"));
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheOwnerIsAGuildId32_SoAnotherClassWordIsRefused()
 		{
-			// The word after keepId is the owning guild's ID32 CLASS (EntityClass.Guild), which the client's keep
+			// The word after keepId is the owning guild's ID32 class (EntityClass.Guild), which the client's keep
 			// window reads as one ID32 with the id that follows - a reply carrying any other class there is not a
 			// keep record, and Parse says so rather than carrying it as a "zone word".
 			var body = Convert.FromHexString(Keep4.Replace("0000deb7", "0000c350"));

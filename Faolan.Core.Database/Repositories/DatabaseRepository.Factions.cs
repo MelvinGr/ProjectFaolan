@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// The Khitai faction system's data access (Gitea #310) - the CATALOG (read-only, from the client) and one
-	// character's STANDING (play state).
+	// The Khitai faction system's data access - the catalog (read-only, from the client) and one
+	// character's standing (play state).
 	public interface IFactionRepository
 	{
 		/// <summary>The whole faction catalog, by id. Sixteen rows; loaded once and cached by the caller.</summary>
@@ -20,7 +20,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<IReadOnlyList<FactionKillAward>> GetFactionKillAwards(uint victimFactionId, int tier);
 
 		/// <summary>
-		///     One character's standings, by faction id. A faction with no row is NEUTRAL, not unknown - the row is
+		///     One character's standings, by faction id. A faction with no row is neutral, not unknown - the row is
 		///     created the first time the standing moves, so this never returns sixteen zeroes.
 		/// </summary>
 		Task<IReadOnlyDictionary<uint, int>> GetCharacterFactionStandings(uint characterId);

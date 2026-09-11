@@ -35,8 +35,9 @@ namespace Faolan
 		{
 			Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 
-			// Parse ONCE, up front - BEFORE the banner, so `--help` answers with help rather than nine lines of ASCII
-			// art first. An unknown option is an error here rather than a setting that quietly stays on its default.
+			// Parsed once, up front and before the banner, so `--help` answers with help rather than nine lines of
+			// ASCII art first. An unknown option is an error here rather than a setting that quietly stays on its
+			// default.
 			// Null means the parser handled the invocation itself (--help, or it reported an error).
 			var options = ServerCommand.Parse(args, out var parseExit);
 			if (options == null)
@@ -47,15 +48,15 @@ namespace Faolan
 
 			Console.WriteLine(Global.StartupBanner);
 
-			// The process ROLE set is parsed and validated by the command line itself (ServerCommand.TryParseRoles), so
+			// The process role set is parsed and validated by the command line itself (ServerCommand.TryParseRoles), so
 			// an impossible combination has already been reported as a CLI error and this can only see a legal one.
 			var (runLogin, runRealm, realmId) = (options.RunLogin, options.RunRealm, options.RealmId);
 
-			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
-			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
-			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so
-			// the tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain
-			// generic host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port).
+			// The in-process MCP server (streamable HTTP on a localhost port) is the only thing here that needs a web
+			// server. It runs only for a realm host and only when enabled, so the host shape follows: a WebApplication
+			// (Kestrel) when MCP runs - mapping the endpoint straight onto that host and sharing its DI, so the tools
+			// resolve the live singletons directly with no nested host - and a plain generic host otherwise, so a
+			// login-only or MCP-off process stays web-server-free with no stray bound port.
 			var runMcp = runRealm && options.Configuration.McpEnabled;
 
 			IHostApplicationBuilder builder = runMcp
@@ -86,20 +87,20 @@ namespace Faolan
 				o.SingleLine = true;
 			});
 
-			// Registered through a FACTORY, not as a pre-built instance: MS.DI disposes the singletons it creates and
-			// leaves the ones it is handed alone, and `AddProvider(instance)` is the latter. The provider buffers its
-			// writes and flushes on a 1 s timer (see FileLoggerProvider), so an undisposed one could lose the last
+			// Registered through a factory rather than as a pre-built instance: MS.DI disposes the singletons it creates
+			// and leaves the ones it is handed alone, and `AddProvider(instance)` is the latter. The provider buffers
+			// its writes and flushes on a 1 s timer (see FileLoggerProvider), so an undisposed one would lose the last
 			// second of faolan.log at shutdown; owned by the container, its Dispose flushes when the host stops.
 			var logFile = builder.Configuration.LogFile;
 			builder.Logging.Services.AddSingleton<ILoggerProvider>(_ => new FileLoggerProvider(logFile));
 
-			// The login DH private key (Server:PrivateKey). Read BEFORE any listener starts so a bad value throws here
+			// The login DH private key (Server:PrivateKey). Read before any listener starts so a bad value throws here
 			// rather than mid-login, where it would silently degrade every login to accept-any.
 			var serverPrivateKey = builder.Configuration.ServerPrivateKey;
 
-			// BOTH states get a line, because the one that matters most is the one that used to print NOTHING: a server
-			// that checks no passwords looked identical at startup to one that does. "Unset" is no longer a built-in
-			// key either - there is no key at all - so say what that means for logins rather than for config.
+			// Both states get a line, because a server that checks no passwords must not look identical at startup to
+			// one that does. There is no built-in key, so the unset case says what that means for logins rather than
+			// for config.
 			if (serverPrivateKey == null)
 			{
 				Console.WriteLine(
@@ -110,13 +111,12 @@ namespace Faolan
 				Console.WriteLine("[login] Using the configured Server:PrivateKey - every client must be patched (Faolan.ClientLauncher --patch-login) and its password is validated.");
 			}
 
-			// ⚠️ This block runs BEFORE the host on purpose, and the alternative was weighed and dropped (#409). Every
-			// listener builds its `TcpListener` in its constructor, and the host constructs all hosted services before
-			// starting any, so a port cannot be resolved from inside one. Deferring socket creation to StartAsync would
-			// remove this block - at the cost of touching ServerBase and all five listeners, making `LocalEndPoint`
-			// invalid until start (the bind log lines read it), moving the `[role]` banner into a service, and turning
-			// two fail-fast errors - a bad `--role realm=<id>` and a port conflict - into failures during host start
-			// with worse messages. It is the same work either way and this shape says it in one place, so it stays.
+			// This block runs before the host on purpose: every listener builds its `TcpListener` in its constructor and
+			// the host constructs all hosted services before starting any, so a port cannot be resolved from inside
+			// one. Deferring socket creation to StartAsync would remove the block, at the cost of making
+			// `LocalEndPoint` invalid until start (the bind log lines read it), moving the `[role]` banner into a
+			// service, and turning two fail-fast errors - a bad `--role realm=<id>` and a port conflict - into failures
+			// during host start with worse messages.
 			Realm? hostRealm = null;
 			try
 			{
@@ -124,15 +124,15 @@ namespace Faolan
 
 				// The shared migrate + load-the-data + seed sequence (DatabaseInitializer), logged Console-style because
 				// the host - and with it any ILogger - does not exist yet. A database with no content gets faolan.sql
-				// loaded into it here, which is what lets a clone run without the committed binary (#412).
-				// The realms this deployment DECLARES (the `Realms` section - see FaolanRealms), reconciled into the
+				// loaded into it here, which is what lets a clone run without the committed binary.
+				// The realms this deployment declares (the `Realms` section - see FaolanRealms), reconciled into the
 				// table below. Read before the initializer so a malformed declaration fails here, naming the offending
 				// key, rather than half-way through a bootstrap.
 				//
-				// ⭐ The SCOPE is the role. A login process reconciles the whole declared set, because the realm list
-				// it serves is exactly that set; a realm-only process reconciles just its own row, which keeps
-				// "a realm process writes only its own row" (#909/#922) true of the static columns too. An all-in-one
-				// run is the login tier, so it takes the whole set.
+				// The scope is the role. A login process reconciles the whole declared set, because the realm list it
+				// serves is exactly that set; a realm-only process reconciles just its own row, which keeps "a realm
+				// process writes only its own row" true of the static columns too. An all-in-one run is the login tier,
+				// so it takes the whole set.
 				var declared = FaolanRealms.Declared(builder.Configuration);
 				var reconcileOnly = runLogin
 					? null
@@ -148,8 +148,8 @@ namespace Faolan
 				foreach (var realm in seeded.Realms.Created)
 					Console.WriteLine($"[db] Declared realm not in the database - inserted {realm}.");
 
-				// ⚠️ A port change is the one that bites: this process now advertises the new port, while a realm host
-				// that is already running keeps serving the old one until somebody restarts it.
+				// A port change is the one that bites: this process advertises the new port immediately, while a realm
+				// host that is already running keeps serving the old one until it is restarted.
 				foreach (var realm in seeded.Realms.Updated)
 					Console.WriteLine($"[db] Realm changed by the config - {realm}. A running host for it keeps its old ports until restarted.");
 
@@ -194,17 +194,17 @@ namespace Faolan
 
 			if (runRealm)
 			{
-				// The realm THIS process hosts, as an immutable snapshot of the Realm row resolved above (single source
-				// of truth for the realm-local service ports, #324). Registering it is what lets every realm-tier
-				// service below be a plain AddHostedService<T>(): the port arrives by INJECTION rather than through a
-				// factory lambda that reaches into the closed-over `hostRealm`.
+				// The realm this process hosts, as an immutable snapshot of the Realm row resolved above - the single
+				// source of truth for the realm-local service ports. Registering it is what lets every realm-tier
+				// service below be a plain AddHostedService<T>(): the port arrives by injection rather than through a
+				// factory lambda closing over `hostRealm`.
 				var realm = new HostRealm(hostRealm!.Id, hostRealm.Name, hostRealm.Port, hostRealm.ChatServerPort, hostRealm.CsPlayerAgentPort);
 				builder.Services.AddSingleton(realm);
 
-				// ⚠️ Registration ORDER is load-bearing and the four AddHostedService lines below must keep it:
+				// Registration order is load-bearing and the four AddHostedService lines below must keep it:
 				// HostOptions.ServicesStartConcurrently is false, so StartAsync is awaited in registration order. That
-				// is what starts RealmStatusService last (Online = the host is up) and, since hosted services stop in
-				// REVERSE order, flips the realm Offline first as shutdown begins (#324).
+				// is what starts RealmStatusService last (Online means the host is up) and, since hosted services stop
+				// in reverse order, flips the realm Offline first as shutdown begins.
 
 				// Seam into the CS listener: it owns the team roster, and LeaveTeam/KickFromTeam arrive on the world
 				// connection, so the world listener routes them through here (as it does chat and world actions).
@@ -219,27 +219,26 @@ namespace Faolan
 				// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
 				builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
-				// In-process MCP server (Claude tooling) mapped onto THIS host's Kestrel; shares the live singletons above
+				// In-process MCP server (Claude tooling) mapped onto this host's Kestrel; shares the live singletons above
 				// directly. runMcp already folds in McpEnabled and drove the WebApplication host-shape choice above, so
 				// the AddFaolanMcp registration and the MapFaolanMcp endpoint (at the tail) are consistently gated on it.
 				// When disabled the ChatServer also skips the Claude chat-channel subscription (nothing reads the log).
 				if (runMcp)
 					builder.Services.AddFaolanMcp();
 
-				// The realm's ~60 world services (#826). They used to be hand-`new`ed in the GameServer listener's
-				// ctor; the registration lists them in dependency order, which is documentation rather than a
-				// requirement - MS.DI resolves by type. It also registers the bare realm-tagged `ILogger` every one
-				// of them takes, which is why it is scoped to a process that actually hosts a realm.
+				// The realm's world services. The registration lists them in dependency order, which is documentation
+				// rather than a requirement - MS.DI resolves by type. It also registers the bare realm-tagged `ILogger`
+				// every one of them takes, which is why it is scoped to a process that hosts a realm.
 				builder.Services.AddRealmGameServer(realm);
 
 				// Its realm-tagged log category ("...GameServerListener-<realmId>") is built inside the listener from the
 				// injected HostRealm - see its ctor for why that is an ILoggerFactory rather than an ILogger.
 				builder.Services.AddHostedService<GameServerListener>();
-				// #938: build the once-per-server combat/quest catalogs at startup so no player pays their first-touch.
+				// Builds the once-per-server combat and quest catalogs at startup so no player pays their first touch.
 				builder.Services.AddHostedService<RealmWarmupService>();
 
-				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
-				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).
+				// Registered last so it starts after the listeners (Online means the host is up) and, since hosted
+				// services stop in reverse order, flips the realm Offline first as shutdown begins.
 				builder.Services.AddHostedService<RealmStatusService>();
 			}
 
@@ -249,9 +248,9 @@ namespace Faolan
 			{
 				var app = webBuilder.Build();
 
-				// The MCP port is per-realm (#910): `Mcp:Port` is one global key and MCP only runs in a realm host, so
-				// without the offset every realm process bound the same port and the second one died on
-				// `address already in use` - naming a port the operator never set for it.
+				// The MCP port is per-realm: `Mcp:Port` is one global key and MCP runs only in a realm host, so without
+				// the offset every realm process would bind the same port and all but the first would die on "address
+				// already in use", naming a port the operator never set for it.
 				var mcpPort = FaolanMcpServiceCollectionExtensions.McpPortFor(builder.Configuration.McpPort, hostRealm!.Id);
 				app.MapFaolanMcp(hostRealm.Id);
 				Console.WriteLine($"[mcp] http://127.0.0.1:{mcpPort}/mcp (realm {hostRealm.Id})");
@@ -262,8 +261,8 @@ namespace Faolan
 				}
 				catch (IOException ex) when (ex.Message.Contains($":{mcpPort}", StringComparison.Ordinal))
 				{
-					// Kestrel's bind error names a port nobody configured for THIS process and says nothing about MCP,
-					// which is what made the original failure opaque. Say what it is and how to get past it.
+					// Kestrel's bind error names a port nobody configured for this process and says nothing about MCP,
+					// so the failure is restated here with what it is and how to get past it.
 					await Console.Error.WriteLineAsync(
 						$"[mcp] FATAL: could not bind the MCP endpoint on port {mcpPort}. Something else holds it - "
 						+ $"another Faolan process hosting realm {hostRealm.Id}, or an unrelated program. "

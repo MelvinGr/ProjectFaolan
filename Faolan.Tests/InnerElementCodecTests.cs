@@ -11,9 +11,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The remoteformat INNER element - what a `<parameter>` carries, and what a world object's display slot carries.
+	// The remoteformat inner element - what a `<parameter>` carries, and what a world object's display slot carries.
 	// These were the last serialized-XML blobs in the model; storing them as columns is only safe if the columns
-	// rebuild the captured bytes EXACTLY, because the client is fed them verbatim (the `key` is a client-validated
+	// rebuild the captured bytes exactly, because the client is fed them verbatim (the `key` is a client-validated
 	// content hash and `flags` drives the localized declension).
 	public class InnerElementCodecTests
 	{
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		// A literal - both the blanked session-slot form and a populated one.
 		[InlineData("<stringentry string=\"\" flags=\"\" >")]
 		[InlineData("<stringentry string=\"Valeria\" flags=\"f\" >")]
-		// A nested parameter-less root; note the DOUBLE space before '>'.
+		// A nested parameter-less root; note the double space before '>'.
 		[InlineData("<remoteformat id=\"3217121\" category=\"50200\" key=\"0@5S/y3Ly5j(Wq*H1/Y3\" knubot=\"0\"  ></remoteformat>")]
 		public void Parse_ThenBuild_IsByteExact(string xml)
 		{
@@ -58,8 +58,8 @@ namespace Faolan.Tests
 			Assert.Equal(0u, nested.Knubot);
 		}
 
-		// Anything outside the three shapes must FAIL rather than be half-read - there is no blob column left, so a
-		// throw is the only way an unknown shape can surface at import (#530 rule 4; this used to return null).
+		// Anything outside the three shapes must fail rather than be half-read - there is no blob column left, so a
+		// throw is the only way an unknown shape can surface at import.
 		[Theory]
 		[InlineData(null)]
 		[InlineData("")]
@@ -72,16 +72,15 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => InnerElementCodec.Parse(xml!));
 		}
 
-		// Whole-table CONSISTENCY, not fidelity. Every shipped row must produce an element the parser reads back
+		// Whole-table consistency, not fidelity. Every shipped row must produce an element the parser reads back
 		// identically - which catches a row whose columns cannot express a legal element at all (a Localized row with
 		// neither id nor token, say).
 		//
-		// It deliberately does NOT claim byte-exactness against the capture, because it cannot: the serialized blobs
-		// were dropped when these columns replaced them, so there is nothing left in the database to compare to. The
-		// value it builds from is our own output, and a test fed its own output proves only self-consistency. FIDELITY
-		// is gated by the [Theory] cases above - those strings are real captured values, one per shape in the corpus -
-		// and, for the dialogue path, by ConversationConstructTests against captured packets. The full 8232-row
-		// comparison against the original blobs was run once, at migration time, before they were dropped.
+		// It deliberately does not claim byte-exactness against the capture, because it cannot: the database holds the
+		// columns, not the serialized blobs, so there is nothing there to compare to. The value it builds from is our
+		// own output, and a test fed its own output proves only self-consistency. Fidelity is gated by the [Theory]
+		// cases above - those strings are real captured values, one per shape in the corpus - and, for the dialogue
+		// path, by ConversationConstructTests against captured packets.
 		[Fact]
 		public async Task EveryShippedInnerElement_IsExpressibleAndSelfConsistent()
 		{

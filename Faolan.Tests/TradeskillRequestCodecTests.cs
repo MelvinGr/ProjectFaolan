@@ -4,8 +4,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// 0x06B9CD94 TradeskillRequestIIR - the recipe-book request (#148). The body below is retail's, verbatim from
-	// NecroL80_mage-necromancer_shops_open-crrafting-receipies, which is the ONLY tradeskill traffic in all 120 dumps.
+	// 0x06B9CD94 TradeskillRequestIIR - the recipe-book request. The body below is retail's, verbatim from
+	// NecroL80_mage-necromancer_shops_open-crrafting-receipies, which is the only tradeskill traffic in all 120 dumps.
 	public class TradeskillRequestCodecTests
 	{
 		// The full 0x2000 sub-payload: [u32 iirLength = 0x11][u32 subop][u32 0xC350][u32 handle][u8 env][u32 version].
@@ -24,7 +24,7 @@ namespace Faolan.Tests
 			Assert.Equal(TradeskillRequestCodec.Build(parsed), body.ToArray());
 		}
 
-		// The point of parsing rather than discarding: the request is FULLY accounted for at 17 bytes, so it cannot
+		// The point of parsing rather than discarding: the request is fully accounted for at 17 bytes, so it cannot
 		// be carrying a recipe id. The client's own reader takes one u32 after the env byte and nothing else.
 		[Fact]
 		public void CapturedRequest_ConsumesEveryByte()

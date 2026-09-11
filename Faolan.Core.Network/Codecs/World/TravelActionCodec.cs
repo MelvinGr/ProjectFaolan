@@ -4,41 +4,40 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// The LOCAL TRAVEL action (#514) - GameAction type 0xD00D, carried as the single GameActionData element of a
+	// The local-travel action - GameAction type 0xD00D, carried as the single GameActionData element of a
 	// GameActionListIIR addressed to the travelling player. It is what retail sends the instant a wagoneer's
 	// destination is picked, and it spells the whole trip out in one wire string:
 	//
 	//     xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1
 	//
 	// which the player's re-stream then confirms to the centimetre (SimpleCharFullUpdate at (1136.0, 132.8, 223.0)).
-	// `ypos` is the HEIGHT - the same axis order the rest of the wire uses - and `Local=1` marks a same-playfield
+	// `ypos` is the height - the same axis order the rest of the wire uses - and `Local=1` marks a same-playfield
 	// relocate, which is why both captured wagoner trips carry no redirect and no loading screen.
 	//
-	// ⚠️ The action is NOT travel-only, and the trailing flag is what says which use it is. All four captured actions
+	// The action is not travel-only, and the trailing flag is what says which use it is. All four captured actions
 	// share the `xpos/ypos/zpos/PlayFieldID` head and then differ:
 	//
 	//     ...;PlayFieldID=1020;Local=1           the three wagoner trips (a same-playfield relocate)
-	//     ...;PlayFieldID=2070;HeroicEnabled=0   an INSTANCE entry, carrying the difficulty mode instead (#511)
+	//     ...;PlayFieldID=2070;HeroicEnabled=0   an instance entry, carrying the difficulty mode instead
 	//
 	// So the flag is modelled as a (key, value) pair rather than as a bool called Local: collapsing the two would make
 	// an instance entry read as a non-local trip, and re-building it would emit the wrong key. An unrecognised key is a
 	// parse failure, not a default - a third use of this action must be looked at, not guessed at.
 	//
-	// A class-(c) sub-record codec (#530 rule 5c): it decodes the ActionTail GameActionListCodec hands back, is never
-	// sent alone, and so declares no opcode. The tail's layout, continuing GameActionDataCodec's element grammar from
+	// A sub-record codec: it decodes the ActionTail GameActionListCodec hands back, is never sent alone, and so
+	// declares no opcode. The tail's layout, continuing GameActionDataCodec's element grammar from
 	// the 0x2d6 word (GameActionListCodec's own header has already written typeId/field/version/subCount/0x2d5):
 	//
 	//     [u32 0x2d6 = 0][u32 0x2f2 = 1][u32 0x2f5 = 0][u32 ScriptID][u16 len][latin-1 ScriptParams][u8 0][u32 0]
 	//                                                                         ^ GameActionListCodec.ReadSubClassTrailer
 	//
 	// The two values are the type's own descriptor key list, in the client's order: 53261 declares `39;209` =
-	// `ScriptID;ScriptParams` (docs/re/gameaction-keylists.tsv). So the leading word is the retail SCRIPT the server
+	// `ScriptID;ScriptParams` (docs/re/gameaction-keylists.tsv). So the leading word is the retail script the server
 	// ran, and the string is that script's parameters - which is what makes 0xD00D a general "the server ran a script"
-	// action whose FAMILY is named by the params, never by the action id.
+	// action whose family is named by the params, never by the action id.
 	//
-	// The element's `field` is NOT part of this action: it is `GameActionData::s_nInstance`, the sending process's own
-	// unique-instance counter (`GameActionInstanceId`, #636). It used to read as per-trip data we could not derive,
-	// which is what kept this codec decode-only.
+	// The element's `field` is not part of this action: it is `GameActionData::s_nInstance`, the sending process's own
+	// unique-instance counter (`GameActionInstanceId`).
 	public static class TravelActionCodec
 	{
 		// The GameAction type the client dispatches this payload to. Inside the client's asserted GameAction range
@@ -48,7 +47,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// The `ScriptID` retail runs for a wagoner trip - identical on all four captured trips (Cordelia, Treva,
 		// Hakotep's Conall's Valley ride and the Poitain instance entry), across two characters and three servers.
 		// A fifth 0xD00D in the corpus carries a different script (0x004984B0) and a `PF=11040` param string, which is
-		// some other server-side script entirely and is deliberately NOT modelled here.
+		// some other server-side script entirely and is deliberately not modelled here.
 		public const uint TripScriptId = 0x0037A487;
 
 		// The trailing flag keys observed across the corpus - see the class comment. Kept as a set rather than as a bool
@@ -60,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.World
 		private const uint Fixed0x2f2 = 1;
 		private const uint Fixed0x2f5 = 0;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(TravelAction value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -203,33 +202,34 @@ namespace Faolan.Core.Network.Codecs.World
 
 	// One 0xD00D move-the-player action as the wire states it. `FlagKey`/`FlagValue` are the trailing pair verbatim -
 	// `Local=1` on a wagoner trip, `HeroicEnabled=0` on a cross-playfield one - and `ScriptId` is the action's
-	// `ScriptID` descriptor value, carried so a re-build is byte-exact rather than the constant being asserted off
-	// four samples.
+	// `ScriptID` descriptor value, carried so a re-build is byte-exact rather than asserting the constant off four
+	// samples.
 	public sealed record TravelAction(uint DestinationMapId, float X, float Y, float Z, string FlagKey, uint FlagValue, uint ScriptId)
 	{
-		// A same-playfield relocate: the wagoner trips. A cross-playfield trip carries the difficulty flag instead and
-		// is NOT local, which is exactly the distinction a single bool would have lost.
+		/// <summary>A same-playfield relocate: the wagoner trips.</summary>
+		/// <remarks>A cross-playfield trip carries the difficulty flag instead and is not local.</remarks>
 		public bool IsLocal => FlagKey == TravelActionCodec.LocalFlag && FlagValue != 0;
 	}
 
-	// The two semantic forms of a trip action, as VALUE factories (#530 rule 6): both take the same
-	// (map, x, y, z) parameter list, so choosing between them by `Build` overload is exactly the ambiguity that rule
-	// removes. Which one a trip is comes from the DESTINATION PLAYFIELD, and the corpus says so on all four captured
-	// trips: the three whose destination is the playfield the player was already on carry `Local=1` (Cordelia -> 1020,
-	// Treva -> 1090, Hakotep -> 1010), and the one that crosses (Wagoner Mycus -> Poitain 2070) carries
-	// `HeroicEnabled=0` instead. That is the same split `TravelService` already makes to choose between relocating in
-	// place and running the changemap handoff.
+	// The two semantic forms of a trip action, as value factories rather than `Build` overloads: both take the same
+	// (map, x, y, z) parameter list, so a signature could not tell them apart. Which one a trip is comes from the
+	// destination playfield, and the corpus says so on all four captured trips: the three whose destination is the
+	// playfield the player was already on carry `Local=1` (Cordelia -> 1020, Treva -> 1090, Hakotep -> 1010), and the
+	// one that crosses (Wagoner Mycus -> Poitain 2070) carries `HeroicEnabled=0` instead. That is the same split
+	// `TravelService` already makes to choose between relocating in place and running the changemap handoff.
 	public static class TravelActions
 	{
-		// A SAME-playfield relocate - no loading screen. `Local=1` on every captured wagoner trip.
+		/// <summary>A same-playfield relocate - no loading screen. `Local=1` on every captured wagoner trip.</summary>
 		public static TravelAction Local(uint mapId, float x, float y, float z)
 		{
 			return new TravelAction(mapId, x, y, z, TravelActionCodec.LocalFlag, 1, TravelActionCodec.TripScriptId);
 		}
 
-		// A CROSS-playfield trip. The flag carries the instance difficulty mode (#511) rather than a locality: retail
-		// sent `HeroicEnabled=0` for the normal-mode entry, which is the only value the corpus has, so anything else
-		// would be invented.
+		/// <summary>A cross-playfield trip.</summary>
+		/// <remarks>
+		///     The flag carries the instance difficulty mode rather than a locality. Retail sent `HeroicEnabled=0` for the
+		///     normal-mode entry, which is the only value the corpus has.
+		/// </remarks>
 		public static TravelAction CrossPlayfield(uint mapId, float x, float y, float z, bool heroic = false)
 		{
 			return new TravelAction(mapId, x, y, z, TravelActionCodec.HeroicEnabledFlag, heroic

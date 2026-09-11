@@ -5,13 +5,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gate for the 0x200F DispatchTeamSearchResult body (#889).
+	// Gate for the 0x200F DispatchTeamSearchResult body.
 	//
-	// The corpus can only pin one half of this: all SIX captured replies are the EMPTY result, because no traced
+	// The corpus can only pin one half of this: all six captured replies are the empty result, because no traced
 	// session ever had a team flagged as looking for members. So the empty body is a byte-exact retail golden, and the
-	// NON-empty grammar is gated the only way it can be - against the client's own reader, whose two components are
+	// non-empty grammar is gated the only way it can be - against the client's own reader, whose two components are
 	// themselves capture-proven: a row is a `cTeam` (TeamRosterCodec, byte-exact in TeamTradeFriendCodecTests) then a
-	// string. That is what RowIsARosterThenItsMessage asserts, by requiring the row to START with the captured
+	// string. That is what RowIsARosterThenItsMessage asserts, by requiring the row to start with the captured
 	// roster's exact bytes.
 	public class TeamSearchResultCodecTests
 	{
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 		private const string CapturedEmptyBody = "000003f100";
 
 		// The two-member roster retail sent as DispatchYouJoinedTeam (f693) - the same bytes TeamTradeFriendCodecTests
-		// gates, reused here because a search row IS one of these.
+		// gates, reused here because a search row is one of these.
 		private const string CapturedRosterHex =
 			"0000dea90051dd9a0000c35001317cf800000bd3" +
 			"0000c35001317cf8000a4a6e6275657674666b6a000000290000000500000fb400000002000000000000000600000000000001620000c79c00000fb4" +
@@ -41,8 +41,7 @@ namespace Faolan.Tests
 		}
 
 		// The retail golden: a search that matched nothing is [ListFrame(0)][moreHits 0], and both halves have to be
-		// there. Dropping the trailing byte is the #408 failure - the client reads the empty frame and then runs off
-		// the end of the body.
+		// there. Dropping the trailing byte makes the client read the empty frame and then run off the end of the body.
 		[Fact]
 		public void EmptyResult_IsTheCapturedBody()
 		{
@@ -66,7 +65,7 @@ namespace Faolan.Tests
 		{
 			var body = TeamSearchResultCodec.Build(new TeamSearchResult([new TeamSearchResultRow(CapturedRoster(), "Need a healer")], false));
 
-			var expected = "000007e2" // ListFrame.ForCount(1) - and NOT a constant: a one-element list frames as 0x7E2
+			var expected = "000007e2" // ListFrame.ForCount(1) - and not a constant: a one-element list frames as 0x7E2
 			             + CapturedRosterHex
 			             + "000d4e6565642061206865616c6572" // [u16 13]"Need a healer", Latin1
 			             + "00"; // i_bMoreHits

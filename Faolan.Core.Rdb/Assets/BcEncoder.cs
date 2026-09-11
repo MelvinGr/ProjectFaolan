@@ -2,14 +2,22 @@ using System;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Encodes RGBA32 → BCn block-compressed data — the inverse of BcDecoder, for re-authoring FCTX textures
-	// (#295 Phase 2: replace/upscale a texture and write it back into the RDB). Endpoint fit per 4×4 block is a
-	// simple min/max bounding box (colour) / min-max (alpha) — not the theoretically-optimal fit, but a valid block
-	// a GPU decodes correctly, which is what matters for an in-engine texture swap.
-	//   BC1 (DXT1) — opaque colour.   BC3 (DXT5) — colour + 8-bit alpha.   BC4 — single channel (for MIXD detail).
+	/// <summary>
+	///     Encodes RGBA32 pixels into BCn block-compressed data, the inverse of <see cref="BcDecoder" />, so an FCTX
+	///     texture can be re-authored and written back into the RDB.
+	/// </summary>
+	/// <remarks>
+	///     Endpoint fit per 4×4 block is a plain min/max bounding box (colour) or min-max (alpha). That is not the
+	///     theoretically optimal fit, but it yields a valid block that a GPU decodes correctly, which is all an
+	///     in-engine texture swap needs. BC1 (DXT1) is opaque colour, BC3 (DXT5) is colour plus 8-bit alpha, BC4 is a
+	///     single channel (the MIXD detail maps).
+	/// </remarks>
 	public static class BcEncoder
 	{
-		// RGBA32 (row-major, top-down) → BC1 blocks (8 bytes / 4×4 tile). Opaque (BC1's 1-bit alpha = fully opaque).
+		/// <summary>
+		///     Encodes RGBA32 (row-major, top-down) into BC1 blocks, 8 bytes per 4×4 tile. Output is opaque: BC1's
+		///     1-bit alpha is always fully opaque here.
+		/// </summary>
 		public static byte[] EncodeBc1(ReadOnlySpan<byte> rgba, int width, int height)
 		{
 			var (bw, bh) = Blocks(width, height);
@@ -27,7 +35,10 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
-		// RGBA32 → BC3 blocks (16 bytes / 4×4 tile: 8-byte alpha block + 8-byte colour block).
+		/// <summary>
+		///     Encodes RGBA32 into BC3 blocks, 16 bytes per 4×4 tile: an 8-byte alpha block followed by an 8-byte
+		///     colour block.
+		/// </summary>
 		public static byte[] EncodeBc3(ReadOnlySpan<byte> rgba, int width, int height)
 		{
 			var (bw, bh) = Blocks(width, height);
@@ -47,8 +58,10 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
-		// Single-channel (one byte per texel, row-major) → BC4 blocks (8 bytes / 4×4 tile, same layout as the BC3
-		// alpha block). For the MIXD detail/normal channels.
+		/// <summary>
+		///     Encodes a single channel (one byte per texel, row-major) into BC4 blocks, 8 bytes per 4×4 tile, which
+		///     share the BC3 alpha block layout. Used for the MIXD detail/normal channels.
+		/// </summary>
 		public static byte[] EncodeBc4(ReadOnlySpan<byte> channel, int width, int height)
 		{
 			var (bw, bh) = Blocks(width, height);
@@ -73,8 +86,11 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
-		// RGBA32 normal map (R=X, G=Y) → BC5/ATI2 blocks (16 bytes / 4×4 tile: X interp block then Y interp block).
-		// The inverse of BcDecoder.DecodeBc5Normal (which reconstructs Z). For the MIXD normal sub-texture.
+		/// <summary>
+		///     Encodes an RGBA32 normal map (R = X, G = Y) into BC5/ATI2 blocks, 16 bytes per 4×4 tile: the X
+		///     interpolated block followed by the Y one. The inverse of <see cref="BcDecoder.DecodeBc5Normal" />,
+		///     which reconstructs Z; used for the MIXD normal sub-texture.
+		/// </summary>
 		public static byte[] EncodeBc5(ReadOnlySpan<byte> rgba, int width, int height)
 		{
 			var (bw, bh) = Blocks(width, height);
@@ -108,8 +124,10 @@ namespace Faolan.Core.Rdb.Assets
 			return (Math.Max(1, (w + 3) / 4), Math.Max(1, (h + 3) / 4));
 		}
 
-		// 16 RGB texels → an 8-byte BC1 colour block. Always 4-colour mode (c0 >= c1) - valid for BC1 (opaque) and
-		// required for the BC3 colour block.
+		/// <summary>
+		///     Encodes 16 RGB texels into an 8-byte BC1 colour block, always in 4-colour mode (c0 >= c1), which is
+		///     valid for opaque BC1 and required for the BC3 colour block.
+		/// </summary>
 		private static void EncodeColorBlock(ReadOnlySpan<byte> block, Span<byte> dst)
 		{
 			int rMin = 255, gMin = 255, bMin = 255, rMax = 0, gMax = 0, bMax = 0;
@@ -191,8 +209,11 @@ namespace Faolan.Core.Rdb.Assets
 			dst[7] = (byte)((indices >> 24) & 0xff);
 		}
 
-		// 16 single-byte values → an 8-byte interpolated block (BC3 alpha / BC4). Endpoints v0=max, v1=min so the
-		// 8-value mode (v0 > v1) is used; a flat block (v0 == v1) maps every texel to index 0 == v0.
+		/// <summary>
+		///     Encodes 16 single-byte values into an 8-byte interpolated block (BC3 alpha or BC4). Endpoints are
+		///     v0 = max and v1 = min so the 8-value mode (v0 > v1) is selected; a flat block (v0 == v1) maps every
+		///     texel to index 0, which is v0.
+		/// </summary>
 		private static void EncodeInterpBlock(ReadOnlySpan<byte> v, Span<byte> dst)
 		{
 			int vMin = 255, vMax = 0;
@@ -253,8 +274,11 @@ namespace Faolan.Core.Rdb.Assets
 			b = (b5 << 3) | (b5 >> 2);
 		}
 
-		// Gather a 4×4 tile's RGB (into rgb[16*3]) and, if `alpha` is non-empty, its alpha (into alpha[16]). Edge
-		// tiles clamp to the last row/column for non-multiple-of-4 sizes.
+		/// <summary>
+		///     Gathers a 4×4 tile's RGB into <paramref name="rgb" /> (16 × 3 bytes) and, when
+		///     <paramref name="alpha" /> is non-empty, its alpha into <paramref name="alpha" /> (16 bytes). Edge tiles
+		///     clamp to the last row/column for sizes that are not a multiple of four.
+		/// </summary>
 		private static void GatherRgbA(ReadOnlySpan<byte> rgba, int w, int h, int bx, int by, Span<byte> rgb, Span<byte> alpha)
 		{
 			for (var py = 0; py < 4; py++)

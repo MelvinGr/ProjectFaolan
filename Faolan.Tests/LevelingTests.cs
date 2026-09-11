@@ -3,9 +3,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Levelling curve (#297/#404). Retail's three XP stats are CUMULATIVE - Exp is a running total, bounded below by
+	// Levelling curve. Retail's three XP stats are cumulative - Exp is a running total, bounded below by
 	// ExpCurrentLevelBase (the total at which the current level began) and above by MaxExp (the total at which the
-	// next one does) - so a level's COST is the difference between two thresholds, and the anchor table stores the
+	// next one does) - so a level's cost is the difference between two thresholds, and the anchor table stores the
 	// thresholds. The character row keeps within-level progress; Apply spends it against the derived per-level costs.
 	//
 	// The corpus proof that the anchors are thresholds and not costs is LevelingCurveCorpusTests.
@@ -54,8 +54,8 @@ namespace Faolan.Tests
 			Assert.Equal(1u, gained);
 		}
 
-		// The captured retail thresholds: the CUMULATIVE experience at which each level begins. These are read
-		// straight off the wire (ExpCurrentLevelBase / MaxExp / the NewLevelIIR deltas) and MUST be exact.
+		// The captured retail thresholds: the cumulative experience at which each level begins. These are read
+		// straight off the wire (ExpCurrentLevelBase / MaxExp / the NewLevelIIR deltas) and must be exact.
 		[Theory]
 		[InlineData(1u, 0u), InlineData(2u, 100u), InlineData(3u, 340u), InlineData(4u, 740u), InlineData(5u, 1440u)]
 		[InlineData(6u, 3940u), InlineData(8u, 10240u), InlineData(9u, 14140u)]
@@ -66,8 +66,8 @@ namespace Faolan.Tests
 			Assert.Equal(expected, LevelingResolver.CumulativeXpForLevel(level));
 		}
 
-		// A per-level cost is exact wherever BOTH of its ends are anchored. These are the differences retail's own
-		// bar measures, and they are what the old anchor table got wrong by a factor of up to ~9.
+		// A per-level cost is exact wherever both of its ends are anchored. These are the differences retail's own
+		// bar measures, and a mis-anchored table is wrong on them by a factor of up to ~9.
 		[Theory]
 		[InlineData(1u, 100u), InlineData(2u, 240u), InlineData(3u, 400u), InlineData(4u, 700u), InlineData(5u, 2500u)]
 		[InlineData(8u, 3900u), InlineData(23u, 33400u), InlineData(24u, 34400u), InlineData(80u, 13135900u)]

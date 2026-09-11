@@ -6,16 +6,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #703: a harvested patrol route is an ORDERED, densely sampled polyline - the path the retail NPC actually walked,
-	// which in a city means down the street and round the corner. The #266 wander threw that order away: it picked a
-	// RANDOM waypoint off the list and moved the NPC there in one straight line, so an Old Tarantia guard walked
-	// through the block instead of round it. These gates hold the walk ON the polyline.
+	// A harvested patrol route is an ordered, densely sampled polyline - the path the retail NPC actually walked,
+	// which in a city means down the street and round the corner. A wander that picks a random waypoint off the list
+	// and moves the NPC there in one straight line throws that order away, so an Old Tarantia guard walks through the
+	// block instead of round it. These gates hold the walk on the polyline.
 	public class PatrolRouteWalkTests
 	{
 		[Fact]
 		public void ClosedRoute_KeepsGoingRoundInTheSameDirection()
 		{
-			// Ends that meet: the wrap from last back to first IS a route segment, so there is nothing to turn round for.
+			// Ends that meet: the wrap from last back to first is a route segment, so there is nothing to turn round for.
 			var square = new[]
 			{
 				new Vector3(0, 0, 0), new Vector3(0, 0, 30), new Vector3(30, 0, 30), new Vector3(30, 0, 0),
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		{
 			// An Old Tarantia beat does not close: its two ends are ~77u and a row of houses apart. Jumping from the
 			// last waypoint back to the first would draw exactly the through-the-building line this change removes, so
-			// an open route is walked back DOWN its own polyline instead.
+			// an open route is walked back down its own polyline instead.
 			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 40), new Vector3(40, 0, 40) };
 			var (world, npc) = Walker(street);
 
@@ -62,8 +62,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void LongLeg_IsStillTheNpcsOwnTerritory_SoItIsNotLeashedOffItsBeat()
 		{
-			// #716: the leash territory is the route's POLYLINE, not its vertices. A beat sampled sparsely - the 150
-			// single-leg animal wanders on map 2070 run up to 228u between their two waypoints - puts the whole MIDDLE
+			// The leash territory is the route's polyline, not its vertices. A beat sampled sparsely - the 150
+			// single-leg animal wanders on map 2070 run up to 228u between their two waypoints - puts the whole middle
 			// of the leg further than NpcLeashRange from both ends, so the walker set off, was read as "dragged too far
 			// from home" ~40u out, walked back streaming chase segments, rejoined at the nearest waypoint and did it
 			// again. Forever, and it never once saw the far end of its own beat.
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 40), new Vector3(0, 0, 80) };
 			var (_, npc) = Walker(street);
 
-			npc.Position = new Vector3(3, 0, 78); // where a chase ended: right beside the LAST waypoint
+			npc.Position = new Vector3(3, 0, 78); // where a chase ended: right beside the last waypoint
 			npc.Route.RouteInterrupted = true;
 			npc.Route.RejoinRouteAtNearest(npc.Position);
 
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < 250; i++) // 25s: 30u of staircase at RouteWalkSpeed
 			{
 				world.Tick(0.1);
-				// The height gap closes in step with the horizontal one, so the NPC is on the STAIRS the whole way up.
+				// The height gap closes in step with the horizontal one, so the NPC is on the stairs the whole way up.
 				var expected = 100f + 12f * Math.Clamp(npc.Position.Z / 30f, 0f, 1f);
 				Assert.Equal(expected, npc.Position.Y, 1);
 				climbed |= npc.Position.Y > 111f;
@@ -141,9 +141,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void RouteWalker_WalksContinuously_RatherThanDriftingOnTheWanderClock()
 		{
-			// The wander moved once every 25-60s. A patrol WALKS, so ground is covered steadily: ten seconds in, a
+			// A wander moves once every 25-60s. A patrol walks, so ground is covered steadily: ten seconds in, a
 			// wanderer would still be standing on its spawn (its first move is not even due yet), while a walker is
-			// 22u down the street at RouteWalkSpeed. The gap between those two is the whole point of #703.
+			// 22u down the street at RouteWalkSpeed. That gap is what these ticks measure.
 			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 200) };
 			var (world, npc) = Walker(street);
 
@@ -153,7 +153,7 @@ namespace Faolan.Tests
 			Assert.True(npc.Position.Z > 15f, $"barely moved in 10s: {npc.Position}");
 		}
 
-		// The distance from `point` to the nearest SEGMENT of the polyline - how far off its own route the NPC is.
+		// The distance from `point` to the nearest segment of the polyline - how far off its own route the NPC is.
 		private static float OnPolyline(Vector3[] route, Vector3 point)
 		{
 			var nearest = float.MaxValue;

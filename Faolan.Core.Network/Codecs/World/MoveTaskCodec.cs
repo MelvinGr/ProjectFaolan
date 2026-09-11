@@ -6,24 +6,24 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// MoveTaskIIR (0x96C46740) - how the server tells clients where an entity is and which way it faces. The full
-	// recursive grammar is decoded (docs/re/movetask-grammar.md, #53) and every one of the 6225 captured records
-	// round-trips byte-exact (MoveTaskCodecCorpusTests), so this codec models the WHOLE record. That merges the former
-	// MoveTaskComposite (the recursive codec) with MoveTaskCodec (the semantic builders) - both declared this same
-	// opcode, which is the duplicate-emitter signal (#530 rule 5a).
-	//
-	// Wire body (the inner 0x2000 IIR record; the u32 length prefix belongs to the SENDER, #530 rule 2):
-	//   [subop 0x96C46740][0x0000C350][handle][u16 0][from: 3 raw u32][MoveTaskNode]
-	//
-	// The SEMANTIC forms - a bare position, a rotate, a walk, a patrol, a knockback - are MoveTaskNode VALUES, built
-	// by MoveTaskNodes next door. They are not overloads here because they are not encoders: several of them share a
-	// parameter list (a waypoint list plus a float means a path to one and a patrol to another), and picking which by
-	// signature is exactly the ambiguity rule 1 removes.
+	/// <summary>
+	///     MoveTaskIIR - how the server tells clients where an entity is and which way it faces. The full recursive
+	///     grammar is decoded (docs/re/movetask-grammar.md) and every one of the 6,225 captured records round-trips
+	///     byte-exact (MoveTaskCodecCorpusTests), so this codec models the whole record. The body is
+	///     <c>[subop][class][handle][u16 0][from: 3 raw u32][MoveTaskNode]</c>; the u32 length prefix belongs to the
+	///     framing sender.
+	/// </summary>
+	/// <remarks>
+	///     The semantic forms - a bare position, a rotate, a walk, a patrol, a knockback - are <see cref="MoveTaskNode" />
+	///     values built by <see cref="MoveTaskNodes" />. They are not overloads here because they are not encoders: several
+	///     share a parameter list, a waypoint list plus a float meaning a path to one and a patrol to another, and picking
+	///     between them by signature would be ambiguous.
+	/// </remarks>
 	public static class MoveTaskCodec
 	{
 		public const uint Opcode = (uint)IirTypes.MoveTaskIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(MoveTaskIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -33,8 +33,10 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// Parse the inner record (starting at the subop), throwing on any structure the grammar doesn't cover so an
-		// unrecognised form is never silently mis-encoded.
+		/// <summary>
+		///     Parses the inner record, starting at the sub-opcode, throwing on any structure the grammar does not cover so
+		///     an unrecognised form is never silently mis-encoded.
+		/// </summary>
 		public static MoveTaskIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(MoveTaskCodec));
@@ -56,7 +58,9 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// MoveTaskIIR (0x96C46740). The FROM position is kept as raw u32 bits so a captured float round-trips exactly.
+	/// <summary>
+	///     The MoveTaskIIR body. The from-position is kept as raw u32 bits so a captured float round-trips exactly.
+	/// </summary>
 	public sealed record MoveTaskIIR(uint Handle, uint FromX, uint FromY, uint FromZ, MoveTaskNode Task)
 	{
 		public MoveTaskIIR(uint handle, Vector3 from, MoveTaskNode task)

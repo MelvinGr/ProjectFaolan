@@ -9,7 +9,7 @@ namespace Faolan.Tests
 {
 	// Byte-exact round-trip of the @609 per-goal objective-detail region (decode_snapshot_609.py,
 	// docs/re/fullplayer-snapshot-reader.md). Proves QuestObjectiveRegion models the region losslessly - the
-	// construct-don't-replay foundation for retiring this part of BeachTailsTemplate.bin (Gitea #186), mirroring
+	// construct-don't-replay foundation for retiring this part of BeachTailsTemplate.bin, mirroring
 	// QuestcRegion for the @0..609 journal region.
 	public class QuestObjectiveRegionTests
 	{
@@ -21,14 +21,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildSingle_RegeneratesTheRegion_ByteExact()
 		{
-			// Generation (construct, don't replay, #186): build the two beach goals from their MEANINGFUL fields
+			// Generation (construct, don't replay): build the two beach goals from their meaningful fields
 			// (goalId/n/k/subId/map/marker) - synthesizing the constants - plus their objective/trailing text records
 			// (the DB-sourced data, taken here from the parsed region), and prove the assembled region reproduces the
 			// template's @609 bytes exactly. Confirms a compact per-goal definition regenerates the full record.
 			var parsed = QuestObjectiveRegionCodec.Parse(Region);
 			const uint instance = 0x02165EFF; // the template's baked-in instance (re-addressed live)
 
-			// GoalIdRepeat is explicit: it is EITHER the goal id or 0 depending on the goal (1567 of 2850 captured
+			// GoalIdRepeat is explicit: it is either the goal id or 0 depending on the goal (1567 of 2850 captured
 			// goals carry 0), so it cannot default to the id.
 			var g1 = new QuestObjectiveGoal
 			{
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			var goals = CapturedGoals().ToList();
 			Assert.NotEmpty(goals);
 
-			// MarkerRadius: the client writes ONE byte, so the word never exceeds 255 (max 170 shipped).
+			// MarkerRadius: the client writes one byte, so the word never exceeds 255 (max 170 shipped).
 			Assert.All(goals, g => Assert.InRange(g.MarkerRadius, 0u, 255u));
 
 			// The tail after it is [u8 hideMapMarker][u8][u32] and the last two are 0 on every captured goal - a body
@@ -109,9 +109,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void RequiredCount_GreaterThanOne_RoundTripsThroughTheWire()
 		{
-			// The goal record's count field (the word after goalIdRepeat) is NOT a constant 1: values 1/3/4/8/12/64 are
+			// The goal record's count field (the word after goalIdRepeat) is not a constant 1: values 1/3/4/8/12/64 are
 			// seen across captures (e.g. Hoxxling quest 14012 = 3, quest 13778 goal 6658 = 64), so it is the objective's
-			// required amount (#47). Prove a count > 1 survives BuildSingle -> Write -> Read.
+			// required amount. Prove a count > 1 survives BuildSingle -> Write -> Read.
 			var obj = "<remoteformat id=\"6491\" category=\"50304\" key=\"x\" >";
 			var txt = "<remoteformat id=\"1\" category=\"51200\" key=\"y\" >";
 			var goal = new QuestObjectiveGoal

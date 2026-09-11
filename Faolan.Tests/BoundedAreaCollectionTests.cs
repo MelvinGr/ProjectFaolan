@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Grammar gates for the client's bounded-area trigger table (RDB type 1000053, #504) -
+	// Grammar gates for the client's bounded-area trigger table (RDB type 1000053) -
 	// docs/rdb/bounded-areas-1000053.md.
 	//
 	// Synthetic documents rather than a real record: the shapes below are the ones that actually broke the parser, and
@@ -45,12 +45,12 @@ namespace Faolan.Tests
 			Assert.True(area.IsPolygon);
 		}
 
-		// Dialect 2: a BARE `<boundedarea>` with no attributes and no whitespace between elements. Tortage Volcano and
+		// Dialect 2: a bare `<boundedarea>` with no attributes and no whitespace between elements. Tortage Volcano and
 		// the Tortage Island / Acheronian Ruins records.
 		//
-		// ⚠️ This is the regression that matters. Anchoring the scan on the string "<boundedarea " (with the space)
-		// parses dialect 1 perfectly and returns ZERO areas for dialect 2 - which silently cost 9 playfields, Tortage
-		// Volcano's 7 lava volumes among them, while every other number in the import looked healthy.
+		// The scan must not be anchored on the string "<boundedarea " (with the space): that parses dialect 1
+		// perfectly and returns zero areas for dialect 2, silently costing 9 playfields - Tortage Volcano's 7 lava
+		// volumes among them - while every other number in the import looks healthy.
 		[Fact]
 		public void BareDialect_Parses()
 		{
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 			Assert.Equal(2.5f, area.Vertices[0].Y);
 		}
 
-		// A record holds SEVERAL sibling root blocks, not one. Scanning from the first `<boundedareas>` to the first
+		// A record holds several sibling root blocks, not one. Scanning from the first `<boundedareas>` to the first
 		// `</boundedareas>` returned 7 of Ymir's Pass's 121 areas - and none of its lava, which lives in a later block.
 		[Fact]
 		public void SiblingRootBlocks_AreAllScanned()
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 			Assert.Empty(c!.Areas);
 		}
 
-		// A non-zero scryid marks a region the CLIENT scripts (the ambient/audio companions), which is what separates a
+		// A non-zero scryid marks a region the client scripts (the ambient/audio companions), which is what separates a
 		// lava damage volume from its music twin.
 		[Fact]
 		public void ScryId_IsRead()

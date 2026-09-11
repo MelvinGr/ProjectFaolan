@@ -10,25 +10,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Inventory
 {
-	// Persists the player's equip/unequip/move/drop/split actions to the DB so gear/bag changes survive logout.
-	// The world-burst replay then reflects the saved item instances on next login. Extracted out of
-	// GameServerListener as a composed collaborator (like CombatService): pure persistence, no packet sends.
+	// Persists the player's equip, unequip, move, drop and split actions to the database so gear and bag changes
+	// survive a logout; the world-burst replay then reflects the saved item instances on the next login. Pure
+	// persistence: nothing here sends a packet, and the Inbound handlers (Handle0x2000) call into it.
 	//
-	// ⚠️ Every one of these five is a MOVE, and a move goes through ICharacterRepository.MoveCharacterItem - two column
-	// UPDATEs on existing rows, never a re-mint. That is what keeps the item's crafter, its stack count and its
-	// socketed gems attached to it (#750). Before item instances, an "equip" was: read the source cell's template id,
-	// write it into a slot column, clear the source cell - i.e. the item was RE-CREATED at its destination from
-	// whatever fields the code remembered to copy across. Every per-instance property therefore had to be listed by
-	// hand at each of these call sites, a worn item had nowhere to keep one at all, and anything not listed was
-	// silently dropped. Gems were exactly that. Do not reintroduce a "read the template id, write it elsewhere" pair.
+	// Every one of these five is a move, and a move goes through ICharacterRepository.MoveCharacterItem - two column
+	// updates on existing rows, never a re-mint. That is what keeps the item's crafter, its stack count and its
+	// socketed gems attached to it. Never reintroduce a "read the template id, write it elsewhere" pair: re-creating
+	// the item at its destination means every per-instance property has to be listed by hand at each call site, a worn
+	// item has nowhere to keep one at all, and anything not listed is silently dropped.
 	//
-	// Nothing here catches. Each of these five used to run inside `try { ... } catch { LogWarning }`, which is the worst
-	// possible answer for a persistence path: the CLIENT has already moved the item, so a swallowed write leaves the
-	// screen and the database disagreeing, and the player finds out at the next relog when gear is missing or
-	// duplicated - with nothing in the log tying it to the action. It also swallowed the deliberate throws inside these
-	// same methods. Letting it throw surfaces the failure at the packet loop, which logs it against the packet that
-	// caused it and keeps the connection.
-	// The Inbound handlers (Handle0x2000) call into it.
+	// Nothing here catches, deliberately. The client has already moved the item, so a swallowed write leaves the screen
+	// and the database disagreeing and the player finds out at the next relog, with nothing in the log tying it to the
+	// action; a catch would also swallow the deliberate throws inside these methods. Letting it throw surfaces the
+	// failure at the packet loop, which logs it against the packet that caused it and keeps the connection.
 	public sealed class EquipmentService
 	{
 		private readonly ICharacterInventoryRepository _database;
@@ -59,13 +54,13 @@ namespace Faolan.GameServer.Inventory
 		}
 
 		// Player equipped an item: bag slot `fromBagSlot` -> equip slot `targetSlot`. A move, so the instance that was
-		// in the bag is the one now worn - which is what gives #733 (the crafter on a worn item) and the socketed gems
-		// on worn gear their answer for free. `itemHandle` is the template the client says it dragged; it is checked
-		// against the source cell rather than used to build anything.
+		// in the bag is the one now worn, which is what keeps the crafter and the socketed gems on worn gear.
+		// `itemHandle` is the template the client says it dragged; it is checked against the source cell rather than
+		// used to build anything.
 		//
-		// Returns the instance IFF this equip BOUND it (#756), so the caller can send the stat-0 update; null when
-		// nothing bound - the item does not bind on equip, it was already bound, or the equip was not persisted at
-		// all. A returned value therefore always means "something changed that the client has not been told about".
+		// Returns the instance only if this equip bound it, so the caller can send the stat-0 update; null when nothing
+		// bound - the item does not bind on equip, it was already bound, or the equip was not persisted at all. A
+		// returned value therefore always means "something changed that the client has not been told about".
 		public async Task<ItemInstance?> PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle, int fromBagSlot)
 		{
 			var character = client.Session.Character;
@@ -84,12 +79,12 @@ namespace Faolan.GameServer.Inventory
 			_logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", source.Template.Name, source.TemplateId, fromBagSlot, targetSlot,
 				character.Id);
 
-			// BIND ON EQUIP (#756). Wearing an item whose template carries the rule binds THIS copy to this character,
+			// Bind on equip: wearing an item whose template carries the rule binds this copy to this character
 			// permanently, and the server tells the client by re-sending the cell's stat 0 with bit 26 set. The caller
-			// sends it - this class is persistence only - which is why the outcome is returned rather than announced.
+			// sends that - this class is persistence only - which is why the outcome is returned rather than announced.
 			//
-			// A bind-on-PICKUP item needs nothing here: its template's own Flags word already carries the bit, so
-			// every copy is born bound and the emitters send it whatever this row says.
+			// A bind-on-pickup item needs nothing here: its template's own Flags word already carries the bit, so every
+			// copy is born bound and the emitters send it whatever this row says.
 			if (!source.Template.BindsOnEquip || source.Bound || !await _database.BindCharacterItem(source.Id))
 				return null;
 
@@ -128,8 +123,8 @@ namespace Faolan.GameServer.Inventory
 		// stack of `splitSize` is placed at `targetSlot`. Bag container only (the packet carries no container id;
 		// stackable items live in the bag). A no-op when the source isn't a splittable stack (count <= splitSize).
 		//
-		// Splitting is the one inventory action that legitimately MINTS: the new half is a new item, and both halves
-		// keep the crafter because both are the same stack of the same crafted thing (#727).
+		// Splitting is the one inventory action that legitimately mints: the new half is a new item, and both halves
+		// keep the crafter because both are the same stack of the same crafted thing.
 		public async Task PersistSplitStack(INetworkClient client, int sourceSlot, int targetSlot, uint splitSize)
 		{
 			var character = client.Session.Character;
@@ -168,7 +163,7 @@ namespace Faolan.GameServer.Inventory
 				targetBagSlot, character.Id);
 		}
 
-		// ⭐ BULK unequip (#916): every worn item into the backpack, in slot order, stopping when the bag runs out.
+		// Bulk unequip: every worn item into the backpack, in slot order, stopping when the bag runs out.
 		// The easy half of the pair - each item's source slot is already known, so no resolver is involved.
 		//
 		// Returns what actually moved, in the order it moved, so the caller can send the wire for each. Same contract
@@ -197,10 +192,10 @@ namespace Faolan.GameServer.Inventory
 			return moves;
 		}
 
-		// ⭐ BULK equip (#916): walk the backpack and wear whatever fits, using the client's own template fields to
-		// pick the slot (`EquipSlotResolver`). An item that is not equippable, or whose every candidate slot is
-		// already taken, is left in the bag - this fills the EMPTY slots rather than deciding which of two swords is
-		// better, which is not a question the template data answers.
+		// Bulk equip: walk the backpack and wear whatever fits, using the client's own template fields to pick the slot
+		// (`EquipSlotResolver`). An item that is not equippable, or whose every candidate slot is already taken, is
+		// left in the bag - this fills the empty slots rather than deciding which of two swords is better, which is not
+		// a question the template data answers.
 		//
 		// Bag order is the tie-break, so the outcome is reproducible: the first shirt in the bag is the one worn.
 		public async Task<IReadOnlyList<EquipmentMove>> EquipAll(INetworkClient client)
@@ -223,8 +218,8 @@ namespace Faolan.GameServer.Inventory
 				if (!await _database.MoveCharacterItem(characterId, ContainerKind.Bag, item.Slot, ContainerKind.Equipped, (int)slot.Value))
 					continue;
 
-				// The chosen slot AND everything wearing it consumes - a two-hander blocks the off hand of the same
-				// weapon set, so nothing else may land there.
+				// The chosen slot and everything it consumes - a two-hander blocks the off hand of the same weapon set,
+				// so nothing else may land there.
 				occupied.Add(slot.Value);
 				foreach (var also in EquipSlotResolver.Occupies(item.Template, slot.Value))
 					occupied.Add(also);

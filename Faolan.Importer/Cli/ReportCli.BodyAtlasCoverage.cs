@@ -7,15 +7,17 @@ using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report body-atlas-coverage --report-arg <id>[,<id>...] [--out <dir>]`: the measurement behind #294.
+	// `--report body-atlas-coverage --report-arg <id>[,<id>...] [--out <dir>]`: how much of a body atlas the dilator's
+	// heuristic covers, measured against the mesh's own UV triangles.
 	//
 	// The body-atlas dilator decides "is this texel background" from colour plus local flatness, and that guess fails
 	// where the tan gutter meets tan skin - a smooth patch of upper chest passes both guards and gets flattened. The
 	// mesh's own UV triangles answer the same question without guessing, and this report is what says the two agree
 	// where the heuristic is right and where exactly it is wrong.
 	//
-	// It also settles the ORIENTATION, which is the one thing that could silently invert the whole fix: it rasterizes
-	// the coverage with V as-is and with `1 - v`, and prints how much of each lands on the heuristic's islands.
+	// It also settles the orientation, which is the one thing that could silently invert the whole result: it
+	// rasterizes the coverage with V as-is and with `1 - v`, and prints how much of each lands on the heuristic's
+	// islands.
 	//
 	// The id is any of the three a body is reached by - a CHARACTERCREATOR `<body monsterdataid>` (1091334 is the
 	// Aquilonian female), a MESHINDEXFILE manifest, or a bare RenderMesh.
@@ -55,7 +57,7 @@ namespace Faolan.Importer.Cli
 			Report("UV coverage 1-v", b.CoveredFlipped);
 
 			// With --out, write the masks as images. The numbers say which orientation agrees with the heuristic; only
-			// looking at one says whether the rasterizer drew a BODY or drew noise, and no ratio can tell you that.
+			// looking at one says whether the rasterizer drew a body or drew noise, and no ratio can tell you that.
 			if (outDir != null)
 			{
 				Write($"{id}-uv.png", b.Covered);

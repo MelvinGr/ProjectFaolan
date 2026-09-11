@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// RDB 1000506, the client's archetype -> class membership (#469). The shipped table lives in the client install,
-	// so this gates the READER on the exact shape it uses and pins the finding that matters: the hierarchy the client
+	// RDB 1000506, the client's archetype -> class membership. The shipped table lives in the client install,
+	// so this gates the reader on the exact shape it uses and pins the finding that matters: the hierarchy the client
 	// states is the one `ConanArchetypes` hard-codes.
 	//
 	// `--report class-hierarchy` is the live check against the real RDB; this is the half that runs from a plain
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 			Assert.Equal(0, table.TrailingBytes);
 		}
 
-		// The root row is what makes this a HIERARCHY rather than a flat archetype->class map: Commoner parents the
+		// The root row is what makes this a hierarchy rather than a flat archetype->class map: Commoner parents the
 		// four archetypes, which is why `ConanArchetypes` has no Commoner entry.
 		[Fact]
 		public void CommonerParentsTheFourArchetypes()
@@ -63,8 +63,8 @@ namespace Faolan.Tests
 				table.ChildrenOf((uint)ConanArchetype.Commoner));
 		}
 
-		// ⭐ The finding: the client's own table and the hard-coded constant agree on all twelve placements. The
-		// constant used to cite the game's published documentation, on the belief that no such table shipped.
+		// The client's own table and the hard-coded constant agree on all twelve placements, so the table - not the
+		// game's published documentation - is what the constant answers to.
 		[Theory]
 		[InlineData(ConanArchetype.Soldier)]
 		[InlineData(ConanArchetype.Priest)]

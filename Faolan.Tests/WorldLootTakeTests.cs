@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden tests for the loot-all completion packets, pinned to the hoxxling gameplay capture (bag 0x000021fe,
-	// frames 1491 / 4470). Retail sends NO inventory-add for normal loot - the client moves the item from the bag to
+	// frames 1491 / 4470). Retail sends no inventory-add for normal loot - the client moves the item from the bag to
 	// the backpack locally on LootRemoveItems; the server just signals removal + closes + fades the emptied bag.
 	public class WorldLootTakeTests
 	{
@@ -20,12 +20,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void LootRemoveItems_MatchesCapture()
 		{
-			// Explicitly [0] - a ONE-element list naming slot 0, which is what this capture sends. It used to be
-			// spelled `Build(Bag)` and rely on the empty->[0] substitution the codec no longer does (#453).
+			// Explicitly [0] - a one-element list naming slot 0, which is what this capture sends.
 			Assert.Equal("700101620000c87a000021fe0000000000000007e200000000", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag, 0)));
 		}
 
-		// Per-drag ACK names the looted display Pos in the trailing u32: loot-drag-1538 frame 3266 (bag 0x22ec, dragged
+		// Per-drag ack names the looted display Pos in the trailing u32: loot-drag-1538 frame 3266 (bag 0x22ec, dragged
 		// the item at Pos 1) sends trailing=1; the emptying drag at Pos 0 (fr3277) sends 0. The 0x000007e2 landmark is
 		// constant.
 		[Fact]
@@ -34,9 +33,9 @@ namespace Faolan.Tests
 			Assert.Equal("700101620000c87a000022ec0000000000000007e200000001", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(0x000022ec, 1)));
 		}
 
-		// The removed-slot list is a REAL list, and retail uses it (#453). Measured over all 148 LootRemoveItems records
-		// in the corpus the element count takes 0, 1, 2, 3 and 4 - so a loot-all of n items is ONE message naming all n
-		// slots, not n messages, and not the single `[0]` the loot-all path used to send.
+		// The removed-slot list is a real list, and retail uses it. Measured over all 148 LootRemoveItems records
+		// in the corpus the element count takes 0, 1, 2, 3 and 4 - so a loot-all of n items is one message naming all n
+		// slots, not n messages, and not a single `[0]`.
 		//
 		// Both goldens are from NecroL80_mage-necromancer_login_combat: bag 0x8e8 held three items and bag 0x8ea two.
 		// The list-frame words are the giveaway that these are counts and not landmarks - 0x0fc4 = 4 * 0x3F1 and
@@ -52,7 +51,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(LootRemoveItemsCodec.Build(bag, positions)));
 		}
 
-		// The EMPTY list is a captured shape too - 50 of the 148 records - and it is the bare 0x3F1 the list-frame
+		// The empty list is a captured shape too - 50 of the 148 records - and it is the bare 0x3F1 the list-frame
 		// notes warn reads as a terminator. Every captured bag gets one alongside its removal message, which matches
 		// the corpus's own TryLootCash -> TryLootAll ordering: taking the coins removes no item slot.
 		[Fact]
@@ -61,7 +60,7 @@ namespace Faolan.Tests
 			Assert.Equal("700101620000c87a000021fe0000000000000003f1", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag)));
 		}
 
-		// The CASH form (#809): xxx_mage-necromancer_login_play1 frame 3156, bag 0x42e4 - 21 tin, and 21 is exactly
+		// The cash form: xxx_mage-necromancer_login_play1 frame 3156, bag 0x42e4 - 21 tin, and 21 is exactly
 		// what the DispatchUpdateCash beside it moves the wallet by. This is the shape the codec refused, because the
 		// value straddled a `[u32 reserved][u8 marker]` split that only reads right while the cash is zero.
 		[Fact]

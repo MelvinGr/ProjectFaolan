@@ -9,14 +9,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #752: `ProtoAcgItem` carries TWO templates with a key each, and they are the LOW and HIGH endpoints of a level
+	// `ProtoAcgItem` carries two templates with a key each, and they are the low and high endpoints of a level
 	// range - `AcgItemData_t::GetInterpolatedItem` takes both plus the entry's own level and works out where between
-	// them this copy sits. We used to send `template2 = template1` for everything, which pins every item at its low
-	// endpoint.
+	// them this copy sits. Sending `template2 = template1` for everything pins every item at its low endpoint.
 	//
 	// Measured over 13,368 captured ProtoAcgItems (344 distinct pairs): 3 differ, and they differ in nothing but
 	// level fields. So most items genuinely repeat the template and the emitters must keep doing that - the gate
-	// here is that the pair is DERIVED from the row rather than assumed either way.
+	// here is that the pair is derived from the row rather than assumed either way.
 	public class ItemTemplatePairTests
 	{
 		private static ProtoDecryptionKey Key(uint seed)
@@ -42,7 +41,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, acg.Template3);
 		}
 
-		// The pair travels WITH ITS OWN KEY. Sending template2 without the key that decrypts it would be worse than
+		// The pair travels with its own key. Sending template2 without the key that decrypts it would be worse than
 		// flattening - the client would hold a template it cannot read - so the two are asserted together.
 		[Fact]
 		public void AnItemWithAPair_SendsBothTheSecondTemplateAndItsOwnKey()
@@ -62,12 +61,12 @@ namespace Faolan.Tests
 			Assert.Equal(3976769u, acg.Template2);
 			Assert.Equal(500u, acg.Key2.Key1);
 
-			// key3 == key1 on all 344 captured pairs, so it follows the FIRST key, not the second.
+			// key3 == key1 on all 344 captured pairs, so it follows the first key, not the second.
 			Assert.Equal(item.Key.Key1, acg.Key3.Key1);
 		}
 
 		// A socket is stated twice on the wire - the `slot_map` block and the `ItemSlot<N>ACG1/ACG2` stat pair - and
-		// the corpus pins the two AGREEING 898/898. ACG1/ACG2 are literally template1/template2, so a gem with a pair
+		// the corpus pins the two agreeing 898/898. ACG1/ACG2 are literally template1/template2, so a gem with a pair
 		// has to put its real second endpoint in ACG2 or the two forms contradict each other.
 		[Fact]
 		public void ASocketedGemsStatPair_MatchesItsSlotMapBlock()

@@ -5,16 +5,18 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// DispatchSetDialogueCamera (0x2015) - the cinematic conversation camera bound to the NPC during a conversation
-	// (#188). An RPC-message codec (#530 rule 5b), NOT an IIR: the opcode is the 16-bit word in the rpcHeader,
-	// GameCharAgent -> GameCharInterface. The routing and the send stay in ConversationService; the body is
-	//
-	//   [u32 0xC350][u32 npcHandle][u32 0xC350][u32 playerInstance][CameraArgs]
-	//
-	// CameraArgs is the client's signature order, exactly ten bytes (#410 - this used to be one opaque blob):
-	// nShotSize, nShotType, nShotEmphasis, nShotFov, nShotTilt, bAutoface (5 bytes + a bool byte), then
-	// i_vHeadPaddingY as a big-endian float. A camera packet that is not ten bytes long is not decodable into these
-	// columns, so Parse rejects it rather than importing a row that would rebuild different bytes.
+	/// <summary>
+	///     <c>DispatchSetDialogueCamera</c> - the cinematic conversation camera bound to the NPC during a conversation. An
+	///     RPC-message codec rather than an IIR: the identity is the method in the rpcHeader, GameCharAgent to
+	///     GameCharInterface. The routing and the send stay in <c>ConversationService</c>; the body is
+	///     <c>[u32 entityClass][u32 npcHandle][u32 entityClass][u32 playerInstance][CameraArgs]</c>.
+	/// </summary>
+	/// <remarks>
+	///     <c>CameraArgs</c> is the client's signature order, exactly ten bytes: nShotSize, nShotType, nShotEmphasis,
+	///     nShotFov, nShotTilt and bAutoface (five bytes plus a bool byte), then <c>i_vHeadPaddingY</c> as a big-endian
+	///     float. A camera packet that is not ten bytes long is not decodable into these columns, so <c>Parse</c> rejects
+	///     it rather than importing a row that would rebuild different bytes.
+	/// </remarks>
 	public static class SetDialogueCameraCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchSetDialogueCamera;

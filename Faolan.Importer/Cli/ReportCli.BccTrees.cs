@@ -6,11 +6,11 @@ using System.Text.RegularExpressions;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report bcc-trees`: the client's BEHAVIOUR CONTROL CENTRE trees, and the substate id -> name table the
-	// BehaviorControlCenter IIR's phases 0x0B/0x0C carry on the wire (#810, #812).
+	// `--report bcc-trees`: the client's BEHAVIOUR control CENTRE trees, and the substate id -> name table the
+	// BehaviorControlCenter IIR's phases 0x0B/0x0C carry on the wire.
 	//
-	// ⭐ **RDB 1010203 is plain-text XML** - there is nothing to decode. `BCCTree_c::Load` (`FUN_00603D70`) tries the
-	// merged BINARY resource **1010501** (`0xF6B45`) first and falls back to the individual **1010203** (`0xF6A1B`)
+	// RDB 1010203 is plain-text XML - there is nothing to decode. `BCCTree_c::Load` (`FUN_00603D70`) tries the
+	// merged BINARY resource 1010501 (`0xF6B45`) first and falls back to the individual 1010203 (`0xF6A1B`)
 	// entries, "falling back to text XML" in its own words; the two carry the same 29 trees and the text half reads
 	// straight out:
 	//
@@ -21,10 +21,10 @@ namespace Faolan.Importer.Cli
 	//
 	// The `priority` is the field `FUN_005EB5C0` orders the active-substate list on (`entry + 0x24`).
 	//
-	// ⚠️ **It reports the id COLLISIONS, and that is the point of it being a report rather than a table.** The
+	// It reports the id COLLISIONS, and that is the point of it being a report rather than a table. The
 	// client's own error says an id is resolved *"in this bcc"*, so the ids are per-tree by the rule. Measured over
-	// the 29 shipped trees the two halves disagree: **substate** ids never collide (20 distinct, every shared id
-	// carrying the same name AND the same priority in every tree that declares it), while **state** ids do - 11 is
+	// the 29 shipped trees the two halves disagree: substate ids never collide (20 distinct, every shared id
+	// carrying the same name and the same priority in every tree that declares it), while state ids do - 11 is
 	// `LoopingEmote` in one tree and `SneakHiding` in another. So a substate id->name map is publishable and a state
 	// one is not, and the run PRINTS both counts rather than asserting either: a tree added by a patch could break
 	// the substate half, and this is what would notice.
@@ -53,7 +53,7 @@ namespace Faolan.Importer.Cli
 				if (body.Length == 0) // CDN miss
 					continue;
 
-				// ⚠️ Latin1, not UTF8: the body opens with a short binary header before the `<?xml` and a UTF8 decode
+				// Latin1, not UTF8: the body opens with a short binary header before the `<?xml` and a UTF8 decode
 				// would substitute over those bytes. Nothing here reads them, but corrupting them silently is how a
 				// header that later turns out to matter goes unnoticed.
 				var text = Encoding.Latin1.GetString(body);
@@ -75,7 +75,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"BCC trees (RDB {BccTreeTextType}, text XML): {trees} tree(s), "
 			                  + $"{substates.Count} substate declaration(s), {states.Count} state declaration(s)");
 
-			// ⭐ The collision census, printed for BOTH kinds because the contrast is the finding: it is what says a
+			// The collision census, printed for both kinds because the contrast is the finding: it is what says a
 			// substate id->name map is publishable and a state one is not.
 			foreach (var kind in new[] { "substate", "state" })
 			{
@@ -91,9 +91,9 @@ namespace Faolan.Importer.Cli
 				                  + $"   priority disagreements: {(priorityClashes.Count == 0 ? "NONE" : priorityClashes.Count.ToString())}");
 			}
 
-			// ⭐ STATE id -> name, per tree, for the ids the caller asks about (#905). Stat 0x14 is the client's own
-			// "BCC State", so a stat-20 value IS a state id from this table - which is what makes the four unnamed
-			// values the corpus carries (69, 41, 9, 72) answerable at all. It is a LOOKUP rather than a dump because
+			// state id -> name, per tree, for the ids the caller asks about. Stat 0x14 is the client's own
+			// "BCC State", so a stat-20 value is a state id from this table - which is what makes the four unnamed
+			// values the corpus carries (69, 41, 9, 72) answerable at all. It is a lookup rather than a dump because
 			// state ids genuinely collide across trees (11 is `LoopingEmote` in one and `SneakHiding` in another), so
 			// the only honest answer names the tree alongside the name.
 			if (!string.IsNullOrWhiteSpace(lookup))

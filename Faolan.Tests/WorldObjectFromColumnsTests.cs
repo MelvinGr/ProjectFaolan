@@ -7,14 +7,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the static-world-object construction: a WorldObject whose identity/geometry columns are LIFTED from a
+	// Locks the static-world-object construction: a WorldObject whose identity/geometry columns are lifted from a
 	// capture (the raw Data blob is retired) rebuilds the captured body byte-for-byte via TryBuild - header +
 	// transform-with-token + identity-from-columns + geometry-from-columns - across every class (decor 66AEDD50,
 	// container F096251E, zone 33A56FB0, destructible 6BD56736, climbing dynel 1FD6412B). Re-addressing changes only
 	// the handle.
 	//
-	// The CONTAINER is the one class whose body is not compared to its last byte: a container's trailer is its loot
-	// CONTENTS, which is session state and deliberately not persisted (#410) - a chest rebuilds with the same clean
+	// The container is the one class whose body is not compared to its last byte: a container's trailer is its loot
+	// contents, which is session state and deliberately not persisted - a chest rebuilds with the same clean
 	// empty scaffold a dropped bag gets, so the comparison covers everything the columns own and stops where the
 	// contents begin. The contents codec has its own gates (LootBagTemplateTests).
 	public class WorldObjectFromColumnsTests
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 			var row = RowFromCapturedBody(capturedBody);
 			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 
-			// The carrier's [u32 len] is the SENDER's (#530 rule 2), so the codec is compared against the record.
+			// The carrier's [u32 len] belongs to the sender, so the codec is compared against the record.
 			var body = WorldObjectCodec.Build(row, handle, ReadToken(capturedBody));
 			Assert.Equal(capturedBody[4..], body);
 		}
@@ -72,11 +72,11 @@ namespace Faolan.Tests
 		}
 
 
-		// #498: the destructible trailer's word 0 is its CURRENT health, and the live value is stamped over the
-		// captured one - the health twin of the door's live `isClosed`. This pins BOTH halves of that claim: the word
-		// really is at the end-of-body position the grammar says, and passing the live value changes NOTHING ELSE.
+		// The destructible trailer's word 0 is its current health, and the live value is stamped over the
+		// captured one - the health twin of the door's live `isClosed`. This pins both halves of that claim: the word
+		// really is at the end-of-body position the grammar says, and passing the live value changes nothing else.
 		//
-		// ⚠️ The second half is the load-bearing one. 142 of the 193 shipped harvest nodes were captured mid-harvest
+		// The second half is the load-bearing one. 142 of the 193 shipped harvest nodes were captured mid-harvest
 		// (one at 1/1000), so a build that replays the captured word renders most of a zone's nodes empty while the
 		// server holds them full - and a stamp that disturbed any other byte would break the round-trip gate above
 		// without this test saying which change did it.
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 				Assert.Equal(verbatim[i], stamped[i]);
 			}
 
-			// And the MAX beside it is untouched by the stamp: whatever the capture recorded is what the client gets,
+			// And the max beside it is untouched by the stamp: whatever the capture recorded is what the client gets,
 			// which is what makes the max the category discriminator HarvestCatalog leans on.
 			Assert.Equal(verbatim.ReadU32Be(start + 4), stamped.ReadU32Be(start + 4));
 		}

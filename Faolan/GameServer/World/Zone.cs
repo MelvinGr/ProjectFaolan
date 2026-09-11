@@ -7,26 +7,37 @@ using System.Threading;
 
 namespace Faolan.GameServer.World
 {
-	// One map's live entity registry: every player and NPC currently in that map, keyed by wire handle. Provides the
-	// spatial queries the broadcaster needs (who is near a point) so movement/spawns reach only nearby players -
-	// interest management (Gitea #404). Range scans are linear for now (correct + simple at
-	// beach scale); a uniform grid is the optimisation once entity counts grow.
+	/// <summary>
+	///     One map's live entity registry: every player and NPC currently in that map, keyed by wire handle.
+	/// </summary>
+	/// <remarks>
+	///     Answers the spatial queries interest management needs - who is near a point - so a movement or spawn reaches
+	///     only nearby players. Range scans are linear, which is correct and cheap at the entity counts a beach-scale
+	///     map carries; a uniform grid is the optimisation once they grow.
+	/// </remarks>
 	public sealed class Zone
 	{
 		private readonly ConcurrentDictionary<uint, WorldEntity> _entities = new ConcurrentDictionary<uint, WorldEntity>();
 
-		// Which copy (instance) of MapId this zone is (#268). Together with MapId it is the zone's identity key in
-		// WorldState. 0 = the default shared instance (the historical single-zone-per-map behaviour); a Solo/Group
-		// map mints a non-zero id per copy. Distinct from PlayfieldToken (the WIRE token below): the InstanceId is
-		// the stable routing key, the PlayfieldToken is the value the client learned from the burst (which, until
-		// per-instance burst stamping lands - #268 step 4 - is shared across a Solo map's copies, harmlessly, since a
-		// client only ever sees its own instance).
+		/// <summary>
+		///     Which copy (instance) of <see cref="MapId" /> this zone is. Together with <see cref="MapId" /> it is the
+		///     zone's identity key in <see cref="WorldState" />.
+		/// </summary>
+		/// <remarks>
+		///     Instance 0 is the default shared copy; a Solo or Group map mints a non-zero id per copy. Distinct from
+		///     <see cref="PlayfieldToken" />: the instance id is the stable routing key, while the playfield token is
+		///     the value the client learned from the entry burst. Solo copies share one burst token, which is harmless
+		///     because a client only ever sees its own instance.
+		/// </remarks>
 		public uint InstanceId { get; set; }
 
-		// #309: whether this copy is the map's EPIC difficulty. Stamped at entry from the player's travel-box pick;
-		// what it changes today is only ROUTING (an epic copy never shares with a normal one) and the MapChange's
-		// class word (0xCABC) - the content is deliberately the normal map's until the epic tuning is modelled
-		// (measured so far: ~8x health on non-minion mobs, see NpcSpawnExtractor's epic-window note).
+		/// <summary>Whether this copy is the map's epic difficulty, stamped at entry from the player's travel-box pick.</summary>
+		/// <remarks>
+		///     It changes routing - an epic copy never shares with a normal one - and the MapChange's class word
+		///     (0xCABC rather than 0xC79C). The content is deliberately the normal map's until the epic tuning is
+		///     modelled; measured so far, roughly 8x health on non-minion mobs - see <c>NpcSpawnExtractor</c>'s
+		///     epic-window note. Open work tracked in Gitea #309.
+		/// </remarks>
 		public bool IsEpic { get; set; }
 
 		private uint _nextHandle;
@@ -37,25 +48,33 @@ namespace Faolan.GameServer.World
 
 		public int Count => _entities.Count;
 
-		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
-		// (see N3ToClientQuitCodec). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's
-		// own token (the value woven into the 0x737A6DF9 snapshot tail, the one the client actually learned) overrides
-		// it via PlayfieldTokenScan.TryExtract.
+		/// <summary>
+		///     The per-playfield-instance token stamped into every despawn so the client scopes the removal to this
+		///     playfield.
+		/// </summary>
+		/// <remarks>
+		///     <see cref="WorldState" /> mints one on zone creation as a fallback; for a replayed playfield the burst's
+		///     own token - the value woven into the 0x737A6DF9 snapshot tail, which is the one the client actually
+		///     learned - overrides it via <c>PlayfieldTokenScan.TryExtract</c>.
+		/// </remarks>
 		public uint PlayfieldToken { get; set; }
 
-		// The map's STATIC world objects (props, doors, climbing vines, destructibles), loaded once per zone by
-		// ZonePopulationLoader.EnsureZoneWorldObjects rather than re-queried per world entry (#424). They are deliberately
-		// NOT WorldEntities: they do not move, think, fight or tick, so putting ~1000 inert props in _entities would
-		// buy nothing and cost the simulation a pass over all of them. What they DO need is interest streaming, which
-		// is why they live on the zone - see WorldObjectsInRange.
-		//
-		// A loot bag is the exception and IS a WorldEntity: it has a lifecycle (open, expire, fade), which is exactly
-		// the state that earns entity-hood.
+		/// <summary>
+		///     The map's static world objects: props, doors, climbing vines and destructibles, loaded once per zone by
+		///     <c>ZonePopulationLoader.EnsureZoneWorldObjects</c> rather than re-queried per world entry.
+		/// </summary>
+		/// <remarks>
+		///     They are deliberately not <see cref="WorldEntity" /> instances: they do not move, think, fight or tick,
+		///     so putting ~1000 inert props in the entity map would buy nothing and cost the simulation a pass over all
+		///     of them. What they do need is interest streaming, which is why they live on the zone - see
+		///     <see cref="WorldObjectsInRange" />. A loot bag is the exception and is a <see cref="WorldEntity" />,
+		///     because it has a lifecycle (open, expire, fade), which is the state that earns entity-hood.
+		/// </remarks>
 		public IReadOnlyList<LiveWorldObject> WorldObjects { get; set; } = [];
 
-		// The staged visual sequences currently running on this zone's objects (#678) - a harvested node fading out,
-		// swapping its mesh, and growing back. Keyed by handle so a second harvest of the same node REPLACES its
-		// sequence instead of interleaving two of them.
+		// The staged visual sequences currently running on this zone's objects - a harvested node fading out, swapping
+		// its mesh, and growing back. Keyed by handle so a second harvest of the same node replaces its sequence
+		// instead of interleaving two of them.
 		private readonly ConcurrentDictionary<uint, DynelVisualSequence> _visualSequences = new ConcurrentDictionary<uint, DynelVisualSequence>();
 
 		public Zone(uint mapId)
@@ -63,14 +82,18 @@ namespace Faolan.GameServer.World
 			MapId = mapId;
 		}
 
-		// Starts (or restarts) an object's harvest visual sequence. The caller has already sent its opening fade-out;
-		// this schedules everything that follows it.
+		/// <summary>
+		///     Starts (or restarts) an object's harvest visual sequence. The caller has already sent its opening
+		///     fade-out; this schedules everything that follows.
+		/// </summary>
 		public void StartVisualSequence(LiveWorldObject obj)
 		{
 			_visualSequences[obj.Handle] = new DynelVisualSequence(obj);
 		}
 
-		// Advances every running sequence by `deltaSeconds` and yields the steps that came due.
+		/// <summary>
+		///     Advances every running sequence by <paramref name="deltaSeconds" /> and yields the steps that came due.
+		/// </summary>
 		public IEnumerable<DueDynelVisualStep> TickVisualSequences(double deltaSeconds)
 		{
 			foreach (var sequence in _visualSequences.Values)
@@ -83,20 +106,27 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// #921: how long a harvest node keeps its "being gathered" map pin after the LAST swing on it. Retail restores
-		// the node's own kind 10-15 s after the last health drop of a bout (10 s on 7 of 16 bouts, never sooner),
-		// counted from the last swing, not the first - a bout of four swings holds the pin for ~40 s.
+		/// <summary>
+		///     How long a harvest node keeps its "being gathered" map pin after the last swing on it.
+		/// </summary>
+		/// <remarks>
+		///     Retail restores the node's own kind 10-15 s after the last health drop of a bout (10 s on 7 of 16 bouts,
+		///     never sooner), counted from the last swing rather than the first, so a bout of four swings holds the pin
+		///     for roughly 40 s.
+		/// </remarks>
 		public const double GatheringPinSeconds = 10.0;
 
-		// The harvest nodes currently showing the gathering pin, each with the seconds it has left before its own
-		// kind comes back. Keyed by handle, like the visual sequences, so every swing RESETS the countdown rather than
-		// queueing a second one.
+		// The harvest nodes currently showing the gathering pin, each with the seconds left before its own kind comes
+		// back. Keyed by handle, like the visual sequences, so every swing resets the countdown rather than queueing a
+		// second one.
 		private readonly ConcurrentDictionary<uint, (LiveWorldObject Node, double SecondsLeft)> _gatheringPins = new ConcurrentDictionary<uint, (LiveWorldObject, double)>();
 
-		// A swing landed on `node`: start (or extend) its gathering pin. Returns true when the node was NOT already
-		// showing it - the one case the pin has to go on the wire; a further swing inside the window only restarts
-		// the countdown and sends nothing, which is what retail does (23 of 23 un-flagged swings in the corpus landed
-		// on a node already at ResourceGatheringActive).
+		/// <summary>A swing landed on the node: start, or extend, its gathering pin.</summary>
+		/// <returns>
+		///     Whether the node was not already showing the pin - the one case it has to go on the wire. A further
+		///     swing inside the window only restarts the countdown and sends nothing, which is what retail does: 23 of
+		///     23 un-flagged swings in the corpus landed on a node already at <c>ResourceGatheringActive</c>.
+		/// </returns>
 		public bool MarkGathering(LiveWorldObject node)
 		{
 			var isNew = !_gatheringPins.ContainsKey(node.Handle);
@@ -104,7 +134,10 @@ namespace Faolan.GameServer.World
 			return isNew;
 		}
 
-		// Counts every gathering pin down by `deltaSeconds` and yields the nodes whose window ran out, removing them.
+		/// <summary>
+		///     Counts every gathering pin down by <paramref name="deltaSeconds" /> and yields the nodes whose window
+		///     ran out, removing them.
+		/// </summary>
 		public IEnumerable<LiveWorldObject> TickGatheringPins(double deltaSeconds)
 		{
 			foreach (var (handle, (node, left)) in _gatheringPins)
@@ -121,9 +154,11 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// The static world objects within `range` of `position` - the interest query for streaming props as a player
-		// walks. Same linear scan as the entity queries above, and the same note applies: fine at map scale, a grid is
-		// the optimisation when it stops being.
+		/// <summary>
+		///     The static world objects within <paramref name="range" /> of <paramref name="position" /> - the interest
+		///     query for streaming props as a player walks.
+		/// </summary>
+		/// <remarks>A linear scan, like the entity queries: adequate at map scale, with a grid as the optimisation.</remarks>
 		public IEnumerable<LiveWorldObject> WorldObjectsInRange(Vector3 position, float range)
 		{
 			foreach (var obj in WorldObjects)
@@ -133,9 +168,11 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// The object a client-supplied wire handle refers to. This is the ONLY way back from a handle to a row: the
-		// handle is this zone's, so nothing else can resolve it (it used to be a per-interaction DB query against the
-		// CapturedHandle column - see LiveWorldObject).
+		/// <summary>The object a client-supplied wire handle refers to.</summary>
+		/// <remarks>
+		///     The only way back from a handle to a row: the handle is minted by this zone, so nothing else can
+		///     resolve it.
+		/// </remarks>
 		public bool TryGetWorldObject(uint handle, [MaybeNullWhen(false)] out LiveWorldObject obj)
 		{
 			obj = null;
@@ -151,16 +188,21 @@ namespace Faolan.GameServer.World
 			return false;
 		}
 
-		// Forgets a world object (the GM .delete of a prop) so the zone stops streaming it without a reload.
+		/// <summary>
+		///     Forgets a world object - the GM delete of a prop - so the zone stops streaming it without a reload.
+		/// </summary>
 		public void RemoveWorldObject(uint handle)
 		{
 			WorldObjects = [.. WorldObjects.Where(o => o.Handle != handle)];
 		}
 
-		// Mints the next free wire handle for something this zone streams - an NPC or a static object. ONE counter for
-		// both: they share the client's handle space, so separate sequences could hand the same handle to a prop and a
-		// creature and the second spawn would replace the first. Stays well below 0x02000000, where the client's own
-		// instance handles live (a player's handle IS its character id, e.g. 0x0802E5D4).
+		/// <summary>Mints the next free wire handle for something this zone streams - an NPC or a static object.</summary>
+		/// <remarks>
+		///     One counter serves both: they share the client's handle space, so separate sequences could hand the same
+		///     handle to a prop and a creature, and the second spawn would replace the first. The counter stays well
+		///     below 0x02000000, where the client's own instance handles live - a player's handle is its character id,
+		///     for example 0x0802E5D4.
+		/// </remarks>
 		public uint AllocateHandle()
 		{
 			return Interlocked.Increment(ref _nextHandle);
@@ -171,7 +213,10 @@ namespace Faolan.GameServer.World
 			_entities[entity.Handle] = entity;
 		}
 
-		// Entities within `range` of `position` (3D), excluding `excludeHandle` (typically the source itself).
+		/// <summary>
+		///     Entities within <paramref name="range" /> of <paramref name="position" /> in three dimensions, excluding
+		///     <paramref name="excludeHandle" /> - typically the source itself.
+		/// </summary>
 		public IEnumerable<WorldEntity> EntitiesInRange(Vector3 position, float range, uint? excludeHandle = null)
 		{
 			foreach (var entity in _entities.Values)
@@ -184,7 +229,10 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Players within `range` of `position` - the broadcast recipients for a move/spawn/say/etc.
+		/// <summary>
+		///     Players within <paramref name="range" /> of <paramref name="position" /> - the broadcast recipients for
+		///     a move, spawn or chat line.
+		/// </summary>
 		public IEnumerable<WorldEntity> PlayersInRange(Vector3 position, float range, uint? excludeHandle = null)
 		{
 			return EntitiesInRange(position, range, excludeHandle).Where(e => e.IsPlayer);

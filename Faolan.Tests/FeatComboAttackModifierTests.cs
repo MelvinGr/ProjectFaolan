@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #593: kind 53250 `ChangeInheritedWeaponAttack`, `[187 combo, 84 attack, 66 dps, 67 crit, 68 hate, 69 type]` -
-	// 315 records over 12 feats, and the last kind the ticket's table left undecoded.
+	// Kind 53250 `ChangeInheritedWeaponAttack`, `[187 combo, 84 attack, 66 dps, 67 crit, 68 hate, 69 type]` -
+	// 315 records over 12 feats.
 	//
 	// Every slot is the client's own, from the tooltip branch at `014a1dc5`: it reads the six GameActionStat slots in
 	// order, picks `FinishingComboAttack` or `OpeningComboAttack` on key 84, and renders one localised
@@ -22,7 +22,7 @@ namespace Faolan.Tests
 
 		// `Fierce Opening` - "Increases the opening damage done by all combos": attack 1, key 66 = 30.
 		//
-		// ⚠️ 30 is +30%, NOT +0.30%. The same GameActionStat slot on kind 53209 is hundredths of a percent, and the
+		// 30 is +30%, not +0.30%. The same GameActionStat slot on kind 53209 is hundredths of a percent, and the
 		// difference is the client's own: 53209's branch multiplies by 0.01 and this one pushes the raw int at the
 		// integer formatter with a hardcoded `%`.
 		[Fact]
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.Equal(0, mod.CriticalChanceRating);
 		}
 
-		// `Crushed Bones` - "Increases the initial damage done by all Internal Bleed combos": attack 0, the FINISHING
+		// `Crushed Bones` - "Increases the initial damage done by all Internal Bleed combos": attack 0, the finishing
 		// one, which is what makes the polarity worth pinning. 0 is Finishing and 1 is Opening, not the other way
 		// round, and the two feats that say "opening" in their own text are the ones carrying 1.
 		[Fact]
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 		}
 
 		// `Brutal Blows` - "increasing the chance of inflicting a critical injury": key 67 = 400, which the client
-		// renders as +10% (× 0.025). Stored RAW, as the record carries it.
+		// renders as +10% (× 0.025). Stored raw, as the record carries it.
 		[Fact]
 		public void ComboAttack_ReadsTheCriticalChanceAxis()
 		{
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			Assert.Equal(5, mod.HatePercent);
 		}
 
-		// Every magnitude is SIGNED - the tooltip picks `Decrease…` over `Increase…` on the sign - so reading one
+		// Every magnitude is signed - the tooltip picks `Decrease…` over `Increase…` on the sign - so reading one
 		// unsigned reports 4294967196 for a -100.
 		[Fact]
 		public void ComboAttack_MagnitudesAreSigned()
@@ -101,14 +101,14 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseComboAttackModifiers(Template(ChangeInheritedWeaponAttack, [3202262, 1, 0, 0, 0, 0])));
 		}
 
-		// …and one with no COMBO is a mis-sliced element, not a modifier of combo 0.
+		// …and one with no combo is a mis-sliced element, not a modifier of combo 0.
 		[Fact]
 		public void ComboAttack_WithNoComboReference_IsDropped()
 		{
 			Assert.Empty(RdbFeatImporter.ParseComboAttackModifiers(Template(ChangeInheritedWeaponAttack, [0, 1, 30, 0, 0, 0])));
 		}
 
-		// The client's own branch RETURNS on a selector it does not recognise rather than falling through, so a third
+		// The client's own branch returns on a selector it does not recognise rather than falling through, so a third
 		// value is a mis-slice rather than a third attack we do not model yet - and importing it would put a row in
 		// the table under an enum member that does not exist.
 		[Fact]
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 		}
 
 		// Only kind 53250 lands here. 53209 `UpgradeCombo` is the neighbour that matters: it targets the same combo
-		// space through the same key 187 and carries key 66/67 in the same two slots, at a DIFFERENT scale - so a
+		// space through the same key 187 and carries key 66/67 in the same two slots, at a different scale - so a
 		// parser keying off the shape rather than the kind would file its hundredths as whole percents.
 		[Fact]
 		public void UpgradeCombo_IsNotAComboAttackModifier()

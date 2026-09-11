@@ -7,11 +7,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The fold that turns the harvested WALKS into the dialogue GRAPH (#642).
+	// The fold that turns the harvested walks into the dialogue graph.
 	//
 	// A capture is a walk - one route down the tree, one row per position - which is the right shape to harvest and the
-	// wrong shape to store. These pin the four properties the graph exists for: a screen reached two ways is ONE row, a
-	// menu that loops back is an EDGE rather than an infinite unrolling, a branch is named by the option's own LDB id
+	// wrong shape to store. These pin the four properties the graph exists for: a screen reached two ways is one row, a
+	// menu that loops back is an edge rather than an infinite unrolling, a branch is named by the option's own LDB id
 	// rather than by an index, and two genuinely different screens that happen to share their text still separate.
 	//
 	// Built from ConversationPacket rows directly rather than from wire bytes: the fold reads the columnized form, and
@@ -20,12 +20,12 @@ namespace Faolan.Tests
 	{
 		private const string Npc = "Casilda";
 
-		// The NPC's TEMPLATE - the screen's identity since #646, so every synthetic walk here carries Casilda's real one.
+		// The NPC's template - the screen's identity, so every synthetic walk here carries Casilda's real one.
 		private const uint NpcTemplate = 9411;
 		private const uint TypeId = 42008;
 
-		// The headline case. Two routes reach the same screen, so the answer-path tree stored it twice - once per route,
-		// with different keys and no way to tell they were the same screen.
+		// The headline case: two routes reach the same screen. An answer-path tree stores it twice - once per route,
+		// with different keys and no way to tell they are the same screen.
 		[Fact]
 		public void AConvergentScreen_IsOneNodeWithTwoInboundEdges()
 		{
@@ -42,9 +42,9 @@ namespace Faolan.Tests
 			Assert.Equal([7615u, 8149u], [.. graph.Edges.Where(e => e.ToNodeId == target.Id).Select(e => e.OptionId).OrderBy(o => o)]);
 		}
 
-		// The defect the path key could not express at all: a menu whose option returns to a screen already on the
-		// route. Under the old key each lap had to be captured separately, and the lap after the deepest one closed the
-		// window on the player. As a graph it is one edge back.
+		// What a path key cannot express at all: a menu whose option returns to a screen already on the route. Keyed by
+		// path, each lap has to be captured separately and the lap after the deepest one closes the window on the
+		// player. As a graph it is one edge back.
 		[Fact]
 		public void ALoopBecomesAnEdgeBackIntoTheGraph()
 		{
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			Assert.Contains(graph.Edges, e => e.FromNodeId == second.Id && e.OptionId == 8149 && e.ToNodeId == greeting.Id);
 		}
 
-		// The branch is named by the option's own LDB id, taken off the screen that OFFERED it - never by the index.
+		// The branch is named by the option's own LDB id, taken off the screen that offered it - never by the index.
 		// The same index means different things on different variants of one screen, which is what made the path key
 		// re-select a child by quest gate rather than by what the player actually clicked.
 		[Fact]
@@ -73,12 +73,12 @@ namespace Faolan.Tests
 			]);
 
 			var edge = Assert.Single(graph.Edges);
-			Assert.Equal(0u, edge.OptionId); // index 2 on that screen IS the "Goodbye" option
+			Assert.Equal(0u, edge.OptionId); // index 2 on that screen is the "Goodbye" option
 		}
 
 		// Retail reuses the same line and option strings at two different script states and the follow-ups differ
-		// (Tina 2683, Tina 12413, Laranga 19827, Turach 2822). Those must NOT merge - and the split has to come from a
-		// SHARED slot disagreeing, not merely from one walk being shorter than the other.
+		// (Tina 2683, Tina 12413, Laranga 19827, Turach 2822). Those must not merge - and the split has to come from a
+		// shared slot disagreeing, not merely from one walk being shorter than the other.
 		[Fact]
 		public void SameContentWithConflictingFollowUps_IsDiscriminated()
 		{
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			Assert.Contains(graph.Report, r => r.Contains("distinct screens share the content"));
 		}
 
-		// ...and the converse, which is what makes a truncated capture harmless: a walk that simply STOPS earlier says
+		// ...and the converse, which is what makes a truncated capture harmless: a walk that simply stops earlier says
 		// nothing about the slots it never exercised, so it merges into the fuller screen rather than splitting off as a
 		// near-duplicate. This is what lets one lap of a loop and the full menu be the same row.
 		[Fact]
@@ -113,8 +113,8 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(graph.Report, r => r.Contains("distinct screens share the content"));
 		}
 
-		// The three ways retail opens a window become one enum on the root, replacing the ServerInitiated / TypeId 0 /
-		// AnswerPath == "" trio that used to encode it across three columns of the screen.
+		// The three ways retail opens a window are one enum on the root, rather than a ServerInitiated / TypeId 0 /
+		// AnswerPath == "" trio spread across three columns of the screen.
 		[Theory]
 		[InlineData(false, null, ConversationTrigger.Talk)]
 		[InlineData(true, 1044692756u, ConversationTrigger.UseWorldObject)]
@@ -135,7 +135,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Assert.Single(graph.Entries).Trigger);
 		}
 
-		// The grant belongs to the BRANCH, not to the screen: Turach's 2832 was harvested twice with identical content,
+		// The grant belongs to the branch, not to the screen: Turach's 2832 was harvested twice with identical content,
 		// once granting quest 12371 and once granting nothing, and the difference is how you got there.
 		[Fact]
 		public void TheGrantRidesTheBranchThatReachesTheScreen()
@@ -170,7 +170,7 @@ namespace Faolan.Tests
 				backward.Edges.Select(e => (e.FromNodeId, e.OptionId, e.ToNodeId)).OrderBy(e => e.FromNodeId).ThenBy(e => e.OptionId));
 		}
 
-		// A branch off a screen whose option list was never captured has no durable name, so it is dropped and SAID -
+		// A branch off a screen whose option list was never captured has no durable name, so it is dropped and said -
 		// inventing an index-shaped id would put a branch in the graph that nothing on the wire supports.
 		[Fact]
 		public void ABranchOffAnUncapturedOptionListIsDroppedAndReported()
@@ -184,7 +184,7 @@ namespace Faolan.Tests
 			Assert.Contains(graph.Report, r => r.Contains("option list was never captured"));
 		}
 
-		// The harvested parent link is what names a branch (#642), and it beats the answer path where the two disagree.
+		// The harvested parent link is what names a branch, and it beats the answer path where the two disagree.
 		// Casilda's `2` sub-tree is the case that forced it: harvested under her five-option 12373 greeting but itself
 		// ungated, so a path-derived parent attached it to the three-option unconditional greeting and index 2 named
 		// "Goodbye" instead of the option actually clicked.
@@ -199,7 +199,7 @@ namespace Faolan.Tests
 					ConditionQuestState = QuestState.Active
 				}
 			};
-			var plain = Walk("", Line(900), Options(7615, 0)); // the unconditional greeting, a DIFFERENT option list
+			var plain = Walk("", Line(900), Options(7615, 0)); // the unconditional greeting, a different option list
 			var child = Walk("2", Line(300), Options(0)) with
 			{
 				Walk = Walk("2", Line(300), Options(0)).Walk with
@@ -216,8 +216,8 @@ namespace Faolan.Tests
 			Assert.Equal(graph.Nodes.Single(n => n.ContentKey.StartsWith("50002:100")).Id, edge.FromNodeId); // ...on the gated greeting
 		}
 
-		// The replay gate has to walk each hop under the gate THAT HOP was harvested under, not under the leaf walk's
-		// (#644). Turach is the shape: his 10320-Active greeting offers 2142 both unconditionally and gated on 12407
+		// The replay gate has to walk each hop under the gate that hop was harvested under, not under the leaf walk's
+		//. Turach is the shape: his 10320-Active greeting offers 2142 both unconditionally and gated on 12407
 		// Completed, leading to two different screens, and the walk hanging under the gated one is itself gated on 10320
 		// Active. Matching the leaf's gate at hop 1 found neither branch, fell through to the unconditional one, and the
 		// rest of the route did not exist there - so the deepest walks of his tree stopped replaying.
@@ -239,9 +239,9 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(graph.Report, r => r.Contains("unreplayable"));
 		}
 
-		// The answer-path FALLBACK has to shortlist on what each candidate actually offered. A path names several walks -
+		// The answer-path fallback has to shortlist on what each candidate actually offered. A path names several walks -
 		// one per quest-gated variant of that screen - and Casilda's '0>0' includes a variant that carries no answer list
-		// at all, so picking by gate alone landed on a screen with no button for index 0 and the branch was dropped (#644).
+		// at all, so picking by gate alone landed on a screen with no button for index 0 and the branch was dropped.
 		[Fact]
 		public void ThePathFallbackPrefersAParentThatOfferedTheClickedIndex()
 		{

@@ -6,16 +6,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// PlayfieldFIIR / MapChange (0x5D85BFC7). The BODY builder has had a golden since #189
-	// (CreateEditorRecordTests.PlayfieldFiir_MatchesCapturedBytes); what was never pinned is the CARRIER - the
+	// PlayfieldFIIR / MapChange (0x5D85BFC7). The body builder has its own golden
+	// (CreateEditorRecordTests.PlayfieldFiir_MatchesCapturedBytes); what this pins is the carrier - the
 	// [u32 subop][body] wrapper PlayfieldFCodec puts around it, and what its parser reads back out. Both halves
 	// together are what actually goes on the wire, so this compares them against a whole captured record.
 	//
-	// ⚠️ A pass here does NOT mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, four body
-	// words vary that BuildPlayfieldFiir wrote as constants. The two PER-MAP ones are now imported and sent from the
-	// Maps table (PlayfieldFieldA @30 and PlayfieldFieldC @95, which were wrong for six of the twelve captured maps).
-	// The other two - field58 @58 and the blob's last word @83 - vary WITHIN a map, so they are per-entry state, still supplied by
-	// the caller as constants and still undecoded. Gitea #451.
+	// A pass here does not mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, four body
+	// words vary that BuildPlayfieldFiir wrote as constants. The two per-map ones are now imported and sent from the
+	// Maps table (PlayfieldFieldA @30 and PlayfieldFieldC @95, which a single constant gets wrong for six of the
+	// twelve captured maps). The other two - field58 @58 and the blob's last word @83 - vary within a map, so they are
+	// per-entry state, supplied by the caller as constants and still undecoded. Open work tracked in Gitea #451.
 	//
 	// This golden uses a capture whose four words equal the values the create path supplies, which is exactly why it
 	// can pass while that half of the gap is open.
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedIirContent, Convert.ToHexString(built).ToLowerInvariant());
 		}
 
-		// Parse reads the record SEQUENTIALLY to its last byte (#530 rule 3), so a builder/parser drift cannot hide.
+		// Parse reads the record sequentially to its last byte, so a builder/parser drift cannot hide.
 		[Fact]
 		public void Parse_ReadsBackWhatTheBuilderWrote()
 		{
@@ -53,9 +53,9 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedIirContent, Convert.ToHexString(PlayfieldFCodec.Build(parsed)).ToLowerInvariant());
 		}
 
-		// #818: an instanced playfield sends ZERO scene entries, so the blob is its count word alone - 4 bytes rather
+		// An instanced playfield sends zero scene entries, so the blob is its count word alone - 4 bytes rather
 		// than 24, and the whole record 83 bytes rather than 103. Refused before the fix, and the refusal did not stay
-		// contained in the codec: NpcSpawnExtractor kept the PREVIOUS map on an unreadable MapChange, so White Sands
+		// contained in the codec: NpcSpawnExtractor kept the previous map on an unreadable MapChange, so White Sands
 		// Night's NPCs were harvested as City of Tortage Night spawns while the row counts looked healthy.
 		// xxx_mage-necromancer_login_play4 frame 48 - the login straight into White Sands Night (10803).
 		[Fact]

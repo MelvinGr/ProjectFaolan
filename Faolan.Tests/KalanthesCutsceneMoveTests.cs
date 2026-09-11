@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #234/#193: the create-cutscene Kalanthes MoveTasks are CONSTRUCTED from typed data (positions + the typed
+	// The create-cutscene Kalanthes MoveTasks are constructed from typed data (positions + the typed
 	// MoveTask codec/composite), not replayed from a hex blob. These goldens are the captured MoveTasks
 	// (Blablabla_* f657 intro + f890 walk, handle 0x2C1C) - the from-scratch builders must reproduce them byte-exact.
 	public class KalanthesCutsceneMoveTests

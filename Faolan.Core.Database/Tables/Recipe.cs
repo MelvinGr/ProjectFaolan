@@ -9,7 +9,7 @@ namespace Faolan.Core.Database.Tables
 	// (client readers FUN_007aab30 -> FUN_007abb30 -> FUN_0077be70). Keyed by the record's list-key (Id, which is
 	// also repeated as header word 0 == the RequestRecipeInfo levelId).
 	//
-	// FULLY COLUMNIZED (#193): every wire word rebuilds from typed fields - the per-recipe header/mid/tail columns
+	// Fully columnized: every wire word rebuilds from typed fields - the per-recipe header/mid/tail columns
 	// below, the opaque ref-id list, and the ingredient/result elements (Items child rows + each item's Items-row TEA
 	// key + hash). No verbatim blob. TradeskillRecipeCodec.ToRecord projects a row back to the wire record and
 	// BuildReplyBody serialises it byte-for-byte (gated by TradeskillRecipeCodecTests).
@@ -29,33 +29,32 @@ namespace Faolan.Core.Database.Tables
 		// The mid-header variable word (0 or 1); the surrounding mid words are fixed (0, 0x1F4, _, 0).
 		public uint MidFlag { get; set; }
 
-		// ⭐ The crafting PROFESSION the recipe belongs to - `0xF4241` Weaponsmith (99 recipes) or `0xF4242`
-		// Armorsmith (504), which is the whole shipped set (#148).
+		// The crafting profession the recipe belongs to - `0xF4241` Weaponsmith (99 recipes) or `0xF4242`
+		// Armorsmith (504), which is the whole shipped set.
 		//
-		// ⚠️ It was called `RdbType` because its two values look like RDB type ids, and that reading is REFUTED:
-		// RDB type 1000001 is the PLAYFIELD type - its entries are `Davids Test Playplace`, `Conarch Village`,
+		// It was called `RdbType` because its two values look like RDB type ids, and that reading is refuted:
+		// RDB type 1000001 is the playfield type - its entries are `Davids Test Playplace`, `Conarch Village`,
 		// `Spider_Caverns` - and type 1000002 does not exist in the client's RDB index at all. The mis-naming also
 		// escaped into the ticket history as "recipes imported from RDB 1000001/1000002"; they are capture-derived
 		// (`CaptureRecipeImporter`) and the importer never touches the RDB.
 		//
-		// What it IS, is a clean partition of the two feat ladders. Resolving `RequiredFeatId` through
+		// What it is, is a clean partition of the two feat ladders. Resolving `RequiredFeatId` through
 		// `FeatIdMaps.WireFeatId` names all twelve, six per value, with zero crossover:
 		//
 		//   0xF4241  321000/321001/321100/321101/321200/321201  Weaponsmith Novice..Master   workshop feats 3282xx
 		//   0xF4242  321300/321301/321400/321401/321500/321501  Armorsmith  Novice..Master   workshop feats 3283xx
 		//
-		// ⚠️ Two values is a cheap partition on its own; what makes it a decode is that BOTH the six-rank ladder
-		// and the disjoint workshop-feat family fall on the same split, and that the old reading is positively
-		// disproved rather than merely unsupported.
+		// Two values is a cheap partition on its own; what makes it a decode is that both the six-rank ladder and the
+		// disjoint workshop-feat family fall on the same split.
 		public uint ProfessionId { get; set; }
 
-		// The record's ref-id list (KEY2), 1 or 2 entries in every captured record. It is **the recipe's FEAT
-		// REQUIREMENTS**, not an opaque list: every one of the 18 distinct ids resolves in `FeatIdMaps.WireFeatId`,
+		// The record's ref-id list (KEY2), 1 or 2 entries in every captured record. It is the recipe's feat
+		// requirements, not an opaque list: every one of the 18 distinct ids resolves in `FeatIdMaps.WireFeatId`,
 		// and through its `TemplateId` to a named tradeskill feat.
 		//
 		// `RequiredFeatId` is the crafting-skill feat that unlocks the recipe; `RequiredWorkshopFeatId`, present only
-		// on the higher ranks, is the WORKSHOP the recipe additionally needs - and a workshop is a **guild-city
-		// building**, not a personal feat. The feat table makes that plain: the same family holds
+		// on the higher ranks, is the workshop the recipe additionally needs - and a workshop is a guild-city
+		// building, not a personal feat. The feat table makes that plain: the same family holds
 		// `Battlekeep Armorsmith Workshop I/II/III`, `Battlekeep Barracks`, `Architect Workshop` and
 		// `Alchemist Workshop`. So a high-rank recipe is gated on the player's guild having built the thing.
 		// The whole shipped set:
@@ -65,11 +64,11 @@ namespace Faolan.Core.Database.Tables
 		//     321300/321301/321400  Armorsmith  Novice / Apprentice / Adept        -           44/44/104
 		//     321401/321500/321501  Armorsmith  Artisan / Expert / Master          Workshop I/II/III  104 each
 		//
-		// So the rule the data states is: from ARTISAN upward a recipe also requires a workshop, one tier per rank.
-		// ⚠️ Only Weaponsmith and Armorsmith are present - the other tradeskills are simply not in the captured
+		// So the rule the data states is: from artisan upward a recipe also requires a workshop, one tier per rank.
+		// Only Weaponsmith and Armorsmith are present - the other tradeskills are simply not in the captured
 		// records, not evidence that they work differently.
 		//
-		// ⚠️ Nothing gates on this yet - crafting checks neither feat, so every recipe is craftable by anyone.
+		// Nothing gates on this yet - crafting checks neither feat, so every recipe is craftable by anyone.
 		public uint RequiredFeatId { get; set; }
 
 		// The record's trailing u32 (@0x50) before the flag byte.

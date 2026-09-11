@@ -5,16 +5,16 @@ using System.Text.RegularExpressions;
 namespace Faolan.Importer.Rdb
 {
 	// Sorts the client's bounded-area regions (RDB 1000053, see BoundedAreaCollection) into the families the survey in
-	// docs/rdb/bounded-areas-1000053.md is organised by. 8,300-odd regions over 478 playfields, and the ONLY thing a
-	// region carries about its purpose is its NAME - so this is a naming heuristic and nothing more.
+	// docs/rdb/bounded-areas-1000053.md is organised by. 8,300-odd regions over 478 playfields, and the only thing a
+	// region carries about its purpose is its name - so this is a naming heuristic and nothing more.
 	//
-	// ⚠️ It is a SURVEY AID, NOT AN IMPORT GATE (#513). Landing a bucket in the DB needs that family's own evidence -
+	// It is a SURVEY AID, not AN IMPORT gate. Landing a bucket in the DB needs that family's own evidence -
 	// a capture, a client script, a cross-check against data we already hold. RdbHazardImporter imports lava and only
-	// lava for exactly this reason: the other hazard-shaped names are hazard-shaped BY NAME, and a mis-guessed kill
+	// lava for exactly this reason: the other hazard-shaped names are hazard-shaped by name, and a mis-guessed kill
 	// volume silently kills players on a map nobody is testing. Do not wire a bucket straight into an importer because
 	// the classifier is confident - it has no way to be.
 	//
-	// Rules are ordered and FIRST MATCH WINS, so the buckets are mutually exclusive and the census sums to the total.
+	// Rules are ordered and first match WINS, so the buckets are mutually exclusive and the census sums to the total.
 	// Order is load-bearing and encodes which signal in a name is the stronger claim:
 	//   - the structural families first (collision, audio) - they are the client's own generated names and never a
 	//     gameplay region, so `Vanir_camp_music` is audio, not a camp;
@@ -46,11 +46,10 @@ namespace Faolan.Importer.Rdb
 			// `Throneroomres`). The suffix is anchored at the end precisely because a loose `res` is a substring of half
 			// the place names in the game.
 			//
-			// ⚠️ `_` is a WORD character, so `\brez` does NOT match `zang_xin_camp_rezpad` OR
-			// `BA_MountainGlade_RezDiscovery`. It used to be written `\brez` plus an explicit `re[zs]pad` to paper over
-			// the first case, which left the second: every `*_RezDiscovery` fell through to the QuestGoal rule's
-			// `discovery` and the whole discovery family - the one this bucket is most about - was filed as quest
-			// regions. Anchor on `(?<![a-z])` and the underscore stops mattering.
+			// `_` is a word character, so `\brez` does not match `zang_xin_camp_rezpad` or
+			// `BA_MountainGlade_RezDiscovery`, and patching one case with an explicit `re[zs]pad` leaves the other:
+			// every `*_RezDiscovery` then falls through to the QuestGoal rule's `discovery` and the whole discovery
+			// family is filed as quest regions. Anchoring on `(?<![a-z])` makes the underscore stop mattering.
 			(BoundedAreaBucket.Resurrection, Rx(@"resurrect|rezz|(?<![a-z])rez|re[zs]pad|res$|_res(?![a-z])|(?<![a-z])res(pawn|point|prison|spot|zone)")),
 
 			(BoundedAreaBucket.Teleport, Rx(@"teleport|\bport(al)?\b|zoneline|zone_line|\bwarp\b|traveltrigger")),
@@ -66,34 +65,34 @@ namespace Faolan.Importer.Rdb
 			// Quest regions before encounters: a quest name that also says "spawn"/"trigger" is still a quest region.
 			(BoundedAreaBucket.QuestGoal, Rx(@"quest|\bgoal\b|objective|\bq_\b|_q\d|reacharea|discovery")),
 
-			// Encounter + event START triggers: the ones retail fires an encounter from. Deliberately BEFORE camps,
+			// Encounter + event START triggers: the ones retail fires an encounter from. Deliberately before camps,
 			// because an ambush/boss trigger sitting inside a camp is a trigger first.
 			(BoundedAreaBucket.Encounter, Rx(@"trigger|ambush|encounter|\bevent\b|bossfight|miniboss|\bboss\b|\bfight\b|_start|start_|startba|\bsensor\b|ringspawn|despawn|\bwave\d|cutscene|scene\b")),
 
-			// What is left that says "camp" is a mob camp - a named settlement of creatures. `spawn` on its own is NOT
+			// What is left that says "camp" is a mob camp - a named settlement of creatures. `spawn` on its own is not
 			// enough (it is in despawn triggers, collision names and quest hooks alike, all of which are claimed above);
 			// the surviving spawn-* names here are the mob-placement ones (`Mob spawn center 1`, `StaticSpawns`).
 			(BoundedAreaBucket.SpawnCamp, Rx(@"\bcamps?\b|camp\d|\d camp|_camp|camp_|[a-z]camp|spawn"))
 
-			// There is NO rule for the survey's "zone / area names" family, deliberately. Those regions are named after
+			// There is no rule for the survey's "zone / area names" family, deliberately. Those regions are named after
 			// the PLACE (`Acheronian Ruins`, `The Iron Tower`, `Onyx Chambers`), so the only test for one is whether the
 			// name matches the place-name catalog - a data lookup, not a naming pattern, and the banner ids in MapArea
-			// are LDB string ids rather than text. Identifying them is #348's job; a regex here would have matched
-			// nothing and printed a zero row that reads as "the client ships none", which is the opposite of the truth.
+			// are LDB string ids rather than text. A regex here would match nothing and print a zero row that reads as
+			// "the client ships none", which is the opposite of the truth.
 		];
 
-		// The client-side scry script a region runs to tell the SERVER the player crossed its boundary. 479 regions
+		// The client-side scry script a region runs to tell the server the player crossed its boundary. 479 regions
 		// over 60 playfields share it, and what the server does on that notification is the region's own business:
-		// it is the mechanism behind the area-name banners (#348) and it also appears on dismount volumes, a couple
+		// it is the mechanism behind the area-name banners and it also appears on dismount volumes, a couple
 		// of fire hazards and a respawn-discovery area.
 		//
-		// ⚠️ So it is NOT "the banner script" - it is "this volume talks to the server", which is a strictly weaker
+		// So it is not "the banner script" - it is "this volume talks to the server", which is a strictly weaker
 		// and more useful claim. It is a FILTER, not an identification: a region without it cannot be what fires a
 		// server-sent banner, so it excludes the audio regions, building interiors and playfield borders that a
 		// containment test alone happily returns. Pairing it with a captured banner is what identifies one.
 		//
 		// Found by grouping every 1000053 region by ScryId: on Old Tarantia it selects exactly the `BA_*` sub-areas
-		// (BA_Bridge, BA_MarketWard, BA_EastGate, BA_WestGate, BA_Docks, BA_GreatLibrary, ...), on Tarantia Noble
+		// (BA_Bridge, BA_MarketWard, BA_EastGate, BA_WestGate, BA_Docks, BA_GreatLibrary,...), on Tarantia Noble
 		// District the named quarters (Noble Quarters, The Market, Castle Approach, The Southern Bridge) and on Field
 		// of the Dead the Clan burial mounds - three playfields whose sub-area names are the banner texts.
 		public const uint CrossingNotifierScryId = 220656;

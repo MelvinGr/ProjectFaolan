@@ -11,13 +11,16 @@ using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
-	// Getting ON and OFF a mount (#26 / #142 / #428). Three paths reach it - the summon/dismount channel the client
-	// asks for, the re-seat on world entry into a mount-allowed map, and the involuntary dismount the world tick
-	// forces (a hit that throws the rider, a death, a no-mount area) - and all three send the same two things: the
-	// Ride buff and the `Mount` / `MountSpeed` stat pair.
-	//
-	// Seating used to be written out twice (world entry and the summon channel) with the viewer broadcast on only one
-	// of them, which is the shape #428 was: a horse that rendered for its rider and for nobody else.
+	/// <summary>
+	///     Getting on and off a mount.
+	/// </summary>
+	/// <remarks>
+	///     Three paths reach it - the summon or dismount channel the client asks for, the re-seat on world entry into a
+	///     mount-allowed map, and the involuntary dismount the world tick forces on a hit that throws the rider, a
+	///     death or a no-mount area - and all three send the same two things: the Ride buff and the <c>Mount</c> and
+	///     <c>MountSpeed</c> stat pair. Writing the seating out per path is what produces a horse that renders for its
+	///     rider and for nobody else, because only one of them carries the viewer broadcast.
+	/// </remarks>
 	public sealed class MountService
 	{
 		private readonly WorldBroadcaster _broadcaster;
@@ -40,7 +43,7 @@ namespace Faolan.GameServer.World
 		/// <summary>
 		///     Seats the player on <paramref name="mount" />: the Ride buff, the stat pair, and the live entity's mount
 		///     state. <paramref name="broadcastToViewers" /> pushes the same stats to onlookers - the horse renders from
-		///     THEM, so a viewer who never gets them sees an unmounted player running at mount speed (#428).
+		///     them, so a viewer who never gets them sees an unmounted player running at mount speed.
 		/// </summary>
 		public async Task Seat(INetworkClient client, Mount mount, bool broadcastToViewers)
 		{
@@ -58,11 +61,13 @@ namespace Faolan.GameServer.World
 
 			var entity = _sim.PlayerWorldEntity(client);
 			entity?.IsMounted = true;
-			entity?.MountRideStat = mount.CreatureId; // so a viewer arriving LATER can be told (#428)
-			entity?.MountDamageTaken = 0; // a fresh mount soaks its own beating before it throws you (#142)
+			entity?.MountRideStat = mount.CreatureId; // so a viewer arriving later can be told
+			entity?.MountDamageTaken = 0; // a fresh mount soaks its own beating before it throws you
 		}
 
-		/// <summary>Seats the player and PERSISTS the mount, so it survives a relog or a trip through a no-mount area.</summary>
+		/// <summary>
+		///     Seats the player and persists the mount, so it survives a relog or a trip through a no-mount area.
+		/// </summary>
 		public async Task SeatAndPersist(INetworkClient client, Mount mount)
 		{
 			await Seat(client, mount, true);
@@ -70,9 +75,14 @@ namespace Faolan.GameServer.World
 			await _characters.SaveCharacterMount(client.Session.Character.Id, mount.Id);
 		}
 
-		// Takes the player off their mount and clears the persisted one, so world entry does not re-seat a mount they
-		// no longer have (#142). The voluntary dismount key press (after DismountChannelMs), a hit that throws the
-		// rider, and the respawn after a death all reach it. No-op when they are not mounted.
+		/// <summary>
+		///     Takes the player off their mount and clears the persisted one, so world entry does not re-seat a mount
+		///     they no longer have. A no-op when they are not mounted.
+		/// </summary>
+		/// <remarks>
+		///     The voluntary dismount key press, a hit that throws the rider, and the respawn after a death all reach
+		///     it.
+		/// </remarks>
 		public async Task Dismount(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -110,7 +120,7 @@ namespace Faolan.GameServer.World
 			if (mount == null)
 				return false;
 
-			// Entry-time seating does NOT broadcast: the player is the only one in the burst, and every viewer who
+			// Entry-time seating does not broadcast: the player is the only one in the burst, and every viewer who
 			// later streams them in is told from WorldEntity.MountRideStat, which Seat stamps.
 			await Seat(client, mount, false);
 			_logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.Spell.Name, client.Session.Character.Name, client.Session.Character.MapId);

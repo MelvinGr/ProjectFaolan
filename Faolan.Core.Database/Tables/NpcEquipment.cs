@@ -4,12 +4,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One worn-equipment entry of an NPC TYPE's CharacterIIR (#307/#244) - the type-level counterpart of the
-	// per-placement NpcSpawnEquipment. A summon-only creature (pet/mount) has NO NpcSpawn placement, so its worn
-	// equipment lives on the type here and TryBuildFromType builds it into the spawn body from these rows (instead of
-	// the retired NpcTemplate.Data blob). Same stored shape as NpcSpawnEquipment (INpcEquipment): slot + Template (FK to
+	// One worn-equipment entry of an NPC type's CharacterIIR - the type-level counterpart of the
+	// per-placement NpcSpawnEquipment. A summon-only creature (pet/mount) has no NpcSpawn placement, so its worn
+	// equipment lives on the type here and TryBuildFromType builds it into the spawn body from these rows rather than
+	// replaying a blob. Same stored shape as NpcSpawnEquipment (INpcEquipment): slot + Template (FK to
 	// Items, the quad + hash live there) + Level; cascade-deletes with its NpcTemplate.
-	// Keyed by (type, equipment SLOT) - the NpcTemplate-level twin of NpcSpawnEquipment, keyed the same way.
+	// Keyed by (type, equipment slot) - the NpcTemplate-level twin of NpcSpawnEquipment, keyed the same way.
 	[PrimaryKey(nameof(NpcTemplateId), nameof(Pos))]
 	public class NpcEquipment : INpcEquipment
 	{

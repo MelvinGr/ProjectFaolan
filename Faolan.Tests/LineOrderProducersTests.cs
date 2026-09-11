@@ -8,10 +8,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A quest line's step order has TWO wire producers, both filling the client's `MainQuest_c +0x34` pair vector:
+	// A quest line's step order has two wire producers, both filling the client's `MainQuest_c +0x34` pair vector:
 	// the login snapshot's quest index block (one per held quest, `FUN_00922210`) and the mid-session
 	// MainQuestUpdateIIR Add list (`FUN_00918560`, sent when a quest on the line is granted). LineOrderExtractor
-	// harvests both (#926); this is the gate that they are the same data - on every quest the corpus carries in both,
+	// harvests both; this is the gate that they are the same data - on every quest the corpus carries in both,
 	// the line and the sequence agree - so the second source fills a JournalSequence with the same authority as the
 	// first, and a disagreement between them in a future harvest is a finding rather than noise.
 	public class LineOrderProducersTests

@@ -8,7 +8,9 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Ability names from the RDB 1000020 templates, decrypted with each ability's own harvested Data1..4 TEA key.
+	/// <summary>
+	///     Ability names from the RDB 1000020 templates, decrypted with each ability's own harvested Data1..4 TEA key.
+	/// </summary>
 	public sealed class RdbAbilitiesModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(AbilitiesModule)];

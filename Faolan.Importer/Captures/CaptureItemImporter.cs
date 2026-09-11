@@ -11,10 +11,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Imports item identities harvested from captured inventory snapshots (0x737A6DF9) straight into Items:
-	// sets the Data1..4 quad + Hash on existing rows (e.g. p_items templates) and INSERTS capture-only items
-	// (real quad + hash, no name/level). Takes raw on-wire packet bytes so it has no dependency on the pcap
-	// reader - the Faolan.Importer tool feeds it AnalyzedPacket.Bytes; tests feed it capture .bin bytes.
+	/// <summary>
+	///     Imports item identities harvested from captured inventory snapshots straight into Items: sets the Data1..4
+	///     quad and Hash on existing rows and inserts capture-only items (real quad and hash, no name/level).
+	/// </summary>
+	/// <remarks>
+	///     Takes raw on-wire packet bytes so it has no dependency on the capture reader; tests feed it capture.bin
+	///     bytes.
+	/// </remarks>
 	public static class CaptureItemImporter
 	{
 		public static Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
@@ -27,10 +31,15 @@ namespace Faolan.Importer.Captures
 			return UpsertAsync(db, harvested, types, null, logger);
 		}
 
-		// The upsert itself, over an ALREADY harvested set. Split out for the sources that do not arrive as raw Conan
-		// packets and so cannot go through `ItemHashHarvester`: the `itemref://` chat links (#751) are plain text on
-		// the CHAT stream, and they are also the only source that carries a NAME, which is why `names` exists at all.
-		// Every never-downgrade rule below is shared rather than reimplemented per source.
+		/// <summary>
+		///     The upsert itself, over an already harvested set.
+		/// </summary>
+		/// <remarks>
+		///     Split out for the sources that do not arrive as raw Conan packets and so cannot go through
+		///     `ItemHashHarvester`: the `itemref://` chat links are plain text on the chat stream, and they are also the
+		///     only source that carries a name, which is why <paramref name="names" /> exists. Every never-downgrade rule
+		///     below is shared rather than reimplemented per source.
+		/// </remarks>
 		public static async Task<(int Total, int Inserted)> UpsertAsync(IDatabaseContext db, IReadOnlyDictionary<uint, ItemHashHarvester.CapturedItem> harvested,
 			IReadOnlyDictionary<uint, ItemType>? types = null, IReadOnlyDictionary<uint, string>? names = null, ILogger? logger = null)
 		{
@@ -65,17 +74,15 @@ namespace Faolan.Importer.Captures
 				if (ci.Hash != 0)
 					item.Hash = ci.Hash;
 
-				// The wire LEVEL, on the same never-downgrade rule as the hash: a source that carries no level must not
-				// clobber one another source supplied. This is also the only thing that CORRECTS a level - the legacy
-				// values in the shipped DB predate the visible history and 12 measurable templates disagreed with
-				// retail's wire, because the only previous writer (CaptureListingImporter.HarvestItems) sets Level on
-				// INSERT and skips any template already in Items, so a wrong one was never revisited (#725).
+				// The wire level, on the same never-downgrade rule as the hash: a source that carries no level must not
+				// clobber one another source supplied. This is also what corrects a level an existing row carries
+				// wrong, since it writes to existing rows as well as new ones.
 				if (ci.Level != 0)
 					item.Level = (byte)Math.Min(ci.Level, byte.MaxValue);
 
-				// The SECOND template and its own key (#752) - the high endpoint of a level-scaled item. On the same
-				// never-downgrade rule: only 3 of the 344 captured pairs carry one, and a source that saw the item
-				// without a pair must not erase one that did.
+				// The second template and its own key - the high endpoint of a level-scaled item. On the same
+				// never-downgrade rule: few items carry one, and a source that saw the item without a pair must not
+				// erase one that did.
 				if (ci.Pair is { } pair)
 				{
 					item.TemplateId2 = pair.Template2;
@@ -85,15 +92,13 @@ namespace Faolan.Importer.Captures
 					item.PairKey.Key4 = pair.Key4;
 				}
 
-				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
+				// Classify Quest/Resource items by the container they were captured in; only ever upgrade from the
 				// default Normal so a classification survives a later capture that holds the item in a bag.
 				if (types.TryGetValue(id, out var type) && type != ItemType.Normal)
 					item.Type = type;
 
-				// The display NAME, and ONLY into an empty one. A chat link is player-typed text that happens to be
-				// composed by the client, so it fills a gap but must never outrank a row a snapshot or the RDB named
-				// (#751). Every one of the 13 corpus links whose item we already hold agrees with the stored name
-				// anyway - that agreement is the oracle for the source, not a licence to overwrite.
+				// The display name, and only into an empty one. A chat link is player-typed text that happens to be
+				// composed by the client, so it fills a gap but must never outrank a row a snapshot or the RDB named.
 				if (names != null && string.IsNullOrEmpty(item.Name) && names.TryGetValue(id, out var name) && !string.IsNullOrEmpty(name))
 					item.Name = name;
 			}

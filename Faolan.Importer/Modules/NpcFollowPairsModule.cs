@@ -16,8 +16,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// NPC-follows-NPC formation bindings (#741), harvested from the captured mode-07 MoveTasks. Both ends are
-	// resolved to creature NAMES through the same capture's spawns, so the pair lands on NpcTemplate at both ends.
+	// NPC-follows-NPC formation bindings, harvested from the captured mode-07 MoveTasks. Both ends are
+	// resolved to creature names through the same capture's spawns, so the pair lands on NpcTemplate at both ends.
 	public sealed class NpcFollowPairsModule : IImportModule
 	{
 		// No hard DependsOn (mirrors npc-death-behaviors): it attaches to whatever NpcTemplates exist, and
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// NOT Merge()'d to one leader per follower: a follower type legitimately has several leader types
+			// not Merge()'d to one leader per follower: a follower type legitimately has several leader types
 			// (`Slave of Acheron` was captured behind both `Black Ring Hellsworn` and `Black Ring Defender`), and the
 			// table is keyed to hold all of them.
 			var harvested = ctx.Captures.SelectMany(c => NpcFollowPairExtractor.Extract(c.Packets))

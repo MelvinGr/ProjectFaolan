@@ -6,16 +6,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	/// <summary>
-	///     One of a character's parallel token WALLETS (Gitea #150) - the running totals
+	///     One of a character's parallel token wallets - the running totals
 	///     <c>DispatchUpdateTokenAmount</c> (s2c 0x204D) carries for a single <see cref="TokenPool" />.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ <b>The wire carries lifetime totals, not a balance</b>, and so does this row: the client subtracts
+	///     <b>The wire carries lifetime totals, not a balance</b>, and so does this row: the client subtracts
 	///     <see cref="Spent" /> from <see cref="Gained" /> itself. Storing a single balance would make every push a
 	///     lie about one of the two halves.
 	///     <para />
 	///     A row per pool the character has ever touched, rather than 29 rows per character: retail only ever states
-	///     ONE pool per message and only when it moves (ten pushes in the whole corpus, each a single pool), so an
+	///     one pool per message and only when it moves (ten pushes in the whole corpus, each a single pool), so an
 	///     absent row and a 0/0 row mean the same thing to the client.
 	///     <para />
 	///     The natural composite key is the point (see the model conventions in CLAUDE.md): a wallet is identified by

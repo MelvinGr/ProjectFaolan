@@ -9,14 +9,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #297: the XP curve is SERVER data - the client ships none of it (no XP table among the 25 named CoreTables data
-	// tables, no level-threshold entry in GAMETWEAKS, and the exe's only XP strings are the three UI value names it
+	// The XP curve is server data - the client ships none of it (no XP table among the 25 named CoreTables data
+	// tables, no level-threshold entry in gametweaks, and the exe's only XP strings are the three UI value names it
 	// fills from these stats). So every number in LevelingResolver has to come off the wire, and this is the gate that
 	// says it does: the resolver is replayed against every XP triple the corpus carries.
 	//
 	// It is also the gate that would have caught the bug it was written for. The anchors were harvested as MaxExp
-	// values and then handed back as PER-LEVEL costs, which are two different quantities: MaxExp is the running total
-	// at which the NEXT level begins, so level 24 "cost" 298,040 XP instead of its real 34,400.
+	// values and then handed back as per-level costs, which are two different quantities: MaxExp is the running total
+	// at which the next level begins, so level 24 "cost" 298,040 XP instead of its real 34,400.
 	public class LevelingCurveCorpusTests
 	{
 		// Every distinct (Level, ExpCurrentLevelBase, MaxExp) the captured snapshots carry. The stat sheet addresses
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			return [.. rows.OrderBy(r => r.Item1)];
 		}
 
-		// The load-bearing claim: for every captured character, the base IS the threshold of its level and MaxExp IS
+		// The load-bearing claim: for every captured character, the base is the threshold of its level and MaxExp is
 		// the threshold of the next one. If the two were per-level costs instead, none of this would hold.
 		[Fact]
 		public void TheResolverReproducesEveryCapturedXpTriple()

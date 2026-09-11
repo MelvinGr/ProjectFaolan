@@ -66,20 +66,18 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// Newest first by SEND TIME. This used to lean on the surrogate Id's autoincrement as an insertion-order
-			// proxy; with MailId as the PK (#368) that proxy is gone and MailId itself is useless for it (AllocateMailId
-			// is Random.Shared, not monotonic). Timestamp1 is the send time our own mail builders stamp. Tie-break on
+			// Newest first by send time: Timestamp1 is the send time our own mail builders stamp. Tie-break on
 			// MailId so same-second mails still order deterministically.
 			//
-			// Ordered in MEMORY, like GetTradepostListingsForItem above: SQLite cannot ORDER BY a ulong (its INTEGER is
+			// Ordered in memory, like GetTradepostListingsForItem above: SQLite cannot order by a ulong (its integer is
 			// signed 64-bit) and throws NotSupportedException on the MailId tie-break. An inbox is small, so the sort
 			// is free; the WHERE still runs in SQL.
 			var rows = await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).ToListAsync();
 			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToArray();
 		}
 
-		// The next wire MailId: max + 1 (MailId is the global PK, #368). A deterministic sequence, not a random id +
-		// collision retry. Computed in MEMORY because SQLite cannot MAX a ulong (its INTEGER is signed 64-bit).
+		// The next wire MailId: max + 1 (MailId is the global PK). A deterministic sequence, not a random id +
+		// collision retry. Computed in memory because SQLite cannot MAX a ulong (its integer is signed 64-bit).
 		public async Task<ulong> GetNextMailId()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -89,9 +87,9 @@ namespace Faolan.Core.Database.Repositories
 				: mailIds.Max() + 1UL;
 		}
 
-		// The next sale id for a new listing in this realm: max in the realm + 1 (SaleId is realm-unique, #324). A
-		// deterministic sequence, not a random id + collision retry. Computed in MEMORY because SQLite cannot MAX a
-		// ulong (its INTEGER is signed 64-bit); a realm's listing set is small, so the load is cheap.
+		// The next sale id for a new listing in this realm: max in the realm + 1 (SaleId is realm-unique). A
+		// deterministic sequence, not a random id + collision retry. Computed in memory because SQLite cannot MAX a
+		// ulong (its integer is signed 64-bit); a realm's listing set is small, so the load is cheap.
 		public async Task<ulong> GetNextTradepostSaleId(uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -120,10 +118,9 @@ namespace Faolan.Core.Database.Repositories
 			return rows.OrderBy(l => l.Price).ToArray();
 		}
 
-		// MailAttachment.MailId is the WIRE id (FK -> Mail.MailId, Mail's PK), so this compares like for like. It did
-		// NOT before #368: the FK was a uint pointing at a surrogate Mail.Id row key while callers passed the ulong
-		// wire id, which widened and silently matched nothing - the delete was a no-op, the taken item's attachment
-		// survived, and it came back on relog as a dupe (masked in-session by TakeMailItem's Attachments.Remove).
+		// MailAttachment.MailId is the wire id (FK -> Mail.MailId, Mail's PK), so this compares like for like. Both
+		// sides must stay the wire id: a narrower row key on one side widens silently at the comparison, matches
+		// nothing, and leaves the taken item's attachment behind to come back as a dupe on relog.
 		public async Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

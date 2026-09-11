@@ -14,8 +14,8 @@ namespace Faolan.Importer.Cli
 	{
 		// --report terrain-los [--report-arg <mapId>[:<maxRange>[:profile]]]
 		//
-		// How much of an NPC's nominal aggro range the LINE-OF-SIGHT gate actually leaves it (#577: "agro distance is
-		// way too close, practically have to be on top of npc to agro").
+		// How much of an NPC's nominal aggro range the line-of-sight gate actually leaves it - the gate is what makes
+		// an NPC feel like it only aggroes when the player is on top of it.
 		//
 		// `WorldState.NearestPlayerInRange` culls any candidate past melee range that fails
 		// `TerrainService.HasLineOfSight`, so if that test says "blocked" too often, aggro collapses to exactly
@@ -25,19 +25,19 @@ namespace Faolan.Importer.Cli
 		//
 		// For each NPC spawn on the map it fires rays to eight compass points at a range of distances, each at the
 		// terrain's own ground height (i.e. where a player standing there would be), and tabulates the outcome by
-		// distance band. It uses `TerrainService.Trace`, so the numbers come from the SAME code the game tick runs -
+		// distance band. It uses `TerrainService.Trace`, so the numbers come from the same code the game tick runs -
 		// a re-implementation here would measure a second opinion, not the gate.
 		//
 		// The attribution is the point: terrain and collision fail for entirely different reasons (a heightmap that
 		// reads high, versus a collision mesh that contains the ground it is meant to sit on), and "line-of-sight is
 		// culling aggro" is not actionable without knowing which. The tier-1 vertical band is tabulated as its own
-		// column, ahead of both, because NearestPlayerInRange applies it FIRST: a ray it culls never reaches the
+		// column, ahead of both, because NearestPlayerInRange applies it first: a ray it culls never reaches the
 		// line-of-sight test, so charging it to "terrain" measured a cull the ray gate never made.
 		//
 		// `:profile` additionally dumps the terrain-blocked rays at maxRange - where along the ray the first occluding
 		// sample sits, the target's height relative to the NPC, whether the collision mesh would have caught the same
 		// ray, and the ground/eye-line profile of the ones the vertical band would not have culled. That is how the
-		// heightmap half was cleared of a sampling defect (#577): every blocked in-band ray is a real dune/rock hump
+		// heightmap half was cleared of a sampling defect: every blocked in-band ray is a real dune/rock hump
 		// above both eye-lines, or a terrace ledge with the target on the next terrace down.
 		// TerrainService's own eye height, used only to LABEL the datum check's output and to pick the on-datum set.
 		private const float EyeHeightForReading = TerrainService.EyeHeight;
@@ -72,8 +72,8 @@ namespace Faolan.Importer.Cli
 			if (terrain.GroundHeight(mapId, spawns[0].PositionX, spawns[0].PositionZ) is null)
 				Console.WriteLine($"⚠️ map {mapId} has no heightmap sample at the first spawn - terrain rays will not block.");
 
-			// The DATUM CHECK first, because it decides how to read everything below. The ray starts at the spawn's
-			// stored Y + eye height; if that Y sits BELOW the heightmap's own surface, the eye is underground and the
+			// The DATUM check first, because it decides how to read everything below. The ray starts at the spawn's
+			// stored Y + eye height; if that Y sits below the heightmap's own surface, the eye is underground and the
 			// very first sample occludes - at any distance, including point-blank. A ray gate cannot be tuned out of
 			// that, so a large negative delta here means the two ends are in different vertical datums and the
 			// heightmap half of the gate is measuring nothing real.
@@ -94,10 +94,10 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine();
 			}
 
-			// ON-DATUM spawns only: the ones whose stored Y is within an eye height of the heightmap's surface, i.e.
+			// on-DATUM spawns only: the ones whose stored Y is within an eye height of the heightmap's surface, i.e.
 			// the ones for which the ray test is even meaningful. A spawn sitting below the surface (a cave, an
-			// interior the heightmap does not model, or a bad row) has its eye underground and blocks EVERY ray at
-			// EVERY distance - so mixing them in puts a constant floor under the blocked rate that looks like the gate
+			// interior the heightmap does not model, or a bad row) has its eye underground and blocks every ray at
+			// every distance - so mixing them in puts a constant floor under the blocked rate that looks like the gate
 			// mis-firing at point-blank range when it is really the input.
 			var onDatum = spawns
 				.Where(s => terrain.GroundHeight(mapId, s.PositionX, s.PositionZ) is { } g
@@ -149,7 +149,7 @@ namespace Faolan.Importer.Cli
 							continue;
 						}
 
-						// The gates in the order NearestPlayerInRange applies them: the tier-1 vertical band FIRST, so a
+						// The gates in the order NearestPlayerInRange applies them: the tier-1 vertical band first, so a
 						// target on a terrace 7 u down is culled before line-of-sight is ever asked. Counting it under
 						// "terrain" would charge the ray gate for a cull it never made - on City of Tortage that was
 						// 89 of the 142 terrain-blocked rays at 20 u.
@@ -195,9 +195,9 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// `:profile` - for every TERRAIN-blocked ray at maxRange from an on-datum spawn, WHERE along the sightline the
+		// `:profile` - for every TERRAIN-blocked ray at maxRange from an on-datum spawn, where along the sightline the
 		// first occluding sample sits and how the target's ground relates to the NPC's, then the ground profile of the
-		// rays whose target the vertical gate would NOT already have culled. Re-samples the grid at the same points
+		// rays whose target the vertical gate would not already have culled. Re-samples the grid at the same points
 		// TerrainService does (its constants are read, not repeated) so a profile line and the gate's verdict agree.
 		private static void ProfileTerrainBlocks(TerrainService terrain, uint mapId, IReadOnlyList<Vector3> spawns, Vector2[] directions, float range)
 		{

@@ -54,7 +54,7 @@ namespace Faolan.Importer.Modules
 			foreach (var (type, count) in rdb.TypeCounts())
 				ctx.Out.WriteLine($"  {type,-10}  {count,6}  {(TypeNames.TryGetValue(type, out var n) ? n : "")}");
 
-			// #834: a (type, id) the index states twice means an override layer is present, and TryGet's last-wins
+			// a (type, id) the index states twice means an override layer is present, and TryGet's last-wins
 			// rule is deciding which copy every consumer gets. Say so where a human is looking, rather than leaving
 			// it to be discovered as wrong content. Zero on this client - printed anyway, because "0 duplicate keys"
 			// is the answer to the question and a silent absence is not.

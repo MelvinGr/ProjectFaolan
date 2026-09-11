@@ -11,37 +11,33 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The per-command GM privilege gate (#904): each verb in the command table carries the gm_level bit it
-	// requires, and the ten verbs that ARE retail verbs must carry retail's own mask - read live from the recovered
+	// The per-command GM privilege gate: each verb in the command table carries the gm_level bit it
+	// requires, and the ten verbs that are retail verbs must carry retail's own mask - read live from the recovered
 	// registry (docs/re/gm-command-registry.tsv) rather than restated here, so a registry correction propagates.
 	public class GmCommandTableTests
 	{
 		// Every verb of ours that retail's client also registers. The mask for these is a recovered fact; the rest
-		// of GmCommandMasks is our own family choice and is deliberately NOT pinned (changing a choice is not a
+		// of GmCommandMasks is our own family choice and is deliberately not pinned (changing a choice is not a
 		// regression).
-		// ⚠️ `time` is deliberately NOT here. Retail's `/time` manipulates FRAME times (the deltatimer system) - the
-		// time-of-day setter is `/settime`, which is what our `.time` actually did, so it was renamed (#914 rule 1).
-		// We do not implement retail's `/time`, so pinning its mask would assert against a verb we do not have.
+		//
+		// `time` is deliberately not here. Retail's `/time` manipulates frame times (the deltatimer system) - the
+		// time-of-day setter is `/settime`, which is what our `.time` does. We do not implement retail's `/time`,
+		// so pinning its mask would assert against a verb we do not have.
 		private static readonly string[] RetailVerbs =
 		[
 			"save", "tradeskill", "teleport", "teleportself", "tp", "knockback", "feat", "level", "kill",
-			// #914 Wave A
 			"settime", "gametime", "distance", "whereis", "playfieldinfo", "playfieldinstancelock", "ghost", "system", "hatedbylist",
-			// #914 Wave B1
 			"summon", "unsummon", "assist", "falldamage", "cash",
-			// #914 Wave B2
 			"inflict", "areaknockback", "resurrect",
-			// #914 Wave B3 - the stat family (`setstat` retired into `setlocal`)
+			// The stat family; `setstat` lives under `setlocal`.
 			"get", "set", "setlocal", "getskill", "teleporttarget",
-			// #914 Wave B4 - broadcast family and monster visibility (`invisible` retired into `mobs`)
+			// The broadcast family, and monster visibility under `mobs`.
 			"broadcast", "servcast", "sitecast", "mobs",
-			// #914 batch C1 (`.feat` was the manipulator under the reader's name; it is now `feats`)
+			// `feats` is the manipulator; `feat` is the reader.
 			"feats", "char", "kickban",
-			// #914 batch C2 (`.removeitem` retired into `inventory delete`)
+			// Item removal lives under `inventory delete`.
 			"getfaction", "setfaction", "magic", "inventory",
-			// #914 batch C3
 			"gethash", "quest",
-			// #914 batch C4
 			"settimescale", "showclassstatadjustments", "update"
 		];
 
@@ -66,7 +62,7 @@ namespace Faolan.Tests
 		}
 
 		// None = unrestricted is the client's own convention for an unmasked command. Exactly two verbs are unmasked:
-		// our `.help` (it filters its listing per caller instead) and `/system`, which RETAIL itself registers at mask
+		// our `.help` (it filters its listing per caller instead) and `/system`, which retail itself registers at mask
 		// 0x0 - so leaving it unmasked is matching retail, not an oversight, and `RetailVerbs_CarryRetailsOwnMask`
 		// independently pins it to the registry's own value. Everything else must carry a bit: an accidentally-None
 		// entry would silently open that command to every GM.
@@ -79,7 +75,7 @@ namespace Faolan.Tests
 
 		// The join refuses to come up on any asymmetry between the handler table and the mask table - a handler
 		// with no mask would otherwise dispatch ungated.
-		// ⭐ The completeness gate: EVERY verb in the client's registry must be answerable - either we implement it or
+		// The completeness gate: Every verb in the client's registry must be answerable - either we implement it or
 		// the catalog carries it with retail's mask and usage. A verb in neither comes back as "no such command",
 		// which reads as a broken build rather than an absent subsystem.
 		[Fact]
@@ -98,7 +94,7 @@ namespace Faolan.Tests
 			Assert.True(unanswered.Count == 0, $"Retail verbs with neither an implementation nor a catalog entry: [{string.Join(", ", unanswered)}]");
 		}
 
-		// A catalogued verb carries retail's OWN mask, exactly as an implemented one does - the reply is a
+		// A catalogued verb carries retail's own mask, exactly as an implemented one does - the reply is a
 		// placeholder, the gating is not.
 		[Fact]
 		public void CataloguedVerbs_CarryRetailsOwnMask()
@@ -112,12 +108,12 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ The TRANSCRIPTION gate. The catalog's Usage and Description are copies of a recovered RE artifact, and
+		// The transcription gate. The catalog's Usage and Description are copies of a recovered RE artifact, and
 		// the risk they carry is drift: someone "tidies" a line that looks broken and the catalog quietly stops
 		// describing the client. So both are pinned to docs/re/gm-command-args.tsv.
-		// ⛔ Deliberately NOT a bracket-balance check. Eight of retail's own usage lines are unbalanced - two
-		// because the closing bracket is inside Funcom's HELP string ("Literal: Clears 1 death effect]") - so
-		// asserting balance would fail on a FAITHFUL recovery and reward corrupting it. See RetailCommandCatalog.
+		// Deliberately not a bracket-balance check. Eight of retail's own usage lines are unbalanced - two
+		// because the closing bracket is inside Funcom's help string ("Literal: Clears 1 death effect]") - so
+		// asserting balance would fail on a faithful recovery and reward corrupting it. See RetailCommandCatalog.
 		[Fact]
 		public void CataloguedVerbs_MatchTheRecoveredGrammar()
 		{
@@ -133,7 +129,7 @@ namespace Faolan.Tests
 				Assert.Equal(recovered.Usage, unbacked.Usage);
 
 				// The client's own description, verbatim - falling back to the long form for the one class that
-				// declares no short one (/lua). The TSV cannot hold a newline, so compare it flattened the way
+				// declares no short one (/lua). The tsv cannot hold a newline, so compare it flattened the way
 				// DumpCommandArgs.flatten() does: /tracescripts' description really is two lines.
 				var expected = recovered.Short.Length > 0 ? recovered.Short : recovered.Long;
 				Assert.Equal(expected, Flatten(unbacked.Description));
@@ -142,7 +138,7 @@ namespace Faolan.Tests
 
 		private static string Flatten(string s) => System.Text.RegularExpressions.Regex.Replace(s, "[\u0000-\u001f]+", " ").Trim();
 
-		// A verb cannot be implemented AND catalogued - the join refuses to come up on it, because whichever wins
+		// A verb cannot be implemented and catalogued - the join refuses to come up on it, because whichever wins
 		// would depend on insertion order.
 		[Fact]
 		public void NoVerb_IsBothImplementedAndCatalogued()
@@ -173,8 +169,8 @@ namespace Faolan.Tests
 
 			var table = GmCommandService.BuildGmCommands(handlers);
 
-			// Our verbs PLUS every retail verb we do not back yet - the catalog is folded into the same table so the
-			// client's whole registry answers (#914).
+			// Our verbs plus every retail verb we do not back yet - the catalog is folded into the same table so the
+			// client's whole registry answers.
 			Assert.Equal(GmCommandService.GmCommandMasks.Count + RetailCommandCatalog.Verbs.Count, table.Count);
 			Assert.Equal(GmPrivileges.NpcCommands, table["kill"].RequiredMask);
 			Assert.Equal(GmPrivileges.NpcCommands, table["KILL"].RequiredMask); // case-insensitive, like the chat parser

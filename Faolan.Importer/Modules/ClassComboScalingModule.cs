@@ -60,7 +60,7 @@ namespace Faolan.Importer.Modules
 
 			var rows = Parse(rdb.ReadDecompressed(entry[0]));
 
-			// The completeness check is on the TABLE, not on the layout (which is Parse's job): the client looks a row
+			// The completeness check is on the table, not on the layout (which is Parse's job): the client looks a row
 			// up for every class at every level, so anything short of 12 x 80 is a defect wherever it came from.
 			foreach (var g in rows.GroupBy(r => r.Class))
 			{

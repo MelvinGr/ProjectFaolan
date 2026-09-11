@@ -22,34 +22,41 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// What an NPC DOES, told to everyone who can see it (#826): aggro, turning hostile, entering and leaving combat
-	// mode, its idle assert and ambient animation, its movement / patrol route / follow, its respawn and its scripted
-	// exit - plus putting a runtime NPC or pet into the world in the first place, and taking one back out.
-	//
-	// The seam against `WorldBroadcaster` is not the subject (both are about a `WorldEntity`) but the QUESTION:
-	// the broadcaster answers **who can see what** - the interest pass and the spawn / despawn / move wire it
-	// produces - while this answers **what this creature is doing**. Nothing in the broadcaster calls in here, which
-	// is the property that makes the split legal; this calls out for the three sends the visibility system owns
-	// (`SendWorldSpawn`, `SendWorldDespawn`, `BroadcastEntityDespawn`).
-	//
-	// ⚠️ `RuntimeHandleAllocator` is SHARED with the broadcaster rather than owned here. Loot bags are minted there
-	// and NPCs / pets / ambient members here, and a second counter would hand out colliding handles - so it is built
-	// once in the GameServer ctor and injected into both.
+	/// <summary>
+	///     What an NPC does, told to everyone who can see it: aggro, turning hostile, entering and leaving combat mode,
+	///     its idle assert and ambient animation, its movement, patrol route and follow, its respawn and its scripted
+	///     exit - plus putting a runtime NPC or pet into the world in the first place, and taking one back out.
+	/// </summary>
+	/// <remarks>
+	///     The seam against <see cref="WorldBroadcaster" /> is not the subject - both are about a
+	///     <see cref="WorldEntity" /> - but the question: the broadcaster answers who can see what, the interest pass
+	///     and the spawn, despawn and move wire it produces, while this answers what the creature is doing. Nothing in
+	///     the broadcaster calls in here, which is what makes the split one-way; this calls out for the three sends the
+	///     visibility system owns.
+	///     <para>
+	///         <see cref="RuntimeHandleAllocator" /> is shared with the broadcaster rather than owned here: loot bags
+	///         are minted there and NPCs, pets and ambient members here, so a second counter would hand out colliding
+	///         handles.
+	///     </para>
+	/// </remarks>
 	public sealed class NpcBroadcaster
 	{
-		// The combat-mode stat value the captured beach melee mobs send at aggro (strickenbla capture, #218): the tick
-		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
-		// and one non-swinging entity used 1 - the field is a stance/mode code that isn't fully decoded, but 4 is the
-		// value every actual melee swinger sends.)
-		// BCC STATE ids from the client's own behaviour trees (RDB 1010203; see CharacterStatId.CombatMode). 4 is
-		// `Fighting` - what draws the weapon - and 1 is `Idle`, which sheathes it.
-		//
-		// ⚠️ The sheathe used to be 0, inferred from "an idle spawn carries no stat-20 record at all". It is wrong:
-		// **no shipped tree declares state 0** (#905), so that was a value retail has no meaning for. `Idle` is 1.
+		/// <summary>
+		///     The behaviour-control state ids from the client's own behaviour trees (RDB 1010203; see
+		///     <c>CharacterStatId.CombatMode</c>): 4 is <c>Fighting</c>, which draws the weapon, and 1 is <c>Idle</c>,
+		///     which sheathes it.
+		/// </summary>
+		/// <remarks>
+		///     The captured beach melee mobs push <c>CombatMode = 4</c> on the tick before each mob's first swing. The
+		///     sheathe value is 1 and not 0: no shipped tree declares state 0, so it is a value retail has no meaning
+		///     for.
+		/// </remarks>
 		private const uint NpcCombatModeValue = 4;
+
+		/// <inheritdoc cref="NpcCombatModeValue" />
 		private const uint NpcIdleStateValue = 1;
 
-		// A scripted exit's two beats, from the farewell window closing - see ScheduleScriptedExit for the frames.
+		// A scripted exit's two beats, timed from the farewell window closing - see ScheduleScriptedExit.
 		private const int ScriptedExitMoveDelayMs = 4000;
 		private const int ScriptedExitDespawnDelayMs = 1200;
 
@@ -73,48 +80,54 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
-		// entry point (e.g. Casilda after her rescue stage), keyed by NAME since handles are session-volatile. No-op
-		// (returns false) if no such NPC is loaded in the zone.
-		// #262: make the NPC of TEMPLATE id `templateId` in `mapId`'s zone follow (or stop following) the player - the
-		// id-based escort companion trigger (prefer ids over names). The escortee's template is the Escort goal's
-		// TrailingRefId (e.g. Casilda 9411). See SetNpcFollow for the instance-aware zone resolution.
+		/// <summary>
+		///     Make the NPC of the given template id in a map's zone follow, or stop following, the given player: the
+		///     quest-driven escort companion trigger, as for Casilda after her rescue stage.
+		/// </summary>
+		/// <remarks>
+		///     The escortee's template is the escort goal's <c>TrailingRefId</c>. See the private
+		///     <c>SetNpcFollow</c> overload for the instance-aware zone resolution.
+		/// </remarks>
+		/// <returns>False when no such NPC is loaded in the zone.</returns>
 		public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow)
 		{
 			return SetNpcFollow(mapId, playerHandle, follow, e => e.NpcTemplateId == templateId, $"template {templateId}");
 		}
 
-		// An NPC engaged a target: push its aggro to every viewer in range that sees it - a HateListUpdate (the NPC now
-		// hates the target), a ThreatLevel, and the NPC's target LOCK, so the threat/aggro is visible the tick combat
-		// starts (#216). Additive to the combat-mode weapon-draw; gated with the rest of the combat sim by the caller.
-		//
-		// The three go out in retail's order: `NecroL80_..._login_combat` shows LockedToChanged arriving right after a
-		// HateListUpdate/ThreatLevel pair. LockedToChanged carries [npc handle] -> [target ref], and every captured
-		// instance is a low NPC handle locking onto a PLAYER, which is the aggro moment (#405).
-		//
-		// ⚠️ It goes to VIEWERS, not just to the target, and that is measured rather than assumed: in
-		// `login_2-clients_group-trade-friend` the same (npc, target) pair is sent on BOTH clients' streams (frames
-		// 3146/3147 and 3394/3395) even though only one of them is the target. A single-client capture cannot tell
-		// those apart, which is why the two-client one is the one that settles it.
+		/// <summary>
+		///     An NPC engaged a target: push its aggro to every viewer in range that sees it - a hate-list update, a
+		///     threat level, and the NPC's target lock - so the aggro is visible on the tick combat starts.
+		/// </summary>
+		/// <remarks>
+		///     Additive to the combat-mode weapon draw, and gated with the rest of the combat simulation by the caller.
+		///     The three records go out in retail's order: <c>NecroL80_..._login_combat</c> shows LockedToChanged arriving
+		///     right after a hate-list and threat-level pair. LockedToChanged carries [npc handle] -> [target ref], and
+		///     every captured instance is a low NPC handle locking onto a player, which is the aggro moment.
+		///     <para>
+		///         It goes to viewers rather than only to the target, which is measured: in
+		///         <c>login_2-clients_group-trade-friend</c> the same (npc, target) pair is sent on both clients'
+		///         streams (frames 3146/3147 and 3394/3395) even though only one of them is the target. A
+		///         single-client capture cannot tell those apart.
+		///     </para>
+		/// </remarks>
 		public async Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
 		{
 			if (target == null)
 				return;
 
-			// ⚠️ The hate/threat records are addressed to the TARGET, not to the NPC - it is the PLAYER's threat list
-			// that gains an entry, not the creature's. Measured over the whole corpus: 270 of 270 HateListUpdates carry
-			// the session player as the subject and name the other party as the target, and ThreatLevel is the player's
-			// on 681 of 712. Built the other way round they are addressed to a handle the client has no threat list
-			// for, so it drops them - and with them the re-poll that follows: retail's client answers this pair by
-			// asking RequestAggroStatus for the NPC again (frame 8482 in the Saddur fight) and only then learns the
-			// creature turned hostile. That is why a mob could attack a player while still drawing GREEN and refusing
-			// to be attacked back (#839): the flip reached the server model and nothing told the client.
+			// The hate and threat records are addressed to the target, not to the NPC: it is the player's threat list
+			// that gains an entry, not the creature's. Measured over the whole corpus, 270 of 270 hate-list updates
+			// carry the session player as the subject and name the other party as the target, and the threat level is
+			// the player's on 681 of 712. Built the other way round they address a handle the client has no threat list
+			// for, so it drops them - and with them the re-poll that follows, since retail's client answers this pair by
+			// asking for the NPC's aggro status again and only then learns the creature turned hostile. That is how a
+			// mob comes to attack a player while still drawing green and refusing to be attacked back.
 			var hate = HateListUpdateCodec.Build(target.Handle, npc.Handle);
 			// Retail opens with threat 0 and then 1 - an initialise followed by the first real level, both on the
-			// player - and climbs from there as damage accrues (3 by the second swing in that fight).
+			// player - and climbs from there as damage accrues, reaching 3 by the second swing in that fight.
 			var threatOpen = ThreatLevelCodec.Build(target.Handle, 0, 1);
 			var threat = ThreatLevelCodec.Build(target.Handle, 1, 1);
-			// LockedToChanged is the one that IS the NPC's: [npc] -> [target], exactly as captured (#405).
+			// LockedToChanged is the record that is the NPC's: [npc] -> [target], exactly as captured.
 			var lockedTo = LockedToChangedCodec.Build(npc.Handle, target.Handle);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
@@ -129,20 +142,24 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// A scripted EXIT: the NPC walks to a point and then leaves the world (#839). Casilda's `RunToTortage` is the
-		// case it exists for - her escort is over, so she heads for the city gate and is gone.
-		//
-		// The shape is retail's, measured over BOTH beach-to-city captures, and they agree to within 0.3 s. Timed from
-		// the farewell window closing (`KnubotCloseChatWindow`):
-		//
-		//   +4.0 s   a MoveTask carries her the last few units to the gate
-		//   +5.2 s   n3ToClientQuit - she is gone
-		//
-		// (`xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` fr11419 close, fr11438 move, fr11446 quit;
-		// `xxx_mage-demo_login_play_beach-to-enter-tortage_city` fr10239, fr10254, fr10264.)
-		//
-		// ⚠️ Scheduled rather than awaited: the caller is finishing a conversation, and holding its reply chain for
-		// five seconds would stall the window's own close.
+		/// <summary>
+		///     A scripted exit: the NPC walks to a point and then leaves the world. Casilda's <c>RunToTortage</c> is
+		///     the case it exists for - her escort is over, so she heads for the city gate and is gone.
+		/// </summary>
+		/// <remarks>
+		///     The timing is retail's, measured over both beach-to-city captures, which agree to within 0.3 s. Timed
+		///     from the farewell window closing:
+		///     <code>
+		///     +4.0 s   a MoveTask carries her the last few units to the gate
+		///     +5.2 s   n3ToClientQuit - she is gone
+		///     </code>
+		///     (<c>xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city</c> frames 11419 close, 11438 move,
+		///     11446 quit; <c>xxx_mage-demo_login_play_beach-to-enter-tortage_city</c> frames 10239, 10254, 10264.)
+		///     <para>
+		///         Scheduled rather than awaited: the caller is finishing a conversation, and holding its reply chain
+		///         for five seconds would stall the window's own close.
+		///     </para>
+		/// </remarks>
 		public void ScheduleScriptedExit(WorldEntity npc, Vector3 exit)
 		{
 			ArgumentNullException.ThrowIfNull(npc);
@@ -150,8 +167,8 @@ namespace Faolan.GameServer.World
 
 			Task.RunAfter(ScriptedExitMoveDelayMs, async () =>
 			{
-				// She may already be gone - the player zoned, the zone reloaded, or a second trigger fired. An exit
-				// for an entity that has left is dropped rather than broadcast against a stale handle.
+				// The NPC may already be gone - the player zoned, the zone reloaded, or a second trigger fired - and
+				// an exit for an entity that has left is dropped rather than broadcast against a stale handle.
 				if (!zone.TryGet(npc.Handle, out _))
 					return;
 
@@ -171,23 +188,28 @@ namespace Faolan.GameServer.World
 			}, _logger);
 		}
 
-		// An NPC that was standing in the world PEACEFUL has just turned on the player: restate its collision group to
-		// the mob one, for every viewer that already knows it.
-		//
-		// ⭐ This is what makes the flip real to the CLIENT, and without it the creature is hostile on the server only:
-		// it swings, the hate list arrives, the re-poll answers cCategory 1 - and the player still sees a peaceful
-		// nameplate and cannot hit back. Saddur was the reported case (#839): he attacked for 8 damage while refusing
-		// to be attacked, because his `CarsGroup` was still 1, the townsfolk group he spawned in.
-		//
-		// Measured rather than guessed. Over all 134 captures EVERY character `CarsGroup` record carrying the mob group
-		// is one of the three captured Saddur fights - three captures, three handles, no other occurrence - and in all
-		// three the order is identical: `SendScryEvent "Fight"`, then this record, then the hate list, then the client's
-		// own re-poll. So it is the first thing retail sends on the flip, ahead of everything we already send.
-		//
-		// ⚠️ Two things here are copied from the capture rather than reasoned out, and both are marked as such:
-		// the record is a CHARACTER one carrying the world-object `env` byte (0x00, not the 0x01 characters normally
-		// take - the same "restate the dynel layer first" shape `SkillPointService` documents), and retail sends it
-		// TWICE, as two packets in one segment, in all three captures. [V0: why the second copy.]
+		/// <summary>
+		///     An NPC that was standing in the world peaceful has turned on the player: restate its collision group to
+		///     the mob one, for every viewer that already knows it.
+		/// </summary>
+		/// <remarks>
+		///     This is what makes the flip real to the client. Without it the creature is hostile on the server only -
+		///     it swings, the hate list arrives, the re-poll answers hostile - and the player still sees a peaceful
+		///     nameplate and cannot hit back, because the creature's <c>CarsGroup</c> is still the townsfolk group it
+		///     spawned in.
+		///     <para>
+		///         Measured rather than guessed: over all 134 captures every character <c>CarsGroup</c> record carrying
+		///         the mob group belongs to one of the three captured Saddur fights - three captures, three handles, no
+		///         other occurrence - and in all three the order is identical: a "Fight" scry event, then this record,
+		///         then the hate list, then the client's own re-poll. It is the first thing retail sends on the flip.
+		///     </para>
+		///     <para>
+		///         Two details are copied from the capture rather than reasoned out: the record is a character one
+		///         carrying the world-object <c>env</c> byte (0x00 rather than the 0x01 characters normally take), and
+		///         retail sends it twice, as two packets in one segment, in all three captures.
+		///         [V0: why the second copy.]
+		///     </para>
+		/// </remarks>
 		public async Task BroadcastNpcTurnedHostile(WorldEntity npc)
 		{
 			ArgumentNullException.ThrowIfNull(npc);
@@ -203,12 +225,16 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC engaged or disengaged combat: push the combat-mode stat (stat 20) to every viewer in range that sees it,
-		// so the client DRAWS (enter) or SHEATHES (exit) the NPC's weapon. Without it the NPC swings empty-handed (#218) -
-		// the swing animation plays but no weapon is in hand because the client never put the NPC into combat stance.
-		// Enter sends the captured melee-mob value (4); exit sends 0 (the idle default - a spawn carries no stat-20 record
-		// at all, so 0 sheathes; the sheathe value isn't separately captured). Only viewers who already know the handle
-		// get it (mirrors BroadcastNpcMove).
+		/// <summary>
+		///     An NPC engaged or disengaged combat: push the combat-mode stat to every viewer in range that sees it, so
+		///     the client draws or sheathes the NPC's weapon.
+		/// </summary>
+		/// <remarks>
+		///     Without it the NPC swings empty-handed: the swing animation plays but no weapon is in hand, because the
+		///     client never put the NPC into combat stance. Entering sends <see cref="NpcCombatModeValue" /> and leaving
+		///     sends <see cref="NpcIdleStateValue" />. Only viewers who already know the handle get it, as with
+		///     <see cref="BroadcastNpcMove" />.
+		/// </remarks>
 		public async Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
 		{
 			var body = CombatModeBody(npc, inCombat);
@@ -220,19 +246,26 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// ⭐ Re-assert an already-fighting NPC's combat mode to ONE viewer, when that viewer has just built its dynel
-		// (#905). The broadcast above fires on the engage TRANSITION and only reaches viewers who already know the
-		// handle, so a mob that aggroed before the player could see it never draws its weapon for that player - it
-		// swings empty-handed for the rest of the fight, with no retry.
-		//
-		// Measured, and it is a one-to-one match with what was on screen: over one five-pirate fight the server sent
-		// 1,315 StatUpdateIIR frames and EXACTLY ONE went to an NPC - handle 0x65, the one pirate the player had
-		// selected, which transitioned later via the retaliation path when its handle was already known. The other
-		// four aggroed by proximity on the tick the player arrived and are exactly the four rendering sheathed.
-		//
-		// ⭐ Retail does not treat this as a one-shot either. Over all 138 dumps (10,373 well-formed StatUpdateIIR
-		// frames) there are 593 stat-20 records across 43 captures, and per (capture, handle) **25% are sent more
-		// than once, one of them 28 times**. So a re-assert is retail's own shape, not a patch over ours.
+		/// <summary>
+		///     Re-assert an already-fighting NPC's combat mode to one viewer, when that viewer has just built its dynel.
+		/// </summary>
+		/// <remarks>
+		///     <see cref="BroadcastNpcCombatMode" /> fires on the engage transition and only reaches viewers who already
+		///     know the handle, so a mob that aggroed before the player could see it would never draw its weapon for
+		///     that player and would swing empty-handed for the rest of the fight.
+		///     <para>
+		///         Measured, and a one-to-one match with what was on screen: over one five-pirate fight the server sent
+		///         1,315 stat-update frames and exactly one went to an NPC - handle 0x65, the pirate the player had
+		///         selected, which transitioned later through the retaliation path when its handle was already known.
+		///         The other four aggroed by proximity on the tick the player arrived and are exactly the four
+		///         rendering sheathed.
+		///     </para>
+		///     <para>
+		///         Retail does not treat this as a one-shot either: over all 138 dumps (10,373 well-formed stat-update
+		///         frames) there are 593 stat-20 records across 43 captures, and per capture and handle 25% are sent
+		///         more than once, one of them 28 times.
+		///     </para>
+		/// </remarks>
 		public static Task SendNpcCombatMode(INetworkClient client, WorldEntity npc)
 		{
 			return WorldIir.Send(client, CombatModeBody(npc, true));
@@ -247,21 +280,26 @@ namespace Faolan.GameServer.World
 			return StatUpdateCodec.Build(npc.Handle, stats);
 		}
 
-		// The "this entity is alive and idling" assert (#225): a short-form BehaviorControlCenterIIR (BehaviorId.BccAction)
-		// naming the one fixed idle behaviour, sent to the client that has just CONFIRMED building this NPC's dynel.
-		//
-		// ⚠️ ONCE per entity per viewer, which is what retail does and is not what this used to do. It was streamed as a
-		// per-NPC ~1/s heartbeat - and #716 then had to cap the aggregate, because in Old Tarantia that was 119.6
-		// BCC/s at one client. Measured over the corpus (`--report ambient-animation`): 37,965 records over 7,969
-		// actors, **p50 1 record per actor**, p90 2. Retail asserts it as an entity comes into view and stops.
-		//
-		// The "continuous ~10/s per rendered entity" #225 was filed on was ONE actor in one capture - the necromancer's
-		// Nemedian Deathstalker pet, which takes 1,250 of that capture's 1,353 records in bursts (60 inside one second,
-		// p50 gap 0.000s). Generalising that actor to every entity is what produced the flood. What genuinely recurs for
-		// an ordinary NPC is the ambient ANIMATION, a different command - see BroadcastNpcAmbientAnimation (#766).
-		//
-		// Confirmed-gated by construction (the caller is the confirm), because a record for a Known-but-not-Confirmed
-		// handle hits the pcDynel-NULL loader crash - the hang the original heartbeat experiment ran into.
+		/// <summary>
+		///     The "this entity is alive and idling" assert: a short-form behaviour record naming the one fixed idle
+		///     behaviour, sent to the client that has just confirmed building this NPC's dynel.
+		/// </summary>
+		/// <remarks>
+		///     Once per entity per viewer, which is what retail does. Measured over the corpus
+		///     (<c>--report ambient-animation</c>): 37,965 records over 7,969 actors, p50 one record per actor, p90 two.
+		///     Retail asserts it as an entity comes into view and then stops. Streaming it as a per-NPC heartbeat
+		///     instead reaches 119.6 records a second at one client in Old Tarantia.
+		///     <para>
+		///         The apparent continuous stream in the corpus is one actor in one capture - a necromancer's pet, which
+		///         takes 1,250 of that capture's 1,353 records in bursts, 60 inside one second, with a p50 gap of
+		///         0.000 s. What genuinely recurs for an ordinary NPC is the ambient animation, a different command -
+		///         see <see cref="BroadcastNpcAmbientAnimation" />.
+		///     </para>
+		///     <para>
+		///         Confirmed-gated by construction, the caller being the confirm, because a record for a handle the
+		///         client knows but has not built crashes its loader on a null dynel.
+		///     </para>
+		/// </remarks>
 		public static Task SendNpcIdleAssert(INetworkClient recipient, WorldEntity npc)
 		{
 			ArgumentNullException.ThrowIfNull(recipient);
@@ -270,10 +308,15 @@ namespace Faolan.GameServer.World
 			return WorldIir.Send(recipient, BehaviorControlCenterCodec.Build(BehaviorAnimations.Heartbeat(npc.Handle, ++npc.HeartbeatTick)));
 		}
 
-		// The NPC performs one of its creature's ambient idle animations (#766): a BehaviorId.Emote record naming the
-		// animation the TICK picked and its own length, so the client both plays it and knows how long it runs. Same
-		// Confirmed gating as the heartbeat - the animation plays ON the dynel, so a still-loading viewer has nothing to
-		// play it on. No-op when the tick picked nothing (a creature with no captured animations never gets here).
+		/// <summary>
+		///     The NPC performs one of its creature's ambient idle animations: an emote record naming the animation the
+		///     tick picked and its own length, so the client both plays it and knows how long it runs.
+		/// </summary>
+		/// <remarks>
+		///     The same confirmed gating as <see cref="SendNpcIdleAssert" />, because the animation plays on the dynel
+		///     and a still-loading viewer has nothing to play it on. A no-op when the tick picked nothing: a creature
+		///     with no captured animations never gets here.
+		/// </remarks>
 		public async Task BroadcastNpcAmbientAnimation(WorldEntity npc)
 		{
 			ArgumentNullException.ThrowIfNull(npc);
@@ -290,18 +333,15 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC moved a retail-sized segment (chasing a target, or returning home): send its MoveTask to every player in
-		// range that already sees it. The body is the 61-byte transform form for the SEGMENT (MoveFrom -> Position, facing
-		// the travel direction); the throttle in WorldState.Tick (#272) only queues this once the NPC has covered
-		// MoveBroadcastSegment (~6u, retail's chase step) since the last one, so the client interpolates a real segment
-		// over time instead of getting a 1.2u snap every tick (the jitter/teleport). Only viewers who know the handle get
-		// it (else they'd get a move for an unknown entity).
-		// #827: the companion-follow step, in the shape retail sends it - a mode-04 LIST whose second child BINDS the
-		// task to the leader (MoveTaskNodes.FollowLeader), not the bare path `BroadcastNpcMove` sends for a chase.
-		//
-		// The bare path is why a follower slid: it is a line the client interpolates and then sits at the end of, so
-		// the server re-anchors it every ~6u and the NPC snaps between segments. The bound form hands the follow to
-		// the client, which then owns the position and the walk animation together.
+		/// <summary>
+		///     The companion-follow step, in the shape retail sends it: a mode-04 list whose second child binds the task
+		///     to the leader, rather than the bare path <see cref="BroadcastNpcMove" /> sends for a chase.
+		/// </summary>
+		/// <remarks>
+		///     A bare path is a line the client interpolates and then sits at the end of, so the server has to re-anchor
+		///     it every few units and the NPC snaps between segments. The bound form hands the follow to the client,
+		///     which then owns the position and the walk animation together.
+		/// </remarks>
 		public async Task BroadcastNpcFollow(WorldEntity npc, WorldEntity leader)
 		{
 			ArgumentNullException.ThrowIfNull(npc);
@@ -316,15 +356,24 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		/// <summary>
+		///     An NPC moved a retail-sized segment - chasing a target, or returning home - so send its move task to
+		///     every player in range that already sees it.
+		/// </summary>
+		/// <remarks>
+		///     The tick's throttle only queues this once the NPC has covered a full broadcast segment, about six units,
+		///     which is retail's chase step, so the client interpolates a real segment over time instead of receiving a
+		///     one-unit snap every tick. Only viewers who know the handle get it; anyone else would receive a move for
+		///     an entity they do not have.
+		/// </remarks>
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			// #272: send the mode-1 PathMoveTask WALK form (the client interpolates the segment over time) rather than the
-			// mode-2 RotateMoveTask transform, which is a position-SET the client SNAPS to. The segment is MoveFrom ->
-			// Position (the ~6u the throttle accumulated), so the client renders the NPC where the server model has it -
-			// walking that segment - rather than lagging behind a far-goal path while the model jumps into melee (which
-			// desyncs: the player takes hits from an NPC the client still shows mid-walk). The earlier path attempt reverted
-			// because its trailer anchored at the START (walk then back = net-zero); BuildWalkBody anchors it at the segment
-			// end (Position). Residual: consecutive segments still re-spline (a small snap) - the remaining #272 polish.
+			// The mode-1 walk form, which the client interpolates over time, rather than the mode-2 transform, which is
+			// a position set the client snaps to. The segment runs from MoveFrom to Position - the distance the
+			// throttle accumulated - so the client renders the NPC where the server model has it, walking that segment,
+			// rather than lagging behind a far-goal path while the model jumps into melee, which desynchronises: the
+			// player takes hits from an NPC the client still shows mid-walk. The walk body's trailer must anchor at the
+			// segment end; anchoring it at the start makes the walk net-zero.
 			var body = MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.MoveFrom, MoveTaskNodes.Walk(npc.MoveFrom, npc.Position)));
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
@@ -334,15 +383,17 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// ⭐ An entity JUMPED - it is at a new position and did not walk there (#917). The mode-02 RotateMoveTask is
-		// retail's own form for that: `MoveTaskNodes.Rotate` with from != to is "a step the client SNAPS to", which is
-		// exactly why `BroadcastNpcMove` deliberately does NOT use it for the per-tick chase (a snap reads wrong for
-		// walking). Here the snap is the point.
-		//
-		// ⚠️ This only reaches viewers who ALREADY hold the handle and are still in range of the DESTINATION. A jump
-		// large enough to leave someone's interest radius is not a move for them at all - it is a despawn, and for a
-		// player near the destination it is a spawn. `WorldSimulation.RelocateEntity` runs the interest pass that
-		// settles both; this call is only the third case, the viewer who watches it go.
+		/// <summary>
+		///     An entity jumped: it is at a new position and did not walk there. The mode-02 form is retail's own for
+		///     that, a step the client snaps to, which is why <see cref="BroadcastNpcMove" /> does not use it for the
+		///     per-tick chase. Here the snap is the point.
+		/// </summary>
+		/// <remarks>
+		///     This only reaches viewers who already hold the handle and are still in range of the destination. A jump
+		///     large enough to leave someone's interest radius is not a move for them at all - it is a despawn, and for
+		///     a player near the destination it is a spawn. <c>WorldSimulation.RelocateEntity</c> runs the interest pass
+		///     that settles both; this call covers only the third case, the viewer who watches it go.
+		/// </remarks>
 		public async Task BroadcastEntitySnap(WorldEntity entity)
 		{
 			ArgumentNullException.ThrowIfNull(entity);
@@ -355,8 +406,10 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// #266: (re-)issue a patrolling NPC's captured route to every in-range viewer that already sees it, so it keeps
-		// walking its loop (the tick fires this on each patrol cycle; retail re-paths idle patrols). Only known handles.
+		/// <summary>
+		///     Re-issue a patrolling NPC's captured route to every in-range viewer that already sees it, so it keeps
+		///     walking its loop. The tick fires this on each patrol cycle, as retail re-paths idle patrols.
+		/// </summary>
 		public async Task BroadcastNpcPatrol(WorldEntity npc)
 		{
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
@@ -366,24 +419,27 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC respawned (its timer elapsed on the tick): re-render it for every player in range by re-sending its
-		// stored FA015807 spawn body (re-framed + position-patched per recipient by SendWorldSpawn).
-		//
-		// ⭐ #803: this delivery carries `npc_stats.spawn_animation`, and it is the ONLY one that does. Retail sets
-		// the flag when the entity is (re)created - measured by `--report spawn-animation`'s respawn test, which
-		// matches a death to the same template coming back at the same spot and finds 20 of 35 such respawns flagged
-		// against 8.1 expected from those same templates' OTHER first-sightings. The cleanest lines are the solitary
-		// animals, where a positional match cannot pick up a pack-mate standing nearby: Panther 3/3 flagged against
-		// 1/68, Wild Cow 2/2 against 0/147, Wild Pig 1/1 against 0/83.
-		//
-		// ⚠️ This UNDER-sends relative to retail, deliberately. Retail flags ~6-9% of ordinary first-sightings too -
-		// creatures that respawned before the player arrived and are still inside the window - and we cannot
-		// reproduce that without a duration the corpus does not contain (the death->delivery gap has an unmeasured
-		// respawn timer inside it, so no flagged delivery bounds the window from below). Flagging only the respawns a
-		// player actually witnesses is the subset we can justify, and it is the subset that matters visually. It also
-		// sidesteps the failure #803 warned about: a rule keyed to "the entity was created recently" would flag every
-		// NPC in the zone on the first login after a server start, because our world builds them all at load - a
-		// respawn is a distinct event from world-load creation, so keying on it cannot do that.
+		/// <summary>
+		///     An NPC respawned, its timer having elapsed on the tick: re-render it for every player in range by
+		///     re-sending its stored FA015807 spawn body, which the send re-frames and position-patches per recipient.
+		/// </summary>
+		/// <remarks>
+		///     This is the only delivery that carries the spawn-animation flag. Retail sets it when the entity is
+		///     created or recreated, measured by <c>--report spawn-animation</c>'s respawn test, which matches a death
+		///     to the same template coming back at the same spot and finds 20 of 35 such respawns flagged against 8.1
+		///     expected from those same templates' other first sightings. The cleanest lines are the solitary animals,
+		///     where a positional match cannot pick up a pack-mate standing nearby: Panther 3/3 flagged against 1/68,
+		///     Wild Cow 2/2 against 0/147, Wild Pig 1/1 against 0/83.
+		///     <para>
+		///         This deliberately under-sends relative to retail, which also flags 6 to 9% of ordinary first
+		///         sightings - creatures that respawned before the player arrived and are still inside the window - and
+		///         that cannot be reproduced without a duration the corpus does not contain, since the gap from death
+		///         to delivery has an unmeasured respawn timer inside it. Flagging only the respawns a player witnesses
+		///         is the justifiable subset, and it is the one that matters visually. It also avoids a rule keyed to
+		///         "the entity was created recently", which would flag every NPC in the zone on the first login after a
+		///         server start, because the world builds them all at load.
+		///     </para>
+		/// </remarks>
 		public async Task BroadcastNpcRespawn(WorldEntity npc)
 		{
 			if (npc.SpawnBody == null)
@@ -391,11 +447,11 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				// Re-add to Known: the corpse's quit (#246) removed the handle, so the player
-				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
-				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
+				// Re-add to Known: the corpse's quit removed the handle, so the viewer no longer has it. Adding it
+				// gates the spawn to viewers who need it and restores the invariant that Known means "was sent", so
+				// the later move and combat broadcasts, which check Known, reach them.
 				if (viewer.Client != null && viewer.Knowledge.Known.Add(npc.Handle))
-					await _broadcaster.SendWorldSpawn(viewer.Client, npc, spawnAnimation: true); // #266: no route replay - the tick drives a server-side wander
+					await _broadcaster.SendWorldSpawn(viewer.Client, npc, spawnAnimation: true); // no route replay: the tick drives the wander
 			}
 		}
 
@@ -411,9 +467,12 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Despawns a non-player entity by handle in the calling player's zone: the decoded n3ToClientQuit removal
-		// to every player in range + drop from the model (the cleanup complement to SpawnNpcForPlayer; also works
-		// on burst NPCs and loot bags). Returns the removed entity, or null when the handle is unknown or a player.
+		/// <summary>
+		///     Despawns a non-player entity by handle in the calling player's zone: the n3ToClientQuit removal to every
+		///     player in range, and a drop from the model. The complement of <see cref="SpawnNpcForPlayer" />, and it
+		///     works on burst NPCs and loot bags too.
+		/// </summary>
+		/// <returns>The removed entity, or null when the handle is unknown or belongs to a player.</returns>
 		public async Task<WorldEntity?> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -422,8 +481,8 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
-				// recipient was never sent crashes it). Removes it from Known as it goes.
+				// Only despawn for a viewer that actually has this handle: a despawn for a handle the recipient was
+				// never sent crashes it. The handle comes out of Known as it goes.
 				if (viewer.Client != null && viewer.Knowledge.Known.Remove(entityHandle))
 					await _broadcaster.SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entityHandle);
 			}
@@ -433,15 +492,19 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
-		// MaxCount. A killed member fades + is removed at the end of its corpse sequence (NpcCorpseRemoved), dropping
-		// the pool's live count; here we respawn ONE
-		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
-		// point, streamed to nearby players.
+		/// <summary>
+		///     Ambient pool maintenance, called on a slow cadence from the simulation tick: keep each loaded zone's
+		///     pools at their MaxCount.
+		/// </summary>
+		/// <remarks>
+		///     A killed member fades and is removed at the end of its corpse sequence, dropping the pool's live count.
+		///     One replacement per under-strength pool per pass is spawned at a free point and streamed to nearby
+		///     players, so the cadence is itself the respawn delay.
+		/// </remarks>
 		public async Task MaintainAmbientPools()
 		{
-			// The service spawns the deficit and yields each member as it goes; the streaming is ours. Because
-			// Replenish is a lazy iterator, this keeps the original spawn-then-send order rather than spawning every
+			// The service spawns the deficit and yields each member as it goes; the streaming is this method's.
+			// Because Replenish is a lazy iterator, this keeps the spawn-then-send order rather than spawning every
 			// pool's deficit up front.
 			foreach (var (entity, zone, pos) in _ambient.Replenish())
 			{
@@ -453,10 +516,12 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
-		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
-		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
-		// the Casilda rescue trigger.
+		/// <summary>
+		///     Make the given NPC follow the client's player, or stop following. The world tick then steps it toward
+		///     the player and broadcasts a move task each step.
+		/// </summary>
+		/// <remarks>Used by the <c>.npcfollow</c> GM command and by the escort rescue trigger.</remarks>
+		/// <returns>The NPC, or null when the handle is not a non-player entity in the caller's zone.</returns>
 		public WorldEntity? SetNpcFollow(INetworkClient client, uint npcHandle, bool follow)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -472,11 +537,16 @@ namespace Faolan.GameServer.World
 			return npc;
 		}
 
-		// Spawns a captured NPC (any NpcSpawns row with spawn Data, matched by NAME - the stable key) at the
-		// player's position and renders it for nearby players. Built byte-exact via NpcSpawnBuilder (like the
-		// map-load NPC spawns), re-framed + position-patched per recipient by SendWorldSpawn. When killable, the
-		// entity gets vitals/level/hostility from its row exactly like EnsureZoneNpcs, so it joins combat + loot
-		// as a full world citizen. Returns the spawned entity, or null when no spawnable row matches the name.
+		/// <summary>
+		///     Spawns a captured NPC, matched by name - the stable key - at the player's position and renders it for
+		///     nearby players.
+		/// </summary>
+		/// <remarks>
+		///     The body is built from typed columns as the map-load spawns are, then re-framed and position-patched per
+		///     recipient by the send. When killable, the entity gets its vitals, level and hostility from its row
+		///     exactly as the zone load does, so it joins combat and loot as a full world citizen.
+		/// </remarks>
+		/// <returns>The spawned entity, or null when no spawnable row matches the name.</returns>
 		public async Task<WorldEntity?> SpawnNpcForPlayer(INetworkClient client, string npcName, bool killable = true)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -490,9 +560,9 @@ namespace Faolan.GameServer.World
 				return null;
 			}
 
-			var handle = _handles.Next(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-			// baked ones are just placeholders (the player's zone token here).
+			var handle = _handles.Next(); // a fresh summoned-entity handle, which cannot collide with a player or NPC
+			// Built wholly from columns. The send re-stamps the position and playfield token per recipient, so the
+			// values baked in here are placeholders.
 			var body = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			EntityVitals? vitals = null;
@@ -505,23 +575,23 @@ namespace Faolan.GameServer.World
 			}
 
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate.Name ?? npcName, vitals, npc.NpcTemplateId);
-			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
+			entity.InstanceId = player.InstanceId; // spawn into the summoner's map instance - see SpawnPetForPlayer
 			entity.Level = npc.Level;
-			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // #671, as in the zone-load path
-			entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange); // #838
-			entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment); // #623, likewise
-			entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level, npc.NpcTemplate.StatCore?.ComboClass); // #675, likewise
+			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // the combat kit, as in the zone-load path
+			entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange);
+			entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment);
+			entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level, npc.NpcTemplate.StatCore?.ComboClass);
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
-			entity.FactionId = npc.NpcTemplate.StatCore?.FactionId; // #310
-			entity.NpcType = npc.NpcTemplate.StatCore?.NpcType; // #150, as in the zone-load path
+			entity.FactionId = npc.NpcTemplate.StatCore?.FactionId;
+			entity.NpcType = npc.NpcTemplate.StatCore?.NpcType;
 			entity.NpcFlags = npc.NpcTemplate.StatCore?.NpcFlags;
 			entity.SpawnBody = body;
-			entity.Route.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
+			entity.Route.NoRespawn = true; // a summoned NPC does not revive; it fades out after death
 
-			// Load this NPC type's caster spells (same as the zone-load path) so a summoned caster actually casts
-			// (#232) instead of only meleeing - the sim's cast branch lights up when entity.Spells is non-empty.
+			// Load this NPC type's caster spells, as the zone-load path does, so a summoned caster casts instead of
+			// only meleeing: the simulation's cast branch fires once the entity carries spells.
 			if (entity.Name is { Length: > 0 } spellName)
 			{
 				foreach (var s in await _database.GetNpcSpellsByName(spellName))
@@ -532,10 +602,9 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
 			{
-				// #307: register the spawn in the viewer's Known set. The follow/patrol MoveTask (BroadcastNpcMove) is
-				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
-				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
-				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
+				// Register the spawn in the viewer's Known set. The follow and patrol move tasks are Known-gated, and the
+				// client only renders a spawned model once a move task arrives at its position, so a directly spawned pet
+				// or NPC that is not in Known sends its spawn record but never its move task, and stays invisible.
 				if (viewer.Client != null && viewer.Knowledge.Known.Add(entity.Handle))
 					await _broadcaster.SendWorldSpawn(viewer.Client, entity);
 			}
@@ -544,20 +613,23 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// Spawns a creature TYPE at the player as a PET (#307/#244) - the RIGHT model: no NpcSpawns world placement,
-		// the FA015807 is assembled from the type's columns (StatCore + Equipment + Morphs) via BuildFromType at the
-		// summoner's position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
-		// (SummonPetForPlayer). BuildFromType throws if the type carries no lifted stat core (not yet imported/lifted).
+		/// <summary>
+		///     Spawns a creature type at the player as a pet: no world placement row, the spawn record assembled from
+		///     the type's own columns at the summoner's position and streamed to nearby viewers.
+		/// </summary>
+		/// <remarks>
+		///     The owner assignment and the follow are the caller's. The builder throws if the type carries no lifted
+		///     stat core, which is the fail-fast signal for un-lifted or partially imported data.
+		/// </remarks>
 		public async Task<WorldEntity?> SpawnPetForPlayer(INetworkClient client, NpcTemplate npcType)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return null;
 
-			// BuildFromType throws for a type with no lifted StatCore.IirHeader - the fail-fast signal for un-lifted /
-			// partially-imported data; it never happens for a shipped pet/mount type.
 			var handle = _handles.Next();
-			// Bake the summoner's zone token (4-byte) - see SpawnAmbientMember; a 0 token desyncs the client version read.
+			// Bake the summoner's zone's 4-byte token: a zero token ships a 1-byte one and desyncs the client's version
+			// read.
 			var body = NpcSpawnBuilder.BuildFromType(npcType, handle, player.Position, player.Rotation, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			var level = npcType.StatCore?.Level ?? 0;
@@ -566,14 +638,14 @@ namespace Faolan.GameServer.World
 				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
-			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // #671 - from the TYPE's equipment; a pet has no NpcSpawn row
-			entity.AttackRange = NpcWeapon.AttackRange(npcType.Equipment, WorldState.NpcMeleeRange); // #838
-			entity.MeleeComboId = await _combos.NpcMeleeComboId(npcType.Equipment); // #623, likewise
-			entity.ClassComboIds = await _combos.NpcClassComboIds(npcType.Equipment, level, npcType.StatCore?.ComboClass); // #675, likewise
-			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
-			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
-			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
-			// client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
+			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // the combat kit comes from the type: a pet has no placement row
+			entity.AttackRange = NpcWeapon.AttackRange(npcType.Equipment, WorldState.NpcMeleeRange);
+			entity.MeleeComboId = await _combos.NpcMeleeComboId(npcType.Equipment);
+			entity.ClassComboIds = await _combos.NpcClassComboIds(npcType.Equipment, level, npcType.StatCore?.ComboClass);
+			// The pet belongs to the summoner's map instance rather than the default one. Without this the pet's zone
+			// lookup resolves a different zone and token from the player's, so the send re-stamps the wrong playfield
+			// token and the client silently drops the spawn: no pet bar and no model.
+			entity.InstanceId = player.InstanceId;
 			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.Route.NoRespawn = true;
@@ -584,10 +656,9 @@ namespace Faolan.GameServer.World
 			_sim.World.ZoneForEntity(player).Add(entity);
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
 			{
-				// #307: register the spawn in the viewer's Known set. The follow/patrol MoveTask (BroadcastNpcMove) is
-				// Known-gated (#245/#322/#323), and the client only RENDERS a spawned model once a MoveTask arrives at its
-				// position - so a directly-spawned pet/NPC that isn't in Known sends its FA015807 but never its MoveTask,
-				// and stays invisible. (This is why necro pets stopped rendering after the Known-gate was tightened.)
+				// Register the spawn in the viewer's Known set. The follow and patrol move tasks are Known-gated, and the
+				// client only renders a spawned model once a move task arrives at its position, so a directly spawned pet
+				// or NPC that is not in Known sends its spawn record but never its move task, and stays invisible.
 				if (viewer.Client != null && viewer.Knowledge.Known.Add(entity.Handle))
 					await _broadcaster.SendWorldSpawn(viewer.Client, entity);
 			}
@@ -596,10 +667,14 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
-		// their own escortee live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
-		// map's live zone that actually contains this player, then look up the escortee (by `match`) in THAT copy - a
-		// TryGetZone(mapId) default-instance lookup misses her entirely and the follow silently no-ops.
+		/// <summary>
+		///     Resolves the player's own instance rather than the default one, then looks the NPC up in that copy.
+		/// </summary>
+		/// <remarks>
+		///     A Solo-instanced map puts the player and their escortee in a private playfield copy, not the shared
+		///     instance 0, so a default-instance lookup misses the escortee entirely and the follow silently does
+		///     nothing.
+		/// </remarks>
 		private bool SetNpcFollow(uint mapId, uint playerHandle, bool follow, Func<WorldEntity, bool> match, string label)
 		{
 			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
@@ -617,50 +692,54 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
-		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
-		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
-		// the spawn it was just sent); the waypoints are the absolute captured world coords.
+		/// <summary>
+		///     Issue the NPC's captured patrol route as a move task so the client walks it: retail drives idle patrol
+		///     client-side, sending the route once per spawn or respawn rather than a step per tick.
+		/// </summary>
+		/// <remarks>
+		///     The anchor is the NPC's live position, because the client's render gate requires the move task's position
+		///     to match the spawn it was just sent; the waypoints are absolute captured world coordinates.
+		/// </remarks>
 		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
 			if (!npc.Route.Patrols)
 				return Task.CompletedTask;
 
-			// Encode emits a bare 0x2000 body (no length prefix), so it rides WorldIir.Send.
 			return WorldIir.Send(recipient, npc.Route.WalksRoute ? BuildRouteBody(npc) : npc.Route.PatrolBody);
 		}
 
-		// #716: the beat as this NPC is about to walk it, anchored where it NOW stands.
-		//
-		// The captured `PatrolBody` is anchored at the entity's SPAWN, so re-issuing it at the end of a lap - or to a
-		// viewer arriving mid-beat - told the client to restart the route from the beginning, which reads as the NPC
-		// teleporting back to the start. Rebuilding from the live position removes the jump.
-		//
-		// Rebuilding was tried before (#266) and reverted because it "lost the speed and run-crawled": the trailer slot
-		// paces the walk, and a rebuild that did not supply it left the client pacing off something else. It is supplied
-		// here as the WALK speed (WorldState.RouteWalkSpeed) rather than the captured scalar - the scalar is not a ground
-		// speed, and feeding it back made the fast-scalar beats sprint. See #714 for the measurement.
+		/// <summary>The beat as this NPC is about to walk it, anchored where it now stands.</summary>
+		/// <remarks>
+		///     The captured patrol body is anchored at the entity's spawn, so re-issuing it at the end of a lap, or to a
+		///     viewer arriving mid-beat, tells the client to restart the route from the beginning, which reads as the
+		///     NPC teleporting back to the start. Rebuilding from the live position removes the jump.
+		///     <para>
+		///         A rebuild must supply the trailer's speed slot, which paces the walk; without it the client paces
+		///         off something else and crawls. It is supplied as the walk speed
+		///         (<see cref="WorldState.RouteWalkSpeed" />) rather than the captured scalar, which is not a ground
+		///         speed and makes the fast-scalar beats sprint.
+		///     </para>
+		/// </remarks>
 		private static byte[] BuildRouteBody(WorldEntity npc)
 		{
 			var ahead = PatrolRoute.FromHere(npc.Route.PatrolWaypoints, npc.Route.RouteIndex, npc.Route.RouteBackwards, npc.Route.RouteLoops);
 			if (ahead.Count == 0)
 				return npc.Route.PatrolBody;
 
-			// ⚠️ The walk STARTS where the NPC is standing, so its live position is the path's first waypoint (#714).
+			// The walk starts where the NPC is standing, so its live position is the path's first waypoint. Beginning
+			// the path at the next waypoint instead leaves the client to cover the gap from wherever it has the NPC
+			// onto the route before the timed walk begins, which it does at its own speed - the catch-up dash, visible
+			// only on the first body after a spawn, since every later re-issue fires at a turnaround where the NPC is
+			// already standing on that waypoint and the gap is zero.
 			//
-			// Without it the path began at `ahead[0]` - the next waypoint - and the client had to cover the gap from
-			// wherever it had the NPC onto the route before the timed walk began, which it does at its own speed. That
-			// is the catch-up dash seen in-client, and it appeared only on the FIRST body after a spawn: every later
-			// re-issue fires at a turnaround, where the NPC is already standing on `ahead[0]` and the gap is zero.
-			//
-			// It also makes `seconds` exact rather than approximate: the duration is now the length of the path that is
-			// actually sent, not of a path plus an approach leg the client was pacing separately.
+			// It also makes the duration below exact rather than approximate: it is the length of the path actually
+			// sent, not of a path plus an approach leg the client paces separately.
 			var path = new List<Vector3>(ahead.Count + 1) { npc.Position };
 			path.AddRange(ahead);
 
-			// State how long the walk takes, so the CLIENT is paced by time rather than by its own movement-speed
-			// attribute - which for an NPC is its RUN speed, and is what made the beat get sprinted and then stood
-			// through.
+			// State how long the walk takes, so the client is paced by time rather than by its own movement-speed
+			// attribute, which for an NPC is its run speed and makes it sprint the beat and then stand through the
+			// remainder.
 			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.Route.RouteSpeed;
 
 			return MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position,

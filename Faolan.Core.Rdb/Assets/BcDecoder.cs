@@ -2,11 +2,16 @@ using System;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Decodes BC1 (DXT1) / BC3 (DXT5) block-compressed texture data to RGBA32. Used to turn an AoC FCTX diffuse
-	// (DXT1) into a PNG that glTF can reference (#275 Phase 2). Only the top mip is needed for the model preview.
+	/// <summary>
+	///     Decodes BC1 (DXT1) and BC3 (DXT5) block-compressed texture data to RGBA32, which is how an AoC FCTX diffuse
+	///     becomes a PNG that glTF can reference. Only the top mip is needed for the model preview.
+	/// </summary>
 	public static class BcDecoder
 	{
-		// Decode the top-level mip of a BCn payload (block data only, no DDS/FCTX header) to RGBA32 (row-major, top-down).
+		/// <summary>
+		///     Decodes the top-level mip of a BCn payload (block data only, no DDS or FCTX header) to RGBA32,
+		///     row-major and top-down.
+		/// </summary>
 		public static byte[] Decode(ReadOnlySpan<byte> blocks, int width, int height, string fourCc)
 		{
 			var bc3 = fourCc is "DXT3" or "DXT5";
@@ -17,9 +22,9 @@ namespace Faolan.Core.Rdb.Assets
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
-			// Hoisted out of the block loop: a per-iteration stackalloc never frees until the method returns, so a
-			// large (e.g. 4x-upscaled) texture's block count overflows the stack. The buffer is fully rewritten each
-			// block (DecodeAlphaBlock writes all 16), so reuse is safe.
+			// Must stay out of the block loop: a per-iteration stackalloc is not freed until the method returns, so
+			// a large texture's block count would overflow the stack. DecodeAlphaBlock rewrites all 16 bytes each
+			// block, so reuse is safe.
 			Span<byte> alpha = stackalloc byte[16];
 			var p = 0;
 			for (var by = 0; by < blocksH; by++)
@@ -42,16 +47,18 @@ namespace Faolan.Core.Rdb.Assets
 			return rgba;
 		}
 
-		// Decode BC4 / ATI1 (AoC "MIXD") - a single-channel block format (one 8-byte interpolated-value block per 4x4
-		// tile, identical to the BC3 alpha block) - to RGBA32 grayscale (R=G=B=value, A=255). Used to inspect/apply the
-		// body normal/detail map (#275): the channel carries surface detail (nipples, navel, abs) the diffuse omits.
+		/// <summary>
+		///     Decodes BC4/ATI1 (AoC "MIXD"), a single-channel block format of one 8-byte interpolated-value block per
+		///     4x4 tile identical to the BC3 alpha block, to RGBA32 grayscale (R = G = B = value, A = 255). This is
+		///     the body detail map channel, carrying surface detail the diffuse omits.
+		/// </summary>
 		public static byte[] DecodeBc4(ReadOnlySpan<byte> blocks, int width, int height)
 		{
 			var rgba = new byte[width * height * 4];
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
-			// Hoisted out of the loop (see Decode): reused each block, fully rewritten by DecodeAlphaBlock.
+			// Must stay out of the loop, as in Decode: reused each block, fully rewritten by DecodeAlphaBlock.
 			Span<byte> vals = stackalloc byte[16];
 			var p = 0;
 			for (var by = 0; by < blocksH; by++)
@@ -79,16 +86,19 @@ namespace Faolan.Core.Rdb.Assets
 			return rgba;
 		}
 
-		// Decode BC5 / ATI2 (two BC4 8-byte blocks per 16-byte block: X in the first, Y in the second) to an RGB
-		// tangent-space normal map: R=X, G=Y stored directly (already 0..255 = -1..1), B = reconstructed Z
-		// (sqrt(1-x^2-y^2), re-encoded *0.5+0.5), A=255. Used for the MIXD container's BC5 normal sub-texture.
+		/// <summary>
+		///     Decodes BC5/ATI2 (two BC4 8-byte blocks per 16-byte block, X first then Y) to an RGB tangent-space
+		///     normal map: R = X and G = Y stored directly (already 0..255 spanning -1..1), B = the reconstructed Z
+		///     (sqrt(1 - x^2 - y^2), re-encoded as * 0.5 + 0.5), A = 255. This is the MIXD container's BC5 normal
+		///     sub-texture.
+		/// </summary>
 		public static byte[] DecodeBc5Normal(ReadOnlySpan<byte> blocks, int width, int height)
 		{
 			var rgba = new byte[width * height * 4];
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
-			// Hoisted out of the loop (see Decode): both reused each block, fully rewritten by DecodeAlphaBlock.
+			// Must stay out of the loop, as in Decode: both reused each block, fully rewritten by DecodeAlphaBlock.
 			Span<byte> xs = stackalloc byte[16];
 			Span<byte> ys = stackalloc byte[16];
 			var p = 0;

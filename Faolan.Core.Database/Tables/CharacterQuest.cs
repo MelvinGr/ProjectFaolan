@@ -4,10 +4,10 @@ using Faolan.Core.Database.Attributes;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A quest a character has in progress or completed (one row per character+quest). The quest DEFINITION (title /
+	// A quest a character has in progress or completed (one row per character+quest). The quest definition (title /
 	// description / journal text) lives in the client RDB and is rendered by id (the server only sends quest ids +
 	// state via QuestIIR/QuestGoal/QuestFullUpdate); we just persist which quests a character has and their state +
-	// objective progress. The full accept/branch logic is the pinned RDB Lua quest VM (docs/re/quests-and-combat.md).
+	// objective progress. The full accept/branch logic is the pinned RDB Lua quest vm (docs/re/quests-and-combat.md).
 	public class CharacterQuest : BaseEntity
 	{
 		public uint CharacterId { get; set; }
@@ -22,7 +22,7 @@ namespace Faolan.Core.Database.Tables
 		public QuestState State { get; set; } = QuestState.Active;
 
 		// A kill objective: the NPC name whose death advances this quest's goal (null = no kill objective). The real
-		// quest objective definitions live in the pinned RDB Lua quest VM; until then the target is set when the quest
+		// quest objective definitions live in the pinned RDB Lua quest vm; until then the target is set when the quest
 		// is added, and the tracker advances GoalProgress on a matching kill.
 		[MaxLength(128)]
 		public string? GoalTargetName { get; set; }
@@ -31,10 +31,10 @@ namespace Faolan.Core.Database.Tables
 		public uint GoalProgress { get; set; }
 		public uint GoalRequired { get; set; }
 
-		// Which pick-one-of-N reward this character took, as its 0-based position in the offer (#815). NULL means the
+		// Which pick-one-of-N reward this character took, as its 0-based position in the offer. Null means the
 		// quest either offers no choice or the player has not answered yet.
 		//
-		// ⚠️ The guard is needed because the GRANT is driven by a c2s message, not by the completion. The quest does
+		// The guard is needed because the grant is driven by a c2s message, not by the completion. The quest does
 		// complete exactly once - but `QuestRewardSelectionIIR` is an ordinary client packet naming its own quest id,
 		// so a client can send it twice, or send one for a quest it finished last week, and each arrival would hand out
 		// another item. Recording the answer is what makes the grant idempotent: the reward is spent once this is set,

@@ -4,14 +4,17 @@ using Faolan.Core.Network;
 
 namespace Faolan.GameServer.Combat
 {
-	// ISpellEffectOutbound (#439) - the three wire ops a SpellEffect row needs, so SpellEffectService and
-	// FatalityService dispatch data-driven effects without holding the listener. All three are one forward each, to
-	// the service that owns the act: the buff registry and the pet lifecycle.
-	//
-	// Building it needed one edge cut first. BuffService took CombatService for a single call
-	// (GetOrAddPlayerVitals), which closed a construction cycle - this class -> BuffService -> CombatService ->
-	// FatalityService -> this class - and that cycle is the whole reason the listener implemented the port for so
-	// long. The call reads nothing but the world model, so it moved to WorldSimulation and the cycle went with it.
+	/// <summary>
+	///     The three wire ops a <c>SpellEffect</c> row needs, so <see cref="SpellEffectService" /> and
+	///     <see cref="FatalityService" /> dispatch data-driven effects without holding the listener. Each member is one
+	///     forward to the service that owns the act: the buff registry and the pet lifecycle.
+	/// </summary>
+	/// <remarks>
+	///     The construction order matters: <see cref="BuffService" /> must not depend on
+	///     <see cref="CombatService" />, or the graph closes a cycle through this class ->
+	///     <see cref="BuffService" /> -> <see cref="CombatService" /> -> <see cref="FatalityService" /> -> this class.
+	///     The world-model reads that would otherwise pull it in belong on <c>WorldSimulation</c>.
+	/// </remarks>
 	public sealed class SpellEffectOutbound : ISpellEffectOutbound
 	{
 		private readonly BuffService _buffs;

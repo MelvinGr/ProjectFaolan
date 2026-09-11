@@ -3,18 +3,17 @@ using System;
 namespace Faolan.Core.Progression
 {
 	/// <summary>
-	///     The guild-city and Battlekeep RULES, as the client states them (#147).
+	///     The guild-city and Battlekeep rules, as the client states them.
 	/// </summary>
 	/// <remarks>
-	///     This is the DECISION layer only — it puts nothing on the wire, and deliberately so: not one siege or
-	///     city message occurs anywhere in the capture corpus, so every body that would carry these outcomes is
-	///     unknown. What IS known is what the server has to decide, because retail says it in its own words, in
-	///     ordinary user-facing LDB text. Each rule below cites the string it comes from; the prose is in
+	///     This is the decision layer only - it puts nothing on the wire, and deliberately so: not one siege or city
+	///     message occurs anywhere in the capture corpus, so every body that would carry these outcomes is unknown.
+	///     What is known is what the server has to decide, because retail says it in its own words, in ordinary
+	///     user-facing LDB text. Each rule below cites the string it comes from; the prose is in
 	///     <c>docs/subsystems/guild-cities-and-sieges.md</c>.
 	///     <para>
-	///         ⚠️ So this type answers "may they?" and "when?", never "what do we send?". Wiring it to a message is
-	///         blocked on a capture; encoding the rules is not, and doing it now is what keeps them from being
-	///         re-derived or quietly re-guessed.
+	///         This type therefore answers "may they?" and "when?", never "what do we send?". Wiring it to a message
+	///         is blocked on a capture; encoding the rules is not.
 	///     </para>
 	/// </remarks>
 	public static class GuildCityRules
@@ -26,12 +25,12 @@ namespace Faolan.Core.Progression
 		public const int MinimumMembersToBuildACity = 24;
 
 		/// <summary>
-		///     The city tier required to apply for Massive PvP, and to build or capture a Battlekeep — the same
-		///     number for both, and the largest tier there is.
+		///     The city tier required to apply for Massive PvP, and to build or capture a Battlekeep - the same number
+		///     for both, and the largest tier there is.
 		///     <para>
-		///         [LDB 100/87649219: <i>"…your guild city is now Tier 3. You may apply for Massive PvP battles."</i>;
-		///         LDB 10017/38: <i>"To build or capture a battlekeep …your guild must first possess a Tier 3 city
-		///         keep."</i>; LDB 50020/691 calls Tier 3 <i>"the largest possible"</i>.]
+		///         [LDB 100/87649219: "...your guild city is now Tier 3. You may apply for Massive PvP battles.";
+		///         LDB 10017/38: "To build or capture a battlekeep ...your guild must first possess a Tier 3 city
+		///         keep."; LDB 50020/691 calls Tier 3 "the largest possible".]
 		///     </para>
 		/// </summary>
 		public const int TierRequiredToFight = 3;
@@ -46,10 +45,10 @@ namespace Faolan.Core.Progression
 		public static readonly TimeSpan VulnerabilityWindow = TimeSpan.FromHours(2);
 
 		/// <summary>
-		///     How long after a battle resolves the controlling leader may MOVE the next window.
+		///     How long after a battle resolves the controlling leader may move the next window.
 		///     <para>
-		///         [LDB 100/14454: <i>"The vulnerability window can only be set in the 15 minutes after winning a
-		///         battle."</i>; LDB 50020/691 states the same 15 minutes for a city conquered or an invading army
+		///         [LDB 100/14454: "The vulnerability window can only be set in the 15 minutes after winning a
+		///         battle."; LDB 50020/691 states the same 15 minutes for a city conquered or an invading army
 		///         repelled.]
 		///     </para>
 		/// </summary>
@@ -57,11 +56,11 @@ namespace Faolan.Core.Progression
 
 		/// <summary>
 		///     Whether <paramref name="guild" /> may book a city spot, and why not when it may not. Booking is the
-		///     first step of the chain and the only one with a captured refusal SET, which is what a bookable finite
+		///     first step of the chain and the only one with a captured refusal set, which is what a bookable finite
 		///     resource looks like [LDB 100/20200, 100/20201, 100/129749027].
 		/// </summary>
 		/// <param name="freeCitySpots">
-		///     How many spots the realm has left. ⚠️ Not a rule this type owns — retail's supply is content we do not
+		///     How many spots the realm has left. Not a rule this type owns - retail's supply is content we do not
 		///     hold, so the caller states it.
 		/// </param>
 		public static GuildCityVerdict CanBookCitySpot(GuildCityState guild, int freeCitySpots)
@@ -74,7 +73,7 @@ namespace Faolan.Core.Progression
 			if (freeCitySpots <= 0)
 				return GuildCityVerdict.Refused(GuildCityRefusal.NoFreeCitySpots);
 
-			// ⚠️ The member gate is stated against BUILDING a city, not against booking. Applied here anyway because
+			// The member gate is stated against building a city, not against booking. Applied here anyway because
 			// booking with no way to build is a dead end, and refusing early is the reading that matches the client
 			// hiding the whole feature below 24 members. If a capture ever shows a 20-member guild booking, this is
 			// the line to move. [V0: whether the 24-member gate is on booking or only on building.]
@@ -86,8 +85,8 @@ namespace Faolan.Core.Progression
 		/// <summary>
 		///     Whether the guild may raise a building. The Keep comes first and gates every other structure.
 		///     <para>
-		///         [LDB 100/215909: <i>"This building must be built to claim an area as yours, and without it, no
-		///         other buildings can be raised."</i>]
+		///         [LDB 100/215909: "This building must be built to claim an area as yours, and without it, no other
+		///         buildings can be raised."]
 		///     </para>
 		/// </summary>
 		public static GuildCityVerdict CanBuild(GuildCityState guild, bool isTheKeep)
@@ -122,8 +121,8 @@ namespace Faolan.Core.Progression
 		}
 
 		/// <summary>
-		///     Whether a Battlekeep is vulnerable at <paramref name="now" /> — i.e. inside the two-hour window that
-		///     opened at <paramref name="windowOpensAt" />.
+		///     Whether a Battlekeep is vulnerable at <paramref name="now" /> - inside the two-hour window that opened
+		///     at <paramref name="windowOpensAt" />.
 		/// </summary>
 		public static bool IsVulnerable(DateTimeOffset windowOpensAt, DateTimeOffset now)
 		{
@@ -131,17 +130,17 @@ namespace Faolan.Core.Progression
 		}
 
 		/// <summary>
-		///     Whether the controlling leader may MOVE the next vulnerability window. Legal only inside the
+		///     Whether the controlling leader may move the next vulnerability window. Legal only inside the
 		///     fifteen-minute grace that follows a resolved battle, and only while changes remain.
 		/// </summary>
 		/// <param name="lastBattleResolvedAt">
-		///     When the city was conquered or the invaders repelled. Null = no battle has resolved, so no grace is
+		///     When the city was conquered or the invaders repelled. Null means no battle has resolved, so no grace is
 		///     open and the window sits wherever the default put it.
 		/// </param>
 		/// <param name="changesRemaining">
-		///     ⚠️ Retail caps this — <i>"There are no more changes left to the vulnerability window."</i>
-		///     [LDB 100/245141412] — but never states the allowance, so the caller supplies it rather than this type
-		///     inventing a number. [V0: how many window changes a guild gets.]
+		///     Retail caps this - "There are no more changes left to the vulnerability window." [LDB 100/245141412] -
+		///     but never states the allowance, so the caller supplies it rather than this type inventing a number.
+		///     [V0: how many window changes a guild gets.]
 		/// </param>
 		public static GuildCityVerdict CanMoveVulnerabilityWindow(DateTimeOffset? lastBattleResolvedAt, DateTimeOffset now, int changesRemaining)
 		{
@@ -156,10 +155,10 @@ namespace Faolan.Core.Progression
 
 		/// <summary>
 		///     Whether a siege camp may be raised. Two rules, both from the siege-camp strings: the target must be
-		///     vulnerable, and a camp holds ONE active weapon.
+		///     vulnerable, and a camp holds one active weapon.
 		///     <para>
-		///         [LDB 50018/116765824: <i>"You can only build a siege camp while the city is vulnerable."</i>;
-		///         LDB 50018/116771712: <i>"This siege camp already has an active siege weapon!"</i>]
+		///         [LDB 50018/116765824: "You can only build a siege camp while the city is vulnerable.";
+		///         LDB 50018/116771712: "This siege camp already has an active siege weapon!"]
 		///     </para>
 		/// </summary>
 		public static GuildCityVerdict CanRaiseSiegeCamp(bool targetIsVulnerable, bool campAlreadyHasAWeapon)
@@ -173,7 +172,7 @@ namespace Faolan.Core.Progression
 		}
 
 		/// <summary>
-		///     Repair and construction are BOTH refused for the duration of a siege battle — two separate strings
+		///     Repair and construction are both refused for the duration of a siege battle - two separate strings
 		///     saying the same thing about the two actions.
 		///     <para>[LDB 100/14456 (repair), 100/14457 (build)]</para>
 		/// </summary>
@@ -186,12 +185,12 @@ namespace Faolan.Core.Progression
 	}
 
 	/// <summary>
-	///     The guild state these rules read. A snapshot passed in rather than fetched, because nothing persists a
-	///     city yet — when something does, this is the shape it has to be able to produce.
+	///     The guild state these rules read. A snapshot passed in rather than fetched, because nothing persists a city
+	///     yet - when something does, this is the shape it has to be able to produce.
 	/// </summary>
 	/// <param name="MemberCount">Roster size, which is what the 24-member gate counts.</param>
 	/// <param name="HasCitySpot">Whether a spot has been booked.</param>
-	/// <param name="HasKeep">Whether the Keep is built — the building that gates every other building.</param>
+	/// <param name="HasKeep">Whether the Keep is built - the building that gates every other building.</param>
 	/// <param name="CityTier">1..<see cref="GuildCityRules.MaximumCityTier" />; 0 for a spot with nothing on it.</param>
 	/// <param name="OwnsBattlekeep">A guild may hold at most one.</param>
 	public sealed record GuildCityState(int MemberCount, bool HasCitySpot, bool HasKeep, int CityTier, bool OwnsBattlekeep);
@@ -208,9 +207,9 @@ namespace Faolan.Core.Progression
 	}
 
 	/// <summary>
-	///     Why a guild-city or siege action was refused. Each member names a REAL client string, so when the
-	///     message that carries one is finally captured there is a decision here to attach it to — and until then
-	///     nothing is sent, because the body is unknown.
+	///     Why a guild-city or siege action was refused. Each member names a real client string, so when the message
+	///     that carries one is finally captured there is a decision here to attach it to - and until then nothing is
+	///     sent, because the body is unknown.
 	/// </summary>
 	public enum GuildCityRefusal
 	{

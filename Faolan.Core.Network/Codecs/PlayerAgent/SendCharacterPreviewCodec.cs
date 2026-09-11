@@ -5,26 +5,27 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerInterface.SendCharacterPreview - the s2c half of UpdateCharacterPreview: the stored `preview.bin` for ONE
-	// character, streamed back before the character list so the select screen can pose that character. Gitea #611.
-	//
-	//   [u32 0xC350 (character class)][u32 characterId][ClientSettingsBuffer]
-	//
-	// Retail sends one of these per character that HAS a preview, in reply to GetStartupData and ahead of
-	// SendCharacterSettingsCheckSumMap; characters with nothing stored are simply skipped rather than sent an empty
-	// buffer (229 sightings in the corpus, never an empty one). The body is byte-identical to the c2s upload's, which
-	// is the whole mechanism: the client authors its own preview and the server only keeps it.
+	/// <summary>
+	///     <c>PlayerInterface.SendCharacterPreview</c> - the s2c half of <c>UpdateCharacterPreview</c>: the stored
+	///     <c>preview.bin</c> for one character, streamed back before the character list so the select screen can pose
+	///     that character. The body is <c>[u32 characterClass][u32 characterId][ClientSettingsBuffer]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Retail sends one of these per character that has a preview, in reply to GetStartupData and ahead of
+	///     <c>SendCharacterSettingsCheckSumMap</c>; characters with nothing stored are skipped rather than sent an empty
+	///     buffer (229 sightings in the corpus, never an empty one). The body is byte-identical to the c2s upload's, which
+	///     is the whole mechanism: the client authors its own preview and the server only keeps it.
+	/// </remarks>
 	public static class SendCharacterPreviewCodec
 	{
-		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
-		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
-		// against (#613).
+		// The message identity. On PlayerAgent/PlayerInterface that is the method constant rather than an opcode: the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare against.
 		public const uint Method = (uint)PlayerInterfaceMethods.SendCharacterPreview;
 
 		// The archive's only member, on both directions of the message.
 		public const string PreviewFileName = "preview.bin";
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterPreview value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -35,10 +36,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			return s.ToArray();
 		}
 
-		// The CONSTRUCTED form (#788): a preview authored from a character's own appearance rather than echoed back
-		// from an upload. ⚠️ Nothing in the server calls this - retail sends no preview for a character that has never
-		// logged in, and a record the client REJECTS is worse than the no-preview state retail itself produces. It
-		// exists so a constructed record can be put in front of the client and checked.
+		// A preview authored from a character's own appearance rather than echoed back from an upload. Nothing in the server
+		// calls this: retail sends no preview for a character that has never logged in, and a record the client rejects is
+		// worse than the no-preview state retail itself produces. It exists so a constructed record can be put in front of
+		// the client and checked.
 		public static byte[] Build(uint characterId, CharacterPreviewSet preview)
 		{
 			ArgumentNullException.ThrowIfNull(preview);
@@ -58,6 +59,6 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// A character's stored select-screen preview.
+	/// <summary>A character's stored select-screen preview.</summary>
 	public sealed record CharacterPreview(uint CharacterId, ClientSettingsBuffer Buffer);
 }

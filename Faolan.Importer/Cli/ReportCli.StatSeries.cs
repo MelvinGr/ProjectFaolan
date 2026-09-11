@@ -9,15 +9,14 @@ namespace Faolan.Importer.Cli
 	// `--report stat-series --report-arg <id>[,<id>...]`: the ordered value sequence of one or more stats, per
 	// capture and per entity handle, out of the captured `StatIIR` stream.
 	//
-	// The general question it answers is "what does this stat DO at runtime" - a census says a stat is pushed, a
+	// The general question it answers is "what does this stat do at runtime" - a census says a stat is pushed, a
 	// SERIES says whether it counts up, counts down, resets, or is restated unchanged. `--report morph-stats` is
 	// the census half; this is the other.
 	//
-	// Written for #656 (the daily kill counters `106` / `1000069 DailyPvEKills` / `1000070 DailyPvPKills`, whose
-	// whole evidence was a hand-read of one live session), and kept general because every "what is this stat"
-	// ticket wants exactly this view.
+	// Deliberately general: the daily kill counters (`106`, `1000069 DailyPvEKills`, `1000070 DailyPvPKills`) are
+	// the worked case, but every "what is this stat" question wants exactly this view.
 	//
-	// ⚠️ Grouped by (capture, handle). A handle is session-scoped, so grouping on the handle alone merges unrelated
+	// Grouped by (capture, handle). A handle is session-scoped, so grouping on the handle alone merges unrelated
 	// entities across captures - the same rule the buff level-slot measurement needed.
 	public static partial class ReportCli
 	{
@@ -65,7 +64,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				var all = runs.SelectMany(r => r.Value).ToList();
-				// The shape question: does it MOVE, and which way. A stat that is only ever restated at the same
+				// The shape question: does it move, and which way. A stat that is only ever restated at the same
 				// value is a snapshot field; one that steps in one direction is a counter.
 				var steps = runs.SelectMany(r => r.Value.Zip(r.Value.Skip(1), (a, b) => (long)b - a)).Where(d => d != 0).ToList();
 				Console.WriteLine($"stat {stat}: {all.Count} record(s) over {runs.Count} (capture, handle) run(s), "

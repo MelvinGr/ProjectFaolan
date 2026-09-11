@@ -16,7 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-character LEARNED spell sets (#74) re-granted on login (DispatchLearnSpell). Needs characters + spells.
+	/// <summary>
+	///     Per-character learned spell sets, re-granted on login (DispatchLearnSpell). Needs characters and spells.
+	/// </summary>
 	public sealed class LearnedSpellsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(SpellsModule)];

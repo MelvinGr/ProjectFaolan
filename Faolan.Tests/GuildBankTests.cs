@@ -5,20 +5,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #654: the guild bank's DEPOSIT half. `Guild.Cash` could only ever go down - `GuildWithdrawMoney` paid out and
-	// nothing paid in - and the code said so ("there is no DEPOSIT counterpart; guild money is fed by the guild
-	// TAX"). The client's own method table says otherwise: `GameCharAgent.GuildTransferMoney(uint64
+	// The guild bank's deposit half. `Guild.Cash` could only ever go down - `GuildWithdrawMoney` paid out and
+	// nothing paid in - and the code said so ("there is no deposit counterpart; guild money is fed by the guild
+	// tax"). The client's own method table says otherwise: `GameCharAgent.GuildTransferMoney(uint64
 	// i_nGuildInstance, Explicit64_c i_cAmount)`.
 	//
-	// ⚠️ NONE of it is captured. `--report method-census --report-arg Bank` finds ZERO guild-bank frames across all
+	// None of it is captured. `--report method-census --report-arg Bank` finds zero guild-bank frames across all
 	// 120 captures, because no captured session ever opened the bank window. So the body is recovered from the
-	// client, and what makes that more than a guess is the LAYOUT RULE below, which is measurable.
+	// client, and what makes that more than a guess is the layout rule below, which is measurable.
 	public class GuildBankTests
 	{
 		// The rule the deposit body rests on: a GameCharAgent request body is its declared parameters concatenated,
 		// big-endian, with no header - ID32 = 8 bytes, int = 4, uint64 = 8.
 		//
-		// These are the CAPTURED average body lengths from `--report method-census`, against the client's declared
+		// These are the captured average body lengths from `--report method-census`, against the client's declared
 		// signatures. Nine methods, four distinct parameter counts, three type widths, and every one lands exactly -
 		// which is what licenses reading a two-64-bit-parameter method as a 16-byte body.
 		// (RequestBindLocation, KickFromTeam and TryLootCash are all `(ID32)` at 8 bytes; listed once, since xUnit
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		public void ACapturedGameCharAgentBody_IsItsParametersConcatenated(string method, int capturedLength, int id32s, int ints, int uint64s)
 		{
 			Assert.Equal(capturedLength, id32s * 8 + ints * 4 + uint64s * 8);
-			Assert.NotEmpty(method); // named so a failure says WHICH captured method disagrees
+			Assert.NotEmpty(method); // named so a failure says which captured method disagrees
 		}
 
 		// So `GuildTransferMoney(uint64, Explicit64_c)` is sixteen bytes: two 64-bit values, guild first.
@@ -64,8 +64,8 @@ namespace Faolan.Tests
 			Assert.Equal(body, GuildNotEnoughCashCodec.Build(GuildNotEnoughCashCodec.Parse(body)));
 		}
 
-		// The two halves of the bank are on DIFFERENT tiers, and that asymmetry is the client's own: the deposit goes
-		// where the WALLET is (the game server) and the withdrawal where `Guild.Cash` is (the CS tier). Pinning it
+		// The two halves of the bank are on different tiers, and that asymmetry is the client's own: the deposit goes
+		// where the wallet is (the game server) and the withdrawal where `Guild.Cash` is (the CS tier). Pinning it
 		// here because "both guild money methods are on the guild tier" is the obvious wrong assumption, and it would
 		// silently address the deposit to a listener that never receives it.
 		[Fact]
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			Assert.Equal((uint)CSPlayerAgentMethods.GuildWithdrawMoney, GuildWithdrawMoneyCodec.Method);
 
 			// And the wire renderings collide across the two interfaces (0x2011 vs 0x2035 here, but the principle is
-			// what matters): a method number is only meaningful WITH its interface.
+			// what matters): a method number is only meaningful with its interface.
 			Assert.Equal(0x2011, WireOpcode.Of(GameCharAgentMethods.GuildTransferMoney));
 			Assert.Equal(0x2035, WireOpcode.Of(CSPlayerAgentMethods.GuildWithdrawMoney));
 		}

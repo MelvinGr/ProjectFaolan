@@ -12,32 +12,30 @@ namespace Faolan.Tests
 	// position reproduces the captured body byte-for-byte. This is the registration a non-patrolling NPC needs,
 	// constructible from the spawn's own position (the full multi-segment patrol form is an enhancement).
 	//
-	// The captured goldens carry the carrier's leading [u32 len], which belongs to the SENDER (#530 rule 2), so the
-	// codec's output is compared against the record past it.
+	// The captured goldens carry the carrier's leading [u32 len], which belongs to the sender, so the codec's output
+	// is compared against the record past it.
 	public class MoveTaskBuilderTests
 	{
-		// The two captured MoveTask records, byte-for-byte, past the carrier's [u32 len]. Verified against
-		// Golden/MoveTaskPatrol.bin and Golden/MoveTaskStationary.bin (since deleted, #555) before removal.
+		// The two captured MoveTask records, byte-for-byte past the carrier's [u32 len], pinned as SHA-256 digests:
+		// the retail blobs themselves are not carried in the repo.
 		//
-		// The INPUTS moved into the tests as literals when the blobs went, which is the honest form of what the old
-		// version was doing anyway: it read the handle, positions, waypoints and speed back out of the golden at
-		// fixed offsets and fed them to the builder. Spelling them out says what the capture holds; the digest still
-		// says the builder reproduces it.
+		// The inputs are spelled out as literals rather than read back out of a golden at fixed offsets - that says
+		// what the capture holds, and the digest still says the builder reproduces it.
 		private const string CapturedPatrolSha256 = "2e659474d4b316fd50b6978ad9f7436540a63957875b09bef45c07b12edd174c";
 		private const string CapturedStationarySha256 = "46654fd27c528366b102b2895147fc97ef4d0964be4820f15e50da46b3602f0a";
 
-		// ⭐ FORMATION-FOLLOW (mode 0x07), the wire form of the ambient NPC-vs-NPC chase (#741). In
+		// Formation-follow (mode 0x07), the wire form of the ambient NPC-vs-NPC chase. In
 		// NecroL80_..._annotated_1 the maintainer annotates "giner & scruffy should be chasing each other", and the two
 		// NPCs he means are `Ginger` 0x31C7A - which gets a 694-byte mode-04 patrol with 52 waypoints - and 0x31CFD,
-		// which gets THIS: a 55-byte mode-07 naming 0x31C7A as its target at an offset of -4.5. The pair is re-issued
+		// which gets this: a 55-byte mode-07 naming 0x31C7A as its target at an offset of -4.5. The pair is re-issued
 		// together every ~15 s.
 		//
 		// So the chase is an ordinary MoveTask retargeted at the other NPC's handle, not a scripted behaviour. The
-		// codec already PARSED mode 7 (it round-trips over the corpus); what it had no way to do was build one.
+		// codec already parsed mode 7 (it round-trips over the corpus); what it had no way to do was build one.
 		[Fact]
 		public void BuildFormation_IsByteIdenticalToTheCapturedChase()
 		{
-			// subop, class, follower, u16 0, its position | mode 0x07 | the LEADER's class + handle |
+			// subop, class, follower, u16 0, its position | mode 0x07 | the leader's class + handle |
 			// the formation offset (0, 0, -4.5) and slot 0 - Scruffy holds 4.5 units directly behind Ginger.
 			const string captured = "96c467400000c35000031cfd000044548e5b42cafa5f43fe15c9" +
 			                        "07" +
@@ -108,25 +106,25 @@ namespace Faolan.Tests
 		{
 			return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(body));
 		}
-		// #827: the COMPANION-FOLLOW step, against Casilda's follow in
+		// The companion-follow step, against Casilda's follow in
 		// Hoxxling_mage-heraldofxotli_login_gameplay frame 1959 (her handle 0x00017ED0 walking behind the player
-		// 0x01316E71). We used to send a bare mode-01 path, which the client interpolates and then sits at the end
-		// of - so the server re-anchored it every ~6u and she snapped between segments instead of walking.
+		// 0x01316E71). A bare mode-01 path is interpolated by the client, which then sits at the end of it - so the
+		// server has to re-anchor every ~6u and the follower snaps between segments instead of walking.
 		//
-		// Retail sends a mode-04 LIST of two: the path segment, then a mode-08 node BOUND to the leader's handle.
+		// Retail sends a mode-04 list of two: the path segment, then a mode-08 node bound to the leader's handle.
 		// That second child is what hands the follow to the client, so it owns the position and the walk animation
 		// together - the same reason a patrol animates correctly.
 		//
-		// ⚠️ Every byte matches EXCEPT the four-byte trailer scalar, excluded deliberately and not papered over.
+		// Every byte matches except the four-byte trailer scalar, excluded deliberately and not papered over.
 		// It is the segment's own 3D length; retail's is 0x40E21A9E and every IEEE route gives 0x40E21A9F - float32
 		// accumulation and double accumulation alike. One ulp, from the client's x87 80-bit intermediates, which
-		// managed .NET cannot reproduce and should not try to.
+		// managed .Net cannot reproduce and should not try to.
 		//
-		// ⭐ And it does not matter, which Ghidra settles rather than assumption: the trailer is read by
-		// `FUN_00a3e400` into a struct at +4..+0x20, and the client's movement SPEED does not come from it at all -
-		// `FUN_00a2e670` switches on the spawn's MODE and reads a per-entity field per mode (+0x13c/+0x134 for 1|4,
+		// And it does not matter, which Ghidra settles rather than assumption: the trailer is read by
+		// `FUN_00a3e400` into a struct at +4..+0x20, and the client's movement speed does not come from it at all -
+		// `FUN_00a2e670` switches on the spawn's mode and reads a per-entity field per mode (+0x13c/+0x134 for 1|4,
 		// +0x140 for 2|5). The only MoveTask field that touches speed is the `PathFlags & 0x20` float at +0x60, a
-		// max-speed CAP the executor applies as `if (cap < speed) speed = cap` before advancing by `speed * dt` -
+		// max-speed cap the executor applies as `if (cap < speed) speed = cap` before advancing by `speed * dt` -
 		// and retail's follow record does not set it (PathFlags 0).
 		[Fact]
 		public void CasildaFollowMoveTask_MatchesCapture()

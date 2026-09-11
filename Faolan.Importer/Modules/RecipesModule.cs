@@ -16,14 +16,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Crafting recipe-book catalog (TradeskillReplyIIR 0x9062D559) - the list served when the client opens the
-	// Recipes window. Opt-in (its only capture is one L80 char's full 603-recipe book).
+	/// <summary>
+	///     Crafting recipe-book catalog: the list served when the client opens the Recipes window. Opt-in, because its
+	///     only capture is one level 80 character's full 603-recipe book.
+	/// </summary>
 	public sealed class RecipesModule : IImportModule
 	{
-		// Depends on `items`: every RecipeItem.ItemId is a hard FK to Items. The recipe importer harvests each
-		// referenced item's identity (key + hash) into Items from the recipe element, but the items module must run
-		// first so a real named item wins over the bare harvested placeholder (and the FK resolves for a `--only
-		// recipes` run, which pulls items in via this dependency).
+		/// <remarks>
+		///     Every RecipeItem.ItemId is a hard foreign key to Items. The recipe importer harvests each referenced
+		///     item's identity (key + hash) into Items from the recipe element, but the items module must run first so
+		///     that a real named item wins over the bare harvested placeholder. The dependency also pulls items in for
+		///     an <c>--only recipes</c> run, so the foreign key resolves there too.
+		/// </remarks>
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>

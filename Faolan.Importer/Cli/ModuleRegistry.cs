@@ -5,22 +5,23 @@ using Faolan.Importer.Modules;
 
 namespace Faolan.Importer.Cli
 {
-	// The catalog of import modules + selection/dependency resolution. Each module wraps a CaptureX/Rdb
-	// importer or extractor (see docs/tooling/importer.md). Registration order is the stable tie-break for the
-	// topo sort.
-	// The two module GROUPS, as their files used to describe them before each module got a file of its own
-	// (#928 item 3):
-	// * CAPTURE-sourced modules: the remaining ones. Each wraps an existing CaptureX importer / extractor + the shared
-	// ImportOps orchestration. (items/shops/characters live in their own files.) Modes are advertised; threading
-	// ctx.Mode into the underlying importer internals is the tracked follow-up (see docs/tooling/importer.md
-	// "Write modes") - except where the strategy lives in ImportOps (npcs/conversations overwrite).
-	// * RDB-sourced modules: Opt-in (Source == Rdb keeps them out of the default set); all require --rdb. The two
-	// with out-of-DB write side effects (rdb-respawns -> mirror-store blobs, rdb-items -> --dump-templates) suppress
-	// that write under --dry-run.
+	/// <summary>
+	///     The catalog of import modules, plus selection and dependency resolution. Each module wraps a capture or RDB
+	///     importer or extractor; see docs/tooling/importer.md. Registration order is the stable tie-break for the
+	///     topological sort.
+	/// </summary>
+	/// <remarks>
+	///     Capture-sourced modules each wrap a capture importer or extractor plus the shared import orchestration.
+	///     RDB-sourced modules are opt-in (Source == Rdb keeps them out of the default set) and all require an RDB
+	///     directory; the two with out-of-database write side effects - rdb-respawns writing mirror-store blobs and
+	///     rdb-items dumping templates - suppress that write under --dry-run.
+	/// </remarks>
 	public static class ModuleRegistry
 	{
-		// Registered in default-run order so a no-flag run sequences the same every time (the topo sort is
-		// stable by this order). RDB + mounts are opt-in (InDefaultSet == false).
+		/// <remarks>
+		///     Registered in default-run order so a no-flag run sequences the same every time; the topological sort is
+		///     stable by this order. The RDB modules and mounts are opt-in (InDefaultSet is false).
+		/// </remarks>
 		public static IReadOnlyList<IImportModule> All { get; } =
 		[
 			// --- capture modules ---
@@ -34,35 +35,43 @@ namespace Faolan.Importer.Cli
 			new ClaimsModule(), // opt-in (account claims -> AccountClaim)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---
-			// The ellatha + AoC-fandom-wiki scrapes are GONE: the RDB leads, and it turned out to carry both facts
-			// they were standing in for - a spell's class membership (the class-encoded GuiStackingLine, RdbSpellImporter)
-			// and a combo's reuse time (the combo XML's own `cooldown`, RdbComboImporter). See Gitea #296.
+			// There are no web-scrape modules: the RDB carries both facts they would stand in for - a spell's class
+			// membership (the class-encoded GuiStackingLine, RdbSpellImporter) and a combo's reuse time (the combo
+			// XML's own `cooldown`, RdbComboImporter).
 			new StarterSpellLevelsModule(), // capture-sourced, and the create kit is a LIST, not a level query
 			// --- rdb modules (opt-in, require --rdb) ---
 			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbAchievementsModule(), new RdbFactionsModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
 			new RdbMapsModule(), new RdbNameFilterModule(), new RdbRespawnsModule(), new RdbQuestCatalogModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new RdbQuestTextModule(), new RdbDialogueTeleportsModule(), new RdbRegionsModule(), new ClassAttributeBaseModule(), new ClassComboScalingModule(),
 			// --- corrections that must outrank an rdb module ---
-			// LAST on purpose: rdb-spells writes Spells.DurationMs unconditionally, so a capture-sourced duration for
-			// the rows its property run leaves empty has to be applied after it (#659). Registration order is the
-			// topo sort's tie-break, so this placement IS the ordering.
+			// Last on purpose: rdb-spells writes Spells.DurationMs unconditionally, so a capture-sourced duration for
+			// the rows its property run leaves empty has to be applied after it. Registration order is the topological
+			// sort's tie-break, so this placement is the ordering.
 			new BuffDurationsModule()
 		];
 
-		// The default set when no --only is given: every module that opts in (RDB + mounts are opt-in).
+		/// <summary>
+		///     The default set when no --only is given: every module that opts in.
+		/// </summary>
 		public static IReadOnlyList<IImportModule> DefaultSet => All.Where(m => m.InDefaultSet).ToList();
 
-		// Resolves a module by its CLI Name ("items", from --only/--skip) OR by its class name (nameof(ItemsModule),
-		// the compile-checked key DependsOn uses so a renamed/removed module breaks the build, not a run).
+		/// <summary>
+		///     Resolves a module by its CLI name ("items", from --only / --skip) or by its class name
+		///     (<c>nameof(ItemsModule)</c>, the compile-checked key DependsOn uses so a renamed or removed module
+		///     breaks the build rather than a run).
+		/// </summary>
 		public static IImportModule? Find(string name)
 		{
 			return All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase) || string.Equals(m.GetType().Name, name, StringComparison.OrdinalIgnoreCase));
 		}
 
-		// Expands a requested set with its transitive dependencies, then returns it in dependency order
-		// (deps before dependents). Registration order in All breaks ties so runs are deterministic.
+		/// <summary>
+		///     Expands a requested set with its transitive dependencies and returns it in dependency order,
+		///     dependencies before dependents. Registration order in <see cref="All" /> breaks ties, so runs are
+		///     deterministic.
+		/// </summary>
 		public static IReadOnlyList<IImportModule> Plan(IEnumerable<IImportModule> requested)
 		{
-			// 1. Transitive closure over DependsOn (what a module needs) AND RequiredAfter (what must happen because
+			// 1. Transitive closure over DependsOn (what a module needs) and RequiredAfter (what must happen because
 			//    it ran - a module that leaves the database in a state nobody should stop at names its completer).
 			var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			var pending = new Stack<IImportModule>(requested);
@@ -78,7 +87,7 @@ namespace Faolan.Importer.Cli
 					pending.Push(Find(after) ?? throw new InvalidOperationException($"Module '{m.Name}' requires unknown module '{after}' to run after it."));
 			}
 
-			// 2. Topological sort (DFS), iterating All so the output order is stable.
+			// 2. Topological sort (depth-first), iterating All so the output order is stable.
 			var ordered = new List<IImportModule>();
 			var done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			var onStack = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

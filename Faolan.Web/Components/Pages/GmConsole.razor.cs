@@ -90,7 +90,7 @@ namespace Faolan.Web.Components.Pages
 
 			var (x, y, z) = (Parse(Tp(_tpX, srcId)), Parse(Tp(_tpY, srcId)), Parse(Tp(_tpZ, srcId)));
 
-			// Need either a map or a full coordinate triple.
+			// Either a map or a full coordinate triple is required.
 			if (map == null && (x == null || y == null || z == null))
 			{
 				_notice = "Enter a map id, or a full x/y/z (and optionally a map).";

@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// FanaticCommandIIR_t (0xEE4AA85C) - what the client sends when a GM runs one of its commands (#448/#449).
+	// FanaticCommandIIR_t (0xEE4AA85C) - what the client sends when a GM runs one of its commands.
 	//
-	// ⚠️ These tests used to build their fixture in the SAME shape the parser read, so they passed while both were
-	// wrong and every real command arrived with an empty text. A builder that mirrors its parser proves only that the
-	// file agrees with itself. The two records below are REAL BYTES off the wire from a live GM session
-	// (2026-07-29) - they are the oracle, and the synthetic builder is checked against them.
+	// A builder that mirrors its parser proves only that the file agrees with itself: a fixture built in the shape the
+	// parser reads passes while both are wrong and every real command arrives with an empty text. The two records below
+	// are real bytes off the wire from a live GM session (2026-07-29) - they are the oracle, and the synthetic builder
+	// is checked against them.
 	public class FanaticCommandCodecTests
 	{
 		// `/cloak` typed in-client.
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		private const string TeleportRecord =
 			"00000030EE4AA85C0000C3500802E5D400000000020000000000000000000000132F74656C65706F727420676D2069736C616E64";
 
-		// The same `/cloak`, but with the sender targeting THEMSELVES - the only difference is the target pair.
+		// The same `/cloak`, but with the sender targeting themselves - the only difference is the target pair.
 		private const string CloakSelfTargetedRecord =
 			"00000023EE4AA85C0000C3500802E5D400000000020000C3500802E5D4000000062F636C6F616B";
 
@@ -55,12 +55,12 @@ namespace Faolan.Tests
 			Assert.Equal(expectedText, parsed.Text);
 			Assert.Equal(0x0802E5D4u, parsed.Handle);
 			Assert.Equal(0, parsed.Flag);   // the carrier flag byte
-			Assert.Equal(2u, parsed.Word0); // constant across commands - NOT a command id
+			Assert.Equal(2u, parsed.Word0); // constant across commands - not a command id
 			Assert.Equal(0u, parsed.TargetA); // 0/0 = "no explicit target"; the client substitutes its own pair
 			Assert.Equal(0u, parsed.TargetB);
 		}
 
-		// The regression: the carrier's flag byte belongs BEFORE the record, and dropping it slides every field by one.
+		// The regression: the carrier's flag byte belongs before the record, and dropping it slides every field by one.
 		// The symptom was not a parse failure but plausible garbage - word0 0, targets 33554432/0, empty text - where
 		// 33554432 is 0x02000000, i.e. word0's 2 read one byte early.
 		[Fact]
@@ -102,8 +102,8 @@ namespace Faolan.Tests
 			Assert.Equal("", parsed.Text);
 		}
 
-		// This is an undecoded inbound path, so Parse is STRICT (#530 rule 4): a short or lying body is a decode
-		// FAILURE that names the offset, not a half-read record. The inbound handler catches it and tells the GM the
+		// This is an undecoded inbound path, so Parse is strict: a short or lying body is a decode
+		// failure that names the offset, not a half-read record. The inbound handler catches it and tells the GM the
 		// body did not parse - which is the honest outcome when there is no capture to check a partial read against.
 		[Fact]
 		public void MalformedBodies_Throw()
@@ -111,13 +111,13 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(new byte[] { 1, 2, 3 }));
 			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(new byte[12])); // carrier only, no record
 
-			// A length field larger than the body used to yield "no text" and a plausible-looking record.
+			// A length field larger than the body must throw, not yield "no text" and a plausible-looking record.
 			var lying = Body(9, 0, 0, "abc")[4..];
 			lying[^4] = 0x7F; // blow up the declared text length
 			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(lying));
 		}
 
-		// The captured record WITHOUT its leading u32 record length - what the codec parses (#530 rule 2).
+		// The captured record without its leading u32 record length, which belongs to the sender - what the codec parses.
 		private static byte[] Record(string hex)
 		{
 			return Convert.FromHexString(hex)[4..];
@@ -130,7 +130,7 @@ namespace Faolan.Tests
 			var bytes = new List<byte>();
 			void U32(uint v) => bytes.AddRange([(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v]);
 
-			// Record length counts everything AFTER itself: subop + class + handle + flag + 3 u32s + the u32 length,
+			// Record length counts everything after itself: subop + class + handle + flag + 3 u32s + the u32 length,
 			// i.e. 29 bytes, plus the text. (35 for "/cloak", 48 for "/teleport gm island" - both as captured.)
 			U32((uint)(29 + raw.Length));
 			U32(FanaticCommandCodec.Opcode);

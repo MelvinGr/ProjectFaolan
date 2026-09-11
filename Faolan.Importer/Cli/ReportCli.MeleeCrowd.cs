@@ -8,23 +8,23 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report melee-crowd`: when several retail mobs are on one player at once, HOW ARE THEY ARRANGED? (#908)
+	// `--report melee-crowd`: when several retail mobs are on one player at once, how are THEY ARRANGED?
 	//
 	// Our combat chase walks every attacker to `NpcContactRange` of the target's exact position with no per-attacker
 	// offset, so N attackers all solve for the same 1.5u sphere and settle inside one body's worth of space - five
-	// Tortage Pirates measured 0.03u-0.46u apart in-client. The fix needs a slot geometry, and what that should LOOK
+	// Tortage Pirates measured 0.03u-0.46u apart in-client. The fix needs a slot geometry, and what that should look
 	// like is a retail question rather than a design one: do captured mobs ring their target, favour an arc, or
 	// genuinely overlap?
 	//
-	// ⭐ Method deliberately does NOT go through the attack records. Its sibling `ranged-standoff` established that a
-	// mob's `Combat:*` BCC carries an EMPTY target list, so "who is attacking whom" is not recoverable that way. It
+	// Method deliberately does not go through the attack records. Its sibling `ranged-standoff` established that a
+	// mob's `Combat:*` BCC carries an empty target list, so "who is attacking whom" is not recoverable that way. It
 	// does not need to be: the question is about POSITIONS, and both parties are streamed continuously (spawn +
 	// every `CharDCMove`). So this samples the geometry directly - every moment at which two or more NPCs are within
 	// `CrowdRadius` of a player - and asks how far apart they are.
 	//
-	// ⚠️ Proximity is not proof of aggro. An NPC near a player may be a bystander, which INFLATES separations (a
+	// Proximity is not proof of aggro. An NPC near a player may be a bystander, which INFLATES separations (a
 	// passer-by is further away than a committed attacker). That biases the measurement toward "retail spreads them
-	// out", so the number to trust is the LOW end: if retail mobs genuinely stacked, the minimum separations would
+	// out", so the number to trust is the low end: if retail mobs genuinely stacked, the minimum separations would
 	// be near zero however many bystanders are mixed in. Reported as a distribution for that reason, not a mean.
 	public static partial class ReportCli
 	{
@@ -32,14 +32,14 @@ namespace Faolan.Importer.Cli
 		// so the sample is not defined by our own constant.
 		private const float CrowdRadius = 6f;
 
-		// How recently (in packets) an NPC must have moved to count as WALKING rather than standing about.
+		// How recently (in packets) an NPC must have moved to count as walking rather than standing about.
 		private const int MoverWindow = 400;
 
 		private static void MeleeCrowd(IReadOnlyList<NamedCapture> captures)
 		{
 			var pairs = new List<float>();
 			var moverPairs = new List<float>();
-			// How far a WALKING crowd member stands from the player it is crowding - measured directly, so the ring
+			// How far a walking crowd member stands from the player it is crowding - measured directly, so the ring
 			// radius the separations imply can be checked against it rather than inferred and believed.
 			var moverRadius = new List<float>();
 			var crowds = new List<(string Capture, int Size, float MinGap)>();
@@ -81,8 +81,8 @@ namespace Faolan.Importer.Cli
 							continue;
 						}
 
-						// ⚠️ `CharDCMove` is the PLAYER's movement and ONLY the player's - measured, not assumed:
-						// over the whole corpus it carries 30,769 records and **not one** of them names an NPC handle.
+						// `CharDCMove` is the player's movement and only the player's - measured, not assumed:
+						// over the whole corpus it carries 30,769 records and not one of them names an NPC handle.
 						// So it fixes the crowd's CENTRE and nothing else.
 						case CharDCMoveCodec.Opcode:
 						{
@@ -95,7 +95,7 @@ namespace Faolan.Importer.Cli
 						}
 
 						// ...and an NPC moves by MoveTask. Without this the only NPC position available is the one its
-						// SPAWN record streamed in with - where it was standing when it came into view, not where it
+						// spawn record streamed in with - where it was standing when it came into view, not where it
 						// fought - which would answer a different question while looking like it answered this one.
 						case MoveTaskCodec.Opcode:
 						{
@@ -148,10 +148,10 @@ namespace Faolan.Importer.Cli
 								gaps.Add(gap);
 								pairs.Add(gap);
 
-								// ⚠️ An EXACT zero is an artefact, not a measurement: two independently-moving entities
+								// An exact zero is an artefact, not a measurement: two independently-moving entities
 								// do not land on bit-identical X and Z. It means one entity streamed twice (a respawn
 								// under a new handle) or a scripted co-location - the encounter lure and its boss sit on
-								// one point by design (#502). Counted apart rather than folded into "retail overlaps".
+								// one point by design. Counted apart rather than folded into "retail overlaps".
 								if (gap == 0f)
 									exactlyZero++;
 								else if (gap < 0.5f)
@@ -211,7 +211,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {g.Key} mobs: {mins.Count,5} arrangements   min={mins[0]:0.00}  median={Pick(mins, 0.5):0.00}  p90={Pick(mins, 0.9):0.00}");
 			}
 
-			// ⭐ The cut that answers the ticket. A CHASE is mobs that are moving; a city square is mobs that are not.
+			// The cut that answers the ticket. A CHASE is mobs that are moving; a city square is mobs that are not.
 			if (moverPairs.Count > 0)
 			{
 				var m = moverPairs.Order().ToList();
@@ -221,9 +221,9 @@ namespace Faolan.Importer.Cli
 				foreach (var bound in new[] { 0.5f, 1f, 1.5f })
 					Console.WriteLine($"  pairs closer than {bound:0.0}u: {moverPairs.Count(g => g < bound),5} of {m.Count} ({100.0 * moverPairs.Count(g => g < bound) / m.Count:0.0}%)");
 
-				// ⭐ Is it a RING? On a circle of radius R with N evenly-spaced occupants, neighbours sit
+				// Is it a RING? On a circle of radius R with N evenly-spaced occupants, neighbours sit
 				// 2*R*sin(pi/N) apart - so dividing the observed separation by that factor recovers the radius each
-				// crowd size implies. If the arrangement is a ring, every size implies the SAME radius; if mobs simply
+				// crowd size implies. If the arrangement is a ring, every size implies the same radius; if mobs simply
 				// pack in tighter as more arrive, the implied radius falls away with N. That is the discrimination,
 				// and it is the reason to print a derived column at all.
 				Console.WriteLine("  by crowd size, the CLOSEST walking pair -> the ring radius it implies:");
@@ -262,7 +262,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// Where a move task PUTS the entity: the last waypoint of the deepest node that has any, else the record
-			// header's own point. The header is the segment's FROM (that is what `BroadcastNpcMove` writes), so taking
+			// header's own point. The header is the segment's from (that is what `BroadcastNpcMove` writes), so taking
 			// it when a path exists would track the mob one step behind its own walk.
 			static bool TryTaskDestination(MoveTaskIIR task, out Vector3 to)
 			{

@@ -12,15 +12,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the decoded grammar of the 0x737A6DF9 tails' @609 OBJECTIVE-DETAIL region (between the Quest_c
+	// Locks the decoded grammar of the 0x737A6DF9 tails' @609 objective-detail region (between the Quest_c
 	// journal region @0..609 and the quest index @1168). Decode + dissector: tools/capture/decode_snapshot_609.py;
 	// docs/re/fullplayer-snapshot-reader.md.
 	//
-	// KEY CORRECTION (2026-06-16): @609 is NOT a "QuestFullUpdate block authored by BuildQuestFullUpdate" (the
-	// handover's earlier side-thread). It is its own per-GOAL objective-detail grammar: [0x0BD3 chapterTag] then
+	// Key correction (2026-06-16): @609 is not a "QuestFullUpdate block authored by BuildQuestFullUpdate" (the
+	// handover's earlier side-thread). It is its own per-goal objective-detail grammar: [0x0BD3 chapterTag] then
 	// per goal [1][k][instance][questId][goalId]...[marker]...[u32 objLen][<remoteformat 50304>][text record].
-	// The beach starter has TWO goals (1448 + 3490), each with its own world marker - richer than QuestDefinition's
-	// single GoalId. Generating this region therefore needs a per-goal definition model (Gitea #186).
+	// The beach starter has two goals (1448 + 3490), each with its own world marker - richer than QuestDefinition's
+	// single GoalId. Generating this region therefore needs a per-goal definition model.
 	public class Snapshot609AnalysisTests
 	{
 		private const int RegionStart = 609, IndexTag = 1168; // empirical boundaries (Quest_c end / quest index)
@@ -32,14 +32,14 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task BuildQuestFullUpdate_DoesNotReproduceRegion609()
 		{
-			// The previously-assumed authoring path produces a 869 B block that starts [questId][1][questId][3]...,
+			// The quest-full-update authoring path produces a 869 B block that starts [questId][1][questId][3]...,
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
 			var iir = QuestFullUpdates.ForQuest(0x02165EFF, def, QuestFullUpdateCodec.DefaultQuestLevel);
 			var full = QuestFullUpdateCodec.Build(iir);
 
-			// The full-update's payload IS the quest's journal record (#530 wave 5), so the "content block" the older
-			// slice `full[17..^1]` cut out is just that record's own bytes.
+			// The full-update's payload is the quest's journal record, so a slice such as `full[17..^1]` cuts out just
+			// that record's own bytes.
 			var block = QuestcRecordCodec.Build(iir.Record);
 
 			var region = Template[RegionStart..IndexTag];
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 		{
 			var t = Template;
 
-			// It opens with the 0x00000BD3 chapter tag, NOT a Quest_c/QuestFullUpdate header (which would open with
+			// It opens with the 0x00000BD3 chapter tag, not a Quest_c/QuestFullUpdate header (which would open with
 			// the questId), and the first goal carries questId 10238 + goalId 1448 right after the [1][k] separator.
 			Assert.Equal(0x00000BD3u, t.ReadU32Be(RegionStart)); // chapterTag
 			Assert.Equal(1u, t.ReadU32Be(RegionStart + 4)); // [1]
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		public void Region609_ObjectiveText_IsDbSourced_ForBothGoals()
 		{
 			// Both goals' objective <remoteformat category="50304"> records appear in the region with the DB's keys,
-			// proving the journal TEXT is DB-sourced (only the per-goal structure/markers are not yet in the model).
+			// proving the journal text is DB-sourced (only the per-goal structure/markers are not yet in the model).
 			var region = Encoding.Latin1.GetString(Template[RegionStart..IndexTag]);
 			Assert.Contains("category=\"50304\"", region);
 			Assert.Contains("id=\"1448\"", region); // goal 1 objective

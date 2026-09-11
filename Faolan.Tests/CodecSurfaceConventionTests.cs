@@ -14,58 +14,38 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The UNIFORM CODEC SURFACE gates (Gitea #530). CodecConventionTests next door pins the opcode/literal rules;
-	// this file pins the SHAPE: every codec is `byte[] Build(...)` + `T Parse(in ReadOnlySpan<byte>)` and nothing
-	// else public, reading sequentially through SpanReader to the end of the body.
+	// The uniform codec surface gates. CodecConventionTests next door pins the opcode/literal rules; this file pins
+	// the shape: every codec is `byte[] Build(...)` + `T Parse(in ReadOnlySpan<byte>)` and nothing else public,
+	// reading sequentially through SpanReader to the end of the body.
 	//
-	// ALL SIXTEEN GATES ARE LIVE as of wave 9, over EVERY folder under `Codecs/`. They were added skipped in wave 0
-	// and un-skipped a wave at a time, each asserting only over the folders converted so far - a gate that had gone
-	// live in wave 0 would have been red for the whole sweep and would just have got muted. `MigratedFolders` is read
-	// off disk now, so a NEW folder is covered the moment it exists.
+	// Every gate here is live over every folder under `Codecs/`, and `MigratedFolders` is read off disk, so a new
+	// folder is covered the moment it exists.
 	//
-	// BOTH allowlists are now EMPTY - `UnreadableInTheCorpus` with #545, `UncomposedSubRecords` with #543. Every entry
-	// named the DECODE issue that removed it, and #530 decoded nothing. They are not places to silence a gate.
-	//
-	// Wave order (see #530): 1 Inventory/Feats/Team/Guild · 2 Text/Dialogue/Economy · 3 World · 4 Combat ·
-	// 5 Spawn/Quest · 6 FullCharSnapshot (+#447) · 7 Faolan/ moves in · 8 Faolan.Importer/ stops hand-decoding ·
-	// 9 delete ICodec, un-skip everything.
+	// Both allowlists are empty, and neither is a place to silence a gate: an entry has to name the decode issue
+	// that removes it again.
 	public class CodecSurfaceConventionTests
 	{
 		private const string CodecsNamespace = "Faolan.Core.Network.Codecs";
 
-		// EVERY folder under Codecs/, enumerated from disk. This was a hand-maintained list of the folders converted so
-		// far, which is what let the gates go live a wave at a time; wave 9 drops the filter, so a NEW folder is
-		// covered the moment it exists rather than when someone remembers to add it here.
+		// Every folder under Codecs/, enumerated from disk rather than hand-maintained, so a new folder is covered the
+		// moment it exists.
 		private static readonly string[] MigratedFolders =
 		[
 			RootFolder,
 			.. Directory.EnumerateDirectories(TestPaths.Repo("Faolan.Core.Network", "Codecs")).Select(d => Path.GetFileName(d)!).Order(StringComparer.Ordinal)
 		];
 
-		// A genuine sub-record whose PARENT does not compose it yet - not a place to silence the gate, and each entry
-		// would name the issue that removes it.
-		//
-		// EMPTY since #543, which was the last one: `StatListCodec` was the typed reading of the snapshot's stat
-		// region while `SubClassPostAccessBlockCodec` carried that same region as a flat `uint[]` and
-		// `SubClassStatBlock` laid the two lists out as words - two spellings of one layout in one folder. The block
-		// is typed now and composes both `StatListCodec` and `KnownSpellListCodec` (which was in the same position
-		// and only passed incidentally, because two neighbours referenced its constants).
+		// A genuine sub-record whose parent does not compose it yet - not a place to silence the gate. Each entry would
+		// name the decode issue that removes it; the list is empty.
 		private static readonly string[] UncomposedSubRecords = [];
 
-		// Codecs the corpus round-trip cannot yet cover, each with the DECODE issue that removes it. #530 explicitly
-		// decodes nothing, and every one of these was a real gap the gate FOUND rather than a shape problem.
-		// ⚠️ Entries are per CODEC, not per body, so an entry hides the codec's PASSING bodies too. Delete one the
-		// moment its issue closes - the value of this gate is that the list is short and shrinking.
-		//
-		// EMPTY since #545, and that is the point: all three have come off. `FullPlayerCharacterCodec` with #538 (all
-		// 151 captured snapshot roots re-encode byte-exact), `QuestJournalCodec` with #544 (all 38, once "RRL3" turned
-		// out to be a per-area ACGHash and the "tracked-quest pointer" turned out to be five separate fields), and
-		// `MainQuestUpdateCodec` with #545 (all 46, once the "leading constant" turned out to be the client's
-		// MainQuestUpdate OPERATION). Adding an entry back means shipping a codec that cannot read retail - do it only
-		// with a filed decode issue, never to silence a failure.
+		// Codecs the corpus round-trip cannot yet cover, each with the decode issue that removes it. The list is empty:
+		// adding an entry back means shipping a codec that cannot read retail, so do it only with a filed decode issue,
+		// never to silence a failure. Entries are per codec, not per body, so an entry hides the codec's passing bodies
+		// too.
 		private static readonly string[] UnreadableInTheCorpus = [];
 
-		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
+		// The root of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
 		private const string RootFolder = ".";
 
@@ -74,20 +54,20 @@ namespace Faolan.Tests
 		private static readonly Regex BlockComment = new Regex(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new Regex(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
 
-		// One `case IirTypes.X:` of the listener's routing switch - §6's dispatch exemption, keyed on
-		// the label rather than on a file name (see IirOpcodesAreOnlyNamedInsideCodecs).
+		// One `case IirTypes.X:` of the listener's routing switch - the dispatch exemption, keyed on the label rather
+		// than on a file name (see IirOpcodesAreOnlyNamedInsideCodecs).
 		private static readonly Regex DispatchCaseLabel = new Regex(@"^\s*case\s+IirTypes\.\w+\s*:");
 		private static readonly Regex LineComment = new Regex(@"//.*$", RegexOptions.Multiline);
 		private static readonly Regex StringLiteral = new Regex("\"(?:[^\"\\\\]|\\\\.)*\"");
 
-		// A `new FaolanStream()` that is not introduced by `using` - the leak rule 6 exists for. The lookbehind is
-		// VARIABLE-LENGTH (a .NET regex extension) because the declaration between `using` and the `new` is:
-		// `using var s = `, `using (var s = `, `using FaolanStream s = ` - a fixed-width lookbehind matched none of
-		// them and flagged every correct call site.
+		// A `new FaolanStream()` that is not introduced by `using` - the leak the disposal rule exists for. The
+		// lookbehind is variable-length (a .Net regex extension) because the declaration between `using` and the `new`
+		// varies: `using var s = `, `using (var s = `, `using FaolanStream s = `. A fixed-width lookbehind matches none
+		// of them and flags every correct call site.
 		private static readonly Regex UndisposedStream = new Regex(@"(?<!\busing\b[^;]{0,60})new FaolanStream\(");
 
-		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: codec names are being
-		// rewritten by this very refactor, and ListFrame - the obvious anchor - lives in Faolan.Core now.
+		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: ListFrame - the obvious anchor
+		// - lives in Faolan.Core.
 		private static IEnumerable<Type> CodecTypes => typeof(Endpoints).Assembly.GetTypes()
 			.Where(t => t.Namespace != null && MigratedFolders.Any(f => t.Namespace == NamespaceOf(f)));
 
@@ -96,7 +76,7 @@ namespace Faolan.Tests
 			return folder == RootFolder ? CodecsNamespace : $"{CodecsNamespace}.{folder}";
 		}
 
-		// A codec MODULE: the static classes that carry Build/Parse. Value records are not modules.
+		// A codec module: the static classes that carry Build/Parse. Value records are not modules.
 		private static IEnumerable<Type> CodecModules => CodecTypes
 			.Where(t => t is { IsAbstract: true, IsSealed: true }) // C# static class
 			.Where(t => Methods(t).Any(m => m.Name is "Build" or "Parse"));
@@ -116,9 +96,9 @@ namespace Faolan.Tests
 				string.Join("\n  ", offenders));
 		}
 
-		// `string` is legal alongside `byte[]` because of rule 1a: a handful of codecs carry the remoteformat TEXT
-		// that sits INSIDE a byte codec, and forcing byte[] on them would be a worse shape, not a better one. Widened,
-		// not exempted - everything else in rules 1-7 still applies to them.
+		// `string` is legal alongside `byte[]`: a handful of codecs carry the remoteformat text that sits inside a byte
+		// codec, and forcing byte[] on them would be a worse shape, not a better one. Widened, not exempted - every
+		// other rule still applies to them.
 		[Fact]
 		public void BuildReturnsBytes()
 		{
@@ -140,7 +120,7 @@ namespace Faolan.Tests
 				if (parse == null)
 					continue;
 
-				// Rule 1a: a TEXT codec takes the string instead. One shape or the other, never a mix - that is
+				// A text codec takes the string instead. One shape or the other, never a mix - that is
 				// ParseIsNotOverloaded's job, so all this has to decide is whether the single Parse is legal.
 				var ps = parse.GetParameters();
 				var span = ps.Length == 1 && ps[0].ParameterType == typeof(ReadOnlySpan<byte>).MakeByRefType() && ps[0].IsIn;
@@ -191,13 +171,12 @@ namespace Faolan.Tests
 				string.Join("\n  ", offenders));
 		}
 
-		// The delegation constraint: overloads are free BECAUSE only one of them encodes. A non-canonical Build must
+		// The delegation constraint: overloads are free because only one of them encodes. A non-canonical Build must
 		// delegate, not be a second encoder that can drift from the first.
 		//
-		// Which overload is canonical comes from REFLECTION, not from the parameter's spelling: it is the one whose
-		// single parameter is exactly what Parse returns. An earlier draft matched the type name against `*IIR`, which
-		// silently exempted every codec whose value is an RPC message or a sub-record rather than an IIR - i.e. more
-		// than half of them.
+		// Which overload is canonical comes from reflection, not from the parameter's spelling: it is the one whose
+		// single parameter is exactly what Parse returns. Matching the type name against `*IIR` instead would silently
+		// exempt every codec whose value is an RPC message or a sub-record rather than an IIR - more than half of them.
 		[Fact]
 		public void OnlyTheCanonicalBuildWritesBytes()
 		{
@@ -229,13 +208,13 @@ namespace Faolan.Tests
 
 		// ---- rule 3: sequential reading -------------------------------------------------------------------
 
-		// ⚠️ Scoped to PARSE paths, which is what rule 3 is actually about (#530 §7): a const offset means the fields
-		// between 0 and it were never DECODED, so the codec cannot tell a correct body from one that merely happens to
-		// have the right byte there. A file with no `Parse` reads nothing - its offsets are PATCH offsets into a
+		// Scoped to Parse paths, which is what the sequential-reading rule is about: a const offset means the fields
+		// between 0 and it were never decoded, so the codec cannot tell a correct body from one that merely happens
+		// to have the right byte there. A file with no `Parse` reads nothing - its offsets are patch offsets into a
 		// record whose head is fixed-width (SpawnTransformPatch stamps the live position/token at send time) or into a
 		// captured template (SpawnPacketBuilder's splice engine), and both disappear with the thing they patch rather
-		// than with a rewrite of the reader. Scoping is the agreed answer here, not an allowlist: an allowlist would
-		// exempt a FILE, and the moment one of these grew a Parse it would keep its exemption.
+		// than with a rewrite of the reader. Scoping is the answer here rather than an allowlist: an allowlist would
+		// exempt a file, and the moment one of these grew a Parse it would keep its exemption.
 		[Fact]
 		public void NoConstOffsetsInCodecs()
 		{
@@ -254,9 +233,8 @@ namespace Faolan.Tests
 
 		// ---- rule 6: stream disposal ----------------------------------------------------------------------
 
-		// Scoped to the migrated codec folders for now. It WIDENS to all of Faolan.Core.Network + Faolan/ +
-		// Faolan.Importer/ in wave 8, once those assemblies stop hand-rolling wire code - a resource rule has to cover
-		// everywhere the stream is constructed, but it cannot go live over code the sweep has not reached.
+		// A resource rule has to cover everywhere the stream is constructed, so this reads every source file under
+		// Codecs/.
 		[Fact]
 		public void FaolanStreamsAreDisposed()
 		{
@@ -288,8 +266,7 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "a codec is named for the IIR it emits:\n  " + string.Join("\n  ", offenders));
 		}
 
-		// The MERGE gate. Scoped, so it only sees duplicates INSIDE the migrated set until wave 9 drops the filter -
-		// the 11 cross-folder duplicate emitters (#530 §3) collapse in waves 3-4.
+		// The merge gate: two codecs declaring the same opcode are the same codec and must be merged.
 		[Fact]
 		public void EachIirHasExactlyOneCodec()
 		{
@@ -320,23 +297,14 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "the wire value is named for the client IIR:\n  " + string.Join("\n  ", offenders));
 		}
 
-		// #539: a codec that produces a PAYLOAD its parent should compose reads as standalone whenever the SERVICE does
-		// the composing instead. Five failed when this was first un-skipped; four are fixed - the three FEEDBACK
-		// payloads (`FormatFeedbackCodec.Build(instance, FeedbackPayload)` takes the value and the payload owns its own
-		// typeFlags/footer) and `TradepostMailBodyCodec` (the AH-buy body is `MailColumns.ItemBoughtBody`, because the
-		// listener has no business knowing the mail template exists). `NpcChatterCodec` cleared with the ChatServer
-		// bodies: the world model caches the bark VALUE and `CharacterChatCodec` renders it.
+		// A codec that produces a payload its parent should compose reads as standalone whenever the service does the
+		// composing instead, so the codec that owns the message has to compose the payload - not a listener or a
+		// service. The feedback payloads are the pattern: `FormatFeedbackCodec.Build(instance, FeedbackPayload)` takes
+		// the value and the payload owns its own typeFlags/footer, and the AH-buy body is `MailColumns.ItemBoughtBody`
+		// because the listener has no business knowing the mail template exists.
 		//
-		// The last one, `MagicBuffDataCodec`, cleared in wave 9 and it was a buff-PIPELINE change rather than a codec
-		// one: `NpcSpellCast` stored its payload as BYTES on the world model, so the broadcaster built the 54 bytes at
-		// spawn time and `ActiveBuff` re-Parsed them to read a duration back out. The record carries the VALUE now and
-		// `MagicBuffCodec.Build(applyTo, applyFrom, wireSpellId, MagicBuffData?)` composes it - a typed Build OVERLOAD
-		// rather than a retyped value, because wave 4 keeps `MagicBuffIIR.Data` opaque on purpose (the END twin carries
-		// no data at all, which is what the overload's `null` says).
-		//
-		// Two blind spots WERE fixed while proving the list: the field scan missed `HandledOpcodes` (so the two Team
-		// codecs that do declare their identity were flagged), and "standalone" ignored §6's own definition, which is
-		// "nothing else composes it" - that alone cleared `RemoteFormatScreenCodec`.
+		// Two things the scan must get right: it has to include `HandledOpcodes` as well as `Opcode`, or a codec
+		// declaring its identity in the plural is flagged; and "standalone" means "nothing else composes it".
 		[Fact]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
@@ -354,7 +322,7 @@ namespace Faolan.Tests
 				string.Join("\n  ", offenders));
 		}
 
-		// Keeps the (a)/(b)/(c) taxonomy from rotting: a codec that declares no opcode must be COMPOSED by another
+		// Keeps the (a)/(b)/(c) taxonomy from rotting: a codec that declares no opcode must be composed by another
 		// codec. A "sub-record" nobody composes is really a standalone message with its identity recorded nowhere.
 		[Fact]
 		public void EveryCodecIsClassified()
@@ -362,8 +330,8 @@ namespace Faolan.Tests
 			var sources = CodecSourceFiles().ToDictionary(f => f, File.ReadAllText);
 			var offenders = new List<string>();
 
-			// Via DeclaresAnOpcode, so `HandledOpcodes` (the RPC twin of `HandledTypes`) counts - the plural was the
-			// blind spot wave 7 fixed in RpcMessageCodecsDeclareTheirMethodOpcode and this gate had its own copy of.
+			// Via DeclaresAnOpcode, so `HandledOpcodes` (the RPC twin of `HandledTypes`) counts: a codec declaring the
+			// plural must not read as declaring nothing at all.
 			foreach (var t in CodecModules.Where(t => !DeclaredOpcodes(t).Any() && Fields(t).All(f => !DeclaresItsMessageId(f))))
 			{
 				var composed = sources.Any(kv => !kv.Key.EndsWith($"{t.Name}.cs", StringComparison.Ordinal) && kv.Value.Contains($"{t.Name}.", StringComparison.Ordinal));
@@ -376,14 +344,10 @@ namespace Faolan.Tests
 
 		// ---- rule 7: encode/decode lives in Codecs/ --------------------------------------------------------
 
-		// LIVE since #542, which was the last blocker: `CreateFlowService`'s burst helper took `(opcode, tail)` rather
-		// than a whole record, so every one of its 34 steps spelled an IIR. It sends records now, and the helper whose
-		// only job was slicing the sub-op back off for it (`CreateEditorRecordBuilder`) is gone.
-		//
-		// §6 exempts the listener's opcode DISPATCH switch. The exemption keys on the `case <opcode>:` LABEL, not on
-		// the file name: nothing in `Faolan/` is NAMED "Dispatch" - the switch lives in `GameServerListener.Inbound.cs`
-		// - so the old filename filter exempted nothing and would have counted its 22 routing labels as decode (#542).
-		// A `case` label routes a body to a codec without reading a byte of it, wherever it lives.
+		// The listener's opcode dispatch switch is exempt, and the exemption keys on the `case <opcode>:` label rather
+		// than on a file name: nothing in `Faolan/` is named "Dispatch" - the switch lives in
+		// `GameServerListener.Inbound.cs` - so a filename filter would exempt nothing and count its routing labels as
+		// decode. A `case` label routes a body to a codec without reading a byte of it, wherever it lives.
 		[Fact]
 		public void IirOpcodesAreOnlyNamedInsideCodecs()
 		{
@@ -402,17 +366,16 @@ namespace Faolan.Tests
 		// ---- the payoff -----------------------------------------------------------------------------------
 
 		// Reflection over every codec with a standalone body, against real captured bytes: Parse -> Build must
-		// reproduce the input EXACTLY, and Parse(Build(v)) must equal v. Subsumes rule 3 - a codec that skips a
-		// region cannot reproduce it on the way out, so a partial decode fails here even if EnsureAtEnd() passed.
-		// Sub-record codecs are covered transitively through the parent that composes them.
+		// reproduce the input exactly, and Parse(Build(v)) must equal v. Subsumes the sequential-reading rule - a codec
+		// that skips a region cannot reproduce it on the way out, so a partial decode fails here even if EnsureAtEnd()
+		// passed. Sub-record codecs are covered transitively through the parent that composes them.
 		//
-		// ⚠️ It parses the RECORD, `entry.Body[4..]`, not `entry.Full`. `Body` is `[u32 carrier length][record]` and
-		// rule 2 took that length off every `Build`, so handing the gate the framed form would fail every codec for
-		// the framing rather than for its grammar. (The draft written in wave 0 invoked `Parse` on `entry.Full`, i.e.
-		// the whole packet - it predates rule 2 landing.)
+		// It parses the record, `entry.Body[4..]`, not `entry.Full`. `Body` is `[u32 carrier length][record]` and the
+		// length belongs to the framing sender rather than to any `Build`, so handing the gate the framed form would
+		// fail every codec for the framing rather than for its grammar.
 		//
 		// Codecs with their own dedicated corpus gate (`SimpleCharFullUpdateCorpusTests`, `MoveTaskCodecCorpusTests`,
-		// `SpawnPreIirCorpusTests`) are NOT excluded: those assert over ALL captured bodies and report a census, this
+		// `SpawnPreIirCorpusTests`) are not excluded: those assert over all captured bodies and report a census, this
 		// samples 50 per type and asserts nothing else. Overlap is cheap; a codec silently losing its only coverage is
 		// not.
 		[Fact]
@@ -430,13 +393,13 @@ namespace Faolan.Tests
 				foreach (var op in DeclaredOpcodes(t))
 				foreach (var entry in CorpusExtract.PacketsOfType((uint)op).Take(50))
 				{
-					var record = entry.Body[4..]; // the u32 carrier length is the sender's (#530 rule 2)
+					var record = entry.Body[4..]; // the u32 carrier length is the sender's
 					object? value;
 					try
 					{
 						value = ParserFor(parse)(record);
 					}
-					// The emitted call is a DIRECT call, so the codec's own exception arrives unwrapped - there is no
+					// The emitted call is a direct call, so the codec's own exception arrives unwrapped - there is no
 					// TargetInvocationException to unpack, unlike a MethodInfo.Invoke.
 					catch (CodecParseException e)
 					{
@@ -460,30 +423,29 @@ namespace Faolan.Tests
 			Assert.True(covered > 200, $"the corpus round-trip only exercised {covered} bodies - it is reflecting its way to nothing");
 		}
 
-		// ---- rule 17: where a body STARTS ----------------------------------------------------------------
+		// ---- rule 17: where a body starts ----------------------------------------------------------------
 		//
 		// Two codecs can both take `Parse(in ReadOnlySpan<byte>)` and disagree about which byte is byte 0. Handing
-		// one the other's slice does NOT fail cleanly: it reads four bytes out of step and either runs off the end
-		// or returns plausible values. That cost a `StatDamageIIR` reporting `Flags +0.02` where the capture said
-		// `HealthCurrent -37.25`, and 110 silently undecodable messages in `--report timeline` (Gitea #531).
+		// one the other's slice does not fail cleanly: it reads four bytes out of step and either runs off the end
+		// or returns plausible values - a `StatDamageIIR` reporting `Flags +0.02` where the capture said
+		// `HealthCurrent -37.25`, and silently undecodable messages in `--report timeline`.
 		//
-		// The split the issue describes - one group starting at a u32 LENGTH, the other at the sub-opcode - is gone;
-		// the #530 sweep closed it, and a census of all 141 codecs with a standalone `Parse` finds no codec consuming
-		// a leading length. What was missing is the thing that keeps it gone, which is this gate.
+		// No codec consumes a leading length: a census of all 141 codecs with a standalone `Parse` finds none, and this
+		// gate is what keeps it that way.
 		//
-		// It is BEHAVIOURAL rather than textual on purpose. A source-shape rule ("the first statement must be an
+		// It is behavioural rather than textual on purpose. A source-shape rule ("the first statement must be an
 		// ExpectU32Be") would pass for a codec that reads the word and ignores it, which is precisely the failure
-		// being guarded against. So: take a body the codec is known to ACCEPT, corrupt its first word, and require a
+		// being guarded against. So: take a body the codec is known to accept, corrupt its first word, and require a
 		// throw. A codec whose body starts at the sub-opcode cannot survive that; one that starts four bytes earlier
 		// or later never looked at it.
 		//
-		// ⚠️ There IS a legitimate second convention and it is DECLARED, not excused. A c2s IIR (`DeleteItemCodec`,
+		// There is a legitimate second convention and it is declared, not excused. A c2s IIR (`DeleteItemCodec`,
 		// `MoveInventoryItemCodec`) carries its sub-opcode in the RPC frame, so its body genuinely starts at the
-		// entity class - `[u32 0xC350][u32 charInstance]…`. Those codecs say so with `OpcodeIsInTheFrame`, which is
-		// the issue's own fix direction 1: put the answer in the type, where the next caller will see it. That is a
-		// declaration a codec makes about itself, not an allowlist this test keeps - adding a name here is not
-		// possible, and setting the flag on a codec whose body really does start at its opcode makes the gate
-		// FAIL rather than pass, because the corrupted-word body would then have to parse and does not.
+		// entity class - `[u32 0xC350][u32 charInstance]...`. Those codecs say so with `OpcodeIsInTheFrame`, putting the
+		// answer in the type where the next caller will see it. That is a declaration a codec makes about itself, not an
+		// allowlist this test keeps - adding a name here is not possible, and setting the flag on a codec whose body
+		// really does start at its opcode makes the gate fail rather than pass, because the corrupted-word body would
+		// then have to parse and does not.
 		[Fact]
 		public void IirBodiesStartAtTheirSubOpcode()
 		{
@@ -542,11 +504,11 @@ namespace Faolan.Tests
 			Assert.True(checkedCodecs > 5, $"the body-start gate only exercised {checkedCodecs} codecs - it is reflecting its way to nothing");
 		}
 
-		// The SOURCE half of rule 17, covering every IIR codec rather than the 8 the corpus can reach. It is the
-		// weaker statement - it checks that the codec NAMES the word it opens with, not that it validates it - but
-		// naming is the whole of what #531 asks for: nothing in `Parse(in ReadOnlySpan<byte>)` said which byte was
-		// byte 0, so both readings looked equally plausible at a call site. A first read of `var len = r.ReadU32Be()`
-		// and one of `r.ExpectU32Be(Opcode, ...)` are the same shape and only the second says what it is.
+		// The source half of the body-start rule, covering every IIR codec rather than the 8 the corpus can reach. It is
+		// the weaker statement - it checks that the codec names the word it opens with, not that it validates it - but
+		// naming is the whole point: nothing in `Parse(in ReadOnlySpan<byte>)` otherwise says which byte is byte 0, so
+		// both readings look equally plausible at a call site. A first read of `var len = r.ReadU32Be()` and one of
+		// `r.ExpectU32Be(Opcode, ...)` are the same shape and only the second says what it is.
 		[Fact]
 		public void IirCodecsNameTheWordTheyOpenWith()
 		{
@@ -569,9 +531,9 @@ namespace Faolan.Tests
 				if (Fields(t).Any(f => f.Name == "OpcodeIsInTheFrame"))
 					continue;
 
-				// Three spellings, all of which name the opening word: assert it is THE opcode (the single-opcode
-				// case), read it as an `IirTypes` to dispatch on (a genuine family), or - having declared the frame
-				// carries the opcode - open at the entity class instead.
+				// Three spellings, all of which name the opening word: assert it is the opcode (the single-opcode case),
+				// read it as an `IirTypes` to dispatch on (a genuine family), or - having declared the frame carries the
+				// opcode - open at the entity class instead.
 				if (!first.Contains("ExpectU32Be(Opcode", StringComparison.Ordinal)
 					&& !first.Contains("IirTypes)r.ReadU32Be()", StringComparison.Ordinal)
 					&& !first.Contains("ExpectU32Be(EntityClass", StringComparison.Ordinal))
@@ -585,7 +547,7 @@ namespace Faolan.Tests
 			Assert.True(checkedCodecs > 50, $"the naming gate only exercised {checkedCodecs} codecs - it is reflecting its way to nothing");
 		}
 
-		// The first statement of a codec's decode path that CONSUMES bytes: the body of `internal Read(ref SpanReader
+		// The first statement of a codec's decode path that consumes bytes: the body of `internal Read(ref SpanReader
 		// r)` where there is one, else of the public `Parse`. Comments and the SpanReader construction are skipped -
 		// they consume nothing.
 		private static string? FirstConsumingStatement(string source)
@@ -609,9 +571,8 @@ namespace Faolan.Tests
 			return null;
 		}
 
-		// LIVE from wave 7b: Economy held the last two implementations (`TradepostListingCodec.ParsedResults` and
-		// `ShopContentCodec.ShopContent`) and `PlayfieldProxy` the third, deferred by wave 3 because Economy consumed
-		// its stream `Read`. The interface FILE goes in wave 9; nothing implements it from here.
+		// `ICodec<T>` is retired: a wire value is a plain record and the codec module owns Build/Parse, so nothing in
+		// the tree may implement it.
 		[Fact]
 		public void NoIcodecImplementations()
 		{
@@ -641,7 +602,7 @@ namespace Faolan.Tests
 		}
 
 		// An expression-bodied member's body: from `=>` to its terminating `;`. Taking a fixed window instead reads
-		// into the NEXT member, which is how a `=> Build(...)` delegation gets flagged for the `s.WriteUInt32` in the
+		// into the next member, which is how a `=> Build(...)` delegation gets flagged for the `s.WriteUInt32` in the
 		// method below it.
 		private static string ExpressionBodyOf(string src, int arrowEnd)
 		{
@@ -649,7 +610,7 @@ namespace Faolan.Tests
 			return end < 0 ? src[arrowEnd..] : src[arrowEnd..end];
 		}
 
-		// The root's files are its TOP LEVEL only - recursing would pull in every folder, migrated or not.
+		// The root's files are its top level only - recursing would pull in every folder.
 		private static IEnumerable<string> CodecSourceFiles()
 		{
 			var root = TestPaths.Repo("Faolan.Core.Network", "Codecs");
@@ -677,22 +638,19 @@ namespace Faolan.Tests
 			return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 		}
 
-		// A field that records the codec's message identity. `Opcode` is the single-method form and `HandledOpcodes`
-		// the RPC twin of `HandledTypes` (one layout, the verb in the opcode) - the suffix check used to test only for
-		// "Opcode", so a codec declaring the PLURAL was read as declaring nothing at all.
-		// A codec's declared message IDENTITY: `Opcode`/`HandledOpcodes` on the 15 index-registered classes, and
+		// A codec's declared message identity: `Opcode`/`HandledOpcodes` on the 15 index-registered classes, and
 		// `Method`/`HandledMethods` on PlayerAgent/PlayerInterface, whose methods are registered by 32-bit hash and so
-		// have no opcode to declare against at all (#613).
+		// have no opcode to declare against at all. The plural forms count as much as the singular ones.
 		private static bool DeclaresItsMessageId(FieldInfo f)
 		{
 			return f.Name.EndsWith("Opcode", StringComparison.Ordinal) || f.Name.EndsWith("Opcodes", StringComparison.Ordinal) ||
 			       f.Name.EndsWith("Method", StringComparison.Ordinal) || f.Name.EndsWith("Methods", StringComparison.Ordinal);
 		}
 
-		// A codec whose Build produces a whole message rather than a fragment: the server layer sends it AND no other
-		// codec composes it. The second half is §6's own definition of a sub-record ("a codec that declares no opcode
-		// must be composed by another codec in the tree") and it is what `EveryCodecIsClassified` asks; without it a
-		// sub-record whose parent lives in `Codecs/` still read as standalone the moment a service touched it too.
+		// A codec whose Build produces a whole message rather than a fragment: the server layer sends it and no other
+		// codec composes it. The second half is the definition of a sub-record ("a codec that declares no opcode must be
+		// composed by another codec in the tree") and it is what `EveryCodecIsClassified` asks; without it a sub-record
+		// whose parent lives in `Codecs/` reads as standalone the moment a service touches it too.
 		private static bool IsStandaloneMessage(Type t)
 		{
 			var server = SourceFiles([TestPaths.Repo("Faolan")]).Any(f => File.ReadAllText(f).Contains($"{t.Name}.Build", StringComparison.Ordinal));
@@ -700,7 +658,7 @@ namespace Faolan.Tests
 			return server && !IsComposedByAnotherCodec(t);
 		}
 
-		// True when some OTHER codec source file mentions this codec - i.e. composes it into a larger body.
+		// True when some other codec source file mentions this codec - i.e. composes it into a larger body.
 		private static bool IsComposedByAnotherCodec(Type t)
 		{
 			return CodecSourceFiles()
@@ -713,9 +671,9 @@ namespace Faolan.Tests
 		// ("Object of type 'System.Byte[]' cannot be converted to type 'System.ReadOnlySpan`1[System.Byte]&'"). Nor can
 		// an expression tree build one - they support neither ref-struct locals nor by-ref parameters.
 		//
-		// So the call is emitted: wrap the array, take its address, call, box a value type. This is the whole reason
-		// the strongest gate in the set could not simply be un-skipped, and it is confined to this one helper - if
-		// `Parse`'s signature ever changes, this fails loudly at emit time rather than silently covering nothing.
+		// So the call is emitted: wrap the array, take its address, call, box a value type. It is confined to this one
+		// helper - if `Parse`'s signature ever changes, this fails loudly at emit time rather than silently covering
+		// nothing.
 		private static Func<byte[], object?> ParserFor(MethodInfo parse)
 		{
 			return Parsers.GetOrAdd(parse, static m =>

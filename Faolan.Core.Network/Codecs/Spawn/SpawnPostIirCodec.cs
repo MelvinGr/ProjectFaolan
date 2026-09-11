@@ -7,14 +7,15 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Reads / writes the FA015807 post-IIR stream (SpawnPostIir) byte-exact, for BOTH families. See SpawnPostIir for
-	// the grammar; this file is the one place either family's stream is encoded or decoded.
-	//
-	// A SUB-RECORD codec (#530 §2 rule 5c): composed inside SimpleCharFullUpdateCodec, so it declares no opcode.
-	//
-	// The reader used to try the stream BOTH ways (a "player" and an "NPC" entry-slot carve, end-exactness picking
-	// the winner). #466 removed the need: the client reads one slot grammar for both families, so there is nothing
-	// to resolve and the parse is a single pass.
+	/// <summary>
+	///     Reads and writes the spawn post-IIR stream (<see cref="SpawnPostIir" />) byte-exact, for both families. See
+	///     <see cref="SpawnPostIir" /> for the grammar; this file is the one place either family's stream is encoded or
+	///     decoded.
+	/// </summary>
+	/// <remarks>
+	///     A sub-record codec: composed inside <see cref="SimpleCharFullUpdateCodec" />, so it declares no opcode. The
+	///     client reads one slot grammar for both families, so the parse is a single pass with nothing to resolve.
+	/// </remarks>
 	internal static class SpawnPostIirCodec
 	{
 		internal static SpawnPostIir Read(in ReadOnlySpan<byte> post)
@@ -48,8 +49,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var slot = record.ToArray();
 
-			// The header's own first-record length is DERIVED from what the record turned out to be, rather than
-			// carried beside it - two sources of truth for one width is how the fixed-width readers went wrong.
+			// The header's own first-record length is derived from what the record turned out to be rather than carried
+			// beside it: two sources of truth for one width is how a fixed-width reader goes wrong.
 			stream.WriteUInt32((uint)post.HeadWords.Count);
 			foreach (var word in post.HeadWords)
 				stream.WriteUInt32(word);
@@ -71,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					stream.WriteUInt32(pair.Id).WriteUInt32((uint)pair.Value);
 			}
 
-			// ForCount(0) IS 0x3F1, so an empty third list regenerates the exact closing word it always did.
+			// An empty list frames as the empty-list word, so the closing word regenerates exactly.
 			stream.WriteUInt32(ListFrame.ForCount(post.EndPairs3.Count));
 			foreach (var pair in post.EndPairs3)
 				stream.WriteUInt32(pair.Id).WriteUInt32((uint)pair.Value);
@@ -79,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// ---- read ------------------------------------------------------------------------------------------
 
-		// The header, the first record and the buff list - everything ahead of the entry slot.
+		/// <summary>The header, the first record and the buff list - everything ahead of the entry slot.</summary>
 		private static SpawnPostIir ReadPrologue(ref SpanReader r)
 		{
 			var value = new SpawnPostIir();
@@ -95,8 +96,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (value.FirstRecordLen < 4)
 				throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), r.Position - 8, "a first-record length that can hold the buff list's framing word", value.FirstRecordLen.ToString());
 
-			// The move-task slot, if the record has one. It must consume EXACTLY the bytes ahead of the buff frame -
-			// that is what says the slot was read as the right thing rather than skipped over.
+			// The move-task slot, if the record has one. It must consume exactly the bytes ahead of the buff frame,
+			// which is what says the slot was read as the right thing rather than skipped over.
 			var slotLength = (int)value.FirstRecordLen - 4;
 			if (slotLength > 0)
 			{
@@ -114,8 +115,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var count = r.ReadListCount();
 			for (var n = 0; n < count; n++)
 			{
-				// The client's carve (#658): one u32 spell id per group, then an INNER ListFrame'd record list -
-				// the word the flat model carried as a per-record "Kind" constant.
+				// The client's carve: one u32 spell id per group, then an inner count-framed record list.
 				var group = new ScaffoldBuffGroup
 				{
 					SpellId = r.ReadU32Be()
@@ -148,8 +148,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				});
 			}
 
-			// Both closing lists are ListFrame'd, and the client VALIDATES the framing (the word must be an exact
-			// multiple of 0x3F1) - ReadListCount throws on anything else, which is the same check.
+			// Both closing lists are count-framed, and the client validates the framing - the word must be an exact
+			// multiple of the frame unit - which is the check ReadListCount performs.
 			var skills = r.ReadListCount();
 			for (var n = 0; n < skills; n++)
 			{
@@ -160,10 +160,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var pets = r.ReadListCount();
 			for (var n = 0; n < pets; n++)
 			{
-				// ⚠️ The third word is a SLOT SELECTOR, not a zero constant - `PetHolder_c::RegisterPet` tests it
-				// for 1 and routes that pet to the holder's single primary slot (#466). It is 0 on every captured
-				// spawn only because no captured character had a primary pet out, so asserting it would have thrown
-				// on a body retail can legitimately send.
+				// The third word is a slot selector rather than a zero constant: PetHolder_c::RegisterPet tests it for
+				// 1 and routes that pet to the holder's single primary slot. It is 0 on every captured spawn only
+				// because no captured character had a primary pet out, so asserting it would throw on a body retail
+				// can legitimately send.
 				r.ExpectU32Be(EntityClass.Character, $"pet record {n} entity class");
 				var petInstance = r.ReadU32Be();
 				var slotSelector = r.ReadU32Be();
@@ -173,8 +173,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return slot;
 		}
 
-		// A PLAIN-counted pair list: a bare count, not a ListFrame word. The one list spelling ListFrame does not
-		// cover, and the reason the head-word list at the top of the header was misread as a constant too.
+		/// <summary>
+		///     A plain-counted pair list: a bare count rather than a <see cref="ListFrame" /> word. It is the one list
+		///     spelling ListFrame does not cover.
+		/// </summary>
 		private static void ReadPairs(ref SpanReader r, List<ScaffoldPair> pairs)
 		{
 			var at = r.Position;
@@ -234,7 +236,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					.WriteArrayUInt16Length(Encoding.Latin1.GetBytes(entry.Text ?? ""));
 			}
 
-			// ForCount(0) IS 0x3F1, so an empty list regenerates the exact "constant" it was long read as.
+			// An empty list frames as the empty-list word, which is what makes an empty list look like a constant.
 			s.WriteUInt32(ListFrame.ForCount(slot.Skills.Count));
 			foreach (var skill in slot.Skills)
 				s.WriteUInt32(skill.Id).WriteByte(skill.Rank);

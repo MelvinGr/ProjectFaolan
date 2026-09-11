@@ -7,15 +7,22 @@ using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.World
 {
-	// #363 dev nameplate labelling for NPC spawn AREAS - which area a spawn belongs to, and how to write that area's
-	// name on an overhead nameplate. Pure functions over the shipped `NpcSpawnArea` rows; no world state, no wire.
-	//
-	// Shared by the two populations that both want the label, which is why it is its own type rather than a private
-	// helper on either: the captured `NpcSpawn` load (`EnsureZoneNpcs`, via `AreaLabelFor`) and the ambient pools
-	// (`AmbientPoolService`, via `FormatAreaLabel`). Only rendered when the GM toggles `.togglenpcgroup`.
+	/// <summary>
+	///     Developer nameplate labelling for NPC spawn areas: which area a spawn belongs to, and how to write that
+	///     area's name on an overhead nameplate. Pure functions over the shipped <c>NpcSpawnArea</c> rows, with no
+	///     world state and no wire.
+	/// </summary>
+	/// <remarks>
+	///     Its own type because the two populations that want the label share it: the captured <c>NpcSpawn</c> load
+	///     through <see cref="AreaLabelFor" />, and the ambient pools through <see cref="FormatAreaLabel" />. Only
+	///     rendered when a GM toggles it on.
+	/// </remarks>
 	public static class SpawnAreaLabels
 	{
-		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
+		/// <summary>
+		///     The spawn area a position lands in - nearest by centroid when several overlap, with padded bounds - or
+		///     null.
+		/// </summary>
 		public static NpcSpawnArea? AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
 		{
 			const float pad = 5f;
@@ -39,9 +46,11 @@ namespace Faolan.GameServer.World
 			return best;
 		}
 
-		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
-		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
-		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
+		/// <summary>
+		///     The developer label for a captured spawn's nameplate, link first: the area it is a confirmed member of
+		///     (<c>NpcSpawnAreaId</c>) even when it sits outside the bounds, as a hand-linked stray does, else the area
+		///     its position lands in, so an unlinked NPC still previews which area it is in. Null when neither answers.
+		/// </summary>
 		public static string? AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
 		{
 			NpcSpawnArea? area = null;
@@ -54,15 +63,21 @@ namespace Faolan.GameServer.World
 				: FormatAreaLabel(area);
 		}
 
-		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
-		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own SpawnBodyReader
-		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
+		/// <summary>
+		///     The nameplate label for an area: <c>&lt;group&gt; | &lt;tier&gt; x&lt;count&gt;</c>, for instance
+		///     "Ape2 | id-prop x8".
+		/// </summary>
+		/// <remarks>
+		///     ASCII-only on purpose: the client's nameplate font does not render the middle-dot or multiplication
+		///     glyphs, and the spawn body reader rejects a non-ASCII overhead name - both fail silently, so keep it
+		///     7-bit.
+		/// </remarks>
 		public static string FormatAreaLabel(NpcSpawnArea a)
 		{
 			return $"{a.GroupName} | {ResolvedTag(a.ResolvedBy)} x{a.MaxCount}";
 		}
 
-		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
+		// A short nameplate-friendly tag for a spawn area's creature-resolution provenance.
 		private static string ResolvedTag(SpawnResolutionSource resolvedBy)
 		{
 			return resolvedBy switch

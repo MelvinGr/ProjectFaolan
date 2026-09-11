@@ -7,25 +7,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report creature-races`: RDB type 1000508 is the client's CREATURE RACE table - the names behind
+	// `--report creature-races`: RDB type 1000508 is the client's creature RACE table - the names behind
 	// `CharacterStats.race`, which we store as a bare number on every NPC (`NpcStatCore.Race`, `NpcSpawn.Race`).
 	//
-	// Found while looking for the creature catalog #518 is blocked on. It is NOT that catalog - a race is not a
-	// template, and it carries no level, health, faction or name - but it IS the vocabulary the open-world spawn
-	// GROUPS are named in, and it is what `SpawnAreaResolver`'s tier 4 resolves an area by.
+	// A race is not a creature template - it carries no level, health, faction or name - but it is the vocabulary the
+	// open-world spawn groups are named in, and it is what `SpawnAreaResolver`'s tier 4 resolves an area by.
 	//
-	// The grammar lives in `CreatureRaceTable`, which also carries the account of how it was decoded WRONG the first
-	// time in a way that still parsed to EOF. This report is the other half of that: the checks that would catch it
-	// happening again, printed on every run.
+	// The grammar lives in `CreatureRaceTable`. A wrong reading of this record still parses to EOF, so the report
+	// prints the two checks that catch one, on every run:
 	//
-	//   1. The record's own arithmetic - parsed entries vs the declared count, and the trailing-byte count.
-	//   2. The EXTERNAL join, which is the one that actually falsified the old grammar. A `Race`-category spawn
-	//      group carries a numeric race id AND a human-readable name, from different places in the 1010506 record,
-	//      so folding the name onto a race and comparing ids is evidence the table itself cannot manufacture.
-	//      844/872 agree here against 0/872 under the old reading.
+	//   1. The record's own arithmetic - parsed entries against the declared count, and the trailing-byte count.
+	//   2. The external join, which is the check that can falsify the grammar. A `Race`-category spawn group carries
+	//      a numeric race id and a human-readable name, from different places in the 1010506 record, so folding the
+	//      name onto a race and comparing ids is evidence the table itself cannot manufacture.
 	//
-	// It also sizes the #518 gap: how many unresolved spawn groups name a race, and for how many of those we hold a
-	// template of that race at all.
+	// It also sizes the creature-catalog gap: how many unresolved spawn groups name a race, and for how many of those
+	// a template of that race is held at all.
 	public static partial class ReportCli
 	{
 		private const uint CreatureRaceType = 1000508;
@@ -58,9 +55,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"races with NO template in the catalog ({absent.Count} of {races.Count}): {string.Join(", ", absent)}");
 
 			// ---- The grammar's own proof (see the header note) ----
-			// A `Race`-category spawn group carries a numeric race id (`CommunityId`) AND a human-readable name, and
+			// A `Race`-category spawn group carries a numeric race id (`CommunityId`) and a human-readable name, and
 			// the two come from different places in the 1010506 record. Where the name folds onto a race, the id it
-			// declares should BE that race. That is an external join, so it can falsify the grammar - which is exactly
+			// declares should be that race. That is an external join, so it can falsify the grammar - which is exactly
 			// what it did to the previous one, where the same table shifted every name onto its neighbour's id.
 			var raceGroups = await db
 				.NpcSpawnAreas.Where(a => a.Category == "Race" && a.CommunityId != null)

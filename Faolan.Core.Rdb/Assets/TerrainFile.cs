@@ -3,21 +3,33 @@ using System.IO.Compression;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// A pre-baked per-map terrain file (#284): the RDB heightmap (1066611) + collision mesh (1000012) bodies, gzipped,
-	// so the game server can serve ground-snap + line-of-sight WITHOUT shipping the ~28 GB client RDB. The importer
-	// extracts one file per map (ReportCli terrain-export); TerrainService reads it and parses the two bodies with the
-	// SAME RdbHeightmap / RdbCollisionMesh parsers it uses against the RDB - the file is just the two decompressed
-	// resource bodies (heightmap/collision) re-gzipped, plus the tilemap extent for the heightmap cell size. Either
-	// body may be absent (a map with only one). Layout (FaolanStream, big-endian):
-	//   [u32 magic 'FTR1'][u32 tilemapExtent][u32 gzLen][gzip heightmap body][u32 gzLen][gzip collision body]
+	/// <summary>
+	///     A pre-baked per-map terrain file: the RDB heightmap (1066611) and collision mesh (1000012) bodies, gzipped,
+	///     so the game server can serve ground-snap and line-of-sight without shipping the ~28 GB client RDB.
+	/// </summary>
+	/// <remarks>
+	///     The importer extracts one file per map (the terrain-export report); TerrainService reads it and parses the
+	///     two bodies with the same <see cref="RdbHeightmap" /> and <see cref="RdbCollisionMesh" /> parsers it uses
+	///     against the RDB, because the file is just those two decompressed resource bodies re-gzipped plus the tilemap
+	///     extent that gives the heightmap its cell size. Either body may be absent on a map that has only one.
+	///     <code>
+	///     [u32 magic 'FTR1'][u32 tilemapExtent][u32 gzLen][gzip heightmap body][u32 gzLen][gzip collision body]
+	///     </code>
+	///     The layout is big-endian, as FaolanStream writes it.
+	/// </remarks>
 	public static class TerrainFile
 	{
 		public const string Extension = ".terrain";
 		private const uint Magic = 0x46545231; // 'FTR1'
 
-		// Reads a terrain file. Returns null if the stream isn't a valid FTR1 file. The Heightmap/Collision bodies are
-		// the DECOMPRESSED resource payloads (ready for RdbHeightmap.TryParse / RdbCollisionMesh.TryParse); either may
-		// be empty.
+		/// <summary>
+		///     Reads a terrain file.
+		/// </summary>
+		/// <returns>
+		///     The parsed data, or null when the stream is not a valid FTR1 file. The heightmap and collision bodies
+		///     are the decompressed resource payloads, ready for <see cref="RdbHeightmap.TryParse" /> and
+		///     <see cref="RdbCollisionMesh.TryParse" />; either may be empty.
+		/// </returns>
 		public static Data? Read(Stream stream)
 		{
 			using var buffer = new MemoryStream();

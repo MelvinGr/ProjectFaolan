@@ -9,37 +9,36 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report buff-duration-check`: does every captured buff APPLY agree with the `Spells.DurationMs` we would
-	// build it from? (Gitea #729, moved out of `MagicBuffCorpusTests`.)
+	// `--report buff-duration-check`: does every captured buff apply agree with the `Spells.DurationMs` we would
+	// build it from?
 	//
 	// Retail's apply carries the duration in centiseconds at payload offset 8; our builder takes it from the spell
 	// row. Three outcomes, and only one of them is a bug:
 	//
 	//   captured == row      the builder would reproduce the apply.
 	//   captured <  row      a RESTORE: a relog re-applies a running buff carrying the time LEFT, not the base
-	//                        duration (#601). Expected, and reported as a population rather than a failure.
-	//   captured >  row      an apply cannot outlast the spell it is built from, so the row is wrong. ⚠️ SPLIT in
-	//                        two, because only one half is a defect: a row still at the EMPTY placeholder
+	//                        duration. Expected, and reported as a population rather than a failure.
+	//   captured >  row      an apply cannot outlast the spell it is built from, so the row is wrong. split in
+	//                        two, because only one half is a defect: a row still at the empty placeholder
 	//                        (`DurationMs <= 10`) is one `CaptureSpellImporter.ImportBuffDurationsAsync`
-	//                        deliberately declines - it adopts a wire duration only when two DISTINCT captures state
+	//                        deliberately declines - it adopts a wire duration only when two distinct captures state
 	//                        it, so a single sighting leaves the placeholder standing. That is the rule working, and
 	//                        failing on it would turn the check red the moment a new spell is seen once. A row with a
-	//                        REAL but shorter duration has no such excuse, and that is what #659 sourced four spells
-	//                        from.
+	//                        real but shorter duration has no such excuse.
 	//
-	// ⭐ **Why it is a REPORT and not a test**, the same argument as `--report npc-pose-check` and
-	// `--report item-level-check`: it compares importer OUTPUT (`Spells.DurationMs`) against importer INPUT (the
+	// Why it is a report and not a test, the same argument as `--report npc-pose-check` and
+	// `--report item-level-check`: it compares importer output (`Spells.DurationMs`) against importer input (the
 	// captured applies). As a test it read the input through `fixtures.bin`'s corpus half - a frozen, derived slice -
 	// and PINNED the three populations as exact counts (2,696 exact / 233 short / 41 of those under an hour). Both
 	// sides of that comparison move when captures are added: a newer dump can correct a `DurationMs`, and new applies
 	// enter the dumps but not the frozen extract. So the pins were a guaranteed rebaseline on every data change, on a
-	// gate whose real content is the ONE assertion that something is wrong.
+	// gate whose real content is the one assertion that something is wrong.
 	//
 	// Run against the real dumps there is one population, the two sides are always in step, and the populations are
-	// PRINTED instead of pinned - a number that moves when data is added is a fact about the data, not a regression.
+	// printed instead of pinned - a number that moves when data is added is a fact about the data, not a regression.
 	// What is left asserted is the direction that can only be a defect.
 	//
-	// ⚠️ What stays in `MagicBuffCorpusTests` is everything that is a property of the CODE or of the WIRE alone - the
+	// What stays in `MagicBuffCorpusTests` is everything that is a property of the code or of the wire alone - the
 	// 54-byte payload shape, the zero words, descriptor[2] echoing the spell id, the byte-exact rebuild. Those need
 	// no DB and cannot desync.
 	public static partial class ReportCli
@@ -47,7 +46,7 @@ namespace Faolan.Importer.Cli
 		// The apply payload's duration slot, in centiseconds (MagicBuffData's layout: Counter, CounterType, Duration).
 		private const int BuffDurationOffset = 8;
 
-		// The APPLY form's low byte (1 is the END twin, 2 an UPDATE), and its fixed payload width.
+		// The apply form's low byte (1 is the end twin, 2 an UPDATE), and its fixed payload width.
 		private const byte BuffApplyForm = 0;
 		private const int BuffApplyPayloadLength = 54;
 
@@ -56,7 +55,7 @@ namespace Faolan.Importer.Cli
 		private const uint EmptyBuffDurationMs = 10;
 
 		// Below this the shortfall reads as the restore path rather than as a decode gap: a buff of an hour or more
-		// is the kind a relog catches mid-run (#601). Shorter ones are part of #658's open decode.
+		// is the kind a relog catches mid-run.
 		private const uint BuffRestoreThresholdCs = 360000;
 
 		private static async Task<int> BuffDurationCheck(IReadOnlyList<NamedCapture> captures)

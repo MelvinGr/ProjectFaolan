@@ -3,12 +3,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// "You have mail" (#871) and the recipe query (#873) - two small c2s/s2c bodies whose widths are pinned by the
+	// "You have mail" and the recipe query - two small c2s/s2c bodies whose widths are pinned by the
 	// client's own signature rather than by variance, since the corpus carries four frames of one and one of the
 	// other. `--report method-bodies` is the oracle for both.
 	public class MailNotificationCodecTests
 	{
-		// A captured notification, verbatim. The high half is retail's item-id EPOCH on every frame, which is what
+		// A captured notification, verbatim. The high half is retail's item-id epoch on every frame, which is what
 		// says a mail id is a 64-bit id in the item id space rather than a pair of unrelated words.
 		private static readonly byte[] CapturedNotification = [0x20, 0xD8, 0x2B, 0x63, 0x3A, 0x16, 0x1B, 0x0B];
 

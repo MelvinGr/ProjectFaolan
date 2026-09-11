@@ -16,7 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-class STARTING spells (#74) from the create captures' 0x200A grants.
+	/// <summary>
+	///     Per-class starting spells, from the create captures' 0x200A grants.
+	/// </summary>
 	public sealed class StartingSpellsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

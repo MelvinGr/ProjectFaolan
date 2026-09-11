@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Who a playfield instance BELONGS to, and how hard it is (#511/#512) - both of which turn out to live in the
+	// Who a playfield instance belongs to, and how hard it is - both of which turn out to live in the
 	// PlayfieldProxy and had been read as something else.
 	//
 	// Goldens are real captured proxies from NecroL80_mage-necromancer_login_gameplay_chat-annotated-4 and the castle
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 		// 0x444). Slots [2]+[3] carry 0xDEA9 / 0x000F08DB - the team/guild class and the exact team id
 		// DispatchYouJoinedTeam had announced three seconds earlier, and that the `~Team` channel subscribed to.
 		//
-		// This is #512's whole question answered on the wire: the instance is keyed to the TEAM, not the character.
+		// The wire answers the ownership question outright: the instance is keyed to the team, not the character.
 		[Fact]
 		public void GroupInstanceEntry_IsOwnedByTheTeam()
 		{
@@ -37,12 +37,12 @@ namespace Faolan.Tests
 			Assert.Equal(0x000F08DBu, proxy.OwnerId);
 			Assert.True(proxy.IsInstanced);
 			Assert.True(proxy.IsTeamOwned);
-			// The mode is orthogonal to ownership: this group instance is a NORMAL one.
+			// The mode is orthogonal to ownership: this group instance is a normal one.
 			Assert.False(proxy.IsEpic);
 		}
 
-		// A PERSONAL instance - King Conan's castle (map 2040 = 0x7F8). Owner type 2 with a real owner id, which is
-		// what used to read as "a per-map word" plus "a character handle that is 0 except on the revive body".
+		// A personal instance - King Conan's castle (map 2040 = 0x7F8). Owner type 2 with a real owner id, which is
+		// is easily misread as "a per-map word" plus "a character handle that is 0 except on the revive body".
 		[Fact]
 		public void PersonalInstance_IsOwnedButNotByATeam()
 		{
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			Assert.False(proxy.IsTeamOwned);
 		}
 
-		// An ordinary SHARED playfield owns nothing - the overwhelmingly common case, and the baseline the two above
+		// An ordinary shared playfield owns nothing - the overwhelmingly common case, and the baseline the two above
 		// are meaningful against.
 		[Fact]
 		public void SharedPlayfield_HasNoOwner()
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			Assert.False(proxy.IsTeamOwned);
 		}
 
-		// #511: the difficulty MODE is the class word, and this is the controlled A/B that shows it - the same map
+		// The difficulty mode is the class word, and this is the controlled A/B that shows it - the same map
 		// (1004, the Spider Caverns), entered twice 34 s apart, annotated `energed normal instance` then
 		// `enered epic instance`. Everything but the class word and the instance token matches.
 		[Fact]
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			var normal = Parse("620000c79c000003ec0000000000000000000000000000000100009c500050b36b00");
 			var epic = Parse("620000cabc000003ec0000000000000000000000000000000200009c500050b36c00");
 
-			Assert.Equal(normal.MapId, epic.MapId); // SAME map - the mode is not in the map id
+			Assert.Equal(normal.MapId, epic.MapId); // Same map - the mode is not in the map id
 			Assert.Equal(normal.OwnerType, epic.OwnerType);
 			Assert.Equal(normal.OwnerId, epic.OwnerId);
 

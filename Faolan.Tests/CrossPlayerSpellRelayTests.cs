@@ -14,10 +14,10 @@ namespace Faolan.Tests
 	// to observers who can see them - e.g. player 0x01316e68 self-buffs and observer 0x01316e71 (who has built that
 	// player's handle) receives the exact carrier, framed to the observer's endpoint. This locks BroadcastSpellToViewers:
 	// forward that body verbatim to every viewer who Knows the caster, and to nobody else (the caster isn't echoed, and
-	// a client that hasn't built the caster's handle - #245 - is skipped).
+	// a client that hasn't built the caster's handle is skipped).
 	public class CrossPlayerSpellRelayTests
 	{
-		// A real other-player self-buff ApplySpell body from the capture (idx 3735, actor 0x01316e68), WITHOUT the
+		// A real other-player self-buff ApplySpell body from the capture (idx 3735, actor 0x01316e68), without the
 		// [u32 length] prefix that the DispatchPassBlob array framing re-adds.
 		private const string CapturedSelfBuffBody =
 			"6b87e3160000c35001316e6800003a645c000000c35001316e6800000000000000000041eb0000010000000100000000003a645c00000006000000000000000000000000000000060000000003400f65";
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 
 			var caster = Place(sim, CasterHandle);
 			var viewer = Place(sim, 0x01316e71); // the observer in the capture - has built the caster
-			var stranger = Place(sim, 0x01316d99); // in the zone but has NOT built the caster's handle
+			var stranger = Place(sim, 0x01316d99); // in the zone but has not built the caster's handle
 
 			sim.PlayerWorldEntity(viewer)!.Knowledge.Known.Add(CasterHandle);
 
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			// Exactly one relay, to the viewer who knows the caster.
 			Assert.Single(viewer.Sent);
 			Assert.Empty(caster.Sent); // never echoed back to the caster (its own send happens on the caster path)
-			Assert.Empty(stranger.Sent); // #245: not to a client that never built the caster's handle
+			Assert.Empty(stranger.Sent); // not to a client that never built the caster's handle
 
 			// The relayed packet carries the captured ApplySpell carrier verbatim, length-prefixed (DispatchPassBlob).
 			var expectedTail = new byte[4 + body.Length];
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var caster = Place(sim, CasterHandle);
-			var bystander = Place(sim, 0x01316e71); // present but has NOT built the caster
+			var bystander = Place(sim, 0x01316e71); // present but has not built the caster
 
 			await broadcaster.BroadcastSpellToViewers(caster, Convert.FromHexString(CapturedSelfBuffBody));
 

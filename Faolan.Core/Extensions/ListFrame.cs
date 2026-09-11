@@ -2,48 +2,46 @@ using System;
 
 namespace Faolan.Core.Extensions
 {
-	// The protocol's COUNT-FRAMED LIST word: a u32 == (elementCount + 1) * 0x3F1, written ahead of the elements.
-	// The client's readers assert `word % 0x3F1 == 0` and take `count = word / 0x3F1 - 1`, so the word is DERIVED
-	// from the count and never a literal - a 0x3F1-invalid word (e.g. a verbatim 0 for an empty list) is exactly the
-	// kind of thing the client rejects.
-	//
-	// This word turns up all over: guild lists/rankings, the AH search grid, tradeskill recipes, quest goal + index
-	// regions, the spell book, the shortcut bar, stat lists, the player-spawn scaffold, GameAction lists, and the
-	// resurrection spots. It had ELEVEN different names before this type existed (ListFraming, Frame, ListStride,
-	// ListCountUnit, Marker, ListMultiplier, ListFrame, listMarker, + raw 0x3F1 / 0x7E2 / decimal 1009 literals),
-	// which is precisely why it kept getting re-mistaken for a constant.
-	//
-	// ⚠️ THE 0x7E2 TRAP. A ONE-element list frames as 2 * 0x3F1 = 0x7E2, and single-element lists are the common
-	// case in captures - so 0x7E2 reads as a fixed magic number and gets written down as one. It has happened three
-	// times:
-	//
-	// ...and its nastier sibling, THE 0x3F1 TRAP: an EMPTY list frames as 0x3F1 itself, so a list that happens to be
-	// empty in most captures reads as a closing constant - a "terminator", a "final marker", a "header pad". The
-	// player spawn's post-IIR stream carried FIVE at once (#251), all five of which parsed happily across ~200
-	// captured spawns and only broke on the ~30 where the list had elements: the ID-list close (whose "0x3F1
-	// terminator" is a count word with 13-byte records behind it), the third ending pair list (the "final marker"),
-	// and the leading plain-counted head list (the "[0][4] header"). If a constant sits where a list could, assume it
-	// is ForCount(0) until a capture with a non-empty one proves otherwise - and note that spawns_in_capture-style
-	// breadth over the WHOLE corpus is what surfaces those, not a fixture.
-	//   - the resurrection-spots body carried "const header 0x7E2" for months (every capture has 1 spot) - it was the
-	//     count, and sending 2 spots put a wrong word on the wire (#372);
-	//   - the AH search-results `head` was documented as "the query's category root, echoed, NOT a quantity" - it is
-	//     the count (an EMPTY grid is a 4-byte body whose word is 0x3F1);
-	//   - SendMail's 0x7E2 is still read as a "category constant" off ONE captured mail that has exactly ONE
-	//     attachment (#378).
-	// So: when a "constant" equals n * 0x3F1, suspect a list count, and be suspicious of any grammar pinned only by
-	// single-element captures.
+	/// <summary>
+	///     The protocol's count-framed list word: a u32 equal to <c>(elementCount + 1) * 0x3F1</c>, written ahead of
+	///     the elements.
+	/// </summary>
+	/// <remarks>
+	///     The client's readers assert <c>word % 0x3F1 == 0</c> and take <c>count = word / 0x3F1 - 1</c>, so the word
+	///     is derived from the count and never a literal - a 0x3F1-invalid word (a verbatim 0 for an empty list, say)
+	///     is exactly what the client rejects. The framing turns up all over: guild lists and rankings, the auction
+	///     house search grid, tradeskill recipes, quest goal and index regions, the spell book, the shortcut bar, stat
+	///     lists, the player-spawn scaffold, GameAction lists, and the resurrection spots.
+	///     <para />
+	///     A one-element list frames as <c>2 * 0x3F1 = 0x7E2</c>, and single-element lists are the common case in
+	///     captures - so 0x7E2 reads as a fixed magic number and is easily written down as one. An empty list frames
+	///     as 0x3F1 itself, so a list that happens to be empty in most captures reads as a closing constant: a
+	///     "terminator", a "final marker", a "header pad". The player spawn's post-IIR stream carries five at once,
+	///     all of which parse happily across ~200 captured spawns and only break on the ~30 where the list has
+	///     elements.
+	///     <para />
+	///     When a "constant" equals <c>n * 0x3F1</c>, assume it is <see cref="ForCount" /> until a capture with a
+	///     non-empty list proves otherwise, and distrust any grammar pinned only by single-element captures. Breadth
+	///     over the whole corpus is what surfaces these, not a single fixture.
+	/// </remarks>
 	public static class ListFrame
 	{
-		// The word for an empty list (count 0). Spelled out because it is easy to write 0 by mistake, which the
-		// client rejects.
+		/// <summary>
+		///     The word for an empty list (count 0). Spelled out because it is easy to write 0 by mistake, which the
+		///     client rejects.
+		/// </summary>
 		public const uint Empty = Unit;
 
-		// The framing multiplier. Every count-framed word is a multiple of it.
+		/// <summary>The framing multiplier. Every count-framed word is a multiple of it.</summary>
 		public const uint Unit = 0x3F1;
 
-		// The element count encoded in `word`. Throws if it isn't a valid framing word - the same check the client
-		// makes, so a throw here means we (or the peer) built something the client would reject too.
+		/// <summary>
+		///     The element count encoded in <paramref name="word" />.
+		/// </summary>
+		/// <exception cref="FormatException">
+		///     <paramref name="word" /> is not a valid framing word. This is the same check the client makes, so a
+		///     throw here means we (or the peer) built something the client would reject too.
+		/// </exception>
 		public static int CountOf(uint word)
 		{
 			if (!TryCountOf(word, out var count))
@@ -52,15 +50,17 @@ namespace Faolan.Core.Extensions
 			return count;
 		}
 
-		// The word for a list of `count` elements.
+		/// <summary>The word for a list of <paramref name="count" /> elements.</summary>
 		public static uint ForCount(int count)
 		{
 			ArgumentOutOfRangeException.ThrowIfNegative(count);
 			return (uint)(count + 1) * Unit;
 		}
 
-		// True if `word` is a valid count-framed list word, yielding its element count. Use when a word's meaning is
-		// genuinely in doubt and a non-framing value must not throw.
+		/// <summary>
+		///     True if <paramref name="word" /> is a valid count-framed list word, yielding its element count. Use
+		///     when a word's meaning is genuinely in doubt and a non-framing value must not throw.
+		/// </summary>
 		public static bool TryCountOf(uint word, out int count)
 		{
 			count = 0;

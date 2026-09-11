@@ -11,11 +11,11 @@ namespace Faolan.Core.Database.Tables
 	// A player guild. Wire identity is ID32 [type 0x0000DEB7][instance = Id]; members are Characters with
 	// GuildId set (rank lives on the Character). Protocol: tools/capture/decode_guild.py / the hoxxling
 	// guild_invite_accepted capture.
-	// Guild names are unique PER REALM, not globally (#324): realm Crom and realm Fury may each have a "Knights".
+	// Guild names are unique per realm, not globally: realm Crom and realm Fury may each have a "Knights".
 	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]
 	public class Guild : BaseEntity
 	{
-		// The realm this guild belongs to (#324). Pinned at creation from the founder's realm - NOT derived from
+		// The realm this guild belongs to. Pinned at creation from the founder's realm - not derived from
 		// members (a just-created or emptied guild has no member to infer from). Every guild query is realm-scoped so
 		// two realm processes on the shared DB never cross-read. Backfilled to the existing single realm on migration.
 		public uint RealmId { get; set; }
@@ -27,15 +27,15 @@ namespace Faolan.Core.Database.Tables
 
 		public DateTimeOffset CreationDate { get; set; }
 
-		// The guild government form. NOTE: this is NOT the 0x203F's first byte (that is the CoreGuild_c streaming
+		// The guild government form. Note: this is not the 0x203F's first byte (that is the CoreGuild_c streaming
 		// version, fixed at 3 - see GuildService). The actual government-form byte sits after guildId and is fixed
 		// at 1 on the wire today, because GuildRenownBlock only encodes that form's body layout (the captured
 		// "Sepulchra Invictus" guild was form 1). This column is retained for a future real government-form feature
-		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/subsystems/guilds.md).
+		// and is not yet emitted. The client UI maps the value to a government label (docs/subsystems/guilds.md).
 		// The governing form the founder picked, from CreateGuild's `i_nGoverningForm` byte. It decides the guild's
-		// whole rank ladder - see GuildRankLadder - so it has to be STORED, which it was not: HandleCreateGuild read
-		// the byte and only logged it. Default Cimmerian (0) rather than the old 1, which was Acheron by accident.
-		// CLOSED enum - the client's table has exactly these seven and no Unknown fillers - so it takes the CHECK.
+		// whole rank ladder - see GuildRankLadder - so it has to be stored rather than merely logged. The default is
+		// Cimmerian (0), the first form of the client's own table.
+		// Closed enum - the client's table has exactly these seven and no Unknown fillers - so it takes the check.
 		[ConstrainToEnumValues]
 		public GuildGoverningForm GovernmentForm { get; set; } = GuildGoverningForm.Cimmerian;
 
@@ -60,7 +60,7 @@ namespace Faolan.Core.Database.Tables
 
 		public ulong RenownGlory { get; set; }
 
-		// The rankings "Total" column: the sum of the three categories (NOT the separate `Renown` accumulator that
+		// The rankings "Total" column: the sum of the three categories (not the separate `Renown` accumulator that
 		// feeds the 0x203F renown block). Not persisted - derived on read.
 		[NotMapped]
 		public ulong RenownTotal => RenownValor + RenownGlory + RenownArtistry;

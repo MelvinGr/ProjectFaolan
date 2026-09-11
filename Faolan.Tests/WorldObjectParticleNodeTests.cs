@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The world-object geometry record's six-word "node" is a STANDING PARTICLE EFFECT and the bone it hangs on
-	// (#687), not kd-tree geometry:
+	// The world-object geometry record's six-word "node" is a standing particle effect and the bone it hangs on
+	//, not kd-tree geometry:
 	//
 	//     [effect] [0] [0] [0] [0] [attractor]
 	//
-	// These gates pin the two words that ARE named, and - just as importantly - that the other four are still
+	// These gates pin the two words that are named, and - just as importantly - that the other four are still
 	// zero. The moment a capture lands one that is not, the middle of this record becomes decidable and the
 	// `[V0:]` on it can go; until then, naming those four would be inventing their order.
 	public class WorldObjectParticleNodeTests
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		}
 
 		// Ordinal 0 is the effect. Every shipped value was checked against the client's own RDB and resolves to a
-		// 1010207 (particle-effect) record - that check needs the RDB, so what is gated here is the SHAPE: the ids
+		// 1010207 (particle-effect) record - that check needs the RDB, so what is gated here is the shape: the ids
 		// are large, distinct, and none of them is a small enum-looking number that would suggest something else.
 		[Fact]
 		public async Task TheEffectSlot_HoldsResourceIds_NotSmallEnums()
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Equal([0u], values);
 		}
 
-		// Ordinal 5 is the ATTRACTOR, and this is the evidence for it: it takes exactly the client's two non-zero
+		// Ordinal 5 is the attractor, and this is the evidence for it: it takes exactly the client's two non-zero
 		// attachment-point values and nothing else. A coordinate would not be confined to two integers.
 		[Fact]
 		public async Task TheAttractorSlot_TakesOnlyTheClientsAttachmentPoints()
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			Assert.All(values, v => Assert.Contains(v, Attractors));
 		}
 
-		// ...and it is CONSTANT per effect, which a coordinate could not be either: 4998690 and 3139195 always hang
+		// ...and it is constant per effect, which a coordinate could not be either: 4998690 and 3139195 always hang
 		// on 34, the other nine effects always on 35. An attachment point is a property of the effect, so this is
 		// the second, independent reason the slot is what it is called.
 		[Fact]

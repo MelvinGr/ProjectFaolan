@@ -4,17 +4,19 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchUpdateCashRepository(newCash, feedback) - GameCharInterface 0x06. The BANK's cash line, as distinct
-	// from the wallet the 0x2005 money packet moves (#874).
-	//
-	//   [u64 newCash][u32 feedback]
-	//
-	// Twelve bytes, which is what the single captured frame carries; the two fields adding to 12 is what pins the
-	// widths, since that frame is all zeros and offers no variance. A u64 for money matches every other money field
-	// on this wire (tin is a 64-bit quantity).
-	//
-	// `feedback` is the same shape the mail ops use for their result code - a zero meaning "fine" and a non-zero
-	// naming a refusal. `[V0: the feedback codes for a cash-repository update]`
+	/// <summary>
+	///     <c>DispatchUpdateCashRepository(newCash, feedback)</c> - the bank's cash line, as distinct from the wallet the
+	///     money packet moves: <c>[u64 newCash][u32 feedback]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Twelve bytes, which is what the single captured frame carries; the two fields adding to 12 is what pins the
+	///     widths, since that frame is all zeros and offers no variance. A u64 for money matches every other money field
+	///     on this wire, tin being a 64-bit quantity.
+	///     <para>
+	///         <c>feedback</c> is the same shape the mail operations use for their result code - zero meaning "fine" and
+	///         a non-zero value naming a refusal. [V0: the feedback codes for a cash-repository update]
+	///     </para>
+	/// </remarks>
 	public static class CashRepositoryCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchUpdateCashRepository;

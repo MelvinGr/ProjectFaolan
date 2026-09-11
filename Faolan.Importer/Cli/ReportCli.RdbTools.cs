@@ -13,10 +13,10 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// RDB -> 3D-model asset graph (Gitea #275, Phase 0). With no --report-arg: a corpus summary (how many
+		// RDB -> 3D-model asset graph. With no --report-arg: a corpus summary (how many
 		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg
 		// <meshIndexId>: print that model's graph (RenderMesh id, materials, texture refs) and, if --out <dir> is given,
-		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob for the Phase 1 spike).
+		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob).
 		private static void RdbAssets(string rdbDir, string? arg, string? outDir, bool dumpMesh)
 		{
 			using var rdb = OpenRdb(rdbDir);
@@ -110,7 +110,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("Pass --report-arg <meshIndexId> [--out <dir>] [--dump-mesh] to extract one model.");
 		}
 
-		// List all entries of a TYPE (--report-arg <type>) and dump each decompressed payload to --out as
+		// List all entries of a type (--report-arg <type>) and dump each decompressed payload to --out as
 		// <type>_<id>.bin for offline inspection. Used to crack new RDB record formats (e.g. CHARACTERCREATOR 1010700).
 		private static void RdbDump(string rdbDir, string arg, string? outDir)
 		{
@@ -155,42 +155,42 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Harvests the feat EFFECT element's kind -> width table empirically (#251), and CHECKS it against the width
-		// the kind's key list predicts (#591).
+		// Harvests the feat effect element's kind -> width table empirically, and checks it against the width the
+		// kind's key list predicts.
 		//
-		// The element opens with a KIND tag (0xCF..) and its width VARIES with that kind, which is what defeats a
-		// fixed-stride walk and left 3.1% of effect rows on stats the client cannot name. The width is now KNOWN
-		// rather than fitted - an element is `8 + len(keyList)` words and the key lists come from the client
-		// (GameActionTypes) - so what this measures is a CHECK on that, over shipped bytes.
+		// The element opens with a kind tag (0xCF..) and its width varies with that kind, which is what defeats a
+		// fixed-stride walk. The width is known rather than fitted - an element is `8 + len(keyList)` words and the
+		// key lists come from the client (GameActionTypes) - so what this measures is a check on that, over shipped
+		// bytes.
 		//
-		// ⚠️ What it measures is an upper BOUND, not the width: in a record whose effect list holds exactly one
-		// element, `recordLength - elementStart` also swallows anything the record carries AFTER the element list.
+		// What it measures is an upper BOUND, not the width: in a record whose effect list holds exactly one
+		// element, `recordLength - elementStart` also swallows anything the record carries after the element list.
 		// That is why the surplus dump matters - where the two disagree it has so far been trailing record content
 		// (a list frame, a mesh name), not element bytes.
+
 		// --report rdb-field-coverage [--report-arg <rdbType>]
 		//
 		// Every property-table field a record type carries, how many records carry it, and whether the importer
-		// READS it. Written after #590, where a shipped field (the spell line, 128) turned out to be sitting in plain
-		// sight in a table we already parsed - the question "what else is in here that we walk straight past?"
-		// deserves a measurement rather than a guess.
+		// reads it. A shipped field can sit in plain sight in a table that is already parsed, so "what else is in
+		// here that we walk straight past?" deserves a measurement rather than a guess.
 		//
 		// Defaults to the spell type (1040005); pass `<type>` for another, or `<type>:<field>[,<field>...]` to DRILL
 		// into fields - each one's value distribution and named sample records, which is what turns "unread" into
-		// "worth reading". Several fields drill in ONE pass over the type; a pass costs a full decompress of every
+		// "worth reading". Several fields drill in one pass over the type; a pass costs a full decompress of every
 		// record (21,502 for spells), so drilling them one at a time is the same measurement for N times the wait.
 		//
-		// Append `x<field>` to CROSS-TABULATE the drilled fields against another one - `1040005:348x847` prints, for
+		// Append `x<field>` to cross-TABULATE the drilled fields against another one - `1040005:348x847` prints, for
 		// each value of 847, the distribution of 348 among the records carrying both. That is the shape that answers
-		// "does this field VARY WITH that one", which a pair of independent histograms cannot.
+		// "does this field vary with that one", which a pair of independent histograms cannot.
 		//
-		// ⚠️ It reads the ASCENDING property grammar. That is the established one for SPELL records; for 1000020 the
-		// plaintext half is feats and the run is ascending there too, but an ITEM template's table strictly DESCENDS
+		// It reads the ASCENDING property grammar. That is the established one for spell records; for 1000020 the
+		// plaintext half is feats and the run is ascending there too, but an item template's table strictly DESCENDS
 		// (RdbItemImporter.TryReadPropertyField) and is not covered by this - so a 1000020 run measures the feats.
 		//
-		// With `--out <dir>` a drill also writes `rdb-<type>-field-<n>.tsv` - EVERY carrying record's id, name and
+		// With `--out <dir>` a drill also writes `rdb-<type>-field-<n>.tsv` - every carrying record's id, name and
 		// value, not the 14 samples. A histogram says what values exist; deciding whether an unread field is the
 		// second source for a column we already fill needs the per-record join, and the 14-sample cap cannot do it
-		// (#633).
+		// .
 		private static void RdbFieldCoverage(string rdbDir, string? arg, string? outDir)
 		{
 			var spec = (arg ?? "").Split(':', 2, StringSplitOptions.TrimEntries);
@@ -203,9 +203,9 @@ namespace Faolan.Importer.Cli
 				.Select(s => uint.TryParse(s, out var d) ? d : 0u)
 				.Where(d => d != 0)
 				.ToArray();
-			// What each importer actually consumes today, so the report can say READ vs unread rather than just
+			// What each importer actually consumes today, so the report can say read vs unread rather than just
 			// enumerating. Keep in step with the importers; a field that moves here without moving there is exactly
-			// the drift this report exists to surface. The SPELL half lives on SpellFieldsRead (shared with
+			// the drift this report exists to surface. The spell half lives on SpellFieldsRead (shared with
 			// `--report spell-tooltip`, which is the per-spell view of this census) - see its remarks for the drift
 			// this arrangement is meant to make impossible.
 			var read = type == SpellTemplateType
@@ -217,7 +217,7 @@ namespace Faolan.Importer.Cli
 			var counts = new Dictionary<uint, int>();
 			var ranges = new Dictionary<uint, (uint Min, uint Max)>();
 			// drilled[field][value] = how many records carry that value; crossed[field][(against, value)] likewise but
-			// split by the -x- field's value on the SAME record.
+			// split by the -x- field's value on the same record.
 			var drilled = drills.ToDictionary(f => f, _ => new Dictionary<uint, int>());
 			var crossed = drills.ToDictionary(f => f, _ => new Dictionary<(uint Against, uint Value), int>());
 			var samples = drills.ToDictionary(f => f, _ => new List<string>());
@@ -244,7 +244,7 @@ namespace Faolan.Importer.Cli
 
 				records++;
 				// The whole record's fields first: a cross-tab needs the -x- field's value on this record, and the
-				// property run is ascending, so a field drilled BEFORE the one it is crossed against is not yet known
+				// property run is ascending, so a field drilled before the one it is crossed against is not yet known
 				// while walking. A repeated field is last-wins, matching the importers.
 				var fields = new Dictionary<uint, uint>();
 				foreach (var (field, value) in RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12)))
@@ -352,8 +352,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  type={e.Type,-9} {(e.File == 0xff ? "CDN " : "local")} size={e.Size}");
 		}
 
-		// Decode a skeleton (RDB type 1010002) and print key bone world positions (#275 Phase 3 skeleton validation).
-		// Emit a SKINNED glb for a skinned model (body/equipment): geometry + the character skeleton as a glTF skin.
+		// Decode a skeleton (RDB type 1010002) and print key bone world positions, and emit a skinned glb for a
+		// skinned model (body/equipment): geometry plus the character skeleton as a glTF skin.
 		// --report-arg <meshIndexId>  --out <dir>  [--skeleton <id>, default auto-select by bone palette].
 		private static void RdbRig(string rdbDir, string arg, string? outDir, string? skelArg)
 		{
@@ -384,8 +384,8 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Scan every MESHINDEXFILE (type 1010030) manifest and print those whose .max source path contains the given
-		// substring (case-insensitive). Used to locate race/sex character meshes (head/body/etc.) by name (#275).
+		// Scan every MESHINDEXFILE (type 1010030) manifest and print those whose.max source path contains the given
+		// substring (case-insensitive). Used to locate race/sex character meshes (head/body/etc.) by name.
 		private static void RdbSearch(string rdbDir, string needle)
 		{
 			using var rdb = OpenRdb(rdbDir);
@@ -443,17 +443,18 @@ namespace Faolan.Importer.Cli
 
 		// Decrypt one item's RDB template (type 1000020/1000620) with its stored Data1..4 TEA key and surface everything
 		// that could be a worn-appearance mesh ref: every ASCII string, the property table, and every u32 that resolves
-		// to a MESHINDEXFILE (1010030) / MonsterData (1010201) / RenderMesh (1010001) entry in the RDB (#275 gear).
-		// The client's BALANCE-TWEAK table: RDB type 1000516, a single entry holding 294 named `double` constants
+		// to a MESHINDEXFILE (1010030) / MonsterData (1010201) / RenderMesh (1010001) entry in the RDB.
+
+		// The client's balance-tweak table: RDB type 1000516, a single entry holding 294 named `double` constants
 		// ("tweakables"). This is the game's own tuning sheet, and it is the authority for a pile of numbers we have so far
 		// been guessing at - the out-of-combat regen attribute modifiers (TWK_OOCHealthRegenConModifier = 0.15,
-		// TWK_OOCManaRegenIntModifier = 0.38, ...), the armour/protection targets per level
+		// TWK_OOCManaRegenIntModifier = 0.38,...), the armour/protection targets per level
 		// (TWK_TargetPerLevelArmor = 137.225), combat behaviour (TWK_GlancingHitBaseChance = 5,
 		// TWK_InterruptChance = 30, TWK_OffhandDamagePercent = 0.5) and a set of spell/buff ids the server is expected
-		// to cast itself (TWK_NanoExhaustedEffect, TWK_StaggeringBuffID, TWK_GM_Res_SpellID, ...).
+		// to cast itself (TWK_NanoExhaustedEffect, TWK_StaggeringBuffID, TWK_GM_Res_SpellID,...).
 		//
 		// Grammar: [u32 type][u32 0][u32 1][u32 count] then count × ([u32 nameLen][nameLen ASCII][f64 value LE]).
-		// It is NOT self-referential validation: TWK_NanoExhaustedEffect = 2960 is the exact spell id we independently
+		// It is not self-referential validation: TWK_NanoExhaustedEffect = 2960 is the exact spell id we independently
 		// decoded as the energy-depletion "Exhausted" debuff, and TWK_Selection_Radius = 10 matches the interaction range.
 		//
 		// `--report-arg <substring>` filters by name (case-insensitive), e.g. `--report-arg regen`.

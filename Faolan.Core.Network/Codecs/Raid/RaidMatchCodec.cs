@@ -6,24 +6,30 @@ using Faolan.Core.Network.Codecs.Team;
 
 namespace Faolan.Core.Network.Codecs.Raid
 {
-	// s2c DispatchYouJoinedRaid (CSPlayerInterface 0x93) - the WHOLE raid, the way DispatchYouJoinedTeam is the whole
-	// team. The client calls the parameter `i_cMatch` and reads it with `FUN_005584c0`, which is the only caller of
-	// that reader in the exe, so despite the name it is the raid record and nothing else (#669).
-	//
-	//   [ cTeam ]                                   the raid itself - id, leader, its own member list, its settings
-	//   [ u32 (count+1)*0x3F1 ][ cTeam x count ]    the member TEAMS
-	//   [ u32 (count+1)*0x3F1 ][ member-flags x n ] one [ID32][bool][bool] per character
-	//   [ RaidMatchTail ]                           two ID32s, three words and a flag
-	//
-	// ⚠️ **No capture carries this message.** A sweep of all 120 dumps finds zero raid traffic - no captured session
-	// ever formed a raid - so every byte here comes from the client's reader rather than from retail's sender. The
-	// FRAMING is therefore as certain as static RE gets (a wrong shape desyncs the client's stream and it says so, by
-	// name, in its own assert), while the MEANING of the tail is not established at all. See gaps.md.
+	/// <summary>
+	///     s2c <c>DispatchYouJoinedRaid</c> - the whole raid, the way <c>DispatchYouJoinedTeam</c> is the whole team.
+	/// </summary>
+	/// <remarks>
+	///     The client calls the parameter <c>i_cMatch</c> and reads it with <c>FUN_005584c0</c>, the only caller of that
+	///     reader in the exe, so despite the name it is the raid record and nothing else. The layout:
+	///     <code>
+	///     [ cTeam ]                          the raid itself - id, leader, its own member list, its settings
+	///     [ list frame ][ cTeam x count ]    the member teams
+	///     [ list frame ][ flags x count ]    one [ID32][bool][bool] per character
+	///     [ RaidMatchTail ]                  two ID32s, three words and a flag
+	///     </code>
+	///     <para>
+	///         No capture carries this message: a sweep of all 120 dumps finds zero raid traffic, so every byte here
+	///         comes from the client's reader rather than from retail's sender. The framing is therefore as certain as
+	///         static RE gets - a wrong shape desyncs the client's stream and it names the failure in its own assert -
+	///         while the meaning of the tail is not established at all. See docs/protocol/gaps.md.
+	///     </para>
+	/// </remarks>
 	public static class RaidMatchCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchYouJoinedRaid;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(RaidMatch value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -84,15 +90,24 @@ namespace Faolan.Core.Network.Codecs.Raid
 		}
 	}
 
-	// One character's two raid flags, keyed by their ID32. The client stores them in a map keyed by that id
-	// (`FUN_0055c0a0` inserts each element into a container rather than a vector), which is what says the ID32 is a
-	// key rather than a payload. What the two bools SELECT is not recoverable from the reader. [V0]
+	/// <summary>
+	///     One character's two raid flags, keyed by their ID32.
+	/// </summary>
+	/// <remarks>
+	///     The client stores them in a map keyed by that id (<c>FUN_0055c0a0</c> inserts each element into a container
+	///     rather than a vector), which is what makes the ID32 a key rather than a payload. What the two bools select is
+	///     not recoverable from the reader. [V0]
+	/// </remarks>
 	public sealed record RaidMemberFlags(EntityId Character, bool FlagA, bool FlagB);
 
-	// What the client reads after the two lists: an ID32, a word, a flag, a second ID32, then three more words. The
-	// reader gives their ORDER and WIDTH and nothing else - it stores each straight into a field of the raid object
-	// and the raid UI is what consumes them. Named by position rather than guessed at; a raid we build sends zeros,
-	// which is the same "we model none of this" the empty flag list states. [V0]
+	/// <summary>
+	///     What the client reads after the two lists: an ID32, a word, a flag, a second ID32, then three more words.
+	/// </summary>
+	/// <remarks>
+	///     The reader gives their order and width and nothing else - it stores each straight into a field of the raid
+	///     object, and the raid UI consumes them. Named by position rather than guessed at; a raid built here sends
+	///     zeros, matching the empty flag list. [V0]
+	/// </remarks>
 	public sealed record RaidMatchTail(EntityId Ref1, uint Word1, bool Flag, EntityId Ref2, uint Word2, uint Word3, uint Word4)
 	{
 		public static RaidMatchTail Empty { get; } = new RaidMatchTail(new EntityId(0, 0), 0, false, new EntityId(0, 0), 0, 0, 0);

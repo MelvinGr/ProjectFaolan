@@ -5,15 +5,16 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildInvite (0x202A) - pops the client's accept/decline dialog:
-	//   [guild ID32][guildName s16][invitee ID32][inviterName s16]
-	// Byte-exact against the captured Kyloth -> Hoxxling invite (GuildPacketTests). Moved in from
-	// `GuildService.WriteGuildInviteBody` in #530 wave 7.
+	/// <summary>
+	///     <c>DispatchGuildInvite</c> - pops the client's accept/decline dialog:
+	///     <c>[guild ID32][guildName s16][invitee ID32][inviterName s16]</c>. Byte-exact against the captured
+	///     Kyloth-to-Hoxxling invite (<c>GuildPacketTests</c>).
+	/// </summary>
 	public static class GuildInviteCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildInvite;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GuildInvite value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -54,6 +55,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// DispatchGuildInvite (0x202A).
+	/// <summary>The DispatchGuildInvite body.</summary>
 	public sealed record GuildInvite(uint GuildId, string GuildName, uint InviteeId, string InviterName);
 }

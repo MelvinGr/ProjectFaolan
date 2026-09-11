@@ -6,10 +6,10 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the FeatIIR train/ack codec to the captured hakotep train exchange (the body after the 0x2000 length
-	// prefix). See Faolan/GameServer/GameServerListener.Feats.cs / docs/subsystems/feats.md.
+	// prefix). See Faolan/GameServer/Feats/FeatService.cs / docs/subsystems/feats.md.
 	public class FeatCodecTests
 	{
-		// The s2c ACK (state 0x05) from Hakotep_hox_login_gameplay...train-feats: handle 0x1101B4F5, feats
+		// The s2c ack (state 0x05) from Hakotep_hox_login_gameplay...train-feats: handle 0x1101B4F5, feats
 		// [110000, 112700, 410600], list marker 0x0FC4 = (3+1)*0x3F1.
 		private const string AckHex = "28da68a00000c3501101b4f500050000000000000fc40001adb00001b83c000643e8";
 		private const string RequestHex = "28da68a00000c3501101b4f500040000000000000fc40001adb00001b83c000643e8";
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			Assert.Equal(new[] { 110000u, 112700u, 410600u }, parsed.FeatIds);
 		}
 
-		// Rule 4: Parse THROWS. A short body, a wrong sub-opcode word and a list that promises more ids than the body
+		// Rule 4: Parse throws. A short body, a wrong sub-opcode word and a list that promises more ids than the body
 		// carries are all decode failures naming the offset - never a `false` the caller can forget to check.
 		[Fact]
 		public void Parse_RejectsGarbage()

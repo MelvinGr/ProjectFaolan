@@ -6,24 +6,28 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// ScryScriptIIR (0xA36D3B74) — the Tortage destiny/tutorial STEP driver (the "QuestRewards" of the
-	// opcode catalog is a misnomer; #91 / #149). Server→client it pushes a named scripted step the client's
-	// intro flow runs (e.g. "PlayOrSkip", "IntroDone", "ChangeSex", "ApproachCasilda", or the big
-	// "NEW_character_creation Slave Galley" creation step). Decoded byte-exact from captures (Captures/
-	// scripts/decode_quest.py + ScryScriptIIR ReadSubClass), built here from scratch.
-	//
-	// Wire (subopcode onward; the 4-byte carrier length is added by the send layer):
-	//   [subop 0xA36D3B74][ack 0x0000C350][u32 playerHandle][u8 flag=0][u32 BE pbLen][protobuf pbLen bytes]
-	// The protobuf is a ProtoScryScriptIIR: version=1, type=2, int_parameter=3, string_parameter_one=4 (the step
-	// token), string_parameter_two=5 (resources), id_parameter=6 (a ProtoID32 pair).
-	//
-	// ⚠️ int_parameter (field 3) is a **sint32 - ZIGZAG encoded**. The loose Build overloads here pass the RAW WIRE
-	// VARINT (the values were lifted straight out of captures, e.g. 48126 / 385910), not the decoded integer, so the
-	// raw value is zigzag-DECODED on the way in and protobuf-net re-encodes it to the identical bytes. Evidence it
-	// really is zigzag: across the corpus field 3 is even in 1151 occurrences and odd in only 14 - exactly the
-	// signature of zigzag (positives even, negatives odd), not of arbitrary ids. So a "scriptGroupId" of 48126 is
-	// really int_parameter 24063. Renaming the call sites to the decoded values is a follow-up; what matters here is
-	// that the bytes on the wire stay identical to retail's.
+	/// <summary>
+	///     <c>ScryScriptIIR</c> - the Tortage destiny/tutorial step driver. Server to client it pushes a named scripted
+	///     step the client's intro flow runs ("PlayOrSkip", "IntroDone", "ChangeSex", "ApproachCasilda", or the
+	///     "NEW_character_creation Slave Galley" creation step).
+	/// </summary>
+	/// <remarks>
+	///     Decoded byte-exact from captures and built here from scratch. The wire, from the sub-opcode onward (the 4-byte
+	///     carrier length is added by the send layer):
+	///     <code>
+	///     [subop][ack entityClass][u32 playerHandle][u8 flag=0][u32 BE pbLen][protobuf pbLen bytes]
+	///     </code>
+	///     The protobuf is a <c>ProtoScryScriptIIR</c>: version=1, type=2, int_parameter=3, string_parameter_one=4 (the
+	///     step token), string_parameter_two=5 (resources), id_parameter=6 (a ProtoID32 pair).
+	///     <para>
+	///         <c>int_parameter</c> (field 3) is a <c>sint32</c> and therefore zigzag-encoded. The loose <c>Build</c>
+	///         overloads here pass the raw wire varint - the values were lifted straight out of captures, e.g. 48126 or
+	///         385910 - rather than the decoded integer, so the raw value is zigzag-decoded on the way in and protobuf-net
+	///         re-encodes it to the identical bytes. Across the corpus field 3 is even in 1151 occurrences and odd in only
+	///         14, which is the signature of zigzag (positives even, negatives odd) rather than of arbitrary ids, so a
+	///         "scriptGroupId" of 48126 is really int_parameter 24063.
+	///     </para>
+	/// </remarks>
 	public static class ScryScriptCodec
 	{
 		public const uint Opcode = (uint)IirTypes.ScryScriptIIR;
@@ -38,9 +42,9 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return s.ToArray();
 		}
 
-		// The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no
-		// step-token/resources (f4/f5 omitted) - the post-morph "nudge" the create-world handshake sends. protobuf
-		// = {f1=5 version, f2=0 type, f3=scriptGroupId, f6={0,0}}.
+		// The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no step token
+		// or resources (f4/f5 omitted) - the post-morph nudge the create-world handshake sends. The protobuf is
+		// {f1=5 version, f2=0 type, f3=scriptGroupId, f6={0,0}}.
 		public static byte[] Build(uint playerHandle, uint scriptGroupId)
 		{
 			return Build(new ScryScriptIIR(playerHandle, FramingFlag, new ProtoScryScriptIIR
@@ -56,10 +60,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			}));
 		}
 
-		// A named scripted step. mode 2 = the simple step-token form ("IntroDone", "ChangeSex", "StartFixed3d", ...);
-		// mode 7 = the rich creation step ("NEW_character_creation ..." carried as an f4 <remoteformat> token, an f5
-		// resource-preload list "id:value;...", and a non-zero f6 pair). f6Field1/f6Field2 are the trailing
-		// sub-message pair (both 0 for the simple steps).
+		// A named scripted step. Mode 2 is the simple step-token form ("IntroDone", "ChangeSex", "StartFixed3d", …); mode 7
+		// is the rich creation step ("NEW_character_creation …" carried as an f4 remoteformat token, an f5 resource-preload
+		// list "id:value;…", and a non-zero f6 pair). f6Field1/f6Field2 are the trailing sub-message pair, both 0 for the
+		// simple steps.
 		public static byte[] Build(uint playerHandle, string stepToken, uint mode = 2, uint flag = 0, string resources = "", ulong f6Field1 = 0, ulong f6Field2 = 0)
 		{
 			return Build(new ScryScriptIIR(playerHandle, FramingFlag, new ProtoScryScriptIIR
@@ -90,7 +94,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return value;
 		}
 
-		// The raw wire varint -> the sint32 protobuf-net will zigzag-RE-encode back to that exact varint.
+		// The raw wire varint, which protobuf-net zigzag-re-encodes back to that exact varint.
 		private static int ZigZagDecode(ulong raw)
 		{
 			return (int)(raw >> 1) ^ -(int)(raw & 1);

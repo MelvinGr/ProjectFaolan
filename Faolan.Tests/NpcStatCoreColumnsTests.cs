@@ -13,10 +13,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #244 gate: a captured stat-core sub-message (CharacterStats/NpcStats/CharacterBcc) must survive the
-	// NpcStatCoreColumns decompose->compose round-trip and re-serialise byte-for-byte - the guarantee that lets NPC cores
-	// be rebuilt from typed columns with zero wire drift. Driven from the golden captures (the DB no longer stores the
-	// captured body - both NpcSpawn.Data and NpcTemplate.Data are retired), covering the animal + humanoid core shapes.
+	// A captured stat-core sub-message (CharacterStats/NpcStats/CharacterBcc) must survive the NpcStatCoreColumns
+	// decompose->compose round-trip and re-serialise byte-for-byte - the guarantee that lets NPC cores be rebuilt from
+	// typed columns with zero wire drift. Driven from the golden captures (the DB stores no captured body), covering
+	// the animal + humanoid core shapes.
 	public class NpcStatCoreColumnsTests
 	{
 		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther"), InlineData("SpawnNpcCasilda")]
@@ -39,20 +39,19 @@ namespace Faolan.Tests
 				Assert.True(Same(read.Message.Bcc, NpcStatCoreColumns.ToBcc(core)), "CharacterBcc");
 		}
 
-		// EVERY proto field of the three stat-core sub-messages must survive the round trip - including the ones no
-		// capture in the corpus happens to set (#646).
+		// Every proto field of the three stat-core sub-messages must survive the round trip - including the ones no
+		// capture in the corpus happens to set.
 		//
 		// The golden round-trip above can only prove the fields those three captures carry, so a column for a field
 		// retail never sends looks dead: `RunSpeed`, `MaxRunSpeed`, `Skulk`, `MaxSkulk`, `FactionId`, `LosHeight`,
-		// `MountMesh`, `OocMovementMultiplier`, `TradeskillFlags` and `ClientScryScript` are all NULL on all 1,018
-		// shipped `NpcStatCores` rows, and #646's sweep read that as "schema for a decode that never landed" and
-		// proposed dropping them.
+		// `MountMesh`, `OocMovementMultiplier`, `TradeskillFlags` and `ClientScryScript` are all null on all 1,018
+		// shipped `NpcStatCores` rows, which reads as "schema for a decode that never landed".
 		//
-		// It is the opposite. The column set is dictated by the client's SCHEMA, not by the corpus - the table replaced
-		// the captured `Data` blob (#244), so a field with no column is a field silently dropped from the rebuilt
-		// spawn the day a capture does carry it, and `NpcStatCoreColumns` preserves protobuf PRESENCE exactly (a field
+		// It is the opposite. The column set is dictated by the client's schema, not by the corpus - the table replaced
+		// the captured `Data` blob, so a field with no column is a field silently dropped from the rebuilt
+		// spawn the day a capture does carry it, and `NpcStatCoreColumns` preserves protobuf presence exactly (a field
 		// is copied only when ShouldSerialize is true) precisely so that unset stays unset. This drives every field
-		// SET, so each one has to survive on its own evidence rather than on a capture's.
+		// set, so each one has to survive on its own evidence rather than on a capture's.
 		//
 		// Fields with no column fail here by name, which is the answer to "a column nobody writes is a claim we cannot
 		// keep": the claim is kept by this test, not by the corpus.
@@ -84,22 +83,23 @@ namespace Faolan.Tests
 				$"{missing.Count} stat-core proto field(s) do not survive Lift -> NpcStatCore -> To*: {string.Join(", ", missing)}");
 		}
 
-		// `CharacterStats.flags` is a real BITFIELD, and bit 28 is the "this is an NPC" bit (#646).
+		// `CharacterStats.flags` is a real bitfield, and bit 28 is the "this is an NPC" bit.
 		//
 		// The sweep flagged it as a decode smell: `NpcStatCores.Flags` is 268435457 (0x10000001) on all 1,018 shipped
 		// rows, and "a flags word with one value across the whole corpus is either not a flags word or is being read at
-		// the wrong offset". Neither. It is protobuf field 16, addressed by field NUMBER, so there is no offset to get
+		// the wrong offset". Neither. It is protobuf field 16, addressed by field number, so there is no offset to get
 		// wrong - and the corpus explains the constancy rather than undermining it:
 		//
 		//   NPC records    (17,400): 0x10000001, every one
-		//   PLAYER records    (317): 0x00000001 x308, 0x00000021 x5, 0x00000009 x4 - bit 28 NEVER set
+		//   player records    (317): 0x00000001 x308, 0x00000021 x5, 0x00000009 x4 - bit 28 never set
 		//
-		// So bit 0 is set on everything and bit 28 separates NPC from player. It is constant across NPCs BECAUSE they
+		// So bit 0 is set on everything and bit 28 separates NPC from player. It is constant across NPCs because they
 		// are all NPCs, which is the opposite of the value being undecoded.
 		//
-		// ⚠️ Bits 3 (0x8) and 5 (0x20) are per-player STATE, not identity, and are still unknown: the same character
+		// Bits 3 (0x8) and 5 (0x20) are per-player state, not identity, and are still unknown: the same character
 		// carries 0x1 at one moment and 0x9 or 0x21 at another (Viriden, Beriyah, Skylights, Dejachicka, Korlinius,
-		// Kathokla, Shirux each appear with two values), and the two never co-occur. Tracked as Gitea #648. This gate
+		// Kathokla, Shirux each appear with two values), and the two never co-occur. Open work tracked in Gitea #648.
+		// This gate
 		// deliberately asserts only what is decoded, so a future capture that sets bit 28 on a player - or clears it on
 		// an NPC - fails here rather than being absorbed.
 		[Fact]
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 				if (stats == null || !stats.ShouldSerializeFlags())
 					continue;
 
-				// `npc_stats` present IS the record being an NPC - the independent signal the bit is checked against.
+				// `npc_stats` present is the record being an NPC - the independent signal the bit is checked against.
 				var isNpc = read.Message.npc_stats != null;
 				if (isNpc)
 					npcs++;
@@ -139,20 +139,19 @@ namespace Faolan.Tests
 			Assert.True(wrong.Count == 0, $"{wrong.Count} record(s) disagree with the bit-28 = NPC reading: {string.Join("; ", wrong.Take(5))}");
 		}
 
-		// ⛔ The pose/idle gate that used to live here has MOVED to `dotnet run --project Faolan.Importer -- --report
-		// npc-pose-check` (#729). It asked whether a shipped `NpcStatCores` row carries a pose the type is only rarely
-		// caught in - the Citizen shipped one its own sightings outnumbered 57:1 - and to ask that it had to compare
-		// importer OUTPUT (faolan.db) against importer INPUT, which as a test meant reading the input through
-		// `fixtures.bin`'s frozen corpus half.
+		// The pose/idle gate lives in `dotnet run --project Faolan.Importer -- --report npc-pose-check`, not here. It
+		// asks whether a shipped `NpcStatCores` row carries a pose the type is only rarely caught in - the Citizen
+		// ships one its own sightings outnumber 57:1 - and to ask that it has to compare importer output (faolan.db)
+		// against importer input, which as a test means reading the input through `fixtures.bin`'s frozen corpus half.
 		//
 		// Those two populations diverge the moment captures are added, and the failure is the wrong way round: on
 		// 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a sample of
 		// fourteen, while the shipped value came from a run over a corpus the extract had not seen. The gate was
-		// judging a BETTER-attested value against evidence it had outgrown, and the sanctioned fix - regenerate the
+		// judging a better-attested value against evidence it had outgrown, and the sanctioned fix - regenerate the
 		// extract - rebaselines twenty-odd unrelated gates in one commit. Run against the real dumps there is no
 		// second population, and the `minimumEvidence` floor that existed only to paper over the gap is gone.
 		//
-		// What stays here is the CODEC property - the round-trip and the field sweep above - which a frozen slice
+		// What stays here is the codec property - the round-trip and the field sweep above - which a frozen slice
 		// serves perfectly well, because it asserts something about the code rather than about the data.
 
 		// The writable, protobuf-mapped scalar properties of a generated message - the ones a column has to exist for.

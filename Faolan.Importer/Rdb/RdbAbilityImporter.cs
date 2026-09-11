@@ -7,12 +7,12 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Rdb
 {
 	// Names the Abilities catalog from the client RDB. Each ability's DEFINITION is an RDBH template in type 1000020
-	// (the same TEA-encrypted catalog as item templates, #137), and its per-template key is the ability's own Data1..4
+	// (the same TEA-encrypted catalog as item templates), and its per-template key is the ability's own Data1..4
 	// quad - which CaptureAbilityImporter already harvested from the 0x2052 grant and stored on the row (identical to
 	// how items store their ProtoDecryptionKey). So we decrypt each ability's 1000020 entry with its stored key and
 	// pull the name via the shared RdbItemImporter.ExtractName (the tagged-string reader).
 	//
-	// NB the template carries the ability's EFFECT (name/range/animation/effect-id), NOT its class/level REQUIREMENTS -
+	// NB the template carries the ability's effect (name/range/animation/effect-id), not its class/level REQUIREMENTS -
 	// those live in the class-progression tables, not here (dumped by the ability-names report: fields 287=range,
 	// 294=cast, 617=effect, 79=canonical/family id; nothing encodes required level or class).
 	public static class RdbAbilityImporter

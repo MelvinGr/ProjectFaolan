@@ -11,18 +11,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
 {
-	// QUEST SHARING (#101): offering a quest you hold to your team-mates, and accepting one offered to you.
+	// Quest sharing: offering a quest the player holds to their team-mates, and accepting one offered to them.
 	//
-	// The message set is `docs/subsystems/quest-sharing.md`. Unlike teams and trade, NO capture performs a share, so
-	// every body here is built from the client's own reader/handler rather than observed - the rules below are the
-	// client's, recovered with it, not invented:
+	// The message set is docs/subsystems/quest-sharing.md. Unlike teams and trade, no capture performs a share, so
+	// every body here is built from the client's own reader and handler rather than observed. The rules below are the
+	// client's, recovered with it:
 	//
-	//   * the feedback CODES are the two jump tables in GamecodeClient_t (see QuestShareFeedback),
+	//   * the feedback codes are the two jump tables in GamecodeClient_t (see QuestShareFeedback),
 	//   * "may not be shared" is QuestDefinition.QuestLineFlags bit 4 - the bit that greys the journal's Share button,
-	//   * the RANGE is the 60-unit test the share window's own tick applies before it drops out with
+	//   * the range is the 60-unit test the share window's own tick applies before it drops out with
 	//     "QuestSharePlayerMovedOutOfRange".
 	//
-	// A share is LIVE state like a trade: it cannot outlive either connection, so nothing here is persisted. What is
+	// A share is live state like a trade: it cannot outlive either connection, so nothing here is persisted. What is
 	// persisted is the outcome, and only when the target accepts.
 	public sealed class QuestSharingService
 	{
@@ -32,8 +32,8 @@ namespace Faolan.GameServer.Quest
 		// immediately cancels itself.
 		public const float ShareRadius = 60f;
 
-		// QuestDefinition.QuestLineFlags bit 4: this quest may NOT be shared. Proven in-client (see the column's own
-		// note) - it is what disables the journal's Share button, and it is the server's half of the same rule.
+		// QuestDefinition.QuestLineFlags bit 4: this quest may not be shared. Proven in-client (see the column's own
+		// note) - it is what disables the journal's Share button, and this is the server's half of the same rule.
 		private const uint NotShareableFlag = 0x10;
 
 		private readonly ICsPlayerAgentProvider _teams;
@@ -43,9 +43,9 @@ namespace Faolan.GameServer.Quest
 		private readonly IQuestShareOutbound _outbound;
 		private readonly QuestProgressionService _progression;
 
-		// target -> the offer they have open. The accept/decline bodies name the OTHER party, but what is granted comes
-		// from here rather than from the body, so a forged ShareQuestAccepted cannot hand its sender an arbitrary quest
-		// - the same rule the team accept and the trade start follow.
+		// target -> the offer they have open. The accept and decline bodies name the other party, but what is granted
+		// comes from here rather than from the body, so a forged ShareQuestAccepted cannot hand its sender an arbitrary
+		// quest - the same rule the team accept and the trade start follow.
 		private readonly ConcurrentDictionary<uint, PendingShare> _pendingByTarget = [];
 
 		public QuestSharingService(ICharacterQuestRepository quests, IWorldRepository world, ICsPlayerAgentProvider teams, IQuestShareOutbound outbound, QuestProgressionService progression, ILogger logger)
@@ -59,11 +59,12 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// c2s ShareQuest (0x204F): offer `questId` to every eligible team-mate, and answer the sharer with what
-		// happened. Every exit sends the sharer exactly one GLOBAL feedback, plus one INDIVIDUAL feedback per
-		// team-mate that failed for a reason worth naming.
+		// happened. Every exit sends the sharer exactly one global feedback, plus one individual feedback per team-mate
+		// that failed for a reason worth naming.
 		public async Task Share(uint sharerId, uint questId)
 		{
-			// INCLUDING the sharer, so "solo" is a roster of 0 or 1 - the CS tier only mints a team once someone joins.
+			// The roster includes the sharer, so "solo" is a roster of 0 or 1 - the CS tier only mints a team once
+			// someone joins.
 			var roster = _teams.TeamMembersOf(sharerId).Where(id => id != sharerId).ToList();
 			if (roster.Count == 0)
 			{
@@ -138,8 +139,8 @@ namespace Faolan.GameServer.Quest
 				outOfRange);
 		}
 
-		// c2s ShareQuestAccepted (0x2051): the target pressed Yes. The quest granted is the one WE offered, not the one
-		// the body names - the body's echo is only checked against it.
+		// c2s ShareQuestAccepted (0x2051): the target pressed Yes. The quest granted is the one the server offered, not
+		// the one the body names - the body's echo is only checked against it.
 		public async Task Accept(uint accepterId, uint echoedQuestId)
 		{
 			if (!_pendingByTarget.TryRemove(accepterId, out var pending))

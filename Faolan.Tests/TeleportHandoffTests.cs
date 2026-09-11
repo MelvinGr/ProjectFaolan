@@ -27,7 +27,7 @@ namespace Faolan.Tests
 			Assert.Equal("10d27bc00000c35008006f3101620000c79c000007d00000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
 		}
 
-		// #309: the EPIC-mode begin, byte-for-byte against the captured epic Spider Caverns entry
+		// The epic-mode begin, byte-for-byte against the captured epic Spider Caverns entry
 		// (chat-annotated-3 frame 23843, instance 0x0802E5D4, map 1004=0x3EC). It differs from the normal begin in
 		// the proxy's class word alone - 0xCABC for 0xC79C - which is what Build(epic: true) selects.
 		[Fact]
@@ -37,9 +37,9 @@ namespace Faolan.Tests
 			Assert.Equal("10d27bc00000c3500802e5d401620000cabc000003ec0000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
 		}
 
-		// #309: the EPIC destination announce (frame 23847) - class word 0xCABC, and the rest of the record is the
-		// normal grammar with that session's own instance token/arrival. ⚠️ Proxy slot [5] is compared LOOSELY: the
-		// capture carries 2 there where the builder emits its usual 1 - the slot reads as the map copy's ORDINAL
+		// The epic destination announce (frame 23847) - class word 0xCABC, and the rest of the record is the
+		// normal grammar with that session's own instance token/arrival. Proxy slot [5] is compared loosely: the
+		// capture carries 2 there where the builder emits its usual 1 - the slot reads as the map copy's ordinal
 		// (this was the player's second minted copy; the tokens are consecutive), not part of the mode, and inventing
 		// a per-entry ordinal to chase one observation would be fitting noise. Everything else matches byte-exact.
 		[Fact]
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			{
 				if (body[i] == captured[i])
 					continue;
-				Assert.Equal(-1, ordinalOffset); // at most ONE differing byte...
+				Assert.Equal(-1, ordinalOffset); // at most one differing byte...
 				ordinalOffset = i;
 			}
 
@@ -101,8 +101,8 @@ namespace Faolan.Tests
 			Assert.Equal(704.9f, body.ReadF32Be(99));
 		}
 
-		// The SAME-MAP announce (#809). Stihetfv frame 1277, the beach resurrect on map 0xFAA: 88 bytes, an arrival
-		// transform in the leading slot, an EMPTY spawn blob and trailing 1. This form had no golden, which is how our
+		// The same-map announce. Stihetfv frame 1277, the beach resurrect on map 0xFAA: 88 bytes, an arrival
+		// transform in the leading slot, an empty spawn blob and trailing 1. This form had no golden, which is how our
 		// builder came to emit 89 bytes - a second trailing byte the wire does not carry.
 		[Fact]
 		public void BuildSameMapDestBody_MatchesCapture()
@@ -116,7 +116,7 @@ namespace Faolan.Tests
 				Convert.ToHexStringLower(body));
 		}
 
-		// A PITCHED arrival - the shape the old "facingX, 0, facingZ" model could not express at all, and refused.
+		// A pitched arrival - the shape the old "facingX, 0, facingZ" model could not express at all, and refused.
 		// Hoxxling gameplay2 frame 9112: all four rotation words non-zero, and they normalise to 1.0.
 		[Fact]
 		public void ParseSameMapDestBody_ReadsTheRotationAsAQuaternion()
@@ -133,9 +133,9 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
 		}
 
-		// #814: the spawn blob's SECOND arm - the arrival stated as a spawn-point NAME with no coordinates on the wire.
+		// The spawn blob's second arm - the arrival stated as a spawn-point name with no coordinates on the wire.
 		// xxx_mage-necromancer_login_play3 frame 4735: the Tortage harbour rowboat into White Sands Night (10803),
-		// which is the ACG/instanced travel path and the only capture of it in the corpus. This body was REFUSED before
+		// which is the ACG/instanced travel path and the only capture of it in the corpus. This body was refused before
 		// the fix, because the codec asserted the 0x00018704 tag that the other 94 captured blobs happen to carry.
 		[Fact]
 		public void ParseCrossMapDestBody_ReadsANamedSpawnPointArm()
@@ -149,7 +149,7 @@ namespace Faolan.Tests
 			Assert.Equal("PlayerSpawnPoint", point.Name);
 			Assert.Equal(10803u, parsed.Proxy.MapId); // White Sands Night
 			// The record states no coordinates, and the leading transform is genuinely zero - so the arrival must read
-			// as ABSENT rather than as the origin.
+			// as absent rather than as the origin.
 			Assert.Null(parsed.ArrivalPosition);
 			Assert.Equal(Vector3.Zero, parsed.Position);
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
@@ -173,7 +173,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
 		}
 
-		// An unknown tag must still be REFUSED rather than read past - the fix widens the grammar to the arm retail
+		// An unknown tag must still be refused rather than read past - the fix widens the grammar to the arm retail
 		// actually sends, it does not make the blob tolerant.
 		[Fact]
 		public void ParseCrossMapDestBody_RejectsAnUnknownSpawnBlobTag()

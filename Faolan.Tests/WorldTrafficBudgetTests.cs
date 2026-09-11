@@ -8,26 +8,26 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #716: what the world tick is allowed to put on the wire, measured against the retail corpus.
+	// What the world tick is allowed to put on the wire, measured against the retail corpus.
 	//
 	// A 17-minute Old Tarantia session pushed 20,204 MoveTaskIIR + 125,492 BehaviorControlCenterIIR at one client
 	// (19.3 and 119.6 per second). Over the 91 corpus captures of at least 60 s that carry either IIR, retail runs
 	// MoveTask at a 0.38/s median (p90 0.89, MAX 3.09).
 	//
 	// Both over-sends were per-something bugs, not tuning: an idle beat was streamed as one 2-point chase segment
-	// every ~6 u forever, and the "heartbeat" fired for EVERY live NPC on a shared 1 s accumulator - a record retail
-	// only ever sends ONCE per entity (see WorldBroadcaster.SendNpcIdleAssert). These gates hold the mechanisms that
-	// replaced them, because a rate regression is invisible in every other test: the effects are individually
-	// correct, there are just tens of thousands of them.
+	// every ~6 u forever, and the "heartbeat" fired for every live NPC on a shared 1 s accumulator - a record retail
+	// only ever sends once per entity (see WorldBroadcaster.SendNpcIdleAssert). These gates hold the rates, because a
+	// rate regression is invisible in every other test: the effects are individually correct, there are just tens of
+	// thousands of them.
 	public class WorldTrafficBudgetTests
 	{
-		// Retail's corpus MAXIMUM, i.e. the most generous reading available.
+		// Retail's corpus maximum, i.e. the most generous reading available.
 		private const double RetailMoveTasksPerSecondMax = 3.09;
 
 		[Fact]
 		public void IdleBeat_IsIssuedPerLap_NotPerSegment()
 		{
-			// The MoveTask half. A beat is handed to the client once and walked THERE; the server re-issues it only
+			// The MoveTask half. A beat is handed to the client once and walked there; the server re-issues it only
 			// where the client's copy has run out (a turnaround, or a lap closing). Streaming the walk instead - one
 			// segment per ~6 u - is what measured 19.3/s.
 			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 220) };
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			Assert.InRange(moveTasks, 1, 4);
 			Assert.True(moveTasks / seconds <= RetailMoveTasksPerSecondMax,
 				$"{moveTasks / seconds:F2} MoveTask/s from ONE idle patroller, over retail's corpus maximum of {RetailMoveTasksPerSecondMax}");
-			// ...and the low rate must be a WALKED beat, not a stalled one: it got to the far end of the street.
+			// ...and the low rate must be a walked beat, not a stalled one: it got to the far end of the street.
 			Assert.True(reached > 215f, $"the walk only covered {reached:F1}u of a 220u beat");
 		}
 
@@ -50,9 +50,9 @@ namespace Faolan.Tests
 			// The BCC half, and the actual regression. Old Tarantia carries ~120 visible NPCs, which at one heartbeat
 			// pulse each per second was the 119.6/s measured at one client.
 			//
-			// It is not a rate problem any more, it is gone: retail's `BccAction` is a one-shot ASSERT sent as an entity
+			// It is not a rate problem any more, it is gone: retail's `BccAction` is a one-shot assert sent as an entity
 			// comes into view (p50 1 record per actor over 7,969 captured actors), so it belongs to the client's spawn
-			// confirm - `WorldBroadcaster.SendNpcIdleAssert` - and the TICK emits nothing. A zone of NPCs carrying no
+			// confirm - `WorldBroadcaster.SendNpcIdleAssert` - and the tick emits nothing. A zone of NPCs carrying no
 			// ambient animations therefore produces no behaviour traffic whatsoever, however many of them there are.
 			var world = new WorldState();
 			var zone = world.ZoneFor(2000);
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void AZoneOfIdlers_StaysWithinRetailsAmbientAnimationRate()
 		{
-			// What DOES recur is the ambient animation (#766), and it is per-entity - so it is the one that has to be
+			// What does recur is the ambient animation, and it is per-entity - so it is the one that has to be
 			// checked against a population. Retail runs the Emote channel at 25,778 records over 2,909 actors, p50 9.4s
 			// between one actor's, i.e. a per-actor rate around 0.1/s. 200 NPCs all idling at once is a worst case no
 			// real zone reaches (only 222 of the shipped creature types have animations at all), and even that must stay
@@ -100,7 +100,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EveryIdler_PerformsAnAnimation_NoneIsStarved()
 		{
-			// ...and the per-entity clock must not starve anyone. The heartbeat this replaced had to ROTATE through the
+			// ...and the per-entity clock must not starve anyone. The heartbeat this replaced had to rotate through the
 			// population to cap its aggregate, which is exactly the kind of scheme that can silently drop the tail.
 			var world = new WorldState();
 			var zone = world.ZoneFor(2000);
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 		}
 
 		// A live, non-hostile, stationary NPC - a Citizen standing in the street. Spread out so nobody aggros, follows
-		// or leashes: this measures the IDLE floor.
+		// or leashes: this measures the idle floor.
 		private static WorldEntity Idle(uint handle)
 		{
 			var at = new Vector3(handle * 40f, 0, 0);

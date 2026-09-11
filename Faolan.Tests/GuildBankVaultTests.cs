@@ -17,12 +17,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #654: the guild bank's ITEM vault.
+	// The guild bank's item vault.
 	//
 	// Pinned by the captured session (demol80-demonologist_login_gameplay_annotated_3, 09:45:09-09:46:12) with the
 	// player narrating each step in /say - "deposidet an item", "withdrew it".
 	//
-	// ⚠️ The vault is owned by the GUILD, not by the member who filled it. That is the whole reason `ItemInstance`
+	// The vault is owned by the guild, not by the member who filled it. That is the whole reason `ItemInstance`
 	// grew `OwnerGuildId`, and it is what these tests assert hardest: an item in the vault must not hang off the
 	// depositor, or leaving the guild (or being deleted) would take it with them.
 	public class GuildBankVaultTests : IDisposable
@@ -56,8 +56,8 @@ namespace Faolan.Tests
 			Assert.Contains(ContainerKind.GuildBank, new[] { parsed.From.Container, parsed.To.Container });
 		}
 
-		// The container header retail pushes for an EMPTY vault, byte-exact - and the thing that makes it a guild
-		// container rather than a personal one: its instance is the GUILD id.
+		// The container header retail pushes for an empty vault, byte-exact - and the thing that makes it a guild
+		// container rather than a personal one: its instance is the guild id.
 		[Fact]
 		public void TheVaultPush_IsByteExactAgainstTheCapture()
 		{
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, Convert.ToHexStringLower(GuildBankCodec.Build(parsed.Vault)));
 		}
 
-		// A deposit TRANSFERS ownership: the guild owns it, the depositor does not. Asserted on the row rather than
+		// A deposit transfers ownership: the guild owns it, the depositor does not. Asserted on the row rather than
 		// on the reply, because this is the half the wire cannot show.
 		[Fact]
 		public async Task ADeposit_TransfersOwnershipToTheGuild()
@@ -86,7 +86,7 @@ namespace Faolan.Tests
 			Assert.Equal(GuildId, item.OwnerGuildId);
 			Assert.Equal(ContainerKind.GuildBank, item.Container);
 
-			// It is the SAME row - a deposit is an update, not a re-mint, which is what keeps a crafted or gemmed
+			// It is the same row - a deposit is an update, not a re-mint, which is what keeps a crafted or gemmed
 			// item intact through the vault.
 			Assert.Equal("NecroL80", item.CreatorName);
 			Assert.Single(outbound.Moves);
@@ -109,7 +109,7 @@ namespace Faolan.Tests
 			Assert.Empty(await database.GetGuildBankItems(GuildId));
 		}
 
-		// ⚠️ THE SECURITY ONE. The vault instance is client-supplied, so a member could name ANOTHER guild's vault
+		// The security one. The vault instance is client-supplied, so a member could name another guild's vault
 		// and help themselves. The service checks it against the character's own guild.
 		[Fact]
 		public async Task AMoveNamingAnotherGuildsVault_IsRefused()

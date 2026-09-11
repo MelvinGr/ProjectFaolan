@@ -17,18 +17,18 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report aa-xp` (#150): what a kill pays into the ALTERNATE-ADVANCEMENT xp pool, measured rather than assumed.
+	// `--report aa-xp`: what a kill pays into the ALTERNATE-ADVANCEMENT xp pool, measured rather than assumed.
 	//
-	// ⭐ Retail ANNOUNCES every grant. A `FormatFeedbackIIR` carrying the token `AlternateAdvancementPvEXpGranted`
+	// Retail ANNOUNCES every grant. A `FormatFeedbackIIR` carrying the token `AlternateAdvancementPvEXpGranted`
 	// states the amount verbatim in its first `<parameter>`, and the `AAPvEXP` (1000007) `StatIIR` push in the same
 	// frame moves by exactly that much. So the accrual rate was never capture-blocked - it is written out in words
 	// in the on-screen feedback, and nobody had read those messages.
 	//
 	// The report joins each announcement to the NPC death it follows and to that mob's own spawn record, because the
-	// amount is a function of the KILLED CREATURE's level and not of anything about the player beyond their level:
+	// amount is a function of the killed creature's level and not of anything about the player beyond their level:
 	// the pay-out table it prints is what `AlternateAdvancementRules` ships.
 	//
-	// ⚠️ The mob's level is read off ITS OWN spawn record on the wire, never off `NpcSpawns` - a spawn row is a
+	// The mob's level is read off its own spawn record on the wire, never off `NpcSpawns` - a spawn row is a
 	// per-respawn OBSERVATION and disagrees with the instance that was actually killed (`row_observation` and
 	// `capture_name_not_character` in the agent memory: the same trap, twice).
 	public static partial class ReportCli
@@ -41,7 +41,7 @@ namespace Faolan.Importer.Cli
 		private const ushort AaDeathSeq = 0x0004;
 
 		// The feedback tokens that carry an AA grant. The first two are the kill/quest announcements (the second
-		// adds a bonus PERCENT as its own parameter); the third rides a loot-chat line on an item redemption.
+		// adds a bonus percent as its own parameter); the third rides a loot-chat line on an item redemption.
 		private static readonly string[] AaGrantTokens =
 		[
 			"AlternateAdvancementPvEXpGranted",
@@ -61,7 +61,7 @@ namespace Faolan.Importer.Cli
 		{
 			Console.WriteLine("=== what a kill pays into the AA xp pool (#150) ===\n");
 
-			// ⭐ The MULTIPLIER has a column. Pull the two template words the paying mobs differ on, so the ×2 and
+			// The MULTIPLIER has a column. Pull the two template words the paying mobs differ on, so the ×2 and
 			// ×1.15 rows can be read off the data rather than off the creature's reputation.
 			Dictionary<string, (uint? Type, uint? Flags)> byName;
 			await using (var db = OpenDb())
@@ -75,7 +75,7 @@ namespace Faolan.Importer.Cli
 
 			var grants = new List<(string Capture, int Index, string Token, long Amount, int? Bonus)>();
 			var kills = new List<(string Capture, uint PlayerLevel, uint MobLevel, string Mob, long Amount, int? Bonus, int Distance)>();
-			// #935: each pool push against the kill it belongs to, DIRECTLY. Counting pushes and kills per capture and
+			// each pool push against the kill it belongs to, DIRECTLY. Counting pushes and kills per capture and
 			// dividing gives 2.00 on six captures and misses on three, which cannot say whether the residue is a
 			// clipped window, a witnessed death or something else. Pairing says where each push actually sits.
 			var pushAttribution = new List<(string Capture, int[] Pushes, (int Index, bool ByPlayer)[] Deaths, int[] Grants)>();
@@ -101,8 +101,8 @@ namespace Faolan.Importer.Cli
 				var localGrants = new List<(int Index, string Token, long Amount, int? Bonus)>();
 				var series = new Dictionary<uint, List<(int Index, uint Value)>>();
 
-				// #935: the pool is restated more often than it MOVES, and the restatements track deaths rather than
-				// grants. Separating the deaths the PLAYER caused from the ones they merely witnessed is what decides
+				// the pool is restated more often than it MOVES, and the restatements track deaths rather than
+				// grants. Separating the deaths the player caused from the ones they merely witnessed is what decides
 				// whether the rule is "twice per kill" or "twice per witnessed death" - the two agree on every capture
 				// with fewer than six deaths and diverge on the busy ones.
 				var damagedByPlayer = new HashSet<uint>();
@@ -197,8 +197,8 @@ namespace Faolan.Importer.Cli
 
 					// The kill the announcement belongs to: the latest death at or before it. A grant that follows no
 					// death in the same capture is a quest turn-in or an item redemption, and stays out of the table.
-					// ⚠️ The grant leads its own kill: the announcement is sent a handful of packets BEFORE the dying
-					// creature's LimboDeath behaviour, so the death to pair with is the NEXT one, not the preceding
+					// The grant leads its own kill: the announcement is sent a handful of packets before the dying
+					// creature's LimboDeath behaviour, so the death to pair with is the next one, not the preceding
 					// one. Pairing backwards attributes every amount to the PREVIOUS kill and reads as a table
 					// shifted by one level - which is exactly what it produced (57 against level 73, 234 against 78)
 					// before the distances were printed. `pair_with_the_burst`, again.
@@ -344,11 +344,11 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐ Where each `AAPvEXP` push actually SITS - against the nearest death and the nearest grant (#935).
+		///     Where each `AAPvEXP` push actually SITS - against the nearest death and the nearest grant.
 		/// </summary>
 		/// <remarks>
 		///     The per-capture ratio `pushes / player kills` reads exactly 2.00 on six of the nine captures that hold a
-		///     kill and 2.20 / 2.14 / 0.67 on the rest, which cannot say WHY: a clipped capture window, a witnessed
+		///     kill and 2.20 / 2.14 / 0.67 on the rest, which cannot say why: a clipped capture window, a witnessed
 		///     death that is not the player's, and a second trigger all produce the same miss. Pairing each push with
 		///     the event nearest to it answers it directly, the way the grant announcements were paired to their kills.
 		/// </remarks>
@@ -383,7 +383,7 @@ namespace Faolan.Importer.Cli
 						pairedToOtherDeath++;
 				}
 
-				// How many pushes each death carries, which is the "twice per kill" claim stated per EVENT.
+				// How many pushes each death carries, which is the "twice per kill" claim stated per event.
 				foreach (var d in c.Deaths)
 					perDeath.Add(c.Pushes.Count(p => Math.Abs(p - d.Index) <= AaPushToDeathWindow));
 			}

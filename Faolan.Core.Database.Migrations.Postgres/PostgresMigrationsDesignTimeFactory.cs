@@ -6,14 +6,14 @@ using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Core.Database.Migrations.Postgres
 {
-	// Builds the DbContext for the EF tooling when scaffolding Postgres migrations into THIS project:
+	// Builds the DbContext for the EF tooling when scaffolding Postgres migrations into this project:
 	//   dotnet ef migrations add <Name> --project Faolan.Core.Database.Migrations.Postgres --startup-project Faolan.Core.Database.Migrations.Postgres
-	// The provider is fixed (this IS the Postgres migration project - it must scaffold Postgres regardless of what
+	// The provider is fixed (this is the Postgres migration project - it must scaffold Postgres regardless of what
 	// faolan.json currently selects); the connection comes from the shared faolan.json (no hard-coded host).
-	// GOTCHA: the EF tools run design time with the CWD set to the PROJECT directory, not the repo root, so the plain
-	// relative config path misses - point FAOLAN_CONFIG at it (or set Database__ConnectionString in the environment):
-	//   FAOLAN_CONFIG=$PWD/faolan.json dotnet ef migrations add <Name> --project ... --startup-project ...
-	// `migrations add` never connects, so a SQLite-pointed config is fine here; `database update` takes --connection.
+	// The EF tools run design time with the CWD set to the project directory, not the repo root. Global.ConfigPath
+	// searches upwards for faolan.json and a relative SQLite `Data Source` resolves against the directory it was found
+	// in, so the commands work from anywhere in the tree; FAOLAN_CONFIG (or Database__ConnectionString) still overrides.
+	// `migrations add` never connects, so a SQLite-pointed config is fine here.
 	public sealed class PostgresMigrationsDesignTimeFactory : IDesignTimeDbContextFactory<DatabaseContext>
 	{
 		public DatabaseContext CreateDbContext(string[] args)

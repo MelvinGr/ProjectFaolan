@@ -4,16 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Pvp
 {
-	// DispatchRankingCaluculationCountdown(hoursUntilCaclulation) - CSPlayerInterface 0x3D. How long until the PvP
-	// ranking is recalculated (#874). The client's own spelling of both the method and its field is kept, as
-	// everywhere else: the name is evidence, not prose.
-	//
-	//   [u8 hoursUntilCaclulation]
-	//
-	// One byte. The single captured frame carries 0x0C = 12 hours, which says the unit is HOURS and not something
-	// finer - a minutes or seconds countdown could not fit a day in a byte.
-	//
-	// Belongs to the Massive-PvP / minigame ranking work (#146).
+	/// <summary>
+	///     <c>DispatchRankingCaluculationCountdown(hoursUntilCaclulation)</c> - how long until the PvP ranking is
+	///     recalculated, as a single <c>[u8]</c>. The client's own spelling of the method and its field is kept,
+	///     because the name is evidence.
+	/// </summary>
+	/// <remarks>
+	///     The single captured frame carries 0x0C, i.e. 12 hours, which fixes the unit as hours: a minutes or seconds
+	///     countdown could not fit a day in a byte.
+	/// </remarks>
 	public static class RankingCountdownCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchRankingCaluculationCountdown;

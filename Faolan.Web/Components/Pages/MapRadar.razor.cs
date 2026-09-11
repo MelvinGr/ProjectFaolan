@@ -11,7 +11,7 @@ namespace Faolan.Web.Components.Pages
 		private IJSObjectReference? _module;
 		private List<(uint Id, string Name)> _maps = [];
 
-		private uint MapId { get; set; } = 4010; // Tortage Island default
+		private uint MapId { get; set; } = 4010; // Tortage Island.
 
 		public async ValueTask DisposeAsync()
 		{
@@ -52,7 +52,7 @@ namespace Faolan.Web.Components.Pages
 				.Select(m => (m.Id, m.Name))
 				.ToList();
 
-			// Default to a map a player is actually on, if any (so the radar opens on something live).
+			// Prefer a map a player is actually on, so the radar opens on something live.
 			var sessions = await Live.GetSessionsAsync();
 			var liveCharId = sessions?.FirstOrDefault(s => s.CharacterId != null)?.CharacterId;
 			if (liveCharId is { } cid)

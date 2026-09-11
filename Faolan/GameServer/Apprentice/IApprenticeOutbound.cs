@@ -2,12 +2,15 @@ using System.Threading.Tasks;
 
 namespace Faolan.GameServer.Apprentice
 {
-	// The wire side of apprenticeship, as a narrow port the listener implements - the same shape IQuestShareOutbound
-	// takes for the other two-player interaction. ApprenticeService owns the rules and reaches everything else through
-	// this, so it never holds the listener.
-	//
-	// Everything is addressed by CHARACTER ID: an apprenticeship always spans two connections, and the service has no
-	// business resolving either.
+	/// <summary>
+	///     The wire side of apprenticeship, as a narrow port - the same shape <see cref="Quest.IQuestShareOutbound" />
+	///     takes for the other two-player interaction. <see cref="ApprenticeService" /> owns the rules and reaches
+	///     everything else through this, so it never holds the listener.
+	/// </summary>
+	/// <remarks>
+	///     Everything is addressed by character id: an apprenticeship always spans two connections, and the service has
+	///     no business resolving either.
+	/// </remarks>
 	public interface IApprenticeOutbound
 	{
 		/// <summary>

@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Storing the client-authored settings/preview blobs (Gitea #611), against a real throwaway SQLite DB.
+	// Storing the client-authored settings/preview blobs, against a real throwaway SQLite DB.
 	//
-	// The half-upsert is the part worth exercising for real: the client uploads the settings and the preview as SEPARATE
+	// The half-upsert is the part worth exercising for real: the client uploads the settings and the preview as separate
 	// messages on the same socket, so each write must leave the other column alone. Storing one over the other would
 	// silently lose a player's UI layout or blank the select screen, and neither shows up until the next login.
 	public class ClientSettingsPersistenceTests
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 				Assert.Single(rows);
 				Assert.Equal<byte[]>([4, 5], rows[0].Settings!);
 
-				// Subscription settings live on the ACCOUNT - UpdateSubscriptionSettings carries no id at all, so the
+				// Subscription settings live on the account - UpdateSubscriptionSettings carries no id at all, so the
 				// socket's authentication is the addressing.
 				var accountId = (await ctx.Characters.SingleAsync(c => c.Id == CharacterId, TestContext.Current.CancellationToken)).AccountId;
 				var subscription = UpdateSubscriptionSettingsCodec.Parse(TestPaths.AssetBytes("playeragent-update-subscription-settings.bin"));

@@ -10,32 +10,32 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report respawn-interval` (#855): WHAT SELECTS a creature's respawn interval - 120 s or 150 s.
+	// `--report respawn-interval`: what SELECTS a creature's respawn interval - 120 s or 150 s.
 	//
-	// `--report corpse-timing` established THAT retail respawns and roughly how fast, and the finding it cost a cycle
+	// `--report corpse-timing` established that retail respawns and roughly how fast, and the finding it cost a cycle
 	// to reach is that a respawn comes back on a NEW entity id: `death(H)` then `spawn(H)` finds nothing at all and
-	// reads as "retail never respawns". The signal is the same CREATURE reappearing AT the dead one's spawn point.
+	// reads as "retail never respawns". The signal is the same creature reappearing at the dead one's spawn point.
 	// This report owns that measurement now and asks the next question - which property of the creature, or of the
 	// place, picks the number - by carrying every attribute the spawn body states alongside each interval.
 	//
 	// ## What can fake an interval, and what actually rules each one out
 	//
-	//  * **A sibling that was there all along.** A camp holds eight of one creature within a few units of each other;
+	//  * A sibling that was there all along. A camp holds eight of one creature within a few units of each other;
 	//    the player walks out of range and back, and every one of them re-spawns to the client. Matched by name and
-	//    position alone, the FIRST of those reads as a respawn seconds after a kill. Ruled out by requiring the fill
-	//    to be a handle the client has NEVER SEEN before in this capture - a new entity, not a re-stream of a live
+	//    position alone, the first of those reads as a respawn seconds after a kill. Ruled out by requiring the fill
+	//    to be a handle the client has never seen before in this capture - a new entity, not a re-stream of a live
 	//    one. (This is what corpse-timing's Hatchling cluster of 0.9-13.0 s "intervals" partly was.)
 	//
-	//  * **A creature that came back while the player was away.** A spawn body arrives when the client is told, and
+	//  * A creature that came back while the player was away. A spawn body arrives when the client is told, and
 	//    it is told when the player is in range - so death -> delivery is an UPPER bound on the interval unless the
-	//    player was watching. ⭐ **The test for that is not where the player stood, it is whether the intervals track
-	//    their own deaths.** If four pirates die over 30 s and every fill lands at one moment - the player's return -
+	//    player was watching. The test for that is not where the player stood, it is whether the intervals track
+	//    their own deaths. If four pirates die over 30 s and every fill lands at one moment - the player's return -
 	//    then the intervals are spread as widely as the deaths were. If instead each fill lands the same distance
-	//    after ITS OWN death while the deaths themselves are minutes apart, no single delivery event can explain it
-	//    and the constant IS the timer. So each creature is scored on `deaths spread` against `intervals spread`, and
+	//    after its own death while the deaths themselves are minutes apart, no single delivery event can explain it
+	//    and the constant is the timer. So each creature is scored on `deaths spread` against `intervals spread`, and
 	//    that is a fact about the timestamps alone - no assumption about range anywhere in it.
 	//
-	//    ⛔ A player-position watch gate was built first and thrown away, and the reason is worth keeping. Judged
+	//    A player-position watch gate was built first and thrown away, and the reason is worth keeping. Judged
 	//    against a fixed 100 u radius, every clean 150.0 s Brutal Pirate came back "unwatched" (the player wanders
 	//    107-138 u mid-fight) while a Hatchling nest and a wandering Panther passed - the gate selected exactly the
 	//    wrong matches. Calibrating the radius off the corpus instead does not rescue it: the delivery distances have
@@ -44,13 +44,13 @@ namespace Faolan.Importer.Cli
 	//    it would need - how far retail actually streams a spawn - is its own open question, and our 150 u
 	//    `PlayerInterestRange` is still an invented number.
 	//
-	//  * **A different creature of the same kind wandering in.** Ruled out only partly, by distance: retail's revive
+	//  * A different creature of the same kind wandering in. Ruled out only partly, by distance: retail's revive
 	//    is exact and every clean match lands at 0.0 u, so a fill several units off its anchor is suspect. Each
 	//    match's distance is printed rather than filtered away. The fill's own `spawn_animation` flag rides along as
-	//    an independent witness - #803 measured that retail sets it on a (re)CREATED entity - though its absence
-	//    proves nothing, since it is under-sent.
+	//    an independent witness - retail sets it on a (re)created entity - though its absence proves nothing, since
+	//    it is under-sent.
 	//
-	// ⛔ And there is no bound in the other direction. "The player stood there for N s and nothing came back" cannot
+	// And there is no bound in the other direction. "The player stood there for N s and nothing came back" cannot
 	// distinguish a missing respawn from a delivery the client was out of range for - the capture that shows
 	// `Brutal Pirate 0xaa88` returning at 150.0 s also holds a 334 s window in which it "never returned". Windows are
 	// counted here only to size the HARVEST, never as evidence against a respawn.
@@ -78,7 +78,7 @@ namespace Faolan.Importer.Cli
 		private const double ClusterMajority = 0.6;
 
 		// Deaths with at least this much capture left after them are the population an interval could have been
-		// harvested from. Sizing only - see the ⛔ above.
+		// harvested from. Sizing only - see the above.
 		private const double HarvestWindowSeconds = 160.0;
 
 		private static void RespawnInterval(IReadOnlyList<NamedCapture> captures)
@@ -86,14 +86,13 @@ namespace Faolan.Importer.Cli
 			var matches = new List<RespawnMatch>();
 			var misses = new List<string>();
 
-			// #855's second closing condition: is the non-observation a property of the SOLO playfield rather than of
-			// a long timer? Every anchored death is recorded with the map its creature lives on so the two can be
-			// separated.
+			// Is the non-observation a property of the solo playfield rather than of a long timer? Every anchored
+			// death is recorded with the map its creature lives on so the two can be separated.
 			var deathsByMap = new Dictionary<uint, int>();
 			var matchesByMap = new Dictionary<uint, int>();
 
-			// ⚠️ The CONTROL on the Solo split: a map with deaths and no respawns proves nothing if none of those
-			// deaths had enough capture after it to see one. This counts the deaths that DID.
+			// The control on the Solo split: a map with deaths and no respawns proves nothing if none of those
+			// deaths had enough capture after it to see one. This counts the deaths that did.
 			var harvestableByMap = new Dictionary<uint, int>();
 			var deathsTotal = 0;
 			var deathsAnchored = 0;
@@ -133,14 +132,14 @@ namespace Faolan.Importer.Cli
 					                                        && s.Handle != death.Handle
 					                                        && s.Template == dead.Template
 					                                        && !claimed.Contains(s.Handle)
-					                                        // ⚠️ NEW to the client: this spawn IS the handle's first
+					                                        // NEW to the client: this spawn is the handle's first
 					                                        // sighting. Without it a live sibling re-streamed after an
 					                                        // interest round-trip reads as the respawn.
 					                                        && firstSeen.GetValueOrDefault(s.Handle, -1) == s.Seconds
 					                                        && MathF.Min(Ground(s.Position - home), Ground(s.Position - died)) <= RespawnFillRadius);
 					if (fill == null)
 					{
-						// ⚠️ Why this kill yielded nothing, kept rather than dropped: with five creatures carrying the
+						// Why this kill yielded nothing, kept rather than dropped: with five creatures carrying the
 						// whole report, whether the filters are starving it is a question that has to be answered with
 						// a number. `near` is the closest later spawn of the same creature whatever its distance and
 						// whatever its handle's history.
@@ -185,14 +184,14 @@ namespace Faolan.Importer.Cli
 			SelectorCrossTab(timers);
 		}
 
-		// ⭐ Which of the matched creatures has a measured TIMER. Three things have to hold, and each rules out a
+		// Which of the matched creatures has a measured TIMER. Three things have to hold, and each rules out a
 		// different way for a constant to be an artifact:
 		//
 		//   * the intervals AGREE - at least two of them within `AgreementSeconds` of the shortest;
 		//   * that agreeing cluster holds most of the creature's observations, not a cherry-picked few. A delivery
-		//     delay can only ADD time, so a creature with a timer piles up at one value and trails off to the right;
+		//     delay can only add time, so a creature with a timer piles up at one value and trails off to the right;
 		//     three tight readings inside a spread of 3.4-15.4 s is a continuum, not a pile;
-		//   * and the agreement cannot be one delivery event seen several times - either the DEATHS behind it are
+		//   * and the agreement cannot be one delivery event seen several times - either the deaths behind it are
 		//     `DeathsApartSeconds` apart (one return cannot land at a fixed offset from each of them) or the cluster
 		//     spans two captures, which is a stronger version of the same argument: two sessions share nothing.
 		private static List<CreatureTimer> Timers(List<RespawnMatch> matches)
@@ -228,7 +227,7 @@ namespace Faolan.Importer.Cli
 							? $"scattered - only {cluster.Count} of {all.Count} agree"
 							: $"deaths {deathsSpan:0} s apart in one capture - could be one delivery";
 
-				// ⭐ The cluster's worst anchor distance, and it earns its column: retail's revive is EXACT, so a
+				// The cluster's worst anchor distance, and it earns its column: retail's revive is exact, so a
 				// creature whose "respawns" all land a few units off its spawn point (Panther, 3.6-6.9 u) is a
 				// wandering neighbour of the same kind, while every measured timer sits at 0.0 u.
 				var worst = cluster.Count == 0 ? 0 : cluster.Max(m => m.Distance);
@@ -247,12 +246,12 @@ namespace Faolan.Importer.Cli
 			return timers;
 		}
 
-		// ⭐ THE QUESTION (#855). Every measured interval carries the whole npc_stats/stats attribute set its spawn
+		// the question. Every measured interval carries the whole npc_stats/stats attribute set its spawn
 		// body states, so the split can be tested against each candidate at once rather than argued from two
 		// creatures.
 		//
 		// An attribute SURVIVES as a selector only if it is a function of the interval in the strict sense: never two
-		// creatures sharing its value while disagreeing on the interval. Anything that merely varies WITHIN one
+		// creatures sharing its value while disagreeing on the interval. Anything that merely varies within one
 		// interval group is not refuted (a rule may map several values to one number), which is why the table calls
 		// out only the direction that can only be a defect - the same value, two different intervals.
 		private static void SelectorCrossTab(List<CreatureTimer> timers)
@@ -294,7 +293,7 @@ namespace Faolan.Importer.Cli
 			{
 				var byGroup = groups.Select(g => (Interval: g.Key, Values: g.SelectMany(t => t.Values(of)).Distinct().OrderBy(v => v).ToList())).ToList();
 				var shared = byGroup.SelectMany(g => g.Values).GroupBy(v => v).Where(x => x.Count() > 1).Select(x => x.Key).ToList();
-				// ⚠️ An attribute that is 0 in every group is UNSET on these creatures, not a selector that failed:
+				// An attribute that is 0 in every group is UNSET on these creatures, not a selector that failed:
 				// calling it refuted would credit the report with a finding where it has no reading at all.
 				var verdict = byGroup.All(g => g.Values is [0])
 					? "unset on every measured creature - carries no information"
@@ -316,7 +315,7 @@ namespace Faolan.Importer.Cli
 
 		// The candidate selectors, all read off the spawn body itself so this needs no DB. `level`/`health` are the
 		// scaling reading, `community`/`faction` the "whose camp is it" reading, `superfamily`/`race`/`monsterdata`
-		// the creature-family reading, `npc_type`/`normalset` the RANK reading (Minion/MiniBoss/Boss, Prey), and
+		// the creature-family reading, `npc_type`/`normalset` the rank reading (Minion/MiniBoss/Boss, Prey), and
 		// `map` the one that is not about the creature at all - the playfield's own rule.
 		private static readonly (string Name, Func<RespawnSighting, uint> Of)[] SelectorAttributes =
 		[
@@ -353,13 +352,13 @@ namespace Faolan.Importer.Cli
 				{
 					case PlayfieldFCodec.Opcode:
 						// A MapChange we cannot read clears the map rather than leaving the previous one standing
-						// (#818) - keeping it re-attributes everything that follows to the playfield just left.
+						//  - keeping it re-attributes everything that follows to the playfield just left.
 						map = p.TryParse(PlayfieldFCodec.Parse, out var change) ? change.MapId : 0;
 						break;
 
 					case BehaviorControlCenterCodec.Opcode:
 					{
-						// PLAYERS are not creatures: a player's death is followed by their own resurrect spawn, which
+						// players are not creatures: a player's death is followed by their own resurrect spawn, which
 						// would read as the fastest respawn in the corpus. Same handle line as NpcSpawnExtractor.
 						if (p.TryParse(BehaviorControlCenterCodec.Parse, out var bcc) && bcc.Seq == CorpseDeathSeq && bcc.BehaviorId == CorpseDeathBehaviorId
 						    && bcc.Actor < EntityHandles.CharacterInstanceBase)
@@ -376,7 +375,7 @@ namespace Faolan.Importer.Cli
 						var stats = spawn.Character.Stats;
 						sightings.Add(new RespawnSighting(seconds, spawn.Handle, npc.TemplateId, spawn.Character.Name ?? "?", spawn.Position, map)
 						{
-							// #803: retail sets this on a (re)CREATED entity, so a fill carrying it was built at about
+							// retail sets this on a (re)CREATED entity, so a fill carrying it was built at about
 							// the moment it was delivered - an independent witness. Absence says nothing (it is
 							// under-sent), which is why it is printed beside the interval rather than filtering.
 							Fresh = npc.ShouldSerializeSpawnAnimation(),
@@ -431,7 +430,7 @@ namespace Faolan.Importer.Cli
 			public uint ProfessionType { get; init; }
 		}
 
-		// Creature TEMPLATE -> the map its placements sit on, loaded once. 0 when the creature has no placement at
+		// Creature template -> the map its placements sit on, loaded once. 0 when the creature has no placement at
 		// all - an ambient-pool or summoned type, which is a real answer rather than a lookup failure.
 		private static Dictionary<uint, uint>? _templateMaps;
 
@@ -449,17 +448,16 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     #855's second closing condition: are the creatures that never respawn simply the ones on a SOLO
-		///     playfield?
+		///     Are the creatures that never respawn simply the ones on a solo playfield?
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The hypothesis is that an open-world creature on a Solo map does not come back for the life of the
+		///     The hypothesis is that an open-world creature on a Solo map does not come back for the life of the
 		///     instance, which would make the right model a per-map FLAG rather than any timer. It matters because
 		///     Tortage Island (4010) is one of only four Solo maps and is where nearly every capture was taken - so
 		///     "no respawn observed" could be about the playfield rather than about the interval.
 		///     <para />
-		///     ⚠️ A map with deaths and no matches is NOT by itself evidence: it may simply have no capture long
-		///     enough after them. Read it beside the interval table - a map that yields a MEASURED timer has settled
+		///     A map with deaths and no matches is not by itself evidence: it may simply have no capture long
+		///     enough after them. Read it beside the interval table - a map that yields a measured timer has settled
 		///     the question for itself.
 		/// </remarks>
 		private static void SoloPlayfieldSplit(Dictionary<uint, int> deathsByMap, Dictionary<uint, int> matchesByMap, Dictionary<uint, int> harvestableByMap)
@@ -489,8 +487,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  SOLO maps:  {soloDeaths,4} death(s), {soloWatched,4} watched >= {HarvestWindowSeconds:0}s, {soloMatches,3} respawn(s)");
 			Console.WriteLine($"  OPEN maps:  {openDeaths,4} death(s), {openWatched,4} watched >= {HarvestWindowSeconds:0}s, {openMatches,3} respawn(s)");
 			Console.WriteLine();
-			// ⚠️ The OPEN maps that also yield nothing despite being watched. They are what stops this being a clean
-			// Solo-vs-open split, and naming them is the difference between a finding and an overclaim.
+			// The open maps that also yield nothing despite being watched. They are what stops this being a clean
+			// solo-vs-open split, and naming them is the difference between a finding and an overclaim.
 			var silentOpen = harvestableByMap
 				.Where(kv => kv.Key != 0 && !SoloMaps.Contains(kv.Key) && kv.Value > 0 && matchesByMap.GetValueOrDefault(kv.Key) == 0)
 				.OrderByDescending(kv => kv.Value)
@@ -534,8 +532,8 @@ namespace Faolan.Importer.Cli
 
 		private sealed record RespawnMatch(string Capture, RespawnSighting Dead, RespawnSighting Fill, double DeathSeconds, double Seconds, float Distance, string Anchor);
 
-				// ⚠️ `Sightings`, not one representative: `level` is 32 on one Wild Cow and 33 on the next, so an attribute
-		// read off a single spawn would be silently one of several values. The cross-tab compares SETS.
+				// `Sightings`, not one representative: `level` is 32 on one Wild Cow and 33 on the next, so an attribute
+		// read off a single spawn would be silently one of several values. The cross-tab compares sets.
 		private sealed record CreatureTimer(List<RespawnSighting> Sightings, double Interval, int Observations, int Captures)
 		{
 			public RespawnSighting First => Sightings[0];

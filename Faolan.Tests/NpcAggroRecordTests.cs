@@ -4,15 +4,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The two records that tell a CLIENT it is being attacked (#839). Both are addressed to the PLAYER - it is the
+	// The two records that tell a client it is being attacked. Both are addressed to the player - it is the
 	// player's threat list that gains an entry, not the creature's - and building them the other way round is
 	// invisible on the server and total on the client: the records are dropped, the client never re-polls
-	// RequestAggroStatus, and a creature that has turned hostile keeps drawing GREEN and refuses to be attacked back
+	// RequestAggroStatus, and a creature that has turned hostile keeps drawing green and refuses to be attacked back
 	// while it beats on the player.
 	//
 	// Bytes are retail's own, from the Saddur fight in
 	// `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` (frames 8480), player 0x01317cf8 vs Saddur
-	// 0x0005e96f. The u32 carrier length is the sender's (#530 rule 2), so it is not part of the body.
+	// 0x0005e96f. The u32 carrier length belongs to the sender, so it is not part of the body.
 	public class NpcAggroRecordTests
 	{
 		private const uint Player = 0x01317CF8;
@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		}
 
 		// The corpus is unanimous on which way round it goes: 270 of 270 captured HateListUpdates carry the session
-		// player as the carrier. Asserting the swapped form is NOT what we build keeps the regression explicit rather
+		// player as the carrier. Asserting the swapped form is not what we build keeps the regression explicit rather
 		// than relying on the reader to spot two handles in the right order.
 		[Fact]
 		public void HateListUpdate_IsNotBuiltCreatureFirst()

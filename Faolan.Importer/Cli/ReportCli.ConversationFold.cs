@@ -6,16 +6,15 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report conversation-fold-stability`: does adding ONE capture to the corpus preserve the node ids the fold
-	// already produced? (#643)
+	// `--report conversation-fold-stability`: does adding one capture to the corpus preserve the node ids the fold
+	// already produced?
 	//
 	// The conversations module is Overwrite-only because `ConversationGraph.Fold` is a global partition over every
 	// harvested walk: which screens merge, and which need a `Discriminator`, is decided by comparing the walks against
-	// each other. #643 proposed two ways out and called the cheaper one *"probably true, but it needs stating and
-	// testing rather than assuming"*:
+	// each other. There are two ways out of that, and the cheaper one has to be tested rather than assumed:
 	//
 	//   (a) persist the harvest so the fold can be re-run from the database;
-	//   (b) prove the fold is INCREMENTALLY STABLE for the append-only case - a new walk can only SPLIT a class, never
+	//   (b) prove the fold is INCREMENTALLY stable for the append-only case - a new walk can only split a class, never
 	//       merge two - and apply just the splits.
 	//
 	// This is the test (b) needs. It folds the whole corpus, then folds it again with one capture held out, and asks
@@ -23,8 +22,8 @@ namespace Faolan.Importer.Cli
 	// importer could have left alone; a LOST id is a row whose primary key moved, taking its packets, edges and
 	// entries with it.
 	//
-	// ⚠️ It has to be a REPORT and not a test: the answer is a property of the shipped corpus, which is not in this
-	// repo, and it changes whenever a capture is added - exactly the shipped-data-gate rule in CLAUDE.md (#729).
+	// It has to be a report and not a test: the answer is a property of the shipped corpus, which is not in this
+	// repo, and it changes whenever a capture is added - exactly the shipped-data-gate rule in CLAUDE.md.
 	public static partial class ReportCli
 	{
 		private static void ConversationFoldStability(IReadOnlyList<NamedCapture> captures)
@@ -41,11 +40,11 @@ namespace Faolan.Importer.Cli
 
 			var fullGraph = ConversationGraph.Fold(HarvestOf(withWalks.SelectMany(c => walksOf[c.Name])));
 			var full = fullGraph.Nodes.Select(n => n.Id).ToHashSet();
-			// ⭐ The fragility metric, and the reason the headline below cannot be read as "the fold is stable". The
-			// ONLY way an append moves an existing id is by renumbering a discriminator, and a discriminator can only
+			// The fragility metric, and the reason the headline below cannot be read as "the fold is stable". The
+			// only way an append moves an existing id is by renumbering a discriminator, and a discriminator can only
 			// be renumbered where there is more than one class in a (template, contentKey) group. A corpus in which
 			// every node sits at discriminator 0 has nothing to renumber - so an append-stable result there is a fact
-			// about the DATA, not about the function.
+			// about the data, not about the function.
 			var discriminated = fullGraph.Nodes.Count(n => n.Discriminator > 0);
 			Console.WriteLine($"  the WHOLE corpus folds to {full.Count:N0} node(s), {discriminated:N0} of them at a discriminator above 0");
 			Console.WriteLine();
@@ -79,7 +78,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  worst single capture                              : {worst:N0} node id(s) moved");
 			Console.WriteLine();
 
-			// ⭐ The verdict, stated rather than left to the reader - the whole point of the report is to settle (b)
+			// The verdict, stated rather than left to the reader - the whole point of the report is to settle (b)
 			// one way or the other, and "some ids move" and "no ids move" are opposite answers to it.
 			if (worst == 0)
 			{
@@ -111,7 +110,7 @@ namespace Faolan.Importer.Cli
 		// The fold's node ids for a set of walks, through exactly the path the importer uses: extract, split the
 		// variants, merge, fold. Anything less would measure a different function than the one the module runs.
 		//
-		// ⚠️ `NpcTemplateId` is NOT filtered against the database here, where the importer filters against imported
+		// `NpcTemplateId` is not filtered against the database here, where the importer filters against imported
 		// templates. That only ever REMOVES walks, uniformly in both runs, so it cannot change whether an id moves -
 		// and keeping the DB out of it makes the report a pure function of the corpus.
 		private static HashSet<uint> FoldOf(IEnumerable<ConversationWalk> walks)

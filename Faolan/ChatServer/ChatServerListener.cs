@@ -25,8 +25,8 @@ namespace Faolan.ChatServer
 		private readonly IChatServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// The port is the hosting realm's ChatServerPort (from its Realm row - the single source of truth for the
-		// realm-local service ports, #324), taken by INJECTION rather than read from global config: `HostRealm` is a
+		// The port is the hosting realm's ChatServerPort (its Realm row is the single source of truth for the
+		// realm-local service ports), taken by injection rather than read from global config: `HostRealm` is a
 		// singleton the pre-host bootstrap registers, which is what lets this be a plain AddHostedService<T>().
 		public ChatServerListener(HostRealm realm, ILogger<ChatServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IChatServerDispatcher dispatcher,
 			IGameServerDispatcher gameServerDispatcher) : base(realm.ChatServerPort, logger, configuration, database, new ChatPacketTracer(logger))
@@ -60,9 +60,9 @@ namespace Faolan.ChatServer
 					// same shape the client sends to the CSPlayerAgent as Authenticate(nCharacterInstance, nCookie,
 					// communityVersion) - capture-confirmed: in every trace the chat cookie is byte-identical to the
 					// CSPlayerAgent one, which is the `uCookie` the UniverseAgent handed out in DispatchAckAuthenticate.
-					// ⚠️ We look the account up BY that cookie, which only works because SendPlayerAgentRealm issues
-					// Account.Id AS the cookie (Faolan/UniverseAgent/Packets.cs) - if the cookie ever becomes a real
-					// opaque token, this lookup has to go through a cookie->account map instead.
+					// The account is looked up by that cookie, which only works because SendPlayerAgentRealm issues
+					// Account.Id as the cookie (Faolan/UniverseAgent/UniverseAgentListener.Outbound.cs). If the cookie
+					// ever becomes a real opaque token, this lookup has to go through a cookie->account map instead.
 					// Version is 1 in all 5239 captured Hellos; language is the client's UI language ("English").
 					var protocolVersion = body.ReadUInt32();
 					var clientInstance = body.ReadUInt32();
@@ -82,7 +82,7 @@ namespace Faolan.ChatServer
 
 					Logger.LogInformation("ChatServer hello decoded: version={Version}, clientInstance={ClientInstance:X8}, cookie/accountId={AccountId:X8}, language={Language}", protocolVersion, clientInstance, accountId, language);
 
-					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
+					// Retail sends the full chat-channel subscription list first (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from
 					// the raw pcap. Every channel it holds is declared in ChatChannels; the standing ones carry a
 					// constant id, so they are just that list.
@@ -90,12 +90,12 @@ namespace Faolan.ChatServer
 						await SendChannelSubscription(client, channel, id);
 
 					// ...then the ones that follow something the character belongs to - their map and their guild -
-					// through the SAME calls a mid-session change takes, so the login burst and a later move cannot
+					// through the same calls a mid-session change takes, so the login burst and a later move cannot
 					// drift apart. Each is a no-op when there is nothing to belong to, hence no condition here.
 					await SubscribeMembershipChannels(client);
 
-					// The empty-bodied answer to Hello. Named HelloAck in #532 - from position, since an empty body
-					// gives nothing else to go on, but the position is invariant across all 41 captures.
+					// The empty-bodied answer to Hello. Named HelloAck from position - an empty body gives nothing else
+					// to go on - and that position is invariant across all 41 captures.
 					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.HelloAck));
 
 					var character = client.Session.Character!;
@@ -108,19 +108,19 @@ namespace Faolan.ChatServer
 
 					await SendSystemMessage(client, ChatMarkup.Lines([.. Global.BuildString.Split('\n').Select(ChatMarkup (l) => l)]));
 
-					// Restore the stored friend list. ⚠️ The MESSAGES are the captured ones (the same pair an add
-					// sends), but this TIMING is not: the captured account had no friends before it added them, so
-					// login-with-friends confirms both the shape and the place: 0x0014 + 0x0028 per friend, in the same
-					// burst as the channel subscriptions and the welcome message. It goes HERE rather than on the
-					// client's chat-init (0x0064), which arrives at most once across two clients in the corpus and
-					// never at all from ours - hooking it there meant the restore never ran.
-					// Retail restores the list as 0x0014 + 0x0028 pairs with NO presence push - that belongs to an add.
+					// Restore the stored friend list: 0x0014 + 0x0028 per friend, in the same burst as the channel
+					// subscriptions and the welcome message. The messages are the captured ones (the same pair an add
+					// sends); the timing is not captured, because the captured account had no friends before it added
+					// them. It belongs here rather than on the client's chat-init (0x0064), which arrives at most once
+					// across two clients in the corpus and never from this server's client.
+					// Retail restores the list as 0x0014 + 0x0028 pairs with no presence push - that belongs to an add.
 					foreach (var friend in await Database.GetFriends(character.Id))
 						await SendFriendEntry(client, friend, false);
 
-					// ...and tell everyone who has US on their list that we are now online. Without this a friend's
-					// status is frozen at whatever it happened to be when the WATCHER logged in: whoever connects first
-					// sees the other as offline forever, because the restore above can only report who is already here.
+					// ...and tell everyone who has this character on their list that they are now online. Without it a
+					// friend's status is frozen at whatever it was when the watcher logged in: whoever connects first
+					// would see the other as offline for ever, because the restore above can only report who is
+					// already here.
 					await AnnouncePresenceToWatchers(character.Id, SocialStatus.Online);
 
 					break;
@@ -129,26 +129,25 @@ namespace Faolan.ChatServer
 				case ChatServerOpcodes.ChannelChat:
 				{
 					// The client posted a message to a chat channel: [byte type][u32 channelId][string][0000].
-					// Relay it to every connected client as the sender's identity (0x0014) + the message (0x0041
-					// with the sender id inserted). The channel (type+id) is preserved, so each client's own channel
-					// subscriptions decide whether/where it shows - that is what makes the multiple channels work
-					// (global channels reach everyone; ~Playfield's id is a map, so only same-map clients are
-					// subscribed to it and the rest ignore it).
+					// Relay it to every connected client as the sender's identity (0x0014) + the message (0x0041 with
+					// the sender id inserted). The channel (type+id) is preserved, so each client's own channel
+					// subscriptions decide whether and where it shows - global channels reach everyone, while
+					// ~Playfield's id is a map, so only same-map clients are subscribed and the rest ignore it.
 					var channelType = body.ReadByte();
 					var channelId = body.ReadUInt32();
 					var message = body.ReadString();
 
 					Logger.LogInformation("ChatServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
 
-					// A '.command' (not '..') from a GM runs as a GM command in ANY channel, just like in /say -
-					// routed to the player's world session via the GameServer dispatcher. The command line is NOT
-					// echoed to chat (and is kept out of the Claude bridge log below so Claude doesn't "reply" to it).
+					// A '.command' (not '..') from a GM runs as a GM command in any channel, just as in /say - routed
+					// to the player's world session via the GameServer dispatcher. The command line is not echoed to
+					// chat, and is kept out of the Claude bridge log below so nothing replies to it.
 					if (await TryRunChatGmCommand(client, message))
 						break;
 
 					await BroadcastChannelChat(client, channelType, channelId, message);
 
-					// #95: persist the channel post to chat history (write-behind, never breaks the live relay above).
+					// Persist the channel post to chat history (write-behind; it never breaks the live relay above).
 					await PersistChat(client, channelType, channelId, null, false, message);
 
 					break;
@@ -158,7 +157,7 @@ namespace Faolan.ChatServer
 				{
 					// A tell: [u32 targetCharacterId][string text][00 01 00] - op 0x001E both directions (whisper
 					// capture 2026-06-12, Hoxxling <-> Settuc). Deliver to the target as the sender's identity
-					// (0x0014, like channel chat) + the same 0x001E shape with the SENDER's id in the peer slot.
+					// (0x0014, like channel chat) + the same 0x001E shape with the sender's id in the peer slot.
 					// The sender's client renders its own outgoing tell locally - retail echoes nothing back.
 					var targetCharacterId = body.ReadUInt32();
 					var message = body.ReadString();
@@ -167,7 +166,7 @@ namespace Faolan.ChatServer
 
 					Logger.LogInformation("ChatServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
 
-					// #95: persist the whisper to chat history (channelType/id 0 for a tell; recipient in TargetId).
+					// Persist the whisper to chat history (channelType/id 0 for a tell; recipient in TargetId).
 					await PersistChat(client, 0, 0, targetCharacterId, true, message);
 
 					var target = ClientForCharacter(targetCharacterId);
@@ -186,9 +185,10 @@ namespace Faolan.ChatServer
 					break;
 				}
 
-				// 0x0028 AddFriend([u32 characterId]): the friend list lives HERE, not on the game server, and is
-				// ONE-SIDED - no accept step, so the add is a write plus the two replies retail sends, in this order:
-				// the presence push (0x0025, addressed by NAME) then the friend's state (0x0028, ending in its CLASS).
+				// 0x0028 AddFriend([u32 characterId]): the friend list lives on this tier, not the game server, and is
+				// one-sided - there is no accept step, so the add is a write plus the two replies retail sends, in this
+				// order: the presence push (0x0025, addressed by name) then the friend's state (0x0028, ending in its
+				// class).
 				case ChatServerOpcodes.AddFriend:
 				{
 					var friendId = FriendRefCodec.Parse(body.ReadRemainingArray()).CharacterId;
@@ -226,8 +226,8 @@ namespace Faolan.ChatServer
 				}
 
 				// 0x002A SetSocialStatus([u32 SocialStatus]): the player's own presence - what a friend's list shows
-				// beside their name (#892). The chat tier owns the friend list, so it is the tier that has to be told,
-				// and the client tells it directly rather than through the game or CS tiers.
+				// beside their name. The chat tier owns the friend list, so it is the tier that has to be told, and the
+				// client tells it directly rather than through the game or CS tiers.
 				//
 				// It is the LFG toggle's second half: every captured occurrence fires ~50 microseconds after the CS
 				// tier's SetLookingForTeamStatus, 2 for on and 1 for off. Nothing answers it on the wire - retail sends
@@ -260,16 +260,11 @@ namespace Faolan.ChatServer
 			}
 		}
 
-		// #95: write-behind chat-history persistence. Records a channel post (isWhisper=false, target=null) or a tell
-		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
-		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
-		// character id for a player; see player_handle_equals_character_id).
-		// Re-sends this character's entry to every ONLINE watcher, so their list reflects a login or a logout.
+		// Re-sends this character's entry to every online watcher, so their list reflects a login or a logout.
 		//
-		// ⚠️ The MESSAGE is the captured one (the same state an add or a login restore sends), but the TRIGGER is
-		// inferred: no capture covers a friend logging in or out while someone watches. It is hard to see how a friend
-		// list could work without it - presence would never change - so this is the smallest step that makes the feature
-		// coherent, rather than a new packet invented for it.
+		// The message is the captured one (the same state an add or a login restore sends); the trigger is inferred, as
+		// no capture covers a friend logging in or out while someone watches. Without it presence would never change,
+		// so this is the smallest step that makes the feature coherent rather than a packet invented for it.
 		private async Task AnnouncePresenceToWatchers(uint characterId, SocialStatus status)
 		{
 			var self = await Database.GetCharacter(characterId);
@@ -283,7 +278,7 @@ namespace Faolan.ChatServer
 			}
 		}
 
-		// The live presence a character has SET (0x002A). Chat-tier live state, like the roster on the CS tier: it is
+		// The live presence a character has set (0x002A). Chat-tier live state, like the roster on the CS tier: it is
 		// per-connection by definition, so it is not persisted and it goes when the connection does. A character with a
 		// live chat connection who has never set one is simply Online, which is what every captured record carries.
 		private readonly ConcurrentDictionary<uint, SocialStatus> _socialStatus = [];
@@ -298,13 +293,12 @@ namespace Faolan.ChatServer
 				: SocialStatus.Online;
 		}
 
-		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
-		// prepends the 0x0025 push, which retail sends on an ADD but NOT when restoring the list at login.
+		// One friend's list entry: the id -> name binding (0x0014) then its state (0x0028), in retail's order.
+		// `presence` prepends the 0x0025 push, which retail sends on an add but not when restoring the list at login.
 		//
-		// ⚠️ The 0x0014 is not optional decoration. Without it the client holds an id and a state with no name attached
-		// and renders NOTHING - no entry and no error - which is exactly how this looked while the other two messages
-		// were already byte-perfect. ONLINE is whether the character has a live chat connection here, the only thing
-		// this tier can actually know.
+		// The 0x0014 is not optional decoration: without it the client holds an id and a state with no name attached
+		// and renders nothing at all - no entry and no error. Online here means the character has a live chat
+		// connection on this tier, which is the only thing this tier can know.
 		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence, SocialStatus? statusOverride = null)
 		{
 			var name = friend.Name ?? "";
@@ -313,15 +307,15 @@ namespace Faolan.ChatServer
 
 			await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(friend.Id, name)));
 
-			// The stamp is a UNION on the online flag: an OFFLINE friend gets a real unix LAST-SEEN (the captured offline
-			// friend's value is 2h06 before the capture was taken, which is what identified it), and an ONLINE one gets
-			// the PLAYFIELD INSTANCE TOKEN of the playfield they are in (#426, answered by #454 - the same 0x01EDA8B2
-			// turned out to be the instance token inside `TeamMemberRecord`'s embedded PlayfieldProxy, which is why it
-			// is not a time and reads as 1971). That is a LIVE value, so it comes from the game tier through the
-			// dispatcher seam rather than from a column; the captured constant remains the fallback for a friend the
-			// game host does not have in a zone. Same union GuildService's member record already uses.
+			// The stamp is a union on the online flag: an offline friend gets a real unix last-seen (the captured
+			// offline friend's value is 2h06 before the capture was taken, which is what identified it), and an online
+			// one gets the playfield instance token of the playfield they are in - the same 0x01EDA8B2 that appears as
+			// the instance token inside `TeamMemberRecord`'s embedded PlayfieldProxy, which is why it is not a time and
+			// reads as 1971. That is a live value, so it comes from the game tier through the dispatcher seam rather
+			// than from a column; the captured constant is the fallback for a friend the game host does not have in a
+			// zone. GuildService's member record uses the same union.
 			// The logout announce has to say "offline" while the socket is still up, so the caller can override.
-			// The STATUS is what the row renders (online / looking for group / away); ONLINE is the question the stamp
+			// The status is what the row renders (online / looking for group / away); online is the question the stamp
 			// union asks, and all three online statuses answer it the same way. The logout announce has to say offline
 			// while the socket is still up, so the caller can override.
 			var status = statusOverride ?? StatusOf(friend.Id);
@@ -346,6 +340,10 @@ namespace Faolan.ChatServer
 			await base.ClientDisconnected(client);
 		}
 
+		// Write-behind chat-history persistence: records a channel post (isWhisper=false, target=null) or a tell
+		// (isWhisper=true, target=recipient) to the ChatMessages table. A database failure must never break the live
+		// chat relay, so any exception is logged and swallowed. The sender identity matches the wire, where a player's
+		// ClientInstance is its character id.
 		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
 		{
 			try

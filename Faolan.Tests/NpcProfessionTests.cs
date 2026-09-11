@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `NpcStatCore.ProfessionType` is the client's own ROLE tag (`ProtoCoreCharacterIIR.NpcStats.profession_type`),
-	// and #647 put the auction-house click on it. These pin the two claims that makes rest on: that the tag really is
-	// a role, and that the auctioneer's value is exclusive to auctioneers.
+	// `NpcStatCore.ProfessionType` is the client's own role tag (`ProtoCoreCharacterIIR.NpcStats.profession_type`),
+	// and the auction-house click is routed on it. These pin the two claims that rests on: that the tag really is a
+	// role, and that the auctioneer's value is exclusive to auctioneers.
 	//
-	// It matters because the alternative was a display NAME, and a name is not an identity here - "Trader" is a role
+	// It matters because the alternative was a display name, and a name is not an identity here - "Trader" is a role
 	// four templates play, and any NPC that happened to carry the string would have opened the auction house.
 	public class NpcProfessionTests
 	{
@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		//
 		// Both halves are needed. Without the first, the tag could be some unrelated attribute that four Traders happen
 		// to share; without the second, it could be a broad "vendor-ish" class that opens the auction house on
-		// blacksmiths too. Together they say the tag IS the role.
+		// blacksmiths too. Together they say the tag is the role.
 		[Fact]
 		public async Task Auctioneer_IsExactlyTheTradersAndNothingElse()
 		{
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 			Assert.True(strays.Count == 0, $"{strays.Count} \"{AuctioneerName}\" template(s) are not tagged Auctioneer: {string.Join(", ", strays)}");
 		}
 
-		// Every NAMED member of the partial catalog must still match templates, and each name must still describe them.
+		// Every named member of the partial catalog must still match templates, and each name must still describe them.
 		//
 		// The enum is deliberately partial and open - eight values occur and five are identified - so the risk is not
 		// an unknown value appearing (that is expected) but a named one quietly going empty or picking up an unrelated
@@ -78,16 +78,15 @@ namespace Faolan.Tests
 				Assert.All(names, n => Assert.Equal(expectedName, n));
 		}
 
-		// EVERY template of a NAMED profession must carry a `ProfessionName`. This is the precondition that makes
-		// naming a member from the client's string honest, and it is not a formality - it caught a real over-claim
-		// while #649 was being written.
+		// Every template of a named profession must carry a `ProfessionName`. This is the precondition that makes
+		// naming a member from the client's string honest, and it is not a formality - it has caught a real over-claim.
 		//
 		// Type 4's one labelled template (Fenor) says LDB[253] "Redeemer", which is a tempting name for the type; the
-		// type has NINE templates and the other eight carry nothing. Naming it from 1 of 9 rows would have described
+		// type has nine templates and the other eight carry nothing. Naming it from 1 of 9 rows would have described
 		// Fenor and called it the role. So type 4 stays unnamed and this gate keeps the rule: a member may only be
 		// named once every template of its type is labelled.
 		//
-		// ⚠️ It asserts the labels EXIST, not that there is exactly one id. `Guard` has two - 246974048 and the small
+		// It asserts the labels exist, not that there is exactly one id. `Guard` has two - 246974048 and the small
 		// id 28 - and both resolve to the same LDB[253] string "Guard", so the client duplicates that entry. Distinct
 		// ids are therefore not evidence of distinct professions, and the strings themselves cannot be checked here
 		// (the suite runs without the RDB, by design). `--report professions` is where the strings are read.
@@ -115,14 +114,14 @@ namespace Faolan.Tests
 				+ $"{string.Join(", ", unlabelled.Take(8))}");
 		}
 
-		// `ProfessionName` is the ELF hash of the profession's NAME string - the encoding, pinned by two exact hits.
+		// `ProfessionName` is the elf hash of the profession's name string - the encoding, pinned by two exact hits.
 		//
-		// This is what identified the sibling column and is what let #649 resolve it: the hash is an LDB ID, and every
+		// This is what identifies the sibling column: the hash is an LDB id, and every
 		// one of the 88 distinct values lands in LDB category 253 (the profession / shop-kind table). Two of them fall
 		// out of a plain wordlist and both land exactly, which is not a coincidence at 28 bits.
 		//
-		// ⚠️ The column is NOT uniformly hashed - eight ids are small and sequential (1, 2, 22, 28, 44, 46, 53, 56) and
-		// resolve in the same category. The hash is how MOST ids are formed, not a rule for reading the column.
+		// The column is not uniformly hashed - eight ids are small and sequential (1, 2, 22, 28, 44, 46, 53, 56) and
+		// resolve in the same category. The hash is how most ids are formed, not a rule for reading the column.
 		[Theory]
 		[InlineData("Merchant", 210363236u)]
 		[InlineData("Trainer", 193463442u)]

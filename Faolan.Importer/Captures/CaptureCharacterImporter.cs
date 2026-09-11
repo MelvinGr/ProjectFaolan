@@ -15,56 +15,49 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Materializes the CAPTURED characters (NecroL80, DemoL80, Strie, ...) as playable DB characters: every
-	// player-own FA015807 spawn that parses with the byte-exact scaffold codec yields the character's name,
-	// identity (race/sex/level), looks (head/voice/size, stored as CharacterBody in editor 2x units), vitals,
-	// position/map, worn equipment (IIR InventoryEntries whose templates are DB items) and the full spawn
-	// scaffold rows (PlayerSpawnScaffoldRows.ExtractTo - the same mapping the golden tests use). Characters
-	// whose name already exists in the DB are skipped, so re-running the importer never duplicates or
-	// overwrites; the biggest captured spawn per name wins (geared late-game spawns carry the most data).
+	/// <summary>
+	///     Materializes the captured characters as playable DB characters.
+	/// </summary>
+	/// <remarks>
+	///     Every player-own FA015807 spawn that parses with the byte-exact scaffold codec yields the character's name,
+	///     identity (race/sex/level), looks (head/voice/size, stored as CharacterBody), position/map, worn equipment
+	///     (IIR InventoryEntries whose templates are DB items) and the full spawn scaffold rows
+	///     (PlayerSpawnScaffoldRows.ExtractTo - the same mapping the golden tests use). Characters whose name already
+	///     exists in the DB are skipped, so re-running the importer never duplicates or overwrites; the biggest
+	///     captured spawn per name wins (geared late-game spawns carry the most data).
+	/// </remarks>
 	public static class CaptureCharacterImporter
 	{
-		// The account imported characters (and the claims module's AccountClaim rows) attach to. ONE definition -
-		// ClaimsModule used to keep a hand-copied duplicate with a comment pointing here, which is exactly how the
-		// two drift.
+		// The account imported characters (and the claims module's AccountClaim rows) attach to. The one definition;
+		// ClaimsModule reads it from here.
 		internal const string ImportAccountName = "faolan";
-		// The s2c character list. Named at last (#619): on all 135 captured frames the sender is `PlayerAgent`
-		// (0x82F20484) and the receiver `PlayerInterface` (0x7D155738), and the dump's own `MethodId` is the full
-		// 32-bit registration hash 0xC414C5EF - which is already in the enum, under the name the client gives it.
-		// (`SendCharacterList` was our name for it before the method table was recovered; #615 replaced it with
-		// `UpdateClientPlayerData`, which is why the ticket went looking for a member that no longer existed.)
-		//
-		// It stays a WIRE comparison because that is the space the dump records in, and on the hash-registered pair
-		// the rendering keeps only 7 of 32 bits - six PlayerAgent/PlayerInterface pairs really do collide at this
-		// width (`AuthenticateLoggedIn`/`ReceivedCharacterSettings` both render 0x20EC). This one does NOT: 0x20EF is
-		// unique across both enums' 51 members, so the filter is exact rather than merely close.
+		// The s2c character list (sender `PlayerAgent`, receiver `PlayerInterface`, registration hash 0xC414C5EF).
+		// Compared in wire space because that is the space the dump records in; on the hash-registered pair the
+		// rendering keeps only 7 of 32 bits and some pairs collide at that width, but 0x20EF is unique across both
+		// enums, so this filter is exact.
 		private static readonly uint CharacterListWireOpcode = CapturedPacket.Wire(PlayerInterfaceMethods.UpdateClientPlayerData);
 		private const uint InventorySnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
 		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
 
 		// The account imported characters are attached to. 0 = find-or-create ImportAccountName, which is the normal
-		// PLAY account ("faolan"), so the reference characters are reachable from the same login as everything else.
-		// Login validation is stubbed, so any password works.
-		//
-		// This used to import to a dedicated "captured" account, justified in a comment by "a 20+ entry character
-		// list breaks the client's auto-enter flow". That is NOT true (verified 2026-07-20), so the split bought
-		// nothing and only made the reference characters awkward to reach.
+		// play account, so the reference characters are reachable from the same login as everything else. Login
+		// validation is stubbed, so any password works. A long character list does not break the client's auto-enter
+		// flow, so no separate account is needed.
 		public static uint AccountId = 0;
 
-		// minLevel (0 = no filter): captured characters at or below this level are skipped as fresh/tutorial chars
-		// (no trained feats, base ability scaffold). The module sets the reference-set policy; direct callers/tests
-		// default to importing every level.
-		// The CLASS of the character this capture was played on, or null when the capture never shows one (a
-		// create-editor dump before class selection, or a trace that carries no player spawn).
-		//
-		// The local player is the one the server sends a personal FullChar snapshot for (FullPlayerCharacterIIR is only
-		// ever delivered for your own character - the same test the own-character prune below uses), which gives its
-		// instance; the matching FA015807 player spawn then yields the class the same way ImportAsync reads it, from
-		// the pre-IIR value island's low byte at body offset 136.
-		//
-		// Used by the class-specific map import (Map.ClassSpecific): a capture of the Conarch Armory is evidence about
-		// ONE class's copy of it, so its spawns are stamped with this.
+		/// <summary>
+		///     The class of the character this capture was played on, or null when the capture never shows one (a
+		///     create-editor dump before class selection, or a trace that carries no player spawn).
+		/// </summary>
+		/// <remarks>
+		///     The local player is the one the server sends a personal FullChar snapshot for (FullPlayerCharacterIIR is
+		///     only ever delivered for your own character - the same test the own-character prune in
+		///     <see cref="ImportAsync" /> uses), which gives its instance; the matching FA015807 player spawn then yields
+		///     the class the same way ImportAsync reads it, from the pre-IIR value island's low byte at body offset 136.
+		///     Used by the class-specific map import (Map.ClassSpecific): a capture of a class armory is evidence about
+		///     one class's copy of it, so its spawns are stamped with this.
+		/// </remarks>
 		public static ConanClass? DetectPlayedClass(IReadOnlyList<CapturedPacket> capture)
 		{
 			var localInstances = new HashSet<uint>();
@@ -105,10 +98,17 @@ namespace Faolan.Importer.Captures
 			return null;
 		}
 
-		// `refresh` = #753's overwrite mode: an existing character the importer itself built (its row carries
-		// `ImportedFromCapture`) is deleted and rebuilt from the current corpus, so a re-dump can update a frozen
-		// bag/worn set/stat sheet. Off by default, because it discards any rearrangement the player has made to
-		// that character.
+		/// <param name="minLevel">
+		///     0 = no filter; captured characters at or below this level are skipped as fresh/tutorial characters (no
+		///     trained feats, base ability scaffold). The module sets the reference-set policy; direct callers and tests
+		///     default to importing every level.
+		/// </param>
+		/// <param name="refresh">
+		///     The overwrite mode: an existing character the importer itself built (its row carries
+		///     `ImportedFromCapture`) is deleted and rebuilt from the current corpus, so a re-dump can update a frozen
+		///     bag/worn set/stat sheet. Off by default, because it discards any rearrangement the player has made to that
+		///     character.
+		/// </param>
 		public static async Task<(int Seen, int Added, int Skipped, int Refreshed)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0,
 			bool refresh = false)
 		{
@@ -117,8 +117,8 @@ namespace Faolan.Importer.Captures
 			// snapshots are addressed by instance, the spawn provides the name <-> instance link).
 			var best = new Dictionary<string, (byte[] Body, uint MapId, uint Handle)>(StringComparer.OrdinalIgnoreCase);
 			var charList = new Dictionary<string, CharListEntry>(StringComparer.OrdinalIgnoreCase);
-			// Instance -> snapshot bodies, pooled ACROSS captures (instances are globally stable; some
-			// snapshots are analyzer-truncated, so the import falls back through the candidates).
+			// Instance -> snapshot bodies, pooled across captures (instances are globally stable; some
+			// snapshots are truncated, so the import falls back through the candidates).
 			var snapshots = new Dictionary<uint, List<byte[]>>();
 			foreach (var capture in captures)
 			{
@@ -167,13 +167,12 @@ namespace Faolan.Importer.Captures
 					if (subop != SimpleCharFullUpdateCodec.Opcode)
 						continue;
 
-					// Only PLAYER spawns parse with the scaffold codec (NPC FA015807 bodies have a different
-					// post-IIR layout). Editor-preview spawns (the only frame with an EMPTY sublist - what used
-					// to be spelled as "the fully-constant 228-byte pre-frame") carry a
-					// synthesized "Character<instance>" placeholder name - those are the creator's temp
-					// instances, never importable. Real spawns also include OTHER PLAYERS visible in gameplay
-					// captures; those are filtered out after pooling (only the capturing account's own played
-					// character is imported - see the own-character prune below).
+					// Only player spawns parse with the scaffold codec (NPC FA015807 bodies have a different
+					// post-IIR layout). Editor-preview spawns (the only frame with an empty sublist) carry a
+					// synthesized "Character<instance>" placeholder name - those are the creator's temp instances,
+					// never importable. Real spawns also include other players visible in gameplay captures; those
+					// are filtered out after pooling (only the capturing account's own played character is imported -
+					// see the own-character prune below).
 					if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold) || scaffold.PreIir.Sublist.Count == 0)
 						continue;
 					if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name) || IsCreatorTempName(read.Message.Name))
@@ -189,12 +188,12 @@ namespace Faolan.Importer.Captures
 				}
 			}
 
-			// Keep ONLY the capturing account's own PLAYED character(s); drop other players who merely appeared
+			// Keep only the capturing account's own played character(s); drop other players who merely appeared
 			// in a gameplay capture. The own character is identified by being in the account's character list
 			// (0x20EF carries only the capturing account's own characters) and/or by the server having sent it a
-			// personal FullChar snapshot (0x737A6DF9, only ever delivered for the local player). Other players
-			// have neither, so this excludes them. (Pooled across all captures first, so a char listed in one
-			// capture but spawned in another still matches.)
+			// personal FullChar snapshot (only ever delivered for the local player). Other players have neither,
+			// so this excludes them. Pooled across all captures first, so a character listed in one capture but
+			// spawned in another still matches.
 			var otherPlayers = 0;
 			foreach (var name in best.Keys.ToList())
 			{
@@ -218,19 +217,11 @@ namespace Faolan.Importer.Captures
 			var refreshed = 0;
 			foreach (var (name, (body, mapId, handle)) in best.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
 			{
-				// An existing row is left alone unless this is a REFRESH and the row is one we imported (#753).
-				//
-				// ⛔ The refresh rule #753 first proposed - "those whose name matches a capture, with locally
-				// created ones exempt by construction" - does NOT work, and both halves fail for their own reason:
-				//   * this loop only ever iterates names that ARE in a capture (`best` is built from the captures),
-				//     so "matches a capture" exempts nothing at all;
-				//   * imported characters are attached to the NORMAL PLAY account (`ImportAccountName`) by
-				//     deliberate design - the dedicated "captured" account was removed on 2026-07-20 because the
-				//     split bought nothing - so a locally created character sits on the same account and the
-				//     account cannot discriminate either.
-				// So the rule is the row's own `ImportedFromCapture` marker, which only this importer ever sets.
-				// A character created in-game cannot carry it, so `Adada` (the level-4 local character a blanket
-				// re-import deleted) is exempt BY CONSTRUCTION rather than by a level threshold.
+				// An existing row is left alone unless this is a refresh and the row is one the importer built. The
+				// discriminator is the row's own `ImportedFromCapture` marker, which only this importer ever sets: a
+				// character created in-game cannot carry it, so it is exempt by construction. Neither the name (this
+				// loop only iterates names that are in a capture) nor the account (imported characters share the
+				// normal play account) can tell the two apart.
 				var existing = await db.Characters.FirstOrDefaultAsync(c => c.Name == name);
 				if (existing != null)
 				{
@@ -243,11 +234,11 @@ namespace Faolan.Importer.Captures
 						continue;
 					}
 
-					// ⚠️ DELETE + reinsert, not a field-by-field update: the character's capture-derived state is
+					// Delete and reinsert, not a field-by-field update: the character's capture-derived state is
 					// spread over a dozen child tables (items, equipment, scaffold rows, spellbook, stat sheet) and
 					// a partial refresh would leave whichever rows the new dump no longer states. The FK cascade is
-					// what makes this one statement; `PRAGMA foreign_keys` is ON through EF, unlike the sqlite3 CLI.
-					// It costs the player's own rearrangement of an IMPORTED character's bag, which is the trade
+					// what makes this one statement; `PRAGMA foreign_keys` is on through EF, unlike the sqlite3 CLI.
+					// It costs the player's own rearrangement of an imported character's bag, which is the trade
 					// `--mode overwrite` is asking for.
 					db.Characters.Remove(existing);
 					await db.SaveChangesAsync();
@@ -257,16 +248,17 @@ namespace Faolan.Importer.Captures
 				SpawnBodyReader.TryParse(body, out var scaffold);
 				SpawnBodyReader.TryReadCharacterMessage(body, out var read);
 
-				// The class lives in the pre-IIR frame's u16 value island at body offset 135: its LOW byte is
-				// the class id (verified 10/10 against the captured character lists, all pre-frame variants;
-				// the high byte is an hash group). This covers OTHER players too - the char list (0x20EF)
-				// only exists for the capturing account's own characters and serves as the cross-check.
+				// The class lives in the pre-IIR frame's u16 value island at body offset 135: its low byte is
+				// the class id (the high byte is a hash group), consistent with the captured character lists.
+				// This covers other players too - the char list (0x20EF) only exists for the capturing account's
+				// own characters and serves as the cross-check.
 				var classId = charList.GetValueOrDefault(name)?.Class ?? (body.Length > 136
 					? body[136]
 					: 0u);
 
-				// Skip captures taken BEFORE class selection: their class byte is unset (0/1), not one of the 12
-				// real classes. Materializing them creates broken chars (and would violate the Class CHECK constraint).
+				// Skip captures taken before class selection: their class byte is unset (0/1), not one of the 12
+				// real classes. Materializing them creates broken characters (and would violate the Class check
+				// constraint).
 				if (!Enum.IsDefined((ConanClass)classId))
 				{
 					Console.WriteLine($"Characters: skipped '{name}' - invalid/unset class {classId} (captured pre-class-selection).");
@@ -276,7 +268,7 @@ namespace Faolan.Importer.Captures
 
 				// Skip low-level captures (when a minLevel policy is set): fresh/tutorial characters carry no
 				// meaningful progression - base ability scaffold, no trained feats - and only clutter the reference
-				// set. The kept chars are the leveled retail captures (NecroL80/DemoL80 L80, Hakotep L24, AssassinL23 L23).
+				// set.
 				var level = read.Message?.Stats?.Level ?? 0;
 				if (minLevel > 0 && level <= minLevel)
 				{
@@ -297,10 +289,9 @@ namespace Faolan.Importer.Captures
 		{
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();
 
-			// The character keeps its ORIGINAL retail id (the spawn handle = the on-wire instance, e.g. Strie
-			// 0x02165EFF, DemoL80 0x110099BD) unless that id is already taken locally - then the DB generates
-			// one. Dependents that bake the raw CharacterId (scaffold rows, equipment) are added after the
-			// first save settles it.
+			// The character keeps its original retail id (the spawn handle = the on-wire instance) unless that id
+			// is already taken locally - then the DB generates one. Dependents that bake the raw CharacterId
+			// (scaffold rows, equipment) are added after the first save settles it.
 			var originalId = scaffold.Handle != 0 && !await db.Characters.AnyAsync(c => c.Id == scaffold.Handle)
 				? scaffold.Handle
 				: 0;
@@ -310,25 +301,23 @@ namespace Faolan.Importer.Captures
 				Id = originalId,
 				AccountId = accountId,
 				Name = name,
-				// #753: the MARKER that makes this row refreshable. Set here and nowhere else, so a character
-				// created in-game never carries it and `--mode overwrite` cannot touch one.
+				// The marker that makes this row refreshable. Set here and nowhere else, so a character created
+				// in-game never carries it and `--mode overwrite` cannot touch one.
 				ImportedFromCapture = true,
 				AuthChallenge = Guid.NewGuid(),
 				CreationDate = DateTimeOffset.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
 				Class = (ConanClass)classId,
-				// The Sex enum IS the wire sex-code (MALE=2 / FEMALE=3), so the captured value maps directly.
+				// The Sex enum is the wire sex-code (MALE=2 / FEMALE=3), so the captured value maps directly.
 				Sex = (Sex)stats.Sex,
 				// The map active when the spawn was sent (MapChange tracking; the transform's "playfield"
-				// varint is a session instance id, NOT the map), else the char list's persisted map (when
+				// varint is a session instance id, not the map), else the char list's persisted map (when
 				// the Map row exists - FK), else the Tortage Beach fallback.
 				MapId = await ResolveMapId(db, mapId, listEntry),
 				RealmId = realmId
 			};
 
-			// The transform is typed on the scaffold (ProtoVec3/ProtoQuat), so the position and rotation come off it
-			// directly instead of being re-walked as tagged fixed32 pairs here.
 			character.PositionX = scaffold.Position.X;
 			character.PositionY = scaffold.Position.Y;
 			character.PositionZ = scaffold.Position.Z;
@@ -337,13 +326,11 @@ namespace Faolan.Importer.Captures
 			character.RotationZ = scaffold.Rotation.Z;
 			character.RotationW = scaffold.Rotation.W;
 
-			// The captured vitals are deliberately NOT stored. Vitals are derived from (Class, Level) like every other
-			// character's, so an imported character is no different from a created one (#578) - carrying the capture's
-			// own numbers is what made an imported L80 necromancer's ceiling disagree with the curve by ~2x, and a
-			// stored copy is what let the value go stale in the first place. The wire scale the capture uses (x100) is
-			// applied at send time.
+			// The captured vitals are deliberately not stored. Vitals are derived from (Class, Level) like every other
+			// character's, so an imported character is no different from a created one; a stored copy would disagree
+			// with the curve and go stale. The wire scale the capture uses (x100) is applied at send time.
 
-			// The rendered looks, stored as the TRUE wire values (the spawn rebuild emits them as-is).
+			// The rendered looks, stored as the true wire values (the spawn rebuild emits them as-is).
 			character.Body = new CharacterBody
 			{
 				HeadMesh = stats.HeadMesh,
@@ -356,13 +343,13 @@ namespace Faolan.Importer.Captures
 			db.Characters.Add(character);
 			await db.SaveChangesAsync();
 
-			// The full spawn scaffold - the captured character's appearance + progression: the entry table read back
-			// into the appearance MODEL (CharacterBody sliders + CharacterBodyResources refs - what the spawn is
-			// regenerated from and what Faolan.Web renders), the post-IIR id list = the ability/SKILL scaffold, the
-			// pair lists, AND the pre-IIR UNLOCKED FEAT list (a different region + id-space; see
-			// [[feat_trees_decode_251]] / feats.md).
+			// The full spawn scaffold - the captured character's appearance and progression: the entry table read back
+			// into the appearance model (CharacterBody sliders + CharacterBodyResources refs - what the spawn is
+			// regenerated from and what Faolan.Web renders), the post-IIR id list (the ability/skill scaffold), the
+			// pair lists, and the pre-IIR unlocked feat list (a different region and id-space; see
+			// docs/subsystems/feats.md).
 			//
-			// The registry is keyed by wire TAG here - the inverse of the ref -> MorphTarget.Id map generation goes
+			// The registry is keyed by wire tag here - the inverse of the ref -> MorphTarget.Id map generation goes
 			// through, so tag 133 comes back as "*beardmesh_210844" and 226 as "*texscript_202392".
 			var refsByTag = await db.MorphTargets.ToDictionaryAsync(m => (ushort)m.Id, m => m.Name);
 			var (morphsApplied, resourcesRecovered) = PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, refsByTag);
@@ -370,17 +357,14 @@ namespace Faolan.Importer.Captures
 			if (morphsApplied > 0 || resourcesRecovered > 0)
 				Console.WriteLine($"  {character.Name}: lifted {morphsApplied} morph slider(s) into CharacterBody and recovered {resourcesRecovered} appearance resource(s).");
 
-			// The vanity shown-mask, lifted back out of the captured spawn's PreFrame. Without this every imported
-			// character came in at 0 (NO vanity shown) no matter what the capture held - the one piece of
-			// per-character vanity state the import silently dropped. NecroL80's login capture carries 0x000450A4
-			// (bits 2/5/7/12/14/18); the vanity-head/-chest dumps carry 0x04 and 0x20 respectively, which is what
-			// pinned the bit = base equip slot mapping in the first place (#336).
+			// The vanity shown-mask, lifted out of the captured spawn's PreFrame (bit = base equip slot; the
+			// vanity-head/-chest dumps carry 0x04 and 0x20 respectively).
 			character.VanityShownMask = PlayerSpawnScaffoldRows.ReadVanityShownMask(scaffold);
 
 			var knownTemplates = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
 
-			// The character's ITEMS, from the capture's FullChar snapshot when one was sent for this character's
-			// instance: all four containers, WORN INCLUDED (#750). Items not in the Items catalog are skipped.
+			// The character's items, from the capture's FullChar snapshot when one was sent for this character's
+			// instance: all four containers, worn included. Items not in the Items catalog are skipped.
 			var carried = 0;
 			var carriedTotal = 0;
 			var knownSpells = 0;
@@ -396,8 +380,8 @@ namespace Faolan.Importer.Captures
 					Console.WriteLine($"Character '{name}': inventory import failed ({e.GetType().Name}: {e.Message}); worn equipment only.");
 				}
 
-				// The character's SPELLBOOK is the snapshot's known-spell list (its actual learned set - EVERY rank,
-				// not just the highest; see ImportKnownSpells), NOT the incremental DispatchLearnSpell grants (which
+				// The character's spellbook is the snapshot's known-spell list (its actual learned set - every rank,
+				// not just the highest; see ImportKnownSpells), not the incremental DispatchLearnSpell grants (which
 				// only carry a session's re-learns). Scanned straight out of the raw snapshot bytes so it survives a
 				// tails-parse failure on a large caster snapshot.
 				try
@@ -409,8 +393,8 @@ namespace Faolan.Importer.Captures
 					Console.WriteLine($"Character '{name}': known-spell import failed ({e.GetType().Name}: {e.Message}).");
 				}
 
-				// The character's STAT SHEET (level/vitals/attributes/PvP/ratings/...) authored from the snapshot's
-				// stat block, replacing the fixed fresh-char skeleton for this character. Scanned from raw bytes.
+				// The character's stat sheet (level/vitals/attributes/PvP/ratings/...) authored from the snapshot's
+				// stat block, replacing the fixed fresh-character skeleton for this character. Scanned from raw bytes.
 				try
 				{
 					statSlots = await ImportStatBlock(db, character.Id, snapshots);
@@ -421,12 +405,10 @@ namespace Faolan.Importer.Captures
 				}
 			}
 
-			// Worn equipment from the SPAWN IIR - a FALLBACK that fills only the equip slots the snapshot did not
+			// Worn equipment from the spawn IIR - a fallback that fills only the equip slots the snapshot did not
 			// describe. The snapshot's Equipped container is the better source and runs first: the spawn's worn
 			// entries carry the template and nothing else, while the snapshot's carry the stack count, the crafter
-			// and the SOCKETED GEMS. (The snapshot pass used to SKIP container 101 on the reasoning that "the spawn
-			// already provided the worn set" - which threw away the crafter and the gems of every worn item, and
-			// there was nowhere to put either until worn items became instances.)
+			// and the socketed gems.
 			var filled = db.ItemInstances.Local.Where(i => i.OwnerCharacterId == character.Id && i.Container == ContainerKind.Equipped).Select(i => i.Slot).ToHashSet();
 			var worn = filled.Count;
 			foreach (var entry in message.InventoryEntries)
@@ -434,8 +416,8 @@ namespace Faolan.Importer.Captures
 				if (!knownTemplates.Contains(entry.Item.Template1))
 					continue;
 
-				// entry.Pos is a raw wire slot: the worn slots + vanity map to a known slot; the bag / out-of-range
-				// ids don't.
+				// entry.Pos is a raw wire slot: the worn slots and vanity map to a known slot; the bag / out-of-range
+				// ids do not.
 				var slot = (CharacterEquipmentSlot)entry.Pos;
 				if (!Enum.IsDefined(slot) || !filled.Add((int)slot))
 					continue;
@@ -474,7 +456,7 @@ namespace Faolan.Importer.Captures
 			return account.Id;
 		}
 
-		// RealmId is required and captures don't carry our local realm ids, so imported characters join the
+		// RealmId is required and captures do not carry our local realm ids, so imported characters join the
 		// server's (first) realm, creating a default one when the DB has none yet.
 		private static async Task<uint> FindOrCreateRealm(DatabaseContext db)
 		{
@@ -494,7 +476,7 @@ namespace Faolan.Importer.Captures
 			return realm.Id;
 		}
 
-		// CapturedPacket.Body, but only when it is long enough to BE a scaffold: the codec's input layout starts
+		// CapturedPacket.Body, but only when it is long enough to be a scaffold: the codec's input layout starts
 		// [u32 bodyLen][u32 FA015807], so a body under 8 bytes cannot be one. This extra guard is why the check does
 		// not live on CapturedPacket - every other caller wants the body whatever its length.
 		private static byte[] GetScaffoldBody(CapturedPacket packet)
@@ -505,7 +487,7 @@ namespace Faolan.Importer.Captures
 				: [];
 		}
 
-		// Parses a retail PlayerAgent character list (the SendCharacterList layout) into name -> entry;
+		// Parses a retail PlayerAgent character list (the UpdateClientPlayerData layout) into name -> entry;
 		// later lists overwrite earlier ones (latest capture state wins).
 		private static void HarvestCharacterList(byte[] packet, Dictionary<string, CharListEntry> charList)
 		{
@@ -550,27 +532,24 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Parses the snapshot's ProtoFullCharacterIIR root and stores EVERY container's entries as item instances
+		// Parses the snapshot's ProtoFullCharacterIIR root and stores every container's entries as item instances
 		// (Container = the wire kind, Slot = pos, Count = stat 26, plus the crafter and the socketed gems).
 		//
-		// ⚠️ The EQUIPPED container (101) is imported HERE, not from the spawn IIR. It used to be skipped on the
-		// reasoning that "the spawn IIR already provided the worn set" - and the spawn does give the worn TEMPLATES, but
-		// it carries no stack count, no creator_name and no slot_map. So skipping it threw away the crafter and the gems
-		// of every WORN item, and there was nowhere to put either until worn items became instances (#750). Every
-		// socketed-worn-item sighting in the corpus is in this container. The spawn is the FALLBACK for slots this does
-		// not cover; the caller runs it after this for exactly that reason.
+		// The Equipped container (101) is imported here, not from the spawn IIR: the spawn gives the worn templates
+		// but carries no stack count, no creator_name and no slot_map, so importing worn items from it would lose the
+		// crafter and the gems of every worn item. The spawn is the fallback for slots this does not cover; the caller
+		// runs it after this for exactly that reason.
 		private static async Task<(int Stored, int Total)> ImportCarriedInventory(DatabaseContext db, uint characterId, IReadOnlySet<uint> knownTemplates,
 			IReadOnlyList<byte[]> snapshotBodies)
 		{
-			// Largest snapshot first; analyzer-truncated ones (the TCP-reassembly gap) fail to split and the
-			// next-largest is tried instead.
+			// Largest snapshot first; truncated ones fail to split and the next-largest is tried instead.
 			ProtoFullCharacterIIR? root = null;
 			foreach (var snapshotBody in snapshotBodies.OrderByDescending(b => b.Length))
 			{
 				try
 				{
 					// The body opens with the record's own u32 carrier length, which belongs to the sender - the
-					// record itself starts behind it (#530 rule 2).
+					// record itself starts behind it.
 					root = SnapshotRoot.Of(snapshotBody.AsSpan(4));
 					break;
 				}
@@ -602,7 +581,7 @@ namespace Faolan.Importer.Captures
 			}
 
 			// Say it out loud rather than importing a gemmed item as gemless: a gem template the Items catalog does not
-			// hold is a CONTENT gap (the gem was only ever seen inside a socket), and the socket is dropped.
+			// hold is a content gap (the gem was only ever seen inside a socket), and the socket is dropped.
 			if (unresolvedGems.Count > 0)
 			{
 				Console.WriteLine(
@@ -612,11 +591,10 @@ namespace Faolan.Importer.Captures
 			return (stored, total);
 		}
 
-		// The character's SPELLBOOK from its FullChar snapshot's known-spell list (KnownSpellList): each type-2 record
-		// is a learned spell. This is the char's full learned set carrying EVERY RANK - not a "highest rank only"
-		// set: NecroL80's imported book holds Pestilential Blast R1-R6, Ice Strike R1-R6, and so on. That is correct
-		// and retail-accurate; collapsing a family to its top rank is a CLIENT-side UI option, so never filter the
-		// import (or any grant) down to one rank per family. Scanned from the raw snapshot bytes (no tails
+		// The character's spellbook from its FullChar snapshot's known-spell list (KnownSpellList): each type-2 record
+		// is a learned spell. This is the character's full learned set carrying every rank - not a "highest rank
+		// only" set. That is retail-accurate; collapsing a family to its top rank is a client-side UI option, so never
+		// filter the import (or any grant) down to one rank per family. Scanned from the raw snapshot bytes (no tails
 		// deserialize). The largest snapshot that yields a list wins; idempotent (skips already-recorded spells).
 		private static async Task<int> ImportKnownSpells(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
 		{
@@ -634,8 +612,8 @@ namespace Faolan.Importer.Captures
 			var spellbookIds = known.Records.Where(r => r.Type == KnownSpellListCodec.SpellType).Select(r => r.Id).Distinct().ToList();
 
 			// CharacterSpell.SpellId FKs Spells. A spellbook id resolves in-client by RDB id regardless of our catalog,
-			// so an id with no Spell row is a gap in our (incomplete) catalog, not a fake spell (e.g. NecroL80's Corrupted
-			// Soul rank 222682). Skip it (logged) rather than FK-fault; the gap is closed by completing the Spell catalog.
+			// so an id with no Spell row is a gap in our catalog, not a fake spell. Skip it (logged) rather than
+			// FK-fault; the gap is closed by completing the Spell catalog.
 			var cataloged = (await db.Spells.Where(s => spellbookIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
 			var uncataloged = spellbookIds.Where(id => !cataloged.Contains(id)).ToList();
 			if (uncataloged.Count > 0)
@@ -660,8 +638,8 @@ namespace Faolan.Importer.Captures
 			return added;
 		}
 
-		// The character's STAT SHEET (CharacterStat rows) from its FullChar snapshot stat block: the 17 displayed stats
-		// then the 74 sheet stats, in wire order (Ordinal), so the snapshot generator authors them PER-CHARACTER
+		// The character's stat sheet (CharacterStat rows) from its FullChar snapshot stat block: the 17 displayed stats
+		// then the 74 sheet stats, in wire order (Ordinal), so the snapshot generator authors them per character
 		// instead of the fixed fresh skeleton. The snapshot is the whole sheet, so it replaces any existing rows.
 		private static async Task<int> ImportStatBlock(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
 		{
@@ -727,7 +705,7 @@ namespace Faolan.Importer.Captures
 			return Map.TortageBeachId;
 		}
 
-		// One retail character-list entry (PlayerAgent 0x20EF): the only wire source for the CLASS, and the
+		// One retail character-list entry (PlayerAgent 0x20EF): the only wire source for the class, and the
 		// character's persisted map (vs the spawn-time MapChange).
 		private sealed record CharListEntry(uint Class, uint Level, uint MapId);
 	}

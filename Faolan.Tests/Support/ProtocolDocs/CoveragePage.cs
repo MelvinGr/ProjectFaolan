@@ -5,15 +5,15 @@ using System.Text;
 namespace Faolan.Tests.Support.ProtocolDocs
 {
 	// Generates docs/protocol/gen/coverage.md - the answer to "how much of the protocol is actually decoded?".
-	// Attribution is EXACT (from CodecIndex, shared with messages.md), read from the codecs themselves rather than
+	// Attribution is exact (from CodecIndex, shared with messages.md), read from the codecs themselves rather than
 	// guessed from names:
-	//   - a codec covers an IIR type  <=>  the codec TYPE declares it via `HandledTypes` (multi-type) or a
-	//     `const uint *Opcode` (single-type). That is the #317 convention, enforced by CodecConventionTests, which
+	//   - a codec covers an IIR type  <=>  the codec type declares it via `HandledTypes` (multi-type) or a
+	//     `const uint *Opcode` (single-type). That is the codec convention, enforced by CodecConventionTests, which
 	//     also forbids a bare opcode hex literal anywhere in Codecs/ - so nothing can emit an IIR unattributed.
-	//   - a codec has a byte-exact test  <=>  a Faolan.Tests file references the codec class AND asserts on bytes
+	//   - a codec has a byte-exact test  <=>  a Faolan.Tests file references the codec class and asserts on bytes
 	// Each IIR carrier type then gets a verification level (V3 golden / V2 built-only / V1 no builder). Types built
-	// INLINE in the listeners (no codec class) are found by scanning the server tree for the opcode member.
-	// The RPC METHOD opcodes are dispatched inline with no explicit opcode->handler map, so their body-decode status
+	// inline in the listeners (no codec class) are found by scanning the server tree for the opcode member.
+	// The RPC method opcodes are dispatched inline with no explicit opcode->handler map, so their body-decode status
 	// is not auto-correlated here (stated as a known limit, not faked).
 	public static class CoveragePage
 	{

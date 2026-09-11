@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ARGUMENT GRAMMAR half of the recovered command registry (#913).
+	// The argument grammar half of the recovered command registry.
 	//
-	// GmCommandTableTests pins the MASK dimension of every verb we share with retail. Nothing pinned the argument
+	// GmCommandTableTests pins the mask dimension of every verb we share with retail. Nothing pinned the argument
 	// dimension - and that is the one that broke: `/teleportself` had the right name and the right mask (0x4) and
 	// still refused the client's own map UI, because we parsed its argument as a map name while retail declares it
 	// as `posx posz`. These assertions pin the recovered facts our parser is built on, so a regenerated dump that
@@ -29,9 +29,9 @@ namespace Faolan.Tests
 				.ToList();
 		}
 
-		// The parameter NAMES of one verb, in declaration order. The params column is `name: help` pairs, and a help
+		// The parameter names of one verb, in declaration order. The params column is `name: help` pairs, and a help
 		// text can itself contain a colon ("Literal: Reloads all npc-related data: RDB-data, ...") - so the name is
-		// what precedes the FIRST colon, never a naive split on every one.
+		// what precedes the first colon, never a naive split on every one.
 		private static string[] ParamNames(CommandArgs c)
 		{
 			return c.Params.Length == 0
@@ -39,8 +39,8 @@ namespace Faolan.Tests
 				: c.Params.Split(" | ").Select(p => p.Split(':', 2)[0].Trim()).ToArray();
 		}
 
-		// ⭐ The regression this ticket is about. Retail's teleport family takes X and Z as its two mandatory
-		// coordinates, with Y OPTIONAL behind a literal `y` token - which is why the client's map sends two numbers
+		// The regression this ticket is about. Retail's teleport family takes X and Z as its two mandatory
+		// coordinates, with Y optional behind a literal `y` token - which is why the client's map sends two numbers
 		// and no height. If this ever reads (posx, posy) again, our two-token parse is wrong.
 		[Fact]
 		public void TeleportFamily_TakesXAndZFirst_WithYOptional()
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ The registry record is SIXTEEN bytes and its last one is a MODE byte, which is the only thing telling
+		// The registry record is sixteen bytes and its last one is a mode byte, which is the only thing telling
 		// verbs apart that share a class - and five classes do. Read across the families the byte is a variant
 		// selector: 0 is the target/server form and 1 the self/local one. This is what says `/teleporttarget` acts on
 		// the target while its three siblings act on you, and what separates `/set` from `/setlocal`; get it wrong and
@@ -85,16 +85,14 @@ namespace Faolan.Tests
 				Assert.Equal(mode, cmd.Mode);
 			}
 
-			// Every verb sharing a class with another must be distinguishable from it - with NO exceptions (#923).
+			// Every verb sharing a class with another must be distinguishable from it - with no exceptions.
 			//
-			// ⚠️ The broadcast trio used to be skipped here, on the reading that the dump could not see its selector.
-			// That was true and the cause was a defect in the dump rather than in the client: the registration writes
-			// a 16-BIT value at [0xC] and `DumpCommandArgs` matched only `byte ptr`, so /broadcast's 0x0100 truncated
-			// to 0 and /sitecast's word-write was missed entirely, leaving it at the previous record's 0. Reading the
-			// selector as a word gives 0x0000 / 0x0100 / 0x0001 - three distinct values - and the family joins the
-			// rule like every other.
+			// The broadcast trio is no exception, and it is the family that shows why none may be made. The registration
+			// writes a 16-bit selector at [0xC]: a dump matching only `byte ptr` truncates /broadcast's 0x0100 to 0 and
+			// misses /sitecast's word-write entirely, leaving it at the previous record's 0. Read as a word the selector
+			// is 0x0000 / 0x0100 / 0x0001 - three distinct values - and the family obeys the rule like every other.
 			//
-			// ⭐ Keeping the skip OUT is the point. A truncating read merges verbs silently, and the merged value
+			// Keeping every verb in scope is the point. A truncating read merges verbs silently, and the merged value
 			// (0) is exactly what a class with no selector legitimately has - so the only thing that can catch the
 			// next one is this assertion with nothing excused from it.
 			foreach (var family in ArgTable().GroupBy(c => c.Class).Where(g => g.Count() > 1))

@@ -13,16 +13,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// CONSTRUCT, don't replay: rebuild captured completed-quest journal regions from DB rows and compare byte-for-byte
-	// against the capture (#390). This is the gate that matters for generation - the parse round-trip only proves the
+	// Construct, don't replay: rebuild captured completed-quest journal regions from DB rows and compare byte-for-byte
+	// against the capture. This is the gate that matters for generation - the parse round-trip only proves the
 	// codec agrees with itself, whereas this proves the harvested QuestDefinitions/QuestLines actually reproduce the
 	// wire.
 	//
-	// Ordering is an INPUT, not stored state: the wire order is per-character and not derivable, and the client
-	// re-sorts for display anyway, so the test feeds each capture's own order and checks the CONTENT.
+	// Ordering is an input, not stored state: the wire order is per-character and not derivable, and the client
+	// re-sorts for display anyway, so the test feeds each capture's own order and checks the content.
 	public class CompletedQuestJournalGenerationTests(ITestOutputHelper o)
 	{
-		// The @609 OBJECTIVE region, rebuilt from DB rows and compared byte-for-byte with the capture. The last
+		// The @609 objective region, rebuilt from DB rows and compared byte-for-byte with the capture. The last
 		// generated region without such a gate - and every region that lacked one has shipped malformed at least once
 		// today while the suite stayed green.
 		[Fact]
@@ -55,9 +55,9 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared. The
-				// goal's SolvedTimes (reserved[0]) is taken from the capture for the same reason - it is the CAPTURED
-				// CHARACTER's progress, not quest data, so no row can rebuild it (#550). Every other word still has to
+				// Goals carry the live player's instance; take it from the capture so only content is compared. The
+				// goal's SolvedTimes (reserved[0]) is taken from the capture for the same reason - it is the captured
+				// character's progress, not quest data, so no row can rebuild it. Every other word still has to
 				// match exactly, so this does not weaken the gate: a region that only matched because progress was
 				// ignored would still fail on the 20 words around it.
 				var instance = captured.Goals[0].Instance;
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 				if (rec.XpReward == def.FieldF0)
 					failByOurVariant[rec.QuestId] = failByOurVariant.GetValueOrDefault(rec.QuestId) + 1;
 
-				// Aggregate WHICH field differs, so the tail can be worked in priority order.
+				// Aggregate which field differs, so the tail can be worked in priority order.
 				var rebuiltGoals = QuestObjectiveRegionCodec.Parse(built).Goals;
 				if (rebuiltGoals.Count != captured.Goals.Count)
 					Bump(fieldDiffs, "GOAL COUNT");
@@ -171,7 +171,7 @@ namespace Faolan.Tests
 			foreach (var k in spell.Where(x => x.Key is 1448 or 3490))
 				o.WriteLine($"  goal {k.Key}: localized={k.Value.Localized} remoteformat={k.Value.Remote}");
 
-			// Do two captures of the SAME goal agree on the reserved tags and the text spelling? If not, byte-exact
+			// Do two captures of the same goal agree on the reserved tags and the text spelling? If not, byte-exact
 			// against every capture is impossible by construction and the gate must target the harvested source.
 			var tagVals = new Dictionary<uint, HashSet<string>>();
 			foreach (var (_, sub3, _) in CompletedQuestJournalTests.SubClassesForProbe())
@@ -212,7 +212,7 @@ namespace Faolan.Tests
 			foreach (var q in necrol80)
 				o.WriteLine($"  NECROL80 quest {q}: {(okByQuest.Contains(q) ? "OK" : failByQuest.ContainsKey(q) ? "FAILS" : "not in corpus")}");
 
-			// What IS GoalIdRepeat / Zero2 / Reserved, when they are not what we assume?
+			// What is GoalIdRepeat / Zero2 / Reserved, when they are not what we assume?
 			int rptEqualsGoal = 0, rptEqualsQuest = 0, rptOther = 0, z2NonZero = 0, allGoals = 0;
 			var rptSamples = new List<string>();
 			var stableRpt = new Dictionary<uint, HashSet<uint>>();
@@ -250,7 +250,7 @@ namespace Faolan.Tests
 			foreach (var x in rptSamples)
 				o.WriteLine($"    {x}");
 
-			// MarkerRadius is a byte-ranged word; the tail after it is [u8 hideMapMarker][u8][u32] (#464).
+			// MarkerRadius is a byte-ranged word; the tail after it is [u8 hideMapMarker][u8][u32].
 			uint u1max = 0;
 			int u1over = 0, seenG = 0, hidden = 0;
 			var u1vals = new HashSet<uint>();
@@ -283,8 +283,8 @@ namespace Faolan.Tests
 			if (first.Length > 0)
 				o.WriteLine($"  {first}");
 
-			// The hard gate is on what we SHIP: a quest flagged ObjectiveRegionVerified must rebuild byte-exact in
-			// every capture OF THE VARIANT WE EMIT - the captures whose record carries the same XpReward as the record
+			// The hard gate is on what we ship: a quest flagged ObjectiveRegionVerified must rebuild byte-exact in
+			// every capture of the variant we emit - the captures whose record carries the same XpReward as the record
 			// we would send (ObjectiveGoalExtractor.CapturedRegions documents why F0 is the discriminator). Comparing
 			// across variants failed the beach starter for faithfully rendering the variant we don't emit.
 			// Overall coverage is reported, not asserted - the region still has undecoded fields, and the flag is what
@@ -316,9 +316,9 @@ namespace Faolan.Tests
 				if (sub.QuestIndex is not { } captured || captured.QuestIds.Count == 0)
 					continue;
 
-				// Multi-block (multi-quest) indexes are DB-generation follow-up (#389): the per-quest chain of leadArea
+				// Multi-block (multi-quest) indexes are DB-generation follow-up: the per-quest chain of leadArea
 				// ids and the area-catalog cross-references are only partially modelled, so Build does not yet reproduce
-				// them byte-exact even when each block's shape is generatable. Their PARSE round-trip is guarded by the
+				// them byte-exact even when each block's shape is generatable. Their parse round-trip is guarded by the
 				// corpus round-trip gate; here we hold the line on the single-block indexes the beach path actually
 				// ships. (The 2-quest beach+Casilda generation is proven separately by BuildQuestPortionTests.)
 				if (captured.Blocks.Count != 1 || !captured.Blocks.All(Generatable))
@@ -327,7 +327,7 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				// Rebuild from the SAME quests, in the capture's order.
+				// Rebuild from the same quests, in the capture's order.
 				var ordered = captured.QuestIds.Select(defs.GetValueOrDefault).ToList();
 				if (ordered.Any(d => d == null))
 					continue; // catalog gap, not a builder failure
@@ -357,19 +357,19 @@ namespace Faolan.Tests
 
 				continue;
 
-				// Since #391 the index parses for EVERY captured journal, including multi-area ones whose per-quest
-				// sequences and trailer words are NOT modelled in the DB (they are carried on the wire, not stored).
+				// The index parses for every captured journal, including multi-area ones whose per-quest sequences and
+				// trailer words are not modelled in the DB (they are carried on the wire, not stored).
 				// QuestIndexRegion.Build can only reproduce the "simple" beach shape - monotonic 1..n area sequences and
-				// a (1,0,0) block trailer - so restrict the byte-exact gate to those; the rest are generation follow-up
-				// (#389), not a builder defect. Their PARSE round-trip is still guarded by the corpus round-trip gate.
+				// a (1,0,0) block trailer - so the byte-exact gate is restricted to those. The rest keep their parse
+				// round-trip through the corpus gate.
 				bool Generatable(QuestIndexRegion.Block b)
 				{
 					return b is { TrailerA: 1, TrailerB: 0, TrailerC: 0 } && (b.AreaQuestSequences.Count == 0 || b.AreaQuestSequences.Select((s, i) => s == (uint)(i + 1)).All(x => x));
 				}
 
 				// Build reads the area's magic + full quest catalog from the DB. Where the importer has not harvested
-				// those (an area only ever seen through a character's ACTIVE quests), Build cannot reproduce the block -
-				// a DATA gap tracked by #389, not a builder defect. Skip an index unless the DB carries, for every
+				// those (an area only ever seen through a character's active quests), Build cannot reproduce the block -
+				// a gap in the harvested data, not a builder defect. Skip an index unless the DB carries, for every
 				// block, the matching area magic and a catalog of the captured size.
 				bool DbComplete()
 				{
@@ -410,7 +410,7 @@ namespace Faolan.Tests
 			{
 				regions++;
 
-				// Only regions whose every area AND quest we actually hold can be rebuilt; anything else would be
+				// Only regions whose every area and quest we actually hold can be rebuilt; anything else would be
 				// testing the harvest's coverage rather than the builder.
 				var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
 				var complete = true;
@@ -443,7 +443,7 @@ namespace Faolan.Tests
 				if (firstMismatch.Length > 0)
 					continue;
 
-				// Report the first differing AREA, not just a byte offset - the byte offset says nothing about which
+				// Report the first differing area, not just a byte offset - the byte offset says nothing about which
 				// field is wrong, and every failure on the way here was a single field (map/region order, then the
 				// per-quest sequence word).
 				for (var a = 0; a < region.Areas.Count; a++)
@@ -471,14 +471,14 @@ namespace Faolan.Tests
 			Assert.Equal(0, mismatched);
 		}
 
-		// The completed journal is only emitted ALONGSIDE a non-empty active journal, because that is the only shape
+		// The completed journal is only emitted alongside a non-empty active journal, because that is the only shape
 		// the corpus shows: 81 captured completed journals, every one paired with active quests, and 0 counter-
 		// examples in 104 captures.
 		//
 		// This is pinned as a test because emitting the other shape looks like an obvious improvement - a character
 		// with 1511 completed and 0 eligible active quests plainly "should" get its Completed tab - and doing it
 		// crashed the client on statlist.cpp:134. Byte-exact generation proves the bytes; it says nothing about
-		// whether the client accepts the SHAPE they sit in.
+		// whether the client accepts the shape they sit in.
 		[Fact]
 		public void CompletedJournal_IsNotEmitted_WithoutActiveQuests()
 		{
@@ -504,7 +504,7 @@ namespace Faolan.Tests
 			Assert.Equal(SnapshotTails.EmptyQuestPortion(), SnapshotTails.QuestPortion([], null!, 1, groups));
 		}
 
-		// The quest INDEX, rebuilt from DB rows and compared byte-for-byte with the capture. This is the gate that
+		// The quest index, rebuilt from DB rows and compared byte-for-byte with the capture. This is the gate that
 		// was missing: the index was generated from QuestDefinition columns that are 0 for every harvested quest
 		// (tf1/tf2/trailer), so the server shipped a malformed index and the client died in StatList_t - while every
 		// existing test stayed green, because none of them regenerated an index.

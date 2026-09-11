@@ -18,11 +18,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Quest SHARING (#101), the DECISION layer: who gets offered the quest, who is told what, and what an accept is
+	// Quest sharing, the decision layer: who gets offered the quest, who is told what, and what an accept is
 	// allowed to grant.
 	//
 	// This is the half worth gating, because no capture performs a share - the bodies are built from the client's own
-	// reader and cannot be checked against retail bytes, but the RULES they carry can be checked against the client's
+	// reader and cannot be checked against retail bytes, but the rules they carry can be checked against the client's
 	// own: the twelve feedback codes are its two jump tables, the not-shareable bit is the one that greys its Share
 	// button, and the 60-unit leash is the one its share window applies to itself.
 	public class QuestSharingServiceTests : System.IDisposable
@@ -155,11 +155,11 @@ namespace Faolan.Tests
 			var held = await h.Database.GetCharacterQuests(Mate);
 			Assert.Equal([ShareableQuest], held.Select(q => q.QuestId));
 			Assert.Equal(QuestState.Active, held[0].State);
-			// The J-panel list AND the detail, in that order - the detail alone leaves the log empty.
+			// The J-panel list and the detail, in that order - the detail alone leaves the log empty.
 			Assert.Equal(["log-list", "full-update"], h.QuestOutbound.Calls);
 		}
 
-		// The quest granted comes from OUR pending map, never from the body - so a client that echoes a different id
+		// The quest granted comes from our pending map, never from the body - so a client that echoes a different id
 		// gets nothing rather than a quest of its choosing. The same rule the team accept and the trade start follow.
 		[Fact]
 		public async Task AnAcceptEchoingADifferentQuest_GrantsNothing()

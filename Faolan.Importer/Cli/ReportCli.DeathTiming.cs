@@ -9,16 +9,16 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report death-timing`: every captured death `BehaviorControlCenterIIR`, grouped by its ANIMATION, with each
-	// record's actor resolved to a creature name (#781).
+	// `--report death-timing`: every captured death `BehaviorControlCenterIIR`, grouped by its animation, with each
+	// record's actor resolved to a creature name.
 	//
-	// The question it answers is one #742 left open. `field12` (`ActivationTime`) reads as the death animation's own
-	// length in centiseconds, and three of the four animations hold perfectly still across every record of them - but
-	// 17036, the demon / large-caster one, takes eight values. The obvious explanation is that ONE animation is shared
-	// by many creatures and the length is the CREATURE's, and 17036 is the only one of the four whose population spans
-	// several creature types. So: resolve every actor, and see whether `field12` is constant per creature.
+	// `field12` (`ActivationTime`) reads as the death animation's own length in centiseconds, and three of the four
+	// animations hold perfectly still across every record of them - but 17036, the demon and large-caster one, takes
+	// eight values. The candidate explanation is that one animation is shared by many creatures and the length is the
+	// creature's, 17036 being the only one of the four whose population spans several creature types. So the report
+	// resolves every actor and asks whether `field12` is constant per creature.
 	//
-	// The actor is resolved the way `NpcDeathBehaviorExtractor` does it - against the FA015807 spawns of the SAME
+	// The actor is resolved the way `NpcDeathBehaviorExtractor` does it - against the FA015807 spawns of the same
 	// capture, because a handle is only unique inside one session. A record whose actor never spawned in the capture
 	// (a player death, or a creature streamed before the dump starts) is reported separately rather than dropped
 	// silently: an unresolved population is the one thing that could fake either answer.
@@ -76,7 +76,7 @@ namespace Faolan.Importer.Cli
 				if (values.Count == 1)
 					continue;
 
-				// The question: does the CREATURE explain the spread? A creature carrying one value on every record of
+				// The question: does the creature explain the spread? A creature carrying one value on every record of
 				// it is consistent with "the length is the creature's"; one carrying several falsifies it outright,
 				// which is a stronger result than any amount of agreement.
 				var byActor = anim.Where(r => !r.Actor.StartsWith('(')).GroupBy(r => r.Actor).ToList();

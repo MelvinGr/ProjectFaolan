@@ -5,8 +5,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Server-side gear-stat aggregation (#3): the MaxStatAggregator sums a character's equipped items' StatModifiers by
-	// stat, converting each raw-wire Amount to its DISPLAY value (÷scale). The DATA (which stat, how much) is the
+	// Server-side gear-stat aggregation: the MaxStatAggregator sums a character's equipped items' StatModifiers by
+	// stat, converting each raw-wire Amount to its display value (÷scale). The data (which stat, how much) is the
 	// decode-validated item stat-modifier region (docs/rdb/item-template-stats.md); this pins the summing + scaling.
 	public class MaxStatAggregatorTests
 	{

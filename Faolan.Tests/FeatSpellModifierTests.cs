@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #590: a feat's SPELL modifier - "+35% damage or healing on Flesh to Worms". It sits in the same template region
-	// and carries the same signature as a stat modifier, and the ONLY thing that tells them apart is whether the
-	// payload's first word is a stat id or a spell-LINE id. That is why these were invisible for so long: the shared
+	// A feat's spell modifier - "+35% damage or healing on Flesh to Worms". It sits in the same template region
+	// and carries the same signature as a stat modifier, and the only thing that tells them apart is whether the
+	// payload's first word is a stat id or a spell-line id. That is why these were invisible for so long: the shared
 	// parser found them and dropped them on its stat-id bound.
 	public class FeatSpellModifierTests
 	{
@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		private const uint FleshToWormsLine = 41000;
 		private const uint RankFivePercent = 3500;
 
-		// The two readers split ONE scan, so they can never disagree about where a record is - only about which side
+		// The two readers split one scan, so they can never disagree about where a record is - only about which side
 		// of the stat-id bound it falls on. A record is returned by exactly one of them.
 		[Fact]
 		public void SpellModifier_IsRejectedByParse_AndReturnedByParseRejected()
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			var rejected = ItemTemplateStatModifiers.ParseRejected(body);
 			var mod = Assert.Single(rejected);
 			Assert.Equal(DecompositionKind, mod.Kind);
-			Assert.Equal(FleshToWormsLine, mod.StatId); // the "stat id" slot carries the spell LINE for this kind
+			Assert.Equal(FleshToWormsLine, mod.StatId); // the "stat id" slot carries the spell line for this kind
 			Assert.Equal(RankFivePercent, mod.WireAmount);
 		}
 
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			Assert.Empty(ItemTemplateStatModifiers.ParseRejected(body));
 		}
 
-		// The region is NOT 4-byte aligned to the body in most templates (a feat's name and description are
+		// The region is not 4-byte aligned to the body in most templates (a feat's name and description are
 		// variable-length), so the scan is byte-granular. A word-aligned scan finds nothing at an odd offset - which
 		// is exactly how Decomposition's record hid.
 		[Theory]
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 			Assert.Equal(CombatResolver.ResolveSpellDamage(0, 40), CombatResolver.ResolveSpellDamage(0, 40, 0, 0));
 		}
 
-		// The boost scales the WHOLE result, Magic Damage included: the client's wording is "Increase to damage or
+		// The boost scales the whole result, Magic Damage included: the client's wording is "Increase to damage or
 		// healing on <spell>", not a bonus to one term.
 		[Fact]
 		public void SpellDamage_BoostCoversTheMagicDamageTerm()
@@ -123,7 +123,7 @@ namespace Faolan.Tests
 		}
 
 		// A minimal template body: the 12-byte RDB-Id header, `pad` bytes of filler to shift the alignment, then one
-		// 10-word modifier record `[kind][0][4][0][1][0][2][9][ref][value]`. The parser needs a zero word BEFORE the
+		// 10-word modifier record `[kind][0][4][0][1][0][2][9][ref][value]`. The parser needs a zero word before the
 		// signature, which the record's own second word supplies.
 		private static byte[] Template(uint kind, uint reference, uint value, int pad = 0)
 		{

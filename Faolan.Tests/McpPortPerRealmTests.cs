@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #910: `Mcp:Port` is a single global key and MCP runs only in a realm-hosting process, so every realm host bound
-	// the same 7099 and the second one died on `address already in use` - exactly the developer testing multi-realm.
-	// The port is now the configured BASE plus the realm's offset from the first realm.
+	// `Mcp:Port` is a single global key and MCP runs only in a realm-hosting process, so one port for all of them
+	// would have every realm host bind 7099 and the second die on `address already in use`. The port is the
+	// configured base plus the realm's offset from the first realm.
 	public class McpPortPerRealmTests
 	{
 		[Fact]
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// Every realm in a run gets a DIFFERENT port - the property the bug violated.
+		// Every realm in a run gets a different port - the property the bug violated.
 		public void EveryRealmGetsItsOwnPort()
 		{
 			var ports = new[] { 1u, 2u, 3u, 4u, 5u }.Select(id => FaolanMcpServiceCollectionExtensions.McpPortFor(7099, id)).ToArray();
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ Realm ids are not promised to be small or contiguous. A far-off id would run a ushort past its end, so the
+		// Realm ids are not promised to be small or contiguous. A far-off id would run a ushort past its end, so the
 		// derivation falls back to the base rather than wrapping into a port that means something else - a collision is
 		// recoverable with an explicit `--Mcp:Port`, binding a wrapped-around port is not diagnosable at all.
 		public void AnOutOfRangeRealmId_FallsBackToTheBasePort_RatherThanWrapping()

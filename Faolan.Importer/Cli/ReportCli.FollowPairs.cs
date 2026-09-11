@@ -7,10 +7,10 @@ using Faolan.Importer.Extractors;
 namespace Faolan.Importer.Cli
 {
 	// `--report follow-pairs` - every captured NPC-follows-NPC binding, with the formation offsets each follower
-	// held (#741).
+	// held.
 	//
-	// It exists as a REPORT rather than a scratch script because the useful output is a survey that moves with the
-	// corpus: which creature types are bound to which, how many INSTANCES of each pair a capture carries (the
+	// It exists as a report rather than a scratch script because the useful output is a survey that moves with the
+	// corpus: which creature types are bound to which, how many instances of each pair a capture carries (the
 	// formation is only visible as a group), and which bindings name a leader we cannot resolve - the residue that
 	// says whether the harvest is complete.
 	public static partial class ReportCli

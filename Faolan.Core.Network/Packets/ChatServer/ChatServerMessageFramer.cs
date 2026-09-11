@@ -5,12 +5,13 @@ using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Packets.ChatServer
 {
-	// Frames the chat wire format - [u16 opcode][u16 bodyLength][body] - out of a TCP byte stream.
-	//
-	// Only a PARTIAL frame is ever buffered: complete frames are cut straight out of the recv window, so a recv that
-	// carries n frames allocates exactly those n frames and nothing else. (It used to re-concatenate the whole buffer
-	// on every push and then copy the remainder after every frame, which is quadratic in the number of frames a recv
-	// carries.)
+	/// <summary>
+	///     Frames the chat wire format - <c>[u16 opcode][u16 bodyLength][body]</c> - out of a TCP byte stream.
+	/// </summary>
+	/// <remarks>
+	///     Only a partial frame is ever buffered: complete frames are cut straight out of the recv window, so a recv
+	///     carrying n frames allocates exactly those n frames and nothing else.
+	/// </remarks>
 	public sealed class ChatServerMessageFramer : IMessageFramer
 	{
 		private const int HeaderSize = sizeof(ushort) * 2;
@@ -75,8 +76,8 @@ namespace Faolan.Core.Network.Packets.ChatServer
 				Array.Resize(ref _pending, length);
 		}
 
-		// The length field counts the BODY, so a frame is bodyLength + the 4-byte header (matches what the server itself
-		// sends via ChatServerMessage.Build and the retail captures).
+		// The length field counts the body, so a frame is bodyLength plus the 4-byte header - what the server itself
+		// serializes and what the retail captures show.
 		private static int FrameLength(ReadOnlySpan<byte> frame)
 		{
 			return frame.ReadU16Be(sizeof(ushort)) + HeaderSize;

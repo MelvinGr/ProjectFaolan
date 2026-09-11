@@ -7,9 +7,9 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 namespace Faolan.Tests
 {
 	// The launcher's command line, pinned at the level the rest of the launcher reads it: LauncherOptions. These are
-	// the cases the old hand-rolled scan over argv got wrong or could not express at all - an option whose value ran
-	// off the end of argv threw IndexOutOfRangeException, a misspelling was rejected only because the switch had a
-	// default arm, and --debug-channels' optional value was decided by "does the next token start with '-'".
+	// the cases a hand-rolled scan over argv gets wrong or cannot express at all: an option whose value runs off the
+	// end of argv, a misspelling that is only rejected because the switch has a default arm, and --debug-channels'
+	// optional value decided by "does the next token start with '-'".
 	public class LauncherCommandTests
 	{
 		// The documented unattended launch (CLAUDE.md, docs/tooling/client-launcher.md) - short aliases and all.
@@ -28,10 +28,10 @@ namespace Faolan.Tests
 			Assert.Empty(options.DebugChannels);
 		}
 
-		// --patch-universeaddr and --patch-cdn are FLAGS: they say whether to redirect the client, and the address comes from the
-		// settings the server and the content mirror already read (Server:PublicAddress + Server:UniverseAgentPort,
-		// Cdn:PublicAddress). Each used to carry its own address, so a launch line pointed the client at one endpoint
-		// while faolan.json pointed the server at another, and only the client's copy could be silently wrong.
+		// --patch-universeaddr and --patch-cdn are flags: they say whether to redirect the client, and the address comes
+		// from the settings the server and the content mirror already read (Server:PublicAddress +
+		// Server:UniverseAgentPort, Cdn:PublicAddress). An address on each flag would let a launch line point the client
+		// at one endpoint while faolan.json points the server at another, with only the client's copy silently wrong.
 		//
 		// Bare is therefore a complete invocation - it is what `run.sh --client` passes - and the following token is
 		// the next flag, not the address.
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			Assert.Equal("http://192.168.1.5:7081", options.Configuration.CdnPublicAddress);
 		}
 
-		// --debug-channels carries an OPTIONAL value: bare it means the default set, with a list it means that list.
+		// --debug-channels carries an optional value: bare it means the default set, with a list it means that list.
 		// `run.sh --client2` passes it bare and then appends "$@", so the bare form has to survive being followed by
 		// another flag as well as by nothing at all.
 		[Fact]
@@ -116,11 +116,11 @@ namespace Faolan.Tests
 			Assert.True(options.DryRun);
 		}
 
-		// The DH keys are CONFIG KEYS: the option name IS the configuration path, so what the parse contributes is a
-		// layer keyed exactly as faolan.json spells it - and a key not passed is ABSENT rather than null, so it
+		// The DH keys are config keys: the option name is the configuration path, so what the parse contributes is a
+		// layer keyed exactly as faolan.json spells it - and a key not passed is absent rather than null, so it
 		// cannot shadow the config file with nothing.
 		//
-		// It asserts the LAYER rather than options.Configuration (which is that layer already resolved against the
+		// It asserts the layer rather than options.Configuration (which is that layer already resolved against the
 		// stack) because "the key was not passed" is only visible before the file layers answer for it: on a machine
 		// whose faolan.user.json holds a Server:PublicKey, the resolved config has one whatever the command line said.
 		[Fact]
@@ -141,7 +141,7 @@ namespace Faolan.Tests
 			Assert.Equal("AABB", options.Configuration[Keys.ServerPrivateKey]);
 		}
 
-		// A --launcher-notes URL the client cannot use is a typo in the flag, so it is refused during the PARSE -
+		// A --launcher-notes URL the client cannot use is a typo in the flag, so it is refused during the parse -
 		// before the exe has been backed up and half-patched.
 		[Theory]
 		[InlineData("https://host/notes.php?UniverseName=%s&Language=%s")] // the client's libcurl has no SSL
@@ -161,11 +161,11 @@ namespace Faolan.Tests
 			Assert.Equal("http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s", options.LauncherNotes);
 		}
 
-		// What the declared command line buys: a misspelling is an ERROR, and an option whose value ran off the end
-		// of argv is one too - the old scan indexed args[++i] and threw.
+		// What the declared command line buys: a misspelling is an error, and an option whose value ran off the end
+		// of argv is one too, rather than an index that runs past the end of args.
 		[Theory]
 		[InlineData("--dryrun")]
-		[InlineData("--universeaddr")] // the old address-carrying spelling; it is --patch-universeaddr now
+		[InlineData("--universeaddr")] // not a spelling the parser knows - the flag is --patch-universeaddr
 		[InlineData("--universe-addr")]
 		[InlineData("--exe")]
 		[InlineData("--charname")]

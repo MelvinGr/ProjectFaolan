@@ -10,7 +10,7 @@ namespace Faolan.Tests
 {
 	// Golden tests for the BehaviorControlCenter echo-acks, byte-exact against the armed+unarmed combat capture
 	// (Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng, 2026-06-12). Each case is a real
-	// client request (UP) paired with retail's reply (DOWN); request/reply hex includes the leading u32 body length
+	// client request (up) paired with retail's reply (down); request/reply hex includes the leading u32 body length
 	// (the builders take the length-prefixed request and return the reply content without its length prefix).
 	public class BehaviorAcksTests
 	{
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			// A ground-target Deadly Blizzard cast, interrupted by movement: the client sends the cancel (state=2) and
 			// retail answers with the state=0x0007 abort that drops the cast bar + pops "Interrupted". The abort carries
 			// the begin's args with phase=Mode(2) spliced in, at wire state 7, with the cancel's tail (last byte cleared).
-			// Only the begin's ARGS block feed the builder; behaviorId + tail come from the cancel packet.
+			// Only the begin's args block feed the builder; behaviorId + tail come from the cancel packet.
 			var beginArgs = Convert.FromHexString("08c1e80a1002280a3000609a08"); // idx988 args (13 bytes)
 			var cancel = Convert.FromHexString("0000004a642cd3d60000c3500802e5d40002000000040000001208c1e80a1002180220e45f280a3000609a080000002d0002348e004378e0e141bfe148436ed78c00000000032047a70000041a01");
 			var expected = Convert.FromHexString("642cd3d60000c3500802e5d40007000000040000000f08c1e80a10021802280a3000609a080000002d0002348e004378e0e141bfe148436ed78c00000000032047a70000041a00");
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(request, Instance, 9)));
 		}
 
-		// The CHANNEL-COMPLETE ack - the record that closes the cast bar when a server-timed channel ends. Request is a
+		// The channel-complete ack - the record that closes the cast bar when a server-timed channel ends. Request is a
 		// live client's `Ice Strike` cast begin (phase 0x0003, behaviour 4, 21 args bytes + a 22-byte tail); the reply
 		// echoes it at form 0x000A with `18 03` (field3 = phase 3, cast-state complete) spliced in after field2 and the
 		// tail untouched - behaviour 4 is not one of the two that take a 12-byte pad.
@@ -89,11 +89,11 @@ namespace Faolan.Tests
 			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.ChannelCompleteAck(request, 0x0802E5D4, 3)));
 		}
 
-		// ⛔ ...and WHY that builder exists rather than the byte patch it replaced. The three channel-complete sites used
+		// ...and why that builder exists rather than the byte patch it replaced. The three channel-complete sites used
 		// to reach form 0x000A by stamping `seq = 9` over offsets 16/17 of a clone of the request, so the echo-ack's +1
-		// would land on it. Phase 0x09 is one of the phases whose record ENDS at the seq word, so the patched bytes are
+		// would land on it. Phase 0x09 is one of the phases whose record ends at the seq word, so the patched bytes are
 		// a record that says "no command follows" with a whole command block behind it - and once the codec started
-		// accounting for every byte, this THREW inside the deferred cast resolve. Nothing was sent, and the cast bar sat
+		// accounting for every byte, this threw inside the deferred cast resolve. Nothing was sent, and the cast bar sat
 		// at 100% for ever. Gate the rejection so the patch cannot come back quietly.
 		[Fact]
 		public void TheOldSeq9BytePatch_IsRejectedByTheCodec()
@@ -124,14 +124,14 @@ namespace Faolan.Tests
 			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.EquipMoveAck(request, Instance, 2, null!)));
 		}
 
-		// The hit-result block is `[u32 targetCount][targets][8 x u32][u32 resultCount][41-byte results]` (#536),
-		// decoded from the corpus after the client's reader showed the attack commands read a COUNTED record loop.
-		// This pins the arithmetic the decode rests on - `40 + 8*targets + 41*results` - which accounts for ALL 3687
+		// The hit-result block is `[u32 targetCount][targets][8 x u32][u32 resultCount][41-byte results]`,
+		// decoded from the corpus after the client's reader showed the attack commands read a counted record loop.
+		// This pins the arithmetic the decode rests on - `40 + 8*targets + 41*results` - which accounts for all 3687
 		// captured s2c attack tails, so a change to the block's layout has to face it. (The middle is 9 words rather
 		// than 8 on 28 of them, selected by its own second word; we always send the 8-word form, whose selector is
 		// 1.)
 		//
-		// ⚠️ The single-target form is the one production sends and it must stay byte-identical: the counts move
+		// The single-target form is the one production sends and it must stay byte-identical: the counts move
 		// together in most captures (one extra target, one extra result), which makes the lengths look like a single
 		// 49-byte stride. 49 is 8 + 41, not one record - modelling it as one is the trap this test exists to hold
 		// shut.
@@ -161,10 +161,10 @@ namespace Faolan.Tests
 				BehaviorAcks.HitResultBlock(0x2001, 77));
 		}
 
-		// #673, the player half: a swing is ALWAYS directed, so the player's own hit ack has to state the zone they
-		// swung from. It used to write the `0xCB` default on every swing - i.e. tell the client "Overhead" while the
-		// mitigation charged for whatever the request's direction ability said - which is the same defect the mob
-		// path had. The result type is the u32 at +13 of the 41-byte result, which is the last record in the block.
+		// The player half: a swing is always directed, so the player's own hit ack has to state the zone they swung
+		// from rather than the `0xCB` default - otherwise the client is told "Overhead" while the mitigation is charged
+		// for whatever the request's direction ability said. The result type is the u32 at +13 of the 41-byte result,
+		// which is the last record in the block.
 		[Theory]
 		[InlineData(SwingDirection.UpperLeft, 0xC9u)]
 		[InlineData(SwingDirection.UpperRight, 0xCAu)]

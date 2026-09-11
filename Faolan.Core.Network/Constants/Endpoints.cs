@@ -3,24 +3,27 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Constants
 {
-	// ⚠️ The class IDS live in `Faolan.Core.Constants.RpcInterfaces`, which also carries each class's NAME and its
-	// `*Methods` enum. They were duplicated here as forwarding constants for a while; that is still a second name for
-	// one thing, so callers name the owner directly (`RpcInterfaces.GameCharAgentType`). What is left here is this
-	// type's actual job: the WIRE FORM - turning (type, instance) into the bytes a header carries.
-	//
-	// A Conan packet header is the client's RpcHeader (recovered from AgeOfConan.exe). Its caller_id (field 1,
-	// our "sender") and endpoint_id (field 2, our "receiver") are each a ProtoEndpoint:
-	//
-	//   message ProtoEndpoint { fixed32 type = 1; uint32 instance = 2; uint32 token = 3; }
-	//
-	//   - type     = the object-CLASS id (`RpcInterfaces`)
-	//   - instance = the specific object: the character id for the player, the zone id for the world
-	//   - token    = never present on the wire in any capture
-	//
-	// On the wire a serialized endpoint is exactly [0x0D <type LE32> 0x10 <instance varint>] - the same bytes the
-	// codebase used to hand-roll as byte[] literals. Building them through ProtoEndpoint makes a wrong type/instance
-	// (the create-editor receiver-mismatch bug) impossible by construction. The type ids were recovered from the
-	// client schema and verified against 109k captured endpoints.
+	/// <summary>
+	///     The wire form of an RPC endpoint: turning a (type, instance) pair into the bytes a packet header carries.
+	/// </summary>
+	/// <remarks>
+	///     The class ids themselves live in <c>Faolan.Core.Constants.RpcInterfaces</c>, which also carries each class's
+	///     name and its <c>*Methods</c> enum; callers name that owner directly
+	///     (<c>RpcInterfaces.GameCharAgentType</c>) rather than a forwarding constant here.
+	///     <para>
+	///         A Conan packet header is the client's RpcHeader. Its <c>caller_id</c> (field 1, our "sender") and
+	///         <c>endpoint_id</c> (field 2, our "receiver") are each a
+	///         <c>ProtoEndpoint { fixed32 type = 1; uint32 instance = 2; uint32 token = 3; }</c>, where
+	///         <c>type</c> is the object-class id, <c>instance</c> is the specific object (the character id for the
+	///         player, the zone id for the world) and <c>token</c> is never present on the wire in any capture.
+	///     </para>
+	///     <para>
+	///         A serialized endpoint is exactly <c>[0x0D &lt;type LE32&gt; 0x10 &lt;instance varint&gt;]</c>. Build them
+	///         through <c>ProtoEndpoint</c> rather than as byte literals, so a wrong type/instance pairing is
+	///         impossible by construction. The type ids come from the client schema and are verified against 109k
+	///         captured endpoints.
+	///     </para>
+	/// </remarks>
 	public static class Endpoints
 	{
 
@@ -33,8 +36,10 @@ namespace Faolan.Core.Network.Constants
 			};
 		}
 
-		// The serialized [0x0D <type LE32> 0x10 <instance varint>] bytes, for the byte[]-based WriteHeader overload
-		// and other call sites that still pass raw endpoint blobs.
+		/// <summary>
+		///     The serialized <c>[0x0D &lt;type LE32&gt; 0x10 &lt;instance varint&gt;]</c> bytes, for the byte[]-based
+		///     <c>WriteHeader</c> overload and other call sites that pass raw endpoint blobs.
+		/// </summary>
 		public static byte[] EndpointBytes(uint type, uint instance)
 		{
 			return Endpoint(type, instance).ToProtobuf();

@@ -4,17 +4,23 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// VALUE factory for a Quest_c journal record: the construct-don't-replay generator for the quest region (#186),
-	// proven byte-exact for 10238 by QuestcGenerationTests. Not a codec - it maps DB rows to the record
-	// QuestcRecordCodec encodes, and per #530 rule 1 that mapping is a neighbour rather than an overload on the
-	// codec's surface (#533 owns row<->value mapping proper).
+	/// <summary>
+	///     Value factory for a Quest_c journal record: the generator for the quest region, proven byte-exact for quest
+	///     10238 by QuestcGenerationTests. Not a codec - it maps database rows onto the record
+	///     <see cref="QuestcRecordCodec" /> encodes, and that mapping is a neighbour rather than an overload on the codec's
+	///     surface.
+	/// </summary>
 	public static class QuestcRecords
 	{
-		// One journal record from a QuestDefinition: its 5 header text refs + areaId, plus the per-quest scalars that
-		// are carried from the capture rather than derived (the Snapshot* columns). The numeric objective lists are
-		// left empty - the objective TEXT rides in the strings; see docs/re/fullplayer-snapshot-reader.md.
-		// `rewards` is the record's four reward lists (QuestRewardLists.ForQuest, #893); null builds a record with all
-		// four empty, which is what a quest with no reward data of either kind carries.
+		/// <summary>
+		///     One journal record from a QuestDefinition: its five header text refs and quest-line id, plus the per-quest
+		///     scalars carried from the capture rather than derived. The numeric objective lists are left empty - the
+		///     objective text rides in the strings; see docs/re/fullplayer-snapshot-reader.md.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="rewards" /> is the record's four reward lists (QuestRewardLists.ForQuest); null builds a
+		///     record with all four empty, which is what a quest with no reward data of either kind carries.
+		/// </remarks>
 		public static QuestcRecord ForQuest(QuestDefinition def, uint level, QuestRewardLists? rewards = null)
 		{
 			ArgumentNullException.ThrowIfNull(def);
@@ -26,10 +32,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Level = level,
 				BandTolerance = 0,
 				BandLevel = def.BandLevel,
-				// Carried through from the capture, meaning unknown. This used to emit a constant 0x412 for EVERY
-				// quest, which is only right for the beach journal - captured records vary (NecroL80's run 2, 10, ...).
-				// Substituting a constant here is the same mistake as defaulting the vanity mask: the wire must carry
-				// what retail carried.
+				// Carried through from the capture, meaning unknown. It is not a constant: captured records vary, and a
+				// fixed value is only right for the beach journal.
 				QuestLineFlags = def.QuestLineFlags,
 				Title = Slot(QuestTextSlot.Title),
 				Summary = Slot(QuestTextSlot.Summary),
@@ -38,9 +42,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Region2 = Slot(QuestTextSlot.MapName),
 				FieldEc = def.FieldEc,
 				QuestLineId = def.QuestLineId,
-				// @+0x2c is the series HEAD, not this quest's id (#566) - equal for a standalone quest, an earlier
-				// step for a chain member. Falls back to the own id when the column was never harvested, which is
-				// both the standalone answer and what we emitted before the column existed.
+				// @+0x2c is the series head, not this quest's id: equal for a standalone quest, an earlier step for a
+				// chain member. It falls back to the quest's own id when the column was never harvested, which is the
+				// standalone answer.
 				Field2c = def.ChainHeadQuestId == 0
 					? def.QuestId
 					: def.ChainHeadQuestId,

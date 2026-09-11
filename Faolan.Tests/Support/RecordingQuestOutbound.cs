@@ -8,9 +8,9 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support
 {
-	// An IQuestOutbound that RECORDS what the quest engine tells the client, as one ordered `Calls` log ("log-list",
-	// "full-update", "goal <id> <update>", "quest state <n>") plus the ambushes it schedules. One class for the three
-	// per-file copies that each logged a different subset (#928 item 2); a gate that cares about one kind filters.
+	// An IQuestOutbound that records what the quest engine tells the client, as one ordered `Calls` log ("log-list",
+	// "full-update", "goal <id> <update>", "quest state <n>") plus the ambushes it schedules. One class for every
+	// gate; a gate that cares about one kind filters.
 	public sealed class RecordingQuestOutbound : IQuestOutbound
 	{
 		public List<string> Calls { get; } = [];

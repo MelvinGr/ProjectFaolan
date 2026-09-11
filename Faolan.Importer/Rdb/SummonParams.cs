@@ -5,25 +5,25 @@ using System.Globalization;
 namespace Faolan.Importer.Rdb
 {
 	// The pet a summon spell spawns, read out of the ScriptParams string of its `StartServerSideScryScriptWithParams`
-	// (53261) GameAction element (#640):
+	// (53261) GameAction element:
 	//
 	//   spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781
 	//
-	// A `key=value;key=value` list, order not relied on. This is what makes the summon roster a catalog READ rather
+	// A `key=value;key=value` list, order not relied on. This is what makes the summon roster a catalog read rather
 	// than a hand-typed table: `spawnHash` present == this spell summons a pet, over all 21,502 spell records.
 	//
-	// ⚠️ 53261 is a GENERAL "run this server script" action, so the ACTION does not mark a summon - the params do.
-	// It runs unrelated scripts elsewhere in the catalog, which is why a summon is recognised by its PARAMS.
+	// 53261 is a general "run this server script" action, so the action does not mark a summon - the params do. It
+	// runs unrelated scripts elsewhere in the catalog, which is why a summon is recognised by its params.
 	//
-	// There are TWO spellings, and which one a spell uses is what says whether the pet fights:
-	//   spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781     a COMBAT pet
-	//   Type=Pet;Tag=3681                                              the social COMPANION
+	// There are two spellings, and which one a spell uses is what says whether the pet fights:
+	//   spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781     a combat pet
+	//   Type=Pet;Tag=3681                                              the social companion
 	// Every captured summon agrees: all 11 spawnHash pets bind with PetBindings.CombatKind and the one Type=Pet pet
 	// with SocialKind (docs/subsystems/summon-pet-decode.md). So `Companion` is read off the spelling rather than
 	// carried as a third fact.
 	//
-	// ⚠️ `spawnHash` is a 4-character ACG token that resolves to nothing in the client - it addressed retail's
-	// SERVER-side content (see Spell.SummonSpawnHash). It is kept as the pet's stable identity, not as a lookup key.
+	// `spawnHash` is a 4-character ACG token that resolves to nothing in the client - it addressed retail's
+	// server-side content (see Spell.SummonSpawnHash). It is kept as the pet's stable identity, not as a lookup key.
 	public sealed record SummonParams(string Token, bool Companion, uint? PetBuff, uint? PointCost)
 	{
 		private const string SpawnHashKey = "spawnHash";

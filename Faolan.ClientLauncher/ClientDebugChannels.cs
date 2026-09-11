@@ -6,15 +6,15 @@ using System.Linq;
 namespace Faolan.ClientLauncher
 {
 	/// <summary>
-	///     Turns on the retail client's OWN debug channels (`GameCode/Stats`, `GameCode/ArmorMitigation`,
-	///     `GameCode/ItemData`, `ClientInterface`, `N3.IIR`, …) by writing its logger config file, so the client tells us
-	///     what it computed instead of us inferring it from screenshots.
+	///     Turns on the retail client's own debug channels (`GameCode/Stats`, `GameCode/ArmorMitigation`,
+	///     `GameCode/ItemData`, `ClientInterface`, `N3.IIR`, …) by writing its logger config file, so the client reports
+	///     what it computed instead of it having to be inferred from screenshots.
 	/// </summary>
 	/// <remarks>
 	///     The client reads <c>dbDebug.conf</c> from its install dir at startup (the path is built at
 	///     <c>0x004130C7</c>, the parser is <c>FUN_004AB950</c>). The parser skips blank and <c>#</c> lines, then
-	///     full-line-matches each line against a fixed table of SETTINGS keys at <c>0x01F847C4</c> — and every line that
-	///     matches NONE of them is registered as a debug CHANNEL:
+	///     full-line-matches each line against a fixed table of settings keys at <c>0x01F847C4</c> — and every line that
+	///     matches none of them is registered as a debug channel:
 	///     <code>
 	///     name  = tok(line)                                  ; delimiters " =\n\r"
 	///     value = tok()
@@ -30,7 +30,7 @@ namespace Faolan.ClientLauncher
 	///         <c>atoi("false") == 0</c>.
 	///     </para>
 	///     <para>
-	///         ⚠️ Do NOT lower <c>DebugLevel</c> to open everything at once: measured, that produces ~117k lines in
+	///         <c>DebugLevel</c> must not be lowered to open everything at once: measured, that produces ~117k lines in
 	///         seconds (<c>GameCode/Movement</c> alone logs per entity per frame). Per-channel is the usable form.
 	///     </para>
 	///     <para>
@@ -49,26 +49,27 @@ namespace Faolan.ClientLauncher
 		// Scry.ScriptcommandsTrace, CommandQueue, Hiding). `strings AgeOfConan.exe | grep '^GameCode/'` lists all ~90.
 		public static readonly string[] Default =
 		[
-			// EVERY stat the client applies, with its PREVIOUS value: "CMsg_StatChange()..(<id> <new> old:<old>)".
-			// Strictly more than GameCode/Stats, which only shows server-driven sets - this also catches what the client
-			// computes or derives itself, which is how the attribute pipeline was found (#442/#444): the five attributes
-			// start at a hardcoded 10, then each loaded item template's contribution lands as its own write, so the log
+			// Every stat the client applies, with its previous value: "CMsg_StatChange()..(<id> <new> old:<old>)".
+			// Strictly more than GameCode/Stats, which only shows server-driven sets: this also catches what the client
+			// computes or derives itself, which is how the attribute pipeline is legible - the five attributes start at
+			// a hardcoded 10, then each loaded item template's contribution lands as its own write, so the log
 			// attributes a delta to an item id. Pairs with GameCode/ItemData, which names the template being loaded.
 			"ClientInterface",
 			"GameCode/Stats", // every stat the server sends, by id and value - "got new stats: 507=291000"
 			"GameCode/ArmorMitigation", // TotalArmorValue / Adjusted / Min+MaxMitigation / Final Mitigation per hit
 			"GameCode/ItemData", // item template load + per-item static data
 			"GameCode/Magic/Calculation", // spell magnitude computation
-			"GameCode/GameAction/Modify", // the magnitude AFTER modification - "GetOnCasterModifyPercent", "Value after percent modification"
+			"GameCode/GameAction/Modify", // the magnitude after modification - "GetOnCasterModifyPercent", "Value after percent modification"
 			"GameCode/Effects", // visual effect start/stop, by resource id
 
 			// The client's weapon-damage maths, step by step, naming the stat it read at each one:
 			// "CalcBaseDPS: Base DPS:2960.00" -> "DPS after abilitybonus:3868.45 (stat:804)" -> "after
-			// genericdamagemodifier:4086.76". Ten lines a fight and it is the whole formula (#395).
+			// genericdamagemodifier:4086.76". Ten lines a fight, and it is the whole formula.
 			"GameCode/Combat/DPS",
 
 			// "Tried to GetStringStat for GameActionStat_e 1241 but it did not exist" - the client naming a stat it
-			// wanted and we never sent. A missing-data detector rather than a trace, and near-silent when we are right.
+			// wanted and was never sent. A missing-data detector rather than a trace, and near-silent when the server
+			// is right.
 			"GameActionData/GetStat",
 
 			// The world-entry / teleport handshake as a state machine ("ClientCharacterReadyToSendInPlay",
@@ -90,8 +91,8 @@ namespace Faolan.ClientLauncher
 		private const int MaxChannels = 0x80;
 		private const int MaxNameLength = 47;
 
-		// The SETTINGS keys FUN_004AB950 recognizes (the string table at 0x01F847C4). Anything else in the file is a
-		// channel - which also means a channel must not be NAMED one of these, or the parser eats it as a setting.
+		// The settings keys FUN_004AB950 recognises (the string table at 0x01F847C4). Anything else in the file is a
+		// channel, which also means a channel must not be named one of these or the parser eats the line as a setting.
 		private static readonly string[] SettingKeys =
 		[
 			"DebugLevel", "TypeMode", "UseCallback", "ShowImportant", "Log4cxxFormat", "PrefixLevel",
@@ -130,10 +131,11 @@ namespace Faolan.ClientLauncher
 			{
 				var existed = File.Exists(path);
 
-				// Build from the PRISTINE file when the launcher has backed one up, not from our own last write -
-				// otherwise every run with a different --debug-channels list leaves its old entries behind, and the
+				// Build from the pristine file when the launcher has backed one up, never from the last write -
+				// otherwise every run with a different --debug-channels list leaves its old entries behind and the
 				// 0x80-entry table fills with channels nobody asked for. Same principle as the exe patch: transform the
-				// original, don't re-transform the output. (So this file is launcher-owned, like LocalConfig.xml.)
+				// original rather than re-transforming the output, which makes this file launcher-owned like
+				// LocalConfig.xml.
 				var backup = path + ".bak";
 				var lines = File.Exists(backup)
 					? File.ReadAllLines(backup).ToList()

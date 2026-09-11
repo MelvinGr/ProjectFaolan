@@ -3,68 +3,84 @@ using System.Text;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// The FA015807 (SimpleCharFullUpdate) PRE-IIR scaffold - the fixed read sequence
-	// SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00) runs after the transform and before the embedded
-	// CoreCharacterFullUpdateIIR: a u8 version (0x05), then 6 u8 + 53 u32 interleaved with one count-framed sublist
-	// (docs/re/fa015807-spawn-reader.md, recovered from Ghidra and validated over 4558 captured records).
-	//
-	// ONE type for BOTH families (#530 wave 5b). It used to be two - `NpcSpawnPreIir` and `PlayerSpawnPreFrame` -
-	// that walked the SAME layout table, because it is the same client reader; the only apparent difference was that
-	// the player's model also carried the 5 bytes of the embedded CoreCharacter header that its parse happened to cut
-	// into. Those two fields belong to the message, not to the scaffold, and now live on SimpleCharFullUpdateIIR.
-	//
-	// The 53 u32 are read in WIRE order but scattered into NON-CONTIGUOUS C++ struct fields 0x184..0x264, and the
-	// client applies each to the dynel as a STAT (WordStatIds). On an NPC the server fills only THREE of the 53
-	// (w17, w18, w38) and the rest goes out carrying unrelated server-side data - script-engine diagnostics, LDB
-	// <localized> fragments - which is why an NPC's block reads as text and why 591 captured Pillagers carry 551
-	// distinct blocks (#603). So the block carries NO session-volatile instance handles either way: the only stale
-	// reference in a spawn is the playfield token in the transform (SpawnTransformPatch), which is why a
-	// carried-over scaffold re-addresses cleanly once the token is fixed.
-	//
-	// The per-spawn sublist is EMPTY on 11,394 of the 11,400 captured NPC spawns, which is why it was long held as
-	// the raw 4-byte `0x3F1` framing word; on a PLAYER it is the character's saved FEAT SPECS - named, with a
-	// trained-feat list each (#466 / #474), which is what put a name to the whole structure.
+	/// <summary>
+	///     The spawn pre-IIR scaffold - the fixed read sequence SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
+	///     runs after the transform and before the embedded CoreCharacterFullUpdateIIR: a u8 version, then 6 u8 and 53 u32
+	///     interleaved with one count-framed sublist. See docs/re/fa015807-spawn-reader.md, recovered from the client and
+	///     validated over 4,558 captured records. One type for both families, because it is one client reader.
+	/// </summary>
+	/// <remarks>
+	///     The 53 u32 are read in wire order but scattered into non-contiguous C++ struct fields 0x184..0x264, and the
+	///     client applies each to the dynel as a stat (<see cref="WordStatIds" />). On an NPC the retail server fills only
+	///     three of the 53 (w17, w18, w38) and the rest goes out carrying unrelated server-side data - script-engine
+	///     diagnostics, LDB fragments - which is why an NPC's block reads as text and why 591 captured Pillagers carry 551
+	///     distinct blocks.
+	///     <para>
+	///         The block carries no session-volatile instance handles either way: the only stale reference in a spawn is the
+	///         playfield token in the transform (<see cref="SpawnTransformPatch" />), which is why a carried-over scaffold
+	///         re-addresses cleanly once the token is fixed.
+	///     </para>
+	///     <para>
+	///         The per-spawn sublist is empty on 11,394 of the 11,400 captured NPC spawns, which makes its framing word look
+	///         like a constant; on a player it is the character's saved feat specs, named, each with its own trained-feat
+	///         list.
+	///     </para>
+	/// </remarks>
 	public sealed record SpawnPreIir
 	{
 		public const byte ExpectedVersion = 0x05;
 
-		// How many of the scaffold's fields are single BYTES (the other 53 are u32). Named for what it counts: it
-		// used to be `ByteCount`, which reads as a width and collided with the scaffold's actual width.
+		/// <summary>How many of the scaffold's fields are single bytes; the other 53 are u32.</summary>
 		public const int FlagCount = 6;
 
 		public const int WordCount = 53;
 
-		// Scaffold size on the wire for the EMPTY-sublist form: u8 version + 6 u8 + 53 u32 + the sublist's own
-		// framing word. 1 + 6 + 53*4 + 4 = 223. A scaffold whose sublist has entries is wider - use ByteCount.
+		/// <summary>
+		///     The scaffold's size on the wire for the empty-sublist form: the version byte, 6 u8, 53 u32 and the sublist's
+		///     own framing word, 223 bytes in all. A scaffold whose sublist has entries is wider - use
+		///     <see cref="ByteCount" />.
+		/// </summary>
 		public const int FixedLength = 1 + FlagCount + WordCount * 4 + 4;
 
-		// The wire index of the one word the retail server reliably WRITES on an NPC spawn - one of the three
-		// (w17, w18, w38) the leaked-text sweep found it never leaves alone, and the only one of the three that is
-		// non-zero (#603). The most-minimal captured scaffolds carry exactly ONE non-zero word, here. Its struct
-		// offset is 0x1fc. A captured PLAYER frame carries the same modal value in the same slot.
+		/// <summary>
+		///     The wire index of the one word the retail server reliably writes on an NPC spawn: one of the three (w17, w18,
+		///     w38) the leaked-text sweep found it never leaves alone, and the only one of the three that is non-zero. The
+		///     most minimal captured scaffolds carry exactly one non-zero word, here, at struct offset 0x1fc, and a captured
+		///     player frame carries the same modal value in the same slot.
+		/// </summary>
 		public const int CategoryWordIndex = 17;
 
-		// The modal value of the category word across the corpus (111 = 0x6f, ~49% of all NPCs; it is a 5-state
-		// per-instance enum {3, 0x6f, 0x78, 0xc9, 0x12c}, NOT identity-bound). The from-scratch minimal scaffold
-		// defaults to it - byte-identical to the most-minimal captured NPCs (e.g. Kier-Dheed's Panther).
+		/// <summary>
+		///     The modal value of the category word across the corpus - 111, about 49% of all NPCs. It is a five-state
+		///     per-instance enum {3, 0x6f, 0x78, 0xc9, 0x12c} rather than something bound to identity. The from-scratch
+		///     minimal scaffold defaults to it, which is byte-identical to the most minimal captured NPCs.
+		/// </summary>
 		public const uint DefaultCategory = 0x6f;
 
-		// Flags index of the frame's archetype byte (Soldier 1 / Priest 2 / Rogue 3 / Mage 4), abs @135 in the spawn
-		// body. Applied to the dynel as stat 0x01F `Archetype`.
+		/// <summary>
+		///     Flags index of the frame's archetype byte - Soldier 1, Priest 2, Rogue 3, Mage 4 - at offset 135 in the spawn
+		///     body. Applied to the dynel as stat 0x01F, Archetype.
+		/// </summary>
 		public const int ArchetypeFlagIndex = 1;
 
-		// Flags index of the class byte (0x12 Barbarian .. 0x2c Demonologist), abs @136. Applied as stat 0x043
-		// `Class` - which is the corroboration for the whole FlagStatIds/WordStatIds mapping below: 0x043 is what
-		// #239 named the class stat from an entirely different direction (the in-client character sheet).
+		/// <summary>
+		///     Flags index of the class byte (0x12 Barbarian to 0x2c Demonologist), at offset 136. Applied as stat 0x043,
+		///     Class - which corroborates the whole <see cref="FlagStatIds" /> and <see cref="WordStatIds" /> mapping, since
+		///     0x043 is the class stat named independently from the in-client character sheet.
+		/// </summary>
 		public const int ClassFlagIndex = 2;
 
-		// Flags index of the PRESTIGE class byte, abs @137 - stat 0x12E. Named by the apply, not by a capture: it is
-		// 0 in every captured frame, because prestige classes are Rise of the Godslayer content nothing in the corpus
-		// had.
+		/// <summary>
+		///     Flags index of the prestige class byte, at offset 137 - stat 0x12E. Named by the apply rather than by a
+		///     capture: it is 0 in every captured frame, prestige classes being Rise of the Godslayer content nothing in the
+		///     corpus had.
+		/// </summary>
 		public const int PrestigeClassFlagIndex = 3;
 
-		// The stat id each of the 6 flag bytes is applied to, in flag order. 0 = the byte is not applied as a stat
-		// (flag 0 is consumed as a plain field). See WordStatIds for where these come from.
+		/// <summary>
+		///     The stat id each of the 6 flag bytes is applied to, in flag order. Zero means the byte is not applied as a
+		///     stat; flag 0 is consumed as a plain field. See <see cref="WordStatIds" /> for where these come from.
+		/// </summary>
 		public static readonly uint[] FlagStatIds = [0, 0x01F, 0x043, 0x12E, 0xF4261, 0xF4260];
 
 		/// <summary>
@@ -76,31 +92,32 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		///         Recovered from <c>SimpleCharFullUpdateIIR_t::Apply</c> (<c>FUN_011215e0</c>, found by
 		///         <c>tools/ghidra/DumpScaffoldConsumers.java</c>), which walks the struct region the reader filled and
 		///         pushes every slot into the dynel as <c>SetStat(statId, value)</c> - an explicit id per slot, not a
-		///         positional copy. So the scaffold is not the opaque per-instance state it was filed as: it is a STAT
-		///         BLOCK, and this is its key.
+		///         positional copy. So the scaffold is a stat block rather than opaque per-instance state, and this is
+		///         its key.
 		///     </para>
 		///     <para>
-		///         What the ids say it holds is the character's PvP / MINIGAME CAREER: the LDB stat table names
-		///         `Fatalities` (0x564), `Minigames Abandoned` (0x560), and the `Annihilation` / `Capture the Skull` /
-		///         `Siege` win-loss pairs (0x29A..0x29F), sitting beside `Kills` (0x290) and `Deaths` (0x292). A fresh
-		///         character has no career yet, which is why a fresh player's block is near-empty.
+		///         What the ids say it holds is the character's PvP and minigame career: the LDB stat table names
+		///         Fatalities (0x564), Minigames Abandoned (0x560) and the Annihilation, Capture the Skull and Siege
+		///         win-loss pairs (0x29A..0x29F), beside Kills (0x290) and Deaths (0x292). A fresh character has no
+		///         career yet, which is why a fresh player's block is near-empty.
 		///     </para>
 		///     <para>
-		///         ⚠️ An NPC has no career either, but its block is NOT zero and must not be read as one (#603). The
-		///         retail server writes only w17, w18 and w38 on an NPC spawn and sends the other 50 words carrying
-		///         data it never wrote for that NPC - script-engine diagnostics, LDB `&lt;localized&gt;` fragments,
-		///         binary. 591 captured Pillagers carry 551 distinct blocks. Ours sends zeros
-		///         (<see cref="SpawnPreIirs.Minimal" />), which is the shape retail's three written slots describe.
+		///         An NPC has no career either, but its block is not zero and must not be read as one: the retail
+		///         server writes only w17, w18 and w38 on an NPC spawn and sends the other 50 words carrying data it
+		///         never wrote for that NPC - script-engine diagnostics, LDB fragments, binary - so 591 captured
+		///         Pillagers carry 551 distinct blocks. We send zeros (<see cref="SpawnPreIirs.Minimal" />), which is
+		///         the shape retail's three written slots describe.
 		///     </para>
 		///     <para>
-		///         Two slots are FLOATS: words 14 (0x546) and 35 (0x545) go out through a different setter on the
+		///         Two slots are floats: words 14 (0x546) and 35 (0x545) go out through a different setter on the
 		///         stat vtable (+0x1c rather than +0xc), which is the one place the apply distinguishes a type. That
 		///         is also what <see cref="ConstantWordIndex" /> is about - a word reading 0x41700000 is 15.0f, and a
 		///         float slot is where a float belongs.
 		///     </para>
 		///     <para>
-		///         ⚠️ Most of the 0x545..0x593 run is NOT named by the LDB table (5 of ~80 ids are), so a slot here
-		///         carries a stat id we can address but not yet name. Naming them is LDB/in-client work, not more RE.
+		///         Most of the 0x545..0x593 run is not named by the LDB table - five of about eighty ids are - so a
+		///         slot here carries a stat id that can be addressed but not yet named. Naming them is LDB and
+		///         in-client work rather than more reverse engineering.
 		///     </para>
 		/// </summary>
 		public static readonly uint[] WordStatIds =
@@ -110,30 +127,40 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			0
 		];
 
-		// Word index of a word that is 0x41700000 (float 15.0) in every captured player frame and 0 on NPCs. Named
-		// for what it is - a constant we can reproduce but cannot yet attribute.
+		/// <summary>
+		///     Word index of a word that is 0x41700000 - the float 15.0 - in every captured player frame and 0 on NPCs. A
+		///     constant that can be reproduced but not yet attributed.
+		/// </summary>
 		public const int ConstantWordIndex = 19;
 
-		// ...and that value. 0x41700000 is the IEEE754 encoding of 15.0f, so the word is very likely a float, but
-		// nothing has been found that varies it, so it is reproduced rather than derived.
+		/// <summary>
+		///     That value. It is the IEEE 754 encoding of 15.0f, so the word is very likely a float, but nothing has been
+		///     found that varies it, so it is reproduced rather than derived.
+		/// </summary>
 		public const uint ConstantWordValue = 0x41700000;
 
-		// Word index of a per-SESSION value: it differs between characters and between sessions of the SAME
-		// character (most captured frames carry 6..44; the outliers are round - 1005, 1586, 9000, 11185, 14000).
-		// Nothing has been found that predicts it, so the generated frame reproduces the value the captured fresh
-		// character carried, which the client accepts.
+		/// <summary>
+		///     Word index of a per-session value: it differs between characters and between sessions of the same character,
+		///     most captured frames carrying 6 to 44 with round outliers (1005, 1586, 9000, 11185, 14000). Nothing has been
+		///     found that predicts it, so the generated frame reproduces the value a captured fresh character carried, which
+		///     the client accepts.
+		/// </summary>
 		public const int SessionWordIndex = 21;
 
-		// ...that value.
+		/// <summary>That value.</summary>
 		public const uint FreshSessionWordValue = 8;
 
-		// Word index of the vanity SHOWN-slots bitmask (4 bytes big-endian, bit = base equip slot id, SET = that
-		// slot's vanity piece is shown; #336). Frame offset 18 - the offset #336 found independently, which is
-		// corroboration that this u32 grid is the client's and not a coincidence.
+		/// <summary>
+		///     Word index of the vanity shown-slots bitmask: four bytes big-endian, each bit a base equip slot id, set
+		///     meaning that slot's vanity piece is shown. Its frame offset was found independently of this grid, which
+		///     corroborates that the grid is the client's.
+		/// </summary>
 		public const int VanityShownMaskWordIndex = 4;
 
-		// The C++ struct offset each of the 53 u32 is stored to, in WIRE order. Only used to reassemble the
-		// leaked-server-text view (DecodeScriptText); irrelevant to byte-exact wire round-trip.
+		/// <summary>
+		///     The C++ struct offset each of the 53 u32 is stored to, in wire order. Only used to reassemble the
+		///     server-text view (<see cref="DecodeScriptText" />); irrelevant to the byte-exact wire round-trip.
+		/// </summary>
 		internal static readonly int[] WordStructOffsets =
 		[
 			0x184, 0x188, 0x18c, 0x190, 0x194, 0x198, 0x19c, 0x1a8, 0x1b0, 0x1c0, 0x1c8, 0x1d0, 0x1d8, 0x1e0, 0x1e8, 0x1f0, 0x1b8, 0x1fc, 0x200, 0x204, 0x208, 0x210, 0x214, 0x218, 0x21c, 0x220,
@@ -141,8 +168,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			0x264
 		];
 
-		// The wire read order (after the version byte): true == u8 field, false == u32 field. The single sublist is
-		// held out of this table - it sits between the 32nd and 33rd entry and is variable-width.
+		/// <summary>
+		///     The wire read order after the version byte: true for a u8 field, false for a u32 one. The single sublist is
+		///     held out of this table - it sits between the 32nd and 33rd entry and is variable-width.
+		/// </summary>
 		private static readonly bool[] IsByteField =
 		[
 			true, // wi0
@@ -157,35 +186,44 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// + 27 u32 (wi33..59) appended below in BuildLayout
 		];
 
-		// The full wire layout: the 32 pre-sublist fields (IsByteField), the sublist, then 27 trailing u32.
+		/// <summary>
+		///     The full wire layout: the 32 pre-sublist fields, the sublist, then 27 trailing u32.
+		/// </summary>
 		internal static readonly (bool IsByte, bool IsSublist)[] Layout = BuildLayout();
 
-		// version byte (0x05; client rejects any other value).
+		/// <summary>The version byte; the client rejects any other value.</summary>
 		public byte Version { get; set; } = ExpectedVersion;
 
-		// The 6 single-byte fields, in wire order (read positions 0, 18, 19, 20, 25, 26).
+		/// <summary>The 6 single-byte fields, in wire order - read positions 0, 18, 19, 20, 25 and 26.</summary>
 		public byte[] Flags { get; set; } = new byte[FlagCount];
 
-		// The count-framed sublist between the 32nd and 33rd scaffold field. On a PLAYER it is the character's saved
-		// FEAT SPECS; empty on the create-editor frame and on all but six captured NPCs.
+		/// <summary>
+		///     The count-framed sublist between the 32nd and 33rd scaffold field. On a player it is the character's saved
+		///     feat specs; it is empty on the create-editor frame and on all but six captured NPCs.
+		/// </summary>
 		public List<SpawnPreFrameSublistEntry> Sublist { get; } = [];
 
-		// The 53 u32 fields, in wire order, each held as the big-endian value read off the wire (the value the
-		// client byteswaps into its struct). Re-emitted big-endian, so the round-trip is byte-exact regardless of
-		// what the words mean. DecodeScriptText re-interprets them as the little-endian char buffer.
+		/// <summary>
+		///     The 53 u32 fields, in wire order, each held as the big-endian value read off the wire - the value the client
+		///     byteswaps into its struct. They are re-emitted big-endian, so the round-trip is byte-exact whatever the words
+		///     mean; <see cref="DecodeScriptText" /> re-interprets them as the little-endian char buffer.
+		/// </summary>
 		public uint[] Words { get; set; } = new uint[WordCount];
 
-		// The scaffold's width on the wire: the fixed grid plus whatever the sublist costs.
+		/// <summary>The scaffold's width on the wire: the fixed grid plus whatever the sublist costs.</summary>
 		public int ByteCount => FixedLength - 4 + SpawnPreFrameSublistCodec.ByteCount(Sublist);
 
-		// Reassembles the 53 u32 into the contiguous 228-byte region 0x184..0x267 they are scattered across in the
-		// client struct, little-endian (the stream byteswaps on read, so the wire is LE). This is the buffer BOTH
-		// readings of the region are taken over: the stat block the apply describes (WordStatIds) and - on an NPC,
-		// where retail writes only three of the 53 slots - whatever server-side data the other 50 happen to carry.
-		//
-		// ⚠️ It is a DIAGNOSTIC view, never a source of content. What it holds on an NPC is a snapshot of the retail
-		// server's own heap, not anything about that NPC (#603); `--report scaffold-heap` is the harvest that mines
-		// it (Gitea #604).
+		/// <summary>
+		///     Reassembles the 53 u32 into the contiguous 228-byte region 0x184..0x267 they are scattered across in the
+		///     client struct, little-endian. This is the buffer both readings of the region are taken over: the stat block
+		///     the apply describes (<see cref="WordStatIds" />) and, on an NPC where retail writes only three of the 53
+		///     slots, whatever server-side data the other 50 happen to carry.
+		/// </summary>
+		/// <remarks>
+		///     It is a diagnostic view, never a source of content: what it holds on an NPC is a snapshot of the retail
+		///     server's own heap rather than anything about that NPC. <c>--report scaffold-heap</c> is the harvest that mines
+		///     it.
+		/// </remarks>
 		public byte[] DecodeScriptBuffer()
 		{
 			const int baseOffset = 0x184;
@@ -193,7 +231,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var buffer = new byte[span];
 			for (var i = 0; i < WordCount; i++)
 			{
-				// Word is stored big-endian; the struct char buffer holds the bytes little-endian (reversed).
+				// The word is stored big-endian; the struct char buffer holds the bytes little-endian, i.e. reversed.
 				var at = WordStructOffsets[i] - baseOffset;
 				buffer[at + 0] = (byte)(Words[i] & 0xFF);
 				buffer[at + 1] = (byte)((Words[i] >> 8) & 0xFF);
@@ -204,7 +242,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return buffer;
 		}
 
-		// The printable runs (>= 6 chars) of that buffer, joined by ' | ' - the human-readable form of the same view.
+		/// <summary>
+		///     The printable runs of at least six characters in that buffer, joined by " | " - the human-readable form of the
+		///     same view.
+		/// </summary>
 		public string DecodeScriptText()
 		{
 			var buffer = DecodeScriptBuffer();
@@ -255,16 +296,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 	}
 
-	// The from-scratch pre-IIR scaffolds. Value factories, not codec surface (#530 §2 rule 1 / the wave-3 precedent).
+	/// <summary>The from-scratch pre-IIR scaffolds. Value factories, not codec surface.</summary>
 	public static class SpawnPreIirs
 	{
-		// The from-scratch pre-IIR scaffold for a freshly-spawned NPC: version 0x05, all flags 0, all 53 words 0
-		// except the category word (defaulted to 0x6f), and the empty 0x3F1 sublist. This is the "last un-lifted
-		// part" of the from-DB NPC spawn (Gitea #185), sourced from NOTHING - and #603 showed that is the CORRECT
-		// shape rather than a safe fallback: over the captured NPC spawns the retail server fills only w17, w18 and
-		// w38, and whatever the other 50 words carry is data it never wrote for this NPC. Reproducing a captured
-		// block would be reproducing retail's leak. Its encoding is byte-identical to the most-minimal captured
-		// NPC scaffolds.
+		/// <summary>
+		///     The from-scratch pre-IIR scaffold for a freshly spawned NPC: the version byte, all flags 0, all 53 words 0
+		///     except the category word, and an empty sublist.
+		/// </summary>
+		/// <remarks>
+		///     Sourcing it from nothing is the correct shape rather than a safe fallback: across the captured NPC spawns the
+		///     retail server fills only w17, w18 and w38, and whatever the other 50 words carry is data it never wrote for
+		///     that NPC, so reproducing a captured block would reproduce retail's leak. Its encoding is byte-identical to the
+		///     most minimal captured NPC scaffolds.
+		/// </remarks>
 		public static SpawnPreIir Minimal(uint category = SpawnPreIir.DefaultCategory)
 		{
 			return new SpawnPreIir

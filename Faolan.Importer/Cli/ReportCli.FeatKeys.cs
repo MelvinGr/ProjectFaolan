@@ -11,39 +11,38 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report feat-keys [--report-arg <mode>]`: hunt the per-template TEA keys for ENCRYPTED records in RDB type
-	// 1000020 (#877/#897, the plan from #251).
+	// `--report feat-keys [--report-arg <mode>]`: hunt the per-template TEA keys for encrypted records in RDB type
+	// 1000020.
 	//
-	// ⚠️ **`FeatKeyScanner` already existed and was called from NOWHERE.** #251 built the instrument and left it
-	// unwired, so the question "do these keys ride the wire?" had been answered by *assumption* ever since. This is
-	// that grep having a trigger.
+	// This is the trigger for `FeatKeyScanner`: without it, the question "do these keys ride the wire?" can only be
+	// answered by assumption.
 	//
 	// The method is the scanner's: treat every 16-byte window of every captured packet body as a candidate key and
-	// TEA-decrypt the target record's FIRST BLOCK only. A correct key yields the `IOz1` container the plaintext opens
+	// TEA-decrypt the target record's first block only. A correct key yields the `IOz1` container the plaintext opens
 	// with (see FeatKeyScanner for why that, and not the template's own type word).
 	//
 	// ## Modes
 	//
-	//   (default)          the FEAT sample - kept for #877's original question. Now answers it structurally rather
-	//                      than by scanning: all 19,777 feat records are PLAINTEXT, so there is no feat key to find.
+	//   (default)          the feat sample. It answers structurally rather than by scanning: every feat record is
+	//                      plaintext, so there is no feat key to find.
 	//   `<n>`              the same, with the sample size.
-	//   `ids:a,b,c`        those exact records - a NAMED hunt (#895).
-	//   `unkeyed[:n]`      ⭐ n encrypted records we hold NO key for, spread evenly across the catalog (#897). This
+	//   `ids:a,b,c`        those exact records - a named hunt.
+	//   `unkeyed[:n]`      n encrypted records we hold no key for, spread evenly across the catalog. This
 	//                      is the coverage hunt: every key found decrypts a template we cannot currently read.
 	//
-	// ## ⭐⭐ Every run plants a CONTROL, and that is not optional
+	// ## Every run plants a control, and that is not optional
 	//
 	// This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be completely
-	// broken and look exactly like a true negative forever - there is no failing case to notice. This one WAS, twice
-	// over, for two tickets (see FeatKeyScanner's remarks). So every run appends two records whose keys we already
-	// hold and refuses to report a negative unless they came back. A run that loses its control has measured nothing.
+	// broken and look exactly like a true negative forever - there is no failing case to notice. So every run appends
+	// two records whose keys are already held and refuses to report a negative unless they came back. A run that
+	// loses its control has measured nothing.
 	//
-	// ⚠️ Cost is windows x targets and the corpus is ~10^9 windows, so this is a sampled run. A negative over a
+	// Cost is windows x targets and the corpus is ~10^9 windows, so this is a sampled run. A negative over a
 	// sample is meaningful now that the instrument is known to work - which is exactly what could not be said before.
 	public static partial class ReportCli
 	{
 		// The two Spellweaving ability templates whose keys are in the DB, harvested from captured 0x2052 grants.
-		// Chosen because they are ABILITIES: an item key could plausibly be found by the same path a future change
+		// Chosen because they are abilities: an item key could plausibly be found by the same path a future change
 		// breaks, whereas these ride a message shape the scanner knows nothing about.
 		private static readonly uint[] ControlIds = [3663271, 3364576];
 
@@ -61,11 +60,11 @@ namespace Faolan.Importer.Cli
 			using var reader = OpenRdb(rdb);
 
 			// Every 1000020 id we already hold a key for - the Items and Abilities catalogs. `unkeyed` is the
-			// complement of this inside the ENCRYPTED half of the catalog.
+			// complement of this inside the encrypted half of the catalog.
 			var keyed = (await db.Items.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).Select(i => i.Id).ToListAsync()).ToHashSet();
 			keyed.UnionWith(await db.Abilities.Where(a => a.Key.Key1 != 0 || a.Key.Key2 != 0 || a.Key.Key3 != 0 || a.Key.Key4 != 0).Select(a => a.Id).ToListAsync());
 
-			// Walk the catalog ONCE and bucket it. The encrypted/plaintext split is the RDBH magic, which is also the
+			// Walk the catalog once and bucket it. The encrypted/plaintext split is the RDBH magic, which is also the
 			// question "is there a key to look for at all".
 			var encrypted = new List<uint>();
 			var encryptedBlocks = new Dictionary<uint, byte[]>();
@@ -98,9 +97,9 @@ namespace Faolan.Importer.Cli
 			                  + $"{plaintext:N0} plaintext, {unreadable:N0} unreadable.");
 			Console.WriteLine($"  we already hold a key for {keyed.Count:N0} record(s) ({keyed.Count(encryptedBlocks.ContainsKey):N0} of them encrypted catalog entries).");
 
-			// ⭐⭐ `exhaustive` inverts the scan: harvest the corpus's candidate quads structurally, then test each
-			// against EVERY encrypted record. No sampling at all, so its answer is about the catalog rather than
-			// about a draw from it (#897).
+			// `exhaustive` inverts the scan: harvest the corpus's candidate quads structurally, then test each
+			// against every encrypted record. No sampling at all, so its answer is about the catalog rather than
+			// about a draw from it.
 			if (mode.StartsWith("exhaustive", StringComparison.OrdinalIgnoreCase))
 			{
 				await Exhaustive(capturesDir, reader, encrypted, encryptedBlocks, keyed, mode.EndsWith(":apply", StringComparison.OrdinalIgnoreCase), db);
@@ -129,7 +128,7 @@ namespace Faolan.Importer.Cli
 			var foundControls = controls.Where(c => hits.Any(h => h.TemplateId == c)).ToList();
 			var found = hits.Select(h => h.TemplateId).Distinct().Except(controls).ToList();
 
-			// ⭐ The control is reported FIRST and gates the conclusion. A run that lost it has measured nothing, and
+			// The control is reported first and gates the conclusion. A run that lost it has measured nothing, and
 			// saying so is the whole point of carrying one.
 			if (foundControls.Count != controls.Count)
 			{
@@ -164,7 +163,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Every encrypted record, against every candidate quad the corpus carries. The control is implicit and much
-		// stronger here: the records we ALREADY hold keys for are in the target set, so the run reports how many of
+		// stronger here: the records we already hold keys for are in the target set, so the run reports how many of
 		// them it recovers - if that number is low the instrument is broken and nothing else in the output counts.
 		private static async Task Exhaustive(string capturesDir, RdbReader reader, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed,
 			bool apply, Faolan.Core.Database.DatabaseContext db)
@@ -198,10 +197,10 @@ namespace Faolan.Importer.Cli
 
 			var byId = hits.GroupBy(h => h.TemplateId).ToDictionary(g => g.Key, g => g.First());
 
-			// ⚠️ VALIDATE before believing any of it. The scan's oracle is the first block only - ~45 bits, so a
-			// false positive over ~10^9 trials is ~1e-5 rather than 0. This decrypts the WHOLE record and inflates
-			// it, then checks it opens with its own `[type][id]`: a key that survives that has produced a readable
-			// template, which is the thing we actually want it for.
+			// Validate before believing any of it. The scan's oracle is the first block only - ~45 bits, so a false
+			// positive over ~10^9 trials is ~1e-5 rather than 0. This decrypts the whole record and inflates it, then
+			// checks it opens with its own `[type][id]`: a key that survives that has produced a readable template,
+			// which is what the key is wanted for.
 			var good = new List<uint>();
 			foreach (var id in brandNew.OrderBy(x => x))
 			{
@@ -231,7 +230,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"        carried by {h.WordOrder}  in {h.Source} @{h.Offset}");
 			}
 
-			// ⭐ WHICH MESSAGE carries them is the actionable half: a key we do not hold, in a shape we can name,
+			// which message carries them is the actionable half: a key we do not hold, in a shape we can name,
 			// says which parser is missing rather than merely that one is.
 			Console.WriteLine();
 			Console.WriteLine("  by carrying message:");
@@ -245,14 +244,14 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// ⚠️ Writing from a SCAN is the exception, not the shortcut, and it is only right where the wire gives no
+			// Writing from a scan is the exception, not the shortcut, and it is only right where the wire gives no
 			// other option. Most carriers name the item: an inventory entry, a shop ware, a spawn's worn gear, an
 			// auction row and a socketed gem all carry `(template, key)` together, and those belong in
 			// `ItemHashHarvester` where they keep paying on every future capture - which is where they now are.
 			//
-			// The equip/unequip BehaviorControlCenter ack does NOT: its tail carries the moved item's key quad twice
-			// with **no template id anywhere** (`BehaviorAcks.EquipMoveAck` writes exactly that). There is nothing to
-			// attribute the key BY, so trial decryption against the catalog is not a lazy substitute for a parser -
+			// The equip/unequip BehaviorControlCenter ack does not: its tail carries the moved item's key quad twice
+			// with no template id anywhere (`BehaviorAcks.EquipMoveAck` writes exactly that). There is nothing to
+			// attribute the key by, so trial decryption against the catalog is not a lazy substitute for a parser -
 			// it is the only mechanism that can identify the record at all.
 			//
 			// Every key written here has already survived a full decrypt + inflate + [type][id] check above, and it
@@ -266,7 +265,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// The target set for each mode. Kept apart from the scan so the selection is readable on its own - it is the
-		// half that decides what a negative MEANS.
+		// half that decides what a negative means.
 		private static async Task<List<uint>> SelectTargets(Faolan.Core.Database.DatabaseContext db, string mode, List<uint> encrypted,
 			Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed)
 		{
@@ -285,7 +284,7 @@ namespace Faolan.Importer.Cli
 				var want = int.TryParse(mode.Contains(':') ? mode[(mode.IndexOf(':') + 1)..] : "", out var n) && n > 0 ? n : 200;
 				var pool = encrypted.Where(id => !keyed.Contains(id)).OrderBy(id => id).ToList();
 
-				// ⚠️ Spread, not the first N. The catalog is ordered by id and id ranges cluster by content pack, so
+				// Spread, not the first N. The catalog is ordered by id and id ranges cluster by content pack, so
 				// taking the head would sample one corner of the game and call it the catalog.
 				var step = Math.Max(1, pool.Count / Math.Max(1, want));
 				var picked = pool.Where((_, i) => i % step == 0).Take(want).ToList();

@@ -15,12 +15,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #893: construct-don't-replay for the journal record's four reward lists. Every captured Quest_c record in the
+	// Construct-don't-replay for the journal record's four reward lists. Every captured Quest_c record in the
 	// corpus slice - the login snapshot's and the live QuestFullUpdate's - is rebuilt from the shipped rows
 	// (QuestRewardOptions for the quest's own set, QuestLineRewards for the line's, Items for the keys and levels)
-	// and must come out ELEMENT-EXACT: same templates in the same order with the same key, level and quantity.
+	// and must come out element-exact: same templates in the same order with the same key, level and quantity.
 	//
-	// ⭐ Breadth by construction, like the other snapshot round-trips: the beach starter carries no reward list at
+	// Breadth by construction, like the other snapshot round-trips: the beach starter carries no reward list at
 	// all, so a golden would gate nothing, while the slice holds ~5,000 elements over ~180 quests.
 	public class QuestRewardListsCorpusTests
 	{

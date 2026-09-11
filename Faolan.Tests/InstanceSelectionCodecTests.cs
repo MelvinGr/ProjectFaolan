@@ -4,12 +4,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `DispatchInstanceSelectionForCurrentPlayfield` (#309) - the "Select instance" window's contents.
+	// `DispatchInstanceSelectionForCurrentPlayfield` - the "Select instance" window's contents.
 	//
-	// TWO retail replies, both 38 bytes, both inlined rather than carved into the fixture archive. The second (#738)
-	// is what turns this from a single sample into a gate: it is a DIFFERENT map and a different instance token, so
-	// the layout is now pinned by two independent observations rather than by one that could have had map-shaped
-	// coincidences in it.
+	// Two retail replies, both 38 bytes, both inlined rather than carved into the fixture archive. The second
+	// is what turns this from a single sample into a gate: it is a different map and a different instance token, so
+	// the layout is pinned by two independent observations rather than by one that could carry map-shaped
+	// coincidences.
 	//
 	// Both are the "only the current instance" answer - the second is annotated by the maintainer as *"tried to
 	// 'select instace', no others where available"*, which is exactly what a one-element list means, and it is the
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			Assert.Equal(hex, Convert.ToHexStringLower(built));
 		}
 
-		// The count is a PLAIN u32, not the (n+1)*0x3F1 list frame. A one-element list is 0x00000001 here, where a
+		// The count is a plain u32, not the (n+1)*0x3F1 list frame. A one-element list is 0x00000001 here, where a
 		// framed one would be 0x000007E2 - the trap this project keeps re-finding, so it is pinned rather than
 		// left implicit in the golden above.
 		[Fact]

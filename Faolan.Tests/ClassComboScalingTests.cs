@@ -12,10 +12,10 @@ namespace Faolan.Tests
 {
 	// The client's own combo scaling table (RDB 1000513 `RDBComboLookup_c`) as we shipped it.
 	//
-	// Two halves, because the risk is in two places. The PARSE gate holds the record layout - the client's parser
+	// Two halves, because the risk is in two places. The parse gate holds the record layout - the client's parser
 	// reads six u32 per row, discards the third and scales two of them, and getting the stride wrong still produces
-	// plausible-looking numbers, so the parser has to reject a blob whose length does not divide. The SEED gate holds
-	// the shipped rows to the shape the client demands of them: it looks a row up by (class, level) for EVERY class
+	// plausible-looking numbers, so the parser has to reject a blob whose length does not divide. The seed gate holds
+	// the shipped rows to the shape the client demands of them: it looks a row up by (class, level) for every class
 	// and level and logs "MISSING combo lookup data" when one is absent, so a partial import is a real defect.
 	public class ClassComboScalingTests
 	{
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 				(rows[1].Class, rows[1].Level, rows[1].DpsModifier, rows[1].SecondaryModifier, rows[1].StaminaDivisor));
 		}
 
-		// A trailing byte means the stride assumption is wrong, and a stride that is wrong by a WORD still yields rows
+		// A trailing byte means the stride assumption is wrong, and a stride that is wrong by a word still yields rows
 		// that parse - so the length check, not the field values, is what catches it.
 		[Fact]
 		public void Parse_RejectsABlobThatDoesNotDivide()

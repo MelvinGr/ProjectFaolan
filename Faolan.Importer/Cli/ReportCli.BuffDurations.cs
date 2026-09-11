@@ -8,15 +8,15 @@ namespace Faolan.Importer.Cli
 {
 	// `--report buff-durations [--report-arg <spell name substring or base id>]`
 	//
-	// Every captured `MagicBuffIIR` APPLY grouped by spell, with the durations retail stated for it and the
+	// Every captured `MagicBuffIIR` apply grouped by spell, with the durations retail stated for it and the
 	// `Spells.DurationMs` we would build from. It is the evidence view behind `MagicBuffCorpusTests`'
 	// duration gate: that test asserts counts, this prints the rows the counts came from.
 	//
 	// Two populations it separates, because they look identical in a total:
-	//   * SHORTFALL - the wire is below the row, and DECREASES across a capture for the same spell. That is retail
-	//     re-sending a long buff with its remaining time (#601's restore path), not a data disagreement.
-	//   * EXCESS - the wire is above the row, which the restore reading cannot explain and which is therefore a
-	//     wrong `Spells.DurationMs` (#659).
+	//   * shortfall - the wire is below the row, and decreases across a capture for the same spell. That is retail
+	//     re-sending a long buff with its remaining time (the restore path), not a data disagreement.
+	//   * excess - the wire is above the row, which the restore reading cannot explain and which is therefore a
+	//     wrong `Spells.DurationMs`.
 	public static partial class ReportCli
 	{
 		private static void BuffDurations(IReadOnlyList<NamedCapture> captures, string? filter)

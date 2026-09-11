@@ -3,23 +3,27 @@ using System.Buffers.Binary;
 
 namespace Faolan.Core.Extensions
 {
-	// Offset-addressed reads/writes of the wire's fixed-width primitives, so a field access reads as ONE operation
-	// (`body.ReadU32Be(4)`) instead of a BinaryPrimitives call wrapped around a hand-sliced span. This is the shared
-	// home for what was previously re-declared as a local `U32`/`ReadLE`/`WriteLe` helper in a dozen files.
-	//
-	// Every overload slices with the field's exact width, so a short buffer throws at the slice (naming the offset)
-	// rather than reading past the field or silently succeeding on a truncated tail.
-	//
-	// `byte[]` and `Span<byte>` receivers bind to the ReadOnlySpan overloads directly (C# 13 first-class span
-	// conversions) - no `.AsSpan()` at the call site.
-	//
-	// The set is deliberately COMPLETE (both endiannesses of every width BinaryPrimitives offers) rather than trimmed
-	// to what is called today: a gap would send the next call site back to a raw BinaryPrimitives + hand-sliced span,
-	// which is exactly the second idiom this class exists to retire. A few overloads therefore have no caller yet.
-	//
-	// Endianness follows the wire, and the two are NOT interchangeable: the Conan protocol is big-endian, EXCEPT
-	// protobuf fixed32 floats (little-endian) and the client's own RDB/asset files (little-endian). See the
-	// `protocol_float_endianness` note - both spellings in this codebase are intentional.
+	/// <summary>
+	///     Offset-addressed reads and writes of the wire's fixed-width primitives, so a field access reads as one
+	///     operation (<c>body.ReadU32Be(4)</c>) instead of a <see cref="BinaryPrimitives" /> call wrapped around a
+	///     hand-sliced span. This is the one home for that idiom; a codec never declares its own.
+	/// </summary>
+	/// <remarks>
+	///     Every overload slices with the field's exact width, so a short buffer throws at the slice (naming the
+	///     offset) rather than reading past the field or silently succeeding on a truncated tail.
+	///     <para />
+	///     <c>byte[]</c> and <c>Span&lt;byte&gt;</c> receivers bind to the <see cref="ReadOnlySpan{T}" /> overloads
+	///     directly (first-class span conversions), so there is no <c>.AsSpan()</c> at the call site.
+	///     <para />
+	///     The set is deliberately complete - both endiannesses of every width <see cref="BinaryPrimitives" /> offers -
+	///     rather than trimmed to what is called today: a gap would send the next call site back to a raw
+	///     <see cref="BinaryPrimitives" /> call over a hand-sliced span, which is the idiom this class exists to
+	///     retire. A few overloads therefore have no caller yet.
+	///     <para />
+	///     Endianness follows the wire, and the two are not interchangeable: the Conan protocol is big-endian, except
+	///     protobuf fixed32 floats (little-endian) and the client's own RDB/asset files (little-endian). Both
+	///     spellings in this codebase are intentional.
+	/// </remarks>
 	public static class SpanExtensions
 	{
 		extension(ReadOnlySpan<byte> span)

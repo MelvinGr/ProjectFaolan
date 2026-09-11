@@ -13,7 +13,7 @@ namespace Faolan.Tests
 {
 	// The FullChar (0x737A6DF9 snapshot) generation oracle, mirroring the spawn's
 	// PlayerCharacterMessage_RoundTripsByteIdentically: the snapshot's protobuf root must decode as the
-	// recovered ProtoFullCharacterIIR and RE-ENCODE byte-identically, over every captured snapshot body that
+	// recovered ProtoFullCharacterIIR and RE-encode byte-identically, over every captured snapshot body that
 	// the inspector can split (prefix + root + tails). Truncated analyzer captures (the TCP-reassembly gap
 	// drops parts of compressed downloads) are skipped; a body that splits but does not round-trip fails.
 	public class FullCharIirRoundTripTests
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// The AUTHORING oracle (#57): FullCharacterRoots.ForCharacter, fed a captured root's own field values,
+		// The authoring oracle: FullCharacterRoots.ForCharacter, fed a captured root's own field values,
 		// must re-encode that root byte-identically - so the snapshot path can author the root from typed inputs
 		// (DB containers + account flags + tag/spell state) instead of carrying the captured protobuf root.
 		[Fact]
@@ -126,9 +126,8 @@ namespace Faolan.Tests
 				yield return (bin, packet.BodyReader().ReadArrayUInt32Length());
 			}
 
-			// NOTE: there is deliberately no capture-corpus loop here. It used to enumerate Captures/*.json while
-			// SKIPPING *.tshark.json - and the corpus contains nothing else, so it never yielded a single packet even
-			// when the captures were present. Dead code that also silently skipped when they were absent.
+			// Note: there is deliberately no capture-corpus loop here. The committed fixtures above are the whole input,
+			// so the gate cannot silently yield nothing when the private captures are absent.
 		}
 	}
 }

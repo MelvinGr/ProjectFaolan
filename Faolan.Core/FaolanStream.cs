@@ -31,8 +31,10 @@ namespace Faolan.Core
 		{
 		}
 
-		// A read-only cursor over a WINDOW of an existing array (no copy) - used to read a message body that is a slice
-		// of a larger buffer (e.g. Rpc.BodyReader over the inbound frame's array).
+		/// <summary>
+		///     A read-only cursor over a window of an existing array (no copy) - used to read a message body that is a
+		///     slice of a larger buffer, as <c>Rpc.BodyReader</c> does over the inbound frame's array.
+		/// </summary>
 		public FaolanStream(byte[] data, int index, int count) : base(data, index, count, false, true)
 		{
 		}
@@ -110,18 +112,30 @@ namespace Faolan.Core
 			return ReadArray(Length - Position);
 		}
 
-		// WIRE STRINGS ARE RAW BYTES - use Latin1, never ASCII or UTF-8.
-		//
-		// The client's BinaryStream::ReadString (FUN_00cbf840 <- FUN_0048f840) memcpy's the length-prefixed bytes
-		// straight into an MSVC std::string. It does NOT transcode. So a wire string is a byte string, and the only
-		// correct .NET mapping is Latin1: it is a bijection between bytes 0x00-0xFF and chars U+0000-U+00FF, so every
-		// byte round-trips.
-		//   - Encoding.ASCII is LOSSY both ways: it turns any byte >= 0x80 into '?' on read, and any non-ASCII char
-		//     into '?' on write. It silently destroys accented characters.
-		//   - Encoding.UTF8 re-encodes a high char into a multi-byte sequence the client never sent, and throws or
-		//     substitutes on bytes that are not valid UTF-8 - which raw byte strings frequently are not.
-		// (The captures cannot show this: every decodable captured string is pure ASCII, where all three agree - the
-		// quest XML escapes non-ASCII as &#nn; entities. The client is the oracle here, not the corpus.)
+		/// <summary>
+		///     Reads a length-prefixed wire string.
+		/// </summary>
+		/// <remarks>
+		///     Wire strings are raw bytes: use Latin1, never ASCII or UTF-8. The client's
+		///     <c>BinaryStream::ReadString</c> (FUN_00cbf840, called from FUN_0048f840) copies the length-prefixed
+		///     bytes straight into an MSVC <c>std::string</c> and does not transcode. A wire string is therefore a
+		///     byte string, and the only correct .NET mapping is Latin1: a bijection between bytes 0x00-0xFF and chars
+		///     U+0000-U+00FF, so every byte round-trips.
+		///     <list type="bullet">
+		///         <item>
+		///             <c>Encoding.ASCII</c> is lossy both ways - it turns any byte >= 0x80 into '?' on read and any
+		///             non-ASCII char into '?' on write, silently destroying accented characters.
+		///         </item>
+		///         <item>
+		///             <c>Encoding.UTF8</c> re-encodes a high char into a multi-byte sequence the client never sent,
+		///             and throws or substitutes on bytes that are not valid UTF-8 - which raw byte strings frequently
+		///             are not.
+		///         </item>
+		///     </list>
+		///     The captures cannot settle this: every decodable captured string is pure ASCII, where all three agree
+		///     (the quest XML escapes non-ASCII as <c>&amp;#nn;</c> entities). The client is the oracle here, not the
+		///     corpus.
+		/// </remarks>
 		public string ReadString()
 		{
 			return Encoding.Latin1.GetString(ReadArrayUInt16Length());
@@ -300,8 +314,11 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
-		// The little-endian twin of WriteUInt32. Not a wire form: the client's own FILE formats (the `IOz1` settings
-		// archive and the `preview.bin` inside it) are little-endian and happen to be shipped over a big-endian wire.
+		/// <summary>
+		///     The little-endian twin of <see cref="WriteUInt32" />. Not a wire form: the client's own file formats
+		///     (the <c>IOz1</c> settings archive and the <c>preview.bin</c> inside it) are little-endian and happen to
+		///     be shipped over a big-endian wire.
+		/// </summary>
 		public FaolanStream WriteUInt32LittleEndian(uint value)
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(uint)];
@@ -330,9 +347,11 @@ namespace Faolan.Core
 			return WriteFloat(value.W);
 		}
 
-		// The u16-length-prefixed form is the client's DEFAULT string framing (BinaryStream::ReadString mode 0:
-		// read a u16; a value >= 0x8000 escapes to a u32 long form, which nothing we emit approaches). See ReadString
-		// for why Latin1 and not ASCII/UTF-8.
+		/// <summary>
+		///     The u16-length-prefixed form, which is the client's default string framing
+		///     (<c>BinaryStream::ReadString</c> mode 0: read a u16; a value >= 0x8000 escapes to a u32 long form,
+		///     which nothing we emit approaches). See <see cref="ReadString" /> for why Latin1 and not ASCII/UTF-8.
+		/// </summary>
 		public FaolanStream WriteString(string value)
 		{
 			return WriteArrayUInt16Length(Encoding.Latin1.GetBytes(value ?? ""));

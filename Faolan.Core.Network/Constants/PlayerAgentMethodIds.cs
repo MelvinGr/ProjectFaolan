@@ -6,50 +6,49 @@ using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Core.Network.Constants
 {
-	// The PlayerAgent / PlayerInterface METHOD — the `method_instance` (RpcHeader field 4) this one interface pair
-	// carries, and the catalog that names the opcodes retail was seen using. Gitea #320/#610.
-	//
-	// ## The id is derived, not tabulated
-	//
-	// Two things were written down about this field, and both were wrong in a way that made the interface look
-	// un-enumerable:
-	//
-	// 1. **It is not a fixed 4-byte id after a 16-bit opcode.** The whole header is protobuf and the method is one
-	//    varint field; `Rpc` reads and writes it whole (see Rpc.Parse). What used to be read as a `[u16 opcode][tail]`
-	//    split was that varint cut after its first group, which is why the last byte of a "4-byte tail" is always small
-	//    (0x02..0x0F) — it is the top of a 32-bit value, not the low byte of a hash.
-	// 2. **The value is computed, not stored.** None of these ids appears anywhere in `AgeOfConan.exe`, which is what
-	//    made "just dump the table" a dead end. The client registers each method with a 32-bit constant, and that
-	//    constant IS what goes on the wire.
-	//
-	// So the enums below (Faolan.Core/Enums/Opcodes.cs) are the client's own registration constants, and there is no
-	// encoding step left. Adding a method means copying one constant, not observing it on the wire.
-	//
-	// Re-derive both tables from the client:
-	//   c2s: analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
-	//          -scriptPath tools/ghidra -postScript DumpPlayerAgentCtor.java
-	//   s2c: STR=AuthenticateAck MAX=3 analyzeHeadless ... -postScript StrXrefs.java
-	// Both print `<constant>; FUN_00487900(); FUN_0040ec10("<Name>", <len>)` triples — the registration idiom.
-	//
-	// ⚠️ **The 16-bit opcode is NOT a method key on this interface.** `WireOpcode.Of` is a lossy view of the method
-	// varint — `0x2080 | (constant & 0x7F)` here, since every constant needs more than one group — so two methods whose
-	// constants share their low 7 bits share an opcode, and both such pairs are in the corpus: `0x20EC` is
-	// `ReceivedCharacterSettings` (0x3C7C926C) AND `AuthenticateLoggedIn` (0x9D991E6C); `0x20D6` is
-	// `VerifyLanguageSetting` (0x9847AED6) AND `UpdateCharacterPreview` (0x4D661656). Inbound dispatch keys on
-	// `Rpc.Method` (#608); the map below is what retail was OBSERVED sending, for naming only.
+	/// <summary>
+	///     The PlayerAgent / PlayerInterface method - the <c>method_instance</c> (RpcHeader field 4) this one interface
+	///     pair carries, and the catalog naming the opcodes retail is seen using.
+	/// </summary>
+	/// <remarks>
+	///     The id is derived, not tabulated. The whole header is protobuf and the method is one varint field, which
+	///     <c>Rpc</c> reads and writes whole; there is no <c>[u16 opcode][tail]</c> split. The value is also computed
+	///     rather than stored - none of these ids appears in <c>AgeOfConan.exe</c>, because the client registers each
+	///     method with a 32-bit constant and that constant is what goes on the wire. The enums in
+	///     Faolan.Core/Enums/Opcodes.cs are those registration constants, so adding a method means copying one
+	///     constant, not observing it on the wire.
+	///     <para>
+	///         Re-derive both tables from the client:
+	///         <code>
+	///         c2s: analyzeHeadless &lt;data-repo&gt;/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+	///                -scriptPath tools/ghidra -postScript DumpPlayerAgentCtor.java
+	///         s2c: STR=AuthenticateAck MAX=3 analyzeHeadless ... -postScript StrXrefs.java
+	///         </code>
+	///         Both print <c>&lt;constant&gt;; FUN_00487900(); FUN_0040ec10("&lt;Name&gt;", &lt;len&gt;)</c> triples,
+	///         the registration idiom.
+	///     </para>
+	///     <para>
+	///         The 16-bit opcode is not a method key on this interface. <c>WireOpcode.Of</c> is a lossy view of the
+	///         method varint - <c>0x2080 | (constant &amp; 0x7F)</c> here, since every constant needs more than one
+	///         group - so two methods whose constants share their low 7 bits share an opcode, and both such pairs are
+	///         in the corpus: 0x20EC is <c>ReceivedCharacterSettings</c> (0x3C7C926C) and <c>AuthenticateLoggedIn</c>
+	///         (0x9D991E6C); 0x20D6 is <c>VerifyLanguageSetting</c> (0x9847AED6) and <c>UpdateCharacterPreview</c>
+	///         (0x4D661656). Inbound dispatch keys on <c>Rpc.Method</c>; the lists below record what retail is
+	///         observed sending, for naming only.
+	///     </para>
+	/// </remarks>
 	public static class PlayerAgentMethodIds
 	{
 		// The client's registration constants, keyed by name. Derived from the `PlayerAgentMethods` /
-		// `PlayerInterfaceMethods` enums (Faolan.Core/Enums/Opcodes.cs) so the constants live in exactly one place -
-		// they are a typed catalog the inbound dispatch switches on (#608), not just a table this file reads.
+		// `PlayerInterfaceMethods` enums (Faolan.Core/Enums/Opcodes.cs) so the constants live in exactly one place:
+		// they are the typed catalog the inbound dispatch switches on, not just a table this file reads.
 		public static readonly IReadOnlyDictionary<string, uint> PlayerAgentRegistration = Registration<PlayerAgentMethods>();
 
 		public static readonly IReadOnlyDictionary<string, uint> PlayerInterfaceRegistration = Registration<PlayerInterfaceMethods>();
 
-		// The methods the corpus actually shows, in each direction. Named rather than keyed by opcode: an opcode here is
-		// only the method varint's first group and COLLIDES (`0x20EC` names two of these), so it cannot be a key - which
-		// is why the `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enums were deleted in #613. This is a record of what
-		// retail was seen sending, not a general opcode->method function.
+		// The methods the corpus shows, in each direction. Named rather than keyed by opcode: an opcode here is only the
+		// method varint's first group and collides (0x20EC names two of these), so it cannot be a key. This is a record
+		// of what retail is seen sending, not a general opcode->method function.
 		public static readonly IReadOnlyList<PlayerInterfaceMethods> ObservedInterfaceMethods =
 		[
 			// s2c — the ones the server sends.
@@ -57,9 +56,9 @@ namespace Faolan.Core.Network.Constants
 			PlayerInterfaceMethods.OnFacebookTokenResult, PlayerInterfaceMethods.SendCharacterSettingsCheckSumMap, PlayerInterfaceMethods.SendCharacterSettings,
 			PlayerInterfaceMethods.SetDimensionList, PlayerInterfaceMethods.SendCharacterPreview, PlayerInterfaceMethods.UpdateClientPlayerData,
 
-			// The four login handoffs. They carry a full_routing_context (RpcHeader field 3) as well, which is why the
-			// codebase used to read all four as one opcode `0x1A07` - that was field 3's tag plus its length byte, and
-			// the method varint sat behind it (#610).
+			// The four login handoffs. They carry a full_routing_context (RpcHeader field 3) as well, whose tag and
+			// length byte precede the method varint - so a naive read of the first two bytes sees the same value for
+			// all four.
 			PlayerInterfaceMethods.ChatServerConnectReady, PlayerInterfaceMethods.CSServerConnectReady,
 			PlayerInterfaceMethods.LoginConnectReady, PlayerInterfaceMethods.OverrideGameTweaks
 		];
@@ -73,9 +72,11 @@ namespace Faolan.Core.Network.Constants
 			PlayerAgentMethods.ReceivedCharacterSettings, PlayerAgentMethods.UpdateSubscriptionSettings
 		];
 
-		// The two bytes you would read off a hex dump for this method. A rendering of the constant rather than a fact
-		// about the method - it collides, so it can name a frame in a capture but must never key anything (#613/#615).
-		// Named here for the login tier's reading of it; `WireOpcode.Of` is the general form and does the work.
+		/// <summary>
+		///     The two bytes a hex dump shows for this method: a rendering of the constant rather than a fact about the
+		///     method. It collides, so it can name a frame in a capture but must never key anything.
+		/// </summary>
+		/// <remarks>Named here for the login tier's reading of it; <c>WireOpcode.Of</c> is the general form.</remarks>
 		public static ushort ObservedOpcode(uint methodInstance)
 		{
 			return WireOpcode.Of(methodInstance);

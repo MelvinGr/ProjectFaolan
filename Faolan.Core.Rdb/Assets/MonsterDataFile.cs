@@ -5,22 +5,28 @@ using System.Xml.Linq;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Parses an Age of Conan RDB MonsterData record (type 1010201) - the XML model definition a character/monster
-	// references (the CHARACTERCREATOR's <head monsterdataid="..."/> points here). It lists the render meshes that
-	// make up the model: for a player head that is the head mesh + the eye mesh + the eyelash/teeth mesh (#275).
-	//
-	//   <monsterdata animsys=".." skeleton=".." name="..">
-	//     <mesh mesh="222148"/>   <!-- head -->
-	//     <mesh mesh="222146"/>   <!-- eyes -->
-	//     <mesh mesh="222147"/>   <!-- lashes/teeth -->
-	//   </monsterdata>
+	/// <summary>
+	///     Parses an Age of Conan RDB MonsterData record (type 1010201): the XML model definition a character or
+	///     monster references, which the CHARACTERCREATOR's <c>&lt;head monsterdataid="..."/&gt;</c> points at. It
+	///     lists the render meshes that make up the model; for a player head that is the head mesh, the eye mesh and
+	///     the eyelash/teeth mesh.
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     &lt;monsterdata animsys=".." skeleton=".." name=".."&gt;
+	///       &lt;mesh mesh="222148"/&gt;   head
+	///       &lt;mesh mesh="222146"/&gt;   eyes
+	///       &lt;mesh mesh="222147"/&gt;   lashes/teeth
+	///     &lt;/monsterdata&gt;
+	///     </code>
+	/// </remarks>
 	public sealed record MonsterDataFile(uint Id, string? Name, uint? SkeletonId, IReadOnlyList<uint> MeshIds)
 	{
 		public const uint Type = 1010201;
 
 		public static MonsterDataFile Parse(uint id, byte[] decompressed)
 		{
-			// A handful of 1010201 entries are a DIFFERENT document (<animsys>); Carve returns null for those rather
+			// A handful of 1010201 entries are a different document (<animsys>); Carve returns null for those rather
 			// than falling back to the first '<' and handing the parser the binary RDB-Id header.
 			var xml = RdbXml.Carve(Encoding.Latin1.GetString(decompressed), "monsterdata");
 			if (xml == null)

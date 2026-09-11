@@ -8,8 +8,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the from-scratch player-spawn BODY builder (#210, the player analog of #185): assembled entirely from a
-	// typed SimpleCharFullUpdateIIR (session/transform fields + the DB scaffold rows + the CharacterIIR), with NO captured
+	// Locks the from-scratch player-spawn body builder: assembled entirely from a
+	// typed SimpleCharFullUpdateIIR (session/transform fields + the DB scaffold rows + the CharacterIIR), with no captured
 	// template. Proven by decomposing SpawnAssassinTemplate.bin into its parts (transform, CharacterIIR, scaffold rows)
 	// and rebuilding it byte-for-byte - so the fresh-char constants (FieldA=0, no Scale, the transform encoding) and
 	// the rows->wire assembly reproduce the capture.
@@ -20,9 +20,9 @@ namespace Faolan.Tests
 		{
 			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnAssassinTemplate").AsSpan(4));
 
-			// A character with no scaffold rows cannot be described, and there is no longer a captured-splice path to
-			// fall back to: the rows are seeded at character creation, so their absence is corruption and it throws.
-			// Returning null instead used to mean a player nobody could see, reported only as a log warning.
+			// A character with no scaffold rows cannot be described, and there is no captured-splice path to fall back
+			// to: the rows are seeded at character creation, so their absence is corruption and it throws. Returning
+			// null instead would mean a player nobody can see, reported only as a log warning.
 			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity,
 				scaffold.Character, new Character
 				{
@@ -41,14 +41,14 @@ namespace Faolan.Tests
 			var position = scaffold.Position;
 			var rotation = scaffold.Rotation;
 
-			// The scaffold rows (id list / feats) plus the APPEARANCE MODEL (Body morphs + BodyResources refs) on a
-			// Character. Strie is an Assassin; the pre-IIR frame is now reconstructed from that class (not stored), so
-			// the from-scratch body equals the template's CONSTRUCTED form - same transform/rows/IIR, canonical
+			// The scaffold rows (id list / feats) plus the appearance model (Body morphs + BodyResources refs) on a
+			// Character. Strie is an Assassin; the pre-IIR frame is reconstructed from that class rather than stored, so
+			// the from-scratch body equals the template's constructed form - same transform/rows/IIR, canonical
 			// FreshPreFrame(Assassin), no buff records.
 			//
-			// The entry table is not carried across as rows any more: extraction turns Strie's six weighted entries
-			// into resource refs through the catalog, and generation resolves those refs back to the same six tags. So
-			// this now proves the DERIVATION is lossless, not merely that a row copy round-trips.
+			// The entry table is not carried across as rows: extraction turns Strie's six weighted entries into resource
+			// refs through the catalog, and generation resolves those refs back to the same six tags. So this proves the
+			// derivation is lossless, not merely that a row copy round-trips.
 			var scaffoldCharacter = new Character
 			{
 				Id = scaffold.Handle,
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(expected)), Convert.ToHexString(built));
 		}
 
-		// The burst-less composition (#210): the from-code CharacterIIR built for a NEW character (PlayerCharacterIirs.
+		// The burst-less composition: the from-code CharacterIIR built for a new character (PlayerCharacterIirs.
 		// Build) + assembled into a player body (PlayerSpawnBuilder) must produce a body that re-parses with that
 		// character's name - i.e. the build -> re-encode -> scaffold-assemble chain fits together.
 		[Fact]

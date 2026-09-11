@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		private const ulong ItemId = 2366689308620230826;
 		private const ulong RecordId = 2693654;
 
-		// Per-instance state read from the captured Slave Manacles entry (these are NOT template data - they are
+		// Per-instance state read from the captured Slave Manacles entry (these are not template data - they are
 		// the character's specific item instance: its GUID, inventory record id, stack count, and hash hash).
 		private const ulong Slot = 18;
 		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");

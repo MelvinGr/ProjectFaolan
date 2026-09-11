@@ -14,15 +14,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database
 {
 	// Brings a database up to a runnable state: migrate to the latest schema for the active provider, load the game
-	// data if the database has none, then reconcile the declared realms + ensure the default account. Shared by the server and the
-	// importer so a fresh DB is brought up the SAME way on either path - the one place that sequence lives. Returns
-	// what happened so the caller logs in its own style (ILogger on the server, Console in the importer).
+	// data if the database has none, then reconcile the declared realms + ensure the default account. Shared by the
+	// server and the importer so a fresh DB is brought up the same way on either path - the one place that sequence
+	// lives. Returns what happened so the caller logs in its own style (ILogger on the server, Console in the
+	// importer).
 	public static class DatabaseInitializer
 	{
-		// The default admin login. The password is a REAL hash of PasswordHashing.DefaultSeedPassword ("faolan"):
-		// it used to be an empty string, which PasswordHashing.Matches treated as "no password set, accept
-		// anything" - that sentinel is gone, so an empty value would now authenticate nothing and a fresh clone
-		// could not log in. Administrator + Active mirrors the committed reference account.
+		// The default admin login. The password is a real hash of PasswordHashing.DefaultSeedPassword ("faolan"):
+		// PasswordHashing.Matches has no "no password set, accept anything" sentinel, so an empty value would
+		// authenticate nothing and a fresh clone could not log in. Administrator + Active mirrors the committed
+		// reference account.
 		public static async Task<bool> EnsureDefaultAccountAsync(DatabaseContext db, CancellationToken cancellationToken = default)
 		{
 			if (await db.Accounts.AnyAsync(cancellationToken))
@@ -43,7 +44,7 @@ namespace Faolan.Core.Database
 		// Ports/type mirror the committed faolan.db realm so a fresh DB matches the reference deployment. The realm's
 		// id is left DB-generated (1 on a fresh DB) - realm-scoped rows resolve it by lookup, not by a hard-coded id.
 		//
-		// ⚠️ This is the UNDECLARED path only (see ReconcileRealmsAsync): it runs for a deployment that configures no
+		// This is the undeclared path only (see ReconcileRealmsAsync): it runs for a deployment that configures no
 		// realms at all, and its "any realm exists, do nothing" gate is what makes that deployment's database
 		// untouchable. A declared deployment goes through the reconciler instead, which addresses rows by id.
 		public static async Task<bool> EnsureDefaultRealmAsync(DatabaseContext db, CancellationToken cancellationToken = default)
@@ -67,21 +68,21 @@ namespace Faolan.Core.Database
 		}
 
 		/// <summary>
-		///     Brings the <c>Realms</c> table into line with what the configuration DECLARES - the static half of each
+		///     Brings the <c>Realms</c> table into line with what the configuration declares - the static half of each
 		///     row, so a realm's name, address and ports are reviewable in faolan.json instead of being edited into a
 		///     committed binary database by hand.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ It writes the STATIC columns only. The three LIVE ones are never touched here. <c>OnlineStatus</c> and
+		///     It writes the static columns only. The three live ones are never touched here. <c>OnlineStatus</c> and
 		///     <c>LastSeenUtc</c> are how a login process learns whether a realm host - possibly on another machine -
-		///     is still serving (#909, #922), and the invariant that keeps that honest is that the host which owns a
-		///     realm's PORTS is the only thing that writes its liveness; a file cannot observe an absence, so it does
-		///     not get to claim one. <c>LoadStatus</c> is the realm's POPULATION, which nothing computes yet - and
+		///     is still serving, and the invariant that keeps that honest is that the host which owns a
+		///     realm's ports is the only thing that writes its liveness; a file cannot observe an absence, so it does
+		///     not get to claim one. <c>LoadStatus</c> is the realm's population, which nothing computes yet - and
 		///     declaring it would be the reason it never could, since every restart would overwrite whatever the live
-		///     count had put there. A realm this call CREATES starts Offline with a null heartbeat, which reads as
+		///     count had put there. A realm this call creates starts Offline with a null heartbeat, which reads as
 		///     down until a host says otherwise.
 		///     <para />
-		///     ⚠️ It never DELETES. Four tables FK a realm - characters, guilds, mail and auction listings - so a row
+		///     It never deletes. Four tables FK a realm - characters, guilds, mail and auction listings - so a row
 		///     that has dropped out of the config is reported to the caller and left standing. Removing a realm is a
 		///     data migration, not a config edit.
 		///     <para />
@@ -95,7 +96,7 @@ namespace Faolan.Core.Database
 		{
 			// Nothing declared: the historical behaviour, unchanged. Falling through to the reconciler with the
 			// built-in default instead would address the default realm by id 1 - and a database whose realm carries
-			// some other id (it was DB-generated) would then gain a SECOND realm that nobody asked for.
+			// some other id (it was DB-generated) would then gain a second realm that nobody asked for.
 			if (declared is not { Count: > 0 })
 				return await EnsureDefaultRealmAsync(db, cancellationToken)
 					? new RealmReconciliation([FaolanRealms.Default[0].Name], [], [])
@@ -119,7 +120,7 @@ namespace Faolan.Core.Database
 				}
 
 				// Written field by field rather than by replacing the row, so the liveness pair is not in the set of
-				// things that COULD be assigned here by a later edit.
+				// things that could be assigned here by a later edit.
 				var changes = Changes(row, realm);
 				if (changes.Length == 0)
 					continue;
@@ -146,7 +147,7 @@ namespace Faolan.Core.Database
 			return new RealmReconciliation([.. created], [.. updated], undeclared);
 		}
 
-		// What the config says that the row does not, phrased as "was -> is" so the caller can LOG it. ⚠️ A port
+		// What the config says that the row does not, phrased as "was -> is" so the caller can log it. A port
 		// change on a realm whose host is already running is the reason this is worth spelling out: the login tier
 		// starts advertising the new port immediately and the running host keeps serving the old one.
 		private static string[] Changes(Realm row, DeclaredRealm realm)
@@ -170,7 +171,7 @@ namespace Faolan.Core.Database
 			return [.. changes];
 		}
 
-		// ⚠️ The live columns are left at their defaults - Offline, never seen, Recommended - and are NOT settable from
+		// The live columns are left at their defaults - Offline, never seen, Recommended - and are not settable from
 		// the config. RealmLiveness reads a null heartbeat as down even when the flag says Online, so a realm declared
 		// today does not appear up until a host has actually claimed it and said so.
 		private static Realm Row(DeclaredRealm realm)
@@ -188,12 +189,12 @@ namespace Faolan.Core.Database
 			};
 		}
 
-		// Loads faolan.sql into a database that came up with NO GAME CONTENT (#412) - what makes a fresh clone
+		// Loads faolan.sql into a database that came up with no game content - what makes a fresh clone
 		// runnable without the committed faolan.db. Returns false when there was nothing to do.
 		//
 		// "No content" is probed on Items rather than on the migration history: a database can be migrated but empty
 		// (someone deleted the binary, a container started on an empty volume, a test built a schema), and those are
-		// exactly the cases that want the data. A database that already HAS content is never touched, so this cannot
+		// exactly the cases that want the data. A database that already has content is never touched, so this cannot
 		// resurrect rows someone deliberately deleted.
 		public static async Task<bool> EnsureGameDataAsync(DatabaseContext db, CancellationToken cancellationToken = default)
 		{
@@ -205,10 +206,9 @@ namespace Faolan.Core.Database
 				throw new InvalidOperationException(
 					$"The database has no game content and the seed '{seed}' is missing, so the world would come up empty. Point FAOLAN_SEED at faolan.sql, or regenerate it with `dotnet run --project Faolan.Importer -- --report sql-seed`.");
 
-			// One file, both dialects, nothing to run after it. There used to be a per-dialect counter-resync sidecar
-			// (faolan.seq.{sqlite,postgres}.sql) for keys the store generates; no game-content table has one - every
-			// one is keyed by its own identity - so both were empty and are gone. SqlSeedWriter refuses to emit a seed
-			// that would need one.
+			// One file, both dialects, nothing to run after it: no game-content table has a store-generated key -
+			// every one is keyed by its own identity - so there is no counter left to resync once the seed has
+			// loaded. SqlSeedWriter refuses to emit a seed that would need one.
 			await ExecuteScriptAsync(db, seed, cancellationToken);
 
 			return true;
@@ -233,7 +233,7 @@ namespace Faolan.Core.Database
 		///     that declares none - which keeps the historical "insert the default realm into an empty table" path.
 		/// </param>
 		/// <param name="onlyRealmId">
-		///     Reconcile just this realm's row, which a realm-role process passes so it writes only its own (#909).
+		///     Reconcile just this realm's row, which a realm-role process passes so it writes only its own.
 		/// </param>
 		public static async Task<(RealmReconciliation Realms, bool AccountCreated, bool DataSeeded)> InitializeAsync(DatabaseContext db, bool seedGameData = true,
 			IReadOnlyList<DeclaredRealm>? realms = null, uint? onlyRealmId = null, CancellationToken cancellationToken = default)
@@ -242,12 +242,12 @@ namespace Faolan.Core.Database
 			// Migrate applies the pending set for the active provider.
 			await db.Database.MigrateAsync(cancellationToken);
 
-			// The game data first, then the deployment defaults. The seed is CONTENT ONLY (#412) - it carries no
+			// The game data first, then the deployment defaults. The seed is content only - it carries no
 			// Accounts/Realms/Characters rows - so the two Ensure calls below are what give a fresh database its
 			// default realm and the `faolan` admin account to log in with.
 			var dataSeeded = seedGameData && await EnsureGameDataAsync(db, cancellationToken);
 
-			// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.
+			// A world can't serve without a realm (guild/AH/mail/character FK it) or an account to log into.
 			// These are config state, not schema, so they're ensured here rather than shipped in a migration. Idempotent.
 			var reconciled = await ReconcileRealmsAsync(db, realms, onlyRealmId, cancellationToken);
 			var accountCreated = await EnsureDefaultAccountAsync(db, cancellationToken);

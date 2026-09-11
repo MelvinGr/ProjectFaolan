@@ -10,10 +10,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// The character ROW and its 1:1 satellites: create/load/save, the transform and bind, respawn discovery, the
-	// kill counters, client settings, friends and the achievement tags. What a character IS, as opposed to what it
+	// The character row and its 1:1 satellites: create/load/save, the transform and bind, respawn discovery, the
+	// kill counters, client settings, friends and the achievement tags. What a character is, as opposed to what it
 	// carries (ICharacterInventoryRepository), is on (ICharacterQuestRepository), has learned
-	// (ICharacterProgressionRepository) or adds up to (ICharacterStatRepository) - Gitea #928 item 9.
+	// (ICharacterProgressionRepository) or adds up to (ICharacterStatRepository).
 	public interface ICharacterRepository
 	{
 		Task<bool> AddFriend(uint characterId, uint friendCharacterId);
@@ -37,13 +37,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<uint[]> GetCharacterTags(uint characterId);
 
-		// #748: grant a tag (an achievement, or an item-shop "bundle shown" flag - one id space). False = already held.
+		// Grant a tag (an achievement, or an item-shop "bundle shown" flag - one id space). False = already held.
 		Task<bool> AddCharacterTag(uint characterId, uint tagId);
 
 		// The achievement a tag id names, or null for an id the client's catalog does not carry (LDB 55701).
 		Task<Achievement?> GetAchievement(uint tagId);
 
-		// Achievements whose NAME contains `nameSubstring`, capped at `limit` - a 4,095-entry catalog needs a lookup.
+		// Achievements whose name contains `nameSubstring`, capped at `limit` - a 4,095-entry catalog needs a lookup.
 		Task<Achievement[]> FindAchievements(string nameSubstring, int limit);
 		Task<Character[]> GetCharactersByAccount(uint id);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
@@ -55,8 +55,8 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 
 		/// <summary>
-		///     Persist (or with a null <paramref name="mapId" /> clear) the character's PvP-match RETURN location -
-		///     where the minigame teleport took them from (#146). Consumed by the world entry when the match is gone.
+		///     Persist (or with a null <paramref name="mapId" /> clear) the character's PvP-match return location -
+		///     where the minigame teleport took them from. Consumed by the world entry when the match is gone.
 		/// </summary>
 		Task SaveCharacterPvpReturn(uint characterId, uint? mapId, Vector3 position);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
@@ -65,15 +65,15 @@ namespace Faolan.Core.Database.Repositories
 		/// <summary>The PvP career counters (snapshot stats 0x290 / 0x292), persisted per kill like the PvE pair.</summary>
 		Task SetCharacterPvpKillCounts(uint characterId, uint kills, uint deaths);
 
-		// The PvP criminal state (#503): when the criminal debuff expires (null = not a criminal) and the murder-point
+		// The PvP criminal state: when the criminal debuff expires (null = not a criminal) and the murder-point
 		// pool. Persisted immediately, like the kill counters - the debuff has to survive a relog and a zone change,
 		// which is what the annotated capture shows it doing.
 		Task SetCharacterCriminalState(uint characterId, DateTimeOffset? criminalUntil, uint murderPoints);
 
-		/// <summary>Stat 0x0A9 `HeroicMode` (#625) - the raw wire value, see Character.HeroicMode.</summary>
+		/// <summary>Stat 0x0A9 `HeroicMode` - the raw wire value, see Character.HeroicMode.</summary>
 		Task SetCharacterHeroicMode(uint characterId, uint heroicMode);
 
-		/// <summary>Records the Tortage tutorial hints a character has been shown, as a bitmask (#461).</summary>
+		/// <summary>Records the Tortage tutorial hints a character has been shown, as a bitmask.</summary>
 		Task SetCharacterTutorialSteps(uint characterId, ulong stepsSeen);
 		Task<bool> SetCreationSpawn(uint characterId);
 		Task<bool> SetVanityFilter(uint characterId, uint slot, bool toggleState);
@@ -84,7 +84,7 @@ namespace Faolan.Core.Database.Repositories
 	{
 		private const uint MaxCharacterId = EntityHandles.MaxCharacterId;
 
-		// Character ids ARE the on-wire client instance (see EntityHandles for the whole number line and why the
+		// Character ids are the on-wire client instance (see EntityHandles for the whole number line and why the
 		// ceiling exists). Allocated from the base upward, continuing the existing 0x013xxxxx rows.
 		private const uint FirstCharacterId = EntityHandles.CharacterInstanceBase;
 
@@ -105,7 +105,7 @@ namespace Faolan.Core.Database.Repositories
 			return true;
 		}
 
-		// The characters who have `characterId` on THEIR list - the reverse direction, which the one-sided list makes a
+		// The characters who have `characterId` on their list - the reverse direction, which the one-sided list makes a
 		// genuinely different query. Needed to tell them when this character comes online or goes offline; without it a
 		// friend's status is frozen at whatever it was when the watcher logged in.
 		public async Task<uint[]> GetFriendWatchers(uint characterId)
@@ -114,7 +114,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterFriends.Where(f => f.FriendCharacterId == characterId).Select(f => f.CharacterId).ToArrayAsync();
 		}
 
-		// The befriended CHARACTERS, not the join rows - every caller needs the name and class to build the wire record.
+		// The befriended characters, not the join rows - every caller needs the name and class to build the wire record.
 		public async Task<Character[]> GetFriends(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -127,9 +127,8 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterFriends.Where(f => f.CharacterId == characterId && f.FriendCharacterId == friendCharacterId).ExecuteDeleteAsync() > 0;
 		}
 
-		// #748: returns FALSE when the character already held the tag. It used to return nothing, which was fine while
-		// it had no callers at all - the tag subsystem's missing middle - and is not: `DispatchAddTag` is an AWARD, so
-		// re-awarding a held tag pops the client's banner again. The caller needs to know.
+		// Returns false when the character already held the tag. The caller needs to know: `DispatchAddTag` is an
+		// award, so re-awarding a held tag pops the client's banner again.
 		public async Task<bool> AddCharacterTag(uint characterId, uint tagId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -178,11 +177,9 @@ namespace Faolan.Core.Database.Repositories
 					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
-				// No equipment row to create: a naked character is a character with no Equipped item instances (#750),
-				// which the spawn and equip paths read as the empty worn set it is. This used to seed ONE WIDE ROW of 26
-				// empty slot columns purely so "a character has an equipment row" could be an invariant every reader
-				// depended on, and half a dozen call sites threw on its absence. The representation no longer has an
-				// absence to distinguish from emptiness.
+				// No equipment row to create: a naked character is a character with no Equipped item instances,
+				// which the spawn and equip paths read as the empty worn set it is. The representation has no absence
+				// to distinguish from emptiness, so there is nothing to pre-seed.
 				ctx.Characters.Add(character);
 				await ctx.SaveChangesAsync();
 			}
@@ -217,7 +214,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.Id == id);
 		}
 
-		// The client-authored settings/preview blobs (#611), or null when the client has never uploaded either.
+		// The client-authored settings/preview blobs, or null when the client has never uploaded either.
 		public async Task<CharacterClientSettings?> GetCharacterClientSettings(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -232,7 +229,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterClientSettings.AsNoTracking().Where(s => s.Character.AccountId == accountId).ToArrayAsync();
 		}
 
-		// Upsert of ONE half: a null argument leaves that column alone rather than clearing it, because the client
+		// Upsert of one half: a null argument leaves that column alone rather than clearing it, because the client
 		// uploads the settings and the preview as separate messages and either can arrive without the other.
 		public async Task SaveCharacterClientSettings(uint characterId, byte[]? settings, byte[]? preview)
 		{
@@ -286,7 +283,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Achievements.Where(a => a.Name.ToLower().Contains(lowered)).OrderBy(a => a.Id).Take(limit).ToArrayAsync();
 		}
 
-		// The account's PLAYABLE characters - a nameless row is a create in progress, never something to list. That was
+		// The account's playable characters - a nameless row is a create in progress, never something to list. That was
 		// a `skipUninitialized = true` parameter no call site ever passed false to, i.e. a switch for a behaviour
 		// nobody wanted.
 		public async Task<Character[]> GetCharactersByAccount(uint id)
@@ -351,12 +348,12 @@ namespace Faolan.Core.Database.Repositories
 			ctx.CharacterSkills.AddRange(character.Skills);
 			ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
 
-			// Feat SPECS are ENSURED, never delete+reinserted like the two above: CharacterFeat's foreign key is
+			// Feat specs are ensured, never delete+reinserted like the two above: CharacterFeat's foreign key is
 			// (CharacterId, SpecIndex), so dropping a spec drops every feat trained in it - a scaffold save would
 			// silently wipe a character's feats.
 			//
-			// This has to happen here because TrySeedFreshRows builds the fresh character's single unnamed spec IN
-			// MEMORY and this is the only code that writes the scaffold. It didn't, so the spec was discarded at the
+			// This has to happen here because TrySeedFreshRows builds the fresh character's single unnamed spec in
+			// memory and this is the only code that writes the scaffold. It didn't, so the spec was discarded at the
 			// end of the create session; the next connection re-loaded the character with zero spec rows and the
 			// spawn builder threw out of SpecsOf ("has no CharacterFeatSpec rows"), stranding the client on a
 			// loading screen that never progressed. Every imported character has exactly one, so a character with
@@ -476,7 +473,7 @@ namespace Faolan.Core.Database.Repositories
 	{
 		// The navigations a Character needs to describe itself completely: the transform/appearance rows plus the
 		// spawn-scaffold set the FA015807 record is generated from. Lazy loading is deliberately off, so a navigation
-		// that is not included here reads as EMPTY rather than failing - which makes the include list part of the
+		// that is not included here reads as empty rather than failing - which makes the include list part of the
 		// contract, not a performance knob. One list, used by every loader that produces a long-lived Character, so
 		// the session copy and the scaffold copy cannot describe the same character differently.
 		public static IQueryable<Character> WithSessionNavigations(this IQueryable<Character> characters)

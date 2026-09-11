@@ -17,12 +17,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// One capture-timeline event: a CapturedPacket plus the two things a reader needs that the bytes do not carry -
-	// what the message is CALLED, and where it sat in the session.
-	//
-	// `Raw` is the IIR record as the dump carried it, `Content` the same with the u32 length prefix stripped. Both
-	// exist because they are what different consumers want: the codecs take Content (every Build here starts at the
-	// sub-opcode), while the offsets quoted in docs/re and in capture notes are into Raw.
+	/// <summary>
+	///     One capture-timeline event: a <see cref="CapturedPacket" /> plus the two things a reader needs that the
+	///     bytes do not carry - what the message is called, and where it sat in the session.
+	/// </summary>
+	/// <remarks>
+	///     <c>Raw</c> is the IIR record as the dump carried it and <c>Content</c> the same with the u32 length prefix
+	///     stripped. Both exist because different consumers want different ones: the codecs take Content, since every
+	///     Build starts at the sub-opcode, while the offsets quoted in docs/re and in capture notes are into Raw.
+	/// </remarks>
 	public sealed class TimelineEvent
 	{
 		public TimelineEvent(CapturedPacket packet, TimelineLookups look)
@@ -32,15 +35,14 @@ namespace Faolan.Importer.Cli
 			Direction = packet.Direction;
 			Tier = TimelineLookups.Tier(packet);
 			Raw = packet.Body;
-			// ⚠️ The opcode alone CANNOT tell an IIR carrier from an ordinary method: opcodes are PER INTERFACE and
-			// every interface numbers its first method 0x2000, so PassBlob, InitiateAuthentication, DispatchChallenge
-			// and the first GameChar method are all the same number. Two things that looked like decoded IIR ids were
-			// really that collision - the universe handshake's account name ("0x6c6c3165") and ~990 aggro-status
-			// packets whose body[4..8] is an entity handle ("0x00027917" is Laranga).
+			// The opcode alone cannot tell an IIR carrier from an ordinary method: opcodes are per interface and every
+			// interface numbers its first method 0x2000, so PassBlob, InitiateAuthentication, DispatchChallenge and
+			// the first GameChar method all render the same. Values that look like decoded IIR ids are routinely that
+			// collision - the universe handshake's account name, or an aggro-status packet whose body[4..8] is an
+			// entity handle.
 			//
-			// The ENDPOINT is what actually says which interface a packet is on (CLAUDE.md: every 0x2000 packet in the
-			// corpus is GameAgent <-> GameInterface), so that is the test. The length check is a second, structural
-			// one: a real IIR record opens with its own length.
+			// The endpoint is what says which interface a packet is on, so that is the test. The length check is a
+			// second, structural one: a real IIR record opens with its own length.
 			var onIirEndpoint = packet.SenderClass is RpcInterfaces.GameAgentType or RpcInterfaces.GameInterfaceType
 			                    && packet.ReceiverClass is RpcInterfaces.GameAgentType or RpcInterfaces.GameInterfaceType;
 			Iir = onIirEndpoint && packet.IsIirCarrier && Raw.Length >= 8 && Raw.ReadU32Be(0) == Raw.Length - 4
@@ -67,8 +69,10 @@ namespace Faolan.Importer.Cli
 		public string Name { get; }
 	}
 
-	// Everything the timeline resolves ids against: the opcode ENUMS (so names cannot go stale the way a dump's
-	// `Method` column can), the game-data tables, and the client's encrypted LDB pages.
+	/// <summary>
+	///     Everything the timeline resolves ids against: the opcode enums (so names cannot go stale the way a dump's
+	///     <c>Method</c> column can), the game-data tables, and the client's encrypted LDB pages.
+	/// </summary>
 	public sealed class TimelineLookups
 	{
 		private static readonly Regex RemoteFormatTag = new Regex("<(?:remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
@@ -76,9 +80,12 @@ namespace Faolan.Importer.Cli
 
 		private Dictionary<(uint Category, uint Id), byte[]> _ciphertext = [];
 
-		// The plaintext half of the LDB. Deliberately a SECOND map rather than merged into _ciphertext: one holds
-		// ciphertext that still needs the key the wire carried, the other holds finished strings. Merging them would
-		// let a decrypt failure read as a lookup miss and print LDB[cat][id] either way, hiding which one broke.
+		/// <remarks>
+		///     The plaintext half of the LDB. Deliberately a second map rather than merged into the ciphertext one:
+		///     that holds strings still needing the key the wire carried, this holds finished strings. Merging them
+		///     would let a decrypt failure read as a lookup miss and print the placeholder either way, hiding which
+		///     one broke.
+		/// </remarks>
 		private Dictionary<(uint Category, uint Id), string> _plaintext = [];
 
 		public Dictionary<uint, string> IirNames { get; } = Enum.GetValues<IirTypes>()
@@ -96,10 +103,9 @@ namespace Faolan.Importer.Cli
 		///     Combo id -> the combo's name, for the <c>combo_id</c> a behaviour record's <c>CommandMessage</c> carries.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The wire value IS the `Combos` primary key, so a swing's combo resolves with no correlation at all -
-		///     `3536865` is `Slave_1_AOE_2hb_Sweep_2`. Worth stating because combos are NOT in `Spells` (they live in
-		///     their own catalog, see the `combos_are_in_classspells_and_are_not_spellbook_spells` note), so the
-		///     obvious lookup misses every one of them.
+		///     The wire value is the <c>Combos</c> primary key, so a swing's combo resolves with no correlation at all.
+		///     Worth stating because combos are not in <c>Spells</c> - they live in their own catalog - so the obvious
+		///     lookup misses every one of them.
 		/// </remarks>
 		public Dictionary<uint, string> Combos { get; private set; } = [];
 
@@ -109,8 +115,10 @@ namespace Faolan.Importer.Cli
 
 		public Dictionary<uint, List<Placed>> WorldObjects { get; private set; } = [];
 
-		// The stat NAMES come from the typed enum rather than a parsed doc. LDB gives current and max the same name,
-		// which is why the enum spells them HealthCurrent/HealthMax - the timeline wants the enum's precision.
+		/// <remarks>
+		///     The stat names come from the typed enum rather than a parsed doc: the LDB gives current and max the same
+		///     name, which is why the enum spells them HealthCurrent and HealthMax - the timeline wants that precision.
+		/// </remarks>
 		public Dictionary<uint, string> Stats { get; } = Enum.GetValues<CharacterStatId>()
 			.GroupBy(v => (uint)v).ToDictionary(g => g.Key, g => g.First().ToString());
 
@@ -147,19 +155,18 @@ namespace Faolan.Importer.Cli
 			return look;
 		}
 
-		// Which service tier a packet sat on.
-		//
-		// ⚠️ **NOT a port lookup** (#730). This used to be `7010 universe / 7011 playeragent / 7012 cs / 7001 chat /
-		// 7017 game` - OUR OWN deployment's ports. Retail's are 7010 / 7011 / **7013** / **7002** / **7025**+**7031**,
-		// so on every retail capture chat, cs and game fell through to a bare port number - and a tier the report does
-		// not recognise falls back to the GAME opcode tables, which is how a chat channel subscription came out named
-		// `DispatchCloseDialogForLockedItemsInLootBag` and the maintainer's own annotations came out as
-		// `DispatchMoveInventoryItemFromGuildBank`. Every capture in the corpus is retail's, so the map named nothing
-		// but the two ports that happen to agree.
-		//
-		// The signals that ARE deployment-independent: the dump's `Protocol` column for chat (a ChatServer frame
-		// carries no RpcHeader at all), and the frame's own ENDPOINT class for everything else. The port is kept only
-		// as the last resort, for a frame whose dump row has neither.
+		/// <summary>
+		///     Which service tier a packet sat on.
+		/// </summary>
+		/// <remarks>
+		///     Deliberately not a port lookup: the ports differ between this deployment and retail, and every capture
+		///     in the corpus is retail's, so a port map would recognise only the tiers that happen to agree - and a
+		///     tier the report does not recognise falls back to the game opcode tables, which names chat and CS frames
+		///     after unrelated game methods.
+		///     The deployment-independent signals are the dump's <c>Protocol</c> column for chat (a ChatServer frame
+		///     carries no RpcHeader at all) and the frame's own endpoint class for everything else. The port is kept
+		///     only as a last resort, for a frame whose dump row has neither.
+		/// </remarks>
 		public static string Tier(CapturedPacket packet)
 		{
 			if (packet.Protocol == "ChatServer")
@@ -196,11 +203,13 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Which interface each RECEIVER endpoint class is. The receiver is the object being addressed - the server's
-		// *Agent on a c2s call, the client's *Interface on an s2c dispatch - so it names the interface in BOTH
-		// directions. Verified over the whole corpus: all 404k Conan packets are a clean A<->B swap of one of these
-		// pairs, and the receiver's enum contains the opcode in every case bar three mis-framed packets in one lossy
-		// capture (their "bodies" are the first bytes of an RpcHeader).
+		/// <remarks>
+		///     Which interface each receiver endpoint class is. The receiver is the object being addressed - the
+		///     server's *Agent on a c2s call, the client's *Interface on an s2c dispatch - so it names the interface in
+		///     both directions. Verified over the whole corpus: every Conan packet is a clean swap of one of these
+		///     pairs, and the receiver's enum contains the opcode in every case bar a handful of mis-framed packets in
+		///     one lossy capture, whose bodies are the first bytes of an RpcHeader.
+		/// </remarks>
 		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new Dictionary<uint, Type>
 		{
 			[RpcInterfaces.UniverseAgentType] = typeof(UniverseAgentMethods),
@@ -217,38 +226,41 @@ namespace Faolan.Importer.Cli
 			[RpcInterfaces.TradepostInterfaceType] = typeof(TradepostInterfaceMethods)
 		};
 
-		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its INTERFACE, and the
-		// receiver endpoint class is the only thing that says which interface a packet is on.
-		//
-		// ⚠️ Opcodes are PER INTERFACE - every interface numbers its first method 0x2000 - so picking the interface
-		// from the tier plus the direction, as this did, is picking it by guess. The world connection alone carries
-		// four interfaces (GameAgent/GameInterface, GameChar*, GameChar*Project) and trying them in a fixed order let
-		// the first enum answer for all of them: 1,642 packets in one capture came out as PassBlob / DispatchPassBlob /
-		// RemoveGuildFeat / DispatchGameStats / DispatchReportDimesionID when they were really the aggro poll, the
-		// sprint input and the quest-marker reply. Every one of those is in TimelineNoise, so the wrong name also
-		// defeated the noise filter and printed 40% of the timeline as heartbeat traffic (#558).
-		//
-		// A KNOWN receiver is authoritative: if its interface does not define the opcode, the answer is that we cannot
-		// name it, NOT the name a different interface happens to have at that number. Falling through would rebuild
-		// the bug.
-		// The two classes that register by 32-bit HASH, so their frames are named from the method constant rather than
-		// from an opcode that cannot tell two of them apart (#608/#613).
+		/// <summary>
+		///     The message's name. An IIR names itself through <see cref="IirTypes" />; an RPC method is named by its
+		///     interface, and the receiver endpoint class is the only thing that says which interface a packet is on.
+		/// </summary>
+		/// <remarks>
+		///     Opcodes are per interface - every interface numbers its first method 0x2000 - so picking the interface
+		///     from the tier plus the direction is picking it by guess. The world connection alone carries four
+		///     interfaces, and trying them in a fixed order lets the first enum answer for all of them, which renders
+		///     the aggro poll, the sprint input and the quest-marker reply under unrelated names and defeats the noise
+		///     filter along with it.
+		///     A known receiver is therefore authoritative: if its interface does not define the opcode, the answer is
+		///     that the message cannot be named, never the name a different interface happens to have at that number.
+		/// </remarks>
+		/// <remarks>
+		///     The two classes that register by 32-bit hash, so their frames are named from the method constant rather
+		///     than from an opcode that cannot tell two of them apart.
+		/// </remarks>
 		private static readonly Dictionary<uint, Type> MethodsByReceiver = new Dictionary<uint, Type>
 		{
 			[RpcInterfaces.PlayerAgentType] = typeof(PlayerAgentMethods),
 			[RpcInterfaces.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
 		};
 
-		// Re-reads the frame for its `method_instance`. The catch is deliberate and narrow: this is a REPORT over
-		// captures that are known to contain mis-framed buffers (a lossy capture's three such packets are noted above),
-		// and a diagnostic should render those as a raw id rather than abort the whole timeline. Nothing on the wire
-		// path swallows a parse failure.
-		//
-		// ⚠️ `InvalidDataException` is listed EXPLICITLY and is not redundant (#628). It lives in `System.IO` but
-		// derives from `SystemException`, NOT from `IOException` - so the `IOException` catch that was here alone read
-		// as covering it and did not. `Rpc.Parse` wraps the underlying `EndOfStreamException` (which IS an
-		// `IOException`) in one, so the only exception this ever actually saw was the one slipping through, and the
-		// timeline died on all three mount captures.
+		/// <summary>
+		///     Re-reads the frame for its <c>method_instance</c>.
+		/// </summary>
+		/// <remarks>
+		///     The catch is deliberate and narrow: this is a report over captures known to contain mis-framed buffers,
+		///     and a diagnostic should render those as a raw id rather than abort the whole timeline. Nothing on the
+		///     wire path swallows a parse failure.
+		///     <c>InvalidDataException</c> is listed explicitly and is not redundant: it lives in <c>System.IO</c> but
+		///     derives from <c>SystemException</c>, not from <c>IOException</c>, and <c>Rpc.Parse</c> wraps the
+		///     underlying <c>EndOfStreamException</c> in one - so an <c>IOException</c> catch alone looks like it
+		///     covers this and does not.
+		/// </remarks>
 		private static string NameOfMethod(CapturedPacket packet, Type methods)
 		{
 			uint method;
@@ -258,10 +270,9 @@ namespace Faolan.Importer.Cli
 			}
 			catch (Exception e) when (e is IOException or InvalidDataException)
 			{
-				// The DUMP already recorded the method - the Wireshark dissector read it off the real frame, before
-				// our Rebuild had a chance to lose anything - so a header we cannot re-frame is not a dead end. This
-				// is what was rendering every keep-alive as "0x2085 (unparseable header)"; the frames are fine, our
-				// reconstruction of their RpcHeader is what fails on them.
+				// The dump already recorded the method - the Wireshark dissector read it off the real frame, before
+				// the rebuild had a chance to lose anything - so a header that cannot be re-framed is not a dead end.
+				// The frames themselves are fine; it is the reconstruction of their RpcHeader that fails.
 				method = packet.MethodId;
 			}
 
@@ -273,23 +284,20 @@ namespace Faolan.Importer.Cli
 			if (iir != 0)
 				return IirNames.TryGetValue(iir, out var n) ? n : $"0x{iir:x8}";
 
-			// EVERY Conan frame is named from its `method_instance`, re-read out of the header.
-			//
-			// ⚠️ It used to compare the dump's u16 against the enum directly for all but PlayerAgent/PlayerInterface,
-			// and since #615 that is comparing two different spaces: an enum member IS the method (`ChatVicinity =
-			// 0x02`) while the dump records the WIRE RENDERING of it (`0x2002`). So the compare simply never matched,
-			// and 4,136 of the 8,646 game/cs frames in one capture - nearly half - rendered as a bare `0x2020`. The
-			// same mismatch `CapturedPacket.Wire(...)` exists to bridge, one lookup over.
+			// Every Conan frame is named from its `method_instance`, re-read out of the header. Comparing the dump's
+			// u16 against the enum directly would compare two different spaces: an enum member is the method
+			// (`ChatVicinity = 0x02`) while the dump records the wire rendering of it (`0x2002`). That is the mismatch
+			// `CapturedPacket.Wire(...)` exists to bridge.
 			if (MethodsByReceiver.TryGetValue(packet.ReceiverClass, out var methods))
 				return NameOfMethod(packet, methods);
 
 			if (InterfaceByReceiver.TryGetValue(packet.ReceiverClass, out var iface))
 				return NameOfMethod(packet, iface);
 
-			// ChatServer frames carry NO RpcHeader, so they have no endpoint to key off and the tier is all there is
-			// (TsharkCaptureReader leaves SenderClass/ReceiverClass zero for them). Its two enums do not collide with
-			// each other, so direction alone separates them. Here the dump's u16 IS the opcode - chat has no method
-			// field to render, which is why these are the only two `*Opcodes` enums in the codebase.
+			// ChatServer frames carry no RpcHeader, so they have no endpoint to key off and the tier is all there is
+			// (TsharkCaptureReader leaves SenderClass and ReceiverClass zero for them). Its two enums do not collide
+			// with each other, so direction alone separates them. Here the dump's u16 is the opcode - chat has no
+			// method field to render, which is why these are the only two `*Opcodes` enums in the codebase.
 			var opcode = (ushort)packet.WireOpcode;
 			foreach (var type in InterfacesFor(tier, packet.Direction == "c2s"))
 			{
@@ -301,8 +309,10 @@ namespace Faolan.Importer.Cli
 			return $"0x{packet.WireOpcode:x4}";
 		}
 
-		// The endpoint-less fallback. Only the chat tier reaches it in the corpus; the other tiers are listed so a
-		// packet whose dump row is missing its endpoint columns still gets a best effort rather than a bare hex id.
+		/// <summary>
+		///     The endpoint-less fallback. Only the chat tier reaches it in the corpus; the other tiers are listed so a
+		///     packet whose dump row is missing its endpoint columns still gets a best effort rather than a bare hex id.
+		/// </summary>
 		private static IEnumerable<Type> InterfacesFor(string tier, bool c2s)
 		{
 			switch (tier)
@@ -314,7 +324,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				// No "playeragent" case: that pair is named from its method constant (MethodsByReceiver), which needs
-				// the frame, and its enums are uint-backed so a bare u16 opcode could not index them anyway (#613).
+				// the frame, and its enums are uint-backed so a bare u16 opcode could not index them anyway.
 				case "cs":
 				{
 					yield return c2s ? typeof(CSPlayerAgentMethods) : typeof(CSPlayerInterfaceMethods);
@@ -337,10 +347,15 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Readable text out of a body: a plain wire string, or the LDB string a remoteformat references - DECRYPTED
-		// with the key the wire itself carries. That key is the whole trick: the eleven encrypted categories are not
-		// readable from the client alone, and the server hands over the per-string key in the very packet that
-		// references it, so a capture is self-sufficient - including for screens our own tables have never captured.
+		/// <summary>
+		///     Readable text out of a body: a plain wire string, or the LDB string a remoteformat references, decrypted
+		///     with the key the wire itself carries.
+		/// </summary>
+		/// <remarks>
+		///     That key is the whole trick: the encrypted categories are not readable from the client alone, and the
+		///     server hands over the per-string key in the very packet that references it, so a capture is
+		///     self-sufficient - including for screens no local table has ever captured.
+		/// </remarks>
 		public string Text(byte[] raw)
 		{
 			var tag = RemoteFormatTag.Match(Encoding.Latin1.GetString(raw));
@@ -353,10 +368,15 @@ namespace Faolan.Importer.Cli
 				: text;
 		}
 
-		// The resolved text of ONE `<remoteformat>` string that is already a string rather than a packet body - a quest
-		// journal carries a dozen of them as wire strings inside the record, and each one references its own LDB line
-		// with its own key. Unquoted, so a caller can compose several into one line. A string with no tag comes back
-		// unchanged: journal fields are occasionally plain text rather than a reference.
+		/// <summary>
+		///     The resolved text of one <c>&lt;remoteformat&gt;</c> string that is already a string rather than a packet
+		///     body - a quest journal carries a dozen of them as wire strings inside the record, each referencing its
+		///     own LDB line with its own key.
+		/// </summary>
+		/// <remarks>
+		///     Unquoted, so a caller can compose several into one line. A string with no tag comes back unchanged:
+		///     journal fields are occasionally plain text rather than a reference.
+		/// </remarks>
 		public string Line(string remoteFormat)
 		{
 			if (string.IsNullOrEmpty(remoteFormat))
@@ -370,9 +390,12 @@ namespace Faolan.Importer.Cli
 			return text.Length == 0 ? Flatten(remoteFormat) : text;
 		}
 
-		// The content a `<remoteformat>` tag points at. `Literal` distinguishes the real LDB line (decrypted, and worth
-		// quoting) from a stand-in for one we cannot produce - a `token "..."` reference, or `LDB[cat][id]` when the
-		// client pages hold no ciphertext for it or the wire carried no key.
+		/// <summary>
+		///     The content a <c>&lt;remoteformat&gt;</c> tag points at. <c>Literal</c> distinguishes the real LDB line
+		///     - decrypted, and worth quoting - from a stand-in for one that cannot be produced: a <c>token "..."</c>
+		///     reference, or <c>LDB[cat][id]</c> when the client pages hold no ciphertext for it or the wire carried no
+		///     key.
+		/// </summary>
 		private (string Text, bool Literal) Resolve(Match tag)
 		{
 			var attrs = Attribute.Matches(tag.Groups[1].Value)
@@ -388,9 +411,9 @@ namespace Faolan.Importer.Cli
 			    && LdbKey.Decode(key) is { } decoded && LdbKey.Decrypt(blob, decoded) is { } plain)
 				return (Flatten(plain), true);
 
-			// A reference into one of the PLAINTEXT categories carries no key and needs none - the string ships
-			// readable. Half the category table is this side (52000 regions, 51200 bounded_areas, 51000 npc_template,
-			// 50200 item, ...), so consulting only the ciphertext map made all of it unresolvable (#561).
+			// A reference into one of the plaintext categories carries no key and needs none - the string ships
+			// readable. Half the category table is on that side (52000 regions, 51200 bounded_areas, 51000
+			// npc_template, 50200 item, ...), so the ciphertext map alone cannot resolve it.
 			if (_plaintext.TryGetValue((category, id), out var text))
 				return (Flatten(text), true);
 
@@ -402,18 +425,21 @@ namespace Faolan.Importer.Cli
 			return text.Replace('\n', ' ').Replace('\r', ' ').Trim();
 		}
 
-		// A wire string is [u16 BE length][latin-1 bytes]. Finding that FRAMING beats scraping printable bytes: the
-		// length's low byte is itself often printable and arrives glued to the front of the message.
-		//
-		// ⚠️ This is a GUESS over a body whose grammar we do not know - it is the last resort for messages with no
-		// case in DescribeCore - and a two-byte match is where the guessing goes wrong. An entity handle is the
-		// trap: `[0000c350][0002792a]` reads at offset 4 as length 0x0002 with payload `79 2a`, so 292 lines in one
-		// capture printed "y)" / "y+" / "y(" / "y*" - the low half of a Tortage handle, 0x79 being 'y' (#556).
-		//
-		// So a two-character run has to earn it: ALL of it must be letters or digits. That keeps the genuine short
-		// strings in the corpus ("jo" in channel chat, "en" the language code on LoginCharacter) and rejects the
-		// handle halves, which pair a letter with punctuation. It is not airtight - a handle CAN end in two letters -
-		// but the real fix for a message that matters is a case in DescribeCore, not a better guess here.
+		/// <summary>
+		///     Scans a body for a wire string, which is [u16 big-endian length][latin-1 bytes].
+		/// </summary>
+		/// <remarks>
+		///     Finding that framing beats scraping printable bytes: the length's low byte is itself often printable and
+		///     arrives glued to the front of the message.
+		///     This is still a guess over a body whose grammar is unknown - the last resort for messages with no case
+		///     in DescribeCore - and a two-byte match is where the guessing goes wrong. An entity handle is the trap:
+		///     <c>[0000c350][0002792a]</c> reads at offset 4 as length 0x0002 with payload <c>79 2a</c>, which renders
+		///     as the low half of a handle.
+		///     So a two-character run has to earn it: all of it must be letters or digits. That keeps the genuine short
+		///     strings in the corpus ("jo" in channel chat, "en" the language code on LoginCharacter) and rejects the
+		///     handle halves, which pair a letter with punctuation. It is not airtight - a handle can end in two
+		///     letters - but the fix for a message that matters is a case in DescribeCore, not a better guess here.
+		/// </remarks>
 		private const int UnambiguousLength = 3;
 
 		private static string PlainString(byte[] raw)

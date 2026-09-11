@@ -4,29 +4,32 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// VALUE factories for the @609 objective region - the construct-don't-replay generator (#186) that turns a quest's
-	// per-goal DB rows into the records QuestObjectiveRegionCodec encodes. Not a codec: nothing here reads or writes
-	// bytes, and the structural words a goal record carries (the [1] lead, the goal-id echo, the reserved pairs) are
-	// synthesized here rather than being 20 positional parameters on the codec's surface.
+	/// <summary>
+	///     Value factories for the @609 objective region: the generator that turns a quest's per-goal database rows into
+	///     the records <see cref="QuestObjectiveRegionCodec" /> encodes. Not a codec - nothing here reads or writes bytes,
+	///     and the structural words a goal record carries (the lead, the goal-id echo, the reserved pairs) are synthesized
+	///     here rather than being twenty positional parameters on the codec's surface.
+	/// </summary>
 	public static class QuestObjectiveRegions
 	{
-		// The region for one quest's goals, addressed to the live player's client instance (the records carry raw
-		// entity references, re-addressed like the rest of the tails).
-		//
-		// PARTIAL goals are left OUT, and this region is gated on reproducing the capture EXACTLY
-		// (ObjectiveRegionVerified; a region the client cannot parse asserts it on statlist.cpp:134), so skipping
-		// them keeps every verified region byte-identical - the region stays exactly what it was before those rows
-		// were harvested.
-		//
-		// ⚠️ The REASON is no longer "a mid-session harvest recovers none of the numeric fields a record is built
-		// from" (#548): it recovers the kind tag, the count, the reserved pairs and the per-goal pin. What has never
-		// been verified is that a region rebuilt to INCLUDE them reproduces the wire, and that is the bar here - so
-		// widening this is a byte-exact regeneration job, not a comment change.
-		//
-		// `solvedTimesOf` resolves a goal's PROGRESS - `QuestGoal_c::SolvedTimes`, the first reserved word (#550). It is
-		// per-CHARACTER state and deliberately not on the definition row, so a caller that has no character (the
-		// importer's byte-exact verifier replaying one capture, a golden) passes the reading it is comparing against,
-		// and a caller building a fresh journal passes nothing and gets 0 - which is what an unstarted goal carries.
+		/// <summary>
+		///     The region for one quest's goals, addressed to the live player's client instance; the records carry raw entity
+		///     references, re-addressed like the rest of the tails.
+		/// </summary>
+		/// <remarks>
+		///     Partial goals are left out. This region is gated on reproducing the capture exactly
+		///     (ObjectiveRegionVerified), since a region the client cannot parse asserts on statlist.cpp:134, and skipping
+		///     them keeps every verified region byte-identical. A mid-session harvest does recover the kind tag, the count,
+		///     the reserved pairs and the per-goal pin, but a region rebuilt to include them has never been shown to
+		///     reproduce the wire, and that is the bar here: widening this is a byte-exact regeneration job.
+		///     <para>
+		///         <paramref name="solvedTimesOf" /> resolves a goal's progress - QuestGoal_c::SolvedTimes, the first reserved
+		///         word. That is per-character state and deliberately not on the definition row, so a caller with no character
+		///         (the importer's byte-exact verifier replaying one capture, or a golden) passes the reading it is comparing
+		///         against, while a caller building a fresh journal passes nothing and gets 0, which is what an unstarted goal
+		///         carries.
+		///     </para>
+		/// </remarks>
 		public static QuestObjectiveRegion ForQuest(QuestDefinition def, uint instance, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(def);
@@ -41,9 +44,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 			};
 		}
 
-		// One goal's record. The MEANINGFUL fields come from the row; the structural ones are synthesized (Lead = 1)
-		// or echoed, and the undecoded scalars are carried per goal from the capture. `solvedTimes` is the live
-		// progress - see ForQuest.
+		/// <summary>
+		///     One goal's record. The meaningful fields come from the row; the structural ones are synthesized or echoed, and
+		///     the undecoded scalars are carried per goal from the capture. <paramref name="solvedTimes" /> is the live
+		///     progress; see <see cref="ForQuest" />.
+		/// </summary>
 		public static QuestObjectiveGoal ForGoal(QuestDefinition def, QuestGoalDefinition g, uint instance, uint solvedTimes = 0)
 		{
 			ArgumentNullException.ThrowIfNull(def);
@@ -52,9 +57,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return new QuestObjectiveGoal
 			{
 				Lead = QuestObjectiveGoalCodec.GoalLead,
-				// A goal with no captured kind cannot be built into a region the client will accept - but that is
-				// gated upstream by ObjectiveRegionVerified, which only ever flips on for goals harvested from the
-				// wire. Falling back to 0 here keeps the builder total; it never reaches a live client.
+				// A goal with no captured kind cannot be built into a region the client will accept, but that is gated
+				// upstream by ObjectiveRegionVerified, which only flips on for goals harvested from the wire. Falling
+				// back to 0 here keeps the builder total; it never reaches a live client.
 				K = g.Separator ?? 0,
 				Instance = instance,
 				QuestId = def.QuestId,
@@ -65,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					? 1
 					: g.RequiredCount,
 				// reserved[0] is the goal's live SolvedTimes; [1..6] are the three (marker, identity) reference slots,
-				// which ARE definition data (#546).
+				// which are definition data.
 				Reserved = [solvedTimes, g.Extra1, g.Extra2, g.Extra3, g.Extra4, g.Extra5, g.Extra6],
 				SubId = g.SubId,
 				MapId = g.MapId ?? 0,
@@ -78,7 +83,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			};
 		}
 
-		// A text record addresses its string either by numeric id or by a NAME token; both spellings occur per slot.
+		/// <summary>
+		///     A text record addresses its string either by numeric id or by a name token; both spellings occur per slot.
+		/// </summary>
 		private static string ObjectiveToken(QuestGoalDefinition g)
 		{
 			return g.ObjectiveToken is { Length: > 0 } t

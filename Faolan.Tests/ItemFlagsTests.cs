@@ -11,11 +11,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #756: the item entry's `Flags` word (stat 0) is the TEMPLATE's own property field 0, not a constant.
+	// The item entry's `Flags` word (stat 0) is the template's own property field 0, not a constant.
 	//
-	// It used to be a `flags = 1` default parameter that no caller ever passed - the third time that exact shape
-	// shipped a wrong constant on this message, after `level = 1` on the same entry and the dead `level` on
-	// GrantItemToBackpack. So the gates here assert the DERIVATION rather than a value: a golden that passes the
+	// A `flags = 1` default parameter that no caller ever passes is how this message ships a wrong constant - the
+	// same shape as a `level = 1` default on the same entry. So the gates here assert the derivation rather than a
+	// value: a golden that passes the
 	// number in cannot notice when the emitter stops reading the column (see the agent memory
 	// `self_referential_golden_tests`, and `unpassed_default_parameter_ships_a_wrong_value`).
 	public class ItemFlagsTests
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			return stats.Single(s => s.Stat == FlagsStat).Value;
 		}
 
-		// The snapshot entry and the live add must BOTH read the column, and must both TRACK it - asserting one fixed
+		// The snapshot entry and the live add must both read the column, and must both track it - asserting one fixed
 		// value would still pass if the emitter went back to a constant that happened to match.
 		[Theory]
 		[InlineData(1u)]
@@ -48,9 +48,8 @@ namespace Faolan.Tests
 			Assert.Equal(flags, FlagsOf(SnapshotItems.LiveAddEntry(1, 2, 1, item, item.Hash).StatLists));
 		}
 
-		// A NULL column means no RDB template was readable, NOT that the template said zero - which is exactly why
-		// the column is nullable. Those fall back to 1 (what everything shipped before #756), and the fallback must
-		// not be reachable from a real zero.
+		// A null column means no RDB template was readable, not that the template said zero - which is exactly why
+		// the column is nullable. Those fall back to 1, and the fallback must not be reachable from a real zero.
 		[Fact]
 		public void AnUnreadTemplate_FallsBackToOne_AndAGenuineZeroDoesNot()
 		{
@@ -58,12 +57,12 @@ namespace Faolan.Tests
 			Assert.Equal(0u, FlagsOf(SnapshotItems.ListEntry(0, 1, 2, 1, Template(0), 0).Item!.StatLists));
 		}
 
-		// The shipped catalog: the reader that produced these values must not have DRIFTED past the property table.
+		// The shipped catalog: the reader that produced these values must not have drifted past the property table.
 		//
 		// Walking past the display-name string lands in the record's `[2][9]` region, where the list-framing words
 		// `0x7E2`/`0xBD3` at three byte alignments read as plausible fields - that gave 200-odd templates a `Flags` of
 		// 0xE2000000 / 0x0007E200 / 0x0BD30000 before `ItemTemplateProperties` was made to stop at the string. Every
-		// one of those drifted values has bit 0 CLEAR while every real non-zero one has it SET (4,676 of 4,741), so
+		// one of those drifted values has bit 0 clear while every real non-zero one has it set (4,676 of 4,741), so
 		// this is the cheap invariant that catches the drift coming back.
 		[Fact]
 		public async Task EveryShippedFlagsWord_IsZeroOrCarriesBitZero()
@@ -79,8 +78,8 @@ namespace Faolan.Tests
 				string.Join("\n", drifted.Select(d => $"  {d.Id} \"{d.Name}\" = 0x{d.Flags:x8}")));
 		}
 
-		// #756's per-instance half, both directions. The template's word is what a fresh copy carries; the bound bit
-		// is added by the INSTANCE overload and by nothing else, because a caller holding no instance is describing an
+		// The per-instance half, both directions. The template's word is what a fresh copy carries; the bound bit
+		// is added by the instance overload and by nothing else, because a caller holding no instance is describing an
 		// item nobody owns.
 		[Fact]
 		public void TheBoundBitComesFromTheInstance_NotTheTemplate()
@@ -93,7 +92,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x00000001u, FlagsOf(SnapshotItems.ListEntry(carried, 1, 2).Item!.StatLists));
 			Assert.Equal(0x04000001u, FlagsOf(SnapshotItems.LiveAddEntry(worn, 1, 2).StatLists));
 
-			// ...and a bind-on-PICKUP template carries it with the instance flag CLEAR, because the bit is in its own
+			// ...and a bind-on-pickup template carries it with the instance flag clear, because the bit is in its own
 			// word. Nothing has to be stored for that half.
 			var mintsBound = new ItemInstance { Container = ContainerKind.Bag, Slot = 3, Count = 1, TemplateId = 1, Template = Template(0x04000001) };
 			Assert.Equal(0x04000001u, FlagsOf(SnapshotItems.ListEntry(mintsBound, 1, 2).Item!.StatLists));
@@ -111,12 +110,12 @@ namespace Faolan.Tests
 			Assert.Equal("00000065110099bd000000020000000004000001", Convert.ToHexStringLower(body));
 		}
 
-		// The two RULES, evaluated the way the client evaluates them. Table-driven off `ItemInfoView`'s own predicates
+		// The two rules, evaluated the way the client evaluates them. Table-driven off `ItemInfoView`'s own predicates
 		// so a change to either derivation has to restate the client's rule rather than quietly widen it.
 		[Theory]
 		[InlineData(0u, null, 0u, false)] // nothing set
 		[InlineData(0x20u, null, 0u, true)] // MoreFlags bit 5 alone
-		[InlineData(0u, 4u, 5u, true)] // quality > 1 AND Can bit 2 - Cloak of Hugin's shape
+		[InlineData(0u, 4u, 5u, true)] // quality > 1 and Can bit 2 - Cloak of Hugin's shape
 		[InlineData(0u, 4u, 1u, false)] // quality high, Can bit 2 clear
 		[InlineData(0u, 0u, 5u, false)] // Can bit 2 set, quality too low - Slave Manacles' shape
 		[InlineData(0u, 2u, 521u, false)] // Daggamalt: quality 2 but Can = 0x209, bit 2 clear
@@ -134,7 +133,7 @@ namespace Faolan.Tests
 		}
 
 		[Theory]
-		[InlineData(null, false)] // no readable template - must NOT read as bound (a lifted `!= 0` would say true)
+		[InlineData(null, false)] // no readable template - must not read as bound (a lifted `!= 0` would say true)
 		[InlineData(1u, false)]
 		[InlineData(0x04000001u, true)]
 		[InlineData(0x05000001u, true)] // Cloak of Hugin: bits 24 and 26
@@ -152,7 +151,7 @@ namespace Faolan.Tests
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var bound = await db.Items.CountAsync(i => i.Flags != null && (i.Flags & BoundFlag) != 0, TestContext.Current.CancellationToken);
 
-			// A floor, not the exact 1,267 shipped today: a re-harvest against a fuller RDB may only ADD templates,
+			// A floor, not the exact 1,267 shipped today: a re-harvest against a fuller RDB may only add templates,
 			// and pinning the count would make that a failure instead of progress.
 			Assert.True(bound >= 1000, $"only {bound} templates mint bound - the Flags harvest looks broken");
 		}

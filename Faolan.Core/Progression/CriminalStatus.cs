@@ -1,13 +1,13 @@
 namespace Faolan.Core.Progression
 {
 	/// <summary>
-	///     The PvP criminal system's decoded constants (#503): the debuff spells retail applies, and the rules the
-	///     client's own spell descriptions state.
+	///     The PvP criminal system's decoded constants: the debuff spells retail applies, and the rules the client's
+	///     own spell descriptions state.
 	/// </summary>
 	/// <remarks>
-	///     Decoded from the chat-annotated gameplay capture, whose annotations walk the whole mechanic: `killed player,
-	///     became criminal 36 murder points` -> `just noticed the criminal debuff i got after killing player (2m
-	///     remaining)` -> `npc refued to deal with me because of ciminal` -> `now it works (debuf gone)`.
+	///     Decoded from the chat-annotated gameplay capture, whose annotations walk the whole mechanic: "killed
+	///     player, became criminal 36 murder points" -> "just noticed the criminal debuff i got after killing player
+	///     (2m remaining)" -> "npc refued to deal with me because of ciminal" -> "now it works (debuf gone)".
 	///     <para>
 	///         Two independent things line up on it. On the wire, stat <c>0x449</c> - which the client's LDB string
 	///         table names <b>"Murder Points"</b> - moves at the kill, and a MagicBuffIIR applies spell
@@ -17,14 +17,14 @@ namespace Faolan.Core.Progression
 	///         needs no inference.
 	///     </para>
 	///     <para>
-	///         And the RULES are stated outright by the client, not guessed by us. Spell 3827287's description reads
-	///         "Wagoneers &amp; ship captains will not transport you and normal vendors will not trade with you. You
-	///         can seek out smugglers at outlaw camps instead." - which is exactly the annotated NPC refusal, and ties
-	///         the criminal state to the travel NPCs of #506. The harsher <b>Murderer</b> tier (3827285, 24 h) adds
-	///         "Murderers are attacked by city guards".
+	///         The rules are stated outright by the client. Spell 3827287's description reads "Wagoneers &amp; ship
+	///         captains will not transport you and normal vendors will not trade with you. You can seek out smugglers
+	///         at outlaw camps instead." - which is exactly the annotated NPC refusal, and ties the criminal state to
+	///         the travel NPCs. The harsher Murderer tier (3827285, 24 h) adds "Murderers are attacked by city
+	///         guards".
 	///     </para>
 	///     <para>
-	///         ⚠️ What is NOT decoded is the LADDER: how many murder points promote Criminal to Murderer, and how the
+	///         What is not decoded is the ladder: how many murder points promote Criminal to Murderer, and how the
 	///         pool decays. The corpus has exactly one player kill, so there is one point on that curve. The shipped
 	///         spell set implies the shape - Criminal at 20 s / 300 s / 1 h and Murderer at 24 h, plus "Increase
 	///         Murderpoints" (4038603) and "Reduce Murderpoints" (4038602) as the mechanism - but which threshold
@@ -46,26 +46,27 @@ namespace Faolan.Core.Progression
 		public const uint MurdererSpellId = 3827285;
 
 		/// <summary>
-		///     The "Criminal Protection" buff - spell 3880938. Retail applies it on a TEAM JOIN and it is what
-		///     exempts team-mates from the criminal system. It never travels alone: every captured apply and end is
+		///     The "Criminal Protection" buff - spell 3880938. Retail applies it on a team join and it is what exempts
+		///     team-mates from the criminal system. It never travels alone: every captured apply and end is
 		///     accompanied, in the same frame, by a <c>DispatchAddSpellResistance</c> /
-		///     <c>DispatchRemoveSpellResistance</c> of <c>SpellMetaTypes.CriminalTeam</c> at 100% (#869).
+		///     <c>DispatchRemoveSpellResistance</c> of <c>SpellMetaTypes.CriminalTeam</c> at 100%.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Nothing applies it yet - what grants and clears it is the open half of the criminal system (#503).
-		///     The pairing above is what is measured: 17 resistance frames over 5 captures, 1:1 with the buff.
+		///     Nothing applies it yet - what grants and clears it is the open half of the criminal system. The pairing
+		///     above is what is measured: 17 resistance frames over 5 captures, 1:1 with the buff.
+		///     Open work tracked in Gitea #503.
 		/// </remarks>
 		public const uint CriminalProtectionSpellId = 3880938;
 
 		/// <summary>
-		///     Murder points added by one player kill, in WIRE units, as measured: stat <c>0x449</c> went to 3500 at
+		///     Murder points added by one player kill, in wire units, as measured: stat <c>0x449</c> went to 3500 at
 		///     the kill. The player reported "36", so the client's display scale is about 100 - consistent with the
 		///     rest of the stat sheet, where the displayed number and the wire number differ by a per-stat scale.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The capture then puts the stat back to <b>0</b> three seconds later, and why is not established. The
-		///     natural reading is that the pool scores a threshold, converts to the criminal debuff and resets - but
-		///     that is one observation of one kill, so it is written down rather than modelled.
+		///     The capture then puts the stat back to 0 three seconds later, and why is not established. The natural
+		///     reading is that the pool scores a threshold, converts to the criminal debuff and resets - but that is
+		///     one observation of one kill, so it is written down rather than modelled.
 		/// </remarks>
 		public const uint PointsPerPlayerKill = 3500;
 
@@ -78,24 +79,24 @@ namespace Faolan.Core.Progression
 		///     ("Smuggler", "Tortage Smuggler", "Atzel Smuggler", "The Smuggler").
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Name-based, and deliberately so for now: there is no column or captured flag that marks a vendor as
-		///     an outlaw fence, and the name is the only signal the data actually carries. If a smuggler ever turns up
-		///     whose name does not say so, this is where it breaks - which is better than a silent wrong answer.
+		///     Name-based, deliberately: there is no column or captured flag that marks a vendor as an outlaw fence,
+		///     and the name is the only signal the data carries. If a smuggler ever turns up whose name does not say
+		///     so, this is where it breaks - which is better than a silent wrong answer.
 		/// </remarks>
 		public static bool TradesWithCriminals(string? vendorName) =>
 			vendorName != null && vendorName.Contains("Smuggler", System.StringComparison.OrdinalIgnoreCase);
 
 		/// <summary>
-		///     Whether this travel NPC will still carry a criminal (#506). The client's own Criminal description is the
-		///     rule and it names both halves of the same sentence: <i>"Wagoneers &amp; ship captains will not transport
-		///     you and normal vendors will not trade with you. You can seek out smugglers at outlaw camps instead."</i>
-		///     The vendor half is <see cref="TradesWithCriminals" />; this is the transport half.
+		///     Whether this travel NPC will still carry a criminal. The client's own Criminal description is the rule
+		///     and it names both halves of the same sentence: "Wagoneers &amp; ship captains will not transport you and
+		///     normal vendors will not trade with you. You can seek out smugglers at outlaw camps instead." The vendor
+		///     half is <see cref="TradesWithCriminals" />; this is the transport half.
 		/// </summary>
 		/// <remarks>
 		///     The smuggler exception is written to cover transport too. The description offers smugglers as the
 		///     alternative without restricting that to trade, and a smuggler who sells to outlaws but refuses to move
-		///     them would make the sentence's own "instead" meaningless. ⚠️ That reading is not separately confirmed by
-		///     a capture - the corpus has no criminal attempting to travel - so it is the same name-based rule with the
+		///     them would make the sentence's own "instead" meaningless. That reading is not separately confirmed by a
+		///     capture - the corpus has no criminal attempting to travel - so it is the same name-based rule with the
 		///     same caveat, and it is the conservative direction (a criminal is refused by every NPC that is not
 		///     explicitly an outlaw fence).
 		/// </remarks>

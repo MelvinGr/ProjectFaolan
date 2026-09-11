@@ -10,13 +10,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// Wires quest goals from their own DECRYPTED objective text (#520/#521).
+	// Wires quest goals from their own DECRYPTED objective text.
 	//
 	// The client states what every goal asks for, in encrypted LDB category 50304, and we hold the per-string key on
-	// the goal itself (`ObjectiveKey`). So the wiring that used to need a hand-written table is a RULE over the
-	// client's own words: `Deliver` goals name their recipient, and this reads it.
+	// the goal itself (`ObjectiveKey`), so the wiring is a rule over the client's own words rather than a
+	// hand-written table: `Deliver` goals name their recipient, and this reads it.
 	//
-	// ⚠️ RDB-BACKED, therefore its own opt-in module rather than part of the capture-driven `quest-wiring`: the
+	// RDB-BACKED, therefore its own opt-in module rather than part of the capture-driven `quest-wiring`: the
 	// ciphertext lives in the client's install, and the capture modules deliberately run without an RdbDir. Nothing is
 	// lost when it does not run - the wiring is bootstrap-only and already-wired goals are skipped, so the rows stay as
 	// they are.
@@ -25,11 +25,11 @@ namespace Faolan.Importer.Rdb
 		// `quest_goal_templates.goal_name` - the goal's own display text.
 		private const uint GoalNameCategory = 50304;
 
-		// Every pattern and the reading itself live on QuestObjectiveText (#704): the capture-driven wiring in
-		// `ImportOps` has to ask the same questions of the PLAINTEXT catalog `Name` column, and one implementation is the
+		// Every pattern and the reading itself live on QuestObjectiveText: the capture-driven wiring in
+		// `ImportOps` has to ask the same questions of the plaintext catalog `Name` column, and one implementation is the
 		// only way the two stay in step. The shapes it knows, and why each is there, are documented on that class -
 		// including the "Ask X about Y" form, which is why quest 10287's "Ask Tina about Nadini" (goal 7363) sat `Partial`
-		// and its quest presented in-client as a ONE-goal quest (#527).
+		// and its quest presented in-client as a one-goal quest.
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
@@ -46,8 +46,7 @@ namespace Faolan.Importer.Rdb
 			foreach (var goal in goals)
 			{
 				// Bootstrap-only, like every other wiring step: a Quest-editor edit or a hand seed survives a re-import.
-				// `None` is the un-typed state (#522) - it used to be `Kill`, which is why this also had to test the
-				// TargetName to tell a real kill goal from a row nobody had typed.
+				// `None` is the un-typed state, so the type alone says whether a goal has been wired.
 				if (goal.GoalType != QuestGoalType.None)
 				{
 					alreadyWired++;
@@ -96,13 +95,13 @@ namespace Faolan.Importer.Rdb
 					gated++;
 				}
 
-				// ⚠️ RECONCILE the sentence's name against the catalog before storing it. `TargetName` is a MATCH KEY,
+				// RECONCILE the sentence's name against the catalog before storing it. `TargetName` is a match key,
 				// compared for EQUALITY against the live entity's name - and prose uses the short form where the world
 				// uses the full one. Two goals shipped dead on exactly that: *"Talk to Bronwith in Conarch Village"*
-				// stored `Bronwith`, which can never equal the live **Battlemaster Bronwith**, and *"Speak to Chael"*
-				// stored `Chael` against **Tanner Chael**. Both read as wired and neither could ever fire.
+				// stored `Bronwith`, which can never equal the live Battlemaster Bronwith, and *"Speak to Chael"*
+				// stored `Chael` against Tanner Chael. Both read as wired and neither could ever fire.
 				//
-				// It is the same rule `RdbQuestGoalTargetImporter` already applies to the 51000 half - the CATALOG wins
+				// It is the same rule `RdbQuestGoalTargetImporter` already applies to the 51000 half - the catalog wins
 				// wherever it exists, because the catalog is what the runtime compares against. Only an UNAMBIGUOUS
 				// single template may claim the name (measured: no goal in the shipped data has two), so a title that
 				// several NPCs share leaves the short form alone rather than picking one.
@@ -120,7 +119,7 @@ namespace Faolan.Importer.Rdb
 				// is about, so recording it is right regardless of spawn coverage - and the goal then works the moment
 				// its map is imported, with no second pass through here. It is inert either way until then.
 				//
-				// ⚠️ Counted, not silent: a wired goal whose NPC is missing LOOKS wired, so the run says how many.
+				// Counted, not silent: a wired goal whose NPC is missing looks wired, so the run says how many.
 				if (!npcNames.Contains(recipient))
 					withoutNpc++;
 				else if (!withDialogue.Contains(recipient))
@@ -129,10 +128,10 @@ namespace Faolan.Importer.Rdb
 				goal.GoalType = QuestGoalType.TalkToNpc;
 				goal.TargetName = recipient;
 
-				// A goal this rule types is now COMPLETE - kind, target and count - so it stops being partial and
+				// A goal this rule types is now complete - kind, target and count - so it stops being partial and
 				// starts counting. `Partial` is what `AllGoalsComplete`, `MatchingKillGoal` and
 				// `QuestObjectiveRegion.Build` skip on, so leaving it set would wire the goal and still render the
-				// quest as if it had one fewer objective (#527). Only cleared here, where the row is actually filled.
+				// quest as if it had one fewer objective. Only cleared here, where the row is actually filled.
 				if (goal is { Partial: true, RequiredCount: > 0 })
 					goal.Partial = false;
 
@@ -145,7 +144,7 @@ namespace Faolan.Importer.Rdb
 			return new Result(goals.Count, wired, unreadable, gated, noName, notOurShape, alreadyWired, withoutNpc, withoutDialogue, reconciled);
 		}
 
-		// (category, id) -> ciphertext over the ENGLISH pages of the ENCRYPTED categories. The language comes from the
+		// (category, id) -> ciphertext over the english pages of the encrypted categories. The language comes from the
 		// client's own language records rather than from the text (whole pages ship untranslated, so a sniffer unions
 		// languages and yields French), and the encrypted set from the page header's own flags word.
 		private static Dictionary<(uint Category, uint Id), byte[]> EnglishEncryptedStrings(string rdbDir, string? cdnBase)

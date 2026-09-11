@@ -8,10 +8,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The `Realms` configuration section: the STATIC half of a Realm row, declared in faolan.json instead of edited
+	// The `Realms` configuration section: the static half of a Realm row, declared in faolan.json instead of edited
 	// into a committed binary database by hand.
 	//
-	// ⚠️ Most of these gates are about the ways a realm can be declared WRONG, because the cost of each is paid at
+	// Most of these gates are about the ways a realm can be declared wrong, because the cost of each is paid at
 	// the far end of a login rather than at startup: a realm the login tier advertises with a port nothing binds is a
 	// client that connects, waits, and gives up. Config time is the only place left to catch them where the message
 	// can still name the key.
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// An enum is spelled by NAME in the file (the generator writes "PvP", not 256), and case-insensitively, the
+		// An enum is spelled by name in the file (the generator writes "PvP", not 256), and case-insensitively, the
 		// same way the catalog's own enum settings parse.
 		public void AnEnum_IsSpelledByNameAndIsCaseInsensitive()
 		{
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 
 		[Theory]
 		// There is no per-field default: a half-declared realm is one the login tier would advertise wrongly, so every
-		// field is named or the realm is refused. The message has to carry the KEY, since the operator's next move is
+		// field is named or the realm is refused. The message has to carry the key, since the operator's next move is
 		// to go and fix that line.
 		[InlineData("Name")]
 		[InlineData("IpAddress")]
@@ -69,8 +69,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⭐ The id is the foreign key every character, guild, mail and auction listing carries, so it cannot be
-		// implicit. 0 is what an omitted or unparsable value reads back as, AND what the database takes as "generate
+		// The id is the foreign key every character, guild, mail and auction listing carries, so it cannot be
+		// implicit. 0 is what an omitted or unparsable value reads back as, and what the database takes as "generate
 		// one" - so it is refused rather than defaulted.
 		public void AZeroOrMissingId_IsRefused()
 		{
@@ -96,8 +96,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// The same check Realm.IpAddressLong makes (#845: the chat/CS handoff carries a u32 and the client is IPv4
-		// only), moved to config time - it used to throw on the SEND, i.e. after a player had already picked the realm.
+		// The same check Realm.IpAddressLong makes - the chat/CS handoff carries a u32 and the client is IPv4 only -
+		// at config time rather than on the send, which is after a player has already picked the realm.
 		public void AnIpV6Address_IsRefusedAtConfigTime()
 		{
 			Assert.Contains("InterNetworkV6", Throws(Realm(1, ip: "::1")));
@@ -141,16 +141,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⭐ #910 again, one layer up: there it was one global MCP port shared by every realm process, here it is two
-		// realm hosts racing for a bind. The loser dies with the winner already advertised, which is the quiet,
-		// wrong-direction failure the liveness work exists to remove.
+		// Two realm hosts racing for one bind: the loser dies with the winner already advertised, which is a quiet
+		// failure in the wrong direction. Config time is where it has to be refused.
 		public void TwoRealmsSharingAPortOnOneAddress_AreRefused()
 		{
 			Assert.Contains("both declare port 7012", Throws(Realm(1), Realm(2, name: "Other", port: 9014, chat: 7012, cs: 9001)));
 		}
 
 		[Fact]
-		// ...but the SAME ports on a DIFFERENT machine are the normal multi-realm shape, and must stay legal.
+		// ...but the same ports on a different machine are the normal multi-realm shape, and must stay legal.
 		public void TwoRealmsWithTheSamePortsOnDifferentAddresses_AreFine()
 		{
 			var realms = FaolanRealms.Declared(Config(Realm(1, ip: "10.0.0.1"), Realm(2, name: "Other", ip: "10.0.0.2")));

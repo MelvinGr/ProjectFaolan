@@ -8,13 +8,13 @@ namespace Faolan.Web
 	// The armory/viewer's command line: configuration keys only, declared so `--help` lists them and a misspelling
 	// is an error rather than a setting that silently stays on its default.
 	//
-	// RdbDir is the one that matters in practice - the 3D viewer needs the client's RDB folder, and it is OPTIONAL:
-	// without it the rest of the site (roster, GM tools, mail) works and only the model endpoints fail. Same key as
-	// the importer uses, so one name across the two things that read the client's assets.
+	// RdbDir is the one that matters in practice - the 3D viewer needs the client's RDB folder - and it is optional:
+	// without it the rest of the site (roster, GM tools, mail) works and only the model endpoints fail. It is the same
+	// key the importer uses, so there is one name across the two things that read the client's assets.
 	public static class WebCommand
 	{
-		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
-		// `--help` here cannot describe a default the code does not use.
+		// A view of the one setting catalog (FaolanSettings): the description and the default live there, so `--help`
+		// here cannot describe a default the code does not use.
 		private static readonly Option[] Options =
 			FaolanSettings.Options(Keys.ContentRdbDir, Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.CdnPublicAddress);
 

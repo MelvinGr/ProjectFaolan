@@ -2,14 +2,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Reads / writes the FA015807 pre-IIR scaffold (SpawnPreIir) byte-exact: the version byte, then the fixed
-	// 6 u8 + 53 u32 grid interleaved with the one count-framed sublist, per SpawnPreIir.Layout.
-	//
-	// A SUB-RECORD codec (#530 §2 rule 5c): composed inside SimpleCharFullUpdateCodec, never sent alone, so it
-	// declares no opcode. There used to be TWO of these - `NpcSpawnPreIirCodec.Encode/TryDecode` and
-	// `PlayerSpawnPreFrameCodec.Build/TryParse` - walking the same layout table; the NPC one additionally SCANNED
-	// the body to find where the scaffold started, because it was decoded out of a whole body rather than composed
-	// into one. Reading the body sequentially removes both the scan and the second copy.
+	/// <summary>
+	///     Reads and writes the spawn pre-IIR scaffold (<see cref="SpawnPreIir" />) byte-exact: the version byte, then the
+	///     fixed grid of 6 u8 and 53 u32 interleaved with the one count-framed sublist, per SpawnPreIir.Layout.
+	/// </summary>
+	/// <remarks>
+	///     A sub-record codec: composed inside <see cref="SimpleCharFullUpdateCodec" /> and never sent alone, so it
+	///     declares no opcode. Because the body is read sequentially, nothing here has to scan for where the scaffold
+	///     starts.
+	/// </remarks>
 	internal static class SpawnPreIirCodec
 	{
 		internal static SpawnPreIir Read(ref SpanReader r)

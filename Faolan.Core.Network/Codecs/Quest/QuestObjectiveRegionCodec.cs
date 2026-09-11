@@ -4,18 +4,19 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// The @609 OBJECTIVE-DETAIL region of the 0x737A6DF9 FullChar snapshot tails - the bytes that follow each Quest_c
-	// journal record (QuestcRecordCodec). Grammar decoded + validated 2026-06-16 (tools/capture/decode_snapshot_609.py,
-	// docs/re/fullplayer-snapshot-reader.md): a per-GOAL objective-detail list, NOT a QuestFullUpdate block (that
-	// earlier claim was disproven - 559 B vs 869 B).
-	//
-	// Wire:  [u32 (goals + 1) * 0x3F1]  then one QuestObjectiveGoal per goal.
-	//
-	// The lead word is an ordinary ListFrame count, NOT a "ChapterTag": the beach quest's 2 goals make it 0xBD3 and a
-	// 1-goal quest (Casilda 13479) makes it 0x7E2. #255.
+	/// <summary>
+	///     The @609 objective-detail region of the FullChar snapshot tails - the bytes that follow each Quest_c journal
+	///     record (<see cref="QuestcRecordCodec" />). It is a per-goal objective-detail list: a
+	///     <see cref="ListFrame" /> count, then one <see cref="QuestObjectiveGoal" /> per goal.
+	/// </summary>
+	/// <remarks>
+	///     The lead word is an ordinary list count rather than a tag - a single-goal quest and the beach's two-goal quest
+	///     carry different words. Grammar decoded and validated with tools/capture/decode_snapshot_609.py; see
+	///     docs/re/fullplayer-snapshot-reader.md.
+	/// </remarks>
 	public static class QuestObjectiveRegionCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestObjectiveRegion value)
 		{
 			using var s = new FaolanStream();
@@ -33,12 +34,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		internal static QuestObjectiveRegion Read(ref SpanReader r)
 		{
-			// STRICT: the lead word IS the count - read exactly that many goals rather than consuming while the next
-			// word happens to be GoalLead. The tolerant peek made this reader accept output the CLIENT rejects: a
-			// record whose goal count disagreed with the goals actually written round-tripped here and then desynced
-			// the client's cursor, which died at the next StatList_t (assert "(nSize%1009)==0 && nSize>0, inconsistent
-			// IdentityList", statlist.cpp:134 = FUN_0139d450). Reader and writer sharing a tolerant model is exactly
-			// what hides a wire bug - see the snapshot-prefix and packed-repeated cases.
+			// The lead word is the count: read exactly that many goals rather than consuming while the next word
+			// happens to be GoalLead. A tolerant peek accepts output the client rejects - a record whose goal count
+			// disagrees with the goals actually written round-trips here and then desyncs the client's cursor, which
+			// dies at the next StatList_t ("inconsistent IdentityList", statlist.cpp:134 = FUN_0139d450). Reader and
+			// writer sharing a tolerant model is what hides a wire bug.
 			var count = r.ReadListCount();
 			var goals = new List<QuestObjectiveGoal>(count);
 			for (var i = 0; i < count; i++)
@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// One quest's @609 objective-detail region.
+	/// <summary>One quest's @609 objective-detail region.</summary>
 	public sealed record QuestObjectiveRegion
 	{
 		public List<QuestObjectiveGoal> Goals { get; init; } = [];

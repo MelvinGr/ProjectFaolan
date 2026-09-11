@@ -19,7 +19,7 @@ namespace Faolan.Core.Enums
 		Necromancer = 0x29
 	}
 
-	// The class DISPLAY names, and the lookup back from one.
+	// The class display names, and the lookup back from one.
 	//
 	// These are the client's own spellings, from RDB 1000505 `RDBPlayerClassData_c` - a `[classId][name][tier]`
 	// registry whose 12 tier-3 entries are exactly the enum above (`docs/rdb/client-data-tables.md`). They are stated
@@ -27,8 +27,8 @@ namespace Faolan.Core.Enums
 	// capture-driven importer modules, which have no `RdbDir`; the registry is the authority the spellings were taken
 	// from, and the reason they can be trusted verbatim.
 	//
-	// ⚠️ This is a NAME lookup, not a parser - it matches the whole string. Anything that wants to find a class named
-	// INSIDE a longer string has to split that string itself and decide what a segment is, because "Ranger" is a
+	// This is a name lookup, not a parser - it matches the whole string. Anything that wants to find a class named
+	// inside a longer string has to split that string itself and decide what a segment is, because "Ranger" is a
 	// substring of nothing useful but "Priest" is a substring of "Priest of Mitra".
 	public static class ConanClasses
 	{

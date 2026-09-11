@@ -14,8 +14,8 @@ namespace Faolan.Core.Network.Server.GameServer
 	public interface IGameServerProvider
 	{
 		/// <summary>
-		///     Force-disconnect a connected character (closes the world socket). Returns false when the
-		///     character is not connected to this listener. Used by the web admin "ban + kick" path via MCP.
+		///     Force-disconnects a connected character, closing the world socket. Returns false when the character is not
+		///     connected to this listener.
 		/// </summary>
 		bool DisconnectCharacter(uint characterId);
 
@@ -26,9 +26,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		CharacterLiveState? GetCharacterLiveState(uint characterId);
 
 		/// <summary>
-		///     The COMPLETE live <see cref="INetworkClientSession" /> of every client connected to this listener -
-		///     the full session state (selected target, energy, conversation, entry mode, account/character, …).
-		///     Read-only inspection (e.g. the MCP list_world_sessions tool); do not mutate the returned objects.
+		///     The complete live <see cref="INetworkClientSession" /> of every client connected to this listener: the
+		///     full session state (selected target, energy, conversation, entry mode, account/character, …). Read-only
+		///     inspection; do not mutate the returned objects.
 		/// </summary>
 		IEnumerable<INetworkClientSession> GetWorldSessions();
 
@@ -46,9 +46,9 @@ namespace Faolan.Core.Network.Server.GameServer
 		Task<bool> RunGmCommand(uint characterId, string commandText);
 
 		/// <summary>
-		///     Pushes the in-world guild tag (0x2550C99A GuildUpdateIIR) onto the character's live world
-		///     connection, if connected to this listener. An empty name clears the tag. Used by the
-		///     CsPlayerAgent guild flow so joining/leaving a guild updates the world view without a relog.
+		///     Pushes the in-world guild tag onto the character's live world connection, when it is connected to this
+		///     listener. An empty name clears the tag. Used by the CsPlayerAgent guild flow so joining or leaving a guild
+		///     updates the world view without a relog.
 		/// </summary>
 		Task<bool> SendGuildTag(uint characterId, string guildName);
 
@@ -62,24 +62,24 @@ namespace Faolan.Core.Network.Server.GameServer
 		Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined);
 
 		/// <summary>
-		///     Ends a PvP minigame for one member: DispatchMinigameMatchEnded (GameCharInterface 0x8B) on their WORLD
-		///     connection, carrying the winning side and what the match meant for them. The match itself lives on the CS
-		///     tier (PvpMatchService) but the minigame messages travel on this one, which is why the end crosses the seam
-		///     the same way the match-start clock does. Returns false when the member is not connected here.
+		///     Ends a PvP minigame for one member: DispatchMinigameMatchEnded on their world connection, carrying the
+		///     winning side and what the match meant for them. The match itself lives on the CS tier but the minigame
+		///     messages travel on this one, which is why the end crosses the seam the same way the match-start clock
+		///     does. Returns false when the member is not connected here.
 		/// </summary>
 		Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult);
 
 		/// <summary>
-		///     Stops a PvP minigame for one member with a reason line: DispatchForceStopMinigame (GameCharInterface 0x8F),
-		///     the client's own abort path. Returns false when the member is not connected here.
+		///     Stops a PvP minigame for one member with a reason line: DispatchForceStopMinigame, the client's own abort
+		///     path. Returns false when the member is not connected here.
 		/// </summary>
 		Task<bool> SendMinigameForceStop(uint characterId, string message);
 
 		/// <summary>
 		///     Teleports a connected character to a map, riding the same retail change-map sequence the travel box
-		///     uses (announce + handoff + reconnect). <paramref name="position" /> null lands at the map's default
-		///     spawn. The seam the CS tier's group-finder entry uses to put a formed team into its instance (#511);
-		///     returns false when the character is not connected to this listener.
+		///     uses (announce, handoff, reconnect). A null <paramref name="position" /> lands at the map's default spawn.
+		///     This is the seam the CS tier's group-finder entry uses to put a formed team into its instance; returns
+		///     false when the character is not connected to this listener.
 		/// </summary>
 		Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null);
 
@@ -88,10 +88,10 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     UpdateCash the client renders. Returns false when the character is not connected here, so the caller can
 		///     refuse rather than move money nobody will see.
 		///     <para>
-		///         The wallet is the GAME tier's: it lives on the live session's <c>Character.Money</c> and the client
+		///         The wallet is the game tier's: it lives on the live session's <c>Character.Money</c> and the client
 		///         learns of a change only through that tier's UpdateCash. A guild-bank withdrawal is decided on the CS
-		///         tier (which owns <c>Guild.Cash</c> and the rank ladder) and paid out here, so this is the seam
-		///         between the two halves of one transaction — hence "credit the connected character", not "set money".
+		///         tier, which owns <c>Guild.Cash</c> and the rank ladder, and paid out here, so this is the seam between
+		///         the two halves of one transaction - hence "credit the connected character", not "set money".
 		///     </para>
 		/// </summary>
 		Task<bool> CreditCharacterCash(uint characterId, ulong amountTin);

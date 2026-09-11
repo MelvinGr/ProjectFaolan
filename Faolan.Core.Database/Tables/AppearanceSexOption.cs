@@ -5,14 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// The character-creator options that are per SEX and not per race - the body morph ranges (`BodyNodes`), the face
-	// morph ranges (`FaceNodes`) and the five voice samples. In CHARACTERCREATOR (RDB 1010700) these hang off the SEX
+	// The character-creator options that are per sex and not per race - the body morph ranges (`BodyNodes`), the face
+	// morph ranges (`FaceNodes`) and the five voice samples. In charactercreator (RDB 1010700) these hang off the sex
 	// element, above the per-race sections, so there is exactly one set of each per sex.
 	//
-	// They used to live in AppearanceChoice, written once per race so that a single (sex, race) query returned
-	// everything. That meant storing each definition FOUR times - 264 rows carrying 66 distinct ones - and it made the
-	// table lie about its own shape: a `morph` row keyed by Race implies morphs vary by race, and they do not. The
-	// per-race categories (hair, head, beard, piercings, the colours, the tattoos, and height, which IS read per race
+	// Kept out of the per-race AppearanceChoice: a `morph` row keyed by Race would imply morphs vary by race, and
+	// they do not - writing one per race stores each definition four times (264 rows carrying 66 distinct ones). The
+	// per-race categories (hair, head, beard, piercings, the colours, the tattoos, and height, which is read per race
 	// even though its 92..100 happens to be uniform) stay in AppearanceChoice.
 	//
 	// Keyed by (Sex, Category, Sequence), the same "a choice IS its slot in one list" reasoning AppearanceChoice uses.
@@ -34,7 +33,7 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string Category { get; set; } = null!;
 
-		// The morph NAME for a morph/facemorph row, or the voice `enum` for a voice row.
+		// The morph name for a morph/facemorph row, or the voice `enum` for a voice row.
 		[MaxLength(128)]
 		public string Value { get; set; } = null!;
 

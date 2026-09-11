@@ -6,27 +6,26 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report fixture-stats`: what would a REPRESENTATIVE SELECTION of the corpus slice actually keep, and what
-	// would it throw away? (Gitea #555 step 1.)
+	// `--report fixture-stats`: what would a representative selection of the corpus slice actually keep, and what
+	// would it throw away?
 	//
-	// The ticket's rule is *"keep every body our codecs fail to parse or re-encode, plus K per shape class"*, with
-	// `(IIR, body length)` as the shape class - measured there at 45,520 bodies -> ~1,647 and 14.7 MB -> ~3.6 MB. The
-	// first clause is empty today (`--report codec-sweep` is at 100%), so the whole trade turns on the second, and
-	// this is the measurement that says what it costs.
+	// The candidate rule is "keep every body the codecs fail to parse or re-encode, plus K per shape class", with
+	// `(IIR, body length)` as the shape class. The first clause is empty while `--report codec-sweep` is at 100%, so
+	// the whole trade turns on the second, and this is the measurement that says what it costs.
 	//
-	// ⛔ **The headline is that length is a good proxy for some IIRs and a catastrophic one for others**, and the
+	// The headline is that length is a good proxy for some IIRs and a catastrophic one for others, and the
 	// report prints the ratio rather than the total so that is visible per type instead of averaged away. A type
-	// whose bodies outnumber its lengths by three orders of magnitude has all of its variety INSIDE one shape class,
+	// whose bodies outnumber its lengths by three orders of magnitude has all of its variety inside one shape class,
 	// and one-per-class would keep a single body of it.
 	//
-	// ⭐ Why a report and not a test: it measures the archive against a hypothetical, which is a decision aid rather
+	// Why a report and not a test: it measures the archive against a hypothetical, which is a decision aid rather
 	// than an invariant. The invariants are `CorpusExtract`'s two floors, which is where a narrowing would have to be
 	// argued.
 	public static partial class ReportCli
 	{
-		// A second candidate class, printed beside the length one: the body with its VOLATILE head masked. Entity
-		// handles and positions differ on every capture of the same entity, which is why the ticket found exact dedup
-		// useless (17,612 of 17,717 spawns are byte-distinct) - but that is a statement about the volatile fields, not
+		// A second candidate class, printed beside the length one: the body with its volatile head masked. Entity
+		// handles and positions differ on every capture of the same entity, which is what makes exact dedup useless -
+		// nearly every spawn body is byte-distinct - but that is a statement about the volatile fields, not
 		// about the grammar. Masking them is the honest version of "a shape signature", and the gap between the two
 		// columns is how much of the corpus is genuinely distinct.
 		private const int VolatileHeadBytes = 32;

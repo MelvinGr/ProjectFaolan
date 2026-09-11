@@ -10,7 +10,7 @@ namespace Faolan.Web.Components.Pages
 	public partial class Status
 	{
 		private DateTimeOffset? _lastLogin;
-		private IReadOnlyList<LiveSession>? _online; // null = game server unreachable (offline)
+		private IReadOnlyList<LiveSession>? _online; // Null when the game server is unreachable, that is, offline.
 		private List<ClassRow> _classes = [];
 
 		private List<RecentRow> _recent = [];
@@ -33,8 +33,8 @@ namespace Faolan.Web.Components.Pages
 			_spells = await db.Spells.LongCountAsync();
 			_lastLogin = await db.Accounts.MaxAsync(a => a.LastConnection);
 
-			// Roster is small; SQLite can't translate DateTimeOffset comparisons/ordering, so pull characters into memory
-			// and compute the recent list / class distribution client-side.
+			// The roster is small and SQLite cannot translate DateTimeOffset comparisons or ordering, so the characters
+			// are pulled into memory and the recent list and class distribution computed here.
 			var chars = await db.Characters.Where(c => c.Name != null && c.Name != "").Include(c => c.Map).ToListAsync();
 			_chars = chars.Count;
 
@@ -52,7 +52,7 @@ namespace Faolan.Web.Components.Pages
 				? 0
 				: _classes.Max(c => c.Count);
 
-			// Live presence from the running game server's MCP endpoint (null when it's offline).
+			// Live presence from the running game server's MCP endpoint; null when it is offline.
 			_online = await Live.GetSessionsAsync();
 
 			_loaded = true;

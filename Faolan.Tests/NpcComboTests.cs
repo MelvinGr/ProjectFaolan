@@ -17,13 +17,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #623 part 2: retail's NPCs swing COMBOS, and which one is decided by the weapon in their hands.
+	// Retail's NPCs swing combos, and which one is decided by the weapon in their hands.
 	//
 	// The evidence is `--report combo-swings`: over the 484 captured NPC combo swings, every actor resolves to a
 	// spawn in the same capture, and grouping the combo against that spawn's worn items separates cleanly - every
 	// `combo_npc_generic_polearm` actor holds a polearm, every `_2hb` one a two-handed blunt, and one NPC type with
 	// two loadouts (Bat Pict Mauler, template 8799 polearm vs 13960 club) swings the two different combos. So the
-	// choice is the WEAPON's and not the creature's, which is what makes it derivable for every armed mob we spawn
+	// choice is the weapon's and not the creature's, which is what makes it derivable for every armed mob we spawn
 	// rather than only for the 40 types some capture happened to record.
 	//
 	// What is locked here is that premise end to end: the item catalog really does state the weapon class, the
@@ -38,9 +38,9 @@ namespace Faolan.Tests
 			"combo_npc_generic_polearm"
 		];
 
-		// The premise everything else rests on: `Items.SearchCategory` IS the client's weapon class. The shipped
+		// The premise everything else rests on: `Items.SearchCategory` is the client's weapon class. The shipped
 		// catalog separates the seven melee classes perfectly - every 30011 row's name carries the `1hEdge` token and
-		// no other, and so on down - so reading the class off the category is a lookup, not a name match (#244).
+		// no other, and so on down - so reading the class off the category is a lookup, not a name match.
 		[Fact]
 		public void TheItemCatalogsSearchCategory_IsTheWeaponClass()
 		{
@@ -55,11 +55,10 @@ namespace Faolan.Tests
 				[NpcWeapon.Shield] = "hield" // Shield/shield - the NPC rows capitalise it, the player ones do not
 			};
 
-			// ⚠️ The premise here is a HEURISTIC - that a designer's internal name predicts the client's own category -
+			// The premise here is a heuristic - that a designer's internal name predicts the client's own category -
 			// and the client disagrees on this row. 355300 "NPC_Vanir_axe_uber2_2hEdge_(W_YMIRGIANT_ONLY)" is
-			// SearchCategory 30011 (one-hand edge) and has been for as long as we have shipped it; what changed is that
-			// `rdb-ldb-names` filled 530 previously-EMPTY item names, so a row that had no name to read now has one that
-			// says 2hEdge. The category is the client's field and wins; the name is prose. Listed rather than filtered
+			// SearchCategory 30011 (one-hand edge), while the name `rdb-ldb-names` resolves for it says 2hEdge. The
+			// category is the client's field and wins; the name is prose. Listed rather than filtered
 			// by a pattern so the exception stays countable - a second one should fail again and be looked at, not
 			// disappear into a wildcard.
 			var nameDisagreesWithTheClient = new HashSet<uint>
@@ -97,7 +96,7 @@ namespace Faolan.Tests
 			Assert.Equal(GenericCombos, shipped);
 		}
 
-		// The mapping itself, loadout by loadout. The off hand only ever refines the ONE-handed cases - a shield or a
+		// The mapping itself, loadout by loadout. The off hand only ever refines the one-handed cases - a shield or a
 		// second weapon splits `1he` three ways and `dagger` two - which is exactly the shape of the generic set.
 		[Theory]
 		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.Shield, "combo_npc_generic_1he_shield")]
@@ -115,9 +114,9 @@ namespace Faolan.Tests
 			Assert.Equal(expected, NpcWeapon.MeleeComboName(Equip(main, off)));
 		}
 
-		// The cases that carry no GENERIC combo, and they are the ones retail leaves plain too: `Combat:Unarmed` is
-		// 0 of 769 captured acks. A bow gets none HERE because there is no `combo_npc_generic_bow` row - an archer's
-		// combos are the `combo_npc_ranger_bow_*` class family, which `ClassComboFamily` answers instead (#676).
+		// The cases that carry no generic combo, and they are the ones retail leaves plain too: `Combat:Unarmed` is
+		// 0 of 769 captured acks. A bow gets none here because there is no `combo_npc_generic_bow` row - an archer's
+		// combos are the `combo_npc_ranger_bow_*` class family, which `ClassComboFamily` answers instead.
 		[Theory]
 		[InlineData(0u)] // unarmed - every animal
 		[InlineData(30017u)] // bow
@@ -129,7 +128,7 @@ namespace Faolan.Tests
 			Assert.Null(NpcWeapon.MeleeComboName(null));
 		}
 
-		// Coverage over the SHIPPED spawn set rather than over the 40 types a capture recorded - which is the whole
+		// Coverage over the shipped spawn set rather than over the 40 types a capture recorded - which is the whole
 		// argument for driving this off the weapon. Every placement whose main hand holds one of the seven melee
 		// classes resolves, and nothing else does.
 		[Fact]
@@ -162,7 +161,7 @@ namespace Faolan.Tests
 			Assert.True(armed >= 900, $"only {armed} melee-armed spawn placements resolved - the equipment lift looks short");
 		}
 
-		// The wire half: the id rides `combo_id` (CommandMessage field 7), the same field a PLAYER's combo swing
+		// The wire half: the id rides `combo_id` (CommandMessage field 7), the same field a player's combo swing
 		// uses, and nothing else about the ack moves. A plain swing is byte-identical to what it was before the
 		// combo existed, which is what keeps the captured frame-6472 golden meaningful.
 		[Fact]
@@ -201,11 +200,11 @@ namespace Faolan.Tests
 			Assert.InRange(NpcWeapon.ClassComboShare, 0.58, 0.59); // 92 class / 65 generic over the two wired weapons
 		}
 
-		// #675: `Combos.Criteria` is the WEAPON CLASS a combo requires, and it maps one-to-one onto the item catalog's
+		// `Combos.Criteria` is the weapon class a combo requires, and it maps one-to-one onto the item catalog's
 		// own `SearchCategory`. That is what turns the class families from names into a lookup - the polearm rows are
 		// the criteria-25 ones, not "the ones with `polearm` in the name".
 		//
-		// Checked from the CATALOG side over all 744 rows rather than from the nine generic ones: wherever a combo's
+		// Checked from the catalog side over all 744 rows rather than from the nine generic ones: wherever a combo's
 		// name carries a weapon token, its Criteria is that weapon's. Nothing in the shipped catalog contradicts it.
 		[Theory]
 		[InlineData(NpcWeapon.OneHandEdge, 23, "combo_npc_generic_1he")]
@@ -228,8 +227,8 @@ namespace Faolan.Tests
 			Assert.True(db.Items.Any(i => i.SearchCategory == searchCategory), $"no item of class {searchCategory}");
 		}
 
-		// The two buckets the weapon DOES answer, and they are answered because each has exactly one class family.
-		// Corpus, per SPAWN rather than per type (one handle in one capture holds one loadout): all 31 assassin-family
+		// The two buckets the weapon does answer, and they are answered because each has exactly one class family.
+		// Corpus, per spawn rather than per type (one handle in one capture holds one loadout): all 31 assassin-family
 		// swings are by dagger-wielders and all 8 dagger-armed templates swing the family; likewise 61 swings and 5
 		// templates for the polearm guardians.
 		[Theory]
@@ -247,23 +246,22 @@ namespace Faolan.Tests
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var rows = await db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass }).ToListAsync(TestContext.Current.CancellationToken);
 			Assert.All(rows, r => Assert.StartsWith(family, r.Name, System.StringComparison.Ordinal));
-			// ⭐ And the CLIENT agrees with the name on every row that speaks (#675) - the veto never fires here,
+			// And the client agrees with the name on every row that speaks - the veto never fires here,
 			// which is the point: it exists for the two rows whose name says Conqueror and whose `npcclass` says
 			// Dark Templar, and neither is in a wired bucket.
 			Assert.All(rows, r => Assert.True(r.NpcClass == null || r.NpcClass == (int)@class,
 				$"{r.Name} states npcclass {r.NpcClass}, not {(int)@class}"));
 		}
 
-		// ⚠️ The buckets that stay UNANSWERED, pinned so a later "tidy up the rest" pass has to face the evidence
+		// The buckets that stay unanswered, pinned so a later "tidy up the rest" pass has to face the evidence
 		// rather than widening the switch:
 		//
 		//   shield    refuted, not merely unsampled - `combo_npc_guardian_shield_*` is swung by 3 of the 6 captured
 		//             shield-bearing templates, the three Vanir ones swinging only generic
-		//   2h/dual   `barbarian` / `conqueror` / `hox` all appear on two-handers (blunt AND edge) and no template
+		//   2h/dual   `barbarian` / `conqueror` / `hox` all appear on two-handers (blunt and edge) and no template
 		//             swings two of them, so it is a per-NPC property with two or three candidates
 		//
-		// BOW/CROSSBOW is no longer among them - #676 gave the shot its own carrier, so the ranger family that was
-		// answered all along is wired.
+		// Bow and crossbow are not among them: the shot has its own carrier, so the ranger family is wired.
 		[Theory]
 		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.Shield)]
 		[InlineData(NpcWeapon.TwoHandEdge, 0u)]
@@ -280,7 +278,7 @@ namespace Faolan.Tests
 
 		// The level gate is `Combos.Level` verbatim - the family name's trailing number. Across the 30 captured
 		// class-family swings no actor ever swings a row above its own level, and a level-75 mob still swings the
-		// rank-1 row, so this is a CEILING and not a bracket: a higher-level NPC's set contains the lower one's.
+		// rank-1 row, so this is a ceiling and not a bracket: a higher-level NPC's set contains the lower one's.
 		[Fact]
 		public async Task TheClassFamilyIsGatedByLevel_AsACeilingNotABracket()
 		{
@@ -300,16 +298,16 @@ namespace Faolan.Tests
 			Assert.All(await db.Combos.Where(c => atOne.Contains(c.Id)).ToListAsync(TestContext.Current.CancellationToken), c => Assert.True(c.Level <= 1, $"{c.Name} is level {c.Level}"));
 		}
 
-		// ⭐ #675 closed: the archetype is HARVESTED per template (`NpcStatCore.ComboClass`), and with it the three
-		// buckets the weapon could never answer resolve - because the class no longer comes from the weapon at all.
-		// The weapon only narrows WITHIN the class, through the row's own `Criteria`.
+		// The archetype is harvested per template (`NpcStatCore.ComboClass`), which resolves the three buckets the
+		// weapon can never answer: the class does not come from the weapon at all. The weapon only narrows within the
+		// class, through the row's own `Criteria`.
 		[Theory]
 		[InlineData(ConanClass.Barbarian, NpcWeapon.TwoHandBlunt, 0u, "combo_npc_barbarian_2h_")] // the 2h bucket
 		[InlineData(ConanClass.Barbarian, NpcWeapon.TwoHandEdge, 0u, "combo_npc_barbarian_2h_")]
 		[InlineData(ConanClass.Conqueror, NpcWeapon.TwoHandBlunt, 0u, "combo_npc_conqueror_2h_")] // ...on the same weapon
 		[InlineData(ConanClass.Barbarian, NpcWeapon.OneHandEdge, NpcWeapon.OneHandEdge, "combo_npc_barbarian_dual_")] // dual 1h
 		[InlineData(ConanClass.Guardian, NpcWeapon.OneHandEdge, NpcWeapon.Shield, "combo_npc_guardian_shield_")] // the shield bucket
-		[InlineData(ConanClass.Guardian, NpcWeapon.Polearm, 0u, "combo_npc_guardian_polearm_")] // ...and the SAME class on a polearm
+		[InlineData(ConanClass.Guardian, NpcWeapon.Polearm, 0u, "combo_npc_guardian_polearm_")] // ...and the same class on a polearm
 		[InlineData(ConanClass.HeraldOfXotli, NpcWeapon.TwoHandEdge, 0u, "combo_npc_hox_")]
 		[InlineData(ConanClass.DarkTemplar, NpcWeapon.OneHandEdge, 0u, "combo_npc_dark_templar_")]
 		public async Task TheHarvestedArchetype_AnswersTheBucketsTheWeaponCannot(ConanClass @class, uint main, uint off, string family)
@@ -319,7 +317,7 @@ namespace Faolan.Tests
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var rows = await db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass, c.Criteria }).ToListAsync(TestContext.Current.CancellationToken);
-			// Every row is the archetype's, stated by the CLIENT rather than read off the name...
+			// Every row is the archetype's, stated by the client rather than read off the name...
 			Assert.All(rows, r => Assert.Equal((int)@class, r.NpcClass));
 			// ...and the expected weapon family is among them.
 			Assert.Contains(rows, r => r.Name.StartsWith(family, System.StringComparison.Ordinal));
@@ -346,8 +344,8 @@ namespace Faolan.Tests
 				n => n.StartsWith("combo_npc_guardian_shield_", System.StringComparison.Ordinal));
 		}
 
-		// ⚠️ `Criteria` 28 is `2hEdge` on the GENERIC set and yet retail swings the criteria-28 CLASS rows with
-		// two-handed BLUNT weapons - LargeWarclub, Warhammer, HeavyBludgeon, SledgeHammer, BattleMaul, all in the
+		// `Criteria` 28 is `2hEdge` on the generic set and yet retail swings the criteria-28 class rows with
+		// two-handed blunt weapons - LargeWarclub, Warhammer, HeavyBludgeon, SledgeHammer, BattleMaul, all in the
 		// corpus. So the widening is capture-driven; pinned here so it cannot be "tidied" back to 2hEdge.
 		[Fact]
 		public void Criteria28_IsAnyTwoHander_BecauseRetailSwingsItWithBlunts()
@@ -362,7 +360,7 @@ namespace Faolan.Tests
 			Assert.False(NpcWeapon.MeetsComboCriteria(99, Equip(NpcWeapon.TwoHandEdge, 0)));
 		}
 
-		// The shipped harvest: every stamped archetype is a class the CLIENT's own combo catalog has rows for, so a
+		// The shipped harvest: every stamped archetype is a class the client's own combo catalog has rows for, so a
 		// stat core can never name a family that does not exist. 36 templates over 7 classes, and the module reports
 		// zero templates voting for two classes.
 		[Fact]

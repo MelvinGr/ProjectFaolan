@@ -68,8 +68,9 @@
 
 	private string BarId => $"{Id}-bar";
 
-	// Seed the runtime collapse state from the Collapsed parameter ONCE. Keeping the toggle in a private field (not the
-	// parameter) means a parent re-render can't reset it - a [Parameter] set internally is overwritten on the next render.
+	// Seed the runtime collapse state from the Collapsed parameter once. Keeping the toggle in a private field rather
+	// than the parameter means a parent re-render cannot reset it: a [Parameter] set internally is overwritten on the
+	// next render.
 	protected override void OnInitialized()
 	{
 		_collapsed = Collapsed;

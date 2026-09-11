@@ -12,17 +12,25 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.ClientLauncher
 {
-	// A minimal stand-in for ConanPatcher.exe: computes the two flags AgeOfConan.exe needs to run directly (instead
-	// of bouncing back to the patcher) and starts the client. Both flags were recovered by RE of ConanPatcher.exe:
-	//   -clienthash <md5 of AgeOfConan.exe>   the client-integrity hash the patcher forwards
-	//   -key <TEA-encrypt(time||time)>        the launch-freshness token (see Faolan.Core.Crypt.ConanLaunchToken)
-	// Optionally adds the auto-login flags (-username/-password/-charname) so you skip the login + character screens.
+	/// <summary>
+	///     A minimal stand-in for ConanPatcher.exe: computes the two flags AgeOfConan.exe needs to run directly,
+	///     instead of bouncing back to the patcher, and starts the client.
+	/// </summary>
+	/// <remarks>
+	///     The two flags, as ConanPatcher.exe passes them, are
+	///     <c>-clienthash &lt;md5 of AgeOfConan.exe&gt;</c>, the client-integrity hash the patcher forwards, and
+	///     <c>-key &lt;TEA-encrypt(time||time)&gt;</c>, the launch-freshness token built by
+	///     <see cref="ClientLaunchToken" />. The auto-login flags (-username, -password, -charname) are added on
+	///     request, which skips the login and character screens.
+	/// </remarks>
 	internal static class Program
 	{
 		private const string SteamAppId = "217750";
 
-		// Copy path -> path.bak only if the backup doesn't already exist, so the FIRST run captures the pristine
-		// original and later runs (which see an already-modified file) never overwrite it.
+		/// <summary>
+		///     Copies path to path.bak only when the backup does not already exist, so the first run captures the
+		///     pristine original and later runs, which see an already-modified file, never overwrite it.
+		/// </summary>
 		private static void BackupOnce(string path)
 		{
 			var bak = path + ".bak";
@@ -30,8 +38,11 @@ namespace Faolan.ClientLauncher
 				File.Copy(path, bak);
 		}
 
-		// Print any AgeOfConan.log content past `pos`; returns the new position. Resets to 0 if the file shrank
-		// (a new session truncated/recreated it). Shared-read so the client can keep writing/rotating it.
+		/// <summary>
+		///     Prints any AgeOfConan.log content past <paramref name="pos" /> and returns the new position, restarting
+		///     from 0 when the file has shrunk because a new session truncated or recreated it. The file is opened
+		///     shared-read so the client can keep writing to and rotating it.
+		/// </summary>
 		private static long DumpNewLogContent(string path, long pos)
 		{
 			try
@@ -57,10 +68,12 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
-		// A normalized, case-insensitive fragment of the exe path used to recognise a running client from the SAME
-		// install in its command line. The path is compared below its root (leading separator dropped, backslashes
-		// unified to '/', lowercased) so both the native "/mnt/.../AgeOfConan.exe" and the Wine "Z:\mnt\...\AgeOfConan.exe"
-		// forms match the same install while a different install's path does not.
+		/// <summary>
+		///     A normalised, case-insensitive fragment of the exe path, used to recognise a running client from the
+		///     same install by its command line. The path is compared below its root — leading separator dropped,
+		///     backslashes unified to '/', lowercased — so both the native "/mnt/.../AgeOfConan.exe" and the Wine
+		///     "Z:\mnt\...\AgeOfConan.exe" forms match the same install while a different install's path does not.
+		/// </summary>
 		private static string ExePathSignature(string exe)
 		{
 			var full = exe;
@@ -70,16 +83,22 @@ namespace Faolan.ClientLauncher
 			}
 			catch
 			{
-				// keep the raw value if it can't be resolved
+				// Keep the raw value when it cannot be resolved.
 			}
 
 			return NormalizePath(full).TrimStart('/');
 		}
 
-		// Kill the running AgeOfConan client launched from THIS `exe` path only (so a client running from a different
-		// install is left alone) - matched by the exe's full path in the process command line, NOT just the
-		// "AgeOfConan.exe" name. Under Wine/Proton the path appears in the Z:\ drive form, so we compare on a normalized
-		// signature (see ExePathSignature). On Windows we compare the process main-module path.
+		/// <summary>
+		///     Kills the running AgeOfConan client launched from this <paramref name="exe" /> path only, leaving a
+		///     client from a different install alone.
+		/// </summary>
+		/// <remarks>
+		///     Matching is on the exe's full path in the process command line rather than on the "AgeOfConan.exe" name
+		///     alone. Under Wine and Proton the path appears in its Z:\ drive form, so the comparison runs on the
+		///     normalised signature from <see cref="ExePathSignature" />; on Windows the process main-module path is
+		///     compared instead.
+		/// </remarks>
 		private static void KillRunningClients(string exe)
 		{
 			var killed = 0;
@@ -97,7 +116,7 @@ namespace Faolan.ClientLauncher
 					}
 					catch
 					{
-						// MainModule can throw (access denied / bitness mismatch / vanished); skip.
+						// MainModule can throw on access denied, a bitness mismatch or a vanished process.
 					}
 				}
 			}
@@ -113,8 +132,9 @@ namespace Faolan.ClientLauncher
 					{
 						var comm = File.ReadAllText(Path.Combine(dir, "comm")).Trim();
 						var cmdline = File.ReadAllText(Path.Combine(dir, "cmdline")).Replace('\0', ' ');
-						// Only this install's client: its cmdline must reference the exact exe PATH (not just the
-						// AgeOfConan.exe name), excluding this launcher (which carries the path in its own --exe args).
+						// Only this install's client: its cmdline must reference the exact exe path, not just the
+						// AgeOfConan.exe name, and this launcher is excluded because it carries that path in its
+						// own --exe argument.
 						var isClient = NormalizePath(cmdline).Contains(sig, StringComparison.Ordinal) && !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal) && comm != "dotnet";
 
 						if (isClient)
@@ -122,7 +142,7 @@ namespace Faolan.ClientLauncher
 					}
 					catch
 					{
-						// process vanished or unreadable; ignore.
+						// The process vanished or is unreadable.
 					}
 				}
 			}
@@ -133,13 +153,13 @@ namespace Faolan.ClientLauncher
 
 		private static int Main(string[] args)
 		{
-			// The whole command line, declared and parsed in one place (LauncherCommand) - an unknown or misspelled
-			// option is an error here, not a flag that quietly did nothing.
+			// The whole command line is declared and parsed in one place, so an unknown or misspelled option is an
+			// error here rather than a flag that quietly did nothing.
 			if (LauncherCommand.Parse(args, out var parseExit) is not { } options)
 				return parseExit;
 
-			// Resolve the client exe: --exe wins, else auto-detect the Steam install (app 217750, Linux + Windows).
-			// No hardcoded fallback - error out if neither yields a path.
+			// Resolve the client exe: --exe wins, otherwise the Steam install is auto-detected. There is no hardcoded
+			// fallback, so neither yielding a path is an error.
 			var exe = options.Exe ?? SteamPaths.FindExe();
 			if (exe == null)
 			{
@@ -160,15 +180,12 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
-			// --restore: undo every LocalConfig.xml redirect the launcher applies - put the retail Funcom
-			// <UniverseAddr> and CDN URLs back - and exit. No backup file is used; the retail values are the
-			// constants above.
+			// --restore undoes every on-disk change the launcher makes and exits, by copying each <file>.bak back over
+			// the modified file: the pristine exe carries the Funcom DH pubkey, the pristine LocalConfig.xml the
+			// retail UniverseAddr and CDN URLs, and the pristine dbDebug.conf retail's three logger channels.
 			if (options.Restore)
 			{
-				// Copy each <file>.bak back over the modified file: the pristine exe carries the Funcom DH pubkey +
-				// GUI subsystem, the pristine LocalConfig.xml the retail UniverseAddr + CDN URLs, the pristine
-				// dbDebug.conf retail's three logger channels. Restore BOTH exe
-				// variants (DX9 + DX10) regardless of the --dx10 flag, so whichever was patched is undone.
+				// Both exe variants are restored regardless of --dx10, so whichever was patched is undone.
 				var dir = Path.GetDirectoryName(exe)!;
 				foreach (var name in new[] { "AgeOfConan.exe", "AgeOfConanDX10.exe", "LocalConfig.xml", ClientDebugChannels.ConfName })
 				{
@@ -181,8 +198,8 @@ namespace Faolan.ClientLauncher
 				return 0;
 			}
 
-			// Back up the pristine exe + LocalConfig.xml + dbDebug.conf to <file>.bak (once - only if no .bak exists
-			// yet) before we modify any of them, so --restore is a straight copy-back instead of a reverse-transform.
+			// Back the pristine exe, LocalConfig.xml and dbDebug.conf up to <file>.bak - once, only when no .bak exists
+			// yet - before any of them is modified, so --restore is a straight copy-back and not a reverse transform.
 			if (!options.DryRun)
 			{
 				BackupOnce(exe);
@@ -191,21 +208,22 @@ namespace Faolan.ClientLauncher
 					BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, ClientDebugChannels.ConfName));
 			}
 
-			// Patch the client's embedded Funcom DH pubkey -> CELLAO on disk so the server can validate the password
-			// (ClientExePatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
-			// Linux-only). Done here, before the md5, so -clienthash matches the launched file; persists like the
-			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
+			// Patch the client's embedded Funcom DH pubkey on disk so the server can validate the password. It is a
+			// plain byte swap in the file, with no process memory access, so it works on every platform. It runs here,
+			// before the md5, so -clienthash matches the launched file; it persists like the LocalConfig redirects and
+			// is undone by --restore, and it is idempotent.
 			if (options is { PatchLogin: true, DryRun: false })
 			{
-				// Load the DH keys from the SAME config the server reads (faolan.json < these flags < environment), so a
-				// deployment that overrides Server:PrivateKey patches the matching public key without a second setting to
-				// keep in step. A malformed key throws here rather than producing an exe that silently cannot log in.
+				// The DH keys come from the same configuration the server reads (faolan.json, then these flags, then
+				// the environment), so a deployment that overrides Server:PrivateKey patches the matching public key
+				// with no second setting to keep in step. A malformed key throws here rather than producing an exe
+				// that silently cannot log in.
 				//
-				// WHICH key goes in is decided here, at the one call site that patches, rather than inside the crypto:
-				// normally the public half DERIVED from Server:PrivateKey - the client must carry our public key for the
-				// server to reproduce the shared secret - but an explicit Server:PublicKey wins, for the one case where
-				// the two genuinely differ: patching a client to talk to somebody ELSE's server, whose private key you
-				// do not have and must not need. Which is also the one way there is a key to patch without a private one.
+				// Which key goes in is decided at this one call site rather than inside the crypto. Normally it is the
+				// public half derived from Server:PrivateKey, because the client must carry our public key for the
+				// server to reproduce the shared secret; an explicit Server:PublicKey wins for the one case where the
+				// two genuinely differ, which is patching a client to talk to somebody else's server, whose private
+				// key the operator does not have and must not need.
 				string? publicHex = null;
 				if (options.Configuration.ServerPublicKey is { } explicitPublic)
 				{
@@ -218,9 +236,9 @@ namespace Faolan.ClientLauncher
 					Console.WriteLine("login-key : deriving the public key from the configured Server:PrivateKey");
 				}
 
-				// No key on either side leaves nothing to patch IN. Skipping is the honest outcome - the client keeps
-				// Funcom's key, which is exactly what a keyless server expects (it checks no passwords) - but it is
-				// said out loud, because --patch-login was asked for and did not happen.
+				// With no key on either side there is nothing to patch in. Skipping is the honest outcome - the client
+				// keeps Funcom's key, which is exactly what a keyless server expects, since it checks no passwords -
+				// but it is said out loud, because --patch-login was asked for and did not happen.
 				if (publicHex == null)
 				{
 					Console.Error.WriteLine("login-key : no Server:PrivateKey is set, so there is no public key to patch in - launching unpatched. The server accepts this client on its account name alone; run `dotnet run --project Faolan -- --generate-login-key` to enable password validation.");
@@ -250,8 +268,8 @@ namespace Faolan.ClientLauncher
 				}
 			}
 
-			// Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead) - same on-disk
-			// swap, covered by the exe .bak. Done before the md5 so -clienthash matches the launched file.
+			// Redirect the client's hardcoded launcher-notes URL, retail's now-dead msgs.ageofconan.com. It is the same
+			// on-disk swap, covered by the exe .bak, and runs before the md5 so -clienthash matches the launched file.
 			if (options is { LauncherNotes: { } launcherNotes, DryRun: false })
 			{
 				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
@@ -276,7 +294,7 @@ namespace Faolan.ClientLauncher
 				}
 			}
 
-			// -clienthash = md5 of the exe we launch; -key = a fresh launch token.
+			// -clienthash is the md5 of the exe being launched; -key is a fresh launch token.
 			var clientHash = Md5Hex(exe);
 			var key = ClientLaunchToken.Now();
 
@@ -299,16 +317,16 @@ namespace Faolan.ClientLauncher
 			if (options.DryRun)
 				return 0;
 
-			// Kill a client already running from THIS exe path first (so repeated test launches start clean) - a client
+			// Kill a client already running from this exe path first, so repeated test launches start clean; a client
 			// from a different install is left running.
 			KillRunningClients(exe);
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 
-			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours - the ADVERTISED address and the
-			// UniverseAgent port the server itself is configured with, so the client dials what the server binds. The
-			// redirect PERSISTS after this run - it is NOT reverted on exit and no backup/sidecar file is written. Run
-			// `--restore` to undo it.
+			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours, using the advertised address and
+			// the UniverseAgent port the server itself is configured with, so the client dials what the server binds.
+			// The redirect persists after this run rather than being reverted on exit; --restore undoes it from the
+			// .bak taken above.
 			if (options.PatchUniverseAddr)
 			{
 				var universeAddr = options.Configuration.ServerUniverseAddress;
@@ -317,12 +335,13 @@ namespace Faolan.ClientLauncher
 			}
 
 			// Point the three LocalConfig.xml CDN keys at the local ContentMirror, at the address the mirror is
-			// configured to be reachable ON (Cdn:PublicAddress - NOT Cdn:ListenAddress, which is an interface). Same
-			// deal: persists, no revert, no backup file; `--restore` undoes it.
+			// configured to be reachable on: Cdn:PublicAddress, not Cdn:ListenAddress, which names an interface. This
+			// redirect persists too, and --restore undoes it.
 			if (options.PatchCdn)
 			{
-				// The one way this can be blank is an explicitly emptied key. Say so rather than silently launching a
-				// client still pointed at Funcom's dead CDN, which is a --patch-cdn that reads as if it worked.
+				// The only way this can be blank is an explicitly emptied key. It is reported rather than silently
+				// launching a client still pointed at Funcom's dead CDN, which would read as a --patch-cdn that
+				// worked.
 				if (options.Configuration.CdnPublicAddress is not { Length: > 0 } murl)
 				{
 					Console.Error.WriteLine(
@@ -333,10 +352,10 @@ namespace Faolan.ClientLauncher
 					Console.WriteLine($"redirected CDN keys -> {murl}");
 			}
 
-			// Open the client's own debug channels by writing its logger config (dbDebug.conf). BEFORE the launch: the
-			// client reads that file once, during startup, so the channels are live from its first line - and it needs
-			// no process memory access, which is what makes it work on Windows too. Persists like the other redirects;
-			// `--restore` puts retail's file back.
+			// Open the client's own debug channels by writing its logger config, dbDebug.conf. This must happen before
+			// the launch: the client reads that file once during startup, so the channels are live from its first
+			// line, and writing a file needs no process memory access, which is what makes it work on Windows too. It
+			// persists like the other redirects, and --restore puts retail's file back.
 			if (options.DebugChannels.Length > 0)
 				ClientDebugChannels.Configure(gameDir, options.DebugChannels, Console.WriteLine);
 
@@ -346,8 +365,8 @@ namespace Faolan.ClientLauncher
 				UseShellExecute = false
 			};
 
-			// Runner selection (mirrors launchClient.sh): on Windows run the exe directly; with --wine use that
-			// command; otherwise launch through Proton (`proton run <exe> <args>`) with the Steam compat env.
+			// Runner selection: on Windows run the exe directly; with --wine use that command; otherwise launch through
+			// Proton as `proton run <exe> <args>` with the Steam compat environment.
 			if (OperatingSystem.IsWindows())
 				psi.FileName = exe;
 			else if (options.Wine is { } wine)
@@ -384,10 +403,10 @@ namespace Faolan.ClientLauncher
 			foreach (var a in launchArgs)
 				psi.ArgumentList.Add(a);
 
-			// The client writes its console output (WriteConsoleW) to a Wine console - lost when we don't flip to
-			// CUI - but the SAME content also goes to AgeOfConan.log. So --console tails that log into this terminal
-			// (proton's own messages still inherit our stdio). Record the log's pre-launch size so we only show this
-			// session (the client truncates/rotates it on start).
+			// The client writes its console output through WriteConsoleW to a Wine console, which is lost here, but the
+			// same content also goes to AgeOfConan.log, so --console tails that log into this terminal while proton's
+			// own messages keep inheriting our stdio. The log's pre-launch size is recorded so only this session is
+			// shown, since the client truncates or rotates the file on start.
 			var logPath = Path.Combine(gameDir, "AgeOfConan.log");
 			var logStart = options.Console && File.Exists(logPath)
 				? new FileInfo(logPath).Length
@@ -405,7 +424,8 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
-			// With --console, stay in the foreground and tail the log until the client exits. Otherwise launch and return
+			// With --console, stay in the foreground and tail the log until the client exits; otherwise launch and
+			// return immediately.
 			if (options.Console)
 			{
 				Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
@@ -435,8 +455,11 @@ namespace Faolan.ClientLauncher
 			return path.Replace('\\', '/').ToLowerInvariant();
 		}
 
-		// Copy path.bak back over path (if the backup exists). Leaves the .bak in place so it stays the pristine
-		// reference for a re-patch. Returns true if a backup was restored.
+		/// <summary>
+		///     Copies path.bak back over path when the backup exists, leaving the .bak in place so it stays the
+		///     pristine reference for a re-patch.
+		/// </summary>
+		/// <returns>True when a backup was restored.</returns>
 		private static bool RestoreFromBackup(string path)
 		{
 			var bak = path + ".bak";
@@ -447,14 +470,18 @@ namespace Faolan.ClientLauncher
 			return true;
 		}
 
-		// Point the three CDN keys at the mirror base URL (LocalConfig.xml is backed up to .bak first, so --restore
-		// puts the retail URLs back). Returns true if any key was changed.
+		/// <summary>
+		///     Points the three CDN keys at the mirror base URL. LocalConfig.xml is backed up to .bak first, so
+		///     --restore puts the retail URLs back.
+		/// </summary>
+		/// <returns>True when any key was changed.</returns>
 		private static bool SetCdnConfig(string gameDir, string baseUrl)
 		{
 			var b = baseUrl.TrimEnd('/');
 			var changed = false;
-			// The three LocalConfig.xml CDN keys and the mirror path tag that routes each (the request path carries
-			// the tag, so a key -> <base>/<tag>/upm). UniverseAddr (the login server) is separate - see --patch-universeaddr.
+			// The three LocalConfig.xml CDN keys and the mirror path tag that routes each: the request path carries the
+			// tag, so a key becomes <base>/<tag>/upm. UniverseAddr, the login server, is separate and is handled by
+			// --patch-universeaddr.
 			foreach (var (key, tag) in new[] { ("HttpPatchAddr", "update"), ("ClientHttpPatchAddr", "gameupdate"), ("ControlHttpPatchAddr", "control") })
 			{
 				if (SetConfigTag(gameDir, key, $"{b}/{tag}/upm") != null)
@@ -464,9 +491,14 @@ namespace Faolan.ClientLauncher
 			return changed;
 		}
 
-		// Set a single LocalConfig.xml <tag> to `value`, returning the previous value (so the caller can revert),
-		// or null if nothing changed / the file or field is missing. Re-enables a LocalConfig.xml.disabled if that's
-		// all that's present (the file is shared by UniverseAddr + the mirror CDN keys).
+		/// <summary>
+		///     Sets a single LocalConfig.xml tag to <paramref name="value" />. A LocalConfig.xml.disabled is re-enabled
+		///     when that is all that is present, since the file is shared by UniverseAddr and the mirror CDN keys.
+		/// </summary>
+		/// <returns>
+		///     The previous value, so the caller can revert, or null when nothing changed or the file or field is
+		///     missing.
+		/// </returns>
 		private static string? SetConfigTag(string gameDir, string tag, string value)
 		{
 			try
@@ -508,15 +540,20 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
-		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
+		/// <summary>
+		///     Sets a child-process environment variable only when it is not already set in the real environment, so
+		///     the shell can override it.
+		/// </summary>
 		private static void SetIfUnset(ProcessStartInfo psi, string name, string value)
 		{
 			if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
 				psi.Environment[name] = value;
 		}
 
-		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value,
-		// or null if nothing changed / the file or field is missing.
+		/// <summary>
+		///     Sets LocalConfig.xml's UniverseAddr, the client's login server, to <paramref name="addr" />.
+		/// </summary>
+		/// <returns>The previous value, or null when nothing changed or the file or field is missing.</returns>
 		private static string? SetUniverseAddr(string gameDir, string addr)
 		{
 			return SetConfigTag(gameDir, "UniverseAddr", addr);

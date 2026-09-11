@@ -5,22 +5,22 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Constants
 {
-	// AUTO-GENERATED (#364) from the captured create-editor initial burst - the five archetype pedestals and the
-	// live avatar preview, as TYPED DATA. Regenerate with:
-	//
-	//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
-	//
-	// Replaces the inline hex bodies `CreateFlowService` used to carry and `CreateEditorCharBuilder.Reconstruct`
-	// parsed back out of themselves - the same treatment #258 gave the access-window table and #651 the editor
-	// avatar's stat sheet. The record was never opaque (SimpleCharFullUpdateCodec parses and re-encodes it
-	// byte-exact), so once the grammar is typed the only thing the blob still carried was these values.
-	//
-	// ⚠️ Some pre-IIR words are the retail server's own UNINITIALISED MEMORY, not content: the slots they sit in
-	// resolve to `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`, `Onslaught2SpecialsKilled` and
-	// the like, and a create-editor pedestal has no seasonal PvP record. They are reproduced because the gate is
-	// byte-exactness against retail and dropping them would be a behavioural change needing an in-client check -
-	// NOT because they mean anything. Do not read them as data, and do not carry them to a new record.
-	// See Gitea #364.
+	/// <summary>
+	///     The create-editor initial burst as typed data: the five archetype pedestals and the live avatar preview.
+	/// </summary>
+	/// <remarks>
+	///     Generated from the captured create-editor burst. Regenerate with:
+	///     <code>
+	///     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
+	///     </code>
+	///     <para>
+	///         Some pre-IIR words are the retail server's own uninitialised memory rather than content: the slots they
+	///         sit in resolve to <c>PvPAnnihilationMatchesWonSeasonal</c>, <c>PvPCTFMatchesLostSeasonal</c>,
+	///         <c>Onslaught2SpecialsKilled</c> and the like, and a create-editor pedestal has no seasonal PvP record.
+	///         They are reproduced because the gate is byte-exactness against retail, not because they mean anything.
+	///         Do not read them as data, and do not carry them to a new record.
+	///     </para>
+	/// </remarks>
 	public static class CreateEditorScene
 	{
 		// "Stygian Female" - 557 captured bytes.

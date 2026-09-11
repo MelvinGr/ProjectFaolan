@@ -18,12 +18,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The RAID state machine (#669) - create, invite, accept, decline, kick, move, swap, dissolve - and the messages
+	// The raid state machine - create, invite, accept, decline, kick, move, swap, dissolve - and the messages
 	// each transition puts on the wire.
 	//
-	// ⚠️ Unlike TeamServiceTests, there is no capture behind this: no session in the corpus ever formed a raid. What
-	// these gates pin is that our behaviour matches the SHAPE the client's own method table describes - a raid is a
-	// set of teams, its leader is a TEAM, and each message carries the body its reader expects. They are a
+	// Unlike TeamServiceTests, there is no capture behind this: no session in the corpus ever formed a raid. What
+	// these gates pin is that our behaviour matches the shape the client's own method table describes - a raid is a
+	// set of teams, its leader is a team, and each message carries the body its reader expects. They are a
 	// regression fence, not evidence about retail.
 	public class RaidServiceTests
 	{
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			return client.Sent.Select(Rpc.Parse).First(rpc => rpc.Method == (uint)method).Body.ToArray();
 		}
 
-		// A solo player forming a raid gets a TEAM first: a raid holds teams, so there is nothing to put in it
+		// A solo player forming a raid gets a team first: a raid holds teams, so there is nothing to put in it
 		// otherwise. Retail's own raid window shows you sitting in a group of one, which is the same statement.
 		[Fact]
 		public async Task Create_PutsASoloPlayerInATeamInsideTheRaid()
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 			Assert.False(await raids.Create(1));
 		}
 
-		// The invite is answered by a PERSON and joins their whole TEAM: two already-grouped players both end up in
+		// The invite is answered by a person and joins their whole team: two already-grouped players both end up in
 		// the raid off one accept, in one team.
 		[Fact]
 		public async Task AcceptInvite_BringsTheAcceptersWholeTeam()
@@ -112,7 +112,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(CSPlayerInterfaceMethods.DispatchRaidTeamJoined, MethodsSentTo(clients[2]));
 		}
 
-		// The inviter comes from OUR pending table, not the echoed body - the same rule AcceptTeamInvite follows, so
+		// The inviter comes from our pending table, not the echoed body - the same rule AcceptTeamInvite follows, so
 		// a forged accept cannot pull anyone into a raid.
 		[Fact]
 		public async Task AcceptWithoutAnInvite_DoesNothing()
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 			Assert.False(await raids.AcceptInvite(2));
 		}
 
-		// Inviting someone who is already raiding answers the INVITER with DispatchRaidIsAlreadyInRaid - the client
+		// Inviting someone who is already raiding answers the inviter with DispatchRaidIsAlreadyInRaid - the client
 		// has a message for exactly this, so it is the one to send rather than silence.
 		[Fact]
 		public async Task InvitingSomeoneAlreadyRaiding_SaysSo()
@@ -152,7 +152,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(raids.RaidOf(1), raids.RaidOf(2));
 		}
 
-		// A member leaving a MULTI-person team leaves the team in the raid, one member lighter - so the raid sees an
+		// A member leaving a multi-person team leaves the team in the raid, one member lighter - so the raid sees an
 		// update, not a departure.
 		[Fact]
 		public async Task LeavingAMultiMemberTeam_UpdatesTheTeamRatherThanRemovingIt()
@@ -191,7 +191,7 @@ namespace Faolan.Tests
 			Assert.Contains(CSPlayerInterfaceMethods.DispatchRaidTeamLeft, MethodsSentTo(clients[1]));
 		}
 
-		// The raid leader is a TEAM - DispatchRaidNewRaidLeader carries an `i_cTeamID`, not a character - so the
+		// The raid leader is a team - DispatchRaidNewRaidLeader carries an `i_cTeamID`, not a character - so the
 		// promotion moves between teams and the body is a team ID32.
 		[Fact]
 		public async Task WhenTheLeadingTeamLeaves_TheNextTeamLeads()

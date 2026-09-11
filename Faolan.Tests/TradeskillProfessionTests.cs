@@ -16,7 +16,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #735: the tradeskill PROFESSION and RANK model, and the recipe book it gates.
+	// The tradeskill profession and rank model, and the recipe book it gates.
 	//
 	// The model is the client's own and nothing here is editorial except which chains are professions: a profession is
 	// a linear chain in `FeatPrereqs` (each rank requires the one below), and every shipped recipe names the rung it
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		{
 			var ladders = await Ladders();
 
-			// ELEVEN, which is the client's own count: five crafting and six gathering.
+			// Eleven, which is the client's own count: five crafting and six gathering.
 			Assert.Equal(11, ladders.Length);
 			Assert.All(ladders, l => Assert.Equal(TradeskillLadders.RankNames.Length, l.RankFeatIds.Length));
 			Assert.Equal(
@@ -45,12 +45,11 @@ namespace Faolan.Tests
 			Assert.Equal([321000u, 321001u, 321100u, 321101u, 321200u, 321201u, 321202u], weaponsmith.RankFeatIds);
 		}
 
-		// ⚠️ The load-bearing one: Gemcutter's six trained ranks USED to all be named "Gemcutter Novice" - the feat
-		// template's authoring name - so a rank read off the name gave that profession seven Novices and no ladder.
-		// The ladder is read off the chain DEPTH instead, and stays a seven-rung one whatever the names say. Since
-		// #925 the names are the client's own LDB 50220 labels, which name each crafting tier - the one place the
-		// two sources genuinely disagreed and the displayed one was adopted - so the ladder now reads as a ladder
-		// by name too.
+		// The load-bearing one: the feat template's authoring name for all six of Gemcutter's trained ranks is
+		// "Gemcutter Novice", so a rank read off that name gives the profession seven Novices and no ladder. The ladder
+		// is read off the chain depth instead, and stays a seven-rung one whatever the names say. The names themselves
+		// are the client's own LDB 50220 labels, which name each crafting tier - the one place the two sources
+		// genuinely disagree, and the displayed one wins - so the ladder reads as a ladder by name too.
 		[Fact]
 		public async Task GemcuttersRanks_ReadOffTheChainDepth_AndCarryTheClientsTierNames()
 		{
@@ -74,7 +73,7 @@ namespace Faolan.Tests
 		}
 
 		// Every shipped recipe's requirement sits on one of the ladders. If a recipe requirement fell off them the
-		// gate would silently ALLOW it (HasProfessionFor's deliberate default), so this is what keeps that default
+		// gate would silently allow it (HasProfessionFor's deliberate default), so this is what keeps that default
 		// from becoming a hole.
 		[Fact]
 		public async Task EveryShippedRecipesRequirement_SitsOnALadder()
@@ -88,16 +87,16 @@ namespace Faolan.Tests
 			Assert.All(required, feat => Assert.Contains(ladders, l => l.RankOfFeat(feat) != null));
 
 			// ...and the professions represented are exactly the ones the captured books belong to, which is the
-			// finding a shipped recipe set carries: rows are harvested per CHARACTER, so the catalog is the union of
-			// the professions the captured characters had trained. It was Armorsmith + Weaponsmith while NecroL80's
-			// 603-row book was the only readable one; DemoL80's became readable in #811 and brought its own two.
+			// finding a shipped recipe set carries: rows are harvested per character, so the catalog is the union of
+			// the professions the captured characters had trained: NecroL80's 603-row book contributes Armorsmith +
+			// Weaponsmith, and DemoL80's brings its own two.
 			var professions = required.Select(f => ladders.Single(l => l.RankOfFeat(f) != null).Name).Distinct().Order().ToList();
 			Assert.Equal(["Alchemy", "Armorsmith", "Gemcutter", "Weaponsmith"], professions);
 		}
 
-		// ⚠️ A character holds SEVERAL rungs of one ladder, not one: AddCharacterFeats keeps the highest rank per
+		// A character holds several rungs of one ladder, not one: AddCharacterFeats keeps the highest rank per
 		// `id / 100` base and a ladder spans three bases. So a Weaponsmith Grandmaster holds 321001 / 321101 / 321202
-		// and holds NEITHER 321000 (Novice) NOR 321201 (Master) - a set-membership test against the recipe's own
+		// and holds neither 321000 (Novice) nor 321201 (Master) - a set-membership test against the recipe's own
 		// RequiredFeatId would hide most of their book from them.
 		[Fact]
 		public async Task AGrandmastersStoredFeats_ResolveToTheTopRank_ThoughTheyHoldNeitherEnd()
@@ -110,18 +109,18 @@ namespace Faolan.Tests
 			Assert.Equal(6, TradeskillLadders.RankOf(weaponsmith, stored));
 		}
 
-		// ⭐ Retail's own record of a learned tradeskill is the spawn scaffold's skill list, and it carries the RANK:
-		// `CharacterSkills.SkillId` IS a wire feat id. The two imported L80s resolve to a coherent set of professions
+		// Retail's own record of a learned tradeskill is the spawn scaffold's skill list, and it carries the rank:
+		// `CharacterSkills.SkillId` is a wire feat id. The two imported L80s resolve to a coherent set of professions
 		// at plausibly different ranks - which is what says the id, and not the slot, is the thing to read.
 		//
-		// ⚠️ Two of the slots carry ids that are NOT professions on BOTH characters (`328908` Expert Bandaging,
+		// Two of the slots carry ids that are not professions on both characters (`328908` Expert Bandaging,
 		// `326000` Destiny Quest). Resolving against the ladders drops them; reading the slot positionally files them
 		// under a profession and makes the rank look identical across characters - which is how the tier came to be
 		// recorded as absent from this table.
 		//
 		// The two id sets below are the `CharacterSkills.SkillId` lists of the two imported L80s, verbatim. They are
 		// literals because `faolan.sql` excludes characters (per-developer play state), so the rows are not in the
-		// test fixture - the ids ARE the evidence and carry their own provenance.
+		// test fixture - the ids are the evidence and carry their own provenance.
 		[Theory]
 		// NecroL80's scaffold: everything at Master, and Armorsmith at Grandmaster.
 		[InlineData(new uint[] { 321502, 323205, 323505, 327505, 328908, 326000, 323305, 323405 }, 6, 5)]
@@ -135,8 +134,8 @@ namespace Faolan.Tests
 			Assert.Equal(professions, ladders.Count(l => TradeskillLadders.RankOf(l, held) != null));
 			Assert.Equal(miningRank, TradeskillLadders.RankOf(ladders.Single(l => l.Name == "Mining"), held));
 
-			// ⚠️ `328908` and `326000` are on BOTH characters and are NOT professions - they resolve to `Expert
-			// Bandaging` and `Destiny Quest`. Resolving against the ladders drops them; reading the SLOT they sit in
+			// `328908` and `326000` are on both characters and are not professions - they resolve to `Expert
+			// Bandaging` and `Destiny Quest`. Resolving against the ladders drops them; reading the slot they sit in
 			// positionally files them under a profession, and because the pair is identical across characters that is
 			// what made the tier look absent from this table.
 			Assert.All((uint[]) [328908, 326000], id => Assert.All(ladders, l => Assert.Null(l.RankOfFeat(id))));
@@ -167,7 +166,7 @@ namespace Faolan.Tests
 			Assert.All(book, r => Assert.Contains(r.RequiredFeatId, (uint[]) [321000, 321001, 321100]));
 		}
 
-		// A character who has trained nothing gets an EMPTY book - retail, per the ticket: the book is what a
+		// A character who has trained nothing gets an empty book - retail, per the ticket: the book is what a
 		// profession buys, so no profession means no book rather than a book that cannot be used.
 		[Fact]
 		public async Task AnUntrainedCharacterGetsNoBookAndCannotCraft()
@@ -196,8 +195,8 @@ namespace Faolan.Tests
 			Assert.Equal(708, catalog.Count); // the rest is the other three professions, which they have not trained
 		}
 
-		// #779: the GATHERING gate. Retail refused a Stonecutting APPRENTICE a Marble node and named `Stonecutting
-		// Adept` (feat TEMPLATE id 894305) as what was missing, so the rank one below the requirement must refuse and
+		// The gathering gate. Retail refused a Stonecutting apprentice a Marble node and named `Stonecutting
+		// Adept` (feat template id 894305) as what was missing, so the rank one below the requirement must refuse and
 		// the requirement itself must pass. The template -> wire hop is the point: 894305 is not a wire feat id and a
 		// gate that compared it against the character's own feat list would pass everybody.
 		[Theory]
@@ -215,7 +214,7 @@ namespace Faolan.Tests
 		}
 
 		// A character who has trained no gathering profession at all is refused, which is the whole point of the gate -
-		// and every OTHER node stays ungated, because the corpus states one requirement and only one.
+		// and every other node stays ungated, because the corpus states one requirement and only one.
 		[Fact]
 		public async Task AnUntrainedCharacterIsRefusedTheOneGatedNode_AndNothingElseIsGated()
 		{
@@ -226,7 +225,7 @@ namespace Faolan.Tests
 		}
 
 		// The benefit-of-the-doubt default, stated so it cannot be lost: a requirement naming a feat that is on no
-		// ladder we walked is ALLOWED. That is a gap in the recovered graph, not a statement about the character.
+		// ladder we walked is allowed. That is a gap in the recovered graph, not a statement about the character.
 		[Fact]
 		public async Task ARequirementOffEveryLadder_IsAllowed()
 		{
@@ -249,8 +248,8 @@ namespace Faolan.Tests
 		// an idealised one.
 		private async Task<(TradeskillService Service, uint CharacterId)> Trained(string? profession, string? rank)
 		{
-			// ⚠️ A WRITABLE COPY of the shipped database, not `NewSeededDatabase` - that builds a bare schema with no
-			// game content, so the prerequisite graph would be EMPTY and every ladder one rung deep. The ladders are
+			// A writable copy of the shipped database, not `NewSeededDatabase` - that builds a bare schema with no
+			// game content, so the prerequisite graph would be empty and every ladder one rung deep. The ladders are
 			// the thing under test; they have to come from the real feat table.
 			var path = Path.Combine(Path.GetTempPath(), $"faolan-tradeskill-{Path.GetRandomFileName()}.db");
 			File.Copy(TestDb.GameDatabase, path);

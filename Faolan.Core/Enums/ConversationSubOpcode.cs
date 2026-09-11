@@ -1,12 +1,10 @@
 namespace Faolan.Core.Enums
 {
-	// The wire sub-opcode a conversation response packet carries (Gitea #353 / #188): either one of the four Knubot
-	// dialogue-screen IIRs (GameServer 0x2000 sub-opcodes) or the DispatchSetDialogueCamera RPC opcode (0x2015). The
-	// importer requires exactly one of these (it rejects a packet it can't decode) and the runtime builds the packet
-	// from it. The five values straddle TWO opcode enums (four in IirTypes + the camera in
-	// GameCharInterfaceMethods), so there was no single existing enum to reuse - but since the opcode enums now live
-	// here in the shared base too, this names them directly (single source of truth, no duplicated hex). Backed by
-	// uint -> EF stores it as the same INTEGER column as the raw uint it replaced, no migration.
+	// The wire sub-opcode a conversation response packet carries: either one of the four Knubot dialogue-screen IIRs
+	// (GameServer 0x2000 sub-opcodes) or the DispatchSetDialogueCamera RPC opcode (0x2015). The importer requires
+	// exactly one of these (it rejects a packet it cannot decode) and the runtime builds the packet from it. The five
+	// values straddle two opcode enums (four in IirTypes + the camera in GameCharInterfaceMethods), so this names
+	// them directly rather than duplicating the hex. Backed by uint, so EF stores it as a plain INTEGER column.
 	public enum ConversationSubOpcode : uint
 	{
 		KnubotOpenChatWindow = IirTypes.KnubotOpenChatWindowIIR,

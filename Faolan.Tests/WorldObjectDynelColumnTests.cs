@@ -9,10 +9,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Guards the shipped DB-source path for #187: EVERY populated world-object row in the committed faolan.db must be
-	// fully buildable from its typed columns - it carries its geometry columns (#410) and its identity message
-	// round-trips (columns -> ProtoSimpleDynelIIR -> record -> re-parse == same columns). The captured Data blob is
-	// retired, so this is the standing gate that nothing regressed back into needing it. The capture-grounded byte-exact
+	// Guards the shipped DB-source path: every populated world-object row in the committed faolan.db must be
+	// fully buildable from its typed columns - it carries its geometry columns and its identity message
+	// round-trips (columns -> ProtoSimpleDynelIIR -> record -> re-parse == same columns). A captured Data blob is
+	// absent, and this is the standing gate that nothing comes to need one. The capture-grounded byte-exact
 	// golden for a single record lives in SimpleDynelIdentityCodecTests / WorldObjectFromColumnsTests.
 	public class WorldObjectDynelColumnTests
 	{
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 					Name = r.GetString(0),
 					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),
-					// no IsClosed: field 12 is live door state, not a column (#598) - the build below defaults it closed.
+					// no IsClosed: field 12 is live door state, not a column - the build below defaults it closed.
 					QuestItemEffect = r.IsDBNull(3)
 						? null
 						: (uint)r.GetInt64(3),
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 					DisplayFlags = r.IsDBNull(11)
 						? null
 						: r.GetString(11),
-					// The LDB key is four columns now (#520); rebuild it from them rather than from a string.
+					// The LDB key is four columns now; rebuild it from them rather than from a string.
 					DisplayKey = new ProtoDecryptionKey
 					{
 						Key1 = (uint)r.GetInt64(12),
@@ -72,8 +72,8 @@ namespace Faolan.Tests
 						: (uint)r.GetInt64(16)
 				};
 
-				// The geometry record always names an RDB asset (1010030 MESHINDEXFILE / 1010001 RenderMesh /
-				// 1010201 MONSTERDATA), so a zero here means the row was never lifted - not buildable.
+				// The geometry record always names an RDB asset (1010030 meshindexfile / 1010001 RenderMesh /
+				// 1010201 monsterdata), so a zero here means the row was never lifted - not buildable.
 				if (row.GeometryAssetType == 0)
 				{
 					noTail++;

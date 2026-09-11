@@ -22,9 +22,9 @@ namespace Faolan.Importer.Extractors
 		{
 			var byQuest = new Dictionary<uint, QuestDefinition>();
 
-			// The journal's ACGHash, keyed by the AREA it belongs to (#544). Collected across the whole sweep and
+			// The journal's ACGHash, keyed by the area it belongs to. Collected across the whole sweep and
 			// applied at the end rather than as each journal arrives, for two reasons: it is a property of the area, so
-			// it belongs to every quest filed under it and not just the ones whose journal LINE was captured; and a
+			// it belongs to every quest filed under it and not just the ones whose journal line was captured; and a
 			// journal seen before that quest's full-update would otherwise find no definition to write to.
 			var hashByArea = new Dictionary<uint, uint>();
 
@@ -36,7 +36,7 @@ namespace Faolan.Importer.Extractors
 				if (p.SubOpcode == QuestFullUpdateCodec.Opcode)
 				{
 					// TryParse is false only for a body the capture cut short - there is no scan to fall back on any
-					// more, so such a packet contributes nothing rather than a half-read definition (#540).
+					// more, so such a packet contributes nothing rather than a half-read definition.
 					if (p.TryParse(QuestFullUpdateCodec.Parse, out var full))
 						MergeFullUpdate(full.Record, byQuest);
 				}
@@ -91,19 +91,13 @@ namespace Faolan.Importer.Extractors
 			return def;
 		}
 
-
-
-		// Reads the full-update ENTIRELY off `QuestFullUpdateCodec`'s `QuestcRecord` (#540). It used to scan the raw
-		// body for `<remoteformat>`/`<localized>` records and read the level word and the marker block at offsets
-		// RELATIVE to where the primary objective record landed, alongside the codec's own parse of the same bytes.
-		// Every value the scan derived was proven identical to the record's over all 74 captured full-updates before
-		// the scan went - EXCEPT the markers, which the scan got WRONG (see below).
-		//
-		// ⚠️ The level is the record's `state` slot: with the `[u32 len]` prefix `CapturedPacket.Body` keeps, the
-		// scan's `body[33..37]` is `state`, not `BandTolerance` (which is 0 on every captured full-update).
+		// Reads the full-update entirely off `QuestFullUpdateCodec`'s `QuestcRecord`: no raw-body scan for
+		// `<remoteformat>`/`<localized>` records, and no offsets taken relative to where the primary objective record
+		// landed. The level is the record's `state` slot, not `BandTolerance` (which is 0 on every captured
+		// full-update).
 		private static void MergeFullUpdate(QuestcRecord record, Dictionary<uint, QuestDefinition> byQuest)
 		{
-			// A full-update carries ONE 50304 objective record PER GOAL, in goal order - reading only the first is how
+			// A full-update carries one 50304 objective record per goal, in goal order - reading only the first is how
 			// two-goal quests came to look like one-goal quests (12369 dropped 7134, 10287 dropped 7363; the corpus
 			// also has a three-goal quest, 6499/6514/6515, and a twelve-goal one, 19314).
 			var goals = record.Objectives?.Goals ?? [];
@@ -142,7 +136,7 @@ namespace Faolan.Importer.Extractors
 			// this completes with the server-side-only fields (TargetName/GoalType/QuestItemId) rather than
 			// duplicating them.
 			//
-			// ⚠️ EVERY goal carries its OWN map pin, which the byte scan could not see: it read one marker block, the
+			// every goal carries its own map pin, which the byte scan could not see: it read one marker block, the
 			// one sitting before the first objective record, and gave it to the primary goal only. Quest 10238's two
 			// goals are pinned at (416,701) and (521,757), 12369's at (524,755) and (574,944), 14020's three all
 			// differently - so every secondary goal in the DB carried no pin at all. The scan also DISCARDED the
@@ -156,10 +150,10 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				// The goal's reserved words - up to three (marker, identity) reference slots, see
-				// QuestObjectiveGoal.Reserved and #546. They are the goal's own data and cannot be derived, so a quest
-				// the captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor harvests them)
-				// would otherwise carry zeros - and the live sender used to fill the [5..6] slot with a clock reading
-				// instead, which retail never sends (#537).
+				// QuestObjectiveGoal.Reserved. They are the goal's own data and cannot be derived, so a quest the
+				// captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor harvests them)
+				// would otherwise carry zeros, and a sender filling the [5..6] slot with a clock reading sends
+				// something retail never does.
 				var row = UpsertGoal(def, goal, text, (uint)(i + 1), i > 0);
 				if (goal.Reserved.Length == ReservedWords)
 					SetReserved(row, goal.Reserved);
@@ -168,7 +162,7 @@ namespace Faolan.Importer.Extractors
 
 		// A Quest_c record's two category-52000 refs are region (the smaller id, e.g. 4) and map (the map id). Told
 		// apart by id rather than by position, so the full-update and the snapshot journal agree. MapId matters beyond
-		// the text: it is an FK to Maps, and the quests module SKIPS any definition whose map is not in the catalog.
+		// the text: it is an FK to Maps, and the quests module skips any definition whose map is not in the catalog.
 		private static (TextRecord? Region, TextRecord? Map) RegionAndMap(QuestcRecord record)
 		{
 			var r1 = TextRef(record.Region1);
@@ -183,7 +177,7 @@ namespace Faolan.Importer.Extractors
 
 		private const int ReservedWords = 7;
 
-		// reserved[0] is skipped on purpose: it is the goal's per-character SolvedTimes, not quest data (#550).
+		// reserved[0] is skipped on purpose: it is the goal's per-character SolvedTimes, not quest data.
 		private static void SetReserved(QuestGoalDefinition row, uint[] reserved)
 		{
 			row.Extra1 = reserved[1];
@@ -194,11 +188,12 @@ namespace Faolan.Importer.Extractors
 			row.Extra6 = reserved[6];
 		}
 
-		// The journal LIST (0x79f8c7a1) carries the one slot a full-update does not: the panel's per-quest sub-line
-		// (category 50303). The RRL3 scan + per-entry offset walk this used to do is QuestJournalCodec's grammar.
+		// The journal list (0x79f8c7a1) carries the one slot a full-update does not: the panel's per-quest sub-line
+		// (category 50303). The RRL3 framing and the per-entry offsets are QuestJournalCodec's grammar, not this
+		// file's.
 		//
-		// It also carries the area's ACGHash, which the journal builder needs back (#544). That one is recorded per
-		// AREA into `hashByArea` and applied to every definition at the end of the sweep - see Extract.
+		// It also carries the area's ACGHash, which the journal builder needs back. That one is recorded per
+		// area into `hashByArea` and applied to every definition at the end of the sweep - see Extract.
 		private static void MergeJournal(QuestJournalIIR list, Dictionary<uint, QuestDefinition> byQuest, Dictionary<uint, uint> hashByArea)
 		{
 			foreach (var area in new[] { list.Area }.Concat(list.MoreAreas))
@@ -214,8 +209,8 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// One Quest_c journal record -> a definition. This is the ONLY source with journal content for a quest the
-		// captures never showed a QuestFullUpdate for: the login snapshot carries a record for every HELD quest, so a
+		// One Quest_c journal record -> a definition. This is the only source with journal content for a quest the
+		// captures never showed a QuestFullUpdate for: the login snapshot carries a record for every held quest, so a
 		// level-80 character's whole J-panel is here (NecroL80: 27 records vs 2 full-updates). It is also the only
 		// source of the record SCALARS, which is what makes a quest snapshot-eligible - i.e. what lets the server
 		// regenerate its journal entry instead of leaving the panel empty.
@@ -230,7 +225,7 @@ namespace Faolan.Importer.Extractors
 			def.QuestLineId = record.QuestLineId;
 			def.HasSnapshotRecord = true;
 
-			// The record's state word IS the quest level (see QuestDefinition.Level). Do not clobber a value already
+			// The record's state word is the quest level (see QuestDefinition.Level). Do not clobber a value already
 			// harvested from a QuestFullUpdate - they agree where both exist, and the full-update is the older source.
 			if (def.Level == 0)
 				def.Level = record.Level;
@@ -276,7 +271,7 @@ namespace Faolan.Importer.Extractors
 			existing.Flags = rec.Flags;
 		}
 
-		// A Quest_c header string is the full <remoteformat .../> XML; the slot is identified by position in the
+		// A Quest_c header string is the full <remoteformat.../> XML; the slot is identified by position in the
 		// record, so only the attributes matter here.
 		private static TextRecord? TextRef(string xml)
 		{
@@ -291,7 +286,7 @@ namespace Faolan.Importer.Extractors
 					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!, Attr(xml, "token"));
 		}
 
-		// Find-or-create the goal by GoalId within the quest and set the WIRE fields off the goal RECORD. Leaves the
+		// Find-or-create the goal by GoalId within the quest and set the wire fields off the goal record. Leaves the
 		// server-side-only fields (TargetName/GoalType/QuestItemId) untouched so a later Seed* overlay can complete
 		// them.
 		//
@@ -299,10 +294,9 @@ namespace Faolan.Importer.Extractors
 		// goal after the first (see QuestGoalDefinition.Partial). A goal the snapshot already supplied in full is
 		// never downgraded - Partial only ever goes false here.
 		//
-		// ⚠️ The record's `GoalId` word and its objective text record's `id` are THE SAME NUMBER on all 111 captured
-		// goal records, which is what lets this path and ObjectiveGoalExtractor's snapshot path merge onto one row:
-		// the snapshot keys by the word, this one used to key by the text id. Read off the word now, so the two say
-		// the same thing rather than agreeing by coincidence.
+		// The record's `GoalId` word and its objective text record's `id` are the same number on every captured goal
+		// record, which is what lets this path and ObjectiveGoalExtractor's snapshot path merge onto one row. Both
+		// key off the word, so the two say the same thing rather than agreeing by coincidence.
 		private static QuestGoalDefinition UpsertGoal(QuestDefinition def, QuestObjectiveGoal record, TextRecord objective, uint sequence = 1, bool partial = false)
 		{
 			var goal = def.Goals.FirstOrDefault(g => g.GoalId == record.GoalId);
@@ -311,7 +305,7 @@ namespace Faolan.Importer.Extractors
 				def.Goals.Add(goal = new QuestGoalDefinition
 				{
 					GoalId = record.GoalId,
-					// The wire's own step ordinal, NOT the list position: the two differ on real quests (12369's
+					// The wire's own step ordinal, not the list position: the two differ on real quests (12369's
 					// list is [N=2, N=1]), the snapshot harvest has always stored the wire N here, and the region
 					// builder writes the record's N slot back from this column. The position goes to RegionOrder,
 					// 0-based, the snapshot convention.
@@ -331,7 +325,7 @@ namespace Faolan.Importer.Extractors
 			goal.ObjectiveCategory = objective.Category;
 			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new ProtoDecryptionKey();
 
-			// The full-update carries the goal's WHOLE record (#866), so the wire scalars the snapshot path harvests
+			// The full-update carries the goal's whole record, so the wire scalars the snapshot path harvests
 			// land here too - a quest the captures only ever full-updated stops carrying zeros for them. All are
 			// echoes/ids the region variants agree on, so a nonzero reading refreshes.
 			if (record.GoalIdRepeat != 0)
@@ -344,7 +338,7 @@ namespace Faolan.Importer.Extractors
 				goal.HideMapMarker = true;
 
 			// ...and its TRAILING text record, without which the goal cannot be rebuilt at all (a row missing it
-			// builds an `id=0 key=!!!!` record). ⚠️ Fill-if-unset, deliberately: a snapshot-harvested row stores the
+			// builds an `id=0 key=!!!!` record). Fill-if-unset, deliberately: a snapshot-harvested row stores the
 			// spelling of the region variant its def's F0 tags, and the live full-update's spelling differs on
 			// category 51200 (localized vs remoteformat, same id/category/key) - overwriting would break the
 			// byte-exact snapshot regeneration the 99/99 gate holds. The live builder re-spells at send time
@@ -359,16 +353,16 @@ namespace Faolan.Importer.Extractors
 				goal.TrailingToken = trailing.Token;
 			}
 
-			// The goal's KIND TAG and its required amount (#548). The full-update carries both for EVERY goal, not
+			// The goal's kind tag and its required amount. The full-update carries both for every goal, not
 			// just the primary - measured against the snapshot journal, which is the source that was thought to hold
-			// them alone: of the 34 goals the corpus shows in BOTH, all 34 agree on both fields, and across the
+			// them alone: of the 34 goals the corpus shows in both, all 34 agree on both fields, and across the
 			// full-updates the tag takes five values (9/12/20/22/23) and the count four (1/3/7/10). So neither is a
 			// constant this path was papering over - `RequiredCount` was seeded to a flat 1 here and `Separator` was
 			// never set at all, which left every full-update-only goal reading as "kill one unnamed thing".
 			goal.Separator = record.K;
 			goal.RequiredCount = record.RequiredCount;
 
-			// Every goal has its own pin, so a secondary one is set too - see the ⚠️ in MergeFullUpdate. A goal the
+			// Every goal has its own pin, so a secondary one is set too - see the in MergeFullUpdate. A goal the
 			// wire pins nowhere (quest 19314's twelve all read 0/0/0) keeps whatever a snapshot already gave it.
 			if (record.MapId != 0 || record.MarkerX != 0 || record.MarkerY != 0)
 			{

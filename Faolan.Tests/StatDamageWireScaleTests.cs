@@ -8,20 +8,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ⭐ `StatDamageIIR.Delta` is the ONLY field that moves a health bar, and it must be on the client's ×100 vitals
+	// `StatDamageIIR.Delta` is the only field that moves a health bar, and it must be on the client's ×100 vitals
 	// scale. The client's apply is `StatDamageIIR_t` vtable slot 2, `FUN_008d5960`, and its whole stat write is
 	//
 	//     SetStat(statId, GetStat(statId) + record.delta)          // 008d5b2d..008d5b5d
 	//
-	// so `StatValue` is never read - the client recomputes from what it already holds - and a delta stated in DISPLAY
+	// so `StatValue` is never read - the client recomputes from what it already holds - and a delta stated in display
 	// units moves a wire-scale pool by a hundredth of the damage dealt.
 	//
-	// ⛔ That was #902. A 12-damage hit took a 20,200-wire bar (202 HP) to 20,188, the client redrew 201.88 as 202, and
-	// the bar looked frozen while the character really did die. `RegenIIR` had the ×100 right, so the only correction
-	// the client ever got was upward and the bar climbed past its own max - the `688 / 202` second symptom.
+	// A 12-damage hit takes a 20,200-wire bar (202 HP) to 20,188, the client redraws 201.88 as 202, and the bar looks
+	// frozen while the character really does die. `RegenIIR` has the ×100 right, so the only correction the client
+	// ever gets is upward and the bar climbs past its own max - the `688 / 202` second symptom.
 	//
-	// ⚠️ The two fields are what make this testable at all: nothing in the packet says "×100", but the corpus pins the
-	// two to EACH OTHER - `StatValue` equals the same handle's `StatUpdateIIR` stat 27 exactly (diff 0 on twelve
+	// The two fields are what make this testable at all: nothing in the packet says "×100", but the corpus pins the
+	// two to each other - `StatValue` equals the same handle's `StatUpdateIIR` stat 27 exactly (diff 0 on twelve
 	// handles, up to 92 records each) and moves by exactly `Delta` across 1,015 consecutive pairs. So a record whose
 	// two numbers are on different scales is self-contradictory regardless of which scale is right, and that is the
 	// invariant here. It held for three weeks with `StatValue` scaled and `Delta` not, because a golden byte test
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			Assert.Equal(-displayDamage * VitalsScale, record.Delta);
 		}
 
-		// The relation, stated without either constant: applying the delta to the health the PREVIOUS record announced
+		// The relation, stated without either constant: applying the delta to the health the previous record announced
 		// has to land on the health this one announces. That is literally what the client computes, so a scale slip on
 		// either field breaks it - and it stays true if the vitals scale ever turns out to be something other than 100.
 		[Fact]
@@ -71,14 +71,14 @@ namespace Faolan.Tests
 			Assert.Equal(3 * VitalsScale, record.Delta);
 		}
 
-		// Through the REAL sender and the REAL framing, so the test cannot pass on a value the wire never carries.
+		// Through the real sender and the real framing, so the test cannot pass on a value the wire never carries.
 		private static async Task<StatDamageIIR> Emit(uint displayHealth, int displayDelta)
 		{
 			var client = new RecordingNetworkClient(Instance);
 			await CombatService.SendStatDamage(client, Instance, displayHealth, displayDelta, (uint)DamageSchool.Generic, Caster, 0x316449);
 
 			// The mirror of WorldIir.Send's WriteArrayUInt32Length - the carrier length belongs to the sender, so it
-			// is read off here and never inside the codec (#530 rule 2).
+			// is read off here and never inside the codec.
 			return StatDamageCodec.Parse(Rpc.Parse(client.Sent[^1]).BodyReader().ReadArrayUInt32Length());
 		}
 	}

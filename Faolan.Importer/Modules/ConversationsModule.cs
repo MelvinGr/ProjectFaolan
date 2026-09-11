@@ -20,15 +20,14 @@ namespace Faolan.Importer.Modules
 	// rows must be purged), so Overwrite-only.
 	public sealed class ConversationsModule : IImportModule
 	{
-		// Conversation nodes FK NpcTemplateId (NpcsModule, #244) and GrantQuestId (QuestsModule) - both must import
+		// Conversation nodes FK NpcTemplateId (NpcsModule) and GrantQuestId (QuestsModule) - both must import
 		// first so the references resolve (FK is enforced on every provider; no import-time deferral).
 		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule), nameof(QuestsModule)];
 
-		// OVERWRITE only. The graph fold (#642) is a global partition over every harvested walk - which screens merge,
-		// and which need a Discriminator, is decided by comparing them against each other - so it cannot be applied to
-		// one new dump against a database that no longer remembers the walks the rest came from. The merge rule the
-		// #419 upsert existed for ("the most complete capture of a screen wins") now runs INSIDE the fold, across all
-		// captures at once, which is strictly the better place for it.
+		// Overwrite only. The graph fold is a global partition over every harvested walk - which screens merge, and
+		// which need a Discriminator, is decided by comparing them against each other - so it cannot be applied to one
+		// new dump against a database that does not remember the walks the rest came from. The merge rule ("the most
+		// complete capture of a screen wins") runs inside the fold, across all captures at once.
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Overwrite
@@ -41,8 +40,8 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// The variant split runs over the WHOLE corpus rather than per capture: a screen is only a conflict
-			// relative to the other captures of it, and an NPC's states usually come from different dumps (#526).
+			// The variant split runs over the whole corpus rather than per capture: a screen is only a conflict
+			// relative to the other captures of it, and an NPC's states usually come from different dumps.
 			var extracted = ctx.Captures
 				.SelectMany(c => ConversationExtractor.Extract(c.Packets))
 				.ToList();

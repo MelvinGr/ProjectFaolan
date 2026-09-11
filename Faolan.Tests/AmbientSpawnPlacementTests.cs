@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #906: ambient creatures were standing INSIDE each other - nine pairs at exactly 0.000u in one map-4020 dump, all
+	// Ambient creatures were standing inside each other - nine pairs at exactly 0.000u in one map-4020 dump, all
 	// in the ambient handle range. `FreePoint` walked its points for one with 2u of clearance and, when none had it,
 	// ended in `pool.Points[Random.Shared.Next(...)]` - dropping the spacing rule entirely and able to hand back the
 	// very point a live member was standing on.
 	//
-	// ⚠️ The obvious suspect is innocent, and it is worth keeping that here: it is NOT over-subscription. Measured over
-	// the shipped data, `MaxCount` equals the point count EXACTLY on all 3,970 areas. The fallback fires because the
-	// client's own points can sit closer TOGETHER than our 2u radius - 91 areas (2.3%) hold 244 such pairs, and in
+	// The obvious suspect is innocent, and it is worth keeping that here: it is not over-subscription. Measured over
+	// the shipped data, `MaxCount` equals the point count exactly on all 3,970 areas. The fallback fires because the
+	// client's own points can sit closer together than our 2u radius - 91 areas (2.3%) hold 244 such pairs, and in
 	// exactly those the greedy walk runs out of clear points 195 spawns before MaxCount.
 	public class AmbientSpawnPlacementTests
 	{
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// The general guarantee, stated as the property rather than a case: while the pool is UNDER strength - the only
+		// The general guarantee, stated as the property rather than a case: while the pool is under strength - the only
 		// time anything is spawned - some point has nobody exactly on it, and the least-crowded rule always finds it.
 		public void WhileThePoolIsUnderStrength_TheChosenPointIsNeverExactlyOccupied()
 		{
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// The common path is untouched: a point with full clearance still wins, and the FIRST such point is taken, so
+		// The common path is untouched: a point with full clearance still wins, and the first such point is taken, so
 		// a pool fills its points in order rather than scattering.
 		public void AClearPointIsStillTakenInOrder()
 		{
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ The shipped data's real shape: points the CLIENT placed closer together than our radius. Retail put them
+		// The shipped data's real shape: points the client placed closer together than our radius. Retail put them
 		// there deliberately, so the answer is to crowd rather than to refuse - both members are placed, on different
 		// points.
 		public void TwoClientPointsInsideTheRadius_StillHoldTwoMembers()

@@ -7,11 +7,11 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/iir-types.md from the compiled IirTypes enum. Each entry's VALUE is
+	// Generates docs/protocol/gen/iir-types.md from the compiled IirTypes enum. Each entry's value is
 	// a 32-bit BKDR-31 hash of the client's IIR type name; the client names carry _c/_t suffixes (and lowercase n3)
-	// that our curated member names drop. So for each entry we RECOVER the client type string by recomputing BKDR-31
+	// that our curated member names drop. So for each entry we recover the client type string by recomputing BKDR-31
 	// over a small set of candidates derived from the member name, and keep only the one that hashes to the value -
-	// that recovered string is then a self-contained [V1] proof (the id IS the hash of that name). Nothing is parsed
+	// that recovered string is then a self-contained [V1] proof (the id is the hash of that name). Nothing is parsed
 	// from a hand-written doc; the enum + the hash function are the whole source.
 	public static class IirTypesPage
 	{

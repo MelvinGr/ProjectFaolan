@@ -6,7 +6,7 @@ namespace Faolan.Tests
 {
 	// The feat-point prerequisite guard (docs/subsystems/feats.md). The budget comes from the client's own
 	// FeatPointsTable and the cost from the captured retail characters, which is what pins it: each one spends its
-	// level budget EXACTLY.
+	// level budget exactly.
 	public class FeatRulesTests
 	{
 		// Hakotep L24 (6 feats), NecroL80 (25), DemoL80 (25) - the real captured feat
@@ -23,14 +23,13 @@ namespace Faolan.Tests
 			102404, 103604, 103804, 102701, 104204, 103900, 102900, 105500, 102604, 102504, 104002, 103002, 103100, 102804, 104304, 103202, 105004, 105600, 103700, 104404, 104101, 103401, 103500, 104904, 410601
 		];
 
-		// ⭐⭐ #862: the cost model is `rank + 1`, one point per rank, and this is what says so. Three captured
-		// characters at two different levels each spend their budget to the LAST POINT - 79/79, 79/79, 16/16. Nothing
+		// The cost model is `rank + 1`, one point per rank, and this is what says so. Three captured
+		// characters at two different levels each spend their budget to the last point - 79/79, 79/79, 16/16. Nothing
 		// was fitted to get there: the budget is the client's own FeatPointsTable (RDB 1000044) and the feat lists are
 		// the wire's.
 		//
-		// ⚠️ Under the old `max(1, rank)` model all three had points left over (60, 61, 13), which is why this used to
-		// be a "fits with headroom" assertion. Headroom that never binds cannot tell a right cost from a wrong one -
-		// see the same trap in PointBudget's own history below.
+		// A `max(1, rank)` model leaves all three with points to spare (60, 61, 13), i.e. an assertion that they
+		// merely fit with headroom. Headroom that never binds cannot tell a right cost from a wrong one.
 		[Fact]
 		public void EveryCapturedCharacter_SpendsItsBudgetExactly()
 		{
@@ -56,7 +55,7 @@ namespace Faolan.Tests
 			Assert.True(FeatRules.WithinBudget(80, [800001u, 800101u]));
 		}
 
-		// Superseded by FeatPointBudgetTests, which checks these against the CLIENT's FeatPointsTable (RDB 1000044)
+		// Superseded by FeatPointBudgetTests, which checks these against the client's FeatPointsTable (RDB 1000044)
 		// instead of against our own formula. This case asserted 15 at level 24 and 71 at 80 - the `level - 9` rule we
 		// had invented - so it could only ever confirm the code it was written from. The real values are 16 and 79.
 		[Theory, InlineData(1u, 0), InlineData(9u, 0), InlineData(10u, 1), InlineData(24u, 16), InlineData(80u, 79)]
@@ -65,7 +64,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, FeatRules.PointBudget(level));
 		}
 
-		// One point per RANK, and the rank is 0-based - so a rank-0 feat costs the single point that unlocked it and a
+		// One point per rank, and the rank is 0-based - so a rank-0 feat costs the single point that unlocked it and a
 		// rank-4 feat costs the five that walked it up.
 		[Theory]
 		[InlineData(112700u, 1)] // rank 0
@@ -77,7 +76,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, FeatRules.PointCost(featId));
 		}
 
-		// ⛔ #850: an AUTOMATIC feat costs NOTHING, and that exemption is what makes the budget usable at all. The
+		// An automatic feat costs nothing, and that exemption is what makes the budget usable at all. The
 		// automatic feats a level-80 accumulates come to 153 points for one class (77 feats), 97 for another and 89
 		// for a third, against a level-80 budget of 79 - so three classes overspend the entire tree budget before
 		// the player chooses anything, and every train request is rejected. Since the tree is the only path to its
@@ -106,7 +105,7 @@ namespace Faolan.Tests
 			Assert.True(FeatRules.WithinBudget(80, held, automatic));
 		}
 
-		// ⚠️ And the exemption is exactly that - an exemption, not a bypass. A tree feat outside the free set is
+		// And the exemption is exactly that - an exemption, not a bypass. A tree feat outside the free set is
 		// still charged, so the budget still binds on what it is meant to bind on.
 		[Fact]
 		public void ATreeFeatIsStillCharged_EvenBesideTheExemptOnes()

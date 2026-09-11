@@ -5,15 +5,19 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// VALUE factory for the completed-quest journal. Not a codec - it maps DB rows to the region
-	// CompletedQuestJournalRegionCodec encodes (#390).
+	/// <summary>
+	///     Value factory for the completed-quest journal. Not a codec: it maps database rows onto the region
+	///     <see cref="CompletedQuestJournalRegionCodec" /> encodes.
+	/// </summary>
 	public static class CompletedQuestJournalRegions
 	{
-		// Builds the region from DB rows. `groups` is ORDERED - both the area sequence and each area's quest sequence -
-		// because the wire order is per-character and not derivable: two characters carry the same two areas in
-		// opposite order (#390). It is not stored either, since the client demonstrably re-sorts for display (retail
-		// renders alphabetically while the wire does not), so callers pass whatever deterministic order they like and
-		// the tests pass a capture's own order to compare byte-for-byte.
+		/// <summary>
+		///     Builds the region from database rows. <paramref name="groups" /> carries the order - both the area sequence
+		///     and each area's quest sequence - because the wire order is per-character and not derivable: two characters
+		///     carry the same two areas in opposite order. It is not stored either, since the client re-sorts for display
+		///     (retail renders alphabetically while the wire does not), so callers pass any deterministic order and the tests
+		///     pass a capture's own order to compare byte-for-byte.
+		/// </summary>
 		public static CompletedQuestJournalRegion ForAreas(IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)> groups)
 		{
 			ArgumentNullException.ThrowIfNull(groups);

@@ -10,22 +10,22 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #498: the DESTRUCTIBLE trailer's first two words are the object's `(current, max)` health pair, and the max is
+	// The destructible trailer's first two words are the object's `(current, max)` health pair, and the max is
 	// what separates the three populations that share `DestructibleFullUpdateIIR` and nothing else.
 	//
 	// This is the census stated as a gate. It is not a round-trip - the codec's round-trip already passes with the
 	// words anonymous, which is exactly the blind spot: a gate that only re-Builds bytes cannot tell a health pair
-	// from two opaque u32. What makes the naming falsifiable is the SHAPE of the values across the shipped rows -
+	// from two opaque u32. What makes the naming falsifiable is the shape of the values across the shipped rows -
 	// `current <= max` everywhere, `max` constant within a named population, and the tail words dead.
 	//
 	// The populations, and why each one is the thing it is named after:
 	//
-	//   1,000,000   Poitain's `Location Object - *` - UNBUILT guild-city plot markers. Poitain is one of the three
+	//   1,000,000   Poitain's `Location Object - *` - unbuilt guild-city plot markers. Poitain is one of the three
 	//               booking zones the client's own help book names (LDB 50020/689), and the marker set is exactly the
 	//               build menu: Keep, Walls, Towers, Gate, Tavern, Temple, Tradepost, Megalith, Profession, ...
-	//   1,000       harvest nodes (#494), and the ONE band whose `current` varies - because the capture recorded them
+	//   1,000       harvest nodes, and the one band whose `current` varies - because the capture recorded them
 	//               part-way through somebody's mining session.
-	//   100M..300M  the Border Kingdoms battlekeep, BUILT: the tier is in the name (`Wall II` / `Keep III`) and in
+	//   100M..300M  the Border Kingdoms battlekeep, built: the tier is in the name (`Wall II` / `Keep III`) and in
 	//               the health, +50M per tier with a +25M step per building class.
 	public class DestructibleHealthTests
 	{
@@ -56,27 +56,26 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The max is a CATEGORY, not a per-object number: every object sharing a name shares a max. That is what makes
+		// The max is a category, not a per-object number: every object sharing a name shares a max. That is what makes
 		// `HarvestCatalog.NodeMaxHealth` a discriminator rather than a coincidence, and it is the claim that would fail
 		// first if word 1 were something per-instance.
 		//
-		// ⭐ ONE name breaks it - two `Wagon`s in Tarantia Common District at 58,000 and 62,000 - and it is **not** an
-		// unexplained exception (#798). It used to be recorded as one, on the belief that nothing in the columns
-		// separated them. Something does: their `DisplayId`s are **278481 and 278482**, two different entries of LDB
-		// category 55000, and both read `Wagon` in every one of the seven shipped languages (German `Wagen`, French
+		// One name breaks it - two `Wagon`s in Tarantia Common District at 58,000 and 62,000 - and it is not an
+		// unexplained exception: their `DisplayId`s are 278481 and 278482, two different entries of LDB category
+		// 55000, and both read `Wagon` in every one of the seven shipped languages (German `Wagen`, French
 		// `Chariot`, Spanish `Carromato`, Russian `Повозка`, Polish `Wóz`, Korean `짐마차`).
 		//
-		// So they are two distinct display IDENTITIES wearing one text, and the max stays a per-template constant -
-		// the string-vs-identity split #734 found on the nodes, here with the discriminating column named.
+		// So they are two distinct display identities wearing one text, and the max stays a per-template constant -
+		// the same string-vs-identity split the harvest nodes show, here with the discriminating column named.
 		//
-		// ⚠️ The two columns are different things and that is what the old reading missed: `Name` is the wire's own
-		// INTERNAL name (ProtoSimpleDynelIIR field 2, never localized - one object on map 1010 is called
+		// The two columns are different things: `Name` is the wire's own
+		// internal name (ProtoSimpleDynelIIR field 2, never localized - one object on map 1010 is called
 		// `Blacksmithing Hammer TESTITEM` and displays as `Cotton Shrub`), while `DisplayId` is the localized
 		// reference the player actually reads (field 3). Grouping by `Name` therefore merges identities on purpose;
 		// it is the right grouping for "is the max a category?" and the wrong one for "are these the same object".
 		//
 		// The test asserts the explanation rather than pinning the exception: the split name's rows must differ in
-		// `DisplayId`, and each `DisplayId` must carry ONE max - so a genuinely unexplained split (one DisplayId, two
+		// `DisplayId`, and each `DisplayId` must carry one max - so a genuinely unexplained split (one DisplayId, two
 		// maxima) fails here instead of being absorbed by the allowance.
 		[Fact]
 		public async Task MaxHealth_IsConstantWithinAName_AndTheTarantiaWagonsAreTwoNameIds()
@@ -98,7 +97,7 @@ namespace Faolan.Tests
 		}
 
 		// The harvest half, stated the way the subsystem relies on it: a node is exactly the 1000-max band, and the
-		// band's `current` is the only one that MOVES - which is both the decode and the reason the live value has to
+		// band's `current` is the only one that moves - which is both the decode and the reason the live value has to
 		// be stamped at send time (WorldObjectFromColumnsTests pins the stamp itself).
 		[Fact]
 		public async Task HarvestNodes_AreTheThousandMaxBand_AndAreShippedPartlyHarvested()
@@ -109,7 +108,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(nodes);
 			Assert.All(nodes, n => Assert.Equal(HarvestCatalog.NodeMaxHealth, Trailer(n)[WorldObjectGeometryColumns.HealthMaxWord]));
 
-			// The bug this decode exposed: most shipped nodes are NOT full. Asserted as a positive so the fix cannot be
+			// The bug this decode exposed: most shipped nodes are not full. Asserted as a positive so the fix cannot be
 			// "quietly re-import full nodes" - the captured rows stay as captured, and the send path is what corrects.
 			var depleted = nodes.Count(n => Trailer(n)[WorldObjectGeometryColumns.HealthCurrentWord] < HarvestCatalog.NodeMaxHealth);
 			Assert.True(depleted > nodes.Count / 2,

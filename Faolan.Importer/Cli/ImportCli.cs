@@ -13,8 +13,11 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
-	// Importer entry point (invoked from Program.Main). Parses paths + selection + mode, loads captures once,
-	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer.md for the CLI spec.
+	/// <summary>
+	///     Importer entry point, invoked from Program.Main. Parses paths, selection and mode, loads captures once,
+	///     migrates, and hands a resolved plan to <see cref="ImportRunner" />. See docs/tooling/importer.md for the CLI
+	///     spec.
+	/// </summary>
 	public static class ImportCli
 	{
 		public static async Task<int> RunAsync(ImporterOptions options)
@@ -37,10 +40,8 @@ namespace Faolan.Importer.Cli
 						: ""));
 				}
 
-				// ⚠️ A SAMPLE, and it says so: this line is hand-written while `ReportCli` dispatches ~90 report
-				// names, so it went stale the moment the second one was added and reading it as the catalog is how
-				// an existing report gets rebuilt. The switch is the catalog; these are the ones worth knowing about
-				// without going to look.
+				// A sample, and it says so: this line is hand-written while `ReportCli` dispatches scores of report
+				// names. `--report list` prints the catalog; these are the ones worth knowing about without looking.
 				Console.WriteLine("\nReports (read-only, ~90 of them - `grep 'case \"' Faolan.Importer/Cli/ReportCli.cs` for the full set):");
 				Console.WriteLine("  codec-sweep   EVERY codec vs EVERY captured record of its type: Parse + re-Build, byte-compared");
 				Console.WriteLine("  coverage | conversation-states | anim | bcc-census | combo-swings | creature-races | method-census | worldobj");
@@ -56,11 +57,11 @@ namespace Faolan.Importer.Cli
 			var dryRun = options.DryRun;
 			var force = options.Force;
 
-			// Provider + connection come from the SHARED config (the same DB the server uses); see CliConfig.
-			// `--Database:ConnectionString` overrides that key in the command-line layer (env > cmdline > json); the provider follows config.
+			// Provider and connection come from the shared config - the same database the server uses; see CliConfig.
+			// `--Database:ConnectionString` overrides that key in the command-line layer; the provider follows config.
 			var (provider, connection) = CliConfig.ResolveDatabase(options.Configuration);
 
-			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
+			// A SQLite database is a file that must already exist; Postgres targets a server.
 			if (provider == FaolanDbProvider.Sqlite)
 			{
 				var dbFile = new SqliteConnectionStringBuilder(connection).DataSource;
@@ -109,7 +110,7 @@ namespace Faolan.Importer.Cli
 				return 1;
 			}
 
-			// The corpus is needed by the modules that READ it, and only by those: a plan of nothing but Db-source
+			// The corpus is needed by the modules that read it and only by those: a plan of nothing but Db-source
 			// modules (`--only spell-effects`, whose rows are decoded facts) runs on a plain clone with no data repo.
 			var capturesPath = capturesDir != null && Directory.Exists(capturesDir)
 				? capturesDir
@@ -127,7 +128,7 @@ namespace Faolan.Importer.Cli
 				? NamedCapture.LoadAll(capturesPath)
 				: [];
 
-			// Raw packet bytes across every capture PLUS the loose *.bin files (the `itemPackets` source).
+			// Raw packet bytes across every capture plus the loose *.bin files (the `itemPackets` source).
 			var rawPackets = captures.SelectMany(c => c.Packets.Select(p => p.Bytes)).ToList();
 			if (capturesPath != null)
 			{
@@ -141,14 +142,17 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
 			await using var db = DatabaseExtensions.CreateContext(provider, connection);
-			// Migrate + seed the default realm/account before any module runs - the same sequence the server runs
-			// (DatabaseInitializer). Migrations run here, outside the runner's transaction (they can't run inside one).
-			// seedGameData: false ON PURPOSE - the importer's whole job is to BUILD that content from captures, so
-			// loading faolan.sql first would import on top of a copy of its own previous output and blur what this run
-			// actually produced (the --dry-run per-table delta especially).
-			// The declared realms come along for the ride so the importer brings a database up the same way the server
-			// does - a fresh DB it builds is one the server can serve without a second reconcile pass. It never scopes
-			// to one realm: the importer hosts none, so there is no "own row" for it to be limited to.
+			// Migrate and seed the default realm and account before any module runs - the same sequence the server
+			// runs (DatabaseInitializer). Migrations run here, outside the runner's transaction, because they cannot
+			// run inside one.
+			//
+			// seedGameData is false on purpose: the importer's job is to build that content from captures, so loading
+			// faolan.sql first would import on top of a copy of its own previous output and blur what this run
+			// produced - the --dry-run per-table delta especially.
+			//
+			// The declared realms come along so the importer brings a database up the same way the server does, and a
+			// fresh database it builds is one the server can serve without a second reconcile pass. It never scopes to
+			// one realm: the importer hosts none, so there is no own row for it to be limited to.
 			var seeded = await DatabaseInitializer.InitializeAsync(db, false, FaolanRealms.Declared(options.Configuration));
 			foreach (var realm in seeded.Realms.Created)
 				Console.WriteLine($"Importer: declared realm not in the database - inserted {realm}.");

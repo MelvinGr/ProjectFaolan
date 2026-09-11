@@ -16,8 +16,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-map loot pool (#273): the items a map's captured loot bags carried, that NPC-kill drops on that map roll
-	// from instead of the all-items random sample. Needs the items first so the pool can be filtered to buildable rows.
+	/// <summary>
+	///     Per-map loot pool: the items a map's captured loot bags carried, which NPC-kill drops on that map roll from
+	///     instead of the all-items random sample. Needs the items first so the pool can be filtered to buildable rows.
+	/// </summary>
 	public sealed class MapLootModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];

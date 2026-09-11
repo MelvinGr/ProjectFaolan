@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #490: a MoveTask can send an NPC's roam route BY REFERENCE instead of by value - `PathFlags & 1` swaps the
+	// A MoveTask can send an NPC's roam route by reference instead of by value - `PathFlags & 1` swaps the
 	// explicit waypoint list for two u16 that index the playfield's territory table (RDB 1010506,
-	// `GameData::PlayfieldTerritory_c`), which the CLIENT already holds. `PathMoveTask::InitRoamPath` resolves
+	// `GameData::PlayfieldTerritory_c`), which the client already holds. `PathMoveTask::InitRoamPath` resolves
 	// `territories[TerritoryIndex].paths[TerritoryPathIndex]` and walks it, bounds-checking both.
 	//
 	// That claim is only worth anything if the two indices really do address our imported territory table, so these

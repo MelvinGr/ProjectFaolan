@@ -8,9 +8,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The aggro line-of-sight gate (#284 tier 2/3) as WorldState consults it, on a synthetic bake: a flat 64x64 grid at
+	// The aggro line-of-sight gate (tier 2/3) as WorldState consults it, on a synthetic bake: a flat 64x64 grid at
 	// Y=100 with, per test, a terrain hump or a collision actor between an NPC and a player 20 u apart. Locks the two
-	// #577 changes - the collision half's three-ray test (a post is not cover) and the terrain half standing aside for
+	// rules that matter - the collision half's three-ray test (a post is not cover) and the terrain half standing aside for
 	// an endpoint the heightmap does not describe (a cellar NPC is not melee-only) - and the Terrain-before-Collision
 	// attribution `--report terrain-los` relies on.
 	public sealed class TerrainServiceTests : IDisposable
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			var terrain = Bake(Flat(), post);
 
 			Assert.True(RdbCollisionMesh.TryParse(post, out var mesh));
-			Assert.True(mesh.SegmentBlocked(Eye(Npc), Eye(Player))); // the single ray IS blocked ...
+			Assert.True(mesh.SegmentBlocked(Eye(Npc), Eye(Player))); // the single ray is blocked ...
 			Assert.Equal(LineOfSightBlocker.None, terrain.Trace(MapId, Npc, Player)); // ... and the gate sees past it
 		}
 
@@ -105,7 +105,7 @@ namespace Faolan.Tests
 		{
 			// A cellar: the NPC and the player both stand 10 u under the grid. Every sample along the ray reads the
 			// surface 10 u overhead, so a gate that trusted the heightmap here occluded at every range - the melee-only
-			// aggro of #577 for the 7 City of Tortage spawns that sit under their grid.
+			// aggro seen on the 7 City of Tortage spawns that sit under their grid.
 			var terrain = Bake(Flat(), []);
 			var npc = Npc with { Y = Ground - 10 };
 			var player = Player with { Y = Ground - 10 };
@@ -125,7 +125,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Either_Endpoint_Under_The_Surface_Counts()
 		{
-			// Only the PLAYER is under the grid (a cellar the NPC on the street cannot see into is the collision mesh's
+			// Only the player is under the grid (a cellar the NPC on the street cannot see into is the collision mesh's
 			// job, not the heightmap's): the terrain half stands aside for that end too.
 			var terrain = Bake(Flat(), []);
 			var player = Player with { Y = Ground - 10 };

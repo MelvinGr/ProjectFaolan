@@ -3,8 +3,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ConanPatcher "-key" launch token = TEA-encrypt(time||time) with the patcher's hardcoded key, recovered
-	// by RE of ConanPatcher.exe (sub_439140 = TEA, sub_4bcf93 = time()). See Faolan.Core.Crypt.ConanLaunchToken.
+	// The ConanPatcher "-key" launch token is TEA-encrypt(time||time) under the patcher's hardcoded key
+	// (ConanPatcher.exe: sub_439140 is TEA, sub_4bcf93 is time()). See Faolan.Core.Crypt.ConanLaunchToken.
 	public class ClientLaunchTokenTests
 	{
 		[Fact]
@@ -28,9 +28,8 @@ namespace Faolan.Tests
 			Assert.Equal(1781038901u, ClientLaunchToken.GetUnixTime("495cd3b8c7047b47"));
 		}
 
+		// The cases are, in order: empty, too short, right length but not hex, and too long.
 		[Theory, InlineData(""), InlineData("tooShort"), InlineData("zzzzzzzzzzzzzzzz"), InlineData("0123456789abcdef00")]
-		// right length, not hex
-		// wrong length
 		public void GetUnixTime_RejectsMalformed(string token)
 		{
 			Assert.Null(ClientLaunchToken.GetUnixTime(token));

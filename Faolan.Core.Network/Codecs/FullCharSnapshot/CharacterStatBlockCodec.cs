@@ -4,17 +4,19 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The count-prefixed stat-record block shared by the 0x737A6DF9 snapshot and the 0x96B8DC59 vitals/stat-update
-	// packet. Confirmed wire encoding (docs/subsystems/player-stats.md, docs/re/quests-and-combat.md):
-	//
-	//   [u8 recordCount][ N x ([u32 statId][u32 value]) ]
-	//
-	// Values are at WIRE scale: vitals (Health/Mana/Stamina) x100, attributes x10, everything else x1 - see
-	// CharacterStatIdExtensions.GetScale. The value's Set/SetRaw pair is where that conversion happens; this codec
-	// only moves the words.
+	/// <summary>
+	///     The count-prefixed stat-record block shared by the FullChar snapshot and the vitals/stat-update packet:
+	///     <c>[u8 recordCount][ N x ([u32 statId][u32 value]) ]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Values are at wire scale: vitals (Health/Mana/Stamina) x100, attributes x10, everything else x1 - see
+	///     <see cref="CharacterStatIdExtensions.GetScale" />. The value's Set/SetRaw pair is where that conversion
+	///     happens; this codec only moves the words. Confirmed wire encoding: docs/subsystems/player-stats.md,
+	///     docs/re/quests-and-combat.md.
+	/// </remarks>
 	public static class CharacterStatBlockCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterStatBlock value)
 		{
 			using var s = new FaolanStream();

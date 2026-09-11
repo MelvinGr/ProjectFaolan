@@ -8,28 +8,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report name-group-templates`: can the CLIENT name the creature behind an unresolved `Name`-category spawn
-	// group? (Gitea #684.)
+	// `--report name-group-templates`: can the client name the creature behind an unresolved `Name`-category spawn
+	// group?
 	//
-	// #684 measured that 153 `Name`-category `NpcSpawnArea`s carry a real creature name over 31 distinct creatures,
-	// and that "we hold an `NpcTemplate` for exactly 0 of them", concluding **"spawn coverage is capture-bound, not
-	// decode-bound"** and reducing the ticket to a shopping list of captures to wish for.
-	//
-	// ⭐ That is only half true, and this report is the half it missed. `LDB[51000]` is the client's NPC-template
-	// name table and is **keyed by the template id** - verified over the whole catalog: all 1,018 `NpcTemplates`
-	// have an entry and 991 agree exactly with the capture-derived `Name`, an independent cross-check because our
-	// name came off the wire and the LDB's did not. Read BACKWARDS, `name -> templateId`, it answers exactly the
+	// A large share of `Name`-category `NpcSpawnArea`s carry a real creature name for which no `NpcTemplate` is held,
+	// which reads as pure capture coverage. It is only half that. `LDB[51000]` is the client's NPC-template
+	// name table and is keyed by the template id - verified over the whole catalog: every shipped `NpcTemplate` has
+	// an entry and nearly all agree exactly with the capture-derived `Name`, an independent cross-check because our
+	// name came off the wire and the LDB's did not. Read backwards, `name -> templateId`, it answers exactly the
 	// question the resolver's tier 1 asks and cannot currently answer: the client knows what `Shar Kihn (4YQ1)` is,
 	// and it knows its retail template id.
 	//
-	// ⚠️ What that does NOT do is make the creature spawnable. A template id plus a display name is an IDENTITY, not
-	// an entity: level, health, model, faction and profession are all still capture-bound, and #684's own
-	// `rdb_npc_hp_not_in_client` finding stands. So the report deliberately reports the gap in two columns rather
+	// What that does not do is make the creature spawnable. A template id plus a display name is an identity, not
+	// an entity: level, health, model, faction and profession are all still capture-bound, and the client ships no
+	// NPC hit points. So the report deliberately reports the gap in two columns rather
 	// than one - what the client can name, and what is still missing - and writes nothing. Manufacturing a stats-less
 	// `NpcTemplate` to satisfy an FK would ship a creature that spawns wrong, which is worse than one that does not
 	// spawn.
 	//
-	// ⚠️ Names are matched EXACTLY (case-insensitively) after stripping the 4-char tag, the same normalisation tier 1
+	// Names are matched exactly (case-insensitively) after stripping the 4-char tag, the same normalisation tier 1
 	// applies. A fuzzy match here would be the worst kind of false positive: it would silently bind a spawn group to
 	// the wrong creature, and nothing downstream would ever question it.
 	public static partial class ReportCli
@@ -37,8 +34,8 @@ namespace Faolan.Importer.Cli
 		// The 4-char code the client appends to a Name-category group key: `Shar Kihn (4YQ1)`.
 		private static readonly Regex NameGroupTag = new Regex(@"\s*\([0-9A-Za-z]{4}\)\s*$", RegexOptions.Compiled);
 
-		// Dev/test content that must NOT be chased - #684 names these explicitly, and a resolution for one of them
-		// would be a false lead rather than a win.
+		// Dev/test content that must not be chased: a resolution for one of these would be a false lead rather than
+		// a win.
 		private static readonly Regex DevContent = new Regex(@"^(XX[ _]|NonAggro Dummy)", RegexOptions.Compiled);
 
 		// The group key with its 4-char tag stripped - the same normalisation the resolver's tier 1 applies, so a hit
@@ -137,9 +134,9 @@ namespace Faolan.Importer.Cli
 			TieBreakersThatDoNotWork(db, heldIds);
 		}
 
-		// ⛔ The two obvious ways to break an AMBIGUOUS row's tie, both MEASURED and both dead (#684). Printed
-		// rather than written down in prose, because a route that looks this good is going to be tried again and
-		// the numbers are what stop it - the same treatment the scope test got on #661.
+		// The two obvious ways to break an ambiguous row's tie, both measured and both dead. Printed rather than
+		// written down in prose, because a route that looks this good is going to be tried again and the numbers are
+		// what stop it.
 		private static void TieBreakersThatDoNotWork(DatabaseContext db, IReadOnlySet<uint> heldIds)
 		{
 			// 1. "Pick the candidate whose id sits in the target map's template-id BAND." The four map-2095 bosses
@@ -166,11 +163,11 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("      ambiguous candidates is among them, so there is nothing to prefer.");
 
 			// 3. "Another LDB category might key only one of them." The obvious next move once 51000 turns out to name
-			//    both, and it is worth stating as measured because a `Refuge Corpse-Waker` search DOES return a second
+			//    both, and it is worth stating as measured because a `Refuge Corpse-Waker` search does return a second
 			//    category (55701) - which makes "some creatures carry more LDB rows than others" look like a lever.
 			//    It is not one here: checked on the `Shark` pair (`--report ldb-strings --report-arg id:#<templateId>`),
-			//    templates 10027 and 18210 each appear in category 51000 and in NOTHING else, so there is no second
-			//    row to prefer either by. The 55701 hit was on the STRING, not on a template id.
+			//    templates 10027 and 18210 each appear in category 51000 and in nothing else, so there is no second
+			//    row to prefer either by. The 55701 hit was on the string, not on a template id.
 			Console.WriteLine("   3. a SECOND LDB category keying only one candidate - both `Shark` templates (10027, 18210) appear in");
 			Console.WriteLine("      category 51000 and in no other, so there is no extra row to break the tie with.");
 		}

@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #258 follow-up: the base player-spawn ProtoCoreCharacterIIR is now built from code (PlayerCharacterIirs) instead
-	// of the captured PlayerCharacterIirTemplate.bin blob. These prove the bare template (PlayerCharacterIirs.ForCharacter with
-	// no character) reproduces the .bin exactly except for the worn-gear entries - which Build always replaces with the
-	// character's own gear, so they are intentionally not reproduced. The .bin survives only as this golden oracle.
+	// The base player-spawn ProtoCoreCharacterIIR is built from code by PlayerCharacterIirs; PlayerCharacterIirTemplate.bin
+	// is kept only as the golden oracle these tests compare against. The bare template - ForCharacter with no character -
+	// must reproduce the .bin exactly except for the worn-gear entries, which the build always replaces with the
+	// character's own gear and therefore deliberately leaves empty.
 	public class PlayerCharacterIirsTests
 	{
 		private static readonly string TemplatePath = TestPaths.Asset("PlayerCharacterIirTemplate.bin");
@@ -30,8 +30,9 @@ namespace Faolan.Tests
 			Assert.Equal(strippedBytes, built);
 		}
 
-		// Sanity: the captured template carried exactly 4 worn-gear entries (Strie's), which we deliberately drop -
-		// guards the assumption above (if a future template shape changed, the equality test alone could mask it).
+		// The captured template carries exactly 4 worn-gear entries, which the build deliberately drops. Pinning the
+		// count guards the assumption above: a change in the template's shape would otherwise be masked by the
+		// equality test.
 		[Fact]
 		public void Template_CarriesOnlyWornGearThatIsAlwaysReplaced()
 		{

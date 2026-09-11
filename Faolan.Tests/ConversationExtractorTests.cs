@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the answer-index-tree conversation extraction: a conversation INSTANCE = TalkToNpc(f3=0) [greeting] then
+	// Locks the answer-index-tree conversation extraction: a conversation instance = TalkToNpc(f3=0) [greeting] then
 	// server responses + the player's KnubotAnswer(idx) picks. The greeting's responses are the "" screen; the
 	// responses after picking idx are the "idx" screen; the next pick extends the path ("idx>idx2"). A new greeting
 	// (TalkToNpc f3=0) starts a fresh instance. Merge unions screens across instances by (NpcName, TypeId, AnswerPath).
@@ -41,8 +41,8 @@ namespace Faolan.Tests
 			Assert.Equal(0x9D42u, byPath[""].CapturedNpcHandle);
 		}
 
-		// A quest is GRANTED at the dialogue node where its full-update FIRST appears after the player picked an option
-		// (path != ""). A full-update at the greeting (path "") or a re-send of an already-seen quest is NOT a grant
+		// A quest is granted at the dialogue node where its full-update first appears after the player picked an option
+		// (path != ""). A full-update at the greeting (path "") or a re-send of an already-seen quest is not a grant
 		// (those are login restores / re-displays). This is how "talk to NPC -> accept -> quest in journal" is harvested.
 		[Fact]
 		public void Extract_HarvestsQuestGrantAtAcceptNode()
@@ -52,13 +52,13 @@ namespace Faolan.Tests
 				Spawn(0x9D42, "Casilda"),
 				Talk(42008, 1, 0, 0x9D42, 0x02000005), // greeting
 				Response(0x2000, 0xF164A4A5), // "" screen
-				QuestFullUpdate(13479), // at the greeting -> NOT a grant (and remembered)
+				QuestFullUpdate(13479), // at the greeting -> not a grant (and remembered)
 				Answer(0),
 				Response(0x2000, 0x4A3D899A), // "0" screen
-				QuestFullUpdate(13479), // already seen -> NOT a grant
+				QuestFullUpdate(13479), // already seen -> not a grant
 				Answer(0),
 				Response(0x2000, 0x4A3D899A), // "0>0" screen
-				QuestFullUpdate(13480) // first appearance, after a pick -> GRANT on "0>0"
+				QuestFullUpdate(13480) // first appearance, after a pick -> grant on "0>0"
 			};
 
 			var byPath = ConversationExtractor.Extract(packets).ToDictionary(e => e.AnswerPath);
@@ -96,14 +96,14 @@ namespace Faolan.Tests
 			{
 				Talk(42008, 1, 0, 0x9D42, 0x02000005), // greeting
 				Response(0x2000, 0xF164A4A5),
-				Talk(42008, 1, 2, 0x9D42, 0x02000005), // f3!=0 re-request (retail answers it with nothing) - NOT a boundary
+				Talk(42008, 1, 2, 0x9D42, 0x02000005), // f3!=0 re-request (retail answers it with nothing) - not a boundary
 				Answer(0),
 				Response(0x2000, 0x4A3D899A)
 			};
 
 			var entries = ConversationExtractor.Extract(packets);
 
-			// Two screens ("" and "0"), NOT three - the f3=2 talk neither started a new instance nor split a screen.
+			// Two screens ("" and "0"), not three - the f3=2 talk neither started a new instance nor split a screen.
 			Assert.Equal(2, entries.Count);
 			Assert.Contains(entries, e => e.AnswerPath == "");
 			Assert.Contains(entries, e => e.AnswerPath == "0");
@@ -125,8 +125,8 @@ namespace Faolan.Tests
 			Assert.Equal("Casilda", entries[0].NpcName);
 		}
 
-		// Branches captured across re-walks UNION by answer-path: walk 1 contributes "0>0", walk 2 contributes
-		// "0>1". Merge keeps both (distinct paths) and dedupes same-path screens by the RICHER capture - the one with
+		// Branches captured across re-walks union by answer-path: walk 1 contributes "0>0", walk 2 contributes
+		// "0>1". Merge keeps both (distinct paths) and dedupes same-path screens by the richer capture - the one with
 		// more response packets, which is the whole of the merge rule now that the varint term is gone.
 		[Fact]
 		public void Merge_UnionsBranchesAndDedupesByPath()
@@ -144,10 +144,9 @@ namespace Faolan.Tests
 			Assert.True(byPath.ContainsKey("0>0") && byPath.ContainsKey("0>1"));
 		}
 
-		// A client KnubotAnswer (0x4D7D9123) carrying the picked option index - the branch key. Built THROUGH the
-		// codec (#534): the pick is a full Knubot record (KnubotBase header then the index), and the extractor reads
-		// it as one. This used to be 12 hand-laid bytes whose only real content was a trailing u32, which the old
-		// opaque-prefix codec accepted by construction.
+		// A client KnubotAnswer (0x4D7D9123) carrying the picked option index - the branch key. Built through the
+		// codec: the pick is a full Knubot record (KnubotBase header then the index), and the extractor reads it as
+		// one - hand-laid bytes whose only real content is a trailing u32 are not that record.
 		private static CapturedPacket Answer(uint index)
 		{
 			var record = KnubotCodec.Build(new KnubotAnswerIIR(0x02000005, 0x9D42, 0, index));
@@ -197,10 +196,9 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, true, opcode, subOpcode, Frame(new byte[8]));
 		}
 
-		// ⚠️ The name rides a REAL length-prefixed CoreCharacter message, serialized by the generated type (#541).
-		// This used to lay down a bare `0x0A <len> <name>`, which is not a spawn - it only ever satisfied the lenient
-		// byte scan the extractor has stopped using. `SpawnBodyReader.TryReadCharacterMessage` verifies the u32
-		// length ahead of field 1 and re-decodes the message, so the fixture has to carry one.
+		// The name rides a real length-prefixed CoreCharacter message, serialized by the generated type.
+		// `SpawnBodyReader.TryReadCharacterMessage` verifies the u32 length ahead of field 1 and re-decodes the message,
+		// so a bare `0x0A <len> <name>` is not a spawn and the fixture has to carry the real thing.
 		private static CapturedPacket Spawn(uint handle, string name)
 		{
 			var message = new ProtoCoreCharacterIIR
@@ -227,10 +225,9 @@ namespace Faolan.Tests
 			body.WriteU32Be(4, 0x642CD3D6);
 			body.WriteU32Be(8, 0x0000C350);
 			body.WriteU32Be(12, instance);
-			// The BCC phase. It used to be left at 0, which retail never sends - the corpus carries 2/3/4/5/7/0xA/
-			// 0xB/0xC/0xE/0xF/0x10 and nothing else, and the client's reader ends the record at the phase word for
-			// anything it does not list, so a zero here is a record with no command at all (#809). 2 is what a c2s
-			// UseCharacter (0x16) talk actually carries.
+			// The BCC phase. Retail never sends 0 - the corpus carries 2/3/4/5/7/0xA/0xB/0xC/0xE/0xF/0x10 and nothing
+			// else, and the client's reader ends the record at the phase word for anything it does not list, so a zero
+			// is a record with no command at all. 2 is what a c2s UseCharacter (0x16) talk carries.
 			body.WriteU16Be(16, 0x0002);
 			body.WriteU32Be(18, 0x16);
 			body.WriteU32Be(22, (uint)args.Length);

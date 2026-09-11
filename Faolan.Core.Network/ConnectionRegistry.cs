@@ -5,24 +5,20 @@ using System.Linq;
 namespace Faolan.Core.Network
 {
 	/// <summary>
-	///     The live connections on one listener, and the lookups over them. Extracted off <see cref="ServerBase" />
-	///     (#826) so the things that SEND to a character no longer have to be the listener to find it.
+	///     The live connections on one listener, and the lookups over them.
 	/// </summary>
 	/// <remarks>
-	///     This is the dependency that kept the remaining outbound ports on <c>GameServerListener</c>: unlike
-	///     <c>IWorldOutbound</c>, which was a facade over services, ports like <c>ITradeOutbound</c> /
-	///     <c>IQuestShareOutbound</c> / <c>IApprenticeOutbound</c> are the listener's own wire code whose only
-	///     listener-scoped need is "give me the client for this character id". Handing THIS to a wire class is what
-	///     lets that code move without a pile of Func seams pointing back at the listener.
+	///     Wire classes whose only listener-scoped need is "give me the client for this character id" take this
+	///     registry rather than the listener, which is what keeps outbound ports (<c>ITradeOutbound</c>,
+	///     <c>IQuestShareOutbound</c>, <c>IApprenticeOutbound</c>, …) off <c>GameServerListener</c>.
 	///     <para>
-	///         <see cref="ServerBase" /> owns one and delegates its own members to it, so every existing call site is
-	///         unchanged and this is a pure seam, not a behaviour change.
+	///         <see cref="ServerBase" /> owns one and delegates its own connection members to it.
 	///     </para>
 	/// </remarks>
 	public sealed class ConnectionRegistry
 	{
-		// A set, not a list: the value is unused (ConcurrentDictionary is the only concurrent set in the BCL), and it
-		// is concurrent because accepts, disconnects and world broadcasts all touch it from different threads.
+		// Used as a set: the value is unused, and the dictionary is concurrent because accepts, disconnects and world
+		// broadcasts all touch it from different threads.
 		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
 
 		public IEnumerable<INetworkClient> Clients => _clients.Keys;

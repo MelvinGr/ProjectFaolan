@@ -10,7 +10,7 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Extractors
 {
 	// A harvested map area name: the client localized-string id of the top-of-screen FIFO banner, plus the player
-	// position it fired at (#348). One SIGHTING - a map has many areas and each fires repeatedly, so these are
+	// position it fired at. One sighting - a map has many areas and each fires repeatedly, so these are
 	// aggregated into MapArea rows by MergeAreas.
 	public sealed record MapAreaName(uint MapId, uint AreaNameId, float X, float Y, float Z);
 
@@ -18,27 +18,26 @@ namespace Faolan.Importer.Extractors
 	// stored - see Merge.
 	public sealed record CapturedBanner(uint MapId, uint AreaNameId, float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ)
 	{
-		// A hull over ONE sighting is a point: it says where the banner fired once, not where its region is.
+		// A hull over one sighting is a point: it says where the banner fired once, not where its region is.
 		public bool SingleSighting => MinX == MaxX && MinZ == MaxZ;
 
 		public float CentreX => (MinX + MaxX) / 2f;
 		public float CentreZ => (MinZ + MaxZ) / 2f;
 	}
 
-	// Harvests EVERY area banner from captured gameplay, with the position it fired at. After a MapChange
+	// Harvests every area banner from captured gameplay, with the position it fired at. After a MapChange
 	// (PlayfieldFIIR 0x5D85BFC7) the server sends a FormatFeedbackIIR (0x8D5A8B6B) FIFO banner whose remoteformat
 	// carries `GenericDisplayAreaName|<textId>` - the localized area-name string id. Retail sends one whenever the
-	// player crosses into a SUB-AREA, so a playfield has many: Old Tarantia (2000) alone fires six distinct ids.
+	// player crosses into a sub-area, so a playfield has many: Old Tarantia (2000) alone fires six distinct ids.
 	//
 	// The position comes from the last C2S CharDCMoveIIR (0x4517AA81) before the banner - the client's own move, so
-	// by definition the player's. That pairing IS the region data: the boundary triggers are SERVER-side (scanning
+	// by definition the player's. That pairing is the region data: the boundary triggers are server-side (scanning
 	// all 410,433 local RDB records for a banner id found only chance collisions in multi-MB textures, and the
 	// "Bridge of Vilerus I" position lands in no client region but a collision volume), so where retail actually
 	// sent each banner is the only evidence of where the areas are.
 	//
-	// This used to keep only the FIRST banner per map entry and store it as `Map.AreaNameId` - one scalar for a
-	// one-to-many. That silently picked an arbitrary one of the six for Old Tarantia (it landed on 3373522 = "The
-	// West Gate"); MapArea replaces it.
+	// A map carries several banners, so they are kept as `MapArea` rows rather than one scalar on `Map`: Old Tarantia
+	// alone fires six, and a single column can only hold an arbitrary one of them.
 	public static class AreaNameExtractor
 	{
 		private static readonly Regex AreaId = new Regex("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
@@ -49,7 +48,7 @@ namespace Faolan.Importer.Extractors
 			uint currentMap = 0;
 			(float X, float Y, float Z)? pos = null;
 
-			// Banners seen on this playfield before ANY c2s move, waiting for the next one. The ENTRY banner fires
+			// Banners seen on this playfield before any c2s move, waiting for the next one. The entry banner fires
 			// right after the MapChange - before the client has moved - so a "last move before the banner" rule drops
 			// exactly the sighting that names the area the player spawns into. The next move is inside the same area
 			// (the player is standing in it when the banner shows), so it places the sighting just as well.
@@ -57,15 +56,14 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				// NB both directions: the banner is s2c but the POSITION comes from the client's own c2s move, so
+				// NB both directions: the banner is s2c but the position comes from the client's own c2s move, so
 				// this can't filter to downloads the way it did when it only read banners.
 				if (!p.IsIirCarrier)
 					continue;
 
 				if (p is { SubOpcode: PlayfieldFCodec.Opcode, IsDownload: true })
 				{
-					// A short/partial one is not a map announcement we can trust - PlayfieldFCodec.Parse is strict
-					// (#530 rule 4).
+					// A short/partial one is not a map announcement we can trust - PlayfieldFCodec.Parse is strict.
 					if (!p.TryParse(PlayfieldFCodec.Parse, out var change) || change.MapId == currentMap)
 						continue;
 
@@ -77,7 +75,7 @@ namespace Faolan.Importer.Extractors
 
 				if (p is { SubOpcode: CharDCMoveCodec.Opcode, IsDownload: false })
 				{
-					// A C2S move is the client reporting its OWN position, so no handle check is needed.
+					// A C2S move is the client reporting its own position, so no handle check is needed.
 					if (!p.TryParse(CharDCMoveCodec.Parse, out var move))
 						continue;
 
@@ -111,15 +109,15 @@ namespace Faolan.Importer.Extractors
 
 		// The distinct banners the wire was seen carrying, each with the bounds of every position it fired at.
 		//
-		// Both halves are DERIVATION INPUTS since #680, and nothing here is stored. The (playfield, id) pair is the
-		// valuable one: it PINS a playfield's id numbering, which is what lets an ambiguous name resolve and what a
+		// Both halves are derivation inputs and nothing here is stored. The (playfield, id) pair is the
+		// valuable one: it pins a playfield's id numbering, which is what lets an ambiguous name resolve and what a
 		// name match far from that numbering is checked against. The hull is the weak one, and is only still built
 		// because it is the sole route left for a banner whose region carries an internal name - Old Tarantia's
 		// volumes are `BA_Bridge`, never the "Bridge of Vilerus I" the banner renders.
 		//
-		// ⚠️ It used to BE the region data, as a `MapArea` row the runtime tested with a slack radius. That was an
-		// approximation by construction - it can only cover ground a captured player actually walked, and with one
-		// sighting it is a point - and it is the weakest evidence in the subsystem: a banner fires ON ENTRY, so its
+		// The hull is not the region data. It is an approximation by construction - it can only cover ground a
+		// captured player actually walked, and with one sighting it is a point - and it is the weakest evidence in
+		// the subsystem: a banner fires on entry, so its
 		// sample sits on the boundary, and a one-sighting hull is placed by whichever move happened to bracket the
 		// banner. On map 1010 that demonstrably put two different banners in one volume, 600 units from where one of
 		// them belongs.

@@ -11,24 +11,23 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report codec-sweep`: run EVERY codec against EVERY captured record of the type it declares, over all the
+	// `--report codec-sweep`: run every codec against every captured record of the type it declares, over all the
 	// dumps - Parse, then re-Build, then compare byte-for-byte. Two failure kinds, and they are different findings:
 	//
 	//   REFUSED    Parse threw. The codec models a shape retail does not send.
 	//   MISMATCH   Parse succeeded but Build did not reproduce the input. The codec read the body without
 	//              accounting for all of it, so a field is being silently dropped or defaulted.
 	//
-	// This generalises the `--report timeline` footer that found #809's four (it counts refusals in ONE capture, and
-	// one such line is invisible in ten thousand). It is deliberately a REPORT, not a test: `CodecSurfaceConventionTests
-	// .BuildParseRoundTripsOverTheCorpus` does the same thing but against `fixtures.bin`'s frozen 9-type slice at 50
-	// bodies per type, and a gate measured against the real dumps would fail the moment a capture is added (CLAUDE.md,
-	// "a gate comparing SHIPPED DATA to the corpus belongs in a --report"). The test keeps the floor; this says where
+	// It generalises the `--report timeline` footer, which counts refusals in one capture where a single such line is
+	// invisible in ten thousand. It is deliberately a report, not a test:
+	// `CodecSurfaceConventionTests.BuildParseRoundTripsOverTheCorpus` does the same thing against `fixtures.bin`'s
+	// frozen slice, and a gate measured against the real dumps would fail the moment a capture is added (CLAUDE.md,
+	// "a gate comparing shipped data to the corpus belongs in a --report"). The test keeps the floor; this says where
 	// the corpus actually stands.
 	//
-	// ⚠️ It sweeps IIR CARRIERS only. An RPC-message codec is identified by its `Method`, and the dump records a
-	// LOSSY rendering of that field on the hash-registered classes (7 of 32 bits, #615), so dispatching on it would
-	// hand bodies to the wrong codec and report the mismatch as a decode bug. Those need the `Method` to be recovered
-	// first, which is #615's own remaining work.
+	// It sweeps IIR carriers only. An RPC-message codec is identified by its `Method`, and the dump records a lossy
+	// rendering of that field on the hash-registered classes (7 of its 32 bits), so dispatching on it would hand
+	// bodies to the wrong codec and report the mismatch as a decode bug. Those need the `Method` recovered first.
 	//
 	// `--report-arg <IirTypeName>` restricts the sweep to one type and dumps the offending bodies in full.
 	public static partial class ReportCli
@@ -40,8 +39,8 @@ namespace Faolan.Importer.Cli
 			var codecs = CodecModulesWithBodies();
 			var wanted = string.IsNullOrWhiteSpace(only) ? null : only.Trim();
 
-			// opcode -> the codec that declares it. One IIR, one codec (#530 rule 6), so a collision is itself a
-			// finding rather than something to pick a winner from.
+			// Opcode -> the codec that declares it. One IIR, one codec, so a collision is itself a finding rather than
+			// something to pick a winner from.
 			var byOpcode = new Dictionary<uint, (Type Codec, MethodInfo Parse, MethodInfo? Build, bool OpcodeIsInTheFrame)>();
 			var collisions = new List<string>();
 			foreach (var (type, parse, build) in codecs)
@@ -63,7 +62,7 @@ namespace Faolan.Importer.Cli
 			foreach (var capture in captures)
 				foreach (var packet in capture.Packets)
 				{
-					// ⚠️ `IsIirCarrier` is `WireOpcode == 0x2000`, and 0x2000 COLLIDES across interfaces (a method
+					// `IsIirCarrier` is `WireOpcode == 0x2000`, and 0x2000 collides across interfaces (a method
 					// index of 0 on any of them renders the same way) - so it also catches `RequestAggroStatus` and
 					// friends, whose bodies are typed RPC arguments and open with an ID32 rather than an IIR type
 					// word. Requiring the first word to be a named IirTypes is what separates the two; without it the
@@ -88,10 +87,10 @@ namespace Faolan.Importer.Cli
 					var tally = stats.TryGetValue(name, out var t) ? t : stats[name] = new Tally(codec.Codec.Name, codec.Build == null);
 					tally.Seen++;
 
-					// ⚠️ A c2s codec that declares `OpcodeIsInTheFrame` starts its body at the ENTITY CLASS: its caller
+					// A c2s codec that declares `OpcodeIsInTheFrame` starts its body at the entity class: its caller
 					// is the listener's routing switch, which has already consumed the type word. The record still
 					// carries that word on the wire - handing it over would read four bytes out of step and return
-					// plausible values rather than failing (#531), which is exactly what the flag exists to prevent.
+					// plausible values rather than failing, which is exactly what the flag exists to prevent.
 					var bytes = (codec.OpcodeIsInTheFrame ? record[4..] : record).ToArray();
 					object? value;
 					try
@@ -108,7 +107,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// A PARSE-ONLY codec (a c2s message we never emit) has no Build, and that is a declaration rather
+					// A parse-only codec (a c2s message we never emit) has no Build, and that is a declaration rather
 					// than a gap - there is nothing to round-trip, but whether it ACCEPTS retail traffic is still the
 					// question this report exists to answer.
 					if (codec.Build == null)
@@ -220,7 +219,7 @@ namespace Faolan.Importer.Cli
 
 		// The codec modules that own a standalone body: a static class with a `Parse(in ReadOnlySpan<byte>)` and the
 		// canonical `Build(T)` that takes exactly what Parse returns. Sub-record codecs declare no opcode and so drop
-		// out below; text codecs (rule 1a) have a `string` Parse and never match here.
+		// out below; text codecs have a `string` Parse and never match here.
 		private static List<(Type Type, MethodInfo Parse, MethodInfo? Build)> CodecModulesWithBodies()
 		{
 			var found = new List<(Type, MethodInfo, MethodInfo?)>();
@@ -252,8 +251,8 @@ namespace Faolan.Importer.Cli
 		}
 
 		// `Parse` takes an `in ReadOnlySpan<byte>`, which `MethodInfo.Invoke` cannot pass (a byref to a ref struct is
-		// not boxable), so the call is emitted. Same trick as CodecSurfaceConventionTests - and it has the side
-		// benefit that the codec's own exception arrives UNWRAPPED, without a TargetInvocationException around it.
+		// not boxable), so the call is emitted. The same approach CodecSurfaceConventionTests uses, with the side
+		// benefit that the codec's own exception arrives unwrapped, without a TargetInvocationException around it.
 		private static Func<byte[], object?> SweepParserFor(MethodInfo parse)
 		{
 			return SweepParsers.GetOrAdd(parse, static m =>
@@ -275,7 +274,7 @@ namespace Faolan.Importer.Cli
 			});
 		}
 
-		// Whether the codec says its body starts AFTER the type word (a c2s record whose router already read it).
+		// Whether the codec says its body starts after the type word (a c2s record whose router already read it).
 		private static bool OpcodeIsInTheFrame(Type t)
 		{
 			return t.GetField("OpcodeIsInTheFrame", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly) is { IsLiteral: true } f && (bool)f.GetRawConstantValue()!;

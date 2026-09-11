@@ -7,15 +7,15 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report method-census [--report-arg <substring>]`: every RPC METHOD the corpus carries, named, with its
+	// `--report method-census [--report-arg <substring>]`: every RPC method the corpus carries, named, with its
 	// direction, its endpoint classes and how many frames of it there are.
 	//
 	// It exists because "is there a capture of X?" is the first question on almost every protocol ticket, and it was
 	// being answered by a one-off script each time - which is the drift `decode_by_scratch_script_drifts` warns
-	// about, and which cannot answer the OTHER half: what the corpus does NOT contain. A method absent here is the
+	// about, and which cannot answer the other half: what the corpus does not contain. A method absent here is the
 	// evidence that a feature was never captured, and that is a finding worth being able to cite.
 	//
-	// ⚠️ A frame is keyed by (receiver class, wire opcode), and the wire opcode is a RENDERING of `method_instance`,
+	// A frame is keyed by (receiver class, wire opcode), and the wire opcode is a RENDERING of `method_instance`,
 	// not an identity (see `WireOpcode`): exact on the fifteen index-registered classes, LOSSY on the hash-registered
 	// PlayerAgent/PlayerInterface pair, where `0x20EC` names two methods at once. Those rows print every candidate
 	// name rather than picking one.
@@ -54,7 +54,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{(r.Key.Download ? "s2c" : "c2s"),-4} {r.Class,-24}  0x{r.Key.Wire:X4}  {string.Join(" | ", r.Names),-44}  {r.Value.Count,6}  {r.Value.Captures.Count,8}  {r.Value.Bytes / Math.Max(1, r.Value.Count),8}");
 			}
 
-			// The other half, and the reason this is a report: what the corpus does NOT contain. A method with zero
+			// The other half, and the reason this is a report: what the corpus does not contain. A method with zero
 			// frames is not a gap in the tooling - it is a feature nobody ever captured, which is what decides whether
 			// a ticket is "decode it" or "capture it".
 			if (string.IsNullOrWhiteSpace(filter))

@@ -6,15 +6,14 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report create-classes`: which CLASS each create capture selected, and how many spell/combo grants arrived
-	// under each (#581).
+	// `--report create-classes`: which class each create capture selected, and how many spell/combo grants arrived
+	// under each.
 	//
-	// It exists because every create-derived import used to attribute a whole capture to `DetectClass` - the FIRST
-	// `ChangeClass` callback in it - and that is only correct when the player picked one class and stopped. Retail
-	// sends the clicked class's spell/combo book each time so the editor can display it, so a capture where the
-	// player browsed carries several books, and the per-capture attribution merges them onto whichever class came
-	// first. This report is what makes that visible instead of arguable: a row with more than one class is a capture
-	// the old rule could not have got right.
+	// Attributing a whole capture to one class - the first `ChangeClass` callback in it - is only correct when the
+	// player picked one class and stopped. Retail sends the clicked class's spell and combo book each time so the
+	// editor can display it, so a capture where the player browsed carries several books, and a per-capture
+	// attribution merges them onto whichever class came first. This report makes that visible rather than arguable: a
+	// row with more than one class is a capture no per-capture rule can get right.
 	public static partial class ReportCli
 	{
 		private static void CreateClasses(IReadOnlyList<NamedCapture> captures)

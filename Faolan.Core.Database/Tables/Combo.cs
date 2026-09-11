@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Faolan.Core.Database.Tables
 {
 	// A combo definition catalog entry, imported from the client RDB type 1010206 ("Combo animation defs") - which,
-	// unlike the TEA-encrypted ability/item templates, is PLAINTEXT XML, so no key is needed. Each <combo> element
+	// unlike the TEA-encrypted ability/item templates, is plaintext XML, so no key is needed. Each <combo> element
 	// carries the combo's name, its unlock level, the feat it belongs to (featid -> the class feat tree), timing
 	// (cooldown / stamina), the weapon criteria, and the input action sequence. Keyed by the combo id (the same id
 	// ComboBookIIR grants and CharacterCombo stores). The catalog counterpart of Spell / Ability.
@@ -16,21 +16,21 @@ namespace Faolan.Core.Database.Tables
 
 		public uint ParentId { get; set; } // combo-tree parent (XML `parentid`)
 
-		// The character level the combo unlocks at (XML `level`). This IS present here (unlike the ability templates).
+		// The character level the combo unlocks at (XML `level`). This is present here (unlike the ability templates).
 		public byte Level { get; set; }
 		public int Cooldown { get; set; } // seconds (XML `cooldown`)
 		public int Criteria { get; set; } // weapon/state criteria code (XML `criteria`)
 		public int Quality { get; set; } // XML `quality`
 		public int Stamina { get; set; } // XML `stamina`
 
-		// ⭐ The NPC combat CLASS this row belongs to (XML `npcclass`), as a <see cref="Core.Enums.ConanClass" />
-		// value - and the client states it, so the family is not parsed out of the name (#675).
+		// The NPC combat class this row belongs to (XML `npcclass`), as a <see cref="Core.Enums.ConanClass" />
+		// value - and the client states it, so the family is not parsed out of the name.
 		//
 		// It is present on exactly the 68 `combo_npc_*` rows and on nothing else, which is what makes it the NPC
-		// combo catalog's own index. **-1 means the row is the GENERIC set** - the nine `combo_npc_generic_*` rows,
+		// combo catalog's own index. **-1 means the row is the generic set** - the nine `combo_npc_generic_*` rows,
 		// which belong to no class - and that is a different statement from null, which is a row that says nothing.
 		//
-		// ⚠️ Two rows the NAME mis-attributes, which is the reason to carry this at all:
+		// Two rows the name mis-attributes, which is the reason to carry this at all:
 		// `combo_npc_conqueror_dual_1_blood_for_aid` and `..._life_reaper` are `npcclass=31` **Dark Templar**, and
 		// `combo_npc_heimdall_fatality_1` / `_2` are `npcclass=18` **Barbarian**. The corpus corroborates the second
 		// one 3 of 3: every actor that swung a heimdall fatality also swung barbarian rows.

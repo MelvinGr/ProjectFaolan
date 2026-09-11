@@ -7,43 +7,43 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report chatter-groups` (#331): recover the ambient-bark conversation GROUP names, by restoring the CamelCase
+	// `--report chatter-groups`: recover the ambient-bark conversation group names, by restoring the CamelCase
 	// the client's name table folds away and testing each casing against the bark catalog.
 	//
 	// ## Why a search, and why this one is sound
 	//
-	// A bark's string id is `elf28("sayinchat(N)|<channel>(K)|<Group>")` - the WHOLE token, case-sensitively. The
+	// A bark's string id is `elf28("sayinchat(N)|<channel>(K)|<Group>")` - the whole token, case-sensitively. The
 	// group names are enumerable: every known one is referenced by `1020004/1010029`, the server-side SCRIPT
 	// catalog's name list, which is 5,810 bare identifiers. But that table is LOWERCASED by the build, and
 	// `elf28("...|renownbystanderlovers")` resolves to nothing while `...|RenownBystanderLovers` resolves to
 	// *"That's just dreadful, Lord Ovidius, really."*. So the pool is exact and the casing is what is missing.
 	//
-	// ⛔ **THE OBVIOUS ACCEPTANCE TEST DOES NOT WORK, AND THIS REPORT IS WHAT MEASURED THAT.** #331 proposed accepting
-	// a casing when **two or more** `sayinchat(N)` values resolve for it, on the reasoning that one 28-bit collision
-	// is ~5e-6 and two is ~3e-9. That argument assumes the hits are INDEPENDENT and they are not: the sweep gives
+	// The obvious acceptance test does not work, and this report is what measures that. Accepting a casing when two
+	// or more `sayinchat(N)` values resolve for it looks safe - one 28-bit collision is ~5e-6 and two is ~3e-9 - but
+	// that argument assumes the hits are independent and they are not: the sweep gives
 	// every (casing, channel, K) 256 chances - one per N - against a category whose 1,276 ids are themselves clustered
 	// (an ELF hash's low bits depend only on the last few characters, and every id of one group shares a suffix).
 	//
-	// Measured over the full sweep: **350 of the 781 pool names that pass the two-hit rule pass it under MORE THAN ONE
-	// mutually-contradictory casing** - `arenasendaggromessage` under twelve. `AchievementsPetHeraldOfDeeds` (correct)
+	// Measured over the full sweep: 350 of the 781 pool names that pass the two-hit rule pass it under more than one
+	// mutually-contradictory casing - `arenasendaggromessage` under twelve. `AchievementsPetHeraldOfDeeds` (correct)
 	// and `AchievementsPetHeRaLdoFdeEds` (obvious nonsense) both "resolve" nine or more lines. So a hit count is not
 	// evidence of a casing, and any number this report printed as "N groups recovered" would be fiction.
 	//
-	// ⛔⛔ **AND RANKING BY HIT COUNT DOES NOT RESCUE IT EITHER.** The two known groups this vocabulary can reach do
+	// Ranking by hit count does not rescue it either. The two known groups this vocabulary can reach do
 	// come first - `RenownCrier sendtell(3)` at 18 lines and `AchievementsPetHeraldOfDeeds broadcastcycle(6)` at 13,
 	// both matching their captured `NpcChatter` rows exactly - but the top of the overall ranking is nonsense:
 	//
 	//     halloweensnakebosscombat   ->  HalloweenSnakeBoSscOmbAt   24 lines
 	//     playerlocalteleport        ->  PlayerLocalTeLePoRt        22 lines
 	//
-	// ⭐ And the control makes it conclusive rather than merely suspicious: for `renownbystanderlovers`, whose true
-	// casing we KNOW from a capture, the sweep accepts a casing and it is **not** the true one - because "bystander"
-	// is not a word the vocabulary can supply, so `RenownBystanderLovers` is never even tried, while some other split
+	// And the control makes it conclusive rather than merely suspicious: for `renownbystanderlovers`, whose true
+	// casing a capture states, the sweep accepts a casing and it is not the true one - because "bystander" is not a
+	// word the vocabulary can supply, so `RenownBystanderLovers` is never even tried, while some other split
 	// of the same letters resolves enough lines to pass. A method that returns a confident wrong answer for the one
 	// row whose answer is known is not a method.
 	//
-	// ⭐ The mechanism, so the next attempt does not re-derive it: the ELF-28 hash is `h = (h << 4) + c` folded, so
-	// its LOW bits depend only on the last few characters. Tokens that share a suffix - which every candidate for one
+	// The mechanism, so the next attempt does not re-derive it: the ELF-28 hash is `h = (h << 4) + c` folded, so
+	// its low bits depend only on the last few characters. Tokens that share a suffix - which every candidate for one
 	// group does - land in the same narrow band. Printing four of them makes it visible at a glance:
 	//
 	//     sayinchat(137)|broadcastcycle(6)|Achievements...  ->  0x0a93eb03
@@ -51,22 +51,22 @@ namespace Faolan.Importer.Cli
 	//
 	// The effective space is far smaller than 2^28, so a hit is cheap and 2.5e9 probes buy a great many of them.
 	//
-	// **So this report imports NOTHING and asserts nothing.** It prints a ranked candidate list, the contested-casing
-	// rate, and the control - and its value is the negative: it closes the "restore the CamelCase and sweep" route
-	// that #331 proposed, with the numbers that close it.
+	// So this report imports nothing and asserts nothing. It prints a ranked candidate list, the contested-casing
+	// rate, and the control - and its value is the negative: it closes the "restore the CamelCase and sweep" route,
+	// with the numbers that close it.
 	//
 	// ## The casing comes from segmentation, and the vocabulary is the client's own
 	//
 	// `renownbystanderlovers` is `Renown|Bystander|Lovers`. Segmenting needs an English vocabulary, and the one that
-	// works is the client's own LDB TEXT - the same words the game says out loud. A vocabulary built from the
+	// works is the client's own LDB text - the same words the game says out loud. A vocabulary built from the
 	// filename table's `_`-separated parts was tried first and gets 1 of the 5 known groups; this one is built from
 	// every English LDB page.
 	//
-	// ⚠️ A segmentation is a HYPOTHESIS - the report tries every one it can find. What the measurements above show is
-	// that the hash cannot then DECIDE between them, which was the design's load-bearing assumption.
+	// A segmentation is a hypothesis, and the report tries every one it can find. What the measurements above show is
+	// that the hash cannot then decide between them, which is the load-bearing assumption the approach needs.
 	//
-	// ⚠️ And the vocabulary has a hard floor no client-derived source can lift: **`bystander` occurs nowhere in the
-	// client** - not in the 152 English LDB pages, not in any of the 192,291 name-table entries - except inside the
+	// And the vocabulary has a hard floor no client-derived source can lift: `bystander` occurs nowhere in the
+	// client - not in the 152 English LDB pages, not in any of the 192,291 name-table entries - except inside the
 	// four `renownbystander*` names themselves. An authoring word the game never says is unreachable by construction,
 	// so four of the six known groups can never be split from client data alone, whatever the acceptance test.
 	public static partial class ReportCli
@@ -75,7 +75,7 @@ namespace Faolan.Importer.Cli
 		private const uint LdbType = 1030002;
 
 		// The channels and per-channel counts the captured barks use. The token's shape is
-		// `sayinchat(N)|<channel>(K)|<Group>`, and both K and the channel are properties of the GROUP - so a sweep has
+		// `sayinchat(N)|<channel>(K)|<Group>`, and both K and the channel are properties of the group - so a sweep has
 		// to try each pairing rather than assume the one a given group was captured with.
 		private static readonly string[] BarkChannels =
 			["conversation1", "conversation2", "conversation3", "conversation4", "broadcastcycle", "event", "eventactions", "sendtell"];
@@ -131,7 +131,7 @@ namespace Faolan.Importer.Cli
 					if (category == BarkTextCategory)
 						barks[s.Id] = s.Value;
 
-					// ⭐ The VOCABULARY, from every English page rather than only the barks: the group names are
+					// The VOCABULARY, from every English page rather than only the barks: the group names are
 					// authoring identifiers, so their words come from the game's whole world - `Bystander`, `Crier`,
 					// `Stygian`, `Distress` - not from the lines themselves.
 					foreach (var word in Words(s.Value))
@@ -142,12 +142,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"chatter-groups: LDB[{BarkTextCategory}] carries {barks.Count:N0} bark string(s); "
 				+ $"vocabulary of {vocabulary.Count:N0} word(s) from every English page.");
 
-			// ⭐ The second vocabulary source, and the one that reaches AUTHORING words: the name table's own FILENAMES
+			// The second vocabulary source, and the one that reaches AUTHORING words: the name table's own FILENAMES
 			// (187k of them), split on their `_` and other separators. `spawner`, `timer`, `brainscript`, `citylife`
 			// are words the game never says out loud but the content team names files with, and a group name is an
 			// authoring identifier before it is anything else.
 			//
-			// ⚠️ It does NOT rescue every name, and the limit is measured rather than assumed - see the report's
+			// It does not rescue every name, and the limit is measured rather than assumed - see the report's
 			// closing note on `bystander`.
 			foreach (var name in RdbNameTable.Load(rdb).Values)
 			foreach (var word in Words(name))
@@ -164,8 +164,8 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// ⭐ THE SWEEP'S SHAPE IS THE WHOLE COST. The group name is the token's SUFFIX, so the prefix
-			// `sayinchat(N)|<channel>(K)|` does not depend on the candidate: it is precomputed ONCE - a few thousand
+			// The sweep's shape is the whole cost. The group name is the token's suffix, so the prefix
+			// `sayinchat(N)|<channel>(K)|` does not depend on the candidate: it is precomputed once - a few thousand
 			// resumable hash states - and each casing is then hashed onto each state. Written the other way round
 			// (prefix rebuilt inside the N loop) the same sweep re-hashes a 35-char tail a few billion times and does
 			// not finish; this way it is one pass of `casings x states` over ~20 chars each.
@@ -210,7 +210,7 @@ namespace Faolan.Importer.Cli
 					if (hits == null)
 						continue;
 
-					// ⭐ TWO or more, never one - see the class remarks. This is the whole soundness argument.
+					// Two or more, never one - see the header. This is the whole soundness argument.
 					foreach (var ((channel, k), lines) in hits.Where(h => h.Value.Count >= 2))
 						found.Add((name, casing, channel, k, lines));
 				}
@@ -227,8 +227,8 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// Ranked per POOL NAME, because that - not the casing - is the thing the client's own catalog names. The
-			// runner-up with a DIFFERENT casing is printed beside each winner: that margin is the only honest measure
+			// Ranked per POOL name, because that - not the casing - is the thing the client's own catalog names. The
+			// runner-up with a different casing is printed beside each winner: that margin is the only honest measure
 			// of how much the top row is worth, and where it is thin the answer is a coin toss.
 			var byPool = found.GroupBy(f => f.Name).OrderByDescending(g => g.Max(f => f.Lines.Count)).ToList();
 			var contested = byPool.Count(g => g.Select(f => f.Casing).Distinct().Count() > 1);
@@ -249,7 +249,7 @@ namespace Faolan.Importer.Cli
 			if (byPool.Count > 60)
 				Console.WriteLine($"  ... and {byPool.Count - 60:N0} more pool name(s).");
 
-			// ⭐ THE CONTROL, printed rather than described: the groups already in NpcChatter are the only rows whose
+			// The control, printed rather than described: the groups already in NpcChatter are the only rows whose
 			// answer is known, so the report scores itself against them every run. A change that breaks the ranking
 			// shows up here rather than in a number that merely got bigger.
 			Console.WriteLine();
@@ -277,8 +277,8 @@ namespace Faolan.Importer.Cli
 			"AchievementsPetHeraldOfDeeds", "CityLifeCimmerianChildReactToPlayer"
 		];
 
-		// The pool: the names an index record of type 1020004 references, bare identifiers only (a dot means a
-		// FILEname). Same walk `--report rdb-names index:` does.
+		// The pool: the names an index record of type 1020004 references, bare identifiers only - a dot means a file
+		// name. The same walk `--report rdb-names index:` does.
 		private static List<string> ScriptNames(RdbReader rdb)
 		{
 			var names = RdbNameTable.Load(rdb);
@@ -302,7 +302,7 @@ namespace Faolan.Importer.Cli
 
 		// Every CamelCase spelling of `name` its letters can be split into under `vocabulary`, shortest-first.
 		//
-		// ⚠️ The name ITSELF capitalised is always tried first, because a one-word group (`Idar`, `Aratus`) has no
+		// The name itself capitalised is always tried first, because a one-word group (`Idar`, `Aratus`) has no
 		// split to find and would otherwise be unreachable.
 		private static IEnumerable<string> Casings(string name, HashSet<string> vocabulary)
 		{
@@ -318,14 +318,13 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Splits `name` into vocabulary words, FEWEST WORDS FIRST - by iterative deepening on the word count rather
+		// Splits `name` into vocabulary words, FEWEST words first - by iterative deepening on the word count rather
 		// than by sorting whatever a capped DFS happened to find.
 		//
-		// ⚠️ That distinction is not cosmetic, and getting it wrong is what a first attempt did: a plain DFS with a
-		// results cap fills its budget with the deep splits it reaches first (`re|now|n|by|stander|lovers`) and never
-		// reaches the two-word ones, so `Renown|Bystander|Lovers` - the canonical group this whole ticket rests on -
-		// was cut off and the sweep missed five of the seven groups it should have rediscovered. Sorting the results
-		// afterwards cannot fix that: the right answer was never in the list.
+		// That distinction is not cosmetic. A plain depth-first search with a results cap fills its budget with the
+		// deep splits it reaches first (`re|now|n|by|stander|lovers`) and never reaches the two-word ones, so a
+		// canonical split like `Renown|Bystander|Lovers` is cut off entirely. Sorting the results afterwards cannot
+		// fix that: the right answer was never in the list.
 		private static IEnumerable<List<string>> Segmentations(string name, HashSet<string> vocabulary)
 		{
 			var results = new List<List<string>>();
@@ -352,7 +351,7 @@ namespace Faolan.Importer.Cli
 					return;
 
 				// Longest word first: the right split is nearly always the one with the longest words, so this finds
-				// it early WITHIN a depth even though the depth loop is what guarantees fewest-first ACROSS depths.
+				// it early within a depth, even though the depth loop is what guarantees fewest-first across depths.
 				for (var end = name.Length; end > at; end--)
 				{
 					var word = name[at..end];

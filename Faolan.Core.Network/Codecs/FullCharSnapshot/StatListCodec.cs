@@ -4,20 +4,21 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// A 0x3F1-framed StatList_t as the client reads it (CoreFullPlayerCharacterIIR reader, FUN_0139d450 -> the
-	// StatPair_t reader FUN_0139d210 = [u32 statId][u32 value]; docs/re/fullplayer-snapshot-reader.md regions 9-10).
-	// The list is framed by the ordinary ListFrame count word and the record count is `word / 0x3F1 - 1` (the client
-	// asserts "(nSize%1009)==0 && nSize>0"). The stat block is TWO of these back-to-back: StatList#1 = the 17
-	// DISPLAYED stats (Level 0x36 / XP 0x34 / MaxXP 0x15E / HP 0x1B / ...), StatList#2 = the 148 full-sheet stats
-	// (what the old "repeated run" was). This is the real grammar behind the former opaque 338-value skeleton - so
-	// the sheet is authored as (statId, value) pairs from the character, not carried verbatim.
-	//
-	// Composed by SubClassPostAccessBlockCodec, which reads the block as these two lists (#543). It used to carry the
-	// block as a FLAT u32 view with a second codec walking the same bytes to say where the stride-8 tables sat, while
-	// SubClassStatBlock laid the lists out as words - three spellings of one layout.
+	/// <summary>
+	///     A count-framed <c>StatList_t</c> as the client reads it (the CoreFullPlayerCharacterIIR reader FUN_0139d450
+	///     into the <c>StatPair_t</c> reader FUN_0139d210 = <c>[u32 statId][u32 value]</c>;
+	///     docs/re/fullplayer-snapshot-reader.md regions 9-10).
+	/// </summary>
+	/// <remarks>
+	///     The list is framed by the ordinary <c>ListFrame</c> count word, and the client asserts the word is a whole
+	///     number of frame units and greater than zero. The stat block is two of these back to back: the first is the 17
+	///     displayed stats (Level 0x36, XP 0x34, MaxXP 0x15E, HP 0x1B, …) and the second the 148 full-sheet stats, so the
+	///     sheet is authored as (statId, value) pairs from the character rather than carried verbatim. Composed by
+	///     <see cref="SubClassPostAccessBlockCodec" />, which reads the block as these two lists.
+	/// </remarks>
 	public static class StatListCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(StatList value)
 		{
 			using var s = new FaolanStream();
@@ -52,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		}
 	}
 
-	// One StatList_t: the (statId, value) pairs it frames.
+	/// <summary>One <c>StatList_t</c>: the (statId, value) pairs it frames.</summary>
 	public sealed record StatList
 	{
 		public List<(uint Id, uint Value)> Pairs { get; init; } = [];
@@ -68,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return null;
 		}
 
-		// Sets a stat's value (every occurrence of the id) - the character-derived override (Level/HP/XP/...).
+		// Sets a stat's value at every occurrence of the id - the character-derived override (Level, HP, XP, …).
 		public void Set(uint statId, uint value)
 		{
 			for (var i = 0; i < Pairs.Count; i++)

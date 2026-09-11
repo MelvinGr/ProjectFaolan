@@ -7,29 +7,29 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Tests.Support
 {
-	// The capture corpus' TEST SLICE: the packet bodies the whole-corpus gates read, extracted from the 349 MB
+	// The capture corpus' test slice: the packet bodies the whole-corpus gates read, extracted from the 349 MB
 	// capture repo so the suite runs from a plain clone. It is the corpus half of `Faolan.Tests/Assets/fixtures.bin`
 	// (FixtureArchive); the named fixtures in the same file are reached through Golden / TestPaths instead.
 	//
 	// Bodies are byte-identical to the corpus' `BodyHex`, and each carries its provenance as "<capture id>#<packet
 	// index>" - the capture id being the opaque 8-hex-digit id `FixtureArchive.CorpusRecord.Source` describes, not
-	// the dump's file name (#465) - so a byte-exact failure is still traceable to one packet in one capture, by
+	// the dump's file name - so a byte-exact failure is still traceable to one packet in one capture, by
 	// whoever holds the capture repo.
 	//
-	// ⚠️ The extract is DERIVED, so a regeneration that silently drops packets would quietly WEAKEN every gate while
+	// The extract is derived, so a regeneration that silently drops packets would quietly weaken every gate while
 	// they all still pass - the exact failure mode these gates exist to catch. The reader therefore ratchets on the
 	// per-IIR counts below. A short extract throws instead of narrowing coverage.
 	public static class CorpusExtract
 	{
-		// Pinned at the counts of the full corpus (120 tshark.json, one per capture). Regenerating against a SMALLER
+		// Pinned at the counts of the full corpus (120 tshark.json, one per capture). Regenerating against a smaller
 		// corpus fails here rather than passing with fewer packets.
 		//
 		// Re-pinned 2026-07-25 when the corpus itself changed in both directions, which is the case this guard's error
 		// message sanctions:
-		//   * a byte-identical DUPLICATE dump was removed - `..._leave_king_conan_castle-Dispmount` was the same
+		//   * a byte-identical duplicate dump was removed - `..._leave_king_conan_castle-Dispmount` was the same
 		//     capture as `...-Dismount` under a typo'd name (2583/2583 identical TimeUtc and BodyHex), dumped before the
 		//     plugin emitted Direction. It cost -1 FullPlayerCharacter, -48 SimpleCharFullUpdate, -1 PlayfieldF.
-		//   * `NecroL80_..._login_cast-general-abilities` had a pcapng but NO dump, so it had never been analysed. It
+		//   * `NecroL80_..._login_cast-general-abilities` had a pcapng but no dump, so it had never been analysed. It
 		//     adds +8 MoveTask.
 		// Re-pinned 2026-07-31 on the first regeneration since 2026-07-27: nine captures added and every dump rebuilt
 		// with the current dissector, which is +51% bodies (30,158 -> 45,520). Every count grew; that is the direction
@@ -46,21 +46,21 @@ namespace Faolan.Tests.Support
 			((uint)IirTypes.PlayfieldFIIR, 184),
 			((uint)IirTypes.TradeskillReplyIIR, 1),
 			((uint)IirTypes.SimpleDynelFullUpdateIIR, 8333),
-			// #617: added 2026-08-05 so the constructed buff payload can be gated against every captured apply
+			// Added 2026-08-05 so the constructed buff payload can be gated against every captured apply
 			// instead of four hand-picked rows. 4,666 bodies = 2,929 applies (80 bytes) + 1,737 ends (26).
 			((uint)IirTypes.MagicBuffIIR, 4666)
 		];
 
-		// The SHAPE floor, and the reason it exists beside the body-count floor rather than instead of it.
+		// The shape floor, and the reason it exists beside the body-count floor rather than instead of it.
 		//
-		// The count ratchet catches a regeneration that covers FEWER BODIES. It cannot catch one that keeps the
-		// bodies and loses a grammar PATH - 8,332 of one SimpleDynel shape plus one Wharf Door is the same count as
+		// The count ratchet catches a regeneration that covers fewer bodies. It cannot catch one that keeps the
+		// bodies and loses a grammar path - 8,332 of one SimpleDynel shape plus one Wharf Door is the same count as
 		// 8,333 of the common one, and the Wharf Door is the row that found a lift failure (c015345a).
 		//
-		// ⚠️ Distinct body LENGTH is a proxy for that path, not a measure of it - two different grammars can share a
+		// Distinct body length is a proxy for that path, not a measure of it - two different grammars can share a
 		// length, so this is a floor on coverage rather than a proof of it. It is worth pinning anyway because it
 		// fails on a whole class of narrowing the count floor is blind to, and because it is the assertion that
-		// SURVIVES #555's representative selection: one body per (IIR, length) keeps every number below while
+		// survives a representative selection: one body per (IIR, length) keeps every number below while
 		// collapsing every number above, so a shrunken archive can keep this gate and must replace the other.
 		private static readonly (uint Iir, int Lengths)[] ExpectedShapes =
 		[
@@ -86,20 +86,20 @@ namespace Faolan.Tests.Support
 			return Entries.Value;
 		}
 
-		// The bodies of one IIR type. `Body` is the raw wire body INCLUDING its leading u32 length, exactly as
+		// The bodies of one IIR type. `Body` is the raw wire body including its leading u32 length, exactly as
 		// `BodyHex` carried it - callers that want the payload skip the first 4 bytes, as they did before.
 		public static IEnumerable<(string Source, byte[] Body)> OfType(uint iir)
 		{
 			return Entries.Value.Where(e => e.Iir == iir).Select(e => (e.Source, e.Body));
 		}
 
-		// The FULL packets of one IIR, for the extractors that take CapturedPacket and strip framing themselves.
+		// The full packets of one IIR, for the extractors that take CapturedPacket and strip framing themselves.
 		public static IEnumerable<Entry> PacketsOfType(uint iir)
 		{
 			return Entries.Value.Where(e => e.Iir == iir);
 		}
 
-		// The ratchet: a regeneration may only ADD packets. Fewer means the extract was built against a partial
+		// The ratchet: a regeneration may only add packets. Fewer means the extract was built against a partial
 		// corpus, and every gate reading it would silently cover less.
 		private static void AssertCoverage(List<Entry> entries)
 		{
@@ -137,11 +137,11 @@ namespace Faolan.Tests.Support
 			return entries;
 		}
 
-		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
+		// One extracted packet: the full rebuilt wire packet, plus the provenance and frame the gates report.
 		public sealed record Entry(string Source, uint Iir, int Frame, uint Opcode, byte[] Full)
 		{
-			// The 0x2000 body within the full packet: [len4][crc4][headerLen4][header][body]. This is what BodyHex
-			// held, so every gate that used to read BodyHex gets identical bytes.
+			// The 0x2000 body within the full packet: [len4][crc4][headerLen4][header][body] - what the gates compare
+			// against.
 			public byte[] Body
 			{
 				get

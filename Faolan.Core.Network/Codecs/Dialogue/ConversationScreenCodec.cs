@@ -11,10 +11,12 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// A captured `remoteformat` screen XML <-> its columnized ConversationScreen row (+ parameter children) (#188).
-	// The row is the persisted structured RemoteFormatScreen; the runtime rebuilds the wire XML from it. A rule-1a
-	// STRING codec (#530) - the row↔XML mapper around the remoteformat layer - gated byte-exact in
-	// ConversationConstructTests.
+	/// <summary>
+	///     A captured <c>remoteformat</c> screen XML and its columnized <c>ConversationScreen</c> row plus parameter
+	///     children. The row is the persisted structured <c>RemoteFormatScreen</c>; the runtime rebuilds the wire XML from
+	///     it. A string codec - the row-to-XML mapper around the remoteformat layer - gated byte-exact in
+	///     <c>ConversationConstructTests</c>.
+	/// </summary>
 	public static class ConversationScreenCodec
 	{
 		public static string Build(ConversationScreen row)
@@ -22,10 +24,15 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return RemoteFormatScreenCodec.Build(ConversationScreenColumns.ToScreen(row));
 		}
 
-		// Parse a captured screen XML into its ConversationScreen row. THROWS if the parse does not round-trip
-		// byte-for-byte, so a screen shape we cannot reproduce surfaces at import instead of being stored lossy
-		// (a non-numeric / leading-zero id, a value that doesn't survive the uint round-trip). `Sequence` is the
-		// row's position in its packet and is not in the XML - the caller stamps it.
+		/// <summary>
+		///     Parses a captured screen XML into its <c>ConversationScreen</c> row.
+		/// </summary>
+		/// <remarks>
+		///     Throws if the parse does not round-trip byte-for-byte, so a screen shape that cannot be reproduced surfaces at
+		///     import instead of being stored lossily (a non-numeric or leading-zero id, a value that does not survive the
+		///     uint round-trip). <c>Sequence</c> is the row's position in its packet and is not in the XML; the caller stamps
+		///     it.
+		/// </remarks>
 		public static ConversationScreen Parse(string text)
 		{
 			var s = RemoteFormatScreenCodec.Parse(text);
@@ -57,18 +64,20 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 	}
 
-	// The ConversationScreen row <-> the RemoteFormatScreen the codec serialises. A mapper, not an encoder
-	// (#530 §2 rule 1 / #533).
+	/// <summary>
+	///     The <c>ConversationScreen</c> row and the <c>RemoteFormatScreen</c> the codec serialises: a mapper, not an
+	///     encoder.
+	/// </summary>
 	public static class ConversationScreenColumns
 	{
-		// The row as it is PERSISTED: parsed and gated exactly like Parse, then with the session slots blanked. The
-		// captured `name` / `guildname` / `npcguildname` string entries carry the capturing player's character name,
-		// their guild, and the retail SERVER they played on ("Not in guild [Legacy of Cimmeria]") - none of which is
-		// dialogue content, and all of which the runtime regenerates from the live player + realm at send time
-		// (RemoteFormatSession.WithLivePlayer). Storing them would leak real retail names into faolan.db and the
-		// committed faolan.sql seed, and a stale one would reach a client whenever the live value is missing. The
-		// slot itself stays (name, order and flags are part of the screen the client parses); only the string goes.
-		// Blanked AFTER the round-trip gate, so a screen we cannot reproduce byte-exactly still fails at import.
+		// The row as it is persisted: parsed and gated exactly like Parse, then with the session slots blanked. The
+		// captured `name` / `guildname` / `npcguildname` string entries carry the capturing player's character name, their
+		// guild, and the retail server they played on - none of which is dialogue content, and all of which the runtime
+		// regenerates from the live player and realm at send time (RemoteFormatSession.WithLivePlayer). Storing them would
+		// put real retail names into faolan.db and the committed faolan.sql seed, and a stale one would reach a client
+		// whenever the live value is missing. The slot itself stays, since name, order and flags are part of the screen the
+		// client parses; only the string goes. Blanked after the round-trip gate, so a screen that cannot be reproduced
+		// byte-exactly still fails at import.
 		public static ConversationScreen ToStoredRow(string screenXml, int sequence)
 		{
 			var row = ConversationScreenCodec.Parse(screenXml);
@@ -83,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return row;
 		}
 
-		// The parameter's inner element, rebuilt from its columns (#188 follow-up: the InnerRaw blob is retired).
+		// The parameter's inner element, rebuilt from its columns.
 		public static string InnerRawOf(ConversationScreenParameter p)
 		{
 			ArgumentNullException.ThrowIfNull(p);
@@ -107,11 +116,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return rows.OrderBy(r => r.Sequence).Select(ToScreen).ToList();
 		}
 
-		// Lift a captured inner element into the parameter's columns, refusing anything the columns cannot hold: an
-		// unknown shape (InnerElementCodec.Parse throws), one that does not rebuild byte-for-byte, or the
-		// nested-remoteformat kind (which only world objects carry, and which therefore has no column here). A reject
-		// fails the import - the blob that used to absorb these is gone, so silently storing something
-		// unreproducible is no longer possible.
+		// Lift a captured inner element into the parameter's columns, refusing anything the columns cannot hold: an unknown
+		// shape (InnerElementCodec.Parse throws), one that does not rebuild byte-for-byte, or the nested-remoteformat kind,
+		// which only world objects carry and therefore has no column here. A reject fails the import rather than storing
+		// something unreproducible.
 		internal static void SetInner(ConversationScreenParameter row, string innerRaw)
 		{
 			var element = InnerElementCodec.Parse(innerRaw);

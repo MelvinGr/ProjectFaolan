@@ -9,19 +9,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report bounded-areas` - the survey of the client's trigger-volume table (RDB 1000053, #513).
+	// `--report bounded-areas` - the survey of the client's trigger-volume table (RDB 1000053).
 	//
-	// With no `--report-arg` it prints the CENSUS: how many regions fall in each naming bucket and over how many
+	// With no `--report-arg` it prints the census: how many regions fall in each naming bucket and over how many
 	// playfields. That table is the one in docs/rdb/bounded-areas-1000053.md, and it is generated here rather than kept
 	// by hand so it is recomputed from the real parser (BoundedAreaCollection) and the real classifier
 	// (BoundedAreaClassifier) instead of from a one-off script nobody can re-run.
 	//
-	// With `--report-arg <bucket>` it lists every region in that bucket, and - where we already hold data the bucket can
-	// be checked against - the CROSS-CHECK. That is the point of the report: #513's safe buckets are the ones that can be
-	// corroborated before they are imported, and the hazard families are the standing example of what happens without it.
+	// With `--report-arg <bucket>` it lists every region in that bucket and, where the database already holds data the
+	// bucket can be checked against, the cross-check. That is the point of the report: a bucket is safe to import only
+	// once it can be corroborated, and the hazard families are the standing example of what happens without that.
+	//
+	// Open work tracked in Gitea #513.
 	public static partial class ReportCli
 	{
-		// The id space above this is a VARIANT playfield numbering (0x40000000 | <playfield>) that is not a Map.Id - the
+		// The id space above this is a variant playfield numbering (0x40000000 | <playfield>) that is not a Map.Id - the
 		// same set RdbHazardImporter skips. Counted separately so the census describes real playfields.
 		private const uint BoundedAreaVariantIdBase = 0x40000000;
 
@@ -56,25 +58,25 @@ namespace Faolan.Importer.Cli
 			await BoundedAreaDetail(real, bucket.Value);
 		}
 
-		// #513/#348: does the client's trigger-volume table contain the AREA BANNER regions?
+		// does the client's trigger-volume table contain the area BANNER regions?
 		//
 		// `MapArea` is capture-sourced - a hull over the positions retail actually fired each banner at - and it
-		// under-covers by construction, so #513 lists "area banners" as one of the safe, high-value buckets to import
-		// if the real region is in 1000053. This is the test for that, and it deliberately uses **no names**: a
+		// under-covers by construction, so area banners are one of the safe, high-value buckets to import if the real
+		// region is in 1000053. This is the test for that, and it deliberately uses no names: a
 		// banner's identity is an LDB string id and a region's is a place name, so matching them by text needs the
 		// place-name catalog. Containment needs neither.
 		//
 		// The bar is not "some region contains the banner" - on any playfield the border region contains everything.
 		// A sub-area trigger has to SEPARATE the sub-areas, so a region only counts as a candidate if it contains
-		// this area's captured footprint AND does not swallow another area's on the same map. That is the property
+		// this area's captured footprint and does not swallow another area's on the same map. That is the property
 		// that would make it the thing that fires the banner.
 		private static async Task AreaBannerCrossCheck(List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> records, IReadOnlyList<CapturedBanner> captured)
 		{
 			await using var db = OpenDb();
 			var mapNames = await db.Maps.ToDictionaryAsync(m => m.Id, m => m.Name ?? "");
 			var byMap = records.ToDictionary(r => r.MapId, r => r.Areas);
-			// The CAPTURED harvest, straight from the captures: this test is "does a client region contain the hull
-			// retail fired the banner in", so it needs the positions, which are not stored anywhere (#680).
+			// The captured harvest, straight from the captures: this test is "does a client region contain the hull
+			// retail fired the banner in", so it needs the positions, which are not stored anywhere.
 			var banners = captured.GroupBy(a => a.MapId).ToDictionary(g => g.Key, g => g.ToList());
 
 			Console.WriteLine("=== area-banner cross-check: is a MapArea's region in RDB 1000053? ===");
@@ -139,7 +141,7 @@ namespace Faolan.Importer.Cli
 				: "  -> candidates exist; check the named regions before importing (#513).");
 			return;
 
-			// A hull over ONE sighting is a point, so it fires only because of the runtime's slack - worth seeing next
+			// A hull over one sighting is a point, so it fires only because of the runtime's slack - worth seeing next
 			// to a match, because a point can sit inside a region it has no business claiming.
 			static string Hull(CapturedBanner a)
 			{
@@ -152,7 +154,7 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Every readable 1000053 record, parsed. A record that will not parse is REPORTED rather than dropped silently -
+		// Every readable 1000053 record, parsed. A record that will not parse is reported rather than dropped silently -
 		// a census that quietly lost a playfield is worse than no census (the importer_silent_skip lesson).
 		private static List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> ReadBoundedAreas(string rdbDir)
 		{
@@ -255,7 +257,7 @@ namespace Faolan.Importer.Cli
 					if (probeKind == null || !area.IsPolygon)
 						continue;
 
-					// What we ALREADY hold that lands inside this region. The point rather than any overlap - a probe
+					// What we already hold that lands inside this region. The point rather than any overlap - a probe
 					// whose own box merely clips the region edge is a neighbour, not a member, and the sub-camps
 					// (Camp23 White Hands A/B/C/D) are exactly what this is meant to find.
 					var mapProbes = probes.GetValueOrDefault(mapId, []);
@@ -280,24 +282,24 @@ namespace Faolan.Importer.Cli
 			if (probeKind == null)
 				return;
 
-			// BOTH directions. "How many regions cover something we hold" says whether the bucket is corroborated;
-			// "how many things we hold no region covers" says whether importing it would ADD anything - and that second
-			// number is the one that decides an import (#513). A bucket that only ever re-describes rows we already have
+			// both directions. "How many regions cover something we hold" says whether the bucket is corroborated;
+			// "how many things we hold no region covers" says whether importing it would add anything - and that second
+			// number is the one that decides an import. A bucket that only ever re-describes rows we already have
 			// is not worth a table.
 			var totalProbes = probes.Values.Sum(v => v.Count);
 			Console.WriteLine($"{withProbes} of them contain at least one {probeKind} ({probesCovered} covered); the other {shown - withProbes} contain none.");
 			Console.WriteLine($"{coveredProbes.Count} of the {totalProbes} {probeKind} we already hold fall inside one of these regions; {totalProbes - coveredProbes.Count} do not.");
 		}
 
-		// The rows we ALREADY hold that a bucket can be checked against, keyed by map, plus a human name for them.
+		// The rows we already hold that a bucket can be checked against, keyed by map, plus a human name for them.
 		// (null kind = nothing to check this bucket against, so the listing is geometry only.)
 		//
-		// This is the point of the report. #513's safe buckets are the ones that can be corroborated before import, and
-		// the two that can be are the two the client ALSO ships in a purpose-built table of its own:
+		// This is the point of the report: a bucket is safe to import only once it can be corroborated before import,
+		// and the two that can be are the two the client also ships in a purpose-built table of its own:
 		//   - spawn camps    vs NpcSpawnArea  (RDB 1010506 NpcSpawnLayout - roam groups: where, how many, the points)
 		//   - resurrection   vs RespawnPoint  (RDB 1000090 RESURRECTIONPOINTSEXPORT - Guid, restoration %, orientation)
 		// In both cases the dedicated table carries strictly more than the trigger volume does, so the overlap is a
-		// CHECK on what we imported rather than a source to import from.
+		// check on what we imported rather than a source to import from.
 		private static async Task<(Dictionary<uint, List<(string Label, float X, float Z)>> Probes, string? Kind)> CrossCheckProbes(
 			Core.Database.DatabaseContext db, BoundedAreaBucket bucket)
 		{

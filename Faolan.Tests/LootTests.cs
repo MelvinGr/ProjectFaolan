@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Loot on kill (Gitea #404): a kill may drop a loot bag (a transient world object) at the
+	// Loot on kill: a kill may drop a loot bag (a transient world object) at the
 	// death spot that expires off the tick.
 	public class LootTests
 	{

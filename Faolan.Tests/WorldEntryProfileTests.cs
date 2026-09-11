@@ -24,20 +24,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// An in-process PROFILE of the world entry (#938): the real realm container, a temp copy of the real database,
+	// An in-process profile of the world entry: the real realm container, a temp copy of the real database,
 	// and a recorded client, with one or more characters pushed through the actual `SendBurstlessWorldEntry`. It
 	// prints the per-step breakdown the entry now logs, plus the lazily built catalogs and the terrain warm, so the
 	// "first player in the map" spike can be attributed without a client, a profiler or a login.
 	//
-	// OPT-IN, because it reads THIS checkout's faolan.db - the maintainer's play state - and takes seconds:
+	// Opt-in, because it reads this checkout's faolan.db - the maintainer's play state - and takes seconds:
 	//
 	//   FAOLAN_PROFILE_ENTRY=<characterId>[,<characterId>...] dotnet test --project Faolan.Tests -- --filter-class '*WorldEntryProfile*'
 	//
-	// The FIRST character pays every once-per-server cost (the catalogs) and every once-per-map cost (the zone's NPCs
+	// The first character pays every once-per-server cost (the catalogs) and every once-per-map cost (the zone's NPCs
 	// and objects, the terrain); a second one on the same map pays only its own rows. That difference is the whole
 	// point of running two.
 	//
-	// ⚠️ The database is COPIED to the temp dir first: the entry writes (the character's transform, the realm's
+	// The database is copied to the temp dir first: the entry writes (the character's transform, the realm's
 	// status) and the committed faolan.db must not be dirtied by a measurement.
 	public class WorldEntryProfileTests
 	{
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 					client.Session.EntryMode = WorldEntryMode.Login;
 
 					// The terrain warm is fire-and-forget inside the entry, so it never shows in the entry's own
-					// breakdown. It IS a first-player-in-the-map cost, so it is timed here, synchronously, first.
+					// breakdown. It is a first-player-in-the-map cost, so it is timed here, synchronously, first.
 					var clock = System.Diagnostics.Stopwatch.StartNew();
 					terrain.Warm(character.MapId);
 					var terrainMs = clock.ElapsedMilliseconds;
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 
 					// FAOLAN_PROFILE_DUMP=<dir>: one line per packet sent, `<index> <length> <sha256>`, so an entry can be
 					// diffed byte-for-byte against the same entry on another build - the check that a query rewrite
-					// changed the COST and not the WIRE. (The game-time packet carries the clock and differs by design.)
+					// changed the cost and not the wire. (The game-time packet carries the clock and differs by design.)
 					if (Environment.GetEnvironmentVariable("FAOLAN_PROFILE_DUMP") is { Length: > 0 } dumpDir)
 					{
 						Directory.CreateDirectory(dumpDir);

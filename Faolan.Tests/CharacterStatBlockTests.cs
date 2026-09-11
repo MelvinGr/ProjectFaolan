@@ -18,7 +18,7 @@ namespace Faolan.Tests
 			// strickenbla combat capture frame 6424: the combat-mode (weapon-draw) update on beach mob 0x00002C56 the
 			// tick before its first swing - stat 0x14 (CombatMode) = 4. The full IIR body (after the u32 length prefix)
 			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
-			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
+			// fix; see WorldBroadcaster.BroadcastNpcCombatMode.
 			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, 4);
 			var body = StatUpdateCodec.Build(0x00002C56u, stats);
 
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
-			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
+			// Captured packet sends the current ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
 			// spawn (current == max at full health; ids in-client verified, see CharacterStatId).
 			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
 
@@ -97,7 +97,7 @@ namespace Faolan.Tests
 			Assert.Equal((CharacterStatId.ManaCurrent, 6300u), block.Records[2]);
 		}
 
-		// Rule 4: a short body is a decode FAILURE, not a `false` for the caller to drop on the floor.
+		// Rule 4: a short body is a decode failure, not a `false` for the caller to drop on the floor.
 		[Fact]
 		public void Parse_ThrowsWhenTruncated()
 		{
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => CharacterStatBlockCodec.Parse(bytes));
 		}
 
-		// Rule 3: the codec accounts for the WHOLE body, so trailing bytes are a failure rather than a length to
+		// Rule 3: the codec accounts for the whole body, so trailing bytes are a failure rather than a length to
 		// report back. A caller that composes it inside a bigger body uses the internal reader instead.
 		[Fact]
 		public void Parse_ThrowsOnTrailingBytes()
@@ -127,11 +127,11 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(built), Convert.ToHexStringLower(CharacterStatBlockCodec.Build(CharacterStatBlockCodec.Parse(built))));
 		}
 
-		// ApprenticeLevel (0x3C5) is the mentor system's EFFECTIVE level, not a copy of Level - but we do not model
-		// mentoring, so the two are equal for every character we serve and a level change has to re-state BOTH. The
+		// ApprenticeLevel (0x3C5) is the mentor system's effective level, not a copy of Level - but we do not model
+		// mentoring, so the two are equal for every character we serve and a level change has to re-state both. The
 		// over-head nameplate renders max(0x36, 0x3C5) (client nameplate text builder FUN_011d8b00), so a push that
-		// moved only Level left a level-DOWN showing the stale higher number over the health bar while the character
-		// sheet (0x36 alone) showed the new one (#472).
+		// moved only Level left a level-down showing the stale higher number over the health bar while the character
+		// sheet (0x36 alone) showed the new one.
 		[Fact]
 		public void SetLevel_RestatesTheUnmentoredApprenticeLevelAlongsideLevel()
 		{

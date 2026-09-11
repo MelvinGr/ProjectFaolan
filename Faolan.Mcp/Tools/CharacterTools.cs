@@ -56,8 +56,8 @@ namespace Faolan.Mcp.Tools
 				character.AccountId,
 				character.GuildId,
 				Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
-				// Every item the character holds, worn (container Equipped, slot = the equip slot id) and carried alike -
-				// they are one table since #750, so the worn set no longer needs its own shape here.
+				// Every item the character holds, worn (container Equipped, slot = the equip slot id) and carried alike:
+				// they are one table, so the worn set needs no shape of its own here.
 				Items = items.Select(i => new
 				{
 					i.Id,

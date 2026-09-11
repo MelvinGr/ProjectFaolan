@@ -18,7 +18,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The captured-character importer over the dikketest golden spawn: one run materializes the character
-	// (identity, sex via the wire code MALE=2/FEMALE=3, looks in editor 2x units, map from MapChange
+	// (identity, sex via the wire code male=2/FEMALE=3, looks in editor 2x units, map from MapChange
 	// tracking, scaffold rows, equipment for DB items), a second run skips it (names are never duplicated
 	// or overwritten).
 	public class CaptureCharacterImporterTests
@@ -76,20 +76,18 @@ namespace Faolan.Tests
 					.Include(c => c.Skills)
 					.Include(c => c.BodyResources)
 					.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
-				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
+				Assert.Equal(0x01316D2Bu, character.Id); // the original retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
-				// Race 1. This assertion used to read Aquilonian and was written from the enum, which had 1 and 2 the
-				// wrong way round (#469). It is now the PROOF that they were: Dikketest's captured head mesh 1142847
-				// occurs in exactly one appearance list - the female heads under CHARACTERCREATOR's <cimmerian>
-				// element - and her captured race byte is 1. That ties wire race 1 to Cimmerian without going through
-				// the enum at all.
+				// Wire race 1 is Cimmerian, tied to the wire without going through the enum: Dikketest's captured head
+				// mesh 1142847 occurs in exactly one appearance list - the female heads under charactercreator's
+				// <cimmerian> element - and her captured race byte is 1.
 				Assert.Equal(Race.Cimmerian, character.Race);
 				Assert.Equal(18u, (uint)character.Class); // the pre-frame island's low byte @135/136
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).
 				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(TestContext.Current.CancellationToken), character.RealmId);
-				Assert.Equal(1142847u, character.Body!.HeadMesh); // the TRUE wire value (editor sent 2285694 = 2x)
+				Assert.Equal(1142847u, character.Body!.HeadMesh); // the true wire value (editor sent 2285694 = 2x)
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);
 				Assert.Equal(704.9000244141f, character.PositionZ, 0.001f);
@@ -98,29 +96,28 @@ namespace Faolan.Tests
 				Assert.Equal(1f, character.Rotation.LengthSquared(), 0.001f);
 				Assert.NotEqual(1f, character.RotationW); // a real captured W, not the identity fallback
 
-				// The capture's own vitals are deliberately NOT carried: vitals are derived from (Class, Level) so an
-				// imported character is no different from a created one (#578).
+				// The capture's own vitals are deliberately not carried: vitals are derived from (Class, Level) so an
+				// imported character is no different from a created one.
 				Assert.Equal(CharacterMaxStats.For(character.Class, character.Level, VitalAttributes.LevelOneBase).Health, character.MaxVitals(VitalAttributes.LevelOneBase).Health);
 
-				// The spawn's 7 morph entries must reach CharacterBody, which IS the appearance now: it is what
-				// Faolan.Web renders from and what the spawn's entry table is regenerated from. They used to stay at
-				// zero because the entry table was stored alongside them, so an imported character looked right in game
-				// (the spawn replayed those rows) and unmorphed everywhere else - and the first appearance edit rebuilt
-				// the table from those zeros and lost the captured face.
+				// The spawn's 7 morph entries must reach CharacterBody, which is the appearance: it is what Faolan.Web
+				// renders from and what the spawn's entry table is regenerated from. Sliders left at zero would make an
+				// imported character look right in game (the spawn replays its own rows) and unmorphed everywhere else,
+				// and the first appearance edit would rebuild the table from those zeros and lose the captured face.
 				// BuildEntries skips a zero slider, so 7 entries means all 7 body sliders are non-zero.
 				float[] bodyMorphs = [character.Body!.Arm, character.Body.Chest, character.Body.Bosom, character.Body.Stomach, character.Body.Arse, character.Body.Thigh, character.Body.Leg];
 				Assert.All(bodyMorphs, m => Assert.NotEqual(0f, m));
 				Assert.Equal(7, CharacterMorphs.BuildEntries(character.Body).Count);
 
 				// The weighted entries are recovered as resource refs (the inverse of BuildWeightedEntries, which maps
-				// a ref to its MorphTarget's Id = the entry tag). This test seeds no MorphTargets, so NOTHING should
+				// a ref to its MorphTarget's Id = the entry tag). This test seeds no MorphTargets, so nothing should
 				// resolve - that is the property worth pinning here: recovery is driven entirely by the catalog and
 				// never invents a ref. The real inversion is exercised against the shipped catalog by
 				// PlayerSpawnScaffoldRowsTests, where every captured tag resolves.
 				Assert.Empty(character.BodyResources);
 
 				// His 20 captured ability/feat ids plus the archetype ability (300, Rogue) that opens every player's
-				// skill list - a real element of the list under the client's carve (#466), so the extract keeps it.
+				// skill list - a real element of the list under the client's carve, so the extract keeps it.
 				Assert.Equal(21, character.Skills.Count);
 				Assert.Contains(character.Skills, sk => sk.SkillId == 300);
 
@@ -129,14 +126,14 @@ namespace Faolan.Tests
 				Assert.Equal((1, 0, 1, 0), rerun);
 				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
 
-				// #753: the row carries the marker that makes it refreshable, and a REFRESH run rebuilds it - one
+				// The row carries the marker that makes it refreshable, and a refresh run rebuilds it - one
 				// character still, but deleted and re-imported rather than skipped.
 				Assert.True(character.ImportedFromCapture);
 				var refreshed = await CaptureCharacterImporter.ImportAsync(db, [capture], refresh: true);
 				Assert.Equal((1, 1, 0, 1), refreshed);
 				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
 
-				// ...and a character created IN-GAME is exempt by construction: no marker, so even a refresh keeps
+				// ...and a character created in-game is exempt by construction: no marker, so even a refresh keeps
 				// it. This is the `Adada` case - a blanket re-import deleted a level-4 local character, and the level
 				// threshold that was supposed to be the guard is what deleted it.
 				db.Characters.Add(new Character
@@ -165,8 +162,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// A REAL PlayfieldFIIR, built by the codec - PlayfieldFCodec.Parse reads the record whole (#530 rule 3), so a
-		// 40-byte stub with the map id at an offset is no longer a MapChange.
+		// A real PlayfieldFIIR, built by the codec - PlayfieldFCodec.Parse reads the record whole, so a 40-byte stub
+		// with the map id at an offset is not a MapChange.
 		private static byte[] MapChangePacket(uint mapId)
 		{
 			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);

@@ -4,16 +4,18 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildMemberUpdate (0x2030) - one member's roster row changed (rank, online flag, playfield): the member
-	// ELEMENT and nothing else.
-	//
-	// It is the narrow counterpart of DispatchGuildUpdate (0x203F), which re-sends the guild header AND the whole
-	// roster. `CSPlayerInterfaceDispatch_t::DispatchGuildMemberUpdate` (FUN_01340c70) reads no scalars at all - it
-	// constructs the element (FUN_005658a0) and deserializes it (FUN_00566740), the same pair
-	// DispatchGuildMemberJoined uses for its second argument, which is what identifies the payload as the member
-	// record we already build.
-	//
-	// ⚠️ No capture performs a roster change other than a join. [V0]
+	/// <summary>
+	///     <c>DispatchGuildMemberUpdate</c> - one member's roster row changed (rank, online flag, playfield): the member
+	///     element and nothing else.
+	/// </summary>
+	/// <remarks>
+	///     It is the narrow counterpart of <c>DispatchGuildUpdate</c>, which re-sends the guild header and the whole
+	///     roster. <c>CSPlayerInterfaceDispatch_t::DispatchGuildMemberUpdate</c> (FUN_01340c70) reads no scalars at all:
+	///     it constructs the element (FUN_005658a0) and deserializes it (FUN_00566740), the same pair
+	///     <c>DispatchGuildMemberJoined</c> uses for its second argument, which is what identifies the payload as the
+	///     member record.
+	///     <para>No capture performs a roster change other than a join. [V0]</para>
+	/// </remarks>
 	public static class GuildMemberUpdateCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildMemberUpdate;

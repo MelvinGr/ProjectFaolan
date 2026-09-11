@@ -39,12 +39,12 @@ namespace Faolan.Importer.Modules
 
 			// Overwrite deletes every stored row the harvest did not yield, so the table is by construction what the
 			// captures say. Upsert cannot: it re-writes the live rows and leaves the dead ones, reporting a row-count
-			// delta of zero either way, which is how the divergence went unseen (#481). ⚠️ Only a cleanup when the
+			// delta of zero either way, which is how the divergence went unseen. Only a cleanup when the
 			// corpus you are importing is a SUPERSET of the one that built the table - read the warning on
 			// WorldObjectImportOps.ImportWorldObjects before pointing it at the shipped faolan.db.
 			await WorldObjectImportOps.ImportWorldObjects(ctx.Db, objects, ctx.ModeFor(Name) == WriteMode.Overwrite);
 
-			// Say when a door was captured in two different states, rather than resolving it silently (#554). The
+			// Say when a door was captured in two different states, rather than resolving it silently. The
 			// resolution is deterministic, but the fact that the corpus disagreed is worth reading in the log.
 			var resolved = stateConflicts == 0
 				? ""

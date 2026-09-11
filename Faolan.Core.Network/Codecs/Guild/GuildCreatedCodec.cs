@@ -4,20 +4,22 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildCreated (0x2044) - retail's IMMEDIATE create response, which opens the guild window WITH NO RELOG
-	// (unlike the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
-	// (docs/subsystems/create-guild-decode.md, GuildPacketTests):
-	//   [creator member record][guild header]
-	// i.e. the 0x203F pair with the arguments the other way round and no roster list. The header's `Form` byte carries
-	// the request's guild FORM (the full update fixes it at 0x03) and its renown block is the create-time 225-byte
-	// form, which is why one GuildHeaderCodec serves both.
-	//
-	// Moved in from `GuildService.WriteGuildCreatedBody` in #530 wave 7.
+	/// <summary>
+	///     <c>DispatchGuildCreated</c> - retail's immediate create response, which opens the guild window with no relog,
+	///     unlike <c>DispatchGuildUpdate</c>, which only takes effect on the next login. The body is
+	///     <c>[creator member record][guild header]</c>.
+	/// </summary>
+	/// <remarks>
+	///     That is the full update's pair with the arguments the other way round and no roster list. The header's
+	///     <c>Form</c> byte carries the request's guild form (the full update fixes it at 0x03) and its renown block is
+	///     the create-time 225-byte form, which is why one <see cref="GuildHeaderCodec" /> serves both. Byte-exact in
+	///     <c>GuildPacketTests</c>; see docs/subsystems/create-guild-decode.md.
+	/// </remarks>
 	public static class GuildCreatedCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildCreated;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GuildCreated value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -48,6 +50,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// DispatchGuildCreated's two arguments. The creator is online (they just made the guild).
+	/// <summary>DispatchGuildCreated's two arguments. The creator is online, having just made the guild.</summary>
 	public sealed record GuildCreated(GuildMemberRecord Creator, GuildHeader Guild);
 }

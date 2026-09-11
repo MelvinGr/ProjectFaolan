@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #255: the multi-quest snapshot journal portion generates from the player's held quests. Golden: the
+	// The multi-quest snapshot journal portion generates from the player's held quests. Golden: the
 	// compeltefirstquest login snapshot's quest region (2 quests - beach 10238 + Casilda 13479), extracted
 	// byte-exact (QuestPortion2QuestGolden.bin). Proves BuildQuestPortion reproduces a real retail multi-quest
 	// region, so driving it from CharacterQuests is safe to feed the client (which rejects a malformed region).
@@ -20,12 +20,12 @@ namespace Faolan.Tests
 	{
 		private const uint CaptureInstance = 0x021663DD; // Stihetfv's client instance (the goal records carry it)
 
-		// The compeltefirstquest login snapshot's 2,247-byte quest region, byte-for-byte. Verified against
-		// Golden/QuestPortion2QuestGolden.bin (since deleted, #555) before removal.
+		// The SHA-256 of the compeltefirstquest login snapshot's 2,247-byte quest region. The retail blob itself is
+		// not carried in the repo, so the digest is the anchor.
 		private const string CapturedRegionSha256 = "9c6dc1223caac6630ed3e1baeddf1b47f0df631f0866686a28c5586bc3121422";
 
-		// The digest above was pinned over the OLD carve's region, whose final word was really the access-window
-		// table's ListFrame (86 catalog entries) - re-appended so the retail anchor survives the #464 re-carve.
+		// The captured region's final word is the access-window table's ListFrame (86 catalog entries), and the digest
+		// covers it. That word belongs to the table region, so it is re-appended before comparing against the pin.
 		private static readonly byte[] AccessTableFrameWord = BuildFrameWord();
 
 		private static byte[] BuildFrameWord()
@@ -35,9 +35,9 @@ namespace Faolan.Tests
 		}
 		private static readonly string DbPath = TestPaths.FaolanDb;
 
-		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
+		// A character holding no snapshot quests (a freshly created char, or one who completed/abandoned the beach
 		// starter) carries the empty quest region. Byte-exact across all 20 *-create captures (the starter quest is
-		// delivered LIVE on create-world entry, not in the snapshot). See tools/capture/decode_snapshot_quests.py.
+		// delivered live on create-world entry, not in the snapshot). See tools/capture/decode_snapshot_quests.py.
 		[Fact]
 		public void BuildEmptyQuestPortion_MatchesTheCreateCaptureRegion()
 		{
@@ -48,8 +48,8 @@ namespace Faolan.Tests
 				0x00, 0x00, 0x03, 0xF1, // empty completed-journal frame (the phantom "index tag")
 				0x00, 0x00, 0x03, 0xF1, // empty index marker ((0+1)*0x3F1)
 				0x00, 0x00, 0x00, 0x00 // index count = 0
-				// The capture's next word, 0x000156E7, is NOT part of this region: it is the access-window
-				// table's ListFrame(86) - the old carve's phantom "terminal constant" (#464).
+				// The capture's next word, 0x000156E7, is not part of this region: it is the access-window
+				// table's ListFrame(86), not a terminal constant of this one.
 			];
 			Assert.Equal(golden, SnapshotTails.EmptyQuestPortion());
 			// The empty-quest list/null-primary path must route to the same region.
@@ -69,12 +69,11 @@ namespace Faolan.Tests
 
 			var built = SnapshotTails.QuestPortion([beach, casilda], beach, CaptureInstance);
 
-			// The captured region's SHA-256 rather than the region: the blob is gone from the repo (#555). This gate
+			// The captured region's SHA-256 rather than the region: the blob is gone from the repo. This gate
 			// only ever compared against those bytes - both inputs are DB rows - so the digest is the same assertion,
 			// minus the ability to report a first-differing offset. Regenerate the pin only against a capture.
-			// 2243: the captured region's final four bytes under the OLD carve were the access-window table's
-			// ListFrame word (#464). The pinned digest was taken over those 2247 bytes, so the retail anchor is
-			// preserved by re-appending the frame word the table region now owns.
+			// The pin covers 2247 bytes: this 2243-byte region plus the access-window table's ListFrame word, which
+			// the table region owns. Re-appending it is what keeps the comparison against the retail bytes.
 			Assert.Equal(2243, built.Length);
 			Assert.Equal(CapturedRegionSha256, Sha256([.. built, .. AccessTableFrameWord]));
 		}
@@ -90,15 +89,15 @@ namespace Faolan.Tests
 			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
 		}
 
-		// Casilda 13479's journal record is a per-quest CONSTANT (byte-identical across its active + completed login
-		// captures, #255). Generate it via BuildSingle from the DB and assert it matches the record in the captured
+		// Casilda 13479's journal record is a per-quest constant (byte-identical across its active + completed login
+		// captures). Generate it via BuildSingle from the DB and assert it matches the record in the captured
 		// 2-quest region byte-for-byte - the core proof that a non-beach quest's record generates correctly. (The full
-		// region isn't byte-compared: the capture's char COMPLETED the beach quest, so its beach record carries
+		// region isn't byte-compared: the capture's char completed the beach quest, so its beach record carries
 		// obj-list progress a held-but-fresh beach record doesn't - that record is proven separately + in production.)
 		[Fact]
 		public async Task BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
 		{
-			// The region the test above pins against retail's digest IS the captured region, so searching it for the
+			// The region the test above pins against retail's digest is the captured region, so searching it for the
 			// 13479 record is still a comparison against a capture - one hop, not a self-check. (If that gate fails
 			// this one is meaningless, but it fails loudly first.)
 			var region = SnapshotTails.QuestPortion([await LoadDefinition(10238), await LoadDefinition(13479)], await LoadDefinition(10238), CaptureInstance);
@@ -128,11 +127,11 @@ namespace Faolan.Tests
 			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
 		}
 
-		// The beach starter must be able to RIDE the login snapshot. Retail ships the journal in the snapshot and sends
+		// The beach starter must be able to ride the login snapshot. Retail ships the journal in the snapshot and sends
 		// no quest packet at login, so a quest that is not snapshot-eligible simply does not exist in the J-panel after
 		// a relog - which is what "enter the jungle is gone after relogging" was: the quest row was Active the whole
 		// time, but IsSnapshotEligible said no, so the region shipped empty and the live restore path had been deleted
-		// (#389). Every new character holds this quest, so it is the one that must not regress.
+		//. Every new character holds this quest, so it is the one that must not regress.
 		[Fact]
 		public async Task TheBeachStarter_IsSnapshotEligible_SoItSurvivesARelog()
 		{
@@ -152,10 +151,9 @@ namespace Faolan.Tests
 			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), portion);
 		}
 
-		// The same failure, one quest further along the same chain (#827): `The Scavenger's Key` was Active in
-		// CharacterQuests and absent from the client, so the Casilda line read as finished after a relog. It has no
-		// CAPTURED objective region - only 103 of 5,049 quests do - so `ObjectiveRegionVerified` can never speak for
-		// it, and the live restore path that used to cover the difference was deleted (#389/#390).
+		// One quest further along the same chain: `The Scavenger's Key` has no captured objective region - only 103 of
+		// 5,049 quests do - so `ObjectiveRegionVerified` can never speak for it. Without this path a quest that is
+		// Active in CharacterQuests is absent from the client, and the Casilda line reads as finished after a relog.
 		[Fact]
 		public async Task AQuestWithNoCapturedRegion_StillRidesTheSnapshot_WhenItsGoalsStateTheirKind()
 		{
@@ -171,7 +169,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), SnapshotTails.QuestPortion([def], def, CaptureInstance));
 		}
 
-		// The index block states the held quest's STEP NUMBER in its line (#926), and that number is the capture-sourced
+		// The index block states the held quest's step number in its line, and that number is the capture-sourced
 		// JournalSequence - 0 on the 1,009 lines no capture has ordered. A multi-step line with no order would ship as
 		// "step 0, all n still to come", which no capture shows, so the gate refuses the quest until its line is ordered.
 		// A single-step line has nothing to order, and its quest still rides.
@@ -191,9 +189,9 @@ namespace Faolan.Tests
 			Assert.True(SnapshotTails.IsSnapshotEligible(def, area, 1), "a single-step line has nothing to order");
 		}
 
-		// ⚠️ The bar for that widening, and the reason it is not "the builder produced some bytes": a goal with no
-		// captured KIND builds `K = 0`, which the client rejects - and a region it cannot parse takes the WHOLE login
-		// down (statlist.cpp:134), so this must stay strict. PARTIAL goals are excluded, matching what
+		// The bar for that widening, and the reason it is not "the builder produced some bytes": a goal with no
+		// captured kind builds `K = 0`, which the client rejects - and a region it cannot parse takes the whole login
+		// down (statlist.cpp:134), so this must stay strict. Partial goals are excluded, matching what
 		// QuestObjectiveRegions.ForQuest leaves out of the region.
 		[Fact]
 		public void ObjectiveRegionBuildable_NeedsEveryLiveGoalToStateItsKind()
@@ -214,7 +212,7 @@ namespace Faolan.Tests
 			Assert.False(SnapshotTails.IsObjectiveRegionBuildable(null));
 		}
 
-		// @+0x2c carries the SERIES HEAD, not the quest's own id (#566). A standalone quest is its own head, so the
+		// @+0x2c carries the series head, not the quest's own id. A standalone quest is its own head, so the
 		// two agree for 84 of the 99 captured records and the distinction only shows on a chain member - which is why
 		// emitting `def.QuestId` unconditionally looked right for years. 12407 (escort Casilda) is the clearest case:
 		// its head is 13479, the "kill Scavenger Tuut" quest that starts that chain.

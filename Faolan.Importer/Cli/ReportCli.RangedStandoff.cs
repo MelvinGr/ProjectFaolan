@@ -11,23 +11,23 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report ranged-standoff`: at what DISTANCE does a retail archer actually shoot? (#838.)
+	// `--report ranged-standoff`: at what distance does a retail archer actually shoot?
 	//
 	// Our NPC chase closes to `WorldState.NpcContactRange` (1.5u) and swings inside `NpcMeleeRange` (3u) whatever the
 	// creature is holding, so a bow carrier runs up and shoots the player in the face. What it should do instead is a
 	// number nobody has: the client's tuning table (`--report rdb-tweaks`, 295 entries) names `AIDefaults_
-	// MaximumChaseRadius` and `AIDefaults_ChaseDeaggroDelayTime` but NO ranged stand-off, and our item data carries no
+	// MaximumChaseRadius` and `AIDefaults_ChaseDeaggroDelayTime` but no ranged stand-off, and our item data carries no
 	// weapon range. So it has to be measured off retail's own combat.
 	//
 	// Method: pair every `Combat:Ranged` / `Combat:Melee` attack with the positions of the attacker and the target it
 	// names, both tracked live from the spawn record and every subsequent `CharDCMove`, and print the distance
-	// distribution. Melee is the CONTROL: whatever the measurement says about archers only means something if the same
+	// distribution. Melee is the control: whatever the measurement says about archers only means something if the same
 	// pipeline puts melee mobs at contact range.
 	//
-	// ⚠️ **The NPC half of that position tracking does not work, and this report's own negative result hides it.**
-	// `CharDCMove` is the PLAYER's movement and only the player's - measured while writing `melee-crowd` (#908): over
-	// the whole corpus it carries 30,769 records and NOT ONE names an NPC handle. An NPC moves by `MoveTask`. So an
-	// attacker's position here is whatever its SPAWN record streamed in with - where it stood when it came into view,
+	// The NPC half of that position tracking does not work, and this report's own negative result hides it.
+	// `CharDCMove` is the player's movement and only the player's - measured while writing `melee-crowd`: over
+	// the whole corpus it carries 30,769 records and not one names an NPC handle. An NPC moves by `MoveTask`. So an
+	// attacker's position here is whatever its spawn record streamed in with - where it stood when it came into view,
 	// not where it shot from. It happens not to matter today because the attack records carry no target at all, so
 	// zero pairs are produced either way; it would matter the moment a capture with populated targets arrives. Take
 	// the `MoveTask` branch from `melee-crowd` before trusting a number out of this.
@@ -156,7 +156,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{label}: {d.Count} attacks from {rows.Select(r => r.Name).Distinct().Count()} creature(s)");
 				Console.WriteLine($"  min={d[0]:0.0}  p10={Pick(d, 0.1):0.0}  median={Pick(d, 0.5):0.0}  p90={Pick(d, 0.9):0.0}  max={d[^1]:0.0}");
 
-				// A histogram, because a median alone cannot show whether archers hold ONE distance or shoot at
+				// A histogram, because a median alone cannot show whether archers hold one distance or shoot at
 				// whatever range they happen to be - and those imply different AI.
 				var buckets = new[] { 2f, 4f, 6f, 10f, 15f, 20f, 25f, 30f, 40f };
 				foreach (var (lo, hi) in buckets.Select((b, i) => (i == 0 ? 0f : buckets[i - 1], b)).Append((buckets[^1], float.MaxValue)))

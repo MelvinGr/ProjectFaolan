@@ -45,8 +45,8 @@ namespace Faolan.Mcp.Tools
 			if (sessions.Length == 0)
 				return "No clients are currently connected.";
 
-			// Flat identity projection (the shape Faolan.Web's LiveSession deserializes) rather than dumping the whole
-			// session - list_world_sessions is the full-state dump.
+			// A flat identity projection, the shape Faolan.Web's LiveSession deserializes, rather than the whole
+			// session: list_world_sessions is the full-state dump.
 			return JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 

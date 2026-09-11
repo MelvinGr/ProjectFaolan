@@ -6,28 +6,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report quest-line-order` (#926): does ANY shipped column order the steps of a quest line?
+	// `--report quest-line-order`: does any shipped column order the steps of a quest line?
 	//
 	// 1,009 quest lines carry no journal ordering at all - every member sits at `JournalSequence = 0`, because no
 	// capture ever put a character on them. The question this answers is whether the order can be recovered from
 	// something we already hold, and it is answered by SCORING each candidate against the 770 lines whose captured
 	// sequence is complete: a column that orders a line will reproduce that sequence.
 	//
-	// ⭐ **Nothing does, and the quest ID beats every column that was supposed to.** Ascending template id gets
-	// 89.4%; `Level`, `BandLevel` and the three undecoded `Field*` words all score BELOW it, i.e. each one adds noise
-	// to an ordering the id already carries. So the ticket's "the undecoded QuestLine columns have not been read
-	// against this question" is now closed negative rather than open.
+	// Nothing does, and the quest id beats every column that was supposed to. Ascending template id gets 89.4%;
+	// `Level`, `BandLevel` and the three undecoded `Field*` words all score below it, i.e. each one adds noise to an
+	// ordering the id already carries.
 	//
-	// ⚠️ And 89.4% is not a rule. It decays with line length exactly as authoring order would - 93.5% on two-step
+	// And 89.4% is not a rule. It decays with line length exactly as authoring order would - 93.5% on two-step
 	// lines, where it is barely better than a coin flip's worth of evidence, down to 50% on the six-step-and-longer
 	// lines that are the only place a real order shows. Quest ids are assigned roughly in authoring order and
 	// authoring order usually matches play order; that is a correlation, not the client stating anything.
 	//
-	// ⛔ Two of the ticket's candidates need no scoring at all: `Magic` and the `Trailer*` group are columns of
-	// `QuestLine`, one row per LINE, so they cannot express an order WITHIN one. `Quest.tier` / `start_new_tier`, the
+	// Two of the ticket's candidates need no scoring at all: `Magic` and the `Trailer*` group are columns of
+	// `QuestLine`, one row per line, so they cannot express an order within one. `Quest.tier` / `start_new_tier`, the
 	// fields shaped for exactly this, are empty in the client's catalog (`--report rdb-quest-catalog`).
 	//
-	// ⭐ What retail actually states is the quest INDEX block's ordered id list - and we DERIVE that from
+	// What retail actually states is the quest index block's ordered id list - and we DERIVE that from
 	// `JournalSequence` rather than the reverse (`QuestIndexRegions.ForQuests`), so it is a consumer of the order,
 	// not a source of it. Which is why this ticket is capture coverage and not decode.
 	public static partial class ReportCli
@@ -47,7 +46,7 @@ namespace Faolan.Importer.Cli
 
 			var byLine = quests.GroupBy(q => q.LineId).ToDictionary(g => g.Key, g => g.ToList());
 
-			// Only lines whose captured sequence is COMPLETE can score anything: a line with a hole cannot say whether
+			// Only lines whose captured sequence is complete can score anything: a line with a hole cannot say whether
 			// a candidate got it right, and a line of one is moot.
 			var scorable = byLine.Values
 				.Where(l => l.Count > 1 && l.All(q => q.Sequence > 0) && l.Select(q => q.Sequence).Order().SequenceEqual(Enumerable.Range(1, l.Count).Select(i => (uint)i)))

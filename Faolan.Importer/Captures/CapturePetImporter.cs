@@ -12,17 +12,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests the summonable PET creatures (#307) out of the captures so a player-cast pet-summon spell renders.
-	// Like mounts (CaptureMountImporter, which is also lifted onto the creature TYPE since #307/#244), a
-	// pet is done the RIGHT way (#244): its captured FA015807 stat core + equipment + morphs are lifted onto the creature TYPE,
-	// and the server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType) - no world
-	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name the
-	// SummonPet effect rows map each summon-spell id to. Isolated: only touches the NpcTemplate rows for the wanted pet creatures.
+	/// <summary>
+	///     Harvests the summonable pet creatures out of the captures so a player-cast pet-summon spell renders.
+	/// </summary>
+	/// <remarks>
+	///     Like mounts (<see cref="CaptureMountImporter" />), a pet's captured FA015807 stat core + equipment + morphs
+	///     are lifted onto the creature type, and the server spawns it from the type at the summoner's position
+	///     (NpcSpawnBuilder.TryBuildFromType) with no world placement at all. It is resolved at summon time by name
+	///     (SummonPetForPlayer -> GetNpcByName), the name the SummonPet effect rows map each summon-spell id to.
+	///     Only the NpcTemplate rows for the wanted pet creatures are touched.
+	/// </remarks>
 	public static class CapturePetImporter
 	{
 		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
-			// The pet creature names we need - the SpellEffect SummonPet templates, lower-cased for matching.
+			// The SpellEffect SummonPet template names, lower-cased for matching.
 			var wanted = await SpellEffectsModule.PetTemplateNames(db);
 
 			// Every FA015807 spawn across the captures whose name is one of the wanted pets; keep the first (most
@@ -38,10 +42,8 @@ namespace Faolan.Importer.Captures
 
 				byName.TryAdd(key, e);
 
-				// #689: tally EVERY sighting, not just the representative kept above. The four per-spawn-event fields
-				// are corrected to the mode over all of them, and byName keeps only the first - so without this the
-				// representative's pose IS the type's pose, which is exactly the bug #688 fixed for placed NPCs and
-				// this path never got.
+				// Tally every sighting, not just the representative kept above: the four per-spawn-event fields are
+				// corrected to the mode over all of them, while byName keeps only the first.
 				var seenBody = WorldObjectColumns.ExtractBody(e.Data);
 				if (seenBody != null && SpawnBodyReader.TryReadCharacterMessage(seenBody, out var seen))
 					modes.Observe(e.TemplateId, seen.Message);
@@ -56,7 +58,7 @@ namespace Faolan.Importer.Captures
 			var seeded = 0;
 			foreach (var (_, e) in byName)
 			{
-				// The pet creature TYPE (#244): keyed by its captured TemplateId, named the creature name so the summon
+				// The pet creature type: keyed by its captured TemplateId, named the creature name so the summon
 				// resolves by name. Upsert so re-runs keep the type id stable.
 				var type =
 					await db.NpcTemplates.Include(n => n.StatCore).Include(n => n.Equipment).Include(n => n.Morphs).FirstOrDefaultAsync(n => n.TemplateId == e.TemplateId && e.TemplateId != 0) ??
@@ -71,13 +73,13 @@ namespace Faolan.Importer.Captures
 					db.NpcTemplates.Add(type);
 				}
 
-				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from
-				// columns (no Data blob) - the stat core, and, since a pet has no NpcSpawn
-				// placement, its worn equipment + appearance morphs on the type too (NpcEquipment/NpcMorph).
+				// Lift the whole spawn onto the type from its capture so a summoned pet builds wholly from columns:
+				// the stat core, and, since a pet has no NpcSpawn placement, its worn equipment + appearance morphs on
+				// the type too (NpcEquipment/NpcMorph).
 				var body = WorldObjectColumns.ExtractBody(e.Data);
 				if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 				{
-					// Per-spawn-event runtime state must not become the TYPE's definition of itself (#602).
+					// Per-spawn-event runtime state must not become the type's definition of itself.
 					if (type.StatCore == null)
 					{
 						type.StatCore = NpcStatCoreColumns.Lift(read.Message);
@@ -85,9 +87,9 @@ namespace Faolan.Importer.Captures
 					}
 					type.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
 
-					// #689: the four per-spawn-event fields come from the MODE over every sighting, not from the one
+					// The four per-spawn-event fields come from the mode over every sighting, not from the one
 					// representative above. A summoned creature has no NpcSpawns placement, so nothing else ever
-					// revisits this row - the representative's pose would be permanent.
+					// revisits this row.
 					modes.Apply(e.TemplateId, type.StatCore);
 
 					type.Equipment.Clear();
@@ -124,10 +126,9 @@ namespace Faolan.Importer.Captures
 				seeded++;
 			}
 
-			// #689: the four per-spawn-event fields are corrected on EVERY type the sweep saw, not only the
-			// representatives lifted above. Same-named siblings (four Courtesans, two Cobras, two Chickens, two Bulls,
-			// two Drunk Pirates) are shadowed by the byName dedup and have no placement either, so nothing else in the
-			// importer ever revisits them - they kept their first lift's pose permanently.
+			// The four per-spawn-event fields are corrected on every type the sweep saw, not only the representatives
+			// lifted above. Same-named siblings are shadowed by the byName dedup and have no placement either, so
+			// nothing else in the importer ever revisits them.
 			var observedCores = await db.NpcTemplates
 				.Where(n => n.StatCore != null)
 				.Include(n => n.StatCore)

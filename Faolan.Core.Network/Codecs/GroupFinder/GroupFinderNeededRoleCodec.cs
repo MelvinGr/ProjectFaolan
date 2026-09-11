@@ -4,10 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderReceivedNeededRole (0x20CE): the answer to c2s RequestNeededRole(uint32 activityId) -
-	// the activity echoed back plus the role word the finder still needs for it. Captured as [00000026][00000001]
-	// (activity 38, roles 0x1) both times it fires in chat-annotated-4; the role word's bit meaning is the client's
-	// role bitmask (the player answers SelectGroupFinderRoles with 0x4 for the third role button).
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderReceivedNeededRole</c> - the answer to c2s <c>RequestNeededRole(activityId)</c>:
+	///     the activity echoed back plus the role word the finder still needs for it.
+	/// </summary>
+	/// <remarks>
+	///     Captured as <c>[00000026][00000001]</c> (activity 38, roles 0x1) both times it fires in chat-annotated-4.
+	///     The role word is the client's role bitmask - the player answers <c>SelectGroupFinderRoles</c> with 0x4 for
+	///     the third role button.
+	/// </remarks>
 	public static class GroupFinderNeededRoleCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderReceivedNeededRole;

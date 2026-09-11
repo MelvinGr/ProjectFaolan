@@ -9,19 +9,19 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Cli
 {
 	// `--report bcc-census`: every BehaviorControlCenterIIR in the corpus, bucketed by its behaviorId, with the tail
-	// lengths each one carries (#536/#549). This is the scan the per-Command reader table in
+	// lengths each one carries. This is the scan the per-Command reader table in
 	// docs/re/behaviorcontrolcenter-grammar.md is measured against, shipped as a report rather than kept as a scratch
 	// script so the numbers in that doc can be re-derived rather than trusted.
 	//
-	// It also dumps, in FULL, every record whose behaviorId is not in `BehaviorId` - the client's own classmap. Those
+	// It also dumps, in full, every record whose behaviorId is not in `BehaviorId` - the client's own classmap. Those
 	// are the interesting ones: an id the client cannot look up is either a command we have not found the
-	// registration for, or (as #549 turned out) a record we are reading wrong.
+	// registration for, or a record we are reading wrong.
 	public static partial class ReportCli
 	{
-		// `--report-arg <hex>` additionally dumps, in full, every record whose PHASE byte is <hex> (e.g. `0E`);
-		// `--report-arg cmd:<hex>` dumps every record of one COMMAND instead (e.g. `cmd:27`). Phase was the only
-		// filter for a while, which is the wrong axis when the question is "what do this command's records look
-		// like" - and for a command with four records in the whole corpus, phase pulls in thousands of neighbours.
+		// `--report-arg <hex>` additionally dumps, in full, every record whose phase byte is <hex> (e.g. `0E`);
+		// `--report-arg cmd:<hex>` dumps every record of one command instead (e.g. `cmd:27`). Both axes exist because
+		// phase is the wrong one when the question is "what do this command's records look like": for a command with
+		// four records in the whole corpus, a phase filter pulls in thousands of neighbours.
 		private static void BccCensus(IReadOnlyList<NamedCapture> captures, string? phaseArg)
 		{
 			var wantsCommand = (phaseArg ?? "").StartsWith("cmd:", StringComparison.OrdinalIgnoreCase);

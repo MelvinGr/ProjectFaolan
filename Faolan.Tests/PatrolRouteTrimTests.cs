@@ -7,21 +7,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #703: a harvested route must be ONE CONTINUOUS polyline, because the runtime WALKS it - a break is not skipped,
+	// A harvested route must be one continuous polyline, because the runtime walks it - a break is not skipped,
 	// it is walked as a straight line between the two sides, through whatever stands there (Old Tarantia's guards
 	// crossing the buildings).
 	//
 	// A captured mode-4 ListMoveTask routinely holds two mode-1 legs: the NPC's current short step, then the beat it
 	// is walking. Over the corpus every multi-leg task has exactly two legs, and the leading one is 2 waypoints in 450
 	// of 465 cases. Usually the beat starts where the step ends (median seam 0.7u) and the two really are one path;
-	// in 141 cases the beat is elsewhere (up to 495.9u), because a roam path is shared by a GROUP and the NPC joins it
+	// in 141 cases the beat is elsewhere (up to 495.9u), because a roam path is shared by a group and the NPC joins it
 	// partway rather than at its first waypoint.
 	public class PatrolRouteTrimTests
 	{
 		[Fact]
 		public void ContinuousLegs_AreLeftAlone()
 		{
-			// The common case: the step ends where the beat begins, so the two ARE one path and nothing may be dropped.
+			// The common case: the step ends where the beat begins, so the two are one path and nothing may be dropped.
 			var task = List(
 				Leg([new Vector3(0, 0, 0), new Vector3(10, 0, 0)]),
 				Leg([new Vector3(10, 0, 0), new Vector3(20, 0, 0), new Vector3(20, 0, 10)]));
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TerritoryLeg_IsNotTouched()
 		{
-			// A PathFlags&1 leg names a territory path instead of carrying one (#490): no geometry, so it can neither
+			// A PathFlags&1 leg names a territory path instead of carrying one: no geometry, so it can neither
 			// break continuity nor be measured, and it must survive the trim intact.
 			var task = List(
 				new MoveTaskNode { Mode = 1, PathFlags = 1, TerritoryIndex = 7, TerritoryPathIndex = 2 },

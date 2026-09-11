@@ -6,34 +6,36 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// SetNameIIR (0xADCE0CDA) - sets an entity's custom name. ONE grammar, recovered byte-exact from
-	// n3InfoItemRemote::Construct (FUN_005b9d30) + SetNameIIR_t::ReadSubClass (FUN_007ae1d0), #363:
-	//
-	//   [u32 subop][u32 class][u32 handle][u8 isToBePassed]   <- Construct (isToBePassed must be 0 or 1)
-	//   [u32 nameType][u8 flag][u8 refresh]                   <- ReadSubClass (this+0x48 u32, this+0x4c/0x4e bools)
-	//   [u32 nameLen][ASCII name]                             <- nameLen is a U32, HARD-CAPPED at 0x20 by the client
-	//
-	// It used to be TWO builders that thought they were two messages. The create-editor's "name accepted" record was
-	// written as `[u32 0][u8 0x03][u8 0x01][u32 0][u16 len][name]` - which is the SAME bytes read one field boundary
-	// off: its leading zero word is `isToBePassed` plus the top three bytes of `nameType`, its `[u32 0][u16 len]` is
-	// `refresh=0` plus a u32 length. The only real difference between the editor's record and the live one is that
-	// last bool.
-	//
-	// `nameType` (this+0x48) is applied by Activate -> FUN_006ed100(nameType, this+0x4e): it MUST be 1..4 (0 hits the
-	// switch default and the name is silently DROPPED), and 3 or 4 with `refresh` set also REFRESH the live nameplate
-	// (FUN_006dbc00/FUN_00447ba0) - an entity's OverheadText is built from the LDB hash at spawn and only re-reads the
-	// custom name on that refresh. So 3/1/1 is what makes an already-spawned NPC show the name.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     SetNameIIR - sets an entity's custom name. One grammar, recovered byte-exact from n3InfoItemRemote::Construct
+	///     (FUN_005b9d30) and SetNameIIR_t::ReadSubClass (FUN_007ae1d0):
+	///     <code>
+	///     [u32 subop][u32 class][u32 handle][u8 isToBePassed]   Construct; isToBePassed must be 0 or 1
+	///     [u32 nameType][u8 flag][u8 refresh]                   ReadSubClass; this+0x48 u32, this+0x4c/0x4e bools
+	///     [u32 nameLen][ASCII name]                             nameLen is a u32, hard-capped at 0x20 by the client
+	///     </code>
+	/// </summary>
+	/// <remarks>
+	///     <c>nameType</c> (this+0x48) is applied by Activate through FUN_006ed100(nameType, this+0x4e). It must be 1 to 4
+	///     - 0 hits the switch default and the name is silently dropped - and 3 or 4 with <c>refresh</c> set also refresh
+	///     the live nameplate (FUN_006dbc00, FUN_00447ba0), an entity's OverheadText being built from the LDB hash at spawn
+	///     and only re-reading the custom name on that refresh. So 3/1/1 is what makes an already-spawned NPC show the name.
+	///     <para>
+	///         The create-editor's "name accepted" record is the same grammar, differing only in that last bool. The u32
+	///         carrier length belongs to the framing sender.
+	///     </para>
+	/// </remarks>
 	public static class SetNameCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SetNameIIR;
 
-		// The client reads nameLen as a u32 and HARD-CAPS it at 0x20 (so 1..31 characters); a longer name makes it
-		// read length 0, skip the name and reject the blob.
+		/// <summary>
+		///     The client reads nameLen as a u32 and hard-caps it at 0x20, so 1 to 31 characters; a longer name makes it read
+		///     length 0, skip the name and reject the blob.
+		/// </summary>
 		public const int MaxNameLength = 31;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SetNameIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -76,28 +78,35 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 	}
 
-	// SetNameIIR (0xADCE0CDA).
+	/// <summary>The SetNameIIR body.</summary>
 	public sealed record SetNameIIR(uint Handle, string Name, uint NameType = SetNames.NameTypeCustom, byte Flag = 1, byte Refresh = 0, byte IsToBePassed = 0);
 
-	// The two semantic forms of a SetName. VALUE FACTORIES, not Build overloads (#530 §2 rule 1) - they take the same
-	// (handle, name) pair and differ only in the nameplate-refresh bool, which is exactly the ambiguity an overload
-	// would hide.
+	/// <summary>
+	///     The two semantic forms of a SetName, as value factories rather than Build overloads: they take the same
+	///     (handle, name) pair and differ only in the nameplate-refresh bool, which an overload could not express.
+	/// </summary>
 	public static class SetNames
 	{
-		// The nameType the captured records carry. 1..4 are the client's switch cases; 3 with `refresh` set is the one
-		// that repaints an already-spawned entity's floating name.
+		/// <summary>
+		///     The nameType the captured records carry. 1 to 4 are the client's switch cases; 3 with <c>refresh</c> set is
+		///     the one that repaints an already-spawned entity's floating name.
+		/// </summary>
 		public const uint NameTypeCustom = 3;
 
-		// The create-editor's "name accepted" record, echoing the chosen character name back so the client advances to
-		// enter-world (dikketest idx 359, SendNicknameAccepted). No nameplate refresh - the avatar has not spawned yet.
+		/// <summary>
+		///     The create-editor's "name accepted" record, echoing the chosen character name back so the client advances to
+		///     enter-world (dikketest idx 359, SendNicknameAccepted). No nameplate refresh: the avatar has not spawned yet.
+		/// </summary>
 		public static SetNameIIR Accepted(uint handle, string name)
 		{
 			return new SetNameIIR(handle, name);
 		}
 
-		// The in-WORLD nameplate override (#363): the same record with the refresh bool set, which is what makes an
-		// already-spawned NPC show the name. The name is TRUNCATED to the client's cap rather than sent long, because
-		// a longer one makes the client read length 0 and reject the whole blob.
+		/// <summary>
+		///     The in-world nameplate override: the same record with the refresh bool set, which is what makes an
+		///     already-spawned NPC show the name. The name is truncated to the client's cap rather than sent long, because a
+		///     longer one makes the client read length 0 and reject the whole blob.
+		/// </summary>
 		public static SetNameIIR Nameplate(uint handle, string? name)
 		{
 			var text = name ?? "";

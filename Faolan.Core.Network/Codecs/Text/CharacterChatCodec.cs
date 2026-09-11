@@ -4,13 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// s2c CharacterChat (0x0022) - proximity "say", spoken by one entity and delivered to the clients in range:
-	//   [u32 characterId][u16 len][text][u16 type][u8 0]
-	// The speaker is an id only; the client resolves the NAME from a ChatSenderInfo (0x0014) it has already been sent.
-	// `Type` is 0x0001 on every say we send and is carried rather than fixed.
-	//
-	// The GameServer holds the positions, so it passes the in-range recipient ids down and this tier only frames +
-	// delivers. Moved in from `Faolan/ChatServer/Packets.cs` in #530 (the §9 B group the issue's inventory missed).
+	/// <summary>
+	///     s2c <c>CharacterChat</c> - proximity "say", spoken by one entity and delivered to the clients in range:
+	///     <c>[u32 characterId][u16 len][text][u16 type][u8 0]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The speaker is an id only; the client resolves the name from a <c>ChatSenderInfo</c> it has already been sent.
+	///     <c>Type</c> is 0x0001 on every say sent here and is carried rather than fixed. The GameServer holds the
+	///     positions, so it passes the in-range recipient ids down and this tier only frames and delivers.
+	/// </remarks>
 	public static class CharacterChatCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.CharacterChat;
@@ -18,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// The type word every captured say carries.
 		public const ushort SayType = 0x0001;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterChat value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -33,8 +35,8 @@ namespace Faolan.Core.Network.Codecs.Text
 			return Build(new CharacterChat(characterId, text));
 		}
 
-		// An NPC's ambient BARK. The parent composes the child: `NpcChatterCodec` renders the remoteformat and this
-		// frames it, so a caller holding the bark never spells the text layer (#539).
+		// An NPC's ambient bark. The parent composes the child: `NpcChatterCodec` renders the remoteformat and this frames
+		// it, so a caller holding the bark never spells the text layer.
 		public static byte[] Build(uint npcHandle, NpcChatterBark bark)
 		{
 			return Build(new CharacterChat(npcHandle, NpcChatterCodec.Build(bark)));
@@ -65,6 +67,6 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// s2c CharacterChat (0x0022).
+	/// <summary>The s2c CharacterChat body.</summary>
 	public sealed record CharacterChat(uint CharacterId, string Text, ushort Type = CharacterChatCodec.SayType);
 }

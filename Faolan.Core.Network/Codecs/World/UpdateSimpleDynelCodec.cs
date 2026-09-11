@@ -8,13 +8,13 @@ namespace Faolan.Core.Network.Codecs.World
 	// UpdateSimpleDynelIIR (0x30536411) - a loot bag's visual update as it is consumed (sent right before the fade).
 	// 24 B: [subop][0xC87A LootBag][bagHandle][u32 0][u32 0][01][00][01][01].
 	//
-	// ⚠️ The four trailing bytes are UNDECODED - one captured shape, kept as fields rather than named, so a caller
-	// that needs a different combination can send it without inventing a meaning for it.
+	// The four trailing bytes are undecoded - one captured shape, kept as fields rather than named, so a caller that
+	// needs a different combination can send it without inventing a meaning for it.
 	public static class UpdateSimpleDynelCodec
 	{
 		public const uint Opcode = (uint)IirTypes.UpdateSimpleDynelIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(UpdateSimpleDynelIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -53,6 +53,5 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// UpdateSimpleDynelIIR (0x30536411).
 	public sealed record UpdateSimpleDynelIIR(uint TypeTag, uint Handle, uint Word0, uint Word1, byte B0, byte B1, byte B2, byte B3);
 }

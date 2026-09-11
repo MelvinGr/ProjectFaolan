@@ -5,33 +5,40 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// Builds/parses the ChatTextIIR (sub-opcode 0xE0B51102) body - a WORLD/SYSTEM chat line the server pushes into
-	// the client's chat window (distinct from FormatFeedbackIIR's on-screen FIFO overlay and from the ChatServer
-	// channel chat). The text is a `remoteformat` (localized tokens + parameters), the same XML shape the feedback
-	// and Knubot packets use, so the server can emit a localized system line without literal strings.
-	//
-	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = GameServerListener.WorldSenderEndpoint, receiver = the
-	// player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` is that receiver
-	// instance, so a live send is fully addressable from the session.
-	//
-	// Wire grammar (big-endian, decoded 2026-06-16 from DemoL80 randomActions #7564, golden-tested in
-	// ChatTextCodecTests). The carrier's [u32 len] belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it:
-	//   [u32 0xE0B51102]   ChatTextIIR sub-opcode
-	//   [u32 0x0000C350]   standard IIR marker (Character class)
-	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
-	//   [u8  0x00]         lead flag (constant in the sole capture)
-	//   [u16 xmlLen][remoteformat XML]      the message (no null terminator)
-	//   [u8  chatTextType] NPCChatTextType_e — the chat-text type enum (0 in our capture; the client reader rejects
-	//                      values > 5). Decoded from the client #321: writer FUN_006a4c70 emits byte(this+0x4c) then
-	//                      the u32 below; reader FUN_006a4c00 stores the byte into +0x4c after a `<= 5` bounds check.
-	//   [u32 typeFlags]    big-endian flags/format word (client field this+0x2c; 0x40000001 in our capture). Read as
-	//                      a u32 by FUN_0048f900; same bit-30 (0x40000000) family as FormatFeedbackIIR.typeFlags —
-	//                      exact bit meanings still loose, but it is a real field, not padding.
+	/// <summary>
+	///     The <c>ChatTextIIR</c> body - a world or system chat line the server pushes into the client's chat window,
+	///     distinct from FormatFeedbackIIR's on-screen FIFO overlay and from the ChatServer channel chat.
+	/// </summary>
+	/// <remarks>
+	///     The text is a <c>remoteformat</c> (localized tokens plus parameters), the same XML shape the feedback and
+	///     Knubot packets use, so the server can emit a localized system line without literal strings.
+	///     <para>
+	///         It is carried as an IIR on the world conversation (sender the world endpoint, receiver the player's
+	///         GameInterface). The IIR body's <c>instance</c> is that receiver instance, so a live send is fully
+	///         addressable from the session.
+	///     </para>
+	///     <para>
+	///         Wire grammar, big-endian, decoded from the DemoL80 randomActions capture and golden-tested in
+	///         <c>ChatTextCodecTests</c>. The carrier's <c>[u32 len]</c> belongs to the sender:
+	///         <code>
+	///         [u32 subop]        ChatTextIIR sub-opcode
+	///         [u32 entityClass]  standard IIR marker (Character class)
+	///         [u32 instance]     the target GameInterface object (the receiver endpoint instance / ClientInstance)
+	///         [u8  0x00]         lead flag (constant in the sole capture)
+	///         [u16 xmlLen][remoteformat XML]   the message, with no null terminator
+	///         [u8  chatTextType] NPCChatTextType_e - 0 in the capture; the client reader rejects values above 5
+	///         [u32 typeFlags]    big-endian flags/format word (client field this+0x2c; 0x40000001 in the capture)
+	///         </code>
+	///         The type byte comes from the client's writer FUN_006a4c70 and reader FUN_006a4c00, which stores it into
+	///         +0x4c after a bounds check. <c>typeFlags</c> is read as a u32 by FUN_0048f900 and is the same bit-30 family
+	///         as FormatFeedbackIIR's <c>typeFlags</c>; the exact bit meanings are still loose, but it is a real field
+	///         rather than padding.
+	///     </para>
+	/// </remarks>
 	public static class ChatTextCodec
 	{
-		// The two fields after the XML, decoded from the client (de)serializer (#321), no longer an opaque "trailer":
-		// the chat-text TYPE selector (NPCChatTextType_e, one byte) then a big-endian flags/format word. Defaults are
-		// the values in our sole capture (type 0, flags 0x40000001).
+		// The two fields after the XML: the chat-text type selector (NPCChatTextType_e, one byte) then a big-endian
+		// flags/format word. The defaults are the values in the sole capture (type 0, flags 0x40000001).
 		public const byte DefaultChatTextType = 0x00;
 		public const uint DefaultTypeFlags = 0x40000001;
 		public const uint Opcode = (uint)IirTypes.ChatTextIIR; // 0xE0B51102

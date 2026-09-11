@@ -6,27 +6,30 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
-	// (CharacterSkill / CharacterScaffoldPair / CharacterFeat, plus the appearance model CharacterBody +
-	// CharacterBodyResources), so a player spawn can be GENERATED from the database instead of spliced into
-	// captured template bytes. Buff/timer records are transient session state and are deliberately not stored - a
-	// buffed captured spawn extracts to the same rows as its unbuffed form. Fresh characters get the
-	// fresh-character defaults below (extracted from the Dikketest create capture - a just-created character at
-	// world entry; the same role Strie's template played, but with a genuinely fresh scaffold).
-	// See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
-	//
-	// The APPEARANCE TABLE is DERIVED, never stored (#483). It used to be persisted as CharacterAttribute rows and
-	// kept in step with the appearance model by explicit refresh calls on every edit path - two copies of one fact,
-	// and forgetting one froze the avatar's face permanently. BuildAppearanceEntries is the single generator now:
-	// weighted entries from CharacterBodyResources through the MorphTarget registry, morph entries from
-	// CharacterBody. The slot's SKILL list opens with the archetype ability (archetype x 100, what the old carve
-	// called the closer's "value") - derived from the class like the class-progression entry, never stored (#466).
+	/// <summary>
+	///     Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's database rows
+	///     (CharacterSkill, CharacterScaffoldPair, CharacterFeat, plus the appearance model CharacterBody and
+	///     CharacterBodyResources), so a player spawn is generated from the database rather than spliced into captured
+	///     template bytes. See docs/re/player-spawn-generation.md.
+	/// </summary>
+	/// <remarks>
+	///     Buff and timer records are transient session state and are deliberately not stored: a buffed captured spawn
+	///     extracts to the same rows as its unbuffed form. Fresh characters get the fresh-character defaults below,
+	///     extracted from a create capture of a just-created character at world entry.
+	///     <para>
+	///         The appearance table is derived and never stored, <see cref="BuildAppearanceEntries" /> being its single
+	///         generator: weighted entries from CharacterBodyResources through the MorphTarget registry, morph entries from
+	///         CharacterBody. Persisting it as well would be two copies of one fact, and a missed refresh freezes the
+	///         avatar's face. The slot's skill list likewise opens with the archetype ability (archetype times 100), derived
+	///         from the class like the class-progression entry and never stored.
+	///     </para>
+	/// </remarks>
 	public static class PlayerSpawnScaffoldRows
 	{
-		// The pre-IIR frame's grammar lives in SpawnPreIir / SpawnPreIirCodec - it is the client's
-		// SimpleCharFullUpdateIIR scaffold, not a blob with islands, and the character's UNLOCKED FEAT list is the
-		// nested count-framed list inside its sublist (see docs/subsystems/feats.md +
-		// tools/capture/decode_unlocked_feats.py). Nothing here addresses the frame by offset any more.
+		// The pre-IIR frame's grammar lives in SpawnPreIir / SpawnPreIirCodec: it is the client's
+		// SimpleCharFullUpdateIIR scaffold rather than a blob with islands, and the character's unlocked feat list is
+		// the nested count-framed list inside its sublist (see docs/subsystems/feats.md and
+		// tools/capture/decode_unlocked_feats.py). Nothing here addresses the frame by offset.
 
 		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
@@ -44,26 +47,28 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			[ConanClass.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
 		};
 
-		// The CLASS PROGRESSION track: the rank-0 wire feat id of the 80-long run whose entries ARE the class's
-		// levels. `FeatIdMaps` holds exactly twelve runs with `MaxRank >= 79` - one per class - and each run's rank-0
-		// id is the anchor already listed in FreshSkillIdsByClass above, so this table is that query written down
-		// (`Stormcaller` is the RDB's name for the Tempest of Set - see [[class_attribute_base_444]]).
-		//
-		// ⭐ A character carries EXACTLY ONE entry from its own run, and it is `base + (level - 1)` - measured, not
-		// assumed: all four captured characters agree, at four different levels.
-		//
-		//   NecroL80  L80 Necromancer     85279 = 85200 + 79
-		//   DemoL80   L80 Demonologist   104579 = 104500 + 79
-		//   Hakotep   L24 Herald         114823 = 114800 + 23
-		//   AssassinL23 L23 Assassin     160022 = 160000 + 22
-		//
-		// It resolves through FeatIdMaps to that level's `<Class> Class Feat NNN` template - i.e. the class/level
-		// ATTRIBUTE BASE (#444), which is where the client gets the five attributes and MaxHealth it draws. So this
-		// entry is the character's LEVEL restated on the wire, and shipping somebody else's is shipping their
-		// attributes: a level-2 Necromancer holding 85279 renders as a level-80 one (Str 71 / Int 231, HP max 984).
-		//
-		// ⚠️ WIRE ids only. The RDB TEMPLATE ids are NOT contiguous and `template = base + (level - 1)` is wrong for
-		// 5 of the 12 classes ([[class_attribute_base_444]]) - the arithmetic holds on THIS side of FeatIdMaps.
+		/// <summary>
+		///     The class-progression track: the rank-0 wire feat id of the 80-long run whose entries are the class's levels.
+		///     FeatIdMaps holds exactly twelve runs with MaxRank at least 79, one per class, and each run's rank-0 id is the
+		///     anchor listed in <see cref="FreshSkillIdsByClass" />, so this table is that query written down. Stormcaller is
+		///     the RDB's name for the Tempest of Set.
+		/// </summary>
+		/// <remarks>
+		///     A character carries exactly one entry from its own run, and it is <c>base + (level - 1)</c>. Measured rather
+		///     than assumed: all four captured characters agree, at four different levels - a level-80 Necromancer at
+		///     85279 = 85200 + 79, a level-80 Demonologist at 104579 = 104500 + 79, a level-24 Herald at
+		///     114823 = 114800 + 23 and a level-23 Assassin at 160022 = 160000 + 22.
+		///     <para>
+		///         The entry resolves through FeatIdMaps to that level's "Class Feat NNN" template, the class and level
+		///         attribute base, which is where the client gets the five attributes and the MaxHealth it draws. So it is the
+		///         character's level restated on the wire, and shipping somebody else's ships their attributes: a level-2
+		///         Necromancer holding 85279 renders as a level-80 one.
+		///     </para>
+		///     <para>
+		///         These are wire ids only. The RDB template ids are not contiguous and <c>template = base + (level - 1)</c>
+		///         is wrong for 5 of the 12 classes; the arithmetic holds on this side of FeatIdMaps.
+		///     </para>
+		/// </remarks>
 		private static readonly Dictionary<ConanClass, uint> ClassProgressionBaseByClass = new Dictionary<ConanClass, uint>
 		{
 			[ConanClass.Guardian] = 24700,
@@ -80,35 +85,36 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			[ConanClass.BearShaman] = 244300
 		};
 
-		// How long each of those runs is - one entry per level, and the reason a level is clamped into it rather than
-		// walking off the end of the class's band into the next one's.
+		/// <summary>
+		///     How long each of those runs is - one entry per level, and the reason a level is clamped into it rather than
+		///     walking off the end of the class's band into the next one's.
+		/// </summary>
 		private const uint ClassProgressionLevels = 80;
 
-		// The FULL ability/skill scaffold a high-level character of the class carries, harvested from the captured
-		// retail chars (NecroL80 L80 Necro, DemoL80 L80 Demo, AssassinL23 L23 Assassin, Hakotep L24 Herald). A spell's
-		// in-client usability is gated on the char carrying the matching ABILITY/SKILL scaffold entry - and that
-		// spell->ability mapping is server-side, so we replicate a working char's whole scaffold, which makes every
-		// class spell the char has learned castable. NOTE: this scaffold is the ability/skill list, NOT the feat
-		// tree - feats ride a SEPARATE record (FeatIIR 0x28da68a0, its own id-space; an earlier RE wrongly conflated
-		// the two). Over-grants (no per-level breakdown), and only covers classes we have a high-level capture for.
-		// See [[feat_trees_decode_251]] (feats-vs-skills correction) and Gitea #298/#251/#74. Ascending ids (the
-		// wire/codec require it).
-		//
-		// ⚠️ TWO bands that a capture DOES carry are deliberately absent here, because they are facts about the
-		// character that was captured rather than content of its class - and granting them stated those facts about
-		// somebody else:
-		//
-		//   1. the CLASS PROGRESSION entry (85279, 104579, 160022, 114823) - the captured character's LEVEL. See
-		//      ClassProgressionBaseByClass; it is DERIVED per character in TryApplyFrom and never stored.
-		//   2. the TRADESKILL PROFESSION rungs - what that player had TRAINED. The Necromancer's were `Weaponsmith
-		//      Grandmaster` / `Armorsmith Grandmaster` / `Woodcutting`+`Mining`+`Prospecting`+`Stonecutting Master` /
-		//      `Weaver Grandmaster` / `Skinner Master`, the Demonologist's eight more at its own ranks, the
-		//      Assassin's `Mining Apprentice`. A profession is bought by TRAINING it (`.tradeskill` ->
-		//      AddCharacterFeats, #735), so a level-2 character has none; handing over a captured player's made every
-		//      dinged character a Grandmaster smith on its next relog.
-		//
-		// A captured character legitimately keeps both in its OWN extracted rows (ExtractTo) - that is where
-		// TradeskillService reads the imported L80s' professions from. What is wrong is replaying them as the class's.
+		/// <summary>
+		///     The full ability and skill scaffold a high-level character of the class carries, harvested from the captured
+		///     retail characters (a level-80 Necromancer and Demonologist, a level-23 Assassin and a level-24 Herald). Ids
+		///     are ascending, which the wire and the codec require.
+		/// </summary>
+		/// <remarks>
+		///     A spell's in-client usability is gated on the character carrying the matching ability or skill scaffold entry,
+		///     and that spell-to-ability mapping is server-side, so a working character's whole scaffold is replicated, which
+		///     makes every class spell the character has learned castable. This is the ability and skill list, not the feat
+		///     tree: feats ride a separate record (FeatIIR, its own id space). It over-grants, having no per-level breakdown,
+		///     and covers only the classes with a high-level capture.
+		///     <para>
+		///         Two bands a capture does carry are deliberately absent, because they are facts about the character that was
+		///         captured rather than content of its class: the class-progression entry, which is that character's level and
+		///         is derived per character in <see cref="TryApplyFrom" />; and the tradeskill profession rungs, which are
+		///         what that player had trained. A profession is bought by training it, so a level-2 character has none, and
+		///         granting a captured player's makes every character that dings a grandmaster smith on its next relog.
+		///     </para>
+		///     <para>
+		///         A captured character legitimately keeps both in its own extracted rows (<see cref="ExtractTo" />), which is
+		///         where TradeskillService reads the imported characters' professions from. What is wrong is replaying them as
+		///         the class's.
+		///     </para>
+		/// </remarks>
 		private static readonly Dictionary<ConanClass, uint[]> FullSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
 			[ConanClass.Necromancer] =
@@ -133,32 +139,34 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			]
 		};
 
-		// Per-class fresh feat/ability ID list (all rank 0). The FIRST id is the PROFESSION feat and equals
-		// (class enum) * 100 (1800=Barbarian, 2000=Guardian, 2900=BearShaman, 3400=Assassin, 4100=Necromancer,
-		// 2200=Conqueror, 4300=HeraldOfXotli, 4400=Demonologist...), matching the retail self-spawns (Captures/
-		// scripts: profession feat = class*100, always first/ascending). The four captured-at-L1 archetypes use
-		// their exact retail fresh list; the rest fall back to the profession feat + the base feats common to every
-		// captured fresh list. NOTE: the in-world *displayed class* is NOT derived from this feat tree - it reads
-		// player stat 0x43 (see PostReadyFollowUp, #239). The earlier "client derives the
-		// profession from the feat tree" claim was DISPROVEN in-client (a spawn carrying feat 4100 still showed
-		// Barbarian); this list still matters for the actual feat/AA content, just not the class label.
+		/// <summary>
+		///     The base feats common to every captured fresh list, used for a class with no captured fresh list of its own.
+		/// </summary>
+		/// <remarks>
+		///     A fresh feat and ability id list is all rank 0, and its first id is the profession feat, which equals the
+		///     class enum times 100 (1800 Barbarian, 2000 Guardian, 2900 Bear Shaman, 3400 Assassin, 4100 Necromancer, 2200
+		///     Conqueror, 4300 Herald of Xotli, 4400 Demonologist and so on), matching the retail self-spawns, always first
+		///     and ascending. The four archetypes captured at level 1 use their exact retail fresh list; the rest fall back
+		///     to the profession feat prepended to these.
+		///     <para>
+		///         The in-world displayed class is not derived from this feat tree - it reads player stat 0x43 - so a spawn
+		///         carrying a class's profession feat still shows whatever that stat says. The list matters for the feat and
+		///         alternate-advancement content, not for the class label.
+		///     </para>
+		/// </remarks>
 		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
 
-		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
-		// against the imported client registry (MorphTarget.Id IS the wire tag). Wire order = editor
-		// send order (Sequence).
-		//
-		// A character wears the resources it chose or the build FAILS - there is no substitute face. This used to
-		// return null (registry missing, no ref resolved, or nothing but category 2) and the caller then spliced in
-		// DIKKETEST's captured 6 attributes, which is a wrong hair plus two face-marking texscripts presented as the
-		// player's own choices - a wrong appearance that renders as if it worked. The two null cases it collapsed are
-		// different problems and both are now loud: a missing registry is seed corruption (MorphTargets is 1072 rows
-		// of static seed content that every spawn resolves through), and a ref the registry does not know is content
-		// the importer never took in.
-		//
-		// The ONE thing still skipped is category 2 (face paint, e.g. the always-sent *texscript_183875): captured
-		// spawns never carry it, so emitting it would be inventing wire. That is proven grammar, not a fallback - a
-		// character whose only choice is category 2 legitimately builds an EMPTY entry list.
+		/// <summary>
+		///     Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved against
+		///     the imported client registry, where MorphTarget.Id is the wire tag. The wire order is the editor's send order.
+		/// </summary>
+		/// <remarks>
+		///     A character wears the resources it chose or the build fails: there is no substitute face, and falling back to
+		///     a captured character's entries presents somebody else's hair and face markings as the player's own choices -
+		///     a wrong appearance that renders as if it worked. The two failure cases are different problems and both are
+		///     loud: a missing registry is seed corruption, MorphTargets being static seed content every spawn resolves
+		///     through, and a ref the registry does not know is content the importer never took in.
+		/// </remarks>
 		public static List<AppearanceEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			ArgumentNullException.ThrowIfNull(registry);
@@ -176,13 +184,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					$"Character {ordered[0].CharacterId:X8} chose appearance resource(s) {string.Join(", ", unresolved)}, which are not in MorphTargets - its own looks cannot be built. Import them (Faolan.Importer --only rdb-morph-targets).");
 			}
 
-			// ⭐ Category 2 (the always-sent face-paint texscript) is NOT skipped: it is the FIRST element of every
-			// captured created character - what the old 8-bytes-off carve read as the "EntryTableX scalar"
-			// (0xB7 = 183 = *texscript_183875). The old skip was the same artifact from the other side (#466).
-			//
-			// And it goes FIRST regardless of the editor's send position (the editor sends it mid-stream; the spawn
-			// opens with it). Retail's Word2 slots corroborate: slot 1 is the face-paint slot - NecroL80, who
-			// REMOVED his, runs slots 2..15 with slot 1 vacated and opens with his beard instead. The OrderBy is
+			// Category 2, the always-sent face-paint texscript, is the first element of every captured created
+			// character and goes first regardless of the editor's send position - the editor sends it mid-stream while
+			// the spawn opens with it. Retail's Word2 slots corroborate: slot 1 is the face-paint slot, and a character
+			// who removed his runs slots 2..15 with slot 1 vacated and opens with his beard instead. The sort is
 			// stable, so everything else keeps its send order.
 			foreach (var resource in ordered.OrderBy(r => registry[r.Ref].Category == 2 ? 0 : 1))
 			{
@@ -197,16 +202,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return entries;
 		}
 
-		// The scaffold's APPEARANCE TABLE, built WHOLE from the character's appearance model - the one generator,
-		// used by every spawn. In wire order: the weighted appearance entries (the character's chosen editor
-		// resources, resolved through the registry by BuildWeightedEntries - EMPTY when it chose none, never
-		// somebody else's face), then the character's OWN editor morphs (CharacterMorphs - absent sliders yield no
-		// entry, the captured shape of an unmorphed character). Word2 slot ordinals are 1..n in that order.
-		//
-		// NB retail's captured ordinals are NOT always 1..n: they are per-character SLOT ids that survive appearance
-		// edits, so a re-barbered character carries gaps and appends its new hair/beard after its morphs. Nothing
-		// derives them, and nothing needs to - every character we create spawns with 1..n and renders correctly
-		// in-client.
+		/// <summary>
+		///     The scaffold's appearance table, built whole from the character's appearance model - the one generator, used
+		///     by every spawn. In wire order: the weighted appearance entries (<see cref="BuildWeightedEntries" />, empty
+		///     when the character chose none and never somebody else's face), then the character's own editor morphs
+		///     (<see cref="CharacterMorphs" />, absent sliders yielding no entry, which is the captured shape of an
+		///     unmorphed character). Word2 slot ordinals run 1..n in that order.
+		/// </summary>
+		/// <remarks>
+		///     Retail's captured ordinals are not always 1..n: they are per-character slot ids that survive appearance
+		///     edits, so a re-barbered character carries gaps and appends its new hair or beard after its morphs. Nothing
+		///     derives them, and nothing needs to - every character created here spawns with 1..n and renders correctly.
+		/// </remarks>
 		public static List<AppearanceEntry> BuildAppearanceEntries(Character character, IReadOnlyList<AppearanceEntry> weightedAppearance)
 		{
 			ArgumentNullException.ThrowIfNull(weightedAppearance);
@@ -219,13 +226,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return entries;
 		}
 
-		// Seeds the fresh-character scaffold defaults onto a character that has none, IN PLACE, and says whether it did
-		// - false means it already had rows and nothing was touched, so the caller can skip the save. Try-named because
-		// that "no" is an ordinary outcome (every login after the first), not a failure.
-		//
-		// The APPEARANCE is not seeded: it is derived from CharacterBody / CharacterBodyResources at spawn time
-		// (BuildAppearanceEntries). What is left is the progression the character starts with, and the "already
-		// seeded" marker is therefore the SKILL rows - seeded here and nowhere else.
+		/// <summary>
+		///     Seeds the fresh-character scaffold defaults onto a character that has none, in place, and says whether it did:
+		///     false means it already had rows and nothing was touched, so the caller can skip the save. It is Try-named
+		///     because that "no" is an ordinary outcome - every login after the first - rather than a failure.
+		/// </summary>
+		/// <remarks>
+		///     The appearance is not seeded: it is derived from CharacterBody and CharacterBodyResources at spawn time by
+		///     <see cref="BuildAppearanceEntries" />. What is left is the progression the character starts with, so the
+		///     already-seeded marker is the skill rows, seeded here and nowhere else.
+		/// </remarks>
 		public static bool TrySeedFreshRows(Character character)
 		{
 			if (character.Skills is { Count: > 0 })
@@ -240,11 +250,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 			character.ScaffoldPairs = [];
 
-			// A fresh character has trained no feats - but it DOES have the one unnamed spec every character carries,
-			// which is what the frame's sublist entry is. Seeding it is REQUIRED, not cosmetic: SpecsOf throws on a
-			// character with no spec rows (it cannot tell "never trained" from "loaded without Include(FeatSpecs)"),
-			// so a character that reaches a spawn without one cannot be built at all. It must also be PERSISTED -
-			// see the ensure-specs block in DatabaseRepository.SaveCharacterScaffold, which is what writes it.
+			// A fresh character has trained no feats, but it does have the one unnamed spec every character carries,
+			// which is what the frame's sublist entry is. Seeding it is required rather than cosmetic: SpecsOf throws
+			// on a character with no spec rows, since it cannot tell "never trained" from "loaded without
+			// Include(FeatSpecs)", so a character that reaches a spawn without one cannot be built at all. It must
+			// also be persisted - see the ensure-specs block in DatabaseRepository.SaveCharacterScaffold.
 			character.Feats = [];
 			character.FeatSpecs =
 			[
@@ -258,24 +268,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
-		// The unlocked-feat id list the frame carries, flattened across its specs - the inverse of FreshPreFrame's
-		// feat splice. Empty when the frame has no sublist (the create-editor variant). Order is preserved: the wire
-		// order is TRAIN order, not sorted.
-		//
-		// The frame arrives typed now, so there is nothing to parse here and nothing to fail. It used to take the
-		// frame's BYTES and re-walk them - the same walk PlayerSpawnScaffoldCodec had already done to produce them.
+		/// <summary>
+		///     The unlocked-feat id list the frame carries, flattened across its specs - the inverse of FreshPreFrame's feat
+		///     splice. Empty when the frame has no sublist, which is the create-editor variant. Order is preserved: the wire
+		///     order is train order, not sorted.
+		/// </summary>
 		public static List<uint> ExtractPreFrameFeats(SpawnPreIir frame)
 		{
 			return frame.Sublist.SelectMany(spec => spec.FeatIds).ToList();
 		}
 
-		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows), and
-		// says how much of the entry table landed in the appearance model.
-		//
-		// `refsByTag` is the MorphTarget registry keyed by WIRE TAG (= MorphTarget.Id), i.e. the inverse of the map
-		// BuildWeightedEntries generates through: tag 133 comes back as "*beardmesh_210844", 226 as
-		// "*texscript_202392". It is REQUIRED rather than optional because the entry table is the only place a
-		// captured character's looks exist - extracting without it would silently import a faceless character.
+		/// <summary>
+		///     Replaces the character's scaffold rows with the scaffold's content - extraction, from a captured spawn to rows
+		///     - and says how much of the entry table landed in the appearance model.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="refsByTag" /> is the MorphTarget registry keyed by wire tag (MorphTarget.Id), the inverse of
+		///     the map <see cref="BuildWeightedEntries" /> generates through: tag 133 comes back as "*beardmesh_210844", 226
+		///     as "*texscript_202392". It is required rather than optional because the entry table is the only place a
+		///     captured character's looks exist, so extracting without it silently imports a faceless character.
+		/// </remarks>
 		public static (int Morphs, int Resources) ExtractTo(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
 			ArgumentNullException.ThrowIfNull(refsByTag);
@@ -291,11 +303,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			character.ScaffoldPairs = scaffold.Post.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.Post.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
 
-			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR skill list). It IS character
-			// data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame is constants
-			// reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
-			// Specs are preserved rather than flattened (#474): a character with four saved specs round-trips as
-			// four CharacterFeatSpec rows, and the same feat id may legitimately appear in several of them.
+			// The unlocked feat list lives in the pre-IIR frame rather than the post-IIR skill list. It is character
+			// data, so it is extracted to CharacterFeat rows in wire (train) order; the rest of the frame is constants
+			// reconstructed from the character's class by TryApplyFrom. Specs are preserved rather than flattened: a
+			// character with four saved specs round-trips as four CharacterFeatSpec rows, and the same feat id may
+			// legitimately appear in several of them.
 			character.FeatSpecs = scaffold.PreIir.Sublist
 				.Select((spec, index) => new CharacterFeatSpec
 				{
@@ -317,15 +329,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return ExtractAppearance(character, scaffold, refsByTag);
 		}
 
-		// The appearance table read back into the APPEARANCE MODEL - the inverse of BuildAppearanceEntries, and the
-		// reason a captured character's looks survive without a stored copy of the table.
-		//
-		//   - morph elements    -> CharacterBody columns (CharacterMorphs.ApplyEntries, pure arithmetic),
-		//   - weighted elements -> CharacterBodyResources, by looking the wire key back up as a resource ref.
-		//
-		// A morph slider is never mistaken for a resource: the two share a key SPACE (the registry carries entries
-		// literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1 slider keys), so the
-		// discriminator is CharacterMorphs.IsMorphKey - the whole (type, id) pair - and it is checked FIRST.
+		/// <summary>
+		///     The appearance table read back into the appearance model - the inverse of
+		///     <see cref="BuildAppearanceEntries" />, and the reason a captured character's looks survive without a stored
+		///     copy of the table. Morph elements become CharacterBody columns (CharacterMorphs.ApplyEntries, pure
+		///     arithmetic); weighted elements become CharacterBodyResources, by looking the wire key back up as a resource
+		///     ref.
+		/// </summary>
+		/// <remarks>
+		///     A morph slider must never be mistaken for a resource: the two share a key space - the registry carries entries
+		///     literally named "arm", "chest" and "bosom" at ids 256 to 258, which are also the type-1 slider keys - so the
+		///     discriminator is CharacterMorphs.IsMorphKey, the whole (type, id) pair, and it is checked first.
+		/// </remarks>
 		private static (int Morphs, int Resources) ExtractAppearance(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
 			character.Body ??= new CharacterBody
@@ -353,20 +368,23 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return (morphs, character.BodyResources.Count);
 		}
 
-		// The character's specs as the wire wants them: each spec's feats in Sequence order, specs in Index order.
-		//
-		// THROWS when the character has none. Every character has at least the one unnamed spec - the wire's sublist
-		// always carries it, TrySeedFreshRows writes it, and the #474 migration backfilled it for every existing row -
-		// so an empty set is a broken character, not a shape to paper over. Synthesizing one here would let a
-		// character whose spec rows failed to load spawn with an EMPTY feat list, which renders as "you have trained
-		// nothing" and is indistinguishable from the real thing.
+		/// <summary>
+		///     The character's specs as the wire wants them: each spec's feats in Sequence order, the specs in Index order.
+		/// </summary>
+		/// <remarks>
+		///     Throws when the character has none. Every character has at least the one unnamed spec - the wire's sublist
+		///     always carries it and <see cref="TrySeedFreshRows" /> writes it - so an empty set is a broken character rather
+		///     than a shape to paper over. Synthesizing one here would let a character whose spec rows failed to load spawn
+		///     with an empty feat list, which renders as "you have trained nothing" and is indistinguishable from the real
+		///     thing.
+		/// </remarks>
 		public static IReadOnlyList<SpawnPreFrameSublistEntry> SpecsOf(Character character)
 		{
 			if (character?.FeatSpecs is not { Count: > 0 })
 				throw new InvalidOperationException($"character {character?.Id} has no CharacterFeatSpec rows - every character carries at least the one unnamed spec, so this row set is incomplete (was it loaded without Include(c => c.FeatSpecs)?).");
 
-			// Not `Feats ?? []`: the collection is initialised on the entity, so a null one means the graph is broken,
-			// and coalescing it would spawn the character carrying no feats at all.
+			// The Feats collection is initialised on the entity, so a null one means the graph is broken; coalescing it
+			// away would spawn the character carrying no feats at all.
 			var specs = character.FeatSpecs.OrderBy(s => s.Index).Select(s => (s.Index, s.Name)).ToList();
 
 			return specs
@@ -384,7 +402,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 		}
 
-		// The single-spec overload - the shape every fresh character and every shipped character has.
+		/// <summary>The single-spec overload: the shape every fresh and every shipped character has.</summary>
 		public static SpawnPreIir FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
 			var entry = new SpawnPreFrameSublistEntry();
@@ -399,20 +417,22 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var frame = new SpawnPreIir();
 			frame.Flags[SpawnPreIir.ArchetypeFlagIndex] = FrameArchetype(@class);
 			frame.Flags[SpawnPreIir.ClassFlagIndex] = (byte)@class;
-			frame.Words[SpawnPreIir.VanityShownMaskWordIndex] = vanityShownMask; // #336
+			frame.Words[SpawnPreIir.VanityShownMaskWordIndex] = vanityShownMask;
 			frame.Words[SpawnPreIir.CategoryWordIndex] = SpawnPreIir.DefaultCategory;
 			frame.Words[SpawnPreIir.ConstantWordIndex] = SpawnPreIir.ConstantWordValue;
 			frame.Words[SpawnPreIir.SessionWordIndex] = SpawnPreIir.FreshSessionWordValue;
 
 			// One sublist entry per saved feat spec, each carrying its name and its own trained-feat list in train
-			// order. A fresh character has one unnamed spec with no feats, which frames as the bare 0x3F1 word -
-			// byte-identical to the old constant-239 fresh frame.
+			// order. A fresh character has one unnamed spec with no feats, which frames as the bare empty-list word.
 			frame.Sublist.AddRange(specs);
 			return frame;
 		}
 
-		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
-		// (class*100) prepended to the common base feats. Always ascending (the wire/codec require it).
+		/// <summary>
+		///     The fresh feat list for a class: the captured retail list where there is one, otherwise the profession feat
+		///     (the class enum times 100) prepended to the common base feats. Always ascending, which the wire and the codec
+		///     require.
+		/// </summary>
 		public static uint[] FreshSkillIdsFor(ConanClass @class)
 		{
 			if (FreshSkillIdsByClass.TryGetValue(@class, out var ids))
@@ -421,9 +441,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new[] { (uint)@class * 100 }.Concat(CommonFreshSkillIds).OrderBy(id => id).ToArray();
 		}
 
-		// The full high-level feat scaffold for a class (harvested from a captured retail char), or null when we have
-		// no high-level capture for that class. Used on level-up to make the class's learned spells castable (the
-		// feat-presence gate; see FullSkillIdsByClass). Ascending ids.
+		/// <summary>
+		///     The full high-level feat scaffold for a class, harvested from a captured retail character, or null when there
+		///     is no high-level capture for that class. Used on level-up to make the class's learned spells castable through
+		///     the feat-presence gate; see <see cref="FullSkillIdsByClass" />. Ids are ascending.
+		/// </summary>
 		public static uint[]? FullSkillIdsFor(ConanClass @class)
 		{
 			return FullSkillIdsByClass.TryGetValue(@class, out var ids)
@@ -431,13 +453,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				: null;
 		}
 
-		// The class-progression scaffold entry for a character at `level` - the wire feat that IS its level, and
-		// through FeatIdMaps its class/level attribute base. Null for a class with no run in the table, which is no
-		// class today; it stays nullable so a future/unknown ConanClass drops the entry rather than fabricating an id
-		// in some other class's band.
-		//
-		// Level is 1-based and CLAMPED into the run: level 0 (an unset row) reads as level 1 rather than as the
-		// PREVIOUS class's last level, and anything past 80 stops at 80 instead of walking into the next band.
+		/// <summary>
+		///     The class-progression scaffold entry for a character at <paramref name="level" />: the wire feat that is its
+		///     level, and through FeatIdMaps its class and level attribute base. Null for a class with no run in the table,
+		///     which is no class today; it stays nullable so an unknown ConanClass drops the entry rather than fabricating an
+		///     id in some other class's band.
+		/// </summary>
+		/// <remarks>
+		///     The level is 1-based and clamped into the run: level 0, an unset row, reads as level 1 rather than as the
+		///     previous class's last level, and anything past 80 stops at 80 instead of walking into the next band.
+		/// </remarks>
 		public static uint? ClassProgressionIdFor(ConanClass @class, ushort level)
 		{
 			if (!ClassProgressionBaseByClass.TryGetValue(@class, out var progressionBase))
@@ -447,9 +472,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return progressionBase + rank;
 		}
 
-		// Whether `id` is ANY class's progression entry (any class, any level). Used to drop a stored or captured one
-		// before the derived entry goes back in - `@class`'s own run is not enough, because a character can be
-		// carrying another class's from a captured scaffold it was extracted from.
+		/// <summary>
+		///     Whether the id is any class's progression entry, at any level. Used to drop a stored or captured one before
+		///     the derived entry goes back in: the character's own class's run is not enough, because a character can be
+		///     carrying another class's from a captured scaffold it was extracted from.
+		/// </summary>
 		public static bool IsClassProgressionId(uint id)
 		{
 			foreach (var progressionBase in ClassProgressionBaseByClass.Values)
@@ -461,12 +488,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return false;
 		}
 
-		// The LEVEL a scaffold's id list states, read off its class-progression entry - the exact inverse of
-		// ClassProgressionIdFor, and the reason that derivation can be checked rather than believed. Null when the
-		// list carries no progression entry at all, which no captured player spawn does.
-		//
-		// The runs do not overlap, so the class is not needed to read one: an id identifies both which class's run it
-		// is in and how far along. Ranks are 0-based and levels 1-based, hence the +1.
+		/// <summary>
+		///     The level a scaffold's id list states, read off its class-progression entry: the exact inverse of
+		///     <see cref="ClassProgressionIdFor" />, and what lets that derivation be checked. Null when the list carries no
+		///     progression entry at all, which no captured player spawn does.
+		/// </summary>
+		/// <remarks>
+		///     The runs do not overlap, so the class is not needed to read one: an id identifies both which class's run it is
+		///     in and how far along. Ranks are 0-based and levels 1-based, hence the +1.
+		/// </remarks>
 		public static ushort? ClassProgressionLevelOf(IEnumerable<uint> scaffoldIds)
 		{
 			ArgumentNullException.ThrowIfNull(scaffoldIds);
@@ -483,35 +513,39 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return null;
 		}
 
-		// The vanity shown-mask carried by a captured spawn's frame. The write side is FreshPreFrame; this is the
-		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
+		/// <summary>
+		///     The vanity shown-mask carried by a captured spawn's frame. The write side is <see cref="FreshPreFrame" />;
+		///     this is the read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
+		/// </summary>
 		public static uint ReadVanityShownMask(SimpleCharFullUpdateIIR scaffold)
 		{
 			return scaffold.PreIir.Words[SpawnPreIir.VanityShownMaskWordIndex];
 		}
 
-		// Fills the scaffold's per-character parts from the character (generation: model -> wire). Returns false when
-		// the character was never seeded, i.e. has no scaffold rows to describe it with.
-		//
-		// That "never seeded" test is now the SKILL rows. It used to be the entry table, which no longer exists as
-		// state; skills are the honest replacement because TrySeedFreshRows writes them and nothing else does, and
-		// every captured character extracts a full id list. The APPEARANCE deliberately does not gate anything - a
-		// character with no editor choices legitimately wears the default face.
-		//
-		// `registry` is the MorphTarget catalog by ref name; it resolves the character's editor choices into the
-		// weighted entries. A ref it does not know THROWS rather than being dropped or swapped for a default face
-		// (BuildWeightedEntries) - the create flow says the same thing once, at creation, where it is still
-		// actionable (CreateFlowService.ReportUnresolvableAppearance).
+		/// <summary>
+		///     Fills the scaffold's per-character parts from the character - generation, model to wire. Returns false when
+		///     the character was never seeded, i.e. has no scaffold rows to describe it with.
+		/// </summary>
+		/// <remarks>
+		///     The never-seeded test is the skill rows, because <see cref="TrySeedFreshRows" /> writes them and nothing else
+		///     does, and every captured character extracts a full id list. The appearance deliberately gates nothing: a
+		///     character with no editor choices legitimately wears the default face.
+		///     <para>
+		///         <paramref name="registry" /> is the MorphTarget catalog by ref name, which resolves the character's editor
+		///         choices into the weighted entries. A ref it does not know throws rather than being dropped or swapped for a
+		///         default face (<see cref="BuildWeightedEntries" />); the create flow reports the same thing once, at
+		///         creation, where it is still actionable.
+		///     </para>
+		/// </remarks>
 		public static bool TryApplyFrom(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			if (character?.Skills is not { Count: > 0 })
 				return false;
 
-			// The frame is CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask, feats) is the constant
-			// skeleton with the archetype/class island written from the character's class, the vanity hidden-slots
-			// mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden piece
-			// survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
-			// Transient session islands are correctly absent.
+			// The frame is constructed rather than stored: FreshPreFrame is the constant skeleton with the archetype
+			// and class island written from the character's class, the vanity hidden-slots mask from the character's
+			// equipment - the self-spawn carries it so a hidden piece survives relog - and the unlocked feat list
+			// spliced in from CharacterFeat rows in train order. Transient session islands are correctly absent.
 			scaffold.PreIir = FreshPreFrame(character.Class, character.VanityShownMask, SpecsOf(character));
 			var slot = scaffold.Post.Slot;
 			scaffold.Post.BuffRecords.Clear();
@@ -519,21 +553,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			slot.Appearance.Clear();
 			slot.Appearance.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
 
-			// The skill list is the character's stored rows with TWO substitutions, both DERIVED here rather than
-			// read back, the same rule the appearance table follows (#483):
+			// The skill list is the character's stored rows with two substitutions, both derived here rather than read
+			// back, the rule the appearance table also follows:
 			//
-			//   - the ARCHETYPE ability that opens every captured player's list (100/200/300/400 = archetype x 100,
-			//     rank 0 on all 296 captured spawns) - a restatement of the class, so deriving cannot drift. The old
-			//     carve knew it as the closer's "value" (#466);
-			//   - the CLASS-PROGRESSION entry - a restatement of the character's level, and stale is not cosmetic:
-			//     the client reads that entry's `<Class> Class Feat NNN` template for the five attributes and
-			//     MaxHealth it draws, so an entry left at the level the row was written renders those at that level
-			//     for ever. Deriving is the only version that cannot drift.
+			//   - the archetype ability that opens every captured player's list (100/200/300/400, the archetype times
+			//     100, rank 0 on all 296 captured spawns) - a restatement of the class, so deriving cannot drift;
+			//   - the class-progression entry - a restatement of the character's level. Stale is not cosmetic here:
+			//     the client reads that entry's "Class Feat NNN" template for the five attributes and the MaxHealth it
+			//     draws, so an entry left at the level the row was written renders those at that level for ever.
 			//
-			// Every OTHER row is passed through untouched, ranks included - a captured character's professions and
-			// abilities are its own and are not second-guessed here. The skill count feeds the list's ListFrame
-			// word, which the old carve knew as the closer's TAG - and which its writer truncated to u16, a crash
-			// waiting for the first generated 65+-skill character (#250's failure mode); the frame is a u32 now.
+			// Every other row is passed through untouched, ranks included: a captured character's professions and
+			// abilities are its own. The skill count feeds the list's ListFrame word, which is a u32 - truncating it
+			// to a u16 crashes the client on the first generated character with more than 65 skills.
 			slot.Skills.Clear();
 			slot.Skills.Add(new ScaffoldSkill(ArchetypeSkillId(character.Class), 0));
 			var storedSkills = character.Skills?.Where(s => !IsClassProgressionId(s.SkillId) && !IsArchetypeSkillId(s.SkillId)).Select(s => new ScaffoldSkill(s.SkillId, s.Rank)) ?? [];
@@ -553,11 +584,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
-		// The frame's archetype code (scaffold flag 1, abs @135): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
-		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
-		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
-		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
-		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/re/player-spawn-generation.md.
+		/// <summary>
+		///     The frame's archetype code, scaffold flag 1: Soldier 1, Priest 2, Rogue 3, Mage 4. This is a different
+		///     numbering from the ArchType enum, recovered from the captured player spawns, where each class maps to exactly
+		///     one value across all its sessions. It is the only genuine per-character field in the whole pre-IIR frame;
+		///     everything else that varies is the RDB script-engine character buffer, transient and zero for a player. See
+		///     docs/re/fa015807-spawn-reader.md (FUN_01121c00) and docs/re/player-spawn-generation.md.
+		/// </summary>
 		private static byte FrameArchetype(ConanClass @class)
 		{
 			return @class switch
@@ -570,17 +603,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 		}
 
-		// The ARCHETYPE ability that opens every captured player's skill list: FrameArchetype x 100 (Soldier=100,
-		// Priest=200, Rogue=300, Mage=400; rank 0 on all 296 captured spawns). The old 8-bytes-off carve knew this
-		// id as the "closer record's value" (#269/#466); #250's crash-on-wrong-closer was the client's skill parse
-		// failing on a wrong ListFrame word next to it.
+		/// <summary>
+		///     The archetype ability that opens every captured player's skill list: <see cref="FrameArchetype" /> times 100
+		///     - Soldier 100, Priest 200, Rogue 300, Mage 400 - at rank 0 on all 296 captured spawns.
+		/// </summary>
 		public static uint ArchetypeSkillId(ConanClass @class)
 		{
 			return FrameArchetype(@class) * 100u;
 		}
 
-		// Whether `id` is ANY archetype's ability - the same drop-before-derive rule IsClassProgressionId serves:
-		// a stored or captured copy is dropped and the entry re-derived from the character's own class.
+		/// <summary>
+		///     Whether the id is any archetype's ability - the same drop-before-derive rule
+		///     <see cref="IsClassProgressionId" /> serves: a stored or captured copy is dropped and the entry re-derived from
+		///     the character's own class.
+		/// </summary>
 		public static bool IsArchetypeSkillId(uint id)
 		{
 			return id is 100 or 200 or 300 or 400;

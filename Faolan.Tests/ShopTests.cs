@@ -21,8 +21,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void ShopReplayBlob_CarriesTheCapturedShopId()
 		{
-			// The PoC blob must start with the captured shop ID32 (0xC75B:0x1E7E) - guards against the blob
-			// being regenerated from the wrong capture/offset.
+			// The replay blob must start with the captured shop ID32 (0xC75B:0x1E7E); a blob regenerated from the
+			// wrong capture or offset would not.
 			var body = ShopReplayData.DispatchShopDataBody;
 			Assert.Equal("0000c75b00001e7e", Convert.ToHexStringLower(body.AsSpan(0, 8).ToArray()));
 		}
@@ -49,8 +49,8 @@ namespace Faolan.Tests
 			Assert.Equal(ShopService.VendorBuyPriceTin(200, 1) * 3, ShopService.VendorBuyPriceTin(200, 3));
 		}
 
-		// The real per-unit sell price = round(Item.Value / 10), proven against every sale in the
-		// sell_items_to_trader capture (slot->Item.Value->tin). #137.
+		// The per-unit sell price is round(Item.Value / 10), which holds for every sale in the sell_items_to_trader
+		// capture (slot -> Item.Value -> tin).
 		[Theory, InlineData(190u, 19u), InlineData(230u, 23u), InlineData(920u, 92u), InlineData(560u, 56u), InlineData(206u, 21u), InlineData(637u, 64u)]
 		// tmpl 3886819
 		// tmpl 3887406

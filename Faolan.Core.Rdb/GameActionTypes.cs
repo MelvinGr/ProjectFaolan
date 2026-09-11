@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Faolan.Core.Rdb
 {
 	/// <summary>
-	///     One GameAction type as the client registers it: its id, its name, and its KEY LIST - the ordered field
+	///     One GameAction type as the client registers it: its id, its name, and its key list - the ordered field
 	///     grammar of every element of that type. An element carries exactly one u32 per key, after a fixed 8-word
 	///     prefix, so <see cref="Keys" />.Length is what makes the element's width knowable.
 	/// </summary>
@@ -11,13 +11,13 @@ namespace Faolan.Core.Rdb
 	{
 		/// <summary>
 		///     Element width in u32 words: the 8-word prefix plus one value per key. Meaningful only when
-		///     <see cref="IsFixedWidth" /> - a TEXT slot is not one word.
+		///     <see cref="IsFixedWidth" /> - a text slot is not one word.
 		/// </summary>
 		public int WidthWords => 8 + Keys.Length;
 
 		/// <summary>
-		///     False when any slot holds TEXT, which makes the element variable-width and <see cref="WidthWords" />
-		///     a fiction. See <see cref="GameActionTypes.TextKeys" />.
+		///     False when any slot holds text, which makes the element variable-width and <see cref="WidthWords" /> a
+		///     fiction. See <see cref="GameActionTypes.TextKeys" />.
 		/// </summary>
 		public bool IsFixedWidth => System.Array.TrueForAll(Keys, k => !GameActionTypes.TextKeys.Contains(k));
 
@@ -28,8 +28,8 @@ namespace Faolan.Core.Rdb
 		}
 
 		/// <summary>
-		///     True when this type carries the INTERPOLATED family's four ramp slots - the two VALUES (174 low, 175
-		///     high) and the two LEVELS they are reached at (172 low, 173 high). Asked of the key list rather than of
+		///     True when this type carries the interpolated family's four ramp slots - the two values (174 low, 175
+		///     high) and the two levels they are reached at (172 low, 173 high). Asked of the key list rather than of
 		///     a kind allowlist, so a fourth ramp type registered later is one automatically. See
 		///     <see cref="LevelRamp" />.
 		/// </summary>
@@ -37,20 +37,20 @@ namespace Faolan.Core.Rdb
 		                                                                   && SlotOf(GameActionTypes.KeyLowLevel) >= 0 && SlotOf(GameActionTypes.KeyHighLevel) >= 0;
 
 		/// <summary>
-		///     True when this type states its magnitude as a RANGE - a low and a high endpoint rather than one number.
-		///     The four <c>Hit</c>-family types carry it (<c>Hit</c>, <c>SpecialHit</c>, <c>AreaHit</c>, <c>Drain</c>),
-		///     and reading only the first endpoint reports a 58.40-71.40 hit as a flat 58.40 (Gitea #783).
+		///     True when this type states its magnitude as a range - a low and a high endpoint rather than one number.
+		///     The four <c>Hit</c>-family types carry it (<c>Hit</c>, <c>SpecialHit</c>, <c>AreaHit</c>,
+		///     <c>Drain</c>), and reading only the first endpoint reports a 58.40-71.40 hit as a flat 58.40.
 		/// </summary>
 		public bool IsHitRange => SlotOf(GameActionTypes.KeyHitMin) >= 0 && SlotOf(GameActionTypes.KeyHitMax) >= 0;
 
 		/// <summary>
-		///     True when this type carries the INTERPOLATED HIT family's SIX ramp slots - a range whose BOTH endpoints
+		///     True when this type carries the interpolated hit family's six ramp slots - a range whose both endpoints
 		///     ramp over the same two levels. <c>InterpolatedHit</c> (53219) and <c>Disarm</c> (53242) are the two.
 		///     <para>
-		///         ⚠️ A different slot set from <see cref="IsLevelRamp" />'s. The interpolated MODIFY family ramps ONE
-		///         value through 174/175; this family ramps a PAIR through 168/169 (the low endpoint) and 170/171 (the
-		///         high one), sharing 172/173 for the levels. Asking <see cref="IsLevelRamp" /> about 53219 answers no,
-		///         which is why every one of its 1,779 rows shipped with a null ramp (Gitea #783).
+		///         A different slot set from <see cref="IsLevelRamp" />'s. The interpolated modify family ramps one
+		///         value through 174/175; this family ramps a pair through 168/169 (the low endpoint) and 170/171
+		///         (the high one), sharing 172/173 for the levels. Asking <see cref="IsLevelRamp" /> about 53219
+		///         answers no, which is why its rows are easy to ship with a null ramp.
 		///     </para>
 		/// </summary>
 		public bool IsInterpolatedHitRange => SlotOf(GameActionTypes.KeyHitMinLow) >= 0 && SlotOf(GameActionTypes.KeyHitMinHigh) >= 0
@@ -58,16 +58,20 @@ namespace Faolan.Core.Rdb
 		                                                                                && SlotOf(GameActionTypes.KeyLowLevel) >= 0 && SlotOf(GameActionTypes.KeyHighLevel) >= 0;
 	}
 
-	// The client's GameAction type catalog, recovered STATICALLY from the initialiser FUN_008bdf40
-	// (tools/ghidra/DumpGameActionKeyLists.java -> docs/re/gameaction-keylists.tsv, which this mirrors; the
-	// GameActionKeyListTests gate keeps the two in step). See docs/re/gameactionlist-grammar.md.
-	//
-	// Why it lives here rather than next to the wire codecs: the same descriptor governs the RDB feat/spell/item
-	// modifier record, which is a GameAction element stored in a template rather than sent on the wire, and that
-	// is the reader this table exists to drive (ItemTemplateStatModifiers).
+	/// <summary>
+	///     The client's GameAction type catalog, recovered statically from the initialiser FUN_008bdf40
+	///     (<c>tools/ghidra/DumpGameActionKeyLists.java</c> to <c>docs/re/gameaction-keylists.tsv</c>, which this
+	///     mirrors; the <c>GameActionKeyListTests</c> gate keeps the two in step). See
+	///     <c>docs/re/gameactionlist-grammar.md</c>.
+	/// </summary>
+	/// <remarks>
+	///     It lives here rather than next to the wire codecs because the same descriptor governs the RDB
+	///     feat/spell/item modifier record, which is a GameAction element stored in a template rather than sent on
+	///     the wire, and that is the reader this table exists to drive (<see cref="ItemTemplateStatModifiers" />).
+	/// </remarks>
 	public static class GameActionTypes
 	{
-		// Key indices the client NAMES in its own descriptors (docs/re/gameaction-keylists.tsv, `fields` column).
+		// Key indices the client names in its own descriptors (docs/re/gameaction-keylists.tsv, `fields` column).
 		// Only the ones a modifier record needs are named here.
 		public const int KeyStat = 0;
 		public const int KeyLine = 1;      // unnamed by the client, but it is the slot every `...Line...` type
@@ -77,27 +81,27 @@ namespace Faolan.Core.Rdb
 		public const int KeySpell = 88;    // the slot SpellStatModifier carries where SpellLineStatModifier has KeyLine
 		public const int KeyRadius = 11;   // stat 0x2DD, client-named `Radius` - metres, carried by 17 of the 260 types
 
-		// The four slots of the INTERPOLATED family (53220 `InterpolatedModify`, 53221 `InterpolatedTempChangeSkill`,
+		// The four slots of the interpolated family (53220 `InterpolatedModify`, 53221 `InterpolatedTempChangeSkill`,
 		// 53068 `InterpolatedModifyAsRating`, all `[Stat, 174, 172, 175, 173]`). The client names 174 `Substate` and
-		// 175 `Amount`; what they actually are is the two ENDPOINTS of a level ramp, and 172/173 the levels they are
-		// reached at - see docs/re/gameactionlist-grammar.md for the decompiled lerp (Gitea #597).
+		// 175 `Amount`; what they are is the two endpoints of a level ramp, and 172/173 the levels they are reached
+		// at - see docs/re/gameactionlist-grammar.md for the decompiled lerp.
 		public const int KeyLowValue = 174;
 		public const int KeyLowLevel = 172;
 		public const int KeyHighLevel = 173;
 
-		// The `Hit` FAMILY's own slots, and they are PER-TYPE like every unnamed key below - which is exactly why the
-		// predicates that read them (`IsHitRange` / `IsInterpolatedHitRange`) ask the KEY LIST rather than an id
+		// The `Hit` family's own slots, and they are per-type like every unnamed key below - which is why the
+		// predicates that read them (`IsHitRange` / `IsInterpolatedHitRange`) ask the key list rather than an id
 		// allowlist. Only a type carrying the whole set reads this way.
 		//
-		// A hit states a RANGE, not a number: `Hit`/`SpecialHit`/`AreaHit`/`Drain` are `[Stat, 2 min, 37 max, 71]`.
-		// `InterpolatedHit` (53219) states the same range twice - once at each end of a LEVEL RAMP - as
+		// A hit states a range, not a number: `Hit`/`SpecialHit`/`AreaHit`/`Drain` are `[Stat, 2 min, 37 max, 71]`.
+		// `InterpolatedHit` (53219) states the same range twice - once at each end of a level ramp - as
 		// `[Stat, 168, 170, 172, 169, 171, 173, 71]`: the low endpoint ramps 168 -> 169 and the high one 170 -> 171,
-		// both over levels 172..173. Read off the client's own tooltip builder (#782, `ReportCli.SpellTooltip`), which
-		// is what pins which pair is which: `Gangrenous Stench`'s tick renders "58.40-71.40 at level 75 .. 62.20-76.10
+		// both over levels 172..173. Read off the client's own tooltip builder (`ReportCli.SpellTooltip`), which is
+		// what pins which pair is which: `Gangrenous Stench`'s tick renders "58.40-71.40 at level 75 .. 62.20-76.10
 		// at level 80" out of exactly these six slots.
 		//
-		// ⚠️ 170 is the target CAP on the area-targeting kinds (`FilteredAreaFormula`'s "up to 12 targets"). Same
-		// index, unrelated meaning - the per-type warning below is not theoretical.
+		// 170 is the target cap on the area-targeting kinds (`FilteredAreaFormula`'s "up to 12 targets"). Same index,
+		// unrelated meaning - which is why the per-type warning below matters.
 		public const int KeyHitMin = 2;
 		public const int KeyHitMax = 37;
 		public const int KeyHitMinLow = 168;
@@ -105,50 +109,53 @@ namespace Faolan.Core.Rdb
 		public const int KeyHitMaxLow = 170;
 		public const int KeyHitMaxHigh = 171;
 
-		// The ramp's HIGH endpoint. Deliberately an ALIAS of KeyAmount rather than a second constant: it is the same
+		// The ramp's high endpoint. Deliberately an alias of KeyAmount rather than a second constant: it is the same
 		// slot, and the two names are the two things the client calls it - `Amount` in its descriptor (which on the
 		// plain `ModifyAsRating` really is a percentage) and the ramp's upper value in its apply code. Reading a ramp
 		// through `KeyAmount` compiles to the same thing and reads as the wrong unit.
 		public const int KeyHighValue = KeyAmount;
 
-		// ⚠️ THE KEYS BELOW ARE PER-TYPE, unlike the ones above. A key index the client NAMES (0 `Stat`, 39 `Value`,
+		// The keys below are per-type, unlike the ones above. A key index the client names (0 `Stat`, 39 `Value`,
 		// 88 `Spell`, 175 `Amount`) means the same thing on every type that carries it - that is what makes a name
-		// transfer BY KEY. An UNNAMED one carries no such promise, and the catalog proves it does not hold:
+		// transfer by key. An unnamed one carries no such promise, and the catalog proves it does not hold:
 		//
-		//   key 187  a per-SPELL target on `ChangeRecastTime` (53031) and `ChangeHitPercent` (53030) - the slot their
-		//            `...Line...` twins fill with KeyLine - but a per-COMBO target on `UpgradeCombo` (53209).
-		//   key 66   the combo's damage delta on `UpgradeCombo`, a follower SCRIPT GROUP on `SetFollowerScriptGroup`
-		//            (53024), and the proc's incoming/outgoing DIRECTION on the `AddProc` family - the tooltip
+		//   key 187  a per-spell target on `ChangeRecastTime` (53031) and `ChangeHitPercent` (53030) - the slot their
+		//            `...Line...` twins fill with KeyLine - but a per-combo target on `UpgradeCombo` (53209).
+		//   key 66   the combo's damage delta on `UpgradeCombo`, a follower script group on `SetFollowerScriptGroup`
+		//            (53024), and the proc's incoming/outgoing direction on the `AddProc` family - the tooltip
 		//            compares it to 1 to pick `AddProcGettingHit` over `AddProcOnHit`.
-		//   key 67   the combo's reuse-time delta on `UpgradeCombo`, and the combo attack's CRITICAL CHANCE on
+		//   key 67   the combo's reuse-time delta on `UpgradeCombo`, and the combo attack's critical chance on
 		//            `ChangeInheritedWeaponAttack` (53250).
 		//
 		// So these names are read as `<Type>_<slot>` and are only valid inside the parser for that type. Naming an
 		// unnamed key globally is how a decode gets exported to a type it was never checked against.
 		//
-		// ⚠️ And a SCALE transfers even less than a name does. Keys 66 and 67 are read from the same two
-		// `GameActionStat_e` slots (0x315 / 0x316) on `UpgradeCombo` and on `ChangeInheritedWeaponAttack`, and the
-		// tooltip renders them through DIFFERENT arithmetic on each: `× 0.01` and the float formatter on 53209,
-		// against a raw int on 53250's key 66 and `× 0.025` on its key 67. Reading a 53250 value as 53209's
-		// hundredths-of-a-percent would report a +30% opening-damage feat as +0.30%.
+		// A scale transfers even less than a name does. Keys 66 and 67 are read from the same two `GameActionStat_e`
+		// slots (0x315 / 0x316) on `UpgradeCombo` and on `ChangeInheritedWeaponAttack`, and the tooltip renders them
+		// through different arithmetic on each: `x 0.01` and the float formatter on 53209, against a raw int on
+		// 53250's key 66 and `x 0.025` on its key 67. Reading a 53250 value as 53209's hundredths-of-a-percent would
+		// report a +30% opening-damage feat as +0.30%.
 		//
 		// `UpgradeCombo` (53209): the combo it upgrades plus the two axes it moves. Named from the client's own
-		// item-tooltip builder `FUN_0149e450`, which reads GameActionStat_e 0x315/0x316 (= key 66/67 through the
-		// key-index table) and branches on each value's SIGN to pick between the localised
+		// item-tooltip builder `FUN_0149e450`, which reads GameActionStat_e 0x315/0x316 (key 66/67 through the
+		// key-index table) and branches on each value's sign to pick between the localised
 		// `UpgradeCombo_IncreaseDamage`/`_DecreaseDamage` and `UpgradeCombo_IncreaseCooldown`/`_DecreaseCooldown`
-		// strings. Both are SIGNED hundredths of a percent (rendered `× 0.01` with a `%` suffix).
+		// strings. Both are signed hundredths of a percent (rendered `x 0.01` with a `%` suffix).
+		// See docs/re/gameactionlist-grammar.md.
+		// `UpgradeCombo_IncreaseDamage`/`_DecreaseDamage` and `UpgradeCombo_IncreaseCooldown`/`_DecreaseCooldown`
+		// strings. Both are signed hundredths of a percent (rendered `x 0.01` with a `%` suffix).
 		// See docs/re/gameactionlist-grammar.md.
 		public const int KeyUpgradeComboTarget = 187;
 		public const int KeyUpgradeComboDamage = 66;
 		public const int KeyUpgradeComboCooldown = 67;
 
-		// The PROC family - `AddComboProc` (53212, `[88, 236, 187 combo, 117, 237]`) and `AddSpellLineProc` (53070,
+		// The proc family - `AddComboProc` (53212, `[88, 236, 187 combo, 117, 237]`) and `AddSpellLineProc` (53070,
 		// `[88, 236, 1 line, 117, 237, 73]`). The same tooltip builder settles the two spell slots: it tests key 88
 		// and key 236 for a valid spell independently and renders `AddComboProcSelf` when only 88 is set,
 		// `AddComboProcOther` when only 236 is, and `AddComboProcBoth` when both are - so 88 is the spell the proc
-		// puts on the CASTER and 236 the one it puts on the TARGET. 117 is the trigger kind (the `AddProc` branch
+		// puts on the caster and 236 the one it puts on the target. 117 is the trigger kind (the `AddProc` branch
 		// dispatches the Hit / Damage / SpellDamage string family on it) and 237 the magnitude it renders last.
-		// `ChangeHitPercent` (53030): the per-SPELL twin of `ChangeLineHitPercent` (53075), which carries its target
+		// `ChangeHitPercent` (53030): the per-spell twin of `ChangeLineHitPercent` (53075), which carries its target
 		// in KeyLine. 238 of the 240 distinct references resolve against Spells.Id.
 		public const int KeySpellHitPercentTarget = 187;
 
@@ -158,21 +165,21 @@ namespace Faolan.Core.Rdb
 		public const int KeyProcAmount = 237;
 		public const int KeyProcComboTarget = 187;
 
-		// `ChangeInheritedWeaponAttack` (53250, `[187 combo, 84, 66, 67, 68, 69]`): the combo plus WHICH of its
+		// `ChangeInheritedWeaponAttack` (53250, `[187 combo, 84, 66, 67, 68, 69]`): the combo plus which of its
 		// weapon attacks, and then three magnitudes and a damage type. Every slot is named by the same tooltip
 		// builder `FUN_0149e450` (branch at `014a1dc5`), which reads GameActionStat_e 0x45F / 0x315 / 0x316 / 0x317 /
 		// 0x318 in that order and renders one localised string per non-zero slot:
 		//
-		//   key 84   the ATTACK: `0` -> `FinishingComboAttack`, `1` -> `OpeningComboAttack`, and the branch RETURNS
+		//   key 84   the attack: `0` -> `FinishingComboAttack`, `1` -> `OpeningComboAttack`, and the branch returns
 		//            on anything else (`CMP EDI,1; JNZ <bail>` at `014a1e46`) - so it is a two-valued selector, not
 		//            the `Level` its descriptor label suggests. Corroborated by the feats themselves: `Fierce
-		//            Opening` and `Dual Master` ("increases the OPENING damage done by all combos") carry 1.
-		//   key 66   `IncreaseComboDPS` / `DecreaseComboDPS` on the sign - a RAW int with a `%` suffix, so a WHOLE
+		//            Opening` and `Dual Master` ("increases the opening damage done by all combos") carry 1.
+		//   key 66   `IncreaseComboDPS` / `DecreaseComboDPS` on the sign - a raw int with a `%` suffix, so a whole
 		//            percent, unlike 53209's hundredths.
-		//   key 67   `IncreaseComboCriticalChance` / `DecreaseComboCriticalChance` - rendered `× 0.025` (the float at
-		//            `0x020b5944`) with a `%` suffix, i.e. a RATING, 40 points to the percentage point.
+		//   key 67   `IncreaseComboCriticalChance` / `DecreaseComboCriticalChance` - rendered `x 0.025` (the float at
+		//            `0x020b5944`) with a `%` suffix, i.e. a rating, 40 points to the percentage point.
 		//   key 68   `IncreaseComboHateAdjustment` / `DecreaseComboHateAdjustment` - raw int + `%`, like key 66.
-		//   key 69   `ChangeComboDamageType` - NOT a magnitude: the client feeds it to `GetLocalisedString(600, v)`,
+		//   key 69   `ChangeComboDamageType` - not a magnitude: the client feeds it to `GetLocalisedString(600, v)`,
 		//            so it is an id in the damage-type name table. Zero on all 315 shipped records.
 		public const int KeyComboAttackTarget = 187;
 		public const int KeyComboAttackSlot = 84;
@@ -181,43 +188,43 @@ namespace Faolan.Core.Rdb
 		public const int KeyComboAttackHate = 68;
 		public const int KeyComboAttackDamageType = 69;
 
-		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
-		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.
-		// `53183 AddSelfResurrectionSpell`'s own slots (#890): the spell the offer casts on resurrect (the shared
-		// KeySpell slot 88) and the percentage of Health/Stamina/Mana it restores. 100 in all four spells of the
-		// family, which is exactly what the Self-Resurrection Potion's tooltip promises.
+		// `53183 AddSelfResurrectionSpell`'s own slots: the spell the offer casts on resurrect (the shared KeySpell
+		// slot 88) and the percentage of Health/Stamina/Mana it restores. 100 in all four spells of the family,
+		// which is exactly what the Self-Resurrection Potion's tooltip promises.
 		public const int KeySelfResurrectionPercent = 188;
 
+		// The text slots (see TextKeys). 209 is the one every string-carrying type uses; 210 is the second string on
+		// `GenerateName` and `NewTextEffect`, the only two types that carry both.
 		public const int KeyEventString = 209;
 		public const int KeyEventString2 = 210;
 
 		/// <summary>
-		///     Keys whose slot holds TEXT rather than a u32 - `[u16 byteLength][bytes]` - which is what makes an
-		///     element carrying one VARIABLE-width, and by an ODD number of bytes, so `8 + len(keyList)` does not
-		///     describe it and the payload has to be WALKED rather than indexed.
+		///     Keys whose slot holds text rather than a u32 - <c>[u16 byteLength][bytes]</c> - which is what makes an
+		///     element carrying one variable-width, and by an odd number of bytes, so <c>8 + len(keyList)</c> does not
+		///     describe it and the payload has to be walked rather than indexed.
 		///     <para>
-		///         The set is CLOSED, and read out of the client rather than inferred (Gitea #596): the GameAction
-		///         deserializer `FUN_00899a60` takes the string branch for exactly two `GameActionStat_e` ids,
-		///         `0x4d9` and `0x4da`, and the key-index table `FUN_00897bd0` builds maps index `209` to `0x4d9` and
-		///         index `210` to `0x4da` and nothing else to either. So a type is variable-width iff its key list
-		///         contains 209 or 210.
+		///         The set is closed, and read out of the client rather than inferred: the GameAction deserializer
+		///         <c>FUN_00899a60</c> takes the string branch for exactly two <c>GameActionStat_e</c> ids,
+		///         <c>0x4d9</c> and <c>0x4da</c>, and the key-index table <c>FUN_00897bd0</c> builds maps index 209 to
+		///         <c>0x4d9</c> and index 210 to <c>0x4da</c> and nothing else to either. So a type is variable-width
+		///         if and only if its key list contains 209 or 210.
 		///     </para>
 		///     <para>
-		///         The u16 is likewise the client's own string primitive, and it is the ONLY form on this path -
-		///         settled on both sides of the stream (#596). The reader `FUN_00899a60` calls `FUN_0048f840` ->
-		///         `FUN_00cbf840` with mode 0, which reads a u16 and treats `>= 0x8000` as an escape into a long
-		///         form; the WRITER `FUN_00899440` emits that same u16 with the same escape (`0xffff` then `0x1ff`).
-		///         Neither branches on the type - the string branch is chosen by the STAT KEY - so `FUN_00cbf840`'s
-		///         u32 mode (`param_2 == 2`) belongs to some other stream and can never be reached from a
-		///         GameAction element.
+		///         The u16 is likewise the client's own string primitive, and it is the only form on this path,
+		///         settled on both sides of the stream. The reader <c>FUN_00899a60</c> calls <c>FUN_0048f840</c> then
+		///         <c>FUN_00cbf840</c> with mode 0, which reads a u16 and treats <c>&gt;= 0x8000</c> as an escape into
+		///         a long form; the writer <c>FUN_00899440</c> emits that same u16 with the same escape
+		///         (<c>0xffff</c> then <c>0x1ff</c>). Neither branches on the type - the string branch is chosen by
+		///         the stat key - so <c>FUN_00cbf840</c>'s u32 mode (<c>param_2 == 2</c>) belongs to some other stream
+		///         and can never be reached from a GameAction element.
 		///     </para>
 		///     <para>
 		///         The shipped records agree: 653 of the 880 text-carrying elements in the feat and spell catalogs
-		///         tile EXACTLY under the u16 reading. ⚠️ SEVEN do not - all of them `HeadText`, reading
-		///         `[u32 7]["Dimach\0"]` with the NUL counted - and those seven are RETIRED DATA, not a second form:
-		///         they sit in feat templates 3753 and 12362..12386, the same low-id band that carries the retired
-		///         kind 53044 (see <see cref="UnregisteredIds" />) and a `ChangeHitPercent` padded with four
-		///         terminator words, while every u16 record in either catalog is id 791547 or higher. The client
+		///         tile exactly under the u16 reading. Seven do not - all of them <c>HeadText</c>, reading
+		///         <c>[u32 7]["Dimach\0"]</c> with the NUL counted - and those seven are retired data, not a second
+		///         form: they sit in feat templates 3753 and 12362..12386, the same low-id band that carries the
+		///         retired kind 53044 (see <see cref="UnregisteredIds" />) and a <c>ChangeHitPercent</c> padded with
+		///         four terminator words, while every u16 record in either catalog is id 791547 or higher. The client
 		///         cannot read them either. So the walk stops at such a slot rather than guessing a second length
 		///         width. See <c>ItemTemplateStatModifiers.ParseElements</c>.
 		///     </para>
@@ -225,19 +232,20 @@ namespace Faolan.Core.Rdb
 		public static readonly HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
 
 		/// <summary>
-		///     The kinds whose <see cref="KeyRadius" /> is a spell's AREA OF EFFECT - the elements that SELECT the
-		///     targets an area spell lands on, and so the one place the client states an AoE's blast radius (Gitea
-		///     #349). Every one of them pairs the radius with the thing to apply inside it: `KeySpell` for the five
-		///     formula kinds (the sub-spell put on everyone found) and `KeyStat` for `AreaHit` (a stat hit directly).
+		///     The kinds whose <see cref="KeyRadius" /> is a spell's area of effect - the elements that select the
+		///     targets an area spell lands on, and so the one place the client states an AoE's blast radius. Every one
+		///     of them pairs the radius with the thing to apply inside it: <c>KeySpell</c> for the five formula kinds
+		///     (the sub-spell put on everyone found) and <c>KeyStat</c> for <c>AreaHit</c> (a stat hit directly).
 		/// </summary>
 		/// <remarks>
-		///     17 types carry key 11 and this is deliberately NOT all of them - a radius is only an AoE when the
-		///     element is doing target selection. The excluded ones are an audio falloff (`AudioEffect`), a facility
-		///     range (`SetTradingPostAccess`), the three MODIFIER kinds that adjust someone else's radius rather than
-		///     state one (`AOERadiusModification`, `LineAOERadiusModification`, `GlobalAOERadiusModification`), the
-		///     melee cleave add-targets (`ColumnAddTargets`, `AddCleaveTargets`, `AttackAddTargets`, which extend a
-		///     swing rather than define a blast), `AreaKnockback` (a displacement, not the damage area) and
-		///     `TimedEffect` (a duration kind that happens to carry one).
+		///     17 types carry key 11 and this is deliberately not all of them - a radius is only an AoE when the
+		///     element is doing target selection. The excluded ones are an audio falloff (<c>AudioEffect</c>), a
+		///     facility range (<c>SetTradingPostAccess</c>), the three modifier kinds that adjust someone else's
+		///     radius rather than state one (<c>AOERadiusModification</c>, <c>LineAOERadiusModification</c>,
+		///     <c>GlobalAOERadiusModification</c>), the melee cleave add-targets (<c>ColumnAddTargets</c>,
+		///     <c>AddCleaveTargets</c>, <c>AttackAddTargets</c>, which extend a swing rather than define a blast),
+		///     <c>AreaKnockback</c> (a displacement, not the damage area) and <c>TimedEffect</c> (a duration kind that
+		///     happens to carry one).
 		/// </remarks>
 		public static readonly HashSet<uint> AreaTargetKinds =
 		[
@@ -251,9 +259,10 @@ namespace Faolan.Core.Rdb
 		];
 
 		/// <summary>
-		///     The id space the client asserts on, straight out of the descriptor lookup `FUN_008c3910`:
-		///     `descriptor = &amp;DAT_025077c8 + (id - 0xCF09) * 0x104` bytes, guarded by `(id - 0xCF09) &lt;= 0x11D`.
-		///     So the descriptor table is a flat ARRAY of 286 slots indexed by the type id itself.
+		///     The id space the client asserts on, straight out of the descriptor lookup <c>FUN_008c3910</c>:
+		///     <c>descriptor = &amp;DAT_025077c8 + (id - 0xCF09) * 0x104</c> bytes, guarded by
+		///     <c>(id - 0xCF09) &lt;= 0x11D</c>. So the descriptor table is a flat array of 286 slots indexed by the
+		///     type id itself.
 		/// </summary>
 		public const uint FirstId = 0xCF09;
 
@@ -261,21 +270,21 @@ namespace Faolan.Core.Rdb
 		public const uint LastId = 0xD026;
 
 		/// <summary>
-		///     The 26 ids inside <see cref="FirstId" />..<see cref="LastId" /> that the client registers NOTHING for -
-		///     retired types, not types the recovery missed (Gitea #596).
+		///     The 26 ids inside <see cref="FirstId" />..<see cref="LastId" /> that the client registers nothing for -
+		///     retired types, not types the recovery missed.
 		///     <para>
-		///         Proven three ways, because "the dump skipped it" is the obvious competing explanation:
-		///         the initialiser `FUN_008bdf40` writes 260 of the array's 286 slots and never mentions these ids;
-		///         a scan of the whole image finds their id constant NOWHERE (`0xCF34` has zero hits); and the image
-		///         holds exactly 260 `e_Type_GC_GameAction_*` name strings, so every NAMED type was reached. A
-		///         retired id therefore has no descriptor, no key list and no name anywhere in the client.
+		///         Proven three ways, because "the dump skipped it" is the obvious competing explanation: the
+		///         initialiser <c>FUN_008bdf40</c> writes 260 of the array's 286 slots and never mentions these ids;
+		///         a scan of the whole image finds their id constant nowhere (<c>0xCF34</c> has zero hits); and the
+		///         image holds exactly 260 <c>e_Type_GC_GameAction_*</c> name strings, so every named type was
+		///         reached. A retired id therefore has no descriptor, no key list and no name anywhere in the client.
 		///     </para>
 		///     <para>
-		///         What that means for a reader: both the element reader `FUN_00899a60` and the writer
-		///         `FUN_00899440` test the slot's id word for 0 and log `"Tried to stream unknown GameActionData with
-		///         type N"` rather than reading a payload - so shipped data carrying one of these (kind 53044 sits in
-		///         seven low-id feat templates) is content the client itself cannot parse. Reading it is not a gap to
-		///         close; it is data that predates the catalog.
+		///         What that means for a reader: both the element reader <c>FUN_00899a60</c> and the writer
+		///         <c>FUN_00899440</c> test the slot's id word for 0 and log "Tried to stream unknown GameActionData
+		///         with type N" rather than reading a payload - so shipped data carrying one of these (kind 53044 sits
+		///         in seven low-id feat templates) is content the client itself cannot parse. Reading it is not a gap
+		///         to close; it is data that predates the catalog.
 		///     </para>
 		/// </summary>
 		public static readonly IReadOnlySet<uint> UnregisteredIds = new HashSet<uint>

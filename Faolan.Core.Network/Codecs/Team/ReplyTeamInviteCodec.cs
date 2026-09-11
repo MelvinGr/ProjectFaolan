@@ -4,13 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// s2c DispatchReplyTeamInvite (GameCharInterface 0x209F) - the answer to the invited client's RequestTeamInvite:
-	// the inviter's record, the (empty) invite message, and one more zero byte. Byte-exact against f683 of
-	// login_2-clients_group-trade-friend.
-	//
-	// ⚠️ The reply's RpcHeader must carry the trailing 0x01 headerData, and its SENDER is the GameCharAgent object -
-	// see the RequestTeamInvite case in GameServerListener.Inbound. Without either the client discards the reply and
-	// never raises the invite window, which looks exactly like a wrong body and is not one.
+	/// <summary>
+	///     s2c <c>DispatchReplyTeamInvite</c> - the answer to the invited client's <c>RequestTeamInvite</c>: the inviter's
+	///     record, the (empty) invite message, and one more zero byte. Byte-exact against f683 of
+	///     login_2-clients_group-trade-friend.
+	/// </summary>
+	/// <remarks>
+	///     The reply's RpcHeader must carry the trailing 0x01 header data, and its sender must be the GameCharAgent
+	///     object. Without either the client discards the reply and never raises the invite window, which looks exactly
+	///     like a wrong body and is not one.
+	/// </remarks>
 	public static class ReplyTeamInviteCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchReplyTeamInvite;

@@ -4,14 +4,14 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// DispatchInDungeonPlayfield(inDungeon) - GameCharInterfaceProject 0x07. Tells the client whether the playfield
-	// it is standing in counts as a DUNGEON (#874).
-	//
-	//   [u8 inDungeon]
-	//
-	// One byte, and the corpus carries both values - 00 in a Tortage-city session and 01 in the Amphitheatre of
-	// Karutonia instance - so this is a real per-playfield flag rather than a constant. It is what the dungeon and
-	// instance-difficulty work (#309 / #511) has to set when it decides a playfield's kind.
+	/// <summary>
+	///     DispatchInDungeonPlayfield(inDungeon) - tells the client whether the playfield it is standing in counts as a
+	///     dungeon. The body is one byte.
+	/// </summary>
+	/// <remarks>
+	///     The corpus carries both values - 0 in a Tortage-city session and 1 in the Amphitheatre of Karutonia instance -
+	///     so it is a real per-playfield flag rather than a constant, and whatever decides a playfield's kind has to set it.
+	/// </remarks>
 	public static class DungeonPlayfieldCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchInDungeonPlayfield;

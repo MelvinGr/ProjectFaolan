@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The world objects the RUNTIME loads must build the same record as the ones a test hand-assembles.
+	// The world objects the runtime loads must build the same record as the ones a test hand-assembles.
 	//
 	// Written after doors, climbing vines and destructibles were invisible in-client for want of one `Include`.
 	// WorldObjectGeometryCodec writes the geometry-node words and the per-class trailer out of `row.Words`, the repo
@@ -16,7 +16,7 @@ namespace Faolan.Tests
 	// class that owns words went out short (4 bytes for Door and ClimbingDynel, 20 for Destructible) and the client
 	// dropped it: "ReadSubClass for IIR 866480048 (DoorFullUpdateIIR_c) failed ... datasize left in stream=0".
 	//
-	// WorldObjectFromColumnsTests did not catch it because it builds its row FROM a captured body, so the words are always
+	// WorldObjectFromColumnsTests did not catch it because it builds its row from a captured body, so the words are always
 	// populated in memory; the create-editor burst golden did not either, because every editor scene prop is a
 	// SimpleDynel, the one class that owns no words. Neither exercised the repository. This does.
 	public class WorldObjectRepositoryLoadTests

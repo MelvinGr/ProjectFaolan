@@ -10,37 +10,36 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Progression
 {
-	// Skillpoint SPENDS (#739). A character earns a pool of points (`SkillPoints` 0x0F3, the "skill points to
-	// distribute" the level-up hands out) and moves them into the four trainable skills. The client sends the whole
-	// transfer as ONE `SkillIIR` (0xD558FF16): a (statId, delta) list debiting the pool and crediting the skill, so
-	// the deltas sum to zero. See SkillCodec for the grammar.
+	// Skill-point spends. A character earns a pool of points (`SkillPoints` 0x0F3, the "skill points to distribute" the
+	// level-up hands out) and moves them into the four trainable skills. The client sends the whole transfer as one
+	// `SkillIIR` (0xD558FF16): a (statId, delta) list debiting the pool and crediting the skill, so the deltas sum to
+	// zero. See SkillCodec for the grammar.
 	//
-	// The answer retail gives is a pair of ordinary `StatIIR` records - the skill at its new TOTAL, then the pool at
+	// The answer retail gives is a pair of ordinary `StatIIR` records - the skill at its new total, then the pool at
 	// its new total - which is why nothing here builds a bespoke reply message:
 	//
 	//   f98e10b3 0000c350 <handle> 01 0000043d 00000001   <- Runspeed = 1
 	//   f98e10b3 0000c350 <handle> 01 000000f3 00000763   <- SkillPoints = 1891
 	//
-	// The client then MIRRORS both records straight back at us (c2s StatIIR, frames 958/959), which the inbound
-	// StatIIR case already drops on the floor - it is an echo, not a request.
+	// The client then mirrors both records straight back (c2s StatIIR, frames 958/959), which the inbound StatIIR case
+	// drops on the floor - it is an echo, not a request.
 	// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_3 frames 953-959 / 1040-1044 / 1121-1124 / 1179-1183]
 	//
-	// ⚠️ SELLBACK IS DELIBERATELY NOT IMPLEMENTED. The client has a `DoSkillSellback(int i_eStat)` in its method
-	// table and the transfer grammar would express a refund perfectly well (pool credit, skill debit), but there is
-	// ZERO sellback traffic in the corpus and the signature carries no amount - so how much a sellback returns is
-	// unrecoverable. Accepting the reverse direction on trust would let a client cash out the base value every
-	// character starts with (Perception 560 on the captured necromancer) as 560 free points. Refunds wait for a
-	// capture; the reverse direction is refused here rather than guessed.
+	// Sellback is deliberately not implemented. The client has a `DoSkillSellback(int i_eStat)` in its method table and
+	// the transfer grammar would express a refund perfectly well (pool credit, skill debit), but there is no sellback
+	// traffic in the corpus and the signature carries no amount, so how much a sellback returns is unrecoverable.
+	// Accepting the reverse direction on trust would let a client cash out the base value every character starts with
+	// (Perception 560 on the captured necromancer) as 560 free points, so it is refused rather than guessed.
 	public sealed class SkillPointService
 	{
 		// The pool every spend draws from.
 		private const CharacterStatId Pool = CharacterStatId.SkillPoints;
 
-		// Stats whose value ALSO lives on the n3 dynel layer, and which retail therefore restates with the base byte
+		// Stats whose value also lives on the n3 dynel layer, and which retail therefore restates with the base byte
 		// clear (`env` 0x00) before the ordinary gamecode record. Sweeping every captured character `StatIIR` shows
-		// env=0 is a property of the STAT, not of the moment: it is confined to 22 ids out of 53, `Runspeed` (3
-		// records) among them, while `Climbing` / `Hiding` / `Perception` never carry one. So the extra record on the
-		// Runspeed spend is not "the first point in a skill" - it is Runspeed being a movement stat.
+		// env=0 is a property of the stat rather than of the moment: it is confined to 22 ids out of 53, `Runspeed`
+		// (3 records) among them, while `Climbing`, `Hiding` and `Perception` never carry one. So the extra record on
+		// the Runspeed spend is not "the first point in a skill" - it is Runspeed being a movement stat.
 		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_3.tshark.json frame 956 carries env=0 + env=1 for 0x43D; frames 1041/1122/1180 carry env=1 only]
 		private static readonly HashSet<CharacterStatId> DynelMirrored = [CharacterStatId.RunSpeed];
 
@@ -54,9 +53,9 @@ namespace Faolan.GameServer.Progression
 		}
 
 		// c2s SkillIIR: move points out of the pool and into one or more skills, then restate both on the wire.
-		// Refusals are SILENT by design - retail's client gates the spend itself (it knows the pool), so a request
-		// that fails here is a client that already disagrees with us, and inventing a rejection message would put
-		// bytes on the wire retail never sends.
+		// Refusals are silent by design: retail's client gates the spend itself, because it knows the pool, so a
+		// request that fails here is a client that already disagrees with the server, and inventing a rejection message
+		// would put bytes on the wire retail never sends.
 		public async Task HandleAdjustSkill(INetworkClient client, SkillIIR request)
 		{
 			var character = client.Session.Character;
@@ -72,7 +71,7 @@ namespace Faolan.GameServer.Progression
 			var spent = -request.Adjustments.Where(a => a.StatId == (uint)Pool).Sum(a => a.Delta);
 			var credits = request.Adjustments.Where(a => a.StatId != (uint)Pool).ToArray();
 
-			// A spend CONSERVES points: the pool loses exactly what the skills gain. Anything else - a credit-only
+			// A spend conserves points: the pool loses exactly what the skills gain. Anything else - a credit-only
 			// list, a negative skill delta (that is a sellback, see the class comment), a mismatched total - is not
 			// a shape the retail client produces.
 			if (spent <= 0 || credits.Length == 0 || credits.Any(a => a.Delta <= 0) || credits.Sum(a => a.Delta) != spent)
@@ -83,7 +82,7 @@ namespace Faolan.GameServer.Progression
 				return;
 			}
 
-			// The stat SHEET is the authority: it is what the login snapshot is authored from, so a spend that is not
+			// The stat sheet is the authority: it is what the login snapshot is authored from, so a spend that is not
 			// written there does not survive a relog.
 			var sheet = await _database.GetCharacterStats(character.Id);
 			var current = sheet.GroupBy(s => s.StatId).ToDictionary(g => g.Key, g => g.First().Value);

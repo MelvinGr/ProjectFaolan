@@ -18,18 +18,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// Raids: a set of TEAMS rather than a set of characters, which is the whole shape of the feature. Composed
-	// beside TeamService and built on it - the raid owns no roster of its own, it owns a list of team ids and asks
-	// TeamService for each team's `cTeam` when it needs to put one on the wire.
+	// Raids: a set of teams rather than a set of characters, which is the shape of the whole feature. Built on
+	// TeamService - the raid owns no roster of its own, it owns a list of team ids and asks TeamService for each team's
+	// `cTeam` when it needs to put one on the wire.
 	//
-	// Like a team, a raid is EPHEMERAL: nothing here is persisted, because a retail raid does not survive its last
+	// Like a team, a raid is ephemeral: nothing here is persisted, because a retail raid does not survive its last
 	// member logging out.
 	//
-	// ⚠️ **Nothing in this file is capture-proven.** A sweep of all 120 dumps finds zero raid traffic - no captured
-	// session ever formed a raid - so the message BODIES come from the client's own readers (#669, and every codec
-	// used here says which reader) and the ROUTING is the team flow's, one level up. That analogy is not evidence,
-	// and it is recorded as such in docs/protocol/gaps.md rather than being allowed to read as fact. What it is NOT
-	// is invention: every method, its parameters and its body layout are the client's.
+	// Nothing in this file is capture-proven. A sweep of all 120 dumps finds zero raid traffic - no captured session
+	// ever formed a raid - so the message bodies come from the client's own readers (every codec used here says which
+	// reader) and the routing is the team flow's, one level up. That analogy is not evidence, and it is recorded as
+	// such in docs/protocol/gaps.md; what it is not is invention, because every method, its parameters and its body
+	// layout are the client's.
 	public sealed class RaidService
 	{
 		// Raid instances are minted the way team ones are - sequentially from a base, opaque to the client, only
@@ -37,14 +37,14 @@ namespace Faolan.CSPlayerAgent
 		// log line; retail's own numbering is unknown. [V0]
 		private const uint FirstRaidId = 0x00600000;
 
-		// The SENDER of every CsPlayerAgent s2c packet: the guild/team server object - see TeamService.PushSender.
+		// The sender of every CsPlayerAgent s2c packet: the guild/team server object - see TeamService.PushSender.
 		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, 0x04);
 
 		private readonly ConcurrentDictionary<uint, LiveRaid> _raids = [];
 		private readonly ConcurrentDictionary<uint, uint> _raidByTeam = [];
 
-		// invitee -> inviter, for the window between RaidInviteCharacter and RaidAcceptInvite. Keyed by CHARACTER
-		// even for RaidInviteTeam, because it is a person who answers the box.
+		// invitee -> inviter, for the window between RaidInviteCharacter and RaidAcceptInvite. Keyed by character even
+		// for RaidInviteTeam, because it is a person who answers the box.
 		private readonly ConcurrentDictionary<uint, uint> _pendingInvites = [];
 		private readonly ConnectionRegistry _connections;
 		private readonly ILogger _logger;
@@ -102,7 +102,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// c2s RaidInviteCharacter(ID32, string) / RaidInviteCharacterByName(string, string): ask one player in. The
-		// invite is answered by them, and it is their whole TEAM that joins - which is what RaidAcceptInvite does.
+		// invite is answered by them, and it is their whole team that joins - which is what RaidAcceptInvite does.
 		public async Task Invite(uint inviterId, Character target, string message = "")
 		{
 			if (RaidOf(inviterId) is not { } raidId)
@@ -128,7 +128,7 @@ namespace Faolan.CSPlayerAgent
 			_logger.LogInformation("Raid 0x{Raid:X8}: {Inviter:X8} invited {Target}.", raidId, inviterId, target.Name);
 		}
 
-		// c2s RaidInviteTeam(ID32 teamID): the same invite aimed at a whole team. The team's LEADER is the one shown
+		// c2s RaidInviteTeam(ID32 teamID): the same invite aimed at a whole team. The team's leader is the one shown
 		// the box, so this reduces to inviting them.
 		public async Task InviteTeam(uint inviterId, uint teamId)
 		{
@@ -180,9 +180,9 @@ namespace Faolan.CSPlayerAgent
 			await Push(inviterId, CSPlayerInterfaceMethods.DispatchRaidTargetDeclinedRaidInvite, MemberBody(declinerId));
 		}
 
-		// c2s RaidLeave(): the caller leaves. They leave their TEAM too - a raid slot is a seat in one of its teams,
-		// so there is no "in the raid but in no team" state to leave them in. The team goes with them when they were
-		// its last member.
+		// c2s RaidLeave(): the caller leaves, and leaves their team too - a raid slot is a seat in one of its teams, so
+		// there is no "in the raid but in no team" state to leave them in. The team goes with them when they were its
+		// last member.
 		public async Task<bool> Leave(uint characterId)
 		{
 			if (RaidOf(characterId) is not { } raidId || !_raids.TryGetValue(raidId, out var raid) || _teams.TeamOf(characterId) is not { } teamId)
@@ -263,7 +263,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// c2s RaidSetLootOption(int, bool, int): raid-leader-only, echoed to the whole raid - the exact shape of
-		// TeamSetLootOption, which IS captured, on the exact same three-field body.
+		// TeamSetLootOption, which is captured, on the same three-field body.
 		public async Task<bool> SetLootOption(uint leaderId, uint lootMode, bool useNeedGreed, uint lootThreshold)
 		{
 			if (!IsRaidLeader(leaderId, out var raid))
@@ -275,7 +275,7 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		// c2s RaidSetMasterLooter(ID32): raid-leader-only. The s2c body is the CHARACTER record, not their id - the
+		// c2s RaidSetMasterLooter(ID32): raid-leader-only. The s2c body is the character record, not their id - the
 		// client reads `i_cWho` with the cCharacter reader.
 		public async Task<bool> SetMasterLooter(uint leaderId, uint characterId)
 		{
@@ -311,7 +311,7 @@ namespace Faolan.CSPlayerAgent
 				: Task.CompletedTask;
 		}
 
-		// The raid leader is a TEAM, not a character - DispatchRaidNewRaidLeader carries an `i_cTeamID`. So when the
+		// The raid leader is a team, not a character - DispatchRaidNewRaidLeader carries an `i_cTeamID`. So when the
 		// leading team leaves, the next team takes it.
 		private async Task PromoteIfLeaderTeamLeft(LiveRaid raid, uint departedTeamId)
 		{
@@ -358,7 +358,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// The whole raid as `cMatch`: a header cTeam carrying the raid's id, leader and settings, then one cTeam per
-		// member team. The header's own member list is EMPTY - the people are in the sub-teams, and listing them
+		// member team. The header's own member list is empty - the people are in the sub-teams, and listing them
 		// twice would be the client's problem to reconcile. [V0: no capture carries a cMatch]
 		private byte[] MatchBody(LiveRaid raid)
 		{
@@ -407,8 +407,8 @@ namespace Faolan.CSPlayerAgent
 			if (body.Length == 0)
 				return;
 
-			// ⚠️ The RECEIVER is the recipient's OWN CSPlayerInterface instance - its character id, never instance 0.
-			// See the same note on TeamService.Send: a push addressed to instance 0 arrives and is dropped.
+			// The receiver is the recipient's own CSPlayerInterface instance - its character id, never instance 0. See
+			// the same note on TeamService.Send: a push addressed to instance 0 arrives and is dropped.
 			if (_connections.ForCharacter(characterId) is { } client)
 				await client.SendAsync(new Rpc(PushSender, client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), (ushort)opcode, body));
 		}

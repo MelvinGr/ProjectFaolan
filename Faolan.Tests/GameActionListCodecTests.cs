@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for GameActionListIIR (0xF508F4C1) vs captured instances (#190). Proves the
+	// Byte-exact construct + round-trip for GameActionListIIR (0xF508F4C1) vs captured instances. Proves the
 	// decoded fixed header is built for a live frame/dynel handle and the (still-opaque) action tail rides verbatim -
 	// the construct-don't-replay step for this movement/AI record. Grammar: tools/capture/decode_gameactionlist.py.
 	public class GameActionListCodecTests
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		private const string NumericBody = // frame 777: dynel 0xCFEC, numeric position/timer action record
 			"f508f4c10000c35000017e2c00000007e20000cfec000000000000000400000000000000010000000000000001000000090000000100042652000000000000000000002580ffffffce0000004b00000014000002bc0000000000";
 
-		// The two create-editor racial CHARACTER-TEMPLATE choice records (dynel 0xD00C) constructed in
+		// The two create-editor racial character-template choice records (dynel 0xD00C) constructed in
 		// RetailCreateEditorPostReadyBurst, plus a world-entry action record (dynel 0xCF0D). Gates that BuildBody
 		// reproduces each captured body byte-exact, so a burst feeding BuildBody the same dynel/tail is wire-identical.
 		private const string TemplateChoiceBodyA =

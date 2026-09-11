@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// WorldEntity.TakeExpiredBuffs - the world tick's buff-expiry step (#274).
+	// WorldEntity.TakeExpiredBuffs - the world tick's buff-expiry step.
 	//
-	// The regression these guard: the tick used to remove entries while enumerating the live ConcurrentDictionary, so
-	// with SEVERAL buffs expiring in the same tick some were skipped (a removal can unlink the bucket neighbour the
-	// enumerator was about to visit). Because the client never self-expires an icon, a skipped buff left its icon on
-	// the bar at 0s forever. One buff at a time never showed it, which is why it survived the original #274 fix.
+	// Expiry must not remove entries while enumerating the live ConcurrentDictionary: a removal can unlink the bucket
+	// neighbour the enumerator was about to visit, so with several buffs expiring in the same tick some are skipped.
+	// The client never self-expires an icon, so a skipped buff leaves its icon on the bar at 0s forever - and a single
+	// expiring buff never shows the fault, which is why these gates mix several.
 	public class ActiveBuffExpiryTests
 	{
 		[Fact]
@@ -86,12 +86,12 @@ namespace Faolan.Tests
 			Assert.Single(entity.TakeExpiredBuffs(now));
 		}
 
-		// The spellweave TRANCE must never be persisted for relog (#690).
+		// The spellweave trance must never be persisted for relog.
 		//
 		// What happened: a weave was cancelled, which sends the client the buff's end twin - and left the live
 		// `ActiveBuffs` entry standing, because `SendBuffRemoval` only wrote packets. The autosave then persisted it
 		// (a self-buff no dedicated re-applier owns), and the next login restored it. The player got the trance's
-		// EFFECTS and sound looping around them with no weave behind it, no pose (nothing re-sends the trance-enter
+		// effects and sound looping around them with no weave behind it, no pose (nothing re-sends the trance-enter
 		// animation) and no way to stop it - the weave toggle would have opened a new one.
 		//
 		// Two guards, because the fault needed both: the removal now deregisters (covered by the caller), and the
@@ -101,7 +101,7 @@ namespace Faolan.Tests
 		[InlineData(0x3969D000u)] // Arcane Drought
 		[InlineData(0x37E5A800u)] // Spellweaving(1), stack 0
 		[InlineData(0x37E5AA00u)] // ... and further up the stack
-		[InlineData(0x000B9000u)] // Exhausted - energy comes back FULL at login, so a restored one is a lie
+		[InlineData(0x000B9000u)] // Exhausted - energy comes back full at login, so a restored one is a lie
 		public void TheSpellweaveTrance_IsNeverPersisted(uint wireSpellId)
 		{
 			var entity = Entity();
@@ -111,11 +111,10 @@ namespace Faolan.Tests
 			Assert.False(BuffService.ShouldPersistBuff(entity, buff));
 		}
 
-		// The exclusion is the trance, not "buffs that look like it" - an ordinary self-buff still survives a relog,
-		// which is the whole point of #274.
+		// The exclusion is the trance, not "buffs that look like it" - an ordinary self-buff still survives a relog.
 		[Theory]
 		[InlineData(0x0030A200u)] // an ordinary spell
-		[InlineData(0x396AE900u)] // Arcane Renewal - a weave ELEMENT, which is a real spell in its own right
+		[InlineData(0x396AE900u)] // Arcane Renewal - a weave element, which is a real spell in its own right
 		public void AnOrdinarySelfBuff_IsStillPersisted(uint wireSpellId)
 		{
 			var entity = Entity();

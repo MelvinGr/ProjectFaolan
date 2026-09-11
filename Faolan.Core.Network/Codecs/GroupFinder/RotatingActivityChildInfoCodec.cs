@@ -4,22 +4,25 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderReceivedRotatingActivityChildInfo (0x20CF): the answer to c2s
-	// RequestRotatingActivityChildInfo(uint32 activityId) - which child of a ROTATING activity is running now, and
-	// which one is up next. The finder window asks it once per session for activity 1 and paints the "this week /
-	// next week" line from the reply.
-	//
-	//   [u32 activityId][u32 currentChildIndex][u32 nextChildIndex]
-	//
-	// ⭐ THE FIELD SPLIT COMES FROM THE CLIENT, NOT FROM THE BYTES. All five captured replies are byte-identical
-	// (`00000001 00000002 00000003`, two captures), so nothing in the corpus separates three u32s from one u32 and
-	// a u64, or from a list. What settles it is the client's own recovered field list for this dispatch -
-	// `activityId, currentChildIndex, nextChildIndex` [V1: docs/re/aoc-client-rpc-methods.json] - three fields
-	// against a 12-byte body, which is three u32s and can be nothing else.
-	//
-	// ⚠️ What the corpus does NOT pin is what makes a child current: every capture in it was taken in one sitting,
-	// so `2` and `3` are one moment of retail's rotation schedule, not a measured relationship to `1`. We model no
-	// rotation, so `GroupFinderService` answers with that captured pair. Gitea #882.
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderReceivedRotatingActivityChildInfo</c> - the answer to c2s
+	///     <c>RequestRotatingActivityChildInfo(activityId)</c>: which child of a rotating activity is running now and
+	///     which is up next, as <c>[u32 activityId][u32 currentChildIndex][u32 nextChildIndex]</c>. The finder window
+	///     asks it once per session for activity 1 and paints the "this week / next week" line from the reply.
+	/// </summary>
+	/// <remarks>
+	///     The field split comes from the client rather than from the bytes: all five captured replies are
+	///     byte-identical (<c>00000001 00000002 00000003</c>, two captures), so nothing in the corpus separates three
+	///     u32s from one u32 and a u64, or from a list. The client's own recovered field list for this dispatch -
+	///     <c>activityId, currentChildIndex, nextChildIndex</c> [V1: docs/re/aoc-client-rpc-methods.json] - is three
+	///     fields against a 12-byte body, which can only be three u32s.
+	///     <para>
+	///         What the corpus does not pin is what makes a child current: every capture was taken in one sitting, so
+	///         <c>2</c> and <c>3</c> are one moment of retail's rotation schedule rather than a measured relationship
+	///         to <c>1</c>. No rotation is modelled, so <c>GroupFinderService</c> answers with that captured pair.
+	///         Open work tracked in Gitea #882.
+	///     </para>
+	/// </remarks>
 	public static class RotatingActivityChildInfoCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderReceivedRotatingActivityChildInfo;

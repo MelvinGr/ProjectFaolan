@@ -8,12 +8,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #214 - the DEAD-STATE field in the 0x737A6DF9 world-entry FullPlayerChar snapshot.
+	// The dead-state field in the 0x737A6DF9 world-entry FullPlayerChar snapshot.
 	//
 	// The in-client release/resurrect window is gated on a client-side local-player dead-flag
-	// (DAT_0297d374->vtable[0x10]()). Live gdb proved our death PACKETS are byte-correct yet the flag stays
+	// (DAT_0297d374->vtable[0x10]()). Live gdb proved our death packets are byte-correct yet the flag stays
 	// false because our world-entry never sets the dead-state. The retail `login-while-dead` capture carries
-	// the dead state with NO SimpleCharKilledBy / NO ApplySpell - so the dead-state lives in the SNAPSHOT.
+	// the dead state with no SimpleCharKilledBy / no ApplySpell - so the dead-state lives in the snapshot.
 	//
 	// Decoded (tools/capture/decode_death_snapshot.py): the dead-state is the tails stat block's
 	// current-health stat, statId 0x001B (CharacterStatId.HealthCurrent) = 0 (while HealthMax stays full).
@@ -53,10 +53,9 @@ namespace Faolan.Tests
 		public void PostAccessBlock_PatchedDead_ZeroesEveryCurrentHpOccurrenceButKeepsMax()
 		{
 			// The builder-side of the fix: applying class vitals (full HP) then marking dead (CurrentHp = 0) must
-			// zero EVERY HealthCurrent occurrence while leaving every HealthMax one full - exactly the shape the
-			// retail dead snapshot carries. Asserted BY STAT ID: this used to name slots [23]/[54]/[202] and
-			// [21]/[56]/[204], which is the positional addressing #393 removed - the ids are on the wire, and a
-			// stat appears in the displayed list AND in both halves of the sheet.
+			// zero every HealthCurrent occurrence while leaving every HealthMax one full - exactly the shape the
+			// retail dead snapshot carries. Asserted by stat id rather than by slot position: the ids are on the wire,
+			// and a stat appears in the displayed list and in both halves of the sheet.
 			const uint hp = 196, hpBase = 196;
 			var block = SubClassStatBlock.CreateFreshBlock();
 			block.ApplyClassVitals(hp, hpBase, 0, 0, 217, 197);

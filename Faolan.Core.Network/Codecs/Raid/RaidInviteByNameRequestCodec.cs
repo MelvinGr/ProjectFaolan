@@ -4,12 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Raid
 {
-	// c2s RaidInviteCharacterByName (CSPlayerAgent 0x72) - `RaidInviteCharacterByName(const std::string& i_CharName,
-	// const std::string& i_cMessage)`: two wire strings and nothing else. This is what the raid window's name box
-	// sends, and it is the only raid message that names a player the server may never have seen.
-	//
-	// No capture carries it (#669); the shape is the client's parameter list over the captured string encoding
-	// (`[u16 len][latin1]`).
+	/// <summary>
+	///     c2s <c>RaidInviteCharacterByName(const std::string&amp; i_CharName, const std::string&amp; i_cMessage)</c>:
+	///     two wire strings and nothing else. What the raid window's name box sends, and the only raid message that
+	///     names a player the server may never have seen.
+	/// </summary>
+	/// <remarks>
+	///     No capture carries it; the shape is the client's parameter list over the captured string encoding
+	///     (<c>[u16 len][latin1]</c>).
+	/// </remarks>
 	public static class RaidInviteByNameRequestCodec
 	{
 		public const uint Method = (uint)CSPlayerAgentMethods.RaidInviteCharacterByName;

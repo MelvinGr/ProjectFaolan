@@ -6,7 +6,7 @@ namespace Faolan.Tests
 {
 	// The ChatServer / CsPlayerAgent handoffs carry the realm address as a fixed u32 (byte-exact against retail's
 	// ChatServerConnectReady / CSServerConnectReady), and the retail client is IPv4-only - both of its connect helpers
-	// are hard-wired AF_INET + gethostbyname (#845). So `Realm.IpAddressLong` must refuse anything that is not an
+	// are hard-wired AF_INET + gethostbyname. So `Realm.IpAddressLong` must refuse anything that is not an
 	// IPv4 literal rather than truncating a v6 address to its first four bytes, which `GetAddressBytes()` would
 	// happily do and which would ship a handoff to a host that does not exist.
 	public class RealmHandoffAddressTests

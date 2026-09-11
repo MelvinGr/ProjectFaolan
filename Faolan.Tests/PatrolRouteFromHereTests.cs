@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #716: a patrol body is anchored at a POSITION, so what gets handed to the client has to be the part of the beat
+	// A patrol body is anchored at a position, so what gets handed to the client has to be the part of the beat
 	// still ahead of the NPC, starting where it now stands. Re-issuing the captured body - anchored at the entity's
-	// SPAWN - is what made a patroller teleport back to the start of its route the moment a lap ended.
+	// spawn - is what made a patroller teleport back to the start of its route the moment a lap ended.
 	public class PatrolRouteFromHereTests
 	{
 		private static readonly Vector3[] Street =
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void WalkingBack_HandsOverTheWaypointsInDescendingOrder()
 		{
-			// An open route is walked back DOWN its own polyline (#703), so the remainder runs the other way.
+			// An open route is walked back down its own polyline, so the remainder runs the other way.
 			var ahead = PatrolRoute.FromHere(Street, 1, backwards: true, loops: false);
 
 			Assert.Equal([Street[1], Street[0]], ahead);
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ClosedRoute_AtTheStart_IsExactlyOneLap_NotTwo()
 		{
-			// The wrap must not re-add what the first pass already covered: standing at index 0, one lap IS the list.
+			// The wrap must not re-add what the first pass already covered: standing at index 0, one lap is the list.
 			var ahead = PatrolRoute.FromHere(Street, 0, backwards: false, loops: true);
 
 			Assert.Equal(Street, ahead);

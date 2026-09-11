@@ -10,14 +10,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A mail attachment ESCROWS the item row, it does not describe one.
+	// A mail attachment escrows the item row, it does not describe one.
 	//
-	// Before `MailAttachment.EscrowedInstanceId` the attachment carried a template id, the take minted a fresh item
-	// from it and the seller's row was deleted outright - so an auction-house sale delivered a **gemless,
-	// crafterless copy**. That is the same bug #750 fixed for player trades (`a3fb97e8`), which had been left live
-	// in the mail and AH paths because they were not looked at.
+	// Without `MailAttachment.EscrowedInstanceId` the attachment carries a template id, the take mints a fresh item
+	// from it and the seller's row is deleted outright - so an auction-house sale delivers a gemless, crafterless
+	// copy, the same loss a player trade suffers when it re-mints an item instead of moving the row.
 	//
-	// These gates are on the MODEL rather than the service, because that is where the bug lived: what the attachment
+	// These gates are on the model rather than the service, because that is where the bug lived: what the attachment
 	// can point at, and whether the row survives the round trip. `TradepostServiceTests` covers the wire side.
 	public class MailEscrowTests
 	{
@@ -26,7 +25,7 @@ namespace Faolan.Tests
 		private const uint Seller = 7001;
 		private const uint SwordTemplate = 157123;
 
-		// The whole point: a crafted, gemmed item put in escrow and handed on is the SAME ROW, so its crafter and
+		// The whole point: a crafted, gemmed item put in escrow and handed on is the same row, so its crafter and
 		// its gems are still there. Minting from a template loses both, silently.
 		[Fact]
 		public async Task AnEscrowedItem_KeepsItsCrafterAndGemsAcrossTheHandOver()
@@ -48,7 +47,7 @@ namespace Faolan.Tests
 					ctx.Items.Add(new Item { Id = SwordTemplate, Name = "Bloodsilver Khopesh", Key = new ProtoDecryptionKey() });
 					ctx.Items.Add(new Item { Id = GemTemplate, Name = "Sanguine Radiant Sapphire", Key = new ProtoDecryptionKey() });
 
-					// The seller's listed item: player-crafted, and gemmed. Both facts live ONLY on the row.
+					// The seller's listed item: player-crafted, and gemmed. Both facts live only on the row.
 					var listed = new ItemInstance
 					{
 						OwnerCharacterId = Seller, Container = ContainerKind.Bank, Slot = 6, TemplateId = SwordTemplate, Count = 1, CreatorName = "NecroL80",
@@ -76,7 +75,7 @@ namespace Faolan.Tests
 				Assert.Equal("NecroL80", escrowed!.CreatorName);
 				Assert.Equal(GemTemplate, Assert.Single(escrowed.Sockets).GemItemId);
 
-				// The hand-over: the SAME row moves to the buyer.
+				// The hand-over: the same row moves to the buyer.
 				var delivered = await database.TransferCharacterItem(escrowed.Id, Buyer, ContainerKind.Bag, 3);
 
 				Assert.NotNull(delivered);
@@ -95,7 +94,7 @@ namespace Faolan.Tests
 		}
 
 		// The importer-seeded half. Those listings have no seller character and never had an item row, so their
-		// purchase mail carries a NULL escrow and the take still mints from the template - which is why the column
+		// purchase mail carries a null escrow and the take still mints from the template - which is why the column
 		// is nullable rather than required.
 		[Fact]
 		public async Task AnAttachmentWithNoEscrow_IsStillValid()

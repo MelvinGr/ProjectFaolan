@@ -6,21 +6,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The realm-select list. Every gate here is about WHICH SLOT a value lands in, because that is the only thing
+	// The realm-select list. Every gate here is about which slot a value lands in, because that is the only thing
 	// about this message that can be got wrong silently.
 	//
-	// ⭐ #931 is why. The client renders the load level from Dimension_t+0x30, and we sent a `== Full` BOOL there
-	// with the real 0..4 enum in the next slot, which nothing reads. Nothing caught it: the byte COUNT is identical
-	// either way, so no length check fires; every realm we serve is Recommended, so both spellings are 0 and no
-	// capture of our own server differs; and there is no Funcom-era capture of this message to compare against. A
-	// layout that only a disassembly can check needs a test that states the layout.
+	// The client renders the load level from Dimension_t+0x30. A `== Full` bool there, with the real 0..4 enum in the
+	// next slot that nothing reads, is invisible: the byte count is identical either way, so no length check fires;
+	// every realm we serve is Recommended, so both spellings are 0 and no capture of our own server differs; and there
+	// is no Funcom-era capture of this message to compare against. A layout that only a disassembly can check needs a
+	// test that states the layout.
 	public class SetDimensionListCodecTests
 	{
 		private static readonly DimensionEntry Sample = new DimensionEntry(
 			7, RealmOnlineStatus.Online, "Fury", RealmLoadStatus.VeryHeavy, false, RealmType.PvPByFaction, RealmLanguage.German);
 
 		[Fact]
-		// ⭐ THE #931 GATE. The load level occupies the fourth u32 after the name, and it is the ENUM - a value the
+		// The load level occupies the fourth u32 after the name, and it is the enum - a value the
 		// client compares against 0, 1, 2, 3 and 4. VeryHeavy (3) is chosen deliberately: it is a value no boolean
 		// can express, so this fails on any regression back to a flag.
 		public void TheLoadLevel_IsTheEnumAndSitsAtOffset0x30()
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ...and the flag derived from it stays in the NEXT slot, which has no consumer. Asserted so the pair cannot
+		// ...and the flag derived from it stays in the next slot, which has no consumer. Asserted so the pair cannot
 		// quietly swap back: a test naming only 0x30 would still pass if both slots held the enum.
 		public void TheFullFlag_SitsAtOffset0x34_AndIsNotTheLevel()
 		{
@@ -41,16 +41,16 @@ namespace Faolan.Tests
 		// The rest of the record, pinned by offset. These are the fields the client reads (+0x04, +0x24, +0x38) plus
 		// the ones it does not, because a slot moving is what breaks the ones that matter.
 		//
-		// ⚠️ German is deliberately not 0 here. The client counts realms whose +0x40 is NON-ZERO to decide whether to
+		// German is deliberately not 0 here. The client counts realms whose +0x40 is non-zero to decide whether to
 		// show its language-flag button row, so a value that happened to be 0 would make this gate agree with a codec
 		// that dropped the field entirely.
 		[InlineData(0x00, 7u)]                                  // Id
-		[InlineData(0x04, (uint)RealmOnlineStatus.Online)]      // READ: the renderer's `== 2` gate
-		[InlineData(0x24, 1u)]                                  // READ: the language-flag bitfield; 1 = the English bit
+		[InlineData(0x04, (uint)RealmOnlineStatus.Online)]      // Read: the renderer's `== 2` gate
+		[InlineData(0x24, 1u)]                                  // Read: the language-flag bitfield; 1 = the English bit
 		[InlineData(0x28, 0u)]
 		[InlineData(0x2c, 0u)]
-		[InlineData(0x38, (uint)RealmType.PvPByFaction >> 8)]   // READ: Type's HIGH byte, compared against 7
-		[InlineData(0x40, (uint)RealmLanguage.German)]          // READ, but only for being non-zero (the FlagButtons row)
+		[InlineData(0x38, (uint)RealmType.PvPByFaction >> 8)]   // Read: Type's high byte, compared against 7
+		[InlineData(0x40, (uint)RealmLanguage.German)]          // Read, but only for being non-zero (the FlagButtons row)
 		public void EveryOtherField_SitsAtItsClientOffset(int offset, uint expected)
 		{
 			Assert.Equal(expected, Field(Sample, offset));
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 
 		[Fact]
 		// One entry is a fixed 30 bytes past the name, and the name is the only variable-width field. Pinning the
-		// total is what catches a field ADDED or DROPPED, which the per-offset gates above cannot see.
+		// total is what catches a field added or dropped, which the per-offset gates above cannot see.
 		public void AnEntry_IsExactlyTheClientsRecordLength()
 		{
 			// u32 count + u32 id + u32 status + u16 length + the name + the fixed tail.
@@ -87,8 +87,8 @@ namespace Faolan.Tests
 		{
 			var realms = List(Sample, Sample with { Id = 8, Name = "Crom", LoadStatus = RealmLoadStatus.Full, IsFull = true, Type = RealmType.PvE });
 
-			// ⚠️ Compared member-wise, not with Assert.Equal on the records: DimensionList holds an ARRAY, and a
-			// record compares its members with EqualityComparer<T>.Default, which for an array is REFERENCE equality.
+			// Compared member-wise, not with Assert.Equal on the records: DimensionList holds an array, and a
+			// record compares its members with EqualityComparer<T>.Default, which for an array is reference equality.
 			Assert.Equal(realms.Realms, SetDimensionListCodec.Parse(SetDimensionListCodec.Build(realms)).Realms);
 		}
 
@@ -98,12 +98,12 @@ namespace Faolan.Tests
 			Assert.ThrowsAny<System.Exception>(() => SetDimensionListCodec.Parse(SetDimensionListCodec.Build(List(Sample))[..^1]));
 		}
 
-		// The record's fixed tail, in WIRE bytes: five u32s (+0x24..+0x34), then five bytes carrying +0x38's u32 and
+		// The record's fixed tail, in wire bytes: five u32s (+0x24..+0x34), then five bytes carrying +0x38's u32 and
 		// +0x3c's bool, then +0x40's u32 and +0x44's bool.
 		private const int TailBytes = 5 * 4 + 5 + 4 + 1;
 
 		[Theory]
-		// #933: the bitfield at +0x24 is what the client resolves a realm's language FROM, and it is not the id at
+		// The bitfield at +0x24 is what the client resolves a realm's language from, and it is not the id at
 		// +0x40. Three languages have a bit of their own; the four Western ones share one, because the flag row the
 		// client shows holds exactly EnglishFlag, GermanFlag, FrenchFlag and SpanishFlag - one realm serves all four
 		// and the player picks.
@@ -120,8 +120,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ Not a redundant restatement of the table above: it pins the flags to +0x24 rather than to +0x40, which
-		// is the confusion #933 exists to remove. The two carry different things about the same realm.
+		// Not a redundant restatement of the table above: it pins the flags to +0x24 rather than to +0x40, which
+		// is the confusion to avoid. The two carry different things about the same realm.
 		public void TheLanguageFlags_GoToOffset0x24_NotTheLanguageIdSlot()
 		{
 			var korean = Sample with { Language = RealmLanguage.Korean, LanguageFlags = RealmLanguageFlags.For(RealmLanguage.Korean) };
@@ -140,7 +140,7 @@ namespace Faolan.Tests
 			return SetDimensionListCodec.Build(List(realm));
 		}
 
-		// ⚠️ A client offset does NOT map linearly onto the wire, which is the whole reason this is a TABLE rather
+		// A client offset does not map linearly onto the wire, which is the whole reason this is a table rather
 		// than arithmetic. Two things break the correspondence, and both are places a field could be misplaced:
 		//   - the name is a std::string spanning +0x08..+0x23 in the struct (0x1C bytes) but a u16 length plus its
 		//     characters on the wire;

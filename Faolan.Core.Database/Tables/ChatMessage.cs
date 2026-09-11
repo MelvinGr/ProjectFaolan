@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One persisted chat line (#95). The ChatServer records every channel post and whisper here so chat history
+	// One persisted chat line. The ChatServer records every channel post and whisper here so chat history
 	// survives a restart and can be served back (web/MCP log, moderation, a "recent chat" read on rejoin). This is a
-	// HISTORY table, not part of the wire protocol - the live relay (BroadcastChannelChat / whisper) is unchanged;
+	// history table, not part of the wire protocol - the live relay (BroadcastChannelChat / whisper) is unchanged;
 	// persistence is a write-behind side effect. Keyed by the auto-increment Id; queried newest-first by channel.
 	[Index(nameof(SentAt)), Index(nameof(ChannelId))]
 	public class ChatMessage : BaseEntity
@@ -27,7 +27,7 @@ namespace Faolan.Core.Database.Tables
 		public bool IsWhisper { get; set; }
 
 		// The chat channel type byte + id the post went to (e.g. global channels, or a ~Playfield channel whose id is
-		// a map id). For a WHISPER both are 0 and TargetId carries the recipient.
+		// a map id). For a whisper both are 0 and TargetId carries the recipient.
 		public byte ChannelType { get; set; }
 
 		[MaxLength(64)]

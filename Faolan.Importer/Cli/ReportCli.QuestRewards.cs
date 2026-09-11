@@ -10,10 +10,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report quest-rewards` (#464): the four reward lists inside every captured `Quest_c` journal record - what
+	// `--report quest-rewards`: the four reward lists inside every captured `Quest_c` journal record - what
 	// `QuestcRecord` carried for months as *"16 raw u32s, unvalidated"*.
 	//
-	// They are not raw. Each 16-word element is one quest REWARD ITEM, and the shape is the ACG item the snapshot's
+	// They are not raw. Each 16-word element is one quest REWARD item, and the shape is the ACG item the snapshot's
 	// own inventory entries already use:
 	//
 	//     [u32 instance][u32 questId]
@@ -21,11 +21,11 @@ namespace Faolan.Importer.Cli
 	//     [u32 1000620][u32 templateId][u32 key1..key4]     <- ACG template2 + its key
 	//     [u32 level][u32 quantity]
 	//
-	// ⭐ **The proof is DECRYPTION, not shape.** This report takes each element's wire key, opens the RDB entry the
-	// element names, and decrypts it - the same test that pinned `keyN <-> templateN` for `ProtoAcgItem` (#752). A
+	// The proof is DECRYPTION, not shape. This report takes each element's wire key, opens the RDB entry the
+	// element names, and decrypts it - the same test that pinned `keyN <-> templateN` for `ProtoAcgItem`. A
 	// plausible carve cannot survive that: a wrong key yields a garbage header, not a valid one.
 	//
-	// ⭐ And it is a CONTENT source. An item enters our catalog when a capture yields its `Data1..4`, and these
+	// And it is a content source. An item enters our catalog when a capture yields its `Data1..4`, and these
 	// elements carry 100 template keys the inventory path never sees - two thirds of them for templates `Items` does
 	// not hold. Open work tracked in Gitea.
 	//
@@ -154,7 +154,7 @@ namespace Faolan.Importer.Cli
 				else
 					failed++;
 
-				// The CONTROL. Without it "the key works" is just "the record parses", which a decrypt with any key
+				// The control. Without it "the key works" is just "the record parses", which a decrypt with any key
 				// might also manage - and a 1-in-N chance of a plausible header is exactly how a wrong carve survives.
 				if (!Decodes(rdb, entry, wrongKey, id))
 					wrongKeyFailures++;

@@ -4,7 +4,7 @@ using Faolan.Core.Enums;
 namespace Faolan.Core.Database.Tables
 {
 	/// <summary>
-	///     The five attribute scores a character's health/mana/stamina pools scale off, in DISPLAY units (the sheet's
+	///     The five attribute scores a character's health/mana/stamina pools scale off, in display units (the sheet's
 	///     "Strength 20"), i.e. the class/level base plus everything worn and trained. Fed to
 	///     <see cref="CharacterMaxStats.For" />, which turns them into each pool's attribute-scaled term.
 	/// </summary>
@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 		public static VitalAttributes LevelOneBase { get; } = new VitalAttributes(1, 1, 1, 1, 1);
 
 		/// <summary>
-		///     Whether a stat id is one of the five ATTRIBUTES this struct carries. Named here rather than as a set
+		///     Whether a stat id is one of the five attributes this struct carries. Named here rather than as a set
 		///     beside each caller, because "the five" is this type's own definition and a second list of them drifts.
 		/// </summary>
 		public static bool IsAttribute(CharacterStatId stat)
@@ -29,8 +29,8 @@ namespace Faolan.Core.Database.Tables
 		}
 
 		/// <summary>
-		///     A character's totals from the two sources the world model carries: the class/level base (#444,
-		///     <c>ClassAttributeBases</c>, in the RAW WIRE scale) and the display-unit gear/feat bonuses
+		///     A character's totals from the two sources the world model carries: the class/level base
+		///     (<c>ClassAttributeBases</c>, in the raw wire scale) and the display-unit gear/feat bonuses
 		///     (<c>MaxStatAggregator</c>). Absent entries count as zero on both sides - an undecoded (class, level)
 		///     row is an honest shortfall the world-entry path already warns about, not a reason to invent a base.
 		/// </summary>
@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Tables
 
 			uint Score(CharacterStatId attribute)
 			{
-				// ⚠️ The two sources are in DIFFERENT scales: ClassAttributeBase.Amount is raw wire (Constitution 170)
+				// The two sources are in different scales: ClassAttributeBase.Amount is raw wire (Constitution 170)
 				// and MaxStatAggregator has already divided gear by the stat's scale (Constitution 39). Adding them
 				// without this division reads ~10x high.
 				var total = (classBaseWire?.GetValueOrDefault(attribute) ?? 0) / (int)attribute.GetScale()

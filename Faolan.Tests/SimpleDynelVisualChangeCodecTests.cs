@@ -10,21 +10,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// SimpleDynelVisualChangeIIR (0xE7F4F8F8) - the visual/collision state flip, decoded off the CLIENT's own reader
+	// SimpleDynelVisualChangeIIR (0xE7F4F8F8) - the visual/collision state flip, decoded off the client's own reader
 	// (`SimpleDynelVisualChangeIIR_c::ReadSubClass` = FUN_007a6910) rather than off what happened to be captured
-	// (#535).
+	//.
 	//
-	// The tail is discriminated by a u32 KIND, and the previous model split the record one byte early - `[u32
+	// The tail is discriminated by a u32 kind, and the previous model split the record one byte early - `[u32
 	// word0][u8 state]` where the wire has `[u8 0][u32 kind]` - which is why the leading word read as a constant zero
 	// and everything after the "state" had to be carried as an opaque `Trailer`. The two shapes that "could not be
 	// one grammar" (four zero bytes vs a length-prefixed name) are kinds 5 and 0 of the same switch.
 	//
-	// One captured body PER KIND the corpus contains, byte-exact through Parse -> Build. Sizes for the kinds the
-	// corpus does NOT contain (1, 6, 7, 10, 11, 12) come from the same switch, so they are implemented rather than
+	// One captured body per kind the corpus contains, byte-exact through Parse -> Build. Sizes for the kinds the
+	// corpus does not contain (1, 6, 7, 10, 11, 12) come from the same switch, so they are implemented rather than
 	// left to throw; the round-trip below covers the seven that can be evidenced.
 	public class SimpleDynelVisualChangeCodecTests
 	{
-		// (kind, captured body INCLUDING its carrier length word, source)
+		// (kind, captured body including its carrier length word, source)
 		public static TheoryData<uint, string> CapturedBodies => new TheoryData<uint, string>
 			{
 				{ 0, "00000020e7f4f8f80000c878000139660000000000000d6f626a6563745f636c6f736564" }, // Barbarian-create #261
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 			Assert.Equal(record, SimpleDynelVisualChangeCodec.Build(parsed));
 		}
 
-		// The two shapes the old comment said could not be one grammar. They differ ONLY in the kind word: kind 0
+		// The two shapes that look like separate grammars. They differ only in the kind word: kind 0
 		// takes a name, kind 5 takes one word - and both are read by the same switch.
 		[Fact]
 		public void TheNamedAndTheWordShapes_AreOneGrammar()
@@ -62,8 +62,7 @@ namespace Faolan.Tests
 			Assert.Equal([0x000300B3u], flip.Words);
 		}
 
-		// The two forms production sends, still byte-identical to what they built before the kinds were named: the
-		// collision drop (#267's Casilda chain) and the loot-window open.
+		// The two forms production sends: the collision drop (the Casilda chain) and the loot-window open.
 		[Fact]
 		public void TheProductionForms_BuildTheirCapturedShapes()
 		{
@@ -77,13 +76,13 @@ namespace Faolan.Tests
 			Assert.Equal("Open", open.Name);
 		}
 
-		// #678: the HARVEST sequence, byte-exact against the capture it was decoded from -
+		// The harvest sequence, byte-exact against the capture it was decoded from -
 		// `xxx_mage-necromancer_login_play2_tortage_city_first-quests`, the quarry Stone Brick 0x6AF3. Every record
 		// of it, in the order retail sends them, built from what the object's DB row holds: the mesh pair
 		// (GeometryAssetId 23748 / GeometryAssetType 1010030), the collision (Kdtree 168444 - which is that mesh
 		// manifest's own `<CollisionMesh2 file>`), and CarsGroup 5.
 		//
-		// The two runs are the harvest and the REGROWTH, and the difference between them is the whole point: the
+		// The two runs are the harvest and the regrowth, and the difference between them is the whole point: the
 		// first clears the mesh and the collision, the second sets them back to the brick's own.
 		[Fact]
 		public void TheHarvestSequence_MatchesTheCapturedBrick()
@@ -94,7 +93,7 @@ namespace Faolan.Tests
 			// f4247 18:43:16.131 - the harvest opens with a 2.0 s fade-out.
 			Assert.Equal("e7f4f8f80000c87800006af3000000000940000000", Hex(SimpleDynelVisualChanges.FadeOut(Dynel, Brick, 2.0f)));
 
-			// f4276 18:43:18.181 - the fade has run: draw nothing (id 0, still the MESHINDEXFILE type), fade back in.
+			// f4276 18:43:18.181 - the fade has run: draw nothing (id 0, still the meshindexfile type), fade back in.
 			Assert.Equal("e7f4f8f80000c87800006af3000000000400000000000f696e", Hex(SimpleDynelVisualChanges.ChangeMesh(Dynel, Brick, 0, 1010030)));
 			Assert.Equal("e7f4f8f80000c87800006af3000000000840000000", Hex(SimpleDynelVisualChanges.FadeIn(Dynel, Brick, 2.0f)));
 
@@ -109,7 +108,7 @@ namespace Faolan.Tests
 		}
 
 		// The particle puff over the harvested brick (f4249). Not built by the server - the effect id is per-object
-		// content no column holds (Gitea #685) - but the FORM is decoded, so the codec can state it: attractor 0
+		// content no column holds - but the form is decoded, so the codec can state it: attractor 0
 		// means "not attached to a bone", which is why this one carries a position, and that position is the brick's
 		// own (its spawn puts it at 915.92 / 171.04 / 844.66).
 		[Fact]
@@ -125,7 +124,7 @@ namespace Faolan.Tests
 			return Convert.ToHexStringLower(SimpleDynelVisualChangeCodec.Build(value));
 		}
 
-		// Strict (#530 rule 4): a kind outside the client's switch is a decode failure, and so is a body whose
+		// Strict: a kind outside the client's switch is a decode failure, and so is a body whose
 		// payload does not match the kind's stated size - the whole point of the switch is that the size is known.
 		[Fact]
 		public void AnUnknownKind_OrAShortPayload_Throws()

@@ -7,9 +7,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// A quest line named only by an index block (a 4CC, no header) takes its three header records from any quest on
-	// it - the quest record carries the same 50300 / 52000 / 52000 trio the completed journal's area group does.
-	// Reported in-client 2026-09-03: an imported level-15 character's completed tab drew "The Ancient Gateway" (15051, line 2237) under a
-	// nameless "(1)" group because 2237 had a 4CC and no title.
+	// it: the quest record carries the same 50300 / 52000 / 52000 trio the completed journal's area group does.
+	// Without that fill-in the line has no title and the completed tab groups its quests under a nameless heading -
+	// line 2237, which quest 15051 ("The Ancient Gateway") belongs to, is one such line.
 	public class QuestLineHeaderTests
 	{
 		private static QuestDefinition Quest(uint id, uint line, bool withHeader = true)

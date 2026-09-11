@@ -8,24 +8,23 @@ namespace Faolan.Importer.Extractors
 {
 	// Splits an NPC's CONDITION-VARYING screens apart, from the captures alone.
 	//
-	// The problem it solves (#526): a screen's identity is (NpcTemplateId, TypeId, AnswerPath) plus its quest gate, and
+	// The problem it solves: a screen's identity is (NpcTemplateId, TypeId, AnswerPath) plus its quest gate, and
 	// without a gate every variant of one greeting collapses to a single key. `ConversationExtractor.Merge` then picks
-	// between them by PACKET COUNT - so two genuinely different screens are treated as one screen captured better or
+	// between them by packet count - so two genuinely different screens are treated as one screen captured better or
 	// worse, and the longer wins, silently. That is how Turach's and Laranga's fresh-character greetings were lost:
 	// Turach's root is three different answer sets depending on chain stage, and only the last one survived.
 	//
-	// The gate does not need to be hand-written, and since #639 none of it is: the captured QUEST STATE at the greeting
-	// (`ConversationWalk.QuestStates` - every quest the capture has seen a full-update or a state flip for, in its
-	// latest state) is the discriminator. It replaced a five-row table keyed on capture FILE NAMES, which silently
-	// dropped any Casilda screen from a capture nobody had listed.
+	// The gate is not hand-written: the captured quest state at the greeting (`ConversationWalk.QuestStates` - every
+	// quest the capture has seen a full-update or a state flip for, in its latest state) is the discriminator. A
+	// hand-kept table keyed on capture file names would silently drop any screen from a capture nobody had listed.
 	//
-	// ⚠️ But gating EVERY entry on its state would be wrong: greet a vendor while some unrelated quest happens to be
+	// But gating every entry on its state would be wrong: greet a vendor while some unrelated quest happens to be
 	// active and the vendor's greeting becomes conditional on it. So the split is CONFLICT-DRIVEN - a group is only
 	// gated when its entries actually disagree about what the screen says. An NPC captured consistently stays
 	// unconditional, which is nearly all of them.
 	public static class ConversationVariants
 	{
-		// The LDB references a screen carries, in order: `<remoteformat ... category="C" ... id="I">` in any order of
+		// The LDB references a screen carries, in order: `<remoteformat... category="C"... id="I">` in any order of
 		// attributes. This is the SIGNATURE - what the screen says and what it offers.
 		private static readonly Regex Reference = new Regex(
 			"<(?:remoteformat|localized)[^>]*?\\bcategory=\"?(\\d+)\"?[^>]*?\\bid=\"?(\\d+)\"?|" + "<(?:remoteformat|localized)[^>]*?\\bid=\"?(\\d+)\"?[^>]*?\\bcategory=\"?(\\d+)\"?",
@@ -33,14 +32,15 @@ namespace Faolan.Importer.Extractors
 
 		// Assigns a quest gate to the entries that need one, and returns the whole set for Merge.
 		//
-		// `report` receives one line per group that was split, and one per group that conflicts but could NOT be split
-		// (its variants share the same captured quest state - most often a variant gated on something that is not quest
-		// state at all, like the [MALE]/[FEMALE] answer pair, #418). Those are left to Merge's existing packet-count
-		// tiebreak rather than dropped: the goal is to import the BULK and hand-correct the tail, not to be exhaustive.
+		// `report` receives one line per group that was split, and one per group that conflicts but could not be split
+		// (its variants share the same captured quest state - most often a variant gated on something that is not
+		// quest state at all, like the [MALE]/[FEMALE] answer pair). Those are left to Merge's existing packet-count
+		// tiebreak rather than dropped: the goal is to import the bulk and hand-correct the tail, not to be
+		// exhaustive.
 		public static List<ConversationWalk> SplitConflicts(IReadOnlyList<ConversationWalk> all, ICollection<string>? report = null)
 		{
 			var result = new List<ConversationWalk>(all.Count);
-			// Grouped by the NPC's TEMPLATE, not its name (#646) - same reason as Merge's: two same-named different
+			// Grouped by the NPC's template, not its name - same reason as Merge's: two same-named different
 			// NPCs must not have their variants compared against each other. Same fallback chain, shared so the two
 			// groupings cannot disagree.
 			var groups = all.GroupBy(e => (
@@ -67,9 +67,9 @@ namespace Faolan.Importer.Extractors
 				var (gates, unsplit) = Discriminate(classes);
 
 				// The quest state is not the only condition retail varies a screen on. When it cannot tell the variants
-				// apart, try the GREETING COUNT: an NPC says a full welcome the first time you open his window and a
-				// terse line every time after ("Hello.{social greet}" -> "What now?"), which is four of the six screens
-				// #645 reported. Only taken when the flag splits the group CLEANLY and UNANIMOUSLY - two classes, one
+				// apart, try the GREETING count: an NPC says a full welcome the first time you open his window and a
+				// terse line every time after ("Hello.{social greet}" -> "What now?"). Only taken when the flag splits
+				// the group cleanly and unanimously - two classes, one
 				// captured only on a first meeting and one only on a repeat - because a flag that merely correlates
 				// would put a gate on the wire that the captures do not support.
 				if (gates.Count == 0 && SplitsOnGreetingCount(classes))
@@ -117,7 +117,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Whether the greeting count is what tells this group apart: exactly two variants, every capture of one taken on
-		// a FIRST meeting and every capture of the other on a REPEAT. Anything looser - three variants, or a class the
+		// a first meeting and every capture of the other on a REPEAT. Anything looser - three variants, or a class the
 		// corpus caught both ways - is a correlation rather than the condition, and is left to the packet-count
 		// tiebreak with the report saying so.
 		private static bool SplitsOnGreetingCount(List<IGrouping<string, ConversationWalk>> classes)
@@ -127,21 +127,21 @@ namespace Faolan.Importer.Extractors
 			       && classes[0].First().RepeatGreeting != classes[1].First().RepeatGreeting;
 		}
 
-		// Picks one (quest, state) gate per signature class, plus how many classes the captured state could NOT tell
+		// Picks one (quest, state) gate per signature class, plus how many classes the captured state could not tell
 		// apart from the one before them.
 		//
 		// The classes are ordered by how much of the player's quest state the capture knew - a variant seen deep in a
 		// chain knows more quests than the one a fresh character got - and the LEAST-informed class becomes the
 		// unconditional fallback. Every other class is gated on a (quest, state) pair its captures agree on and that no
 		// less-or-equally-informed class carries. Two variants late in the same chain can therefore end up with gates
-		// that BOTH pass at once (Casilda's escort greeting is 12407 Active; her later ones add 12369/12373 on top of a
+		// that both pass at once (Casilda's escort greeting is 12407 Active; her later ones add 12369/12373 on top of a
 		// still-active 12407); the runtime resolves that by serving the variant gated on the quest the player accepted
 		// most recently, which is the beat they are actually on (ConversationService.PickConversationScreen).
 		//
-		// ⚠️ A class with no pair left INHERITS the previous class's gate rather than failing the whole group. Those two
+		// A class with no pair left INHERITS the previous class's gate rather than failing the whole group. Those two
 		// are the same screen as far as the captures can say - most often one capture of it carried a trailing close
 		// window and the other did not - so handing both the same gate lets Merge keep the richer, which is exactly the
-		// old behaviour, WITHOUT dropping the gates every other variant in the group had earned.
+		// old behaviour, without dropping the gates every other variant in the group had earned.
 		private static (Dictionary<string, (uint Quest, QuestState State)> Gates, int Unsplit) Discriminate(List<IGrouping<string, ConversationWalk>> classes)
 		{
 			// A capture that never showed us a quest state says nothing about which variant this is, so it cannot
@@ -159,7 +159,7 @@ namespace Faolan.Importer.Extractors
 				// less informed. A more-informed class is allowed to share the pair - it carries a gate of its own that
 				// is strictly later in the chain, and the most-recent-quest rule prefers it.
 				var blocked = ordered.Take(i).SelectMany(k => Carried(classes.First(c => c.Key == k))).ToHashSet();
-				// ACTIVE first: a conditioned variant is about the quest the player is ON, and that is also the gate the
+				// active first: a conditioned variant is about the quest the player is on, and that is also the gate the
 				// runtime's most-recent-quest tiebreak can order. Gating Casilda's 12369 greeting on "10238 Completed"
 				// (equally true, and the lowest id available) would be true from far earlier in the chain and would lose
 				// the tiebreak to a later quest, serving the wrong line.
@@ -179,7 +179,7 @@ namespace Faolan.Importer.Extractors
 			return (gates, unsplit);
 		}
 
-		// The (quest, state) pairs EVERY informative capture of this variant agrees on. Intersecting rather than
+		// The (quest, state) pairs every informative capture of this variant agrees on. Intersecting rather than
 		// unioning is what keeps a pair that one walk happened to carry (an unrelated quest the player picked up) from
 		// being read as the thing that selects the variant.
 		private static HashSet<(uint Quest, QuestState State)> Agreed(IGrouping<string, ConversationWalk> c)
@@ -200,15 +200,15 @@ namespace Faolan.Importer.Extractors
 			return agreed ?? [];
 		}
 
-		// Every pair ANY capture of this variant carried - what it may not be confused with.
+		// Every pair any capture of this variant carried - what it may not be confused with.
 		private static HashSet<(uint Quest, QuestState State)> Carried(IGrouping<string, ConversationWalk> c)
 		{
 			return c.SelectMany(e => e.QuestStates ?? new Dictionary<uint, QuestState>()).Select(kv => (kv.Key, kv.Value)).ToHashSet();
 		}
 
-		// What the screen SAYS, as its ordered LDB references.
+		// What the screen says, as its ordered LDB references.
 		//
-		// ⚠️ Deliberately not the packet bytes or their count. Two captures of the same screen differ routinely - a
+		// Deliberately not the packet bytes or their count. Two captures of the same screen differ routinely - a
 		// dropped packet, unrelated traffic interleaved into the run - and comparing raw would manufacture a conflict
 		// at almost every key. The LDB reference list is stable across those and is exactly the thing that differs when
 		// the screen is genuinely a different one: Turach's roots share the same "Aye?" line and differ only in the

@@ -8,23 +8,21 @@ using Faolan.Core.Rdb.Assets;
 namespace Faolan.Importer.Cli
 {
 	// `--report class-hierarchy`: the client's own archetype -> class membership (RDB 1000506), checked against the
-	// hard-coded `ConanArchetypes` (Gitea #469).
+	// hard-coded `ConanArchetypes`.
 	//
-	// ⭐ `ConanArchetypes` states, in its own comment, that "the client ships the archetype IDS (1000505 tier 1) but
-	// no MEMBERSHIP table", and therefore takes the twelve placements from the game's published documentation.
-	// **RDB 1000506 is that table.** Its loader names it outright — `FUN_0078de40` bails with *"Could not load
+	// `ConanArchetypes` states, in its own comment, that "the client ships the archetype IDS (1000505 tier 1) but
+	// no membership table", and therefore takes the twelve placements from the game's published documentation.
+	// RDB 1000506 is that table. Its loader names it outright — `FUN_0078de40` bails with *"Could not load
 	// classmembership info. This will cause gui to loose parent class feats"* — and all twelve placements agree
 	// exactly, so the published-documentation citation becomes a corroboration rather than the source.
 	//
-	// The report exists because the constant STAYS hard-coded: the callers that need it run in capture-driven
-	// importer modules with no `RdbDir`, which is the reason it was inlined in the first place. So the client's table
-	// cannot be the runtime source, and the honest alternative is a tool that proves the two agree - the same shape
-	// as `--report creature-races`' cross-check.
+	// The report exists because the constant stays hard-coded: the callers that need it run in capture-driven importer
+	// modules with no RDB directory, so the client's table cannot be the runtime source and the honest alternative is
+	// a tool that proves the two agree - the same shape as `--report creature-races`' cross-check.
 	//
-	// ⚠️ TWO entries ship and they are not versions of each other. Entry 0 is the full AUTHORED hierarchy - 27 edges,
+	// Two entries ship and they are not versions of each other. Entry 0 is the full authored hierarchy - 27 edges,
 	// including classes this build never shipped - and entry 1 is the 16 that did. Checking against entry 0 would
-	// report ten phantom "missing" classes, so the check reads entry 1 and entry 0 is printed beside it as design
-	// history.
+	// report ten phantom "missing" classes, so the check reads entry 1 and entry 0 is printed beside it.
 	public static partial class ReportCli
 	{
 		private static void ClassHierarchy(string rdbDir)
@@ -44,7 +42,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// The class NAMES come from 1000505, the registry the ids belong to - printed rather than assumed, so a
+			// The class names come from 1000505, the registry the ids belong to - printed rather than assumed, so a
 			// row naming a class we have no name for is visible.
 			var names = ClassRegistryNames(rdb);
 
@@ -77,7 +75,7 @@ namespace Faolan.Importer.Cli
 			var problems = 0;
 			foreach (var archetype in Enum.GetValues<ConanArchetype>())
 			{
-				// Commoner is the pre-class starting state: it parents the four ARCHETYPES, not classes, so it has no
+				// Commoner is the pre-class starting state: it parents the four archetypes, not classes, so it has no
 				// `ConanArchetypes` row and is reported below as the root rather than compared here.
 				if (archetype == ConanArchetype.Commoner)
 					continue;
@@ -92,7 +90,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {archetype,-9} ours [{string.Join(",", ours)}]  client [{string.Join(",", theirs)}]  {(agree ? "agree" : "⛔ DISAGREE")}");
 			}
 
-			// Commoner parents the four ARCHETYPES rather than any class, which is why it has no `ConanArchetypes`
+			// Commoner parents the four archetypes rather than any class, which is why it has no `ConanArchetypes`
 			// row - stated so the empty line above is not read as a gap.
 			Console.WriteLine($"  {"(root)",-9} Commoner (0) parents the archetypes themselves: [{string.Join(",", shipped.ChildrenOf(0).Order())}]");
 			Console.WriteLine();

@@ -9,16 +9,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #710: the SPELL-sourced half of the spell-scoped stat modifier - "while this buff is up, your next Fireball
-	// crits harder". #593 imported the identical record off FEATS; the spell half was parsed, its stat and magnitude
-	// stored on `SpellStatEffects`, and its TARGET dropped on the floor, because that table is keyed by the carrier
-	// with the carrier as the SUBJECT and had nowhere to put "…and the thing that moves belongs to another spell".
+	// The spell-sourced half of the spell-scoped stat modifier - "while this buff is up, your next Fireball
+	// crits harder". The identical record is imported off feats. On the spell half the stat and magnitude land on
+	// `SpellStatEffects` and the target has nowhere to go, because that table is keyed by the carrier with the carrier
+	// as the subject: it cannot say "…and the thing that moves belongs to another spell".
 	public class SpellSpellStatModifierTests
 	{
 		private const uint SpellScoped = ItemTemplateStatModifiers.SpellStatModifierKind; // 53054
 		private const uint LineScoped = ItemTemplateStatModifiers.SpellLineStatModifierKind; // 53062
 
-		// The target is the whole point of the table, and it RESOLVES - which is what says the decode is right rather
+		// The target is the whole point of the table, and it resolves - which is what says the decode is right rather
 		// than merely self-consistent. Same strength of result as the feat half's 593/593 and 475/475.
 		[Fact]
 		public async Task EveryTarget_ResolvesAgainstTheShippedCatalog()
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			Assert.InRange(byLine.Count(r => !lines.Contains(r.TargetSpellLineId!.Value)), 0, 20);
 		}
 
-		// The KIND picks the target column, and never both - the same invariant the feat table carries. A row with
+		// The kind picks the target column, and never both - the same invariant the feat table carries. A row with
 		// neither would be a modifier aimed at nothing; a row with both would be two claims about one record.
 		[Fact]
 		public async Task ExactlyOneTargetColumn_IsSet_AndTheKindSaysWhich()
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			Assert.All(rows, r => Assert.Contains(r.EffectKind, (uint[]) [SpellScoped, LineScoped]));
 		}
 
-		// `Value` and `PercentHundredths` are ALTERNATIVES, not a pair - the client's tooltip builder renders them
+		// `Value` and `PercentHundredths` are alternatives, not a pair - the client's tooltip builder renders them
 		// through two different formatters. Exactly one is set on every shipped row, which is what lets them be two
 		// nullable columns rather than a value plus a mode flag.
 		[Fact]
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 				$"spell {r.SpellId} seq {r.Sequence}: {r.Value}/{r.PercentHundredths}"));
 		}
 
-		// ⚠️ A carrier that targets ITSELF would be indistinguishable from an ordinary `SpellStatEffect`, and would
+		// A carrier that targets itself would be indistinguishable from an ordinary `SpellStatEffect`, and would
 		// make the whole table pointless - the target is what separates the two.
 		[Fact]
 		public async Task TheStatsAreSPELLProperties_NotCharacterOnes()
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 				"the modifier stats stopped being dominated by spell properties - check the Stat slot is still being read");
 		}
 
-		// The RELATIVE half is what the engine applies, and the arithmetic is the client's: -1000 = -10%.
+		// The relative half is what the engine applies, and the arithmetic is the client's: -1000 = -10%.
 		[Theory]
 		[InlineData(1000, 0, 1000)] // no modifier - the base is untouched
 		[InlineData(1000, -1000, 900)] // -10%
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, modifiers.ApplyPercent(baseValue, CharacterStatId.ManaCost));
 		}
 
-		// A modifier on a DIFFERENT stat must not leak onto the one being asked about - the fold is per stat.
+		// A modifier on a different stat must not leak onto the one being asked about - the fold is per stat.
 		[Fact]
 		public void ApplyPercent_IgnoresAModifierOnAnotherStat()
 		{
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 			Assert.Equal(-50, modifiers.Absolute(CharacterStatId.ManaCost));
 		}
 
-		// ⭐ #787: the absolute half APPLIES now, in the units the column holds. `ManaCost` stores the property-run
+		// The absolute half applies now, in the units the column holds. `ManaCost` stores the property-run
 		// field verbatim, so the delta needs no conversion.
 		[Fact]
 		public void Apply_AddsTheAbsoluteHalfInTheColumnsOwnUnits()
@@ -138,7 +138,7 @@ namespace Faolan.Tests
 			Assert.Equal(1000, Absolute(CharacterStatId.CastingTimeSeconds, -50).Apply(1000, CharacterStatId.ManaCost));
 		}
 
-		// ⚠️ ...except where the importer converted the field on the way into the column. `CastTime` is built as
+		// ...except where the importer converted the field on the way into the column. `CastTime` is built as
 		// `field * 10` (centiseconds -> ms), so a -300 modifier is -3.00 s = -3000 ms, not -300. Reading it in the
 		// column's units would take 3 s off a 5 s cast instead of 0.3 s.
 		[Fact]
@@ -148,7 +148,7 @@ namespace Faolan.Tests
 			Assert.Equal(3000, Absolute(CharacterStatId.Duration, -200).Apply(5000, CharacterStatId.Duration));
 		}
 
-		// Additive first, then relative - the client's own composition order for a value carrying both (#782).
+		// Additive first, then relative - the client's own composition order for a value carrying both.
 		[Fact]
 		public void Apply_AddsBeforeItScales()
 		{

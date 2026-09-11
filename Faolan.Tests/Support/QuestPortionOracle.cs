@@ -25,7 +25,7 @@ namespace Faolan.Tests.Support
 				}
 			};
 
-			// The empty completed-journal frame (0x3F1) always sits between the active journal and the index (#391).
+			// The empty completed-journal frame (0x3F1) always sits between the active journal and the index.
 			byte[] portion =
 			[
 				.. QuestcRegionCodec.Build(quests), .. CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas([])),

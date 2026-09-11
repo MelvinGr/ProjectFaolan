@@ -8,7 +8,7 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Quest wiring read from the goals' own DECRYPTED objective text (#520/#521). RDB-backed, so it is opt-in and
+	// Quest wiring read from the goals' own DECRYPTED objective text. RDB-backed, so it is opt-in and
 	// separate from the capture-driven `quest-wiring`.
 	public sealed class RdbQuestTextModule : IImportModule
 	{
@@ -28,12 +28,12 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var r = await RdbQuestTextImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
-			// The target fill runs SECOND on purpose. It claims every remaining bare Kill goal whose trailing reference
+			// The target fill runs second on purpose. It claims every remaining bare Kill goal whose trailing reference
 			// is an npc_template, which makes the goal "wired" - so running it first would hide a talk/deliver shape
 			// from the objective-text pass above, which is the only thing that can retype one.
 			var t = await RdbQuestGoalTargetImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 
-			// Every goal it did NOT wire is accounted for by reason - a silent skip here is indistinguishable from a
+			// Every goal it did not wire is accounted for by reason - a silent skip here is indistinguishable from a
 			// decode regression.
 			return new ImportResult(
 				$"{r.Wired} goal(s) typed from their objective text ({r.WiredWithoutNpc} of them naming an NPC we do not hold yet, " +

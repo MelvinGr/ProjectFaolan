@@ -4,18 +4,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The vanity ("costume") hide filter is a bitmask, and the bit index IS the toggle's wire `slot` arg = the base
-	// equip slot id. It is emitted VERBATIM in the spawn's PreFrame, so a drift in the bit mapping shows up in-client as
+	// The vanity ("costume") hide filter is a bitmask, and the bit index is the toggle's wire `slot` arg = the base
+	// equip slot id. It is emitted verbatim in the spawn's PreFrame, so a drift in the bit mapping shows up in-client as
 	// the wrong piece of armour hidden.
 	//
 	// Capture-confirmed by the vanity login dumps: showing Head (slot 2) sets bit 2, Chest (slot 5) sets bit 5, and the
 	// "toggle vanity global" master is slot 31 -> bit 31.
 	//
-	// This was EquipmentSlotMappingTests, which mostly locked the CharacterEquipmentSlot -> CharacterEquipment COLUMN
-	// mapping through that class's `e[slot]` indexer. There is no such mapping any more: since #750 a worn item is an
-	// item instance whose Slot column IS the wire slot id, so there is nothing between the two to get wrong and those
-	// three gates went with the thing they guarded. The mask is what is left, and it moved to Character - it is not a
-	// property of any item.
+	// A worn item is an item instance whose Slot column is the wire slot id, so there is no slot-to-column mapping
+	// between the two to get wrong. The mask is not a property of any item either: it lives on Character.
 	public class VanityShownMaskTests
 	{
 		[Fact]

@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// What makes an NPC say a bark (#694). Ours used to run every bark off one clock and then filter who HEARD it,
-	// so range gated the audience but nothing gated the speech: the crier could deliver "You should consider joining
-	// a guild, <name>!" to a player who had been standing there for ten minutes, or to nobody at all.
+	// What makes an NPC say a bark. Running every bark off one clock and then filtering who heard it gates the
+	// audience by range and the speech not at all: the crier delivers "You should consider joining a guild, <name>!"
+	// to a player who has been standing there for ten minutes, or to nobody.
 	//
 	// The captured set says barks split three ways, and the row already carries the discriminator - the `channel`
 	// component of the token. `NpcChatterBarks.TriggerOf` is that split; these tests pin it against the shipped rows
@@ -27,24 +27,24 @@ namespace Faolan.Tests
 			// The whole corpus: 6 channels over 25 rows / 8 NPC types. If a re-harvest adds a seventh, this fails and
 			// the new one has to be classified deliberately rather than silently defaulting to Ambient.
 			//
-			// It has earned its keep TWICE. The first 2026-08-08 gameplay captures added `broadcastcycle` (the
+			// It has earned its keep twice. The first 2026-08-08 gameplay captures added `broadcastcycle` (the
 			// Chronicler of Deeds' achievement announcements), which would have defaulted to Ambient - the right
 			// answer there, since the name states the cue. The armoury captures the same day added `eventactions`
 			// (the Cimmerian child's `CityLifeCimmerianChildReactToPlayer`), where the default would have been
-			// WRONG: it reacts to a player and carries a `PC.name` slot, so it is Detection.
+			// wrong: it reacts to a player and carries a `PC.name` slot, so it is Detection.
 			Assert.Equal(new[] { "broadcastcycle", "conversation1", "conversation2", "event", "eventactions", "sendtell" }, byChannel);
 		}
 
 		[Fact]
 		public void EveryHARVESTEDLine_SitsOnAnAmbientChannel()
 		{
-			// #717: a harvested line is exactly a row with no `key=` - the bark category is plaintext, so the LDB
+			// A harvested line is exactly a row with no `key=` - the bark category is plaintext, so the LDB
 			// harvest has no key to record and an all-zero FormatKey is how the two provenances are told apart (a
-			// CAPTURED bark always has one; NpcChatterCodec.ToRow throws rather than producing a zero).
+			// captured bark always has one; NpcChatterCodec.ToRow throws rather than producing a zero).
 			//
-			// On a CONDITIONAL channel the script's own state picks the line, so a random pick from its siblings says
+			// On a conditional channel the script's own state picks the line, so a random pick from its siblings says
 			// something the condition would have excluded. `RenownCrier/sendtell` is the proof: 18 lines, 13 of them
-			// stages of a guild-advertising transaction. And the harvest's slot-free filter SELECTS AGAINST the NPC's
+			// stages of a guild-advertising transaction. And the harvest's slot-free filter selects against the NPC's
 			// own lines there - all 13 carry a slot, so the one that got through was `10` "Excuse me, I wanted to ask
 			// you something.", which the crier then greeted a player with in-client.
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
@@ -62,10 +62,10 @@ namespace Faolan.Tests
 		[Theory]
 		[InlineData("conversation1", BarkTrigger.Ambient)] // RenownBystanderLovers / RenownBystanderChild - overheard idle chatter
 		[InlineData("conversation2", BarkTrigger.Ambient)] // RenownBystanderWomen / RenownBystanderLovers
-		[InlineData("sendtell", BarkTrigger.Detection)] //    RenownCrier - a TELL, addressed at the player it detected
+		[InlineData("sendtell", BarkTrigger.Detection)] //    RenownCrier - a tell, addressed at the player it detected
 		[InlineData("event", BarkTrigger.EncounterScript)] // RnBLadyInDistressBrainScript - the #502 encounter's own trigger
 		[InlineData("broadcastcycle", BarkTrigger.Ambient)] // AchievementsPetHeraldOfDeeds - a broadcast, on a cycle
-		[InlineData("eventactions", BarkTrigger.Detection)] // CityLifeCimmerianChildReactToPlayer - reacts TO a player
+		[InlineData("eventactions", BarkTrigger.Detection)] // CityLifeCimmerianChildReactToPlayer - reacts to a player
 		public void ChannelNamesTheCue(string channel, BarkTrigger expected)
 		{
 			Assert.Equal(expected, NpcChatterBarks.TriggerOf(Bark(channel)));
@@ -79,15 +79,15 @@ namespace Faolan.Tests
 			Assert.Equal(BarkTrigger.Ambient, NpcChatterBarks.TriggerOf(Bark("somethingnew")));
 		}
 
-		// ⛔ **A session slot is never STORED with a value.** That is the invariant worth gating, and it is the one
+		// **A session slot is never stored with a value.** That is the invariant worth gating, and it is the one
 		// that failed silently: `IsSessionBarkSlot` tested `EndsWith(".name")`, template 21992's achievement herald
 		// carries `Target.displayname`, and its captured value - a real player's character name - was therefore filed
-		// as CONTENT, shipped in `faolan.sql` and re-sent verbatim to everyone in range (#692).
+		// as content, shipped in `faolan.sql` and re-sent verbatim to everyone in range.
 		//
 		// It replaces a weaker claim that a session slot implies a non-ambient trigger. That claim has a
 		// counterexample and the leak is what surfaced it: `AchievementsPetHeraldOfDeeds` (21992) broadcasts on
 		// `broadcastcycle` - which `TriggerOf` reads as Ambient - and names the player whose deed it is announcing.
-		// So a bark CAN be on an ambient channel and still name somebody, and the trigger classification cannot be
+		// So a bark can be on an ambient channel and still name somebody, and the trigger classification cannot be
 		// inferred from the slot. This gate does not depend on the trigger at all, which is why it survives that.
 		[Fact]
 		public void NoSessionSlot_CarriesAStoredValue()
@@ -104,17 +104,16 @@ namespace Faolan.Tests
 				+ "player's, and storing it re-sends one player's name to everybody"));
 		}
 
-		// The crier's greeting, and why there is exactly ONE of it.
+		// The crier's greeting, and why there is exactly one of it.
 		//
-		// This used to assert TWO tells, and cited the second - SayInChat 10, carrying no session slot - as the corpus'
-		// evidence that an unaddressed bark can still be a tell. It was not a captured line at all: the corpus only ever
-		// caught him saying 57, and 10 came from #331's LDB sibling harvest. Resolved against the client, 10 reads
-		// "Excuse me, I wanted to ask you something." out of a `sendtell` set that is otherwise a guild-advertising
-		// transaction, and in-client he greeted a player with it (#717). Harvesting a conditional channel is what put it
-		// there, and the harvest no longer does.
+		// SayInChat 10 is not one of them, and is not a captured line: the corpus only ever caught him saying 57, and
+		// 10 comes from an LDB sibling harvest. Resolved against the client, 10 reads "Excuse me, I wanted to ask you
+		// something." out of a `sendtell` set that is otherwise a guild-advertising transaction, and in-client he greets
+		// a player with it. Harvesting a conditional channel is what puts such a line in the corpus, and the harvest
+		// does not do that.
 		//
-		// The one-way rule TriggerOf implements is unchanged - the CHANNEL states the cue, a session slot only confirms
-		// it - but the corpus no longer holds a counter-example to the converse, so nothing here claims one.
+		// The one-way rule TriggerOf implements: the channel states the cue, a session slot only confirms it. The corpus
+		// holds no counter-example to the converse, so nothing here claims one.
 		[Fact]
 		public void TheCrier_HasOneTell_AndItIsADDRESSED()
 		{
@@ -151,7 +150,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(world.Tick(0.1), e => e.Type == WorldTickEffectType.NpcGreeting);
 		}
 
-		// Walking away and coming back IS a fresh arrival - that is what a greeting means. The player has to leave the
+		// Walking away and coming back is a fresh arrival - that is what a greeting means. The player has to leave the
 		// wider forget band first, so loitering on the greeting boundary cannot re-trigger it.
 		[Fact]
 		public void LeavingAndReturning_GreetsAgain()

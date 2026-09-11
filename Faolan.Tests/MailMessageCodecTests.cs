@@ -5,8 +5,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the DispatchMailMessage (S->C 0x2002) body against the NecroL80
-	// buy_from_autionhouse_get_mail capture: the base mail (#1604, 629 B, no attachment) and the same mail with the
-	// bought item appended (#1607, 754 B). Proves the mail builder reconstructs the captured bytes from a Mail row
+	// buy_from_autionhouse_get_mail capture: the base mail (frame 1604, 629 B, no attachment) and the same mail with
+	// the bought item appended (frame 1607, 754 B). Proves the mail builder reconstructs the captured bytes from a Mail row
 	// (construct-don't-replay) and that Parse is its faithful inverse. docs/subsystems/tradepost-protocol.md "Buy -> mail".
 	public class MailMessageCodecTests
 	{
@@ -28,8 +28,8 @@ namespace Faolan.Tests
 		                                      "045b3b1a140d274a93cb1564da8ff71d166eedda25bf045b3b252e7d02002d2e7d0200380a45000000000000007208006f31" + "00000000";
 
 		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to the captured recipient, attachCount=0. The
-		// recipient is the captured character - it is IN these bytes (and in the body XML), so the assertions spell it
-		// out; a pseudonym belongs anywhere the name is free input, not where it is what the dump says (#417).
+		// recipient is the captured character - it is in these bytes (and in the body XML), so the assertions spell it
+		// out; a pseudonym belongs anywhere the name is free input, not where it is what the dump says.
 		private const string BaseBody = "20d82b631c0c578f08006f3100074173736173323308006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
 		                                "785b63604e745d3665512136495d546a5d4c7722206b6e75626f743d22302220203e3c706172616d657465722076616c7565" +
@@ -65,8 +65,8 @@ namespace Faolan.Tests
 		{
 			// The base mail (poll / GetAllMails) is the attachment mail with the items withheld - i.e. the 754 B
 			// mail rebuilt with no attachments reproduces the 629 B body (same mailId/recipient/footer). The withholding
-			// is now the ROW mapper's `includeAttachments`, so this goes through it, which also proves the row
-			// round-trip: decoded -> rows -> value -> the SAME bytes.
+			// is the row mapper's `includeAttachments`, so this goes through it, which also proves the row
+			// round-trip: decoded -> rows -> value -> the same bytes.
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 			var row = MailColumns.ToRow(mail);
 
@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 
 			Assert.Equal(0x20d82b631c0c578ful, mail.MailId);
-			Assert.Equal("Assas23", mail.RecipientName); // the capture's recipient, pseudonymised in the blob above (#465)
+			Assert.Equal("Assas23", mail.RecipientName); // the capture's recipient, pseudonymised in the blob above
 			Assert.Equal(0x08006f31u, mail.RecipientClass);
 			Assert.Equal("", mail.SenderName); // system mail - empty sender name
 			Assert.Equal(0ul, mail.Money);

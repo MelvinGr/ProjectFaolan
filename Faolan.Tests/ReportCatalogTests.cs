@@ -6,8 +6,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The `--report` index is a table (#928 item 4); these are the properties the old switch enforced by construction
-	// and the table has to keep by test: one entry per name, kebab-case names, and no entry shadowing the built-in
+	// The `--report` index is a table, so the properties a dispatch switch would enforce by construction are enforced
+	// here instead: one entry per name, kebab-case names, a runner on every entry, and no entry shadowing the built-in
 	// `list`.
 	public class ReportCatalogTests
 	{

@@ -3,27 +3,30 @@ using System.Threading;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Per-session allocator that assigns a unique entity handle to each spawned entity (the player and each NPC)
-	// and remembers the mapping, so the same entity keeps a stable handle across the spawn, its 96C46740
-	// registration, the 0x2020 -> 0x2008 spawn-check, and the 0x2076 manifest. Retail assigns these server-side
-	// (e.g. 0x000818xx, 0x00081906); the exact values are not significant as long as they are unique within the
-	// session and distinct from the player's client instance.
-	//
-	// Phase-2 foundation: once spawns are built dynamically (instead of replayed verbatim with the capture's
-	// handles), every builder draws its handle from here, which is what lets the login path drop the Strie-only
-	// gating and work for any character/NPC set.
+	/// <summary>
+	///     Per-session allocator that assigns a unique entity handle to each spawned entity - the player and each NPC - and
+	///     remembers the mapping, so an entity keeps a stable handle across its spawn, its registration, the spawn-check
+	///     exchange and the manifest.
+	/// </summary>
+	/// <remarks>
+	///     Retail assigns these server-side; the exact values are not significant as long as they are unique within the
+	///     session and distinct from the player's client instance. Every builder draws its handle from here.
+	/// </remarks>
 	public sealed class SpawnHandleTable
 	{
-		// Base chosen to sit in the same low range retail uses while staying clear of character instances
-		// (EntityHandles.CharacterInstanceBase). Allocation is sequential from here, and staying below that base is
-		// the invariant that keeps a spawned entity from colliding with a character - asserted in SpawnHandleTableTests.
+		/// <summary>
+		///     The allocation base, chosen to sit in the same low range retail uses while staying clear of character
+		///     instances (EntityHandles.CharacterInstanceBase). Allocation is sequential from here, and staying below that
+		///     base is the invariant that keeps a spawned entity from colliding with a character; asserted in
+		///     SpawnHandleTableTests.
+		/// </summary>
 		public const uint HandleBase = 0x00090000;
 		private readonly Dictionary<string, uint> _byKey = [];
 
 		private readonly Lock _lock = new Lock();
 		private uint _next = HandleBase;
 
-		// Allocates a fresh, unique handle.
+		/// <summary>Allocates a fresh, unique handle.</summary>
 		public uint Allocate()
 		{
 			lock (_lock)
@@ -32,7 +35,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 		}
 
-		// True if a handle has been assigned to this key.
+		/// <summary>True if a handle has been assigned to this key.</summary>
 		public bool Contains(string entityKey)
 		{
 			lock (_lock)
@@ -41,7 +44,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 		}
 
-		// Returns the handle for the given entity key, allocating one on first use. Stable for the session.
+		/// <summary>
+		///     Returns the handle for the given entity key, allocating one on first use. Stable for the session.
+		/// </summary>
 		public uint GetOrAllocate(string entityKey)
 		{
 			lock (_lock)

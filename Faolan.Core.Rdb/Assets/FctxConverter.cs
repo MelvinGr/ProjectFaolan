@@ -5,13 +5,17 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Converts an Age of Conan FCTX texture container (RDB types 1010004/1010006/... ) to a standard DDS file.
-	// C# port of rdbreader's fctxconverter.cpp (philippelatulippe/rdbreader, GPLv3). FCTX is a thin wrapper around the
-	// same block-compressed (DXT1/3/5) data DDS uses; the only real work is (1) writing a DDS header from the FCTX
-	// header and (2) reversing the mipmap order - FCTX stores DXT mip chains smallest-first, DDS expects largest-first.
-	//
-	// We slice an in-memory payload (RdbReader.ReadDecompressed already unwrapped IOz1/zlib) rather than seeking a file,
-	// which makes the mip reorder a straight gather instead of the C++ relative-seek dance.
+	/// <summary>
+	///     Converts an Age of Conan FCTX texture container (RDB types 1010004, 1010006 and friends) to a standard DDS
+	///     file. Derived from rdbreader's fctxconverter.cpp (philippelatulippe/rdbreader, GPLv3).
+	/// </summary>
+	/// <remarks>
+	///     FCTX is a thin wrapper around the same block-compressed (DXT1/3/5) data DDS uses, so the only real work is
+	///     writing a DDS header from the FCTX header and reversing the mipmap order: FCTX stores DXT mip chains
+	///     smallest-first, DDS expects largest-first. The whole payload is sliced in memory —
+	///     <see cref="RdbReader.ReadDecompressed" /> has already unwrapped IOz1/zlib — which makes the mip reorder a
+	///     straight gather.
+	/// </remarks>
 	public static class FctxConverter
 	{
 		private const uint DDPF_FOURCC = 0x4;
@@ -31,22 +35,20 @@ namespace Faolan.Core.Rdb.Assets
 			if (payload.Length < 24)
 				return Result.Fail("FCTX payload shorter than its 24-byte header");
 
-			// FCTX header: magic[4], version u32, mapsMask u32, width u16, height u16, numMips u8, numMipsInFile u8,
-			// pad u16, fourcc[4] - 24 bytes. NAMED FROM THE CLIENT'S OWN LOADER (#464, 2026-08-31), not from the
-			// census that first characterised the two words:
+			// FCTX header, 24 bytes: magic[4], version u32, mapsMask u32, width u16, height u16, numMips u8,
+			// numMipsInFile u8, pad u16, fourcc[4]. The field names are the client loader's own:
 			//
-			//   * `FUN_00de0f00` reads the magic ("FCTX" = 0x58544346 LE) and then SWITCHES ON THE NEXT u32 -
-			//     1 -> the legacy loader `FUN_00de08c0`, 2 -> the current one `FUN_00de0bd0`, anything else
-			//     unsupported. So the word at +4 is the container VERSION, which is exactly the census's split
-			//     (2 on 2,801 textures, 1 on the 7 legacy ones whose fourcc slot holds no readable tag).
-			//   * The v2 loader POPCOUNTS bits 0x1|0x2|0x4 of the word at +8 and reads that many map chains - so it
-			//     is a bitmask of WHICH MAPS the container carries, not a layout id and not a plain count.
-			//     1 (bit 0) = the base image alone, every single-image format; MIXD's 6 (bits 1+2) = two additional
-			//     maps and its rare 2 (bit 1) = one - which is the 1.36x payload/px split the census measured and
-			//     could not explain as a 6-vs-2 count (that would have to be 3x).
-			//   * Bytes +16/+17 are `m_nNumMips` / `m_nNumMipsInFile` - the loader ASSERTS them equal ("Cheetah",
-			//     "The m_nNumMips field, and the m_nNumMipsInFile should be the same") - and the u16 at +18 is read
-			//     and discarded.
+			//   * FUN_00de0f00 reads the magic ("FCTX" = 0x58544346 LE) and switches on the next u32 - 1 selects the
+			//     legacy loader FUN_00de08c0, 2 the current one FUN_00de0bd0, anything else is unsupported. So the
+			//     word at +4 is the container version: 2 on 2,801 textures, 1 on the 7 legacy ones whose fourcc slot
+			//     holds no readable tag.
+			//   * The v2 loader popcounts bits 0x1|0x2|0x4 of the word at +8 and reads that many map chains, so it is
+			//     a bitmask of which maps the container carries, not a layout id and not a plain count. 1 (bit 0) is
+			//     the base image alone, which every single-image format uses; MIXD's 6 (bits 1+2) is two additional
+			//     maps and its rare 2 (bit 1) is one, matching the measured 1.36x payload-per-pixel split between
+			//     them.
+			//   * Bytes +16/+17 are m_nNumMips and m_nNumMipsInFile - the loader asserts them equal ("The m_nNumMips
+			//     field, and the m_nNumMipsInFile should be the same") - and the u16 at +18 is read and discarded.
 			var version = payload.ReadU32Le(4);
 			var mapsMask = payload.ReadU32Le(8);
 			int width = payload.ReadU16Le(12);
@@ -59,9 +61,10 @@ namespace Faolan.Core.Rdb.Assets
 			var header = new FctxHeader(fourCc, width, height, mip, version, mapsMask);
 			var pixels = payload[24..];
 
-			// MIXD is a CONTAINER of several concatenated maps (see DecodeMixdDetail); the usable single-channel body
-			// detail map is the trailing ATI1/BC4 sub-chain. Narrow to it before reordering, else the DDS is built from
-			// the wrong bytes. (Its "ATI1" tag doubles as the DDS fourcc, so the export is a standard single-channel DDS.)
+			// MIXD is a container of several concatenated maps (see DecodeMixdDetail); the usable single-channel body
+			// detail map is the trailing ATI1/BC4 sub-chain. It must be narrowed to before reordering, or the DDS is
+			// built from the wrong bytes. Its "ATI1" tag doubles as the DDS fourcc, so the export is a standard
+			// single-channel DDS.
 			if (fourCc == "MIXD")
 			{
 				var tag = LocateAti1Tag(pixels, width, height, mip);
@@ -80,7 +83,7 @@ namespace Faolan.Core.Rdb.Assets
 				body = ReorderMipsLargestFirst(pixels, width, height, mip, blockSize, out warning);
 			else
 			{
-				// Unknown/uncompressed fourcc: copy straight through (matches the C++ fall-through path).
+				// Unknown or uncompressed fourcc: copy straight through.
 				body = pixels.ToArray();
 				warning = $"unrecognized fourcc '{fourCc}' - copied verbatim, mip order not reversed";
 			}
@@ -89,18 +92,27 @@ namespace Faolan.Core.Rdb.Assets
 			return new Result(true, dds, header, warning);
 		}
 
-		// True if the payload starts with the FCTX magic (after RdbReader has unwrapped any IOz1/zlib container).
+		/// <summary>
+		///     Whether the payload starts with the FCTX magic, once <see cref="RdbReader" /> has unwrapped any
+		///     IOz1/zlib container.
+		/// </summary>
 		public static bool IsFctx(ReadOnlySpan<byte> payload)
 		{
 			return payload.Length >= 4 && payload[0] == (byte)'F' && payload[1] == (byte)'C' && payload[2] == (byte)'T' && payload[3] == (byte)'X';
 		}
 
-		// Decode the full-res tangent-space NORMAL map from a MIXD container to RGBA (X=R, Y=G, Z reconstructed). The
-		// MIXD body-atlas layout (1024x1024) is: [6 B/block compact-normal][BC5/ATI2 normal chain][ "ATI1" ][BC4
-		// detail chain] - the compact-normal seg1 is the client's DXT5-fallback source (redundant with the BC5, RE'd
-		// via FUN_00ddf960; not a gloss/AO map, so nothing to extract from it). The BC5 normal chain sits immediately
-		// before the "ATI1" tag and is smallest-first, so its full-res mip is the topLen bytes ending at the tag
-		// (located robustly via LocateAti1Tag). Returns false when there's no MIXD/ATI1 or the chain is too short.
+		/// <summary>
+		///     Decodes the full-resolution tangent-space normal map from a MIXD container to RGBA (X = R, Y = G, Z
+		///     reconstructed).
+		/// </summary>
+		/// <returns>False when the payload carries no MIXD/ATI1 chain, or the chain is too short.</returns>
+		/// <remarks>
+		///     The MIXD body-atlas layout (1024x1024) is [6 B/block compact-normal][BC5/ATI2 normal chain][ "ATI1" ]
+		///     [BC4 detail chain]. The compact-normal seg1 is the client's DXT5-fallback source (loader FUN_00ddf960),
+		///     redundant with the BC5 chain rather than a gloss or AO map, so there is nothing to extract from it. The
+		///     BC5 normal chain sits immediately before the "ATI1" tag and is smallest-first, so its full-resolution
+		///     mip is the topLen bytes ending at the tag.
+		/// </remarks>
 		public static bool TryDecodeMixdNormal(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height)
 		{
 			rgba = [];
@@ -124,10 +136,15 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
-		// Decode the full-resolution (top) mip of an FCTX directly to RGBA32 - for embedding a base-colour PNG in glTF.
-		// Decodes the BC1/BC3 (DXT1/3/5) colour formats (the diffuse maps). MIXD (BC4 single-channel normal/detail maps)
-		// return false UNLESS includeSingleChannel is set - the diffuse/material selectors rely on that false to skip
-		// normal maps; only explicit inspection (the debug texture endpoint) opts in to decode MIXD as grayscale.
+		/// <summary>
+		///     Decodes the full-resolution (top) mip of an FCTX directly to RGBA32, which is how a base-colour PNG gets
+		///     embedded in glTF. The BC1/BC3 (DXT1/3/5) colour formats — the diffuse maps — are handled.
+		/// </summary>
+		/// <param name="includeSingleChannel">
+		///     Decode a MIXD (BC4 single-channel normal/detail) payload as grayscale instead of refusing it. The
+		///     diffuse and material selectors rely on the refusal to skip normal maps, so only explicit inspection,
+		///     such as the debug texture endpoint, opts in.
+		/// </param>
 		public static bool TryDecodeTopMip(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height, bool includeSingleChannel = false)
 		{
 			rgba = [];
@@ -145,17 +162,17 @@ namespace Faolan.Core.Rdb.Assets
 
 			var pixels = payload[24..];
 
-			// MIXD ("MIXeD") is NOT a single mip chain - it is a CONTAINER of several concatenated maps. The body's
-			// surface-detail map is a trailing ATI1 (single-channel BC4) sub-texture carrying its OWN smallest-first mip
-			// chain; decode that sub-chain's full-res mip (anchored on its "ATI1" tag) rather than treating the whole
-			// payload as one chain from the start - the latter lands mid-container and decodes to noise.
+			// MIXD is a container of several concatenated maps, not a single mip chain. The body's surface-detail map
+			// is a trailing ATI1 (single-channel BC4) sub-texture carrying its own smallest-first mip chain, so the
+			// decode has to anchor on that sub-chain's "ATI1" tag; treating the whole payload as one chain from the
+			// start lands mid-container and decodes to noise.
 			if (fourCc == "MIXD")
 			{
 				rgba = DecodeMixdDetail(pixels, width, height, mip);
 				return rgba.Length > 0;
 			}
 
-			// Smallest-first layout: the top mip is last; skip every smaller mip (n=mip..2).
+			// Smallest-first layout: the top mip is last, so every smaller mip (n = mip..2) is skipped.
 			var topOffset = 0;
 			for (var n = mip; n >= 2; n--)
 				topOffset += MipSize(width, height, n, blockSize);
@@ -208,9 +225,15 @@ namespace Faolan.Core.Rdb.Assets
 			return dds;
 		}
 
-		// Extract + decode the full-res mip of the trailing ATI1/BC4 detail map from a MIXD container's pixel bytes (the
-		// payload after the 24-byte FCTX header). The sub-chain is smallest-first, so its full-res mip is the last block
-		// run. Empty array when no ATI1 sub-texture is present or the chain is too short to hold a full-res mip.
+		/// <summary>
+		///     Extracts and decodes the full-resolution mip of the trailing ATI1/BC4 detail map from a MIXD container's
+		///     pixel bytes, which are the payload after the 24-byte FCTX header. The sub-chain is smallest-first, so
+		///     its full-resolution mip is the last block run.
+		/// </summary>
+		/// <returns>
+		///     An empty array when there is no ATI1 sub-texture, or the chain is too short to hold a full-resolution
+		///     mip.
+		/// </returns>
 		private static byte[] DecodeMixdDetail(ReadOnlySpan<byte> pixels, int width, int height, int mip)
 		{
 			var topLen = MipSize(width, height, 1, 8);
@@ -223,7 +246,9 @@ namespace Faolan.Core.Rdb.Assets
 				: BcDecoder.DecodeBc4(chain.Slice(chain.Length - topLen, topLen), width, height);
 		}
 
-		// Total bytes of a full smallest-first BCn mip chain (levels 1..mip) at the given block size.
+		/// <summary>
+		///     The total bytes of a full smallest-first BCn mip chain (levels 1..mip) at the given block size.
+		/// </summary>
 		private static int FullChainSize(int width, int height, int mip, int blockSize)
 		{
 			var total = 0;
@@ -232,16 +257,21 @@ namespace Faolan.Core.Rdb.Assets
 			return total;
 		}
 
-		// Robustly locate the ATI1 detail sub-texture's tag inside a MIXD container's pixel bytes (the payload after
-		// the 24-byte FCTX header). The container is a chain of sub-textures (client MIXDTextureLoader,
-		// FUN_00de0bd0: a flags byte gives 1-3 sub-textures, each read with its own fourcc); for the body atlases
-		// that is [6 B/block compact-normal][BC5/ATI2 normal][ "ATI1" ][BC4 detail], with the ATI1 detail the FINAL
-		// sub-texture. Because the detail occupies a full smallest-first BC4 mip chain to the end of the payload, its
-		// tag sits at exactly (length - fullBc4Chain - 4). Anchoring by that computed position and VALIDATING the
-		// four tag bytes there is robust against a coincidental "ATI1" byte-run inside the compressed data (which a
-		// blind LastIndexOf would wrongly pick when it falls after the real tag). Falls back to the byte scan when
-		// the computed position doesn't validate (a MIXD whose layout differs), so it is never worse than the scan.
-		// Returns the offset of the tag, or -1 if no ATI1 sub-texture is found.
+		/// <summary>
+		///     Locates the ATI1 detail sub-texture's tag inside a MIXD container's pixel bytes, which are the payload
+		///     after the 24-byte FCTX header.
+		/// </summary>
+		/// <returns>The offset of the tag, or -1 when there is no ATI1 sub-texture.</returns>
+		/// <remarks>
+		///     The container is a chain of sub-textures (client MIXDTextureLoader, FUN_00de0bd0: a flags byte gives one
+		///     to three sub-textures, each read with its own fourcc). For the body atlases that is [6 B/block
+		///     compact-normal][BC5/ATI2 normal][ "ATI1" ][BC4 detail], with the ATI1 detail last. Because the detail
+		///     occupies a full smallest-first BC4 mip chain to the end of the payload, its tag sits at exactly
+		///     (length - fullBc4Chain - 4). Anchoring on that computed position and validating the four tag bytes
+		///     there is robust against a coincidental "ATI1" byte run inside the compressed data, which a blind
+		///     LastIndexOf would wrongly pick when it falls after the real tag; the byte scan remains the fallback for
+		///     a MIXD whose layout differs.
+		/// </remarks>
 		private static int LocateAti1Tag(ReadOnlySpan<byte> pixels, int width, int height, int mip)
 		{
 			var computed = pixels.Length - FullChainSize(width, height, mip, 8) - Ati1Tag.Length;
@@ -251,7 +281,10 @@ namespace Faolan.Core.Rdb.Assets
 			return pixels.LastIndexOf(Ati1Tag);
 		}
 
-		// BCn block size at mip level n (1-based; n=1 is full resolution). Blocks cover 4x4 texel tiles.
+		/// <summary>
+		///     The byte size of BCn mip level n (1-based, where n = 1 is full resolution). Blocks cover 4x4 texel
+		///     tiles.
+		/// </summary>
 		private static int MipSize(int width, int height, int n, int blockSize)
 		{
 			var w = Math.Max(1, width >> (n - 1));
@@ -261,7 +294,9 @@ namespace Faolan.Core.Rdb.Assets
 			return blocksW * blocksH * blockSize;
 		}
 
-		// FCTX stores a DXT mip chain smallest-first; gather it back into DDS order (largest mip first).
+		/// <summary>
+		///     Gathers an FCTX smallest-first DXT mip chain back into DDS order, largest mip first.
+		/// </summary>
 		private static byte[] ReorderMipsLargestFirst(ReadOnlySpan<byte> pixels, int width, int height, int mip, int blockSize, out string? warning)
 		{
 			warning = null;
@@ -286,9 +321,11 @@ namespace Faolan.Core.Rdb.Assets
 			return ms.ToArray();
 		}
 
-		// Version and MapsMask are the client's own semantics - see the header comment in Convert: the loader
-		// dispatches on Version (1 legacy / 2 current) and popcounts MapsMask's bits 0x1|0x2|0x4 for the number of
-		// map chains to read.
+		/// <summary>
+		///     The decoded FCTX header. Version and MapsMask carry the client's own semantics, detailed in
+		///     <see cref="Convert" />: the loader dispatches on Version (1 legacy, 2 current) and popcounts MapsMask's
+		///     bits 0x1|0x2|0x4 for the number of map chains to read.
+		/// </summary>
 		public readonly record struct FctxHeader(string FourCc, int Width, int Height, int MipCount, uint Version, uint MapsMask);
 
 		public readonly record struct Result(bool Ok, byte[] Dds, FctxHeader Header, string? Warning)

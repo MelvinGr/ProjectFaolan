@@ -8,21 +8,20 @@ namespace Faolan.Tests
 {
 	// Golden-byte tests for GameCharInterface.DispatchValidResurrectionSpots (s2c 0x2024).
 	//
-	// The one-spot case (the death/release screen) was the ONLY case covered here, and it is exactly the case in which
-	// the body's three decoded fields are indistinguishable from constants: at count 1 the count prefix IS 0x7E2, and
-	// the per-record terminator is the body's last byte either way. The multi-spot goldens below are what pin the real
-	// layout - [u32 (count+1) * 0x3F1], a 41-byte record, RestorationLevel in the tail - and what the old builder
-	// would have failed. Exact float bit patterns are reconstructed so each assertion is byte-for-byte.
+	// At count 1 - the death/release screen - the body's three decoded fields are indistinguishable from constants:
+	// the count prefix is 0x7E2 and the per-record terminator is the body's last byte either way. The multi-spot
+	// goldens below are what pin the real layout: [u32 (count+1) * 0x3F1], a 41-byte record, RestorationLevel in the
+	// tail. Exact float bit patterns are reconstructed so each assertion is byte-for-byte.
 	public class DispatchValidResurrectionSpotsTests
 	{
 		// Barbarian-create f=104 - the create-flow variant: spawnPointId 0, restoration 0x64 (= 100, a fresh character
-		// revives at full), type word 0xC79E. 57 bytes; the old builder emitted 55 (it wrote restoration as a u16).
+		// revives at full), type word 0xC79E. 57 bytes - restoration is a u32, not the u16 its magnitude suggests.
 		private const string CapturedCreateFlow = "43a740004314666644254ccd000007e243a740004314666644254ccd0000c79e00000faa000000000000000000000000000000000000006400";
 
 		// account-faolan-...-resurect (idx616 f328; idx4050 is identical bar the death position). One spot, on death.
 		private const string CapturedOneSpot = "446b8aa04326059444877ccd000007e244812c7b431a6ac14473f5c30000c7a0000007da000000000000000000000000000f5c460000000a00";
 
-		// Hoxxling_mage-heraldofxotli_login_gameplay f=7862 - the DISCOVERY re-send (#372): the player is ALIVE and
+		// Hoxxling_mage-heraldofxotli_login_gameplay f=7862 - the discovery re-send: the player is alive and
 		// mid-walk, and the list now holds two spots, the newly-found 784237 ahead of the always-known 784236. Count
 		// prefix 0xBD3 = 3 * 0x3F1, and 784236's record here is byte-identical to its record in f=138's one-spot frame
 		// - which is what proves the 0x00 is per-record rather than end-of-body.
@@ -78,7 +77,7 @@ namespace Faolan.Tests
 		}
 
 		// The captured order is 784237 then 784236, and 784237 is the nearer of the two (13.7 vs 141.9 units from the
-		// player). Feeding them in the OPPOSITE order must still produce the captured bytes: the builder sorts
+		// player). Feeding them in the opposite order must still produce the captured bytes: the builder sorts
 		// nearest-first, so no caller has to know the wire's ordering rule.
 		[Fact]
 		public void ValidResurrectionSpotsBody_TwoSpots_MatchCapture_OrderedNearestFirstWhateverTheInputOrder()

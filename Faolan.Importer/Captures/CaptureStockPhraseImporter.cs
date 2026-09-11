@@ -13,13 +13,17 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests cutscene stock-phrase subtitles (Kalanthes's beach lines, ...) from create-flow captures: pairs each
-	// client PlayStockphraseAsSubtitle (0x205E: [ProtoID npc][u16 len]{stock_N}[u32 threadCtx]) with the retail
-	// ReceivedStockPhraseText reply (0x205D: [u32 threadCtx][u16 len][remoteformat]) by thread-context. Yields
-	// {stock_N} -> the category-50000 remoteformat payload, which GameServer StockConversationService rebuilds from
-	// the row's COLUMNS (#410 - the payload used to be stored as a raw blob). Every captured phrase is a
-	// parameter-less root tag, so the four root attributes are the whole payload; a phrase that ever arrives WITH
-	// parameters would not round-trip through these columns, so it is rejected loudly rather than truncated.
+	/// <summary>
+	///     Harvests cutscene stock-phrase subtitles (Kalanthes's beach lines,...) from create-flow captures.
+	/// </summary>
+	/// <remarks>
+	///     Pairs each client PlayStockphraseAsSubtitle ([ProtoID npc][u16 len]{stock_N}[u32 threadCtx]) with the retail
+	///     ReceivedStockPhraseText reply ([u32 threadCtx][u16 len][remoteformat]) by thread-context. Yields {stock_N} ->
+	///     the category-50000 remoteformat payload, which StockConversationService rebuilds from the row's columns. Every
+	///     captured phrase is a parameter-less root tag, so the four root attributes are the whole payload; a phrase that
+	///     arrives with parameters would not round-trip through these columns, so it is rejected loudly rather than
+	///     truncated.
+	/// </remarks>
 	public static class CaptureStockPhraseImporter
 	{
 		private static readonly uint PlayStockphraseAsSubtitle = CapturedPacket.Wire(GameCharAgentMethods.PlayStockphraseAsSubtitle); // c2s request

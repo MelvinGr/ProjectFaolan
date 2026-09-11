@@ -4,9 +4,14 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Apprentice
 {
-	// DispatchApprenticeModeOnOff(i_bOnOff) - GameCharInterface 0x81. The per-character mode flag: the client lights
-	// its apprenticeship UI (the "Leave apprenticeship" entry, LDB 211711[3184]) while it is on. A single bool, which
-	// this protocol spells as one byte - the same shape `DispatchSyncCanSprint` uses for its `i_bCanSprint`.
+	/// <summary>
+	///     <c>DispatchApprenticeModeOnOff(i_bOnOff)</c> - the per-character mode flag. The client lights its
+	///     apprenticeship UI (the "Leave apprenticeship" entry, LDB 211711[3184]) while it is on.
+	/// </summary>
+	/// <remarks>
+	///     A single bool, which this protocol spells as one byte - the same shape <c>DispatchSyncCanSprint</c> uses for
+	///     its <c>i_bCanSprint</c>.
+	/// </remarks>
 	public static class ApprenticeModeCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchApprenticeModeOnOff;

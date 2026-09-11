@@ -45,9 +45,9 @@ namespace Faolan.GameServer
 	public partial class GameServerListener
 	{
 
-		// IGameServerProvider seam: the PAY-OUT half of a guild-bank withdrawal (#132). The CS tier decides it (it owns
-		// Guild.Cash and the rank ladder) and this tier pays it, because the wallet lives on the live session and the
-		// client only learns of a change through this tier's UpdateCash.
+		// IGameServerProvider seam: the pay-out half of a guild-bank withdrawal. The CS tier decides it, because it
+		// owns Guild.Cash and the rank ladder, and this tier pays it, because the wallet lives on the live session and
+		// the client only learns of a change through this tier's UpdateCash.
 		//
 		// Refusing when the character is not connected here is the point, not a technicality: the caller debits the
 		// guild only if this returns true, so a payout that nobody could receive never happens rather than vanishing.
@@ -79,8 +79,8 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// IGameServerProvider seam: the world-connection half of a team change. TeamService owns the roster (it spans
-		// the CS tier and this one); this only puts the record on the wire for a member connected HERE.
+		// IGameServerProvider seam: the world-connection half of a team change. TeamService owns the roster, which
+		// spans the CS tier and this one; this only puts the record on the wire for a member connected here.
 		public async Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined)
 		{
 			var client = ClientForCharacter(recipientId);
@@ -93,11 +93,11 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// IGameServerProvider seam: the two PvP-minigame messages that END a match. The match lives on the CS tier
-		// (PvpMatchService owns the roster, the clock and the return trip) but every Minigame* dispatch is a
-		// GameCharInterface message and so travels on THIS connection - the same split the match-start clock already
-		// crosses in WorldEntryService. ⚠️ Client-recovered, uncaptured: no captured session finishes a
-		// minigame (docs/re/minigame-massivepvp-messages.md).
+		// IGameServerProvider seam: the two PvP-minigame messages that end a match. The match lives on the CS tier -
+		// PvpMatchService owns the roster, the clock and the return trip - but every Minigame* dispatch is a
+		// GameCharInterface message and so travels on this connection, the same split the match-start clock crosses in
+		// WorldEntryService. Client-recovered and uncaptured: no captured session finishes a minigame
+		// (docs/re/minigame-massivepvp-messages.md).
 		public async Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult)
 		{
 			var client = ClientForCharacter(characterId);
@@ -122,9 +122,9 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
-		// clock and the time of day from it at 5 game seconds per real second, wrapping every 86400 (see GameTimeCodec
-		// for where those come from). `_clock.OffsetGameSeconds` shifts the phase for the `.time` GM command.
+		// 0x4F57DC08 GameTime - the live world clock. Both fields are generated: the resync anchor from the wall clock
+		// and the time of day from it at 5 game seconds per real second, wrapping every 86400 (see GameTimeCodec for
+		// where those come from). `_clock.OffsetGameSeconds` shifts the phase for the `.time` GM command.
 		internal Rpc BuildGameTime(INetworkClient client)
 		{
 			return GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate);
@@ -135,24 +135,22 @@ namespace Faolan.GameServer
 		// remoteformat template lands.
 
 
-		// WHICH of the two vitals blocks to send is decided by WHAT MOVED, and both forms are retail's (#586).
+		// Which of the two vitals blocks to send is decided by what moved, and both forms are retail's.
 		//
-		// `EntityVitals.ToCurrentsBlock` - the three CURRENT ids - is for a push where only a current moved: a hit, a
+		// `EntityVitals.ToCurrentsBlock` - the three current ids - is for a push where only a current moved: a hit, a
 		// cast's mana cost, the regen tick, fall damage. It is what retail overwhelmingly sends
 		// (`--report vitals-shape`: 3,694 of the 4,900 blocks on a non-own handle carry exactly
 		// {HealthCurrent, StaminaCurrent, ManaCurrent}).
 		//
-		// `EntityVitals.ToVitalsBlock` - current AND max - is for a push where a MAX moved: a level-up, a gear or buff
+		// `EntityVitals.ToVitalsBlock` - current and max - is for a push where a max moved: a level-up, a gear or buff
 		// change to a pool, a GM `.set`. Use CombatService.ReseedFromMaxStats(client).ToVitalsBlock() there.
 		//
-		// ⚠️ The rule is "what moved", NOT "always send everything", and it is not "always send currents" either.
-		// There used to be a blanket `SendVitals` pair emitting the three currents alone, justified as "matches the
-		// retail full-spawn announce; max rides the snapshot" - and it was removed because the max ids reach the
-		// client only when something sends them, so every later max change was invisible and the bar kept its
-		// world-entry seed (#450). The replacement over-corrected the other way: sending all six on every swing is
-		// three fabricated records per entity per hit on the hottest path in the game, and for an NPC - which has no
-		// class curve, so ClassBasePools is null - the max ids fall back to our ceiling, which is not the quantity
-		// that slot holds. Neither blanket is right; the split above is.
+		// The rule is "what moved", neither "always send everything" nor "always send currents". The max ids reach the
+		// client only when something sends them, so sending currents alone leaves every later max change invisible and
+		// the bar stuck on its world-entry seed. Sending all six on every swing is the opposite error: three fabricated
+		// records per entity per hit on the hottest path in the game, and for an NPC - which has no class curve, so
+		// ClassBasePools is null - the max ids fall back to a computed ceiling, which is not the quantity that slot
+		// holds.
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
 

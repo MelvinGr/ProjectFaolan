@@ -7,21 +7,19 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #720: an item ENTERING a player's inventory must pass through `GrantItemToBackpack`, because that is where
-	// `AdvanceCollectGoals` fires. A path that MINTS an item itself delivers it fine and silently fails every collect
+	// An item entering a player's inventory must pass through `GrantItemToBackpack`, because that is where
+	// `AdvanceCollectGoals` fires. A path that mints an item itself delivers it fine and silently fails every collect
 	// objective asking for it.
 	//
 	// The gate watches `SetCharacterItemSlot` - the one repository method that brings an item into existence. Its two
-	// siblings are exempt BY CONSTRUCTION rather than by classification, which is the sharpest the census has been:
+	// siblings are exempt by construction rather than by classification, which is the sharpest the census has been:
 	// `MoveCharacterItem` and `SetCharacterItemCount` only ever act on a row that is already there, so neither can
-	// introduce an item and neither can newly tick a collect goal. Before #750 there was no such distinction to draw -
-	// a "move" was a pair of `SetCharacterInventorySlot` calls, indistinguishable from a grant, so an in-inventory move
-	// had to be classified as "not a bypass, trust me" and EquipmentService accounted for 7 of the census' entries.
+	// introduce an item and neither can newly tick a collect goal.
 	//
 	// That is not hypothetical - it shipped twice. `TradepostService.TakeMailItem` found its own bag slot, built its
 	// own wire entry and wrote its own row, so an item bought from the auction house and taken from mail did not
 	// advance a collect goal while the same item looted, bought from a vendor, harvested, claimed or `.additem`ed
-	// did. It was found by INSPECTION, not by a gate. This is the gate.
+	// did. It was found by inspection, not by a gate. This is the gate.
 	//
 	// It is deliberately coarse - a per-file census rather than a per-call analysis - because the thing worth
 	// catching is "a NEW path started writing inventory rows", and that shows up as a new file or a new call in an
@@ -55,11 +53,9 @@ namespace Faolan.Tests
 				(2, "ESCROW only - moving a listed item out of the seller's BANK on sell, and out of the sender's bank "
 				    + "once a mail is taken. The take itself routes through GrantItemToBackpack (#720)."),
 
-			// ⚠️ TradeService is deliberately ABSENT: it mints nothing and clears nothing. A trade HANDS the item over
+			// TradeService is deliberately absent: it mints nothing and clears nothing. A trade hands the item over
 			// (ITradeOutbound.TransferItemToCharacter -> the same choke point, moving the instance instead of minting), so
-			// there is no giver-side clear to write either. It used to have two calls - a grant that skipped the choke
-			// point (the #720 defect in the other delivery path, fixed by #726) and the giver's clear, which #750 removed
-			// with the re-mint it belonged to.
+			// there is no giver-side clear to write either.
 		};
 
 		[Fact]
@@ -99,17 +95,16 @@ namespace Faolan.Tests
 			Assert.True(gone.Count == 0, "Classified writers that no longer write - drop them from the list:\n  " + string.Join("\n  ", gone));
 		}
 
-		// The mail take specifically: it must NOT rebuild the delivery itself. Pinned because that is exactly what
-		// #720 was - the private slot search + wire builder + row write sitting beside the choke point rather than
-		// inside it - and it read as deliberate, since it carried a comment explaining why it was special.
+		// The mail take specifically: it must not rebuild the delivery itself. Pinned because a private slot search +
+		// wire builder + row write sitting beside the choke point rather than inside it reads as deliberate.
 		[Fact]
 		public void TakeMailItem_DeliversThroughTheGrant()
 		{
 			var src = File.ReadAllText(TestPaths.Repo("Faolan", "GameServer", "Economy", "TradepostService.cs"));
 			var take = src[src.IndexOf("private async Task TakeMailItem", System.StringComparison.Ordinal)..];
 
-			// Bound at the next member, or the end of the class when it is the last one - which it now is, since
-			// routing through the grant deleted the private slot-finder and wire builder that used to follow it.
+			// Bound at the next member, or the end of the class when it is the last one - which it is, because routing
+			// through the grant leaves no private slot-finder or wire builder after it.
 			var next = take.IndexOf("\n\t\tprivate ", System.StringComparison.Ordinal);
 			if (next > 0)
 				take = take[..next];

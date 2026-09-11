@@ -11,32 +11,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report quest-reward-lists` (#893): what the FOUR reward lists of a `Quest_c` record mean relative to each
+	// `--report quest-reward-lists`: what the four reward lists of a `Quest_c` record mean relative to each
 	// other, checked against what retail actually HANDED OUT.
 	//
 	// The client's journal renderer (`FUN_01617260`, the QuestJournal view) settles the shape from the other side:
 	//
-	//     if (this quest is the LAST step of its line)      // line.quests.last() == quest.questId
+	//     if (this quest is the last step of its line)      // line.quests.last() == quest.questId
 	//         show XP @+0x28, money @+0x20, obj1 -> reward view, obj2 -> OPTIONAL reward view (+1)
 	//     else
 	//         show XP @+0xf0, money @+0xf8, obj3 -> reward view, obj4 -> OPTIONAL reward view (+1)
 	//
 	// (`FUN_016181f0` fills the first list it is handed into the reward view and the second into the "optional"
-	// view, showing the `RewardPlusOne` marker iff that second list is non-empty.) So the record carries TWO reward
+	// view, showing the `RewardPlusOne` marker iff that second list is non-empty.) So the record carries two reward
 	// sets - one displayed on a line's last step, one on every other step - and within each, a GUARANTEED list and a
-	// CHOOSE-ONE list.
+	// choose-one list.
 	//
 	// This report asks the corpus whether retail's behaviour matches that reading:
-	//   * the pick-one-of-N OFFER (`QuestRewardNotifyIIR`, #815) should draw its options from obj2 or obj4;
-	//   * the items GRANTED at completion (`DispatchAddItem` right after the QuestIIR state-4) should come from obj1
+	//   * the pick-one-of-N offer (`QuestRewardNotifyIIR`) should draw its options from obj2 or obj4;
+	//   * the items granted at completion (`DispatchAddItem` right after the QuestIIR state-4) should come from obj1
 	//     or obj3 (and the picked option);
-	//   * the same quest seen by characters of DIFFERENT classes should carry the same lists if nothing is
+	//   * the same quest seen by characters of different classes should carry the same lists if nothing is
 	//     class-specific - or differ if a list is.
 	// Exit code is 0 always - a measurement.
 	public static partial class ReportCli
 	{
-		// How far after a completion a DispatchAddItem is still "the completion's grant". The offer + confirm + grant
-		// land inside one burst in the #815 capture; this is generous so a slow client does not lose one.
+		// How far after a completion a DispatchAddItem is still "the completion's grant". The offer, confirm and
+		// grant land inside one burst in the captures; this is generous so a slow client does not lose one.
 		private const int GrantWindowPackets = 400;
 
 		private sealed record RewardSets(uint QuestId, IReadOnlyList<uint> Obj1, IReadOnlyList<uint> Obj2, IReadOnlyList<uint> Obj3, IReadOnlyList<uint> Obj4)
@@ -58,14 +58,14 @@ namespace Faolan.Importer.Cli
 			var lastOfLine = await db.QuestLines.AsNoTracking().Where(l => l.LastQuestId != 0).Select(l => l.LastQuestId).ToHashSetAsync();
 			var lineOf = await db.QuestDefinitions.AsNoTracking().ToDictionaryAsync(q => q.QuestId, q => q.QuestLineId);
 			var names = await db.Items.AsNoTracking().Where(i => i.Name != "").ToDictionaryAsync(i => i.Id, i => i.Name);
-			// The client catalog's per-LINE reward (RDB 1000104 MainQuest.reward / optional_reward, imported as
+			// The client catalog's per-line reward (RDB 1000104 MainQuest.reward / optional_reward, imported as
 			// QuestLineReward): the guaranteed list and the choose-one list, per line.
 			var catalogRewards = (await db.QuestLineRewards.AsNoTracking().ToListAsync())
 				.GroupBy(r => r.QuestLineId)
 				.ToDictionary(g => g.Key, g => (Guaranteed: g.Where(r => !r.Optional).Select(r => r.ItemTemplateId).OrderBy(x => x).ToList(),
 					Optional: g.Where(r => r.Optional).Select(r => r.ItemTemplateId).OrderBy(x => x).ToList()));
 			int bMatchesCatalog = 0, bMismatch = 0, bNoCatalog = 0, aMatchesCatalog = 0, aMismatch = 0, aNoCatalog = 0;
-			// Can the line half be BUILT? Its element words beyond the template: `level` should be the item's own
+			// Can the line half be built? Its element words beyond the template: `level` should be the item's own
 			// (Items.Level) and `quantity` should be constant per (line, template) if it is line data.
 			var itemLevel = await db.Items.AsNoTracking().Where(i => i.Level != 0).ToDictionaryAsync(i => i.Id, i => (uint)i.Level);
 			int levelAgree = 0, levelDisagree = 0, levelUnknown = 0;
@@ -74,20 +74,20 @@ namespace Faolan.Importer.Cli
 			var mismatches = new List<string>();
 
 			// Per (quest, class): the four lists as seen in that capture. A quest's lists come from the login snapshot
-			// AND from the live QuestFullUpdate, both of which carry the same Quest_c record.
+			// and from the live QuestFullUpdate, both of which carry the same Quest_c record.
 			var byQuestClass = new Dictionary<(uint Quest, ConanClass Class), RewardSets>();
-			// Per distinct quest: which reward SET it populates (A = obj1/obj2, B = obj3/obj4, both, neither).
+			// Per distinct quest: which reward set it populates (A = obj1/obj2, B = obj3/obj4, both, neither).
 			var setOf = new Dictionary<uint, string>();
-			// ⭐ THE CLIENT'S OWN PREDICATE, evaluated per record: MainQuest_c holds the area's (questId, sequence)
-			// list AS THE SERVER SENT IT (the index region's block at login, the QuestJournalIIR's area block live),
-			// and the journal renders set A iff this quest is that list's LAST entry. Scored per record against which
+			// the client's own PREDICATE, evaluated per record: MainQuest_c holds the area's (questId, sequence)
+			// list AS the server sent it (the index region's block at login, the QuestJournalIIR's area block live),
+			// and the journal renders set A iff this quest is that list's last entry. Scored per record against which
 			// set the record populates; if the server fills the set its own client will display, the diagonal is full.
 			var clientPredicate = new Dictionary<(string Set, bool Last), int>();
 			var offDiagonal = new Dictionary<(uint Quest, string Set, uint SentLast), int>();
 			// Per line: every captured quest's slots side by side, to test whether set B repeats across a line's
-			// steps (a preview of ONE line reward) or differs per step (each step's own reward).
+			// steps (a preview of one line reward) or differs per step (each step's own reward).
 			var perLine = new Dictionary<uint, Dictionary<uint, (string Slots, bool Last)>>();
-			// WITHIN ONE SNAPSHOT: for a line the character holds two or more steps of, do the steps' A slots agree?
+			// within one SNAPSHOT: for a line the character holds two or more steps of, do the steps' A slots agree?
 			// do their B slots agree? A preview of one line reward agrees down the line; a per-step reward does not.
 			int aSame = 0, aDiff = 0, bSame = 0, bDiff = 0;
 			// Per quest: every distinct (A xp, A money, B xp, B money) the corpus carried, with counts.
@@ -247,7 +247,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    {shape,-16} x{n}");
 			Console.WriteLine();
 
-			// 1b. THE cross-tab: the client renders set A on a line's LAST step and set B otherwise, so if the server
+			// 1b. the cross-tab: the client renders set A on a line's last step and set B otherwise, so if the server
 			// populates the set the client will show, A-quests should be last steps and B-quests mid steps.
 			Console.WriteLine("  which SET a quest populates, against whether it is its line's LAST step (QuestLines.LastQuestId):");
 			Console.WriteLine($"    {"set",-16} {"last step",10} {"mid step",10}");
@@ -304,8 +304,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    line-half element QUANTITY constant per (line, template): {quantityByLineTemplate.Count(kv => kv.Value.Count == 1)}/{quantityByLineTemplate.Count}; values {string.Join(",", quantityByLineTemplate.SelectMany(kv => kv.Value).Distinct().OrderBy(x => x))}");
 			Console.WriteLine();
 
-			// 1b'. The RIVAL predicate. The client's MainQuest_c holds the line's quests in a vector and tests the LAST
-			// element; if that vector is sorted by quest ID rather than by journal order, "last" is the line's HIGHEST
+			// 1b'. The RIVAL predicate. The client's MainQuest_c holds the line's quests in a vector and tests the last
+			// element; if that vector is sorted by quest ID rather than by journal order, "last" is the line's highest
 			// id - which is 10928 for its line, not 10836. Scored the same way so the two readings can be compared.
 			var maxIdOfLine = lineOf.GroupBy(kv => kv.Value).ToDictionary(g => g.Key, g => g.Max(kv => kv.Key));
 			bool IsMaxId(uint q) => lineOf.TryGetValue(q, out var l) && maxIdOfLine[l] == q;

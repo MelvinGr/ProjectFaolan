@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The raid wire layer (#669). There is NO raid traffic anywhere in the corpus - no captured session ever formed
+	// The raid wire layer. There is no raid traffic anywhere in the corpus - no captured session ever formed
 	// one - so these gates cannot be byte-exact against retail the way TeamTradeFriendCodecTests is. What they can
-	// do, and what the ticket's whole case rests on, is pin that every raid body is made of pieces retail DID send:
+	// do, and what the ticket's whole case rests on, is pin that every raid body is made of pieces retail did send:
 	//
 	//   * `cTeam`   - the same record DispatchYouJoinedTeam carries, byte-exact against f693;
 	//   * `cCharacter` - the same member record, byte-exact against f678/f680;
@@ -34,8 +34,8 @@ namespace Faolan.Tests
 			return new TeamRoster(teamId, 0x013184AE, [Member()], TeamSettings.Default);
 		}
 
-		// The roster's trailing 18 bytes used to be a `DefaultLootSettings` blob. The client's reader splits them,
-		// and the split is corroborated by TeamSetLootOption's own captured c2s body (`00000000 01 00000002`) - mode
+		// The roster's trailing 18 bytes are not one opaque `DefaultLootSettings` blob: the client's reader splits
+		// them, and the split is corroborated by TeamSetLootOption's own captured c2s body (`00000000 01 00000002`) - mode
 		// 0, need/greed on, threshold 2, which is exactly what falls out of the captured roster.
 		[Fact]
 		public void TheRosterTrailer_IsTheLootSettingsBlock()
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(built), Convert.ToHexString(RaidMatchCodec.Build(parsed)));
 		}
 
-		// An empty raid is still a legal cMatch, and it is the one the list frames get wrong first: a ZERO-element
+		// An empty raid is still a legal cMatch, and it is the one the list frames get wrong first: a zero-element
 		// list is 0x3F1, which reads as a constant if you have only ever seen one with members in it.
 		[Fact]
 		public void AnEmptyRaidMatch_FramesItsListsAsEmptyRatherThanOmittingThem()
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 		}
 
 		// Move and swap share one layout, so the codec declares both rather than picking one: the second ID32 is a
-		// TEAM on the move and a CHARACTER on the swap, which is why its field is named for the slot.
+		// team on the move and a character on the swap, which is why its field is named for the slot.
 		[Fact]
 		public void RaidRosterEdit_RoundTripsAndIsSharedByBothVerbs()
 		{

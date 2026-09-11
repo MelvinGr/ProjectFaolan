@@ -21,9 +21,9 @@ namespace Faolan.Tests
 			Assert.Equal(200f, built.ReadF32Le(SpawnPacketBuilder.PosZOffset));
 		}
 
-		// Round-trip gate (Phase 0): rebuilding the player spawn from the template's own handle/position/rotation
-		// must reproduce the captured bytes exactly. This validates the field offsets - any mis-mapped offset
-		// corrupts the body and fails here before anything is sent to a client.
+		// Round-trip gate: rebuilding the player spawn from the template's own handle/position/rotation must reproduce
+		// the captured bytes exactly. That is what validates the field offsets - a mis-mapped offset corrupts the body
+		// and fails here rather than in a client.
 		[Fact]
 		public void BuildSpawnBody_WithTemplateValues_IsByteIdentical()
 		{

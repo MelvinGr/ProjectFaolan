@@ -6,24 +6,30 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
-	// Picks where a dead player respawns (Gitea #404): the CLOSEST resurrection point the
-	// player KNOWS - either an always-known starter point or one they have discovered. Pure over the map's points +
-	// the player's discovered set so it is unit-testable; the caller supplies the data and applies the move.
-	//
-	// A criminal (#503) uses the OUTLAW half of the map's points instead (#517) - see Resolve.
+	/// <summary>
+	///     Picks where a dead player respawns: the closest resurrection point the player knows, either an always-known
+	///     starter point or one they have discovered.
+	/// </summary>
+	/// <remarks>
+	///     Pure over the map's points and the player's discovered set, so it is unit-testable: the caller supplies the
+	///     data and applies the move. A criminal uses the outlaw half of the map's points instead - see
+	///     <see cref="Resolve" />.
+	/// </remarks>
 	public static class RespawnResolver
 	{
-		// The point a player revives at, with the full fallback chain the callers all want: the closest KNOWN point
-		// of the right kind, else any always-known point, else the map's first. Null only when the map has none.
-		//
-		// The criminal split (#517) is the client's own `shady` attribute on RDB 1000090: 49 outlaw points, one per
-		// major playfield, all AlwaysKnown. A criminal prefers them and a non-criminal never gets one - a shady point
-		// is closest to plenty of ordinary ground (they sit in the same playfields), so without the filter a
-		// law-abiding player would sometimes release into an outlaw camp. Retail evidently just sends a criminal
-		// there: every shady point is AlwaysKnown, so there is nothing to discover.
-		//
-		// The fallback matters: only 49 of 248 mapped playfields carry a shady point, so a criminal who dies anywhere
-		// else takes the normal selection rather than nothing at all.
+		/// <summary>
+		///     The point a player revives at, with the full fallback chain: the closest known point of the right kind,
+		///     else any always-known point, else the map's first. Null only when the map has none.
+		/// </summary>
+		/// <remarks>
+		///     The criminal split is the client's own <c>shady</c> attribute on RDB 1000090: 49 outlaw points, one per
+		///     major playfield, all always-known. A criminal prefers them and a non-criminal never gets one, because a
+		///     shady point is closest to plenty of ordinary ground - they sit in the same playfields - so without the
+		///     filter a law-abiding player would sometimes release into an outlaw camp. Retail simply sends a criminal
+		///     there: every shady point is always-known, so there is nothing to discover. The fallback matters, because
+		///     only 49 of 248 mapped playfields carry a shady point, and a criminal who dies anywhere else takes the
+		///     normal selection rather than nothing at all.
+		/// </remarks>
 		public static RespawnPoint? Resolve(Vector3 from, IReadOnlyList<RespawnPoint> points, ISet<uint> discoveredIds, bool criminal)
 		{
 			if (points.Count == 0)
@@ -39,7 +45,9 @@ namespace Faolan.GameServer.World
 				?? points[0];
 		}
 
-		// The known respawn point closest to `from`, or null if the player knows none in `points`.
+		/// <summary>
+		///     The known respawn point closest to <paramref name="from" />, or null when the player knows none of them.
+		/// </summary>
 		public static RespawnPoint? ClosestKnown(Vector3 from, IEnumerable<RespawnPoint> points, ISet<uint> discoveredIds)
 		{
 			RespawnPoint? best = null;
@@ -60,7 +68,10 @@ namespace Faolan.GameServer.World
 			return best;
 		}
 
-		// True if `point` is usable as a respawn target for a player with `discoveredIds` (always-known, or discovered).
+		/// <summary>
+		///     Whether the point is usable as a respawn target for a player holding
+		///     <paramref name="discoveredIds" /> - always-known, or discovered.
+		/// </summary>
 		public static bool IsKnown(RespawnPoint point, ISet<uint> discoveredIds)
 		{
 			return point.AlwaysKnown || (discoveredIds != null && discoveredIds.Contains(point.Id));

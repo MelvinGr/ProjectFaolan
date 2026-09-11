@@ -12,9 +12,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #188: ConversationService.ServeScreen now CONSTRUCTS the spoken line (KnubotAppendText) and window-open
+	// ConversationService.ServeScreen now constructs the spoken line (KnubotAppendText) and window-open
 	// (KnubotOpenChatWindow) through KnubotCodec instead of replaying the captured packet with byte-substitution.
-	// These tests prove the swap is behavior-preserving: the constructed record is BYTE-IDENTICAL to what the old
+	// These tests prove the swap is behavior-preserving: the constructed record is byte-identical to what the old
 	// handle-substitution produced, and TryConstructKnubotRecord lifts/rebuilds the record out of a full packet.
 	public class ConversationConstructTests
 	{
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		private const uint ClickedNpc = 0x00090000;
 		private const uint LiveInstance = 0x02000123;
 
-		// SetDialogueCamera (#188): decode a real captured camera packet into columns and rebuild it byte-for-byte
+		// SetDialogueCamera: decode a real captured camera packet into columns and rebuild it byte-for-byte
 		// (with the captured handles) - so it can be constructed from the columns instead of replayed.
 		[Fact]
 		public void BuildDialogueCameraPacket_ReproducesTheCapturedPacket()
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(rebuilt));
 		}
 
-		// The structured-column construct (#188) must be BYTE-IDENTICAL to the direct codec construct from the raw
+		// The structured-column construct must be byte-identical to the direct codec construct from the raw
 		// record, so building the packet from the typed columns (no Data blob) doesn't change the wire output.
 		[Fact]
 		public void BuildFromColumns_MatchesTheCodecConstruct()
@@ -160,8 +160,8 @@ namespace Faolan.Tests
 		}
 
 		// The codec-construct oracle: rebuild the record straight from the parsed raw record (the path KnubotCodecTests
-		// gates against the captures), for comparison with the from-columns build. Takes the record WITHOUT the
-		// carrier's [u32 len], which is the sender's now (#530 rule 2).
+		// gates against the captures), for comparison with the from-columns build. Takes the record without the
+		// carrier's [u32 len], which belongs to the sender.
 		private static byte[] ExpectedConstruct(byte[] record)
 		{
 			var parsed = KnubotCodec.Parse(record);

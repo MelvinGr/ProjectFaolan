@@ -1,24 +1,30 @@
 namespace Faolan.Core.Enums
 {
-	// The client's map-pin TYPE - the value of `CharacterStatId.WaypointType` (0xAC) on a dynel, and the type word of
-	// every waypoint record the map GUI holds (#921).
-	//
-	// **Recovered from `RMWaypoint_c`'s constructor** (`FUN_01727820`, `MapGUI\RMWaypoint.cpp`): a dense switch over
-	// the type word that assigns each pin its bitmaps, so each member below is named for the bitmap its case loads
-	// (`WorldmapGUI/minimap_<name>.tga`), never for what a pin looked like in a capture. Values 6 and 14 fall to the
-	// switch's default and draw nothing.
-	//
-	// ⚠️ Two values the switch special-cases AHEAD of the table are deliberately not members: 0xC748 (a zone label's
-	// travel pin, `minimap_travel`) and 0xC87B (a tombstone, `minimap_tombstone` + `_direction`). They are the
-	// dynel's own CLASS words - `EntityClass.ZoneLabel` and `EntityClass.TombStone` in Faolan.Core.Network - so the
-	// 104 zone-label rows of `WorldObjects.WaypointType` hold 51016 = their class, not a type from this table.
-	//
-	// A DYNEL may carry only the subset its stat-apply accepts (`FUN_0080bb20`: 0x0F-0x12, 0x1A, 0x1B, 0x1D, 0xC748 -
-	// anything else logs "The waypoint type stat has a strange value."). That subset is the harvest-node icons plus
-	// the massive-PvP flag and the travel point, and it is what `WorldObjects.WaypointType` holds: a rock is
-	// `StoneNode`, a tree `WoodNode`, a vein `GoldNode`, a deposit `IronNode`, a cotton shrub `ClothNode`, a zone
-	// label its own class word (see above). `ResourceGatheringActive` is the one value never stored: retail pushes it onto a node for the
-	// duration of a harvesting bout and then restores the node's own kind - see docs/re/waypoint-type-stat.md.
+	/// <summary>
+	///     The client's map-pin type - the value of <c>CharacterStatId.WaypointType</c> (0xAC) on a dynel, and the
+	///     type word of every waypoint record the map GUI holds.
+	/// </summary>
+	/// <remarks>
+	///     Recovered from <c>RMWaypoint_c</c>'s constructor (FUN_01727820, <c>MapGUI\RMWaypoint.cpp</c>): a dense
+	///     switch over the type word that assigns each pin its bitmaps, so each member below is named for the bitmap
+	///     its case loads (<c>WorldmapGUI/minimap_&lt;name&gt;.tga</c>), never for what a pin looked like in a
+	///     capture. Values 6 and 14 fall to the switch's default and draw nothing.
+	///     <para />
+	///     Two values the switch special-cases ahead of the table are deliberately not members: 0xC748 (a zone label's
+	///     travel pin, <c>minimap_travel</c>) and 0xC87B (a tombstone, <c>minimap_tombstone</c> plus
+	///     <c>_direction</c>). They are the dynel's own class words - <c>EntityClass.ZoneLabel</c> and
+	///     <c>EntityClass.TombStone</c> in Faolan.Core.Network - so the 104 zone-label rows of
+	///     <c>WorldObjects.WaypointType</c> hold 51016 = their class, not a type from this table.
+	///     <para />
+	///     A dynel may carry only the subset its stat-apply accepts (FUN_0080bb20: 0x0F-0x12, 0x1A, 0x1B, 0x1D,
+	///     0xC748 - anything else logs "The waypoint type stat has a strange value."). That subset is the
+	///     harvest-node icons plus the massive-PvP flag and the travel point, and it is what
+	///     <c>WorldObjects.WaypointType</c> holds: a rock is <see cref="StoneNode" />, a tree <see cref="WoodNode" />,
+	///     a vein <see cref="GoldNode" />, a deposit <see cref="IronNode" />, a cotton shrub <see cref="ClothNode" />,
+	///     a zone label its own class word. <see cref="ResourceGatheringActive" /> is the one value never stored:
+	///     retail pushes it onto a node for the duration of a harvesting bout and then restores the node's own kind -
+	///     see <c>docs/re/waypoint-type-stat.md</c>.
+	/// </remarks>
 	public enum WaypointType : uint
 	{
 		None = 0,

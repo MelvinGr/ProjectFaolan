@@ -8,12 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #433: the create flow's enter-world handoff must NOT depend on the client putting something on its bar.
+	// The create flow's enter-world handoff must not depend on the client putting something on its bar.
 	//
-	// It used to be sent in reply to the client's first 0x206E AddShortcut, which is the client auto-barring a grant -
-	// so a character whose starting kit came back empty barred nothing, sent no 0x206E, and was stranded on a black
-	// screen forever (a level-1 Assassin, 2026-07-29: every ClassAbilities row for the class carries the level of the
-	// captured character it was harvested from, so a level-1 lookup matched none). Retail's trigger is TIME from
+	// Keying it on the client's first 0x206E AddShortcut - the client auto-barring a grant - strands a character whose
+	// starting kit came back empty: it bars nothing, sends no 0x206E, and sits on a black screen forever. Retail's
+	// trigger is time from
 	// CharCreationFinished - 8.90-9.52s across all 13 create captures that reach a redirect, while the last c2s before
 	// the redirect is AddShortcut in 11, a StatIIR PassBlob in one and a bare Ping in another.
 	//
@@ -30,7 +29,7 @@ namespace Faolan.Tests
 			service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
 			await WaitFor(() => Volatile.Read(ref handoffs) > 0);
 
-			// No AddShortcut was ever handled - an empty starting kit can no longer strand creation.
+			// No AddShortcut was ever handled - an empty starting kit cannot strand creation.
 			Assert.Equal(1, Volatile.Read(ref handoffs));
 			Assert.False(client.Session.AwaitingEnterWorld); // latch cleared by the send
 		}
@@ -45,15 +44,14 @@ namespace Faolan.Tests
 			// Arms racing on one session (an AddShortcut path left armed, a retry, a re-entered flow). A second 0x2002
 			// would re-redirect a client that is already reconnecting, so exactly one must win.
 			//
-			// Deliberately MANY arms, not two. With two, the losing interleaving is rare enough that this passed on its
+			// Deliberately many arms, not two. With two, the losing interleaving is rare enough that this passed on its
 			// own and failed only inside the full suite under CPU load - which read as an undiagnosable flake for a
 			// while. Widening the race makes the bug deterministic instead of load-dependent.
 			//
-			// ⚠️ It took TWO fixes, and this test kept failing intermittently between them. The first made the CLAIM an
-			// Interlocked compare-and-swap, which stops two tasks sharing one arm. But arming still wrote the latch
-			// unconditionally, so the surviving interleaving was arm -> claim -> send -> arm again -> claim -> send
-			// again - and in a tight arming loop that happens whenever a task completes before the loop finishes, i.e.
-			// exactly under load. #706 made ARMING a claim as well, onto a terminal `Sent` state.
+			// An Interlocked compare-and-swap on the claim alone is not enough. It stops two tasks sharing one arm, but
+			// if arming still writes the latch unconditionally the surviving interleaving is arm -> claim -> send -> arm
+			// again -> claim -> send again, which happens in a tight arming loop whenever a task completes before the
+			// loop finishes - i.e. exactly under load. So arming is a claim as well, onto a terminal `Sent` state.
 			for (var i = 0; i < 64; i++)
 				service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
 
@@ -69,9 +67,9 @@ namespace Faolan.Tests
 			// The send throwing must not leave the session armed-but-silent; it is logged (see the handler) and the
 			// flow does not spin. This is the failure whose symptom is indistinguishable from the bug being fixed.
 			//
-			// NB since #706 the connection ends TERMINAL rather than back at Idle - the claim moves it to `Sent`
-			// before the send is attempted, so a throw leaves it Sent. That loses nothing: there is exactly one arming
-			// site (creation-finished) and it has already run, so there was never a retry to preserve.
+			// NB the connection ends terminal rather than back at Idle - the claim moves it to `Sent` before the send is
+			// attempted, so a throw leaves it Sent. That loses nothing: there is exactly one arming site
+			// (creation-finished) and it has already run, so there is no retry to preserve.
 			var service = Service(() => throw new InvalidOperationException("connection gone"));
 			var client = new RecordingNetworkClient(0x0802E5D4);
 
@@ -83,16 +81,16 @@ namespace Faolan.Tests
 
 		// The primitive the single-shot property rests on: claim once, and the claim clears the latch.
 		//
-		// ⚠️ Be honest about what this can and cannot do. It does NOT reliably catch the non-atomic latch - the racy
+		// Be honest about what this can and cannot do. It does not reliably catch the non-atomic latch - the racy
 		// "if (!AwaitingEnterWorld) return; AwaitingEnterWorld = false;" was measured to pass this too, because the
 		// window between the read and the write is a couple of instructions and threads rarely land inside it. So the
-		// argument for TryClaimEnterWorldHandoff being an Interlocked compare-and-swap is that it is atomic BY
-		// CONSTRUCTION, not that a test can demonstrate the alternative failing on demand.
+		// argument for TryClaimEnterWorldHandoff being an Interlocked compare-and-swap is that it is atomic by
+		// construction, not that a test can demonstrate the alternative failing on demand.
 		//
 		// What this gate is actually for is the contract - exactly one winner, latch cleared in the same step - so a
 		// future "simplification" back to a plain bool property has something to fail against on the days it does
 		// lose the race. The real evidence that the race is live is the suite: the integration test above failed at
-		// 1579/1580 under full-suite CPU load and passed in isolation, every time, until the CAS landed.
+		// 1579/1580 under full-suite CPU load and passed in isolation, every time, until the cas landed.
 		[Fact]
 		public void ClaimingTheHandoff_HasExactlyOneWinner_UnderContention()
 		{
@@ -136,10 +134,10 @@ namespace Faolan.Tests
 			Assert.False(session.TryClaimEnterWorldHandoff());
 		}
 
-		// `Sent` is TERMINAL for a connection (#706), and this is the half the first fix missed: re-arming after a
-		// handoff has gone out must be REFUSED, not silently allowed to open a second one.
+		// `Sent` is terminal for a connection, and this is the half the first fix missed: re-arming after a
+		// handoff has gone out must be refused, not silently allowed to open a second one.
 		//
-		// It is safe to be terminal because a session is per CONNECTION and the world entry uses a NEW one - the client
+		// It is safe to be terminal because a session is per connection and the world entry uses a new one - the client
 		// reconnects in answer to the handoff. So a second arm means the creation-finished path ran twice on one
 		// connection (a retried or duplicated message), which is exactly the case that must not re-redirect a client
 		// that is already on its way.

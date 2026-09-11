@@ -4,10 +4,10 @@ using System.Collections.Concurrent;
 namespace Faolan.GameServer.Combat
 {
 	/// <summary>
-	///     In-memory store of live entity vitals keyed by entity handle. The world is authoritative in memory, so
-	///     this is never persisted. Backs only NPCs NOT in the world model (players and model NPCs keep their vitals
-	///     on their <c>WorldEntity</c>); entries are lazily created with a default max the first time they are hit
-	///     (real NPC max HP isn't decoded from captures yet).
+	///     In-memory store of live entity vitals keyed by entity handle. The world is authoritative in memory, so this
+	///     is never persisted. It backs only NPCs outside the world model - players and model NPCs keep their vitals on
+	///     their <see cref="World.WorldEntity" /> - and entries are lazily created with a default max the first time
+	///     they are hit, because an NPC outside the model has no spawn row to state its real maximum.
 	/// </summary>
 	public sealed class CombatState
 	{

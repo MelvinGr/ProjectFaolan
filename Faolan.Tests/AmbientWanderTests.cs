@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #363 ambient anti-stacking: a pool member's wander PREFERS an anchor no other entity occupies (isOccupied
+	// Ambient anti-stacking: a pool member's wander prefers an anchor no other entity occupies (isOccupied
 	// predicate), so a pool spreads across its area's points instead of piling up - while still always moving.
 	public class AmbientWanderTests
 	{

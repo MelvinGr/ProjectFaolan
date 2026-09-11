@@ -13,16 +13,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Imports auction-house (Tradepost) listings from captured DispatchTradepostSearchResults (S->C 0x2005) packets
-	// into TradepostListing rows, so AH search returns real data instead of the single-row replay fallback. The
-	// rows are parsed by TradepostListingCodec (the same codec that builds them byte-exact for the wire); each
-	// listing carries a concrete item INSTANCE (its own Data1..4 quad), so the identity lives on the row, not via
-	// the Items template table. Mirrors CaptureShopImporter. Keyed by SaleId (the unique listing id BuyItem targets).
+	/// <summary>
+	///     Imports auction-house (Tradepost) listings from captured DispatchTradepostSearchResults (S->C 0x2005)
+	///     packets into TradepostListing rows.
+	/// </summary>
+	/// <remarks>
+	///     Rows are parsed by TradepostListingCodec, the same codec that builds them byte-exact for the wire. Each
+	///     listing carries a concrete item instance (its own Data1..4 quad), so the identity lives on the row, not on
+	///     the Items template table. Mirrors CaptureShopImporter. Keyed by SaleId, the unique listing id BuyItem targets.
+	/// </remarks>
 	public static class CaptureListingImporter
 	{
 		// TradepostInterface class id (the search-results sender) in little-endian wire order - the discriminator
 		// that tells DispatchTradepostSearchResults apart from GameCharInterface.DispatchUpdateCash: a method is a
-		// per-interface INDEX and both are index 0x05, so they are the same two bytes on the wire.
+		// per-interface index and both are index 0x05, so they are the same two bytes on the wire.
 		private static readonly byte[] TradepostInterfaceLe = [0xB5, 0xD5, 0xC2, 0xF2]; // 0xF2C2D5B5
 
 		public static List<TradepostListing> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -62,35 +66,36 @@ namespace Faolan.Importer.Captures
 			return listings;
 		}
 
-		// Ensures each listed item exists as an Items TEMPLATE so a bought item can persist (CharacterInventory.ItemId
-		// FK) and be re-rendered on relog. The AH listing carries the per-template identity quad + level (verified
-		// identical across a template's listings) but NO hash (the search-results ProtoAcgItem.Hash is 0), so
-		// these are by-template / Hash-0 items: they render via the live add-item path (DispatchAddItem), not the
-		// hash-gated world-entry snapshot. Skips templates we already have (real harvested items win). Returns
-		// the number of new Items rows seeded.
+		/// <summary>
+		///     Ensures each listed item exists as an Items template so a bought item can persist (CharacterInventory.ItemId
+		///     FK) and be re-rendered on relog.
+		/// </summary>
+		/// <remarks>
+		///     The AH listing carries the per-template identity quad and level but no hash (the search-results
+		///     ProtoAcgItem.Hash is 0), so these are by-template / Hash-0 items: they render via the live add-item path
+		///     (DispatchAddItem), not the hash-gated world-entry snapshot. Templates that already exist are not replaced
+		///     (real harvested items win), but their level is refreshed.
+		/// </remarks>
+		/// <returns>The number of new Items rows seeded.</returns>
 		public static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<TradepostListing> listings)
 		{
 			var merged = Merge(listings);
 			var harvested = 0;
 
-			// Seed a row for every id the listings reference: the instance Template (the buy/render identity) AND the
-			// search-key ItemId (the FK target, #257). They're usually equal but can differ; both must exist as Items
-			// rows. For each id, pick a representative listing - one whose Template matches if any (carries the real
+			// Seed a row for every id the listings reference: the instance Template (the buy/render identity) and the
+			// search-key ItemId (the FK target). They are usually equal but can differ; both must exist as Items rows.
+			// For each id, pick a representative listing - one whose Template matches if any (carries the real
 			// instance identity), else one whose ItemId matches (a catalog placeholder).
 			var neededIds = merged.Select(l => l.Template).Where(t => t != 0).Concat(merged.Select(l => l.ItemId).Where(i => i != 0)).Distinct();
 			foreach (var tmpl in neededIds)
 			{
 				var src = merged.FirstOrDefault(l => l.Template == tmpl) ?? merged.First(l => l.ItemId == tmpl);
 
-				// An EXISTING row still gets its level refreshed. It used to just `continue`, and that insert-only
-				// shape is what let 64 legacy levels sit wrong through every re-import (#725): a template already in
-				// Items was never revisited, whatever a later capture said. The #725 fix harvested the level from
-				// inventory entries, which does not reach a template that only ever appears in a LISTING - and one
-				// did, `Skysplendor Shafts`, still carrying the legacy 8 against the listing's 80.
-				//
-				// The listing is wire truth: for every template seen in both, an AH listing reports the same level as
-				// the inventory entry (10/10), so there is no source conflict to arbitrate - only a missing value to
-				// fill and a legacy one to correct. Never downgrade to 0, same rule as the hash.
+				// An existing row still gets its level refreshed: a template that only ever appears in a listing is not
+				// reached by the inventory-entry level harvest, and an insert-only shape would leave a wrong level in
+				// place through every re-import. An AH listing reports the same level as the inventory entry for every
+				// template seen in both, so there is no source conflict to arbitrate. Never downgrade to 0, same rule as
+				// the hash.
 				if (await db.Items.FirstOrDefaultAsync(i => i.Id == tmpl) is { } existing)
 				{
 					if (src.TemplateItem.Level != 0)
@@ -116,20 +121,20 @@ namespace Faolan.Importer.Captures
 			return harvested;
 		}
 
-		// realmId scopes the imported listings to a realm (#324): captures don't carry our local realm ids, so the AH
-		// listings join the deployment's realm (the same one imported characters join). Required because
-		// TradepostListing.RealmId FKs Realms and Postgres ENFORCES that (SQLite tolerated the RealmId=0 default).
+		/// <param name="realmId">
+		///     Scopes the imported listings to a realm: captures do not carry local realm ids, so the AH listings join the
+		///     deployment's realm (the same one imported characters join). TradepostListing.RealmId FKs Realms and
+		///     Postgres enforces it, so a RealmId of 0 is not acceptable.
+		/// </param>
 		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<TradepostListing> listings, uint realmId, ILogger? logger = null)
 		{
 			var added = 0;
 			var updated = 0;
 			var merged = Merge(listings);
 
-			// Seed the item TEMPLATES first (#257): TradepostListing.ItemId is an FK into Items (OnDelete Restrict), so
-			// the listing save below throws "FOREIGN KEY constraint failed" if the filed catalog item has no Items row
-			// yet. HarvestItems used to run AFTER the save (too late) and only seeded by Template - a different field
-			// from the FK target ItemId - so a listing whose ItemId lacked a row crashed the whole importer. Now it runs
-			// here, before the save, and seeds rows for BOTH the search-key ItemId and the instance Template.
+			// Seed the item templates before the listing save: TradepostListing.ItemId is an FK into Items (OnDelete
+			// Restrict), so the save throws "FOREIGN key constraint failed" if the filed catalog item has no Items row
+			// yet. HarvestItems seeds rows for both the search-key ItemId and the instance Template.
 			var harvested = await HarvestItems(db, merged);
 
 			foreach (var e in merged)
@@ -167,15 +172,19 @@ namespace Faolan.Importer.Captures
 			return (merged.Count, added, updated);
 		}
 
-		// Last capture wins for a saleId seen multiple times (re-walks of the same search just re-emit the same
-		// listing with session-shifted volatile ids).
+		/// <summary>
+		///     Last capture wins for a saleId seen multiple times (re-walks of the same search re-emit the same listing
+		///     with session-shifted volatile ids).
+		/// </summary>
 		public static List<TradepostListing> Merge(IEnumerable<TradepostListing> listings)
 		{
 			return listings.GroupBy(l => l.SaleId).Select(g => g.Last()).ToList();
 		}
 
-		// Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListings.Entry, so a
-		// row re-imported and rebuilt reproduces the captured bytes (proven by CaptureListingImporterTests).
+		/// <summary>
+		///     Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListings.Entry, so a row
+		///     re-imported and rebuilt reproduces the captured bytes (CaptureListingImporterTests).
+		/// </summary>
 		public static TradepostListing ToListing(ParsedRow row)
 		{
 			var item = row.Entry.ItemData ?? new ProtoAcgItem();
@@ -202,15 +211,14 @@ namespace Faolan.Importer.Captures
 				ItemHandle = row.ItemHandle,
 				EntryFlags = flags,
 				Timestamp = timestamp,
-				// The listed instance's TEA key lives once in Items (harvested by template). Carry it on a TRANSIENT
+				// The listed instance's TEA key lives once in Items (harvested by template). Carry it on a transient
 				// TemplateItem so HarvestItems can seed Items from it; ImportAsync nulls this nav before saving the
 				// listing (only the Template FK column persists - the row resolves its real Items row on reload).
 				TemplateItem = new Item
 				{
 					Key = key,
-					// #749: the wire's `Level` rides the transient nav rather than a column on the listing. It is a
-					// per-TEMPLATE fact (no template in 8,644 captured sightings carries two levels), and this is the
-					// only thing that ever read it - HarvestItems below, seeding/correcting `Items.Level`.
+					// The wire's `Level` rides the transient nav rather than a column on the listing: it is a
+					// per-template fact, and HarvestItems (seeding/correcting `Items.Level`) is its only reader.
 					Level = (byte)Math.Min(item.Level, byte.MaxValue)
 				},
 				Template = item.Template1,

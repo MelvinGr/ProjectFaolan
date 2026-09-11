@@ -9,11 +9,10 @@ namespace Faolan.Web.Components.Pages
 	// unless the user is in the "Admin" role (stamped at sign-in from the account type), then read the caller's own
 	// account id out of the NameIdentifier claim.
 	//
-	// Five pages carried it - Admin, AccountDetail, DbEditor, QuestEditor, SpellEditor. That is a security check
-	// whose failure mode is SILENT: a page that drifted, or a new page whose author copied an older version, would
-	// simply stop being protected while still looking correct. So OnInitializedAsync is SEALED here and a subclass
-	// gets LoadAsync instead, which is only reached once the gate has passed - a page cannot forget the gate, and
-	// cannot replace it with its own variant.
+	// A per-page copy of this check fails silently - a page that drifted, or a new page whose author copied an older
+	// version, would stop being protected while still looking correct. So OnInitializedAsync is sealed here and a
+	// subclass gets LoadAsync instead, which is reached only once the gate has passed: a page cannot forget the gate or
+	// replace it with its own variant.
 	public abstract class AdminPage : ComponentBase
 	{
 		[Inject] protected NavigationManager Nav { get; set; } = null!;
@@ -22,7 +21,7 @@ namespace Faolan.Web.Components.Pages
 
 		protected bool Authorized { get; private set; }
 
-		// The signed-in admin's OWN account id, so a page can refuse to let them change their own privileges.
+		// The signed-in admin's own account id, so a page can refuse to let them change their own privileges.
 		protected uint SelfId { get; private set; }
 
 		protected sealed override async Task OnInitializedAsync()

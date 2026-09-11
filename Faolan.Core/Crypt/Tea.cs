@@ -4,7 +4,7 @@ using Faolan.Core.Extensions;
 namespace Faolan.Core.Crypt
 {
 	// TEA (Tiny Encryption Algorithm) - the cipher the AoC client uses for both the login block (TEA-CBC, see
-	// LoginEncryption) and the RDBH item-template resources (TEA-ECB; decrypt routine at AgeOfConan.exe va
+	// ClientLoginEncryption) and the RDBH item-template resources (TEA-ECB; decrypt routine at AgeOfConan.exe va
 	// 0xa8f550, the client string `tea_unexpand`). 64-bit block, 128-bit key (4 LE u32), 32 rounds.
 	public static class Tea
 	{
@@ -27,7 +27,7 @@ namespace Faolan.Core.Crypt
 		}
 
 		// Decrypts a buffer in ECB mode (independent 8-byte blocks, little-endian words). Any trailing bytes that
-		// don't fill a block are copied through unchanged (RDBH ciphertext is always a whole number of blocks).
+		// do not fill a block are copied through unchanged (RDBH ciphertext is always a whole number of blocks).
 		public static byte[] DecryptEcb(ReadOnlySpan<byte> data, ReadOnlySpan<uint> key)
 		{
 			if (key.Length != 4)

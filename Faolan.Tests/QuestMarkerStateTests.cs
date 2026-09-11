@@ -19,13 +19,13 @@ namespace Faolan.Tests
 	// whole chain on a fresh character. Her handle is 0x315cc and DispatchSetQuestMarker addresses it five times:
 	//
 	//   t=191.7  QuestFullUpdate grants 13479 "The Scavenger"
-	//   t=191.9  marker 0x00  <- ACCEPTING THE QUEST CLEARS THE '!', it does not grey it
+	//   t=191.9  marker 0x00  <- accepting the quest clears the '!', it does not grey it
 	//   t=213.8  marker 0x00     (Scavenger Tuut killed; 13479 completes, 13563 granted)
 	//   t=223.3  marker 0x04     (key looted; 13480 makes "talk to Casilda" the goal -> gold '?')
 	//   t=230.1  marker 0x00     (13480 handed in, 12407 granted)
 	//
 	// and 0x02 before any of it. Across all 275 captures Casilda is 0x00 x178 / 0x02 x170 / 0x04 x21 - never 0x01.
-	// Until this gate existed the giver of a quest you were carrying wore the SILVER '!' for the quest's whole
+	// Until this gate existed the giver of a quest you were carrying wore the silver '!' for the quest's whole
 	// lifetime, which is the one state retail never puts her in.
 	public class QuestMarkerStateTests : IDisposable
 	{
@@ -86,8 +86,8 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AGiverTheLineHasNotREACHEDYet_KeepsTheSilverExclamation()
 		{
-			// #559 stays: silver means "there is something here you cannot take yet", which is exactly a giver whose
-			// step the chain has not arrived at. It is the not-held case, and only the not-held case.
+			// Silver means "there is something here you cannot take yet", which is exactly a giver whose step the chain
+			// has not arrived at. It is the not-held case, and only the not-held case.
 			var h = await Harness(giverSequence: 2, earlierStep: (GiverQuest + 1, 1));
 
 			Assert.Equal(QuestMarkerResolver.Unavailable, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ATwoQuestGiver_STAYSSilverWhileYouCarryTheFirst()
 		{
-			// Casilda and Alyssa are both "carrying the giver's quest" and get DIFFERENT markers, because what is left
+			// Casilda and Alyssa are both "carrying the giver's quest" and get different markers, because what is left
 			// to grant differs. Casilda grants one quest and goes blank; Alyssa sits on a four-step line ending in
 			// "Report back to Alyssa" and goes silver eight frames after granting hers
 			// (Hoxxling_..._login_gameplay2: grant at frame 9603, 0x01 at frame 9611).
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AGiverStandingOffTheQuestSOwnMap_StillWearsTheMarker()
 		{
-			// `QuestDefinition.MapId` is the objective's marker PIN, not where the giver stands, so it must not gate.
+			// `QuestDefinition.MapId` is the objective's marker pin, not where the giver stands, so it must not gate.
 			// It blocks 15 of the 28 giver quests in the shipped data - Turach and Laranga (quests on 4010, they stand
 			// on 4020), Alyssa (10800 vs 4020), Caor, Oracle Vateesa, Hadrathus - and the captures show retail marking
 			// every one of them.
@@ -142,7 +142,7 @@ namespace Faolan.Tests
 				if (questMapId is { } pin && pin != Map.TortageBeachId)
 					ctx.Maps.Add(new Map { Id = pin, Name = "Somewhere else" });
 				ctx.QuestLines.Add(new QuestLine { QuestLineId = GiverLine });
-				// A step only counts as part of its line once it has journal TEXT - that is the filter
+				// A step only counts as part of its line once it has journal text - that is the filter
 				// GetQuestDefinitionsByLine applies to keep the client's catalog-only quests out of a line (see there).
 				ctx.QuestDefinitions.Add(Step(GiverQuest, "The Scavenger", giverSequence, questMapId));
 				if (earlierStep is { } earlier)
@@ -156,7 +156,7 @@ namespace Faolan.Tests
 				ctx.ConversationNodes.Add(node);
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-				// One SaveChanges per edge: the derived key is stamped ON INSERT, so two unsaved edges both sit at
+				// One SaveChanges per edge: the derived key is stamped on INSERT, so two unsaved edges both sit at
 				// Id 0 in the change tracker and collide before either is written.
 				ctx.ConversationEdges.Add(new ConversationEdge { FromNodeId = node.Id, ToNodeId = node.Id, OptionId = 0, GrantQuestId = GiverQuest });
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);

@@ -3,19 +3,35 @@ using System.Collections.Generic;
 
 namespace Faolan.GameServer.World
 {
-	// One ambient idle animation a live creature can perform (#766) - the runtime form of an `NpcAmbientAnimation` row.
-	// `DurationCentiseconds` is the animation's own length, which the client is told (`activation_time`) and which also
-	// times the next one, and `Weight` is how often retail was captured playing it.
+	/// <summary>
+	///     One ambient idle animation a live creature can perform - the runtime form of an
+	///     <c>NpcAmbientAnimation</c> row.
+	/// </summary>
+	/// <param name="DurationCentiseconds">
+	///     The animation's own length, which the client is told (<c>activation_time</c>) and which also times the next
+	///     one.
+	/// </param>
+	/// <param name="Weight">How often retail was captured playing it.</param>
 	public readonly record struct AmbientAnimation(uint AnimationId, uint DurationCentiseconds, uint Weight);
 
-	// Picking one ambient animation out of a creature's set. Kept beside the type rather than on WorldEntity so the
-	// choice is testable on its own - what it has to get right is the WEIGHTING, and a weighted draw that quietly
-	// degenerates to "always the first one" looks exactly like a working one from the outside.
+	/// <summary>
+	///     Picking one ambient animation out of a creature's set.
+	/// </summary>
+	/// <remarks>
+	///     Kept beside the type rather than on <see cref="WorldEntity" /> so the choice is testable on its own: what it
+	///     has to get right is the weighting, and a weighted draw that degenerates to "always the first one" looks
+	///     exactly like a working one from the outside.
+	/// </remarks>
 	public static class AmbientAnimations
 	{
-		// A weighted pick: an animation retail played twice as often is twice as likely. `random` is passed in so a test
-		// can drive the draw. Returns null for an empty set (a creature no capture caught idling), which is the caller's
-		// cue to leave it standing still rather than invent an animation for it.
+		/// <summary>
+		///     A weighted pick: an animation retail played twice as often is twice as likely.
+		///     <paramref name="random" /> is passed in so a test can drive the draw.
+		/// </summary>
+		/// <returns>
+		///     Null for an empty set - a creature no capture caught idling - which is the caller's cue to leave it
+		///     standing still rather than invent an animation for it.
+		/// </returns>
 		public static AmbientAnimation? Pick(IReadOnlyList<AmbientAnimation> animations, Random random)
 		{
 			ArgumentNullException.ThrowIfNull(animations);

@@ -3,15 +3,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// Per-character progress on a SECONDARY goal of a multi-goal quest (Gitea #357). A quest's PRIMARY (first,
+	// Per-character progress on a secondary goal of a multi-goal quest. A quest's primary (first,
 	// lowest-Sequence) goal keeps living in the scalar CharacterQuest.GoalProgress/GoalRequired - unchanged, so
-	// single-goal quests and the byte-exact snapshot/turn-in paths are untouched. Goals BEYOND the first (a quest that
+	// single-goal quests and the byte-exact snapshot/turn-in paths are untouched. Goals beyond the first (a quest that
 	// asks for two concurrent objectives, e.g. the beach starter 10238's goals 1448 + 3490) get one row here each,
-	// keyed by (CharacterId, QuestId, GoalId). The quest completes only when the primary AND every secondary goal has
+	// keyed by (CharacterId, QuestId, GoalId). The quest completes only when the primary and every secondary goal has
 	// reached its QuestGoalDefinition.RequiredCount (QuestProgressionService.AllGoalsComplete). Rows are upserted lazily
 	// on the first advance of a secondary goal - a missing row means progress 0. QuestId FKs QuestDefinition (unlike
-	// CharacterQuest, whose captured completed-quest history is 94% undefined-quest ids so it keeps NO FK) - only
-	// DEFINED multi-goal quests get secondary-goal rows, so the FK holds.
+	// CharacterQuest, whose captured completed-quest history is 94% undefined-quest ids so it keeps no FK) - only
+	// defined multi-goal quests get secondary-goal rows, so the FK holds.
 	[PrimaryKey(nameof(CharacterId), nameof(QuestId), nameof(GoalId))]
 	public class CharacterQuestGoal
 	{

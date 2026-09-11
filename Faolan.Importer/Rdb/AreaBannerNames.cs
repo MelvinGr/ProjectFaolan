@@ -8,8 +8,8 @@ using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.Importer.Rdb
 {
-	// Every area-banner id the CLIENT knows, and the region each one belongs to - recovered without a capture
-	// (#513/#348/#679).
+	// Every area-banner id the client knows, and the region each one belongs to - recovered without a capture
+	// .
 	//
 	// A banner's wire value is not an LDB key. It is a PARAMETER inside the localized token, and the LDB key is the
 	// ELF-28 hash of the whole token string:
@@ -19,12 +19,12 @@ namespace Faolan.Importer.Rdb
 	//
 	// That looks one-way, but the parameter is a small integer, so the hash INVERTS by sweeping it: compute the hash
 	// for every candidate and keep the ones that hit a real category-50025 id. The prefix is constant, so its hash
-	// state is computed ONCE and only the candidate's digits are hashed per step - which is what makes a sweep of tens
+	// state is computed once and only the candidate's digits are hashed per step - which is what makes a sweep of tens
 	// of millions cost a second rather than a minute.
 	//
-	// ⚠️ A hash hit is not proof on its own: ELF-28 has 2^28 buckets, so sweeping N candidates against a table of M
-	// ids yields roughly N*M/2^28 collisions by chance - about half of the 1,139 hits. Which is why NOTHING is written
-	// on a hit alone. A hit only becomes a row when a client REGION of the same playfield is named exactly that text
+	// A hash hit is not proof on its own: ELF-28 has 2^28 buckets, so sweeping N candidates against a table of M
+	// ids yields roughly N*M/2^28 collisions by chance - about half of the 1,139 hits. Which is why nothing is written
+	// on a hit alone. A hit only becomes a row when a client region of the same playfield is named exactly that text
 	// (MatchRegions below), and a chance collision landing on a place name that also names a notifier region on the playfield
 	// its neighbours are on is not a thing that happens.
 	public static class AreaBannerNames
@@ -39,12 +39,12 @@ namespace Faolan.Importer.Rdb
 		// have not.
 		public const uint SweepMax = 40_000_000;
 
-		// How far apart two banner ids on one playfield may sit and still count as the same BLOCK, and how far outside
+		// How far apart two banner ids on one playfield may sit and still count as the same block, and how far outside
 		// a block a candidate may fall and still be taken.
 		//
 		// Real ids arrive in per-playfield runs - `358073..358089` on map 1080, `277705..277809` on Field of the Dead,
 		// `4186119..4186225` on map 974 - because they were handed out a playfield at a time. A run is not gapless
-		// (1080 skips 358080, 358085 and 358087) and a playfield can own SEVERAL: Old Tarantia has 3373519..3373530,
+		// (1080 skips 358080, 358085 and 358087) and a playfield can own several: Old Tarantia has 3373519..3373530,
 		// 3385037..3385038 and its Outlaw Camp at 3906077. So this is deliberately a cluster test rather than one
 		// min..max range, and the margin is what lets a block grow past the anchors that found it.
 		private const uint BlockGap = 4096;
@@ -56,7 +56,7 @@ namespace Faolan.Importer.Rdb
 		// A banner bound to the volume that fires it: the client's own region, on the client's own playfield.
 		public sealed record Match(uint MapId, string RegionName, uint AreaNameId, string Text);
 
-		// A sweep's result: the banners it recovered, and how many category-50025 entries it swept AGAINST - the second
+		// A sweep's result: the banners it recovered, and how many category-50025 entries it swept against - the second
 		// is not decoration, it is the M in the collision estimate and the one number that says whether the sweep read
 		// the LDB at all.
 		public sealed record Recovery(IReadOnlyList<Banner> Banners, int LdbEntries)
@@ -66,7 +66,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// Sweeps the token parameter and returns every value whose hash is a real category-50025 id, with that id's
-		// ENGLISH text. Ordered by id, which is the order the blocks read in.
+		// english text. Ordered by id, which is the order the blocks read in.
 		public static Recovery Recover(RdbReader rdb)
 		{
 			var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
@@ -121,7 +121,7 @@ namespace Faolan.Importer.Rdb
 			return new string(stripped.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 		}
 
-		// Every spelling a REGION offers, because the client writes its designer bookkeeping into the same field and
+		// Every spelling a region offers, because the client writes its designer bookkeeping into the same field and
 		// then puts the displayed name beside it:
 		//
 		//   `Camp23 Atzels Bandits (Burned Farms)`   -> the banner reads "Burned Farms"
@@ -142,7 +142,7 @@ namespace Faolan.Importer.Rdb
 				yield return poi;
 		}
 
-		// Every spelling a banner TEXT offers. Only one rule, and it is the client contradicting itself: an internal
+		// Every spelling a banner text offers. Only one rule, and it is the client contradicting itself: an internal
 		// name keeps the possessive s on some places and drops it on others - `Ymirs Tongue` for "Ymir's Tongue" but
 		// `BA_LionMarket` for "The Lion's Market". Since Normalise drops the apostrophe either way, the two spellings
 		// need to be offered as ALTERNATIVES rather than one being normalised into the other - collapsing every
@@ -166,11 +166,11 @@ namespace Faolan.Importer.Rdb
 		//
 		// Two gates, and the second is what makes the first safe:
 		//
-		//   1. NAME. The region's normalised name is the banner's normalised text. On its own this is ambiguous far
+		//   1. name. The region's normalised name is the banner's normalised text. On its own this is ambiguous far
 		//      more often than not - 41 different ids render "Outlaw Camp", one per playfield that has one - and it is
 		//      also the gate a chance collision can pass, since a collision's text is drawn from the same table of
 		//      place names.
-		//   2. BLOCK. The id must sit in one of the PLAYFIELD's id blocks. A block is a cluster of ANCHORS: ids that
+		//   2. block. The id must sit in one of the PLAYFIELD's id blocks. A block is a cluster of ANCHORS: ids that
 		//      are already pinned to this map, either because exactly one recovered id in the whole client bears that
 		//      text (so there is nothing to choose) or because a capture recorded retail sending it here. A cluster of
 		//      one anchor counts only when that anchor is captured - wire truth needs no corroboration, a lone name
@@ -181,14 +181,14 @@ namespace Faolan.Importer.Rdb
 		// text "Cimmerian Settlement" at 711411 uniquely, while every other banner on that playfield is 3709826..3709830,
 		// so the id belongs to some other place of the same name and the region is left unresolved.
 		//
-		// ⚠️ **Where the WIRE has pinned a playfield's numbering, only a block holding a captured id counts** (#680).
-		// The same places are named on several playfields - Ymir's Pass's areas appear under 269xxx, 3822xxx AND
+		// Where the wire has pinned a playfield's numbering, only a block holding a captured id counts.
+		// The same places are named on several playfields - Ymir's Pass's areas appear under 269xxx, 3822xxx and
 		// 3908xxx - so a playfield's regions can name-match a whole coherent-looking cluster that belongs to a copy of
-		// it. On Ymir's Pass that cluster is 3908476..3908749 and it matched EIGHT regions, while the two banners
+		// it. On Ymir's Pass that cluster is 3908476..3908749 and it matched eight regions, while the two banners
 		// retail was actually captured sending there are 269294 and 269449. Without this the widened forms below would
 		// have imported all eight, and every one of them would have been another playfield's id.
 		//
-		// A region with SEVERAL surviving candidates is left unresolved and reported, never guessed at.
+		// A region with several surviving candidates is left unresolved and reported, never guessed at.
 		public static List<Match> MatchRegions(
 			IReadOnlyDictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
 			IReadOnlyList<Banner> banners,
@@ -241,7 +241,7 @@ namespace Faolan.Importer.Rdb
 				{
 					var inBlock = ids.Where(id => blocks.Any(b => id >= b.Lo && id <= b.Hi)).ToList();
 
-					// A CAPTURED id among the survivors wins outright. The block is a proximity argument and the wire is
+					// A captured id among the survivors wins outright. The block is a proximity argument and the wire is
 					// a fact: retail sent this id on this playfield, so if one of the candidates is that id, the choice
 					// is already made. This is what settles the generic names on the playfields we have walked -
 					// "Outlaw Camp" on Old Tarantia has 3906077 and 3906603 in block, and 3906077 is the one retail
@@ -287,7 +287,7 @@ namespace Faolan.Importer.Rdb
 				.ToList();
 		}
 
-		// THE LAST PASS, and deliberately the last: the client sometimes ABBREVIATES a word in the internal name that
+		// the last PASS, and deliberately the last: the client sometimes ABBREVIATES a word in the internal name that
 		// the banner spells out, or writes only the distinctive part of it.
 		//
 		//   `BA_AVRoses`   -> "Avenue of Roses"        `BA_AVLions` -> "Avenue of Lions"
@@ -297,10 +297,10 @@ namespace Faolan.Importer.Rdb
 		//
 		//   * the id must already be in one of the PLAYFIELD's blocks and unclaimed - it is this playfield's own id,
 		//     the only question is which of its regions it belongs to;
-		//   * the region must have matched NOTHING by name, so this can never overrule an identity;
+		//   * the region must have matched nothing by name, so this can never overrule an identity;
 		//   * every word of the region name must be a PREFIX of a word of the text, in order (`AV` of `Avenue`,
 		//     `Docks` of `Docks`) - a region word that appears nowhere in the text kills the pair;
-		//   * the pairing must be unique in BOTH directions among what is left.
+		//   * the pairing must be unique in both directions among what is left.
 		//
 		// On Old Tarantia that is a complete bijection - 17 regions against the 17 ids of its blocks, every one paired -
 		// which is the real check on it: a wrong pairing would have to be a permutation that satisfies the rule
@@ -338,7 +338,7 @@ namespace Faolan.Importer.Rdb
 			return matched;
 		}
 
-		// Whether every word of `name` is a prefix of a word of `text`, in order. Stopwords are dropped from the TEXT
+		// Whether every word of `name` is a prefix of a word of `text`, in order. Stopwords are dropped from the text
 		// only - the internal name never carries them.
 		private static bool IsAbbreviationOf(List<string> name, List<string> text)
 		{
@@ -358,8 +358,8 @@ namespace Faolan.Importer.Rdb
 			return true;
 		}
 
-		// A name split into words: on separators AND on camel case, so `BA_AVRoses` reads as [AV, Roses] and
-		// `GreenManTavern` as [Green, Man, Tavern]. An uppercase RUN keeps its last letter for the word that follows
+		// A name split into words: on separators and on camel case, so `BA_AVRoses` reads as [AV, Roses] and
+		// `GreenManTavern` as [Green, Man, Tavern]. An uppercase run keeps its last letter for the word that follows
 		// it, which is what makes `AVRoses` split in the middle rather than at the end.
 		private static List<string> Words(string name)
 		{
@@ -379,9 +379,9 @@ namespace Faolan.Importer.Rdb
 		// Two ways a cluster fails to be a block, and both are the same mistake seen from different sides - another
 		// playfield's copy of these places:
 		//
-		//   * a ONE-ANCHOR cluster, unless that anchor is CAPTURED. A lone name match is exactly the case that turns
+		//   * a one-ANCHOR cluster, unless that anchor is captured. A lone name match is exactly the case that turns
 		//     out to be somewhere else of the same name (map 1010's "Cimmerian Settlement" at 711411).
-		//   * ANY cluster with no captured anchor, once the playfield has captured ids at all. The wire has then
+		//   * any cluster with no captured anchor, once the playfield has captured ids at all. The wire has then
 		//     already said where this playfield's numbering lives, and a name-derived cluster elsewhere is a copy
 		//     (Ymir's Pass: eight regions name-match 3908476..3908749 while retail was captured sending 269xxx).
 		private static List<(uint Lo, uint Hi)> Blocks(List<uint> anchors, IReadOnlyCollection<uint> captured)

@@ -7,15 +7,15 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// StopIIR_c (0xD751EBB4) - the move-stop record: final position + orientation (FUN_00a34700, 7 big-endian floats).
-	// The trailing four are the rotation QUATERNION, in full (CharDCMove's bit4 collapse has no counterpart here) -
-	// unit-length for 100% of the corpus's 3,540 records, and yaw-only in shape (qx = qz = 0).
+	// The trailing four are the full rotation quaternion - CharDCMove's bit4 collapse has no counterpart here -
+	// unit-length for all 3,540 records in the corpus, and yaw-only in shape (qx = qz = 0).
 	//
-	// The u32 length prefix belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it.
+	// The u32 length prefix belongs to the sender - WorldIir.Send writes it.
 	public static class StopCodec
 	{
 		public const uint Opcode = (uint)IirTypes.StopIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(StopIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -52,6 +52,5 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// StopIIR (0xD751EBB4).
 	public sealed record StopIIR(uint Handle, byte Env, Vector3 Position, Quaternion Rotation);
 }

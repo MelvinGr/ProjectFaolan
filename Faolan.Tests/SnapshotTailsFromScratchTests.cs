@@ -15,16 +15,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #186: the WHOLE beach 0x737A6DF9 tails build FROM SCRATCH - no captured-tails template. BuildFromScratch
+	// The whole beach 0x737A6DF9 tails build from scratch - no captured-tails template. BuildFromScratch
 	// assembles the three regions (generated quest portion + the game-static access-window catalog asset + the code
-	// stat skeleton) and reproduces BeachTailsTemplate.bin BYTE-FOR-BYTE for the captured beach character + instance.
-	// Proving this means the .bin is no longer needed to author a beach world-entry snapshot's tails.
+	// stat skeleton) and reproduces BeachTailsTemplate.bin byte-for-byte for the captured beach character + instance.
+	// Proving this means the .bin is not needed to author a beach world-entry snapshot's tails.
 	public class SnapshotTailsFromScratchTests
 	{
 		private const uint BeachStarterQuestId = 10238;
 
 		// A character's vitals ceiling with no gear and the level-1 attribute base - which is what every character in
-		// this file is (freshly-built, no equipment). The world-entry path passes the LIVE EntityVitals instead.
+		// this file is (freshly-built, no equipment). The world-entry path passes the live EntityVitals instead.
 		private static CharacterMaxStats MaxOf(Character character)
 		{
 			return character.MaxVitals(VitalAttributes.LevelOneBase);
@@ -34,10 +34,10 @@ namespace Faolan.Tests
 		private static readonly string DbPath = TestPaths.FaolanDb;
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
-		// The template IS Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the WHOLE
-		// per-class stat block is authored (#4) for an Assassin at L1 it must reproduce that block exactly - i.e. the
-		// production beach flip stays BYTE-IDENTICAL to the proven captured path for the baseline class, and the
-		// per-class authoring only diverges for a DIFFERENT class (Necro etc., the intended #4 change). Guards against
+		// The template is Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the whole
+		// per-class stat block is authored for an Assassin at L1 it must reproduce that block exactly - i.e. the
+		// production beach flip stays byte-identical to the proven captured path for the baseline class, and the
+		// per-class authoring only diverges for a different class (Necro etc., the intended #4 change). Guards against
 		// the SnapshotVitals/ApplyClassVitals slot map drifting away from the captured Rogue values.
 		[Fact]
 		public async Task BuildFromScratch_AuthorsAssassinBlock_StillReproducesTheTemplate()
@@ -48,16 +48,15 @@ namespace Faolan.Tests
 			var strie = new Character
 			{
 				Level = 1,
-				// Strie is a fresh level-1 character with no experience. This used to read `Experience = 10`, chosen so
-				// the old CurrentXp setter's `value * 10` would land 100 in word [80] - but [80] is MaxExp's slot, not
-				// experience, and 100 is simply the level-1 to-next-level cost (#447). Authoring MaxExp from the curve
-				// reproduces the same byte with the character's real, zero, experience.
+				// Strie is a fresh level-1 character with no experience. Word [80] is MaxExp's slot, not experience, and
+				// its 100 is the level-1 to-next-level cost - authoring MaxExp from the curve reproduces that byte with
+				// the character's real, zero, experience.
 				Experience = 0,
 				Class = ConanClass.Assassin,
-				// Strie is FEMALE, and the sheet's Sex slot is authored from the character now rather than carried at
+				// Strie is female, and the sheet's Sex slot is authored from the character rather than carried at
 				// the captured 3 - so the golden states who the template's character is instead of inheriting it.
 				Sex = Sex.Female,
-				// ...and whose ACCOUNT it is: the sheet's PlayerId is the account's, not the character's (#478).
+				// ...and whose account it is: the sheet's PlayerId is the account's, not the character's.
 				AccountId = 0x59EA506E
 			};
 			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, strie, MaxOf(strie), TemplateInstance));
@@ -66,13 +65,13 @@ namespace Faolan.Tests
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
 		}
 
-		// #473: the sheet's vitals come from the CHARACTER, whatever the sheet's provenance. A captured stat sheet is
-		// a BASELINE, not an override - exactly like the Level/Exp/GmLevel overrides, whose own comment notes a
-		// captured level is "stale the moment it dings". This used to be guarded by `!imported`, so a character with
-		// rows in CharacterStats rendered its capture-time health for ever: the same 1270 at level 10 and at level 40
-		// in-client, while armour mitigation moved with the level and proved the client knew.
+		// The sheet's vitals come from the character, whatever the sheet's provenance. A captured stat sheet is
+		// a baseline, not an override - exactly like the Level/Exp/GmLevel overrides, whose own comment notes a
+		// captured level is "stale the moment it dings". Guarding it on `!imported` would let a character with rows in
+		// CharacterStats render its capture-time health for ever: the same 1270 at level 10 and at level 40 in-client,
+		// while armour mitigation moves with the level and proves the client knows.
 		//
-		// Nothing is lost by overriding: vitals are DERIVED from (Class, Level) (#578), so an imported character and a
+		// Nothing is lost by overriding: vitals are derived from (Class, Level), so an imported character and a
 		// created one of the same class and level report the same numbers.
 		[Fact]
 		public async Task BuildFromScratch_ImportedSheet_StillTakesItsVitalsFromTheCharacter()
@@ -87,7 +86,7 @@ namespace Faolan.Tests
 				Class = ConanClass.Assassin
 			};
 
-			// A captured sheet carrying a DIFFERENT health from the character's - the shape that used to win.
+			// A captured sheet carrying a different health from the character's.
 			var captured = SubClassStatBlock.FreshSheet()
 				.Select(p => ((CharacterStatId)p.Id, p.Value))
 				.ToList();
@@ -100,7 +99,7 @@ namespace Faolan.Tests
 			Assert.Equal(fromScratch.PostAccessBlock.GetStat(CharacterStatId.HealthMax), fromCapture.PostAccessBlock.GetStat(CharacterStatId.HealthMax));
 		}
 
-		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)
+		// A dead character's from-scratch tails carry current-health = 0 (the release-window gate)
 		// while the max/base HP side stays full - the same shape the retail login-while-dead snapshot has. An alive
 		// character with identical stats keeps full current health, so the only difference is the dead flag.
 		[Fact]
@@ -169,11 +168,11 @@ namespace Faolan.Tests
 		}
 
 		// The captured-byte tests above only exercise the Strie baseline. The production flip (authoring the tails
-		// instead of replaying the captured burst) relies on BuildFromScratch staying STRUCTURALLY valid for any
+		// instead of replaying the captured burst) relies on BuildFromScratch staying structurally valid for any
 		// character - a different class/level patches different vitals into the stat block, and the snapshot framing
 		// (the in-client hang risk) must survive that. This proves: the assembly re-parses, the three regions keep
 		// their boundaries (quest portion = 1292, access-window catalog parses), the live vitals/XP land in the
-		// right PostAccessBlock slots, and the round-trip is lossless - for a character that is NOT the capture.
+		// right PostAccessBlock slots, and the round-trip is lossless - for a character that is not the capture.
 		[Fact]
 		public async Task BuildFromScratch_StaysValidForANonBaselineCharacter()
 		{
@@ -204,16 +203,16 @@ namespace Faolan.Tests
 			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Mana, tails.PostAccessBlock.CurrentMana);
 			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Stamina, tails.PostAccessBlock.CurrentStamina);
 
-			// The XP bar is authored as a consistent triple by stat id (#447), in retail's CUMULATIVE form (#297):
+			// The XP bar is authored as a consistent triple by stat id, in retail's cumulative form:
 			// the running total in 0x34, this level's threshold in 0x39 and the next level's in 0x15E (word [80]).
-			// The character row's 98,760 is WITHIN-level progress, so the running total is that plus level 7's base.
+			// The character row's 98,760 is within-level progress, so the running total is that plus level 7's base.
 			var level7Base = LevelingResolver.CumulativeXpForLevel(7);
 			Assert.Equal(LevelingResolver.CumulativeXpForLevel(8), tails.PostAccessBlock.MaxExp);
 			Assert.Equal(level7Base + 98760u, StatValue(tails.PostAccessBlock, CharacterStatId.Exp));
 			Assert.Equal(level7Base, StatValue(tails.PostAccessBlock, CharacterStatId.ExpCurrentLevelBase));
 		}
 
-		// A stat's value out of the built block, BY ID. Asserts the stat is actually there rather than letting
+		// A stat's value out of the built block, by ID. Asserts the stat is actually there rather than letting
 		// GetStat's "absent reads as 0" make an expected-zero assertion pass vacuously.
 		private static uint StatValue(SubClassPostAccessBlock block, CharacterStatId stat)
 		{
@@ -243,9 +242,8 @@ namespace Faolan.Tests
 		// The quest portion = the Quest_c journal (the journal region length) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
-			// The @609 objective region is INSIDE the journal records now (the journal region length covers it, #384). What
-			// trails the active journal is the completed-journal frame (empty 0x3F1 for a beach char, #390/#391) then
-			// the quest index.
+			// The @609 objective region is inside the journal records (the journal region length covers it). What trails
+			// the active journal is the completed-journal frame (empty 0x3F1 for a beach char) then the quest index.
 			return (tails.CompletedQuests == null ? 0 : CompletedQuestJournalRegionCodec.Build(tails.CompletedQuests).Length)
 			       + (tails.QuestIndex == null ? 0 : QuestIndexRegionCodec.Build(tails.QuestIndex).Length);
 		}

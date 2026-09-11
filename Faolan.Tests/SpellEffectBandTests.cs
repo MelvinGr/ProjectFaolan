@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #783: a spell record states one element per level BAND, and something has to choose between them. These gate the
-	// choice AND the shipped rows it is made over - the rule is only worth anything if the bands are really there.
+	// A spell record states one element per level band, and something has to choose between them. These gate the
+	// choice and the shipped rows it is made over - the rule is only worth anything if the bands are really there.
 	public class SpellEffectBandTests
 	{
 		// A banded set: exactly the member whose band contains the level.
@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			Assert.Equal([(21u, 30u)], SpellEffectBands.ForLevel(bands, 30, b => b));
 		}
 
-		// ⚠️ CLAMPED, not dropped. `Hellfire Stream`'s bands stop at 30 and the spell is castable far past that; a rule
+		// Clamped, not dropped. `Hellfire Stream`'s bands stop at 30 and the spell is castable far past that; a rule
 		// that required coverage would make it do nothing at exactly the levels it is most often cast at. The client's
 		// own ramp arithmetic clamps outside the band for the same reason.
 		[Fact]
@@ -33,14 +33,14 @@ namespace Faolan.Tests
 			Assert.Equal([(21u, 30u)], SpellEffectBands.ForLevel(bands, 80, b => b));
 			Assert.Equal([(1u, 5u)], SpellEffectBands.ForLevel(bands, 0, b => b));
 
-			// A level in the GAP between two bands takes whichever is closer, and a tie keeps both rather than
+			// A level in the gap between two bands takes whichever is closer, and a tie keeps both rather than
 			// inventing a preference.
 			Assert.Equal([(6u, 10u)], SpellEffectBands.ForLevel(bands, 12, b => b));
 			Assert.Equal([(6u, 10u), (20u, 30u)], SpellEffectBands.ForLevel(Bands((6, 10), (20, 30)), 15, b => b));
 		}
 
-		// ⚠️ The other shape the same rule has to get right: `Life Leech`'s effect record states five elements on one
-		// stat that all share ONE band - four heals and a drain. Every one of them covers the level, so every one of
+		// The other shape the same rule has to get right: `Life Leech`'s effect record states five elements on one
+		// stat that all share one band - four heals and a drain. Every one of them covers the level, so every one of
 		// them applies. Picking "the row for this level" here would throw three quarters of the heal away.
 		[Fact]
 		public void MembersSharingOneBand_AllApply()
@@ -63,15 +63,15 @@ namespace Faolan.Tests
 		}
 
 		// The shipped rows the rule exists for. `Hellfire Stream` (8600) carries five `InterpolatedHit` elements on
-		// (stat 27, period 0), one per band - the set that used to arrive as ONE row reading -488 for every caster of
-		// every level.
+		// (stat 27, period 0), one per band - a set that collapses to a single row reading -488 for every caster of
+		// every level if the bands are ignored.
 		[Fact]
 		public void TheShippedCatalog_CarriesHellfireStreamsFiveLevelBands()
 		{
 			var rows = Rows("SELECT LowLevel, HighLevel, Amount, MaxAmount FROM SpellStatEffects " +
 			                "WHERE SpellId = 8600 AND EffectKind = 53219 AND StatId = 27 ORDER BY LowLevel");
 
-			// Two of the five are stated TWICE by the record (body offsets 1106 and 1194 repeat 390 and 478), so the
+			// Two of the five are stated twice by the record (body offsets 1106 and 1194 repeat 390 and 478), so the
 			// row set is seven and the distinct set is five - see SpellStatEffect.Statement.
 			Assert.Equal(5, rows.Select(r => (r.Low, r.High)).Distinct().Count());
 			Assert.Equal([(1u, 5u), (6u, 10u), (11u, 15u), (16u, 20u), (21u, 30u)], rows.Select(r => (r.Low, r.High)).Distinct());

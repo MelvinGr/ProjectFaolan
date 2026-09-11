@@ -11,8 +11,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The imported bounded-area regions (MapRegion, #519/#521) tested through the SAME routine the runtime uses,
-	// against the SHIPPED rows rather than a synthetic polygon. The parser's own grammar gates live in
+	// The imported bounded-area regions (MapRegion) tested through the same routine the runtime uses,
+	// against the shipped rows rather than a synthetic polygon. The parser's own grammar gates live in
 	// BoundedAreaCollectionTests; this is about the geometry surviving the trip through the importer and the DB.
 	public class MapRegionGeometryTests
 	{
@@ -23,8 +23,8 @@ namespace Faolan.Tests
 			return region!;
 		}
 
-		// The #521 case end to end: quest 10238's goal 1448 resolves (via LDB category 51200 id 180) to `Trappers
-		// Haven` on Tortage Island, and the goal's own map MARKER lands inside that region. That the client's region
+		// The resolution end to end: quest 10238's goal 1448 resolves (via LDB category 51200 id 180) to `Trappers
+		// Haven` on Tortage Island, and the goal's own map marker lands inside that region. That the client's region
 		// and the client's marker agree is the evidence the resolution picked the right polygon - a wrong region
 		// would almost certainly not contain the pin.
 		[Fact]
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 		}
 
 		// The prism is three-dimensional, and that is the point of carrying <heights> at all: a discovery volume is
-		// ~10 units tall, so a player on a floor above must not trip it. Same lesson the lava volumes taught (#504).
+		// ~10 units tall, so a player on a floor above must not trip it. Same lesson the lava volumes taught.
 		[Fact]
 		public async Task Region_RejectsAPointOutsideItsHeightBand()
 		{
@@ -74,10 +74,10 @@ namespace Faolan.Tests
 			Assert.False(EnvironmentService.Contains(region, new Vector3(region.MinX - 100f, y, region.MinZ - 100f)));
 		}
 
-		// ⚠️ The rotated ones are why this table stores a RING and not four floats. `BA_MountainGlade_RezDiscovery`
+		// The rotated ones are why this table stores a ring and not four floats. `BA_MountainGlade_RezDiscovery`
 		// is a rotated quad: its axis-aligned box is nearly twice its real area, so a bbox test would fire from
 		// well outside the volume - on a 16 x 20 pad whose whole purpose is to be tighter than the 30-unit radius
-		// it replaces. This pins a corner of that box as OUTSIDE the polygon.
+		// it replaces. This pins a corner of that box as outside the polygon.
 		[Fact]
 		public async Task RotatedDiscoveryVolume_IsNarrowerThanItsBoundingBox()
 		{
@@ -100,16 +100,14 @@ namespace Faolan.Tests
 			Assert.False(EnvironmentService.Contains(region, new Vector3(region.MaxX, y, region.MaxZ)));
 		}
 
-		// --- #513/#679/#680: the AREA BANNERS -------------------------------------------------------------------
-		// A banner is a COLUMN on the volume that fires it. It used to be a `MapArea` row carrying a hull over the
-		// positions retail was captured firing it at, and the gates here tested that hull against the region it was
-		// matched to. The hull is gone - it was an approximation the runtime had to widen with a slack radius, and
-		// the client ships the real polygon for effectively every banner - so what is shippable is the ASSIGNMENT,
-		// and that is what these hold. The evidence that produced it (hull inside volume, the two routes agreeing)
+		// --- the area banners --------------------------------------------------------------------------------
+		// A banner is a column on the volume that fires it. A hull over the positions retail was captured firing it at
+		// is only an approximation, one the runtime has to widen with a slack radius, and the client ships the real
+		// polygon for effectively every banner - so what is shippable is the assignment, and that is what these hold. The evidence that produced it (hull inside volume, the two routes agreeing)
 		// is checked where the evidence lives: in the importer, against the real corpus, and printed by
 		// `--report area-banner-names`.
 
-		// The FILTER both routes share. Every banner volume runs the client's crossing-notifier scry script; without
+		// The filter both routes share. Every banner volume runs the client's crossing-notifier scry script; without
 		// it Old Tarantia's banners returned up to four containing regions, the tightest being `City_sounds` at
 		// 142,490 u² - an audio region. A region that never tells the server the player entered it cannot be what
 		// fires a server-sent banner, which is as true of a name match as of a geometric one: "Outlaw Camp" also
@@ -124,7 +122,7 @@ namespace Faolan.Tests
 			Assert.All(banners, r => Assert.Equal(BoundedAreaClassifier.CrossingNotifierScryId, r.ScryId));
 		}
 
-		// A banner id identifies ONE area of one playfield, so no two volumes may claim the same one - the server
+		// A banner id identifies one area of one playfield, so no two volumes may claim the same one - the server
 		// would have no way to say which of them the player just walked into, and the client renders one string.
 		// Provenance travels with it: a region either has both halves or neither.
 		[Fact]
@@ -157,7 +155,7 @@ namespace Faolan.Tests
 				source => Assert.True(banners.Any(r => r.AreaNameSource == source), $"no banner resolved by {source}"));
 		}
 
-		// The NO-MOUNT volumes (#681). Behaviour with no parameters, so what there is to gate is that the family is
+		// The no-mount volumes. Behaviour with no parameters, so what there is to gate is that the family is
 		// there, that it is the family the client names, and that every volume is testable - a degenerate one would
 		// silently never unseat anybody.
 		[Fact]
@@ -169,7 +167,7 @@ namespace Faolan.Tests
 			Assert.Equal(14, noMount.Count);
 			Assert.Equal([6100u, 6200u, 6300u, 6400u], noMount.Select(r => r.MapId).Distinct().Order().ToArray());
 
-			// ⚠️ Kara Korum's three are the reason this asserts the COUNT. The client spells them `BA_NoMount_Fengdu`,
+			// Kara Korum's three are the reason this asserts the count. The client spells them `BA_NoMount_Fengdu`,
 			// and `_` is a word character - so a `\bno.?mount` anchor matches neither them nor `No_mount_shaulun`, and
 			// the import silently took 11 of the 14 with every other gate still green.
 			Assert.Equal(3, noMount.Count(r => r.MapId == 6200));
@@ -177,7 +175,7 @@ namespace Faolan.Tests
 			Assert.All(noMount, r => Assert.True(r.MaxY > r.MinY, $"'{r.Name}' has an empty height range"));
 		}
 
-		// A no-mount volume is a real area you ride INTO, not a doorway: the smallest is 25 x 8 and the largest
+		// A no-mount volume is a real area you ride into, not a doorway: the smallest is 25 x 8 and the largest
 		// 373 x 306. Worth pinning because the runtime tests it on every move of every mounted player - if a harvest
 		// ever produced pin-sized ones, riders would cross them between position samples and never be unseated.
 		[Fact]
@@ -191,7 +189,7 @@ namespace Faolan.Tests
 		}
 
 		// Old Tarantia is the map where the answer can be read by eye, so it is worth pinning by name. Four of these
-		// were matched GEOMETRICALLY, from a hull over captured walk positions, before the client's own names could
+		// were matched geometrically, from a hull over captured walk positions, before the client's own names could
 		// be recovered at all - and the two routes agree on `BA_TradingPost` and both gates, which is the check
 		// neither could give itself.
 		[Fact]

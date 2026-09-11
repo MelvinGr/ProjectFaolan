@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #764: a consumable's SHARED cooldown. The client's own template states it - `CoreLockSpellLineTemplate`, kind
-	// 53124, key 39 the spell LINE and key 66 the duration - and the line groups by the resource restored, so health,
+	// A consumable's shared cooldown. The client's own template states it - `CoreLockSpellLineTemplate`, kind
+	// 53124, key 39 the spell line and key 66 the duration - and the line groups by the resource restored, so health,
 	// stamina and mana lock independently.
 	//
-	// The mechanism is `DispatchLockTemplate` (#767), not a refusal: the client greys what it is told to lock and never
-	// sends the second use. So the LINE MEMBERSHIP is the load-bearing part, and it comes from the items themselves -
+	// The mechanism is `DispatchLockTemplate`, not a refusal: the client greys what it is told to lock and never
+	// sends the second use. So the line membership is the load-bearing part, and it comes from the items themselves -
 	// there is no line catalog. These gate the shipped rows the runtime resolves that membership from.
 	public class ConsumableCooldownTests
 	{
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			foreach (var line in new uint[] { 80000, 80100, 80200 })
 				Assert.True(byLine.GetValueOrDefault(line, []).Count >= 5, $"line {line} has {byLine.GetValueOrDefault(line, []).Count} member(s)");
 
-			// No item is on two lines - it cannot be, one column - but the LINES must not share members either, which
+			// No item is on two lines - it cannot be, one column - but the lines must not share members either, which
 			// is what makes them independent.
 			var members = byLine.SelectMany(l => l.Value.Select(i => i.Id)).ToList();
 			Assert.Equal(members.Count, members.Distinct().Count());

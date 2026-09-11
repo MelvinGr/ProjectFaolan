@@ -21,23 +21,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Shared capture-import orchestration the modules (Faolan.Importer.Modules) drive - the upsert/wipe-rebuild
-	// helpers that sit above the per-subsystem CaptureX importers/extractors.
-	// Loot: the map loot pools and the random-loot exclusions. One of the five domain halves of what was one 2,064-line ImportOps (#928 item 7).
+	/// <summary>
+	///     Capture-import orchestration for loot, driven by the modules (Faolan.Importer.Modules): the map loot pools
+	///     and the random-loot exclusions.
+	/// </summary>
 	public static class LootImportOps
 	{
-		// Curated unique/no-random-drop item templates (#273). UNIQUE items are typed Normal and carry no wire-derivable
+		// Curated unique/no-random-drop item templates. Unique items are typed Normal and carry no wire-derivable
 		// "unique" flag (the RDB item-template property table has no decoded unique field, and SearchCategory mixes them
-		// with ordinary sellables), so they can't be auto-detected - this is the hand-maintained denylist. Add a template
-		// id here (or set it live with `.noloot <id>`) when an item that shouldn't randomly drop is spotted in-client.
+		// with ordinary sellables), so they cannot be auto-detected - this is the hand-maintained denylist. Add a
+		// template id here (or set it live with `.noloot <id>`) when an item that should not randomly drop is spotted
+		// in-client.
 		private static readonly uint[] UniqueLootDenylist =
 		[
 			354477 // Ape King's Treasure
 		];
 
-		// Seeds the random-loot exclusion flag (#273): excludes every Quest/Resource item (those typed from a non-Normal
-		// container) plus the curated unique denylist. ADD-ONLY - it never CLEARS the flag, so an item flagged live via
-		// .noloot (or by hand) survives a re-import. Returns the number of rows newly excluded.
+		/// <summary>
+		///     Seeds the random-loot exclusion flag: excludes every Quest/Resource item (those typed from a non-Normal
+		///     container) plus the curated unique denylist.
+		/// </summary>
+		/// <remarks>
+		///     Add-only - it never clears the flag, so an item flagged live via.noloot (or by hand) survives a
+		///     re-import.
+		/// </remarks>
+		/// <returns>The number of rows newly excluded.</returns>
 		public static async Task<int> ApplyRandomLootExclusions(DatabaseContext db)
 		{
 			var denylist = UniqueLootDenylist.ToHashSet();
@@ -59,10 +67,15 @@ namespace Faolan.Importer.Captures
 			return newlyExcluded;
 		}
 
-		// Rebuild the per-map loot pool (#273) from the captured bag contents. Clean rebuild (the pool is fully derived
-		// from the captures, so a re-run should not accumulate stale rows), keyed for dedup by (MapId, ItemTemplateId).
-		// Only items that exist in the Items table are kept - an unknown template the server can't build is useless as a
-		// drop (the items module seeds those identities, so it runs first in the default order).
+		/// <summary>
+		///     Rebuilds the per-map loot pool from the captured bag contents.
+		/// </summary>
+		/// <remarks>
+		///     A clean rebuild (the pool is fully derived from the captures, so a re-run must not accumulate stale rows),
+		///     keyed for dedup by (MapId, ItemTemplateId). Only items that exist in the Items table are kept - an unknown
+		///     template the server cannot build is useless as a drop (the items module seeds those identities, so it runs
+		///     first in the default order).
+		/// </remarks>
 		public static async Task<int> ImportMapLootPool(DatabaseContext db, List<MapLootPoolEntry> entries)
 		{
 			db.MapLootEntries.RemoveRange(await db.MapLootEntries.ToListAsync());

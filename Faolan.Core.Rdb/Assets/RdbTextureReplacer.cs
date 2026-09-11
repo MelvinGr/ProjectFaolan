@@ -3,19 +3,26 @@ using System.Text;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Ties the texture pipeline together (#295 Phase 2): read an FCTX texture from the RDB, upscale it, re-encode to
-	// FCTX/DXT1, and hand back the raw IOz1+zlib blob ready for RdbWriter.InlineEntries. A drop-in higher-res
-	// replacement for a (type,id). Bilinear upscale here is a placeholder for an ML upscaler (Real-ESRGAN etc.) — the
-	// container/encode/inline path is the point; swap the resampler for quality. DXT1 only for now (opaque diffuse).
-	//
-	// ⚠️ NOTHING CALLS THIS. Its only consumer was the Faolan.TextureUpscaler project (GPU ESRGAN upscale + inline),
-	// which has since been removed from the solution, so this is the orphaned driver of a pipeline whose parts are
-	// still live: FctxConverter and FctxEncoder are used and gated by FctxEncoderTests, RdbWriter is used widely.
-	// Kept because #295 is OPEN and this is its in-progress top half, not because anything depends on it - so it is
-	// unexercised code and should be re-verified against a real texture before being trusted.
+	/// <summary>
+	///     Ties the texture pipeline together: reads an FCTX texture from the RDB, upscales it, re-encodes it to FCTX
+	///     and hands back the raw IOz1+zlib blob ready for <see cref="RdbWriter" /> to inline, giving a drop-in
+	///     higher-resolution replacement for a (type, id).
+	/// </summary>
+	/// <remarks>
+	///     The bilinear resampler is a default, not a quality target: the container, encode and inline path is what
+	///     this class owns, and a caller passes its own upscaler in.
+	///     <para>
+	///         Nothing in the solution calls this, so it is unexercised and should be re-verified against a real
+	///         texture before being relied on. The parts it drives — <see cref="FctxConverter" />,
+	///         <see cref="FctxEncoder" /> and <see cref="RdbWriter" /> — are used and covered elsewhere.
+	///         Open work tracked in Gitea #295.
+	///     </para>
+	/// </remarks>
 	public static class RdbTextureReplacer
 	{
-		// Bilinear resample RGBA32 (row-major, top-down) from (sw,sh) to (dw,dh).
+		/// <summary>
+		///     Bilinearly resamples RGBA32 (row-major, top-down) from (sw, sh) to (dw, dh).
+		/// </summary>
 		public static byte[] Bilinear(byte[] src, int sw, int sh, int dw, int dh)
 		{
 			var dst = new byte[dw * dh * 4];
@@ -50,9 +57,12 @@ namespace Faolan.Core.Rdb.Assets
 			return dst;
 		}
 
-		// Build an upscaled FCTX replacement blob for the given texture entry, PRESERVING its format (DXT1 or DXT5),
-		// or null if it isn't a decodable DXT-colour FCTX (MIXD/normal maps return null). `scale` multiplies both
-		// dimensions (2 = double res). `upscale` replaces the resampler (default bilinear).
+		/// <summary>
+		///     Builds an upscaled FCTX replacement blob for the given texture entry, preserving its format.
+		/// </summary>
+		/// <param name="scale">Multiplies both dimensions; 2 doubles the resolution.</param>
+		/// <param name="upscale">Replaces the resampler; <see cref="Bilinear" /> by default.</param>
+		/// <returns>Null when the entry is not a re-encodable FCTX.</returns>
 		public static byte[]? BuildUpscaled(RdbReader rdb, uint type, uint id, int scale = 2, Func<byte[], int, int, int, int, byte[]>? upscale = null)
 		{
 			if (scale < 1 || !rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
@@ -67,7 +77,8 @@ namespace Faolan.Core.Rdb.Assets
 
 			if (fourCc == "MIXD")
 			{
-				// Normal + detail sub-textures, both upscaled; seg1 is regenerated as zero-padding (BC5-path only).
+				// Normal and detail sub-textures, both upscaled; seg1 is regenerated as zero padding, which only the
+				// BC5 path reads.
 				if (!FctxConverter.TryDecodeMixdNormal(payload, out var nrm, out var w, out var h) || !FctxConverter.TryDecodeTopMip(payload, out var det, out _, out _, true))
 					return null;
 
@@ -77,12 +88,12 @@ namespace Faolan.Core.Rdb.Assets
 				var upDrgba = resample(det, w, h, nw, nh);
 				var upD = new byte[nw * nh];
 				for (var i = 0; i < nw * nh; i++)
-					upD[i] = upDrgba[i * 4]; // detail is single-channel (decoded to R)
+					upD[i] = upDrgba[i * 4]; // The detail map is single-channel, decoded into R.
 				return FctxEncoder.WrapIOz1(FctxEncoder.EncodeMixd(upN, upD, nw, nh));
 			}
 
 			if (fourCc != "DXT1" && fourCc != "DXT5")
-				return null; // DXT3/unknown - not re-encodable
+				return null; // DXT3 and unknown fourccs are not re-encodable.
 
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var cw, out var ch))
 				return null;

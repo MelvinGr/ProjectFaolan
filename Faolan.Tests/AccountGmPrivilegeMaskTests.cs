@@ -4,14 +4,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `Account.GmLevel` is the account's WHOLE GM state: the retail client's `gm_level` mask, or null for an account
-	// that is not a GM. It replaced four things that were partly the same data - a `WebAccountType`-derived role, an
-	// override mask, and `GmGodMode`/`GmInvisible` booleans - because `GodMode` (0x200) and `InvisibleToMonsters`
-	// (0x80) are already bits IN that mask. Two stores of one fact is how they drift, and #902 is the bill for it:
-	// the client discards every server-driven health decrease while `GodMode` is set, so an account carrying the bit
-	// while the server thought otherwise took damage, died, and watched a full health bar the whole time.
+	// `Account.GmLevel` is the account's whole GM state: the retail client's `gm_level` mask, or null for an account
+	// that is not a GM. It is the single store for every privilege, including `GodMode` (0x200) and
+	// `InvisibleToMonsters` (0x80), because two stores of one fact drift: the client discards every server-driven
+	// health decrease while `GodMode` is set, so an account carrying the bit while the server thought otherwise takes
+	// damage, dies, and watches a full health bar the whole time.
 	//
-	// ⚠️ It is independent of `WebAccountType`, which governs the admin SITE and says nothing about the game.
+	// It is independent of `WebAccountType`, which governs the admin site and says nothing about the game.
 	public class AccountGmPrivilegeMaskTests
 	{
 		private static Account Gm(uint mask)
@@ -38,8 +37,8 @@ namespace Faolan.Tests
 			Assert.False(Gm(GmRoles.Support2).HasGmPrivilege(GmPrivileges.Developer));
 		}
 
-		// ⛔ The #902 invariant, and it is now structural rather than enforced: god mode is a BIT, so the client's
-		// invulnerability and the server's `.godmode` are the same fact and cannot disagree.
+		// The invariant is structural rather than enforced: god mode is a bit, so the client's invulnerability and the
+		// server's `.godmode` are the same fact and cannot disagree.
 		[Fact]
 		public void GodModeIsJustABit_SoTheClientAndTheServerCannotDisagree()
 		{
@@ -55,7 +54,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, account.ClientGmLevel() & (uint)GmPrivileges.GodMode);
 		}
 
-		// Flipping a bit must never PROMOTE: `.godmode` on someone who is not a GM would otherwise quietly make them
+		// Flipping a bit must never promote: `.godmode` on someone who is not a GM would otherwise quietly make them
 		// one, and any non-zero gm_level puts the retail client into GM mode.
 		[Fact]
 		public void SettingAPrivilegeOnANonGm_DoesNothing()
@@ -68,7 +67,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, account.ClientGmLevel());
 		}
 
-		// The web account type is the admin SITE's role. It must not leak into the game either way round.
+		// The web account type is the admin site's role. It must not leak into the game either way round.
 		[Theory]
 		[InlineData(WebAccountType.Trial)]
 		[InlineData(WebAccountType.Normal)]

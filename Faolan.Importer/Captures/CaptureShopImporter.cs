@@ -9,25 +9,28 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-// The codec's per-WARE record and this file's per-SHOP one are both called ShopEntry; alias the wire one.
+// The codec's per-ware record and this file's per-shop one are both called ShopEntry; alias the wire one.
 using WireShopEntry = Faolan.Core.Network.Codecs.Economy.ShopEntry;
 
 namespace Faolan.Importer.Captures
 {
-	// Imports NPC vendor shops from captured DispatchShopData (0x2033) packets into Shop/ShopItem rows
-	// (grammar: ShopContentCodec / tools/capture/decode_shopdata.py). Shops are keyed by the vendor NPC NAME -
-	// the shop id and NPC handle are session-volatile, the name is stable (resolved from the same capture's
-	// FA015807 spawns, exactly like conversations). The wares' item identities land in the Items table via
-	// ItemHashHarvester's shop source (CaptureItemImporter runs over the same packets first), so the
-	// templates referenced here resolve. Re-importing a vendor replaces its stock wholesale.
+	/// <summary>
+	///     Imports NPC vendor shops from captured DispatchShopData packets into Shop/ShopItem rows (grammar:
+	///     ShopContentCodec / tools/capture/decode_shopdata.py).
+	/// </summary>
+	/// <remarks>
+	///     Shops are keyed by the vendor's NPC template id - the shop id and NPC handle are session-volatile, the
+	///     template is stable (resolved from the same capture's FA015807 spawns). The wares' item identities land in the
+	///     Items table via ItemHashHarvester's shop source (CaptureItemImporter runs over the same packets first), so
+	///     the templates referenced here resolve. Re-importing a vendor replaces its stock wholesale.
+	/// </remarks>
 	public static class CaptureShopImporter
 	{
 		public static List<ShopEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var names = ConversationExtractor.BuildSpawnNameMap(packets);
-			// handle -> vendor TEMPLATE id (#244): the shop is keyed by the vendor's NPC TYPE, not its (non-unique)
-			// internal name, so distinct same-named vendors don't merge and a shop never leaks onto a same-named
-			// non-vendor (e.g. the conversation NPC Atraxus vs the "Halen van Dummy" vendors).
+			// handle -> vendor template id: the shop is keyed by the vendor's NPC type, not its (non-unique) internal
+			// name, so distinct same-named vendors do not merge and a shop never leaks onto a same-named non-vendor.
 			var templates = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).GroupBy(e => e.Handle).ToDictionary(g => g.Key, g => g.First().TemplateId);
 			var shops = new List<ShopEntry>();
 			foreach (var p in packets)

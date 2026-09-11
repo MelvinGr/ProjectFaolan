@@ -8,10 +8,11 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// #291/#300: backfill EMPTY spell names from the localized-string DB (LDB, RDB 1030002), English page picked by
-	// cribbing against the catalog's existing template names. Runs after rdb-spells so those names exist to crib on.
-	// #303: the abilities the client knows but no capture ever granted. Identity only - see RdbLdbAbilityImporter for
-	// why a row from here cannot be granted (the 0x2052 grant carries the TEA key, and the keys are random).
+	/// <summary>
+	///     The abilities the client knows but no capture ever granted, named from the English LDB page. Identity only:
+	///     see RdbLdbAbilityImporter for why a row from here cannot be granted (the 0x2052 grant carries the TEA key,
+	///     and the keys are random).
+	/// </summary>
 	public sealed class RdbLdbAbilitiesModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(RdbLdbNamesModule)];

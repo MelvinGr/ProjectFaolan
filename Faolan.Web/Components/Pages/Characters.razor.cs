@@ -19,8 +19,8 @@ namespace Faolan.Web.Components.Pages
 		private const int InvPageSize = 24;
 		private static readonly string[] InvTabs = ["Normal", "Quest", "Resources"];
 
-		// Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
-		// centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
+		// Paper-doll equipment slots, arranged around the character preview in the AoC layout: Head centred above and
+		// Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
 		private static readonly string[] LeftSlots = ["Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
 		private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
 		private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
@@ -164,11 +164,10 @@ namespace Faolan.Web.Components.Pages
 			await using var db = await DbFactory.CreateDbContextAsync();
 			var full = await db.Characters.Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
 
-			// Vitals are DERIVED rather than stored, so there is no row to include and no older row to back-fill
-			// (#578). The derivation scales off the character's ATTRIBUTES, which are the class/level base (#444) plus
-			// worn gear; this page reads the base only, so the numbers here are the character's pools UNGEARED - a
-			// floor, not what the client draws. Aggregating equipped items is the game server's job
-			// (MaxStatAggregator), not this page's.
+			// Vitals are derived rather than stored, so there is no row to include and none to back-fill. The
+			// derivation scales off the character's attributes, which are the class/level base plus worn gear; this page
+			// reads the base only, so the numbers here are the character's pools ungeared - a floor rather than what the
+			// client draws. Aggregating equipped items is the game server's job (MaxStatAggregator).
 			var classBase = full == null
 				? null
 				: await db.ClassAttributeBases.AsNoTracking()

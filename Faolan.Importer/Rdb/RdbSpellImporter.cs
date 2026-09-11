@@ -15,63 +15,60 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Rdb
 {
 	// Backfills spell stats from the client RDB spell-data records (RDB type 1040005, keyed by spell id; plain
-	// IOz1/zlib - NOT RDBH-encrypted, so no per-spell key needed, unlike item templates). Each record is a typed
+	// IOz1/zlib - not RDBH-encrypted, so no per-spell key needed, unlike item templates). Each record is a typed
 	// container: a 12-byte RDB-Id header ([type][id][..]) followed by a run of [fieldId u32][value u32] LE pairs
 	// in STRICTLY-INCREASING fieldId order (the inverse of the item-template table, which is strictly decreasing -
 	// see RdbItemImporter.TryReadPropertyField). Validated against the in-client Ice Strike tooltip + 6 spells:
 	//   field 0x126 (294) = cast time in centiseconds (value*10 = ms): Ice 200->2.0s, ShockStrike 250->2.5s,
 	//     Fire of Gehenna 200->2.0s, Hellfire Stream 100->1.0s, Shocblast 300->3.0s, Inferno of Amher 250->2.5s.
-	//   field 0x11F (287) = target range * 100 (Ice 2500 -> 25); fields 347/348/349 = the SPLASH triple
-	//     (radius / damage percent * 100 / max targets), on 215 records - NOT the damage rating they were read as
-	//     until #626.
-	// Catalogs the FULL spell list from the RDB: every type-1040005 record that carries a display name is upserted
+	//   field 0x11F (287) = target range * 100 (Ice 2500 -> 25); fields 347/348/349 = the splash triple
+	//     (radius / damage percent * 100 / max targets), on 215 records - not a damage rating.
+	// Catalogs the full spell list from the RDB: every type-1040005 record that carries a display name is upserted
 	// into the Spell table with its Name (the 0x21 string, same framing as item templates - see
 	// RdbItemImporter.ExtractName), CastTime, Range, the splash triple, DurationMs, ManaCost and (additively) Level.
 	// EffectSpell/min-max damage stay untouched - those really are rank/level-COMPUTED and absent from this
-	// record. Idempotent: re-running only rewrites changed values. (#236)
+	// record. Idempotent: re-running only rewrites changed values.
 	//
-	// ⚠️ "Mana is rank/level-COMPUTED, not a base field, so it is not backfillable" (the claim this comment used to
-	// make) was wrong, and wrong in an instructive way: mana IS level-scaled, but the SCALING is what the client does
-	// with the field, not a reason the field is absent. Field 132 is usually the cost as a PERCENT of the caster's
-	// mana pool, which is level-scaled by construction - see Spell.ManaCost (#629).
+	// Mana IS backfillable, level-scaling notwithstanding: the scaling is what the client does with the field, not a
+	// reason the field is absent. Field 132 is usually the cost as a percent of the caster's mana pool, which is
+	// level-scaled by construction - see Spell.ManaCost.
 	//
-	// #402: a record with NO embedded name is NOT automatically junk. A handful of real player-facing spells (e.g.
-	// the "Set's Ruin" necro family 222682-222685, "Warlord's March", ...) carry no 0x21 string in their 1040005
-	// body - their name lives ONLY in the LDB (RDB 1030002, cat 50210). This is NOT about the display name (the
-	// client resolves spell names from its OWN RDB by id; we never send them - the recovered Name is for our
-	// tooling). It is about catalog MEMBERSHIP: CharacterSpell.SpellId FKs Spells, and ImportKnownSpells SKIPS any
+	// A record with no embedded name is not automatically junk. A handful of real player-facing spells (e.g.
+	// the "Set's Ruin" necro family 222682-222685, "Warlord's March",...) carry no 0x21 string in their 1040005
+	// body - their name lives only in the LDB (RDB 1030002, cat 50210). This is not about the display name (the
+	// client resolves spell names from its own RDB by id; we never send them - the recovered Name is for our
+	// tooling). It is about catalog membership: CharacterSpell.SpellId FKs Spells, and ImportKnownSpells skips any
 	// learned id not in the catalog (CaptureCharacterImporter), so an uncataloged spell was dropped from the
 	// character's KnownSpellList entirely - missing from the spellbook, not merely unnamed. So a nameless record is
 	// still catalogued when the LDB knows it as a real spell name - EXCEPT the LDB's own dev/PvP-internal markers
 	// ("XX"/"CTF"-tagged names,
-	// see IsDevMarker), which are test/flag buffs, not player spells. The row is inserted with an EMPTY name; the
+	// see IsDevMarker), which are test/flag buffs, not player spells. The row is inserted with an empty name; the
 	// rdb-ldb-names module (RdbLdbNameImporter, run after) cribs the English LDB name onto it. Of 681 nameless
 	// records: 189 have no LDB name at all and 467 are dev markers - both stay dropped (asset/aura junk); the
 	// remaining 25 are real player spells absent from every other source (the "Set's Ruin"/"Set's Cold Hatred"
-	// families, "War Lord's March", "Mass Ignition", ...).
+	// families, "War Lord's March", "Mass Ignition",...).
 	//
-	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=GUI Stacking Order, 125=level, 287=range,
-	// 294=cast, 347/348/349=the splash triple (radius/damage/max-targets, #626), 447=channel tick interval (#349),
+	// Field map (dumped over all 21,502 records): 8=duration, 123=GUI Stacking Order, 125=level, 287=range,
+	// 294=cast, 347/348/349=the splash triple (radius/damage/max-targets), 447=channel tick interval,
 	// 551=Stacking Order, 79=icon (an id
 	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=GUI Stacking Line
-	// (#590/#634 - see Spell.GuiStackingLine).
+	// (see Spell.GuiStackingLine).
 	//
-	// ⚠️ "This FIELD RUN carries no stat ids" was too strong, and #590 is why it is worth re-testing rather than
-	// repeating: field **847 names an ATTRIBUTE** - 716 records carrying exactly 808 (Intelligence, x482), 810
+	// The field run does carry stat ids: field 847 names an attribute - 716 records carrying exactly 808
+	// (Intelligence, x482), 810
 	// (Wisdom, x224) and 804 (Strength, x10), which is the stat-id space, and it splits along sensible lines (the
-	// Demonologist's nukes on Intelligence, the curses and DoTs on Wisdom). It is now READ, into
-	// Spell.ScalingAttribute, as a per-spell OVERRIDE of the client's per-CLASS default (#592,
-	// docs/rdb/spell-scaling.md).
+	// Demonologist's nukes on Intelligence, the curses and DoTs on Wisdom). It is now read, into
+	// Spell.ScalingAttribute, as a per-spell override of the client's per-class default
+	// (docs/rdb/spell-scaling.md).
 	//
-	// ⚠️ 551 is NOT a "rank-scaling magnitude" - that was our label for an unread number, and the client's own
-	// stat-name table calls it `Stacking Order` (#633). The narrower claim it was supporting still stands on its own:
-	// a buff's MAGNITUDES are not in this run, same as damage/recast (docs/subsystems/stat-engine.md).
+	// 551 is not a rank-scaling magnitude: the client's own stat-name table calls it `Stacking Order`. A buff's
+	// magnitudes are not in this run at all, same as damage and recast (docs/subsystems/stat-engine.md).
 	//
 	// The run is 111 distinct fields wide and the importer reads 13 of them (`--report rdb-field-coverage`). Several
-	// unread ones are on MORE records than the read ones - 54 is on 20,186 of 21,502 - so "we parse this table" is
+	// unread ones are on more records than the read ones - 54 is on 20,186 of 21,502 - so "we parse this table" is
 	// not the same as "we have this table".
 	//
-	// The `[2][9]` REGION of the same record is the exception, and is imported below: explicit (kind, statId, amount)
+	// The `[2][9]` region of the same record is the exception, and is imported below: explicit (kind, statId, amount)
 	// records, the same shape item templates carry (docs/rdb/spell-stat-effects.md). It covers potions/elixirs and a
 	// slice of the class buffs - 866 of 20,847 spells - not the buffs seen in retail captures, which carry no region
 	// at all.
@@ -80,7 +77,7 @@ namespace Faolan.Importer.Rdb
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
 		// 347/348/349 - the SPLASH triple, named by the client's own stat-name table (LDB cat 615): Splash Radius /
 		// Splash Damage / Splash damage max targets. All three sit on the same 215 records, so they are read together;
-		// see Spell.SplashRadius for the units and for why 348 is NOT the "damage rating" it was imported as (#626).
+		// see Spell.SplashRadius for the units and for why 348 is not the "damage rating" it was imported as.
 		private const uint SplashRadiusField = 0x15B;
 		private const uint SplashDamageField = 0x15C;
 		private const uint SplashMaxTargetsField = 0x15D;
@@ -90,84 +87,83 @@ namespace Faolan.Importer.Rdb
 		// the developers' "Oysteins Channeltest".
 		private const uint ChannelingIntervalField = 0x1BF;
 
-		// 129 / 147 - the spell's OWN critical chance and critical-damage bonus (#633). Both are stats the client's
+		// 129 / 147 - the spell's own critical chance and critical-damage bonus. Both are stats the client's
 		// tooltip renderer divides by 100 (`StatDisplayScale.Percent1`), so both are hundredths of a percent: 250 =
 		// 2.50% chance, 5000 = +50.00% damage. 1,228 and 1,224 records carry them.
 		private const uint SpellCriticalDamageField = 0x081;
 		private const uint SpellCriticalChanceField = 0x093;
-		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
+		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none
 
-		// How far into a leading number the shared ARCHETYPE block runs (#581/#296). The archetype combo lines are
+		// How far into a leading number the shared ARCHETYPE block runs. The archetype combo lines are
 		// 20000-20008 - `Soldier_` 20002-20005, `Rogue_` 20006-20007, `Priest_` 20008 - so three archetypes sit under
-		// the one leading `20`, which is a BLOCK there rather than the Guardian class. Every class's OWN lines are far
+		// the one leading `20`, which is a block there rather than the Guardian class. Every class's own lines are far
 		// above it: Guardian 20401-20406, Halberdier 20407-20410, Barbarian 18401-18409, Ranger 39401-39412.
 		private const uint ArchetypeBlockWidth = 8;
 
 		// Key 170 on the area-targeting kinds is the target CAP, named by the client's own tooltip format string:
 		// LDB 1093636[18] is `%s %.2fm%s radius up to %d%s targets`, one string pairing the radius (key 11) with this
-		// count. `Life Leech` carries 11=5 170=12 against an in-client "5.00m radius up to 12 targets" (#773).
-		// ⚠️ Scoped to the area kinds. 170 also appears on `Disarm` and `InterpolatedHit`, where it means something
-		// else entirely - a GameActionStat_e key's meaning is per-TYPE.
+		// count. `Life Leech` carries 11=5 170=12 against an in-client "5.00m radius up to 12 targets".
+		// Scoped to the area kinds. 170 also appears on `Disarm` and `InterpolatedHit`, where it means something
+		// else entirely - a GameActionStat_e key's meaning is per-type.
 		private const int KeyMaxTargets = 170;
 
-		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
+		private const uint LdbType = 1030002; // the localized-string DB, cat 50210 = spell names
 
-		// 132 - the mana cost, carried RAW because the client reads it in two modes: a PERCENTAGE of the caster's
+		// 132 - the mana cost, carried raw because the client reads it in two modes: a PERCENTAGE of the caster's
 		// mana pool, or (when the flags word below says so) an absolute cost in wire hundredths. Recovered from the
-		// client's own tooltip path (#629); see Spell.ManaCost for the decompiled function.
+		// client's own tooltip path; see Spell.ManaCost for the decompiled function.
 		private const uint ManaCostField = 0x084;
 
 		// The FLAGS word's mana bit: set = a percent of the caster's pool, clear = an absolute cost in wire hundredths
-		// (#630, Spell.ManaCostIsPercent). It is NOT a property-table field - it sits in the head ahead of the
-		// ascending run, which is why three sweeps over that run found nothing. ⚠️ That word is located by
-		// `ReadFlagsWord`, RELATIVE to the run: it was a fixed `record byte 52` until #632 measured the head as
-		// variable-length, and the fixed form read 0 on 936 records.
+		// (see Spell.ManaCostIsPercent). It is not a property-table field - it sits in the head ahead of the ascending
+		// run, so a sweep over that run cannot find it. The word is located by `ReadFlagsWord` relative to the run,
+		// never at a fixed record offset: the head is variable-length, and a fixed offset reads 0 on hundreds of
+		// records.
 		private const int ManaCostIsPercentBit = 2;
 
-		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount CREATURE the summon
-		// spawns, so a record carrying it IS a mount summon. 155 records, 122 distinct creatures - the whole
-		// mount catalog, lifted into Mounts (#627). See Mount.CreatureId.
+		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount creature the summon
+		// spawns, so a record carrying it is a mount summon. 155 records, 122 distinct creatures - the whole
+		// mount catalog, lifted into Mounts. See Mount.CreatureId.
 		private const uint MountField = 0x0BA;
 
 		// 53261 StartServerSideScryScriptWithParams - the GameAction a spell performs when its effect is not a stat
-		// change but a server-side SCRIPT. On a pet summon its ScriptParams string is the whole summon (#640,
-		// Spell.SummonSpawnHash). Other spells use the same action for other scripts, which is why the PARAMS decide
+		// change but a server-side script. On a pet summon its ScriptParams string is the whole summon (see
+		// Spell.SummonSpawnHash). Other spells use the same action for other scripts, which is why the params decide
 		// whether a record is a summon, not the action id.
 		private const uint StartServerSideScryScriptWithParamsKind = 53261;
 
 		// 53051 `CastNano` - "nano" being Funcom's Anarchy Online word for a spell. Its single key 39 is the spell to
-		// run, and on a SPELL record that makes it an effect-chain edge (#783); on an ITEM template the same element is
-		// the on-use spell (`ItemTemplateStatModifiers.ParseRejected`'s remarks, #762).
+		// run, and on a spell record that makes it an effect-chain edge; on an item template the same element is
+		// the on-use spell (`ItemTemplateStatModifiers.ParseRejected`'s remarks).
 		private const uint CastNanoKind = 53051;
 
-		// #890: the effect that ARMS a self-resurrection - `53183 AddSelfResurrectionSpell`, whose two useful slots are
+		// the effect that ARMS a self-resurrection - `53183 AddSelfResurrectionSpell`, whose two useful slots are
 		// the spell to cast on resurrect and the restore percentage.
 		private const uint AddSelfResurrectionSpellKind = 53183;
 
 		// 499 - the QUALITY/rarity tier, the same field (and the same 0-indexed ItemQuality ladder) an item template
-		// carries; on a mount record it is the ONLY field separating "Swift <horse>" from "<horse>". Read into
-		// Mount.Quality - NOT as a speed, see Mount.Quality's remarks.
+		// carries; on a mount record it is the only field separating "Swift <horse>" from "<horse>". Read into
+		// Mount.Quality - not as a speed, see Mount.Quality's remarks.
 		private const uint QualityField = 0x1F3;
 
 		// 125 - the level requirement. Verified against the independent wiki scrape: identical for every rank >= 2
-		// (Runed Flesh 25/40/55/70, Pestilential Blast 20/35/50/65/80) and MORE COMPLETE than it - the wiki has
+		// (Runed Flesh 25/40/55/70, Pestilential Blast 20/35/50/65/80) and more complete than it - the wiki has
 		// Pestilential Blast R7 at Level 0, the RDB says 80. 19,239 of 20,822 rows had no level at all, so this is
-		// nearly all upside (coverage 1,583 -> 8,202). (#367)
+		// nearly all upside (coverage 1,583 -> 8,202).
 		//
-		// PRECEDENCE: the RDB LEADS on level data - over the ellatha/wiki scrapes AND over captures (decided
+		// PRECEDENCE: the RDB LEADS on level data - over the ellatha/wiki scrapes and over captures (decided
 		// 2026-07-16: rdb is leading, so if a wiki import says something else, take rdb; rdb is also leading over
 		// captures). So this OVERWRITES whatever is there. The RDB and the scrapes agree on 7,135 of the 7,645 spells
 		// it knows (93%), so the 185 rows it changes are a small correction to a cross-validated field.
 		//
-		// Nothing needs protecting from this any more. `starter-spells` used to encode the create-granted kit by
-		// PINNING those spells to Level 1 (and pushing every other class level-1 row to 2), so an overwrite here would
-		// have silently un-granted a new character's starters. That was always a conflation: retail grants the necro
-		// Ice Strike (Rank 1) at create even though its requirement really is level 7 - and the RDB and ellatha AGREE
-		// on 7, so the pin was overwriting a CORRECT level with a sentinel. The starter kit is now a capture-proven
-		// list on ClassSpell.IsStarter, independent of level, and Spells.Level means only "the level requirement".
+		// Nothing needs protecting from the overwrite. The create-granted kit is not encoded by pinning those spells
+		// to Level 1: retail grants the necro Ice Strike (Rank 1) at create even though its requirement really is
+		// level 7, and the RDB and the community scrapes agree on 7, so a pin would overwrite a correct level with a
+		// sentinel. The starter kit is a capture-proven list on ClassSpell.IsStarter, independent of level, and
+		// Spells.Level means only "the level requirement".
 		//
-		// ⚠️ NOT field 54, which the client's stat-name table also calls `Level` and which is on 20,186 records to
-		// this one's 7,645 - a coverage gap that reads like a bug (#629). It is not one. Field 54 takes 23 values
+		// not field 54, which the client's stat-name table also calls `Level` and which is on 20,186 records to
+		// this one's 7,645 - a coverage gap that reads like a bug. It is not one. Field 54 takes 23 values
 		// over the whole catalog and 19,957 of them are 1 or 80, where 125 takes 43 values that track the real
 		// unlock ladder: Gate of Hell 70, every rank-6 spell 80, `Ice Strike` 7/20/35/50/65/80 across its ranks.
 		// Field 54 is a content BAND (pre- vs post-cap), not a requirement, and 45 named fields is exactly how many
@@ -179,16 +175,16 @@ namespace Faolan.Importer.Rdb
 		private const string RankSuffix = " (Rank ";
 		private const uint MaxCharacterLevel = LevelingResolver.MaxLevel;
 
-		// 123 - `GUI Stacking Order`, the spell's precedence within its stacking line. Read as the RANK until #634,
-		// which it only correlates with; the real rank is the "(Rank N)" suffix in the name.
+		// 123 - `GUI Stacking Order`, the spell's precedence within its stacking line. It only correlates with the
+		// rank; the real rank is the "(Rank N)" suffix in the name.
 		private const uint StackingOrderField = 0x07B;
 		// 128 - `GUI Stacking Line`, class-encoded (ConanClass x 1000 + index) in the common case; see
 		// Spell.GuiStackingLine for why it is carried raw.
 		private const uint StackingLineField = 0x080;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 
-		// 847 - the spell's scaling ATTRIBUTE as a wire stat id (808 Intelligence / 810 Wisdom / 804 Strength); see
-		// Spell.ScalingAttribute. A per-spell OVERRIDE of the client's per-class default, so most records carry none.
+		// 847 - the spell's scaling attribute as a wire stat id (808 Intelligence / 810 Wisdom / 804 Strength); see
+		// Spell.ScalingAttribute. A per-spell override of the client's per-class default, so most records carry none.
 		private const uint ScalingAttributeField = 0x34F;
 		private const uint SpellDataType = 1040005;
 
@@ -196,7 +192,7 @@ namespace Faolan.Importer.Rdb
 		// potion effects, which have no 1040005 record at all - see FillDurationsFromEffectCatalog.
 		private const uint EffectCatalogType = 1000621;
 
-		// #271: the two GameAction element types that SET a base recast (docs/re/gameaction-keylists.tsv). Their
+		// the two GameAction element types that set a base recast (docs/re/gameaction-keylists.tsv). Their
 		// `Change...` twins (53031 / 53069) are modifiers, not a base, and are deliberately not read here.
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SetSpellLineRecastTimeKind = 53077;
@@ -206,11 +202,11 @@ namespace Faolan.Importer.Rdb
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
 
-			// #402: the LDB (cat 50210) roster of spell-name ids, used to recover real player spells whose 1040005
+			// the LDB (cat 50210) roster of spell-name ids, used to recover real player spells whose 1040005
 			// record embeds no name. The id set is language-independent (every localized page shares it). We collect
-			// ALL of an id's localized names, because the dev/PvP-internal "XX"/"CTF" marker is reliable ONLY in
+			// all of an id's localized names, because the dev/PvP-internal "XX"/"CTF" marker is reliable only in
 			// certain languages - e.g. id 3977071 is "Bloqué" in French but "XX_Blocked" in English, so a first-page
-			// (French) check would miss it. A real spell carries the marker in NO language; a dev buff carries it in
+			// (French) check would miss it. A real spell carries the marker in no language; a dev buff carries it in
 			// at least one. The localized (English) display name is cribbed on later by RdbLdbNameImporter.
 			var ldbSpellNames = new Dictionary<uint, List<string>>();
 			foreach (var e in rdb.EntriesOfType(LdbType).Where(rdb.CanRead))
@@ -236,24 +232,24 @@ namespace Faolan.Importer.Rdb
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
 			var toAdd = new List<Spell>();
-			// #367: (spellId -> stat effects) from the [2][9] region, synced into SpellStatEffects after the spells save.
-			// ⚠️ A LIST, not a map keyed on (stat, period). That key was introduced (correctly) so a spell doing a thing
-			// instantly AND over time keeps both, but a spell routinely states SEVERAL elements on the same stat and
-			// period - one per level band, or plain repeats - and keying on it discarded every one but the last (#783).
+			// (spellId -> stat effects) from the [2][9] region, synced into SpellStatEffects after the spells save.
+			// A list, not a map keyed on (stat, period). That key was introduced (correctly) so a spell doing a thing
+			// instantly and over time keeps both, but a spell routinely states several elements on the same stat and
+			// period - one per level band, or plain repeats - and keying on it discarded every one but the last.
 			var statEffects = new Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>>();
 			var spellStatModifiers = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.SpellStatModifier>>();
 
-			// Every spell record this run PARSED - the scope the stat-effect delete runs over, which is deliberately
-			// wider than the set that still HAS effects (#701).
+			// Every spell record this run parsed - the scope the stat-effect delete runs over, which is deliberately
+			// wider than the set that still HAS effects.
 			var statEffectScope = new HashSet<uint>();
-			// #627: (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
+			// (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
 			var mounts = new Dictionary<uint, (uint CreatureId, ItemQuality? Quality)>();
-			// #640: (spell id -> pet summon params) off the 53261 element's ScriptParams string. Written onto the Spell
-			// row below; this is what makes "which spells summon a pet" a catalog READ instead of a hand-typed list.
+			// (spell id -> pet summon params) off the 53261 element's ScriptParams string. Written onto the Spell
+			// row below; this is what makes "which spells summon a pet" a catalog read instead of a hand-typed list.
 			var summons = new Dictionary<uint, SummonParams>();
-			// #271: the base recast, off the record's GameAction ELEMENT region. Resolved only after the loop, because
+			// the base recast, off the record's GameAction element region. Resolved only after the loop, because
 			// deciding which element applies to a spell needs its GuiStackingLine, which this same loop sets.
-			// `recastOwn` is what a record says when IT is cast; the two `assigned` maps are what every record says
+			// `recastOwn` is what a record says when it is cast; the two `assigned` maps are what every record says
 			// about a target, so a rank carrying no element of its own still inherits its family's timer.
 			var recastOwn = new Dictionary<uint, List<(uint Kind, uint Target, uint Value)>>();
 			var assignedBySpell = new Dictionary<uint, uint>();
@@ -269,7 +265,7 @@ namespace Faolan.Importer.Rdb
 			var unparsedSamples = new List<string>();
 			var areaEffects = new Dictionary<uint, List<SpellAreaEffect>>();
 
-			// ⭐ #861: an area/chain link's own CONDITION run, keyed by the row it belongs to. Collected alongside the
+			// an area/chain link's own CONDITION run, keyed by the row it belongs to. Collected alongside the
 			// rows rather than on them because `SpellAreaEffect` is the DB entity and its criteria are a child table -
 			// and because the rows are delete-then-inserted, so the children have to be written in a second pass.
 			var areaCriteria = new Dictionary<(uint SpellId, uint Sequence), IReadOnlyList<ItemTemplateStatModifiers.Criterion>>();
@@ -300,7 +296,7 @@ namespace Faolan.Importer.Rdb
 				var name = RdbItemImporter.ExtractName(body);
 				if (string.IsNullOrEmpty(name))
 				{
-					// #402: no embedded name. Recover it ONLY if the LDB knows it as a real (non-dev) spell name;
+					// no embedded name. Recover it only if the LDB knows it as a real (non-dev) spell name;
 					// insert with an empty name and let RdbLdbNameImporter crib the English name on. Otherwise it is
 					// asset/aura junk and stays dropped.
 					if (!ldbSpellNames.TryGetValue(entry.Id, out var ldbNames) || ldbNames.Any(IsDevMarker))
@@ -328,13 +324,13 @@ namespace Faolan.Importer.Rdb
 				var channelingIntervalMs = fields.TryGetValue(ChannelingIntervalField, out var ci)
 					? ci * 10
 					: 0u; // centiseconds -> ms
-				// #633: hundredths of a percent, carried raw. NOT clamped or defaulted - the modal chance is 250
+				// hundredths of a percent, carried raw. not clamped or defaulted - the modal chance is 250
 				// (2.5%) and the modal damage bonus 5000 (+50%), and the ~half of the records carrying a bare `1` are
 				// spells that essentially never crit, which is a fact about them rather than a missing value.
 				var criticalChanceHundredths = fields.GetValueOrDefault(SpellCriticalChanceField);
 				var criticalDamageHundredths = fields.GetValueOrDefault(SpellCriticalDamageField);
-				var areaRadius = 0u; // metres, filled from the area-targeting elements below (#349)
-				var selfResurrectionSpell = 0u; // #890, filled from the AddSelfResurrectionSpell element below
+				var areaRadius = 0u; // metres, filled from the area-targeting elements below
+				var selfResurrectionSpell = 0u; // filled from the AddSelfResurrectionSpell element below
 				var selfResurrectionPercent = 0u;
 				var areaEffectSpell = 0u; // the spell that area applies - the element's KeySpell, see the loop below
 				var durationMs = fields.TryGetValue(DurationField, out var du)
@@ -346,21 +342,21 @@ namespace Faolan.Importer.Rdb
 				var stackingLine = fields.GetValueOrDefault(StackingLineField);
 				// Only the three attribute stat ids the field is ever observed to take are accepted. It is an
 				// override read straight into a combat formula, so an unexpected value must land as "no override"
-				// rather than as a stat id nothing scales off (#592).
+				// rather than as a stat id nothing scales off.
 				var scalingAttribute = fields.TryGetValue(ScalingAttributeField, out var sa) && IsAttributeStat(sa)
 					? sa
 					: 0u;
 				var stackingOrder = fields.TryGetValue(StackingOrderField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
-				// #629: carried RAW, both modes in the one column - clamping the flat rows into a percent range would
+				// carried raw, both modes in the one column - clamping the flat rows into a percent range would
 				// silently invent a cost, and picking the mode is the reader's job (CombatResolver.ResolveSpellManaCost).
 				var manaCost = fields.TryGetValue(ManaCostField, out var mc) && mc <= ushort.MaxValue
 					? (ushort)mc
 					: (ushort)0;
 				var manaCostIsPercent = (ReadFlagsWord(body.AsSpan(12), runStart) >> ManaCostIsPercentBit & 1) == 1;
 
-				// #627: a record carrying field 186 IS a mount summon, and the value is the creature it seats the
+				// a record carrying field 186 is a mount summon, and the value is the creature it seats the
 				// player on. Collected here rather than in a pass of its own precisely because it is a column lift
 				// off a record this loop already decompressed and parsed.
 				if (fields.TryGetValue(MountField, out var mountCreature) && mountCreature != 0)
@@ -368,17 +364,17 @@ namespace Faolan.Importer.Rdb
 						? (ItemQuality)q
 						: null);
 
-				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates. The record's KIND is
-				// carried through, not dropped: a spell mixes flat and PERCENT records in one region, and reading a
+				// buff/debuff stat deltas live in the same [2][9] region as item templates. The record's kind is
+				// carried through, not dropped: a spell mixes flat and percent records in one region, and reading a
 				// percent one as flat turns "+2% Critical Rating" into "+200" (ItemTemplateStatModifiers).
-				// #271: the base recast. It is an ACTION the spell performs when cast - "set the recast of X" - so it
-				// is filed under its TARGET, not under the record that carries it: `Mesmeric Gaze (Rank 4)` sets the
+				// the base recast. It is an ACTION the spell performs when cast - "set the recast of X" - so it
+				// is filed under its target, not under the record that carries it: `Mesmeric Gaze (Rank 4)` sets the
 				// recast of ranks 1-4, and `Pestilential Blast` carries no element at all, which is exactly the 0 its
 				// retail tooltip shows. Only the two SETTERS are read; ChangeRecastTime / ChangeLineRecastTime are
 				// modifiers on a base the client already holds (docs/re/spell-recast-source.md).
-				// ⭐ #772: the ACCOUNTING check. An element the scan cannot see is a spell mechanic silently missing -
+				// the ACCOUNTING check. An element the scan cannot see is a spell mechanic silently missing -
 				// the whole of Gangrenous Stench's AoE was invisible this way, and no test could notice because every
-				// test asserted on the elements we DID parse. Counted per record and reported below, so the number is
+				// test asserted on the elements we did parse. Counted per record and reported below, so the number is
 				// something a future change has to move deliberately rather than something it can quietly grow.
 				totalBodyBytes += body.Length - 12;
 				foreach (var el in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
@@ -394,7 +390,7 @@ namespace Faolan.Importer.Rdb
 				{
 					unparsedElements += orphans.Count;
 					recordsWithUnparsed++;
-					// The COUNT alone goes stale the moment someone has to act on it, so carry a few whole
+					// The count alone goes stale the moment someone has to act on it, so carry a few whole
 					// coordinates - spell, byte offset, type id and the words around it are what a decode starts from.
 					if (unparsedSamples.Count < 24)
 						foreach (var o in orphans)
@@ -409,13 +405,13 @@ namespace Faolan.Importer.Rdb
 
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
 				{
-					// #640: a PET SUMMON spells itself out in the ScriptParams of its server-side-script element -
+					// a pet SUMMON spells itself out in the ScriptParams of its server-side-script element -
 					// `spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781`. Lifted here for the same reason as
 					// the mount above: a column read off a record this loop already has open.
 					if (element.Kind == StartServerSideScryScriptWithParamsKind && SummonParams.TryParse(element.Text(GameActionTypes.KeyEventString), out var petSummon))
 						summons[entry.Id] = petSummon;
 
-					// #890: a SELF-RESURRECTION offer. `53183 AddSelfResurrectionSpell` names the spell to cast on
+					// a SELF-RESURRECTION offer. `53183 AddSelfResurrectionSpell` names the spell to cast on
 					// resurrect (the shared KeySpell slot) and the percentage of the character it restores, and the
 					// four spells that carry it are the family the potion and the three Elixirs of Resurgence apply.
 					// Lifted here for the same reason as the summon above: two columns off a record already open.
@@ -425,7 +421,7 @@ namespace Faolan.Importer.Rdb
 						selfResurrectionPercent = element.Value(GameActionTypes.KeySelfResurrectionPercent) ?? 0;
 					}
 
-					// #349: the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
+					// the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
 					// which is why the field run has none. Largest wins on a record carrying several (a cone plus a
 					// ring): the radius the spell can reach is the outer one.
 					if (GameActionTypes.AreaTargetKinds.Contains(element.Kind))
@@ -433,7 +429,7 @@ namespace Faolan.Importer.Rdb
 						if (element.Value(GameActionTypes.KeyRadius) is { } radius)
 							areaRadius = Math.Max(areaRadius, radius);
 
-						// #772: the area application WHOLE, one row per element, rather than the single radius the
+						// the area application whole, one row per element, rather than the single radius the
 						// parent column can hold. A spell states several - `Gangrenous Stench` two (one instant, one
 						// every 4 s), `Flesh to Worms` five - and the one a collapse would drop is the aura.
 						// `Fixed2d6` is the PERIOD in centiseconds; 0 means the area is applied once, at cast.
@@ -457,7 +453,7 @@ namespace Faolan.Importer.Rdb
 							});
 						}
 
-						// ⚠️ The same element also names WHAT to apply inside that radius, and dropping it is why a
+						// The same element also names what to apply inside that radius, and dropping it is why a
 						// castable with no duration of its own was sent to the client as its own buff. `Life Leech`
 						// (220979) carries `FilteredAreaFormula(88=220980, 11=5)`: the castable states cast time, mana
 						// and recast, and 220980 is the record that actually lands - 6.5 s, ticking every 3 s. Applying
@@ -473,10 +469,10 @@ namespace Faolan.Importer.Rdb
 							areaEffectSpell = applied;
 					}
 
-					// #783: `CastNano` - "also run spell X" - is the THIRD kind of effect link, and until now it was read
-					// only for ITEM templates (`Item.OnUseSpell`) and ignored on spells. 11,077 elements across the
+					// `CastNano` - "also run spell X" - is the third kind of effect link, and until now it was read
+					// only for item templates (`Item.OnUseSpell`) and ignored on spells. 11,077 elements across the
 					// catalog, and dropping them left effect records imported and unreachable: `Gangrenous Stench`'s
-					// 221069 chains to 3963058 `Physical Wrack`, whose four -1000 rows ARE the "-10% Slashing / Piercing
+					// 221069 chains to 3963058 `Physical Wrack`, whose four -1000 rows are the "-10% Slashing / Piercing
 					// / Crushing / Poison" its in-client tooltip shows, and nothing in the DB could get from one to the
 					// other. 26 spells reference 3963058; 6 reached it, and the 20 that did not all reach it this way.
 					//
@@ -496,11 +492,11 @@ namespace Faolan.Importer.Rdb
 							Sequence = (uint)links.Count,
 							Kind = element.Kind,
 							EffectSpellId = chained,
-							// The element's own 0x2d6, carried faithfully like every other link's - but ⚠️ a consumer
+							// The element's own 0x2d6, carried faithfully like every other link's - but a consumer
 							// must not read a periodic CHAIN as an aura: an aura re-applies an area, and this row has
 							// no area to re-apply. `SpellAreaCatalog` splits on the kind before it splits on the period.
 							PeriodCentiseconds = element.Fixed2d6,
-							// ⭐ And the other half of the pair (#786): an interval alone cannot say whether it is a
+							// And the other half of the pair: an interval alone cannot say whether it is a
 							// cadence or a delay, and `Repeats` can - -1 re-runs, 1 runs once after it.
 							Repeats = (int)element.Fixed2d5
 						});
@@ -522,10 +518,10 @@ namespace Faolan.Importer.Rdb
 						? mine
 						: recastOwn[entry.Id] = []).Add((element.Kind, target, value));
 
-					// ⚠️ Records DISAGREE about a target - 338 spells and 12 lines are named with two different
+					// Records disagree about a target - 338 spells and 12 lines are named with two different
 					// values, because a rank arms its whole family and the ranks do not share a number (Embodiment
 					// of Terror: rank 1's own record says 90 s, rank 2's says 80 s for that same rank 1). The
-					// resolution below prefers what the spell's OWN record says, so this map only ever decides for
+					// resolution below prefers what the spell's own record says, so this map only ever decides for
 					// a spell that carries no element at all, and there the longest wins: under-gating a cast is
 					// the failure that matters.
 					var map = element.Kind == SetSpellRecastTimeKind
@@ -542,25 +538,25 @@ namespace Faolan.Importer.Rdb
 					map[target] = value;
 				}
 
-				// Every record PARSED is scoped for the stat-effect sync below, not just those that still yield
-				// effects (#701). Keying the delete off the RESULTS means a spell whose list becomes empty - because
+				// Every record parsed is scoped for the stat-effect sync below, not just those that still yield
+				// effects. Keying the delete off the RESULTS means a spell whose list becomes empty - because
 				// the parse got stricter - keeps its old rows for ever, so a change that REMOVES bad data would leave
 				// the bad data sitting there. Same lesson, same shape, as RdbFeatImporter's effect sync.
 				statEffectScope.Add(entry.Id);
 
-				// #710: the spell-scoped STAT modifiers - kinds 53054/53062, "make spell X (or every rank of line L)
-				// crit harder / cost less mana / cast faster". These do NOT target the carrier, so `SpellStatEffects`
+				// the spell-scoped stat modifiers - kinds 53054/53062, "make spell X (or every rank of line L)
+				// crit harder / cost less mana / cast faster". These do not target the carrier, so `SpellStatEffects`
 				// - which is keyed by the carrier with the carrier as the SUBJECT - had nowhere to put the target and
 				// dropped it, leaving a stat and a magnitude that named nothing. Same parser and same shape as the
-				// FEAT half (#593); see SpellSpellStatModifier for why it is one mechanism with two sources.
+				// feat half; see SpellSpellStatModifier for why it is one mechanism with two sources.
 				var spellMods = ItemTemplateStatModifiers.ParseSpellStatModifiers(body);
 				if (spellMods.Count > 0)
 					spellStatModifiers[entry.Id] = spellMods;
 
 				var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body.AsSpan(12));
 				if (mods.Count > 0)
-					// Every element, in record order, one row each - see SpellStatEffect for what the old (stat, period)
-					// key was throwing away and how a consumer resolves the set it now gets.
+					// Every element, in record order, one row each - see SpellStatEffect for why a (stat, period) key
+					// loses data and how a consumer resolves the set this gives it.
 					statEffects[entry.Id] = [.. mods];
 
 				summons.TryGetValue(entry.Id, out var summon);
@@ -596,7 +592,7 @@ namespace Faolan.Importer.Rdb
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
 					inserted++;
-					if (!string.IsNullOrEmpty(name)) // #402: an LDB-recovered row is inserted nameless (filled later)
+					if (!string.IsNullOrEmpty(name)) // an LDB-recovered row is inserted nameless (filled later)
 						namesSet++;
 					if (level != 0)
 						levelsSet++;
@@ -605,7 +601,7 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				// #402: never clobber an existing (possibly LDB-cribbed) name with the empty provisional name a
+				// never clobber an existing (possibly LDB-cribbed) name with the empty provisional name a
 				// nameless-record recovery carries.
 				if (!string.IsNullOrEmpty(name) && spell.Name != name)
 				{
@@ -629,7 +625,7 @@ namespace Faolan.Importer.Rdb
 				spell.AreaRadius = areaRadius;
 				spell.DurationMs = durationMs;
 
-				// A CAPTURED effect link wins - it is what retail actually sent for that cast, and `CaptureSpellImporter`
+				// A captured effect link wins - it is what retail actually sent for that cast, and `CaptureSpellImporter`
 				// pairs cast to effect by identical name, which only covers same-name pairs. The RDB states the link on
 				// the area element for every AoE spell, so this fills the gap rather than replacing the capture. (The
 				// class comment above says EffectSpell "stays untouched"; that was true while the only source was
@@ -647,23 +643,23 @@ namespace Faolan.Importer.Rdb
 					levelsSet++;
 				}
 
-				// Both stacking fields are set unconditionally, unlike level: the RDB is their ONLY source, so there is
-				// no other value to defer to and a 0 here means the record genuinely carries none (#590, #634).
+				// Both stacking fields are set unconditionally, unlike level: the RDB is their only source, so there is
+				// no other value to defer to and a 0 here means the record genuinely carries none.
 				spell.GuiStackingOrder = stackingOrder;
 				spell.GuiStackingLine = stackingLine;
 				spell.ScalingAttribute = scalingAttribute;
 				spell.ManaCost = manaCost;
 				spell.ManaCostIsPercent = manaCostIsPercent;
 
-				// #640: set unconditionally, like the stacking fields - the RDB is the only source, and a record with
+				// set unconditionally, like the stacking fields - the RDB is the only source, and a record with
 				// no summon element genuinely is not a summon.
 				spell.SummonSpawnHash = summon?.Token;
 				spell.SummonIsCompanion = summon?.Companion ?? false;
 				spell.SummonPetBuff = summon?.PetBuff;
 				spell.SummonPointCost = summon?.PointCost;
 
-				// #890: set unconditionally for the same reason as the summon fields - the RDB is the only source, and
-				// a spell with no AddSelfResurrectionSpell element genuinely arms no resurrection. NULL rather than 0
+				// set unconditionally for the same reason as the summon fields - the RDB is the only source, and
+				// a spell with no AddSelfResurrectionSpell element genuinely arms no resurrection. null rather than 0
 				// so "arms one" is a question the column answers by itself.
 				spell.SelfResurrectionSpell = selfResurrectionSpell == 0 ? null : selfResurrectionSpell;
 				spell.SelfResurrectionPercent = selfResurrectionSpell == 0 ? null : selfResurrectionPercent;
@@ -671,7 +667,7 @@ namespace Faolan.Importer.Rdb
 
 			var ladderLevelsSet = RankLadderFromEffectBands(byId, statEffects, logger);
 
-			// #271: apply the recast now that every row's GuiStackingLine is set. The spell's OWN record leads - it
+			// apply the recast now that every row's GuiStackingLine is set. The spell's own record leads - it
 			// is that spell's own statement about itself, and it is what the retail tooltip shows - and a record
 			// naming the spell (or its line) from outside only fills in for a rank that carries no element, which is
 			// how `Unimaginable Terror` rank 1 inherits the 45 s its rank-2 sibling arms on their shared line.
@@ -707,28 +703,27 @@ namespace Faolan.Importer.Rdb
 
 			var classSpellsAdded = await SyncClassMembership(db, byId.Values, logger);
 
-			// #367: sync the SpellStatEffect rows now that every affected spell exists (FK). Delete-then-insert per
+			// sync the SpellStatEffect rows now that every affected spell exists (FK). Delete-then-insert per
 			// spell is idempotent and matches the region being authoritative for a spell's stat deltas.
 			var affected = statEffectScope.ToList();
 			var stale = await db.SpellStatEffects.Where(e => affected.Contains(e.SpellId)).ToListAsync();
 			if (stale.Count > 0)
 				db.SpellStatEffects.RemoveRange(stale);
 
-			// ⛔ The effect CRITERIA are deleted EXPLICITLY, and must be - the `ON DELETE CASCADE` on their FK never
-			// fires here. The effect rows above are removed and re-added with the SAME (SpellId, Sequence) key in one
+			// The effect CRITERIA are deleted EXPLICITLY, and must be - the `on DELETE CASCADE` on their FK never
+			// fires here. The effect rows above are removed and re-added with the same (SpellId, Sequence) key in one
 			// unit of work, and EF collapses a delete-then-add of one key into an UPDATE: no DELETE statement ever
 			// reaches SQLite, so no cascade runs.
 			//
-			// That made this importer NOT IDEMPOTENT, and invisibly: the criteria insert below worked exactly once -
-			// the run that first populated the table, when it was empty - and every later run died on
-			// `UNIQUE constraint failed: SpellStatEffectCriteria.SpellId, Sequence, Pos`. It was never noticed because
-			// the module is opt-in and had not been re-run since #791 added the table. A cascade you cannot observe is
-			// not a cascade; the sibling deletes below are explicit for the same reason and this one was the omission.
+			// Relying on that cascade makes this importer non-idempotent: the criteria insert below would work only on
+			// the run that first populates the table, and every later run would die on
+			// `unique constraint failed: SpellStatEffectCriteria.SpellId, Sequence, Pos`. A cascade you cannot observe
+			// is not a cascade, so the delete is explicit here, like its siblings below.
 			var staleCriteria = await db.SpellStatEffectCriteria.Where(c => affected.Contains(c.SpellId)).ToListAsync();
 			if (staleCriteria.Count > 0)
 				db.SpellStatEffectCriteria.RemoveRange(staleCriteria);
 
-			// #772: same delete-then-insert scoped to every record PARSED, for the same reason as the stat effects -
+			// same delete-then-insert scoped to every record parsed, for the same reason as the stat effects -
 			// keying the delete off the RESULTS would let a spell whose area list becomes empty keep its old rows for
 			// ever, so a change that REMOVES bad data would leave the bad data sitting there.
 			var staleAreaCriteria = await db.SpellAreaEffectCriteria.Where(c => affected.Contains(c.SpellId)).ToListAsync();
@@ -739,7 +734,7 @@ namespace Faolan.Importer.Rdb
 			if (staleAreas.Count > 0)
 				db.SpellAreaEffects.RemoveRange(staleAreas);
 
-			// #710: the spell-scoped stat modifiers, on the SAME delete-then-insert scoped to every record PARSED and
+			// the spell-scoped stat modifiers, on the same delete-then-insert scoped to every record parsed and
 			// for the same reason - keying the delete off the RESULTS would let a spell whose modifier list becomes
 			// empty keep its old rows for ever.
 			var staleMods = await db.SpellSpellStatModifiers.Where(m => affected.Contains(m.SpellId)).ToListAsync();
@@ -749,7 +744,7 @@ namespace Faolan.Importer.Rdb
 			foreach (var (carrierId, list) in spellStatModifiers)
 				for (var i = 0; i < list.Count; i++)
 				{
-					// The KIND picks the target column - a line under 53062, a single spell under 53054 - exactly as it
+					// The kind picks the target column - a line under 53062, a single spell under 53054 - exactly as it
 					// does on FeatSpellStatModifier. Never both.
 					var isLine = list[i].Kind == ItemTemplateStatModifiers.SpellLineStatModifierKind;
 					db.SpellSpellStatModifiers.Add(new SpellSpellStatModifier
@@ -777,7 +772,7 @@ namespace Faolan.Importer.Rdb
 					else
 						areaRows++;
 
-					// ⭐ #861: the link's condition run. On a rank TABLE this is the whole mechanic - each edge is
+					// the link's condition run. On a rank table this is the whole mechanic - each edge is
 					// gated on `MustHavePassiveAbilityRunning <the rank below>`, which is what turns ten alternatives
 					// into a one-rank-per-proc upgrade ladder. Same second-pass rule as the stat-effect criteria: the
 					// parent rows are delete-then-inserted and the FK cascades, so a child added now is lost silently.
@@ -811,12 +806,12 @@ namespace Faolan.Importer.Rdb
 						PeriodCentiseconds = effect.PeriodCentiseconds,
 						EffectKind = effect.Kind,
 						Amount = (int)effect.WireAmount,
-						// Null on every kind that states ONE number rather than a range (#783).
+						// Null on every kind that states one number rather than a range.
 						MaxAmount = effect.MaxAmount,
-						// Non-null only on 53189, where Amount is a percentage OF this stat rather than a quantity
-						// in StatId's units (#807).
+						// Non-null only on 53189, where Amount is a percentage of this stat rather than a quantity
+						// in StatId's units.
 						SourceStatId = (CharacterStatId?)effect.SourceStatId,
-						// Null on every kind but the interpolated families (#599/#783).
+						// Null on every kind but the interpolated families.
 						HighAmount = effect.Ramp?.HighValue,
 						MaxHighAmount = effect.MaxRamp?.HighValue,
 						LowLevel = effect.Ramp?.LowLevel,
@@ -824,11 +819,11 @@ namespace Faolan.Importer.Rdb
 					});
 					effectRows++;
 
-					// ⭐ #791: the element's CONDITIONS, verbatim and in order. The run is a postfix expression, so
+					// the element's CONDITIONS, verbatim and in order. The run is a postfix expression, so
 					// `Pos` is load-bearing rather than cosmetic. Stored including operators nothing can evaluate yet -
 					// dropping those would make the table look complete while deciding the condition is absent.
 					//
-					// ⚠️ COLLECTED here and written in a second SaveChanges below, not added now: the effect rows are
+					// COLLECTED here and written in a second SaveChanges below, not added now: the effect rows are
 					// delete-then-inserted and the criterion FK cascades, so inserting a child in the same unit of
 					// work as its parent's delete loses every row silently - the importer reported 32,189 written and
 					// the table held 0.
@@ -847,7 +842,7 @@ namespace Faolan.Importer.Rdb
 					}
 				}
 
-			// #627: the mount catalog is wholly DERIVED from field 186, so the RDB is authoritative for the table as a
+			// the mount catalog is wholly DERIVED from field 186, so the RDB is authoritative for the table as a
 			// whole - a row whose record no longer carries the field is gone, not stale. Rows whose summon spell did
 			// not make it into the catalog (a nameless dev record) are dropped rather than inserted as an FK orphan.
 			var stillThere = await db.Mounts.ToListAsync();
@@ -894,7 +889,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     The per-rank LEVEL LADDER, re-read from the effect ramp bands for the families where
+		///     The per-rank level LADDER, re-read from the effect ramp bands for the families where
 		///     <see cref="LevelField" /> provably is not one.
 		/// </summary>
 		/// <remarks>
@@ -902,12 +897,12 @@ namespace Faolan.Importer.Rdb
 		///     states that ladder for 97 of the catalog's 124 class-spell rank families. For three of them it states
 		///     no ladder at all: every rank of <c>Chill</c> reads 7, every rank of <c>Infestation</c> reads 2, and
 		///     <c>Lifestrike</c>'s five ranks read 2/3/4/4/4. A character dinging to that one level was then taught
-		///     the WHOLE family in a single ding - ranks whose own numbers are written for level 75-80 included, which
+		///     the whole family in a single ding - ranks whose own numbers are written for level 75-80 included, which
 		///     <c>SpellEffectBands</c> then clamps onto a level-4 caster.
 		///     <para>
-		///         The record states the ladder a SECOND time, and correctly: an <c>InterpolatedHit</c> ramp is banded
-		///         by level (keys 172/173), and the band a rank's numbers open at IS that rank's unlock level.
-		///         Measured over the families whose field-125 ladder is intact the two agree EXACTLY - <c>Ice
+		///         The record states the ladder a second time, and correctly: an <c>InterpolatedHit</c> ramp is banded
+		///         by level (keys 172/173), and the band a rank's numbers open at is that rank's unlock level.
+		///         Measured over the families whose field-125 ladder is intact the two agree exactly - <c>Ice
 		///         Strike</c> 7/20/35/50/65/80, <c>Pestilential Blast</c> 1/20/35/50/65/80, <c>Flesh to Worms</c>
 		///         2/25/40/55/70, <c>Frost Blast</c> 16/30/45/60/75, <c>Blasphemous Ruin</c> 14/35/50/65/80. Where
 		///         they disagree an independent scrape backs the BAND: ellatha rates <c>Lifestrike</c> rank 1 and
@@ -915,7 +910,7 @@ namespace Faolan.Importer.Rdb
 		///         field 125 puts the whole of Chill.
 		///     </para>
 		///     <para>
-		///         ⚠️ The band is NOT a general level source and is deliberately not used as one - it agrees with
+		///         The band is not a general level source and is deliberately not used as one - it agrees with
 		///         field 125 on only 46% of the rank spells carrying both, because a ramp may legitimately open at 1
 		///         (a buff that scales from the first level it is castable). It is consulted only where field 125 has
 		///         DISQUALIFIED itself by collapsing ranks, and only where the bands then answer completely,
@@ -950,9 +945,9 @@ namespace Faolan.Importer.Rdb
 				if (fieldLevels >= byRank.Count)
 					continue;
 
-				// ...and the bands have to answer for EVERY rank, with one answer per rank, inside the level cap. A
-				// record carrying NO banded effect is silent rather than dissenting - several of these families ship
-				// two ids per rank where only one holds the ramp - so it is the ids that DO answer that have to agree.
+				// ...and the bands have to answer for every rank, with one answer per rank, inside the level cap. A
+				// record carrying no banded effect is silent rather than dissenting - several of these families ship
+				// two ids per rank where only one holds the ramp - so it is the ids that do answer that have to agree.
 				var ladder = new List<uint>(byRank.Count);
 				foreach (var rank in byRank)
 				{
@@ -966,7 +961,7 @@ namespace Faolan.Importer.Rdb
 				if (ladder.Count != byRank.Count)
 					continue;
 
-				// A ladder never steps DOWN with rank, and it is only worth taking if it separates more ranks than the
+				// A ladder never steps down with rank, and it is only worth taking if it separates more ranks than the
 				// field did - otherwise the two are the same statement and the field is the established one.
 				if (ladder.Zip(ladder.Skip(1)).Any(p => p.Second < p.First) || ladder.Distinct().Count() <= fieldLevels)
 					continue;
@@ -990,11 +985,11 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     The level a spell's numbers OPEN at: the LOWEST ramp low-level over its effects that is above 1,
+		///     The level a spell's numbers OPEN at: the lowest ramp low-level over its effects that is above 1,
 		///     falling back to the lowest of all when every one of them is 1.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Lowest, not highest, and the difference is the whole rule. A record carries one of two shapes, and
+		///     Lowest, not highest, and the difference is the whole rule. A record carries one of two shapes, and
 		///     reading the highest is right for one and reads the CEILING on the other:
 		///     <list type="bullet">
 		///         <item>
@@ -1011,7 +1006,7 @@ namespace Faolan.Importer.Rdb
 		///     <b>263</b> against the highest reading's 202 - and the split is entirely by shape: on the 92 records
 		///     with four or five bands it is right 71 times and the highest reading twice.
 		///     <para>
-		///         ⭐ Which is what turns eleven collapsed families into a repair rather than a residue. Each of them
+		///         Which is what turns eleven collapsed families into a repair rather than a residue. Each of them
 		///         states ranks 2..N at exactly <c>Spells.Level</c> - four or five control points per family, 40-odd
 		///         in all - and then supplies the one rung field 125 lacks: <c>Radiance</c> reads 15/30/45/60/75
 		///         where the field reads 30/30/45/60/75, <c>Gelid Bones</c> 10/25/40/55/70 against 25/25/40/55/70.
@@ -1056,7 +1051,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     Fill the class↔spell ACCESS map from the spell's own <c>GuiStackingLine</c> (#296). A stacking line
+		///     Fill the class↔spell ACCESS map from the spell's own <c>GuiStackingLine</c>. A stacking line
 		///     encoded as <c>ConanClass × 1000 + lineIndex</c> names the class the line belongs to, so the client's
 		///     own catalog answers "which class may cast this" for all twelve classes at once.
 		/// </summary>
@@ -1066,10 +1061,10 @@ namespace Faolan.Importer.Rdb
 		///     It has one, and the two AGREE on 342 of the 343 rows where both spoke, which is what says the field
 		///     really is class membership rather than something that correlates with it.
 		///     <para>
-		///         ⚠️ ADDITIVE, never destructive. The capture-sourced rows carry two facts this cannot see -
-		///         <see cref="ClassSpell.IsStarter" /> (the create kit is a LIST, not a level query) and
+		///         ADDITIVE, never destructive. The capture-sourced rows carry two facts this cannot see -
+		///         <see cref="ClassSpell.IsStarter" /> (the create kit is a list, not a level query) and
 		///         <see cref="ClassSpell.GrantLevel" /> (the level a capture SHOWS the grant at) - so an existing row
-		///         is left exactly as it is. A spell already attributed to a DIFFERENT class is counted and logged
+		///         is left exactly as it is. A spell already attributed to a different class is counted and logged
 		///         rather than silently doubled up: one class-encoded line means one class, so a second attribution
 		///         is a disagreement to look at, not a spell two classes share.
 		///     </para>
@@ -1080,7 +1075,7 @@ namespace Faolan.Importer.Rdb
 				.GroupBy(c => c.SpellId)
 				.ToDictionary(g => g.Key, g => g.Select(c => c.Class).ToList());
 
-			// #581: which stacking LINE belongs to which archetype, from the combos that drive its spells. Per line
+			// which stacking line belongs to which archetype, from the combos that drive its spells. Per line
 			// rather than per spell, because a line's spells are the weapon variants of one combo family and only some
 			// of them have a catalogued combo - reading it per spell left the un-named variants of line 20008 (three
 			// `Censuring Strike` rows) attributed to Guardian while their siblings went to the Priest classes.
@@ -1101,7 +1096,7 @@ namespace Faolan.Importer.Rdb
 				.Where(g => g.Select(x => x.Archetype).Distinct().Count() == 1) // a line naming two archetypes is not evidence
 				.ToDictionary(g => g.Key, g => g.First().Archetype!.Value);
 
-			// The leading numbers that hold at least one archetype line. Every OTHER line under such a number is in the
+			// The leading numbers that hold at least one archetype line. Every other line under such a number is in the
 			// same shared block, so it is not that number's class either - we simply cannot say whose it is.
 			var sharedBlocks = archetypeOfLine.Keys.Select(l => l / 1000).ToHashSet();
 
@@ -1114,14 +1109,13 @@ namespace Faolan.Importer.Rdb
 				if (spell.GuiStackingLine == 0 || !Enum.IsDefined((ConanClass)(spell.GuiStackingLine / 1000)))
 					continue; // no line, or a line whose high part is not a class (50000 and 440061 - see Spell.GuiStackingLine)
 
-				// ⚠️ `line / 1000` is NOT always a class, and this is exactly the trap #296 called out on the COMBO side
-				// and this side never got. The archetype-shared combos sit in the `20000`-`20008` block - `Soldier_`
-				// 20002-20005, `Rogue_` 20006-20007, `Priest_` 20008 - so THREE different archetypes share the leading
-				// `20`, which is a BLOCK there and not Guardian. Reading it as a class shipped Guardian all 22 of the
-				// Rogue and Priest archetype spells (Cunning Strike I-VI, Vicious Strike I-II, Censuring Strike I-III),
-				// while no other class held a single archetype spell.
+				// `line / 1000` is not always a class. The archetype-shared combos sit in the `20000`-`20008` block -
+				// `Soldier_` 20002-20005, `Rogue_` 20006-20007, `Priest_` 20008 - so three different archetypes share
+				// the leading `20`, which is a block there and not Guardian. Reading it as a class gives Guardian all
+				// 22 of the Rogue and Priest archetype spells (Cunning Strike I-VI, Vicious Strike I-II, Censuring
+				// Strike I-III), while no other class holds a single archetype spell.
 				//
-				// Recognised from the DATA rather than by hardcoding the range: a LINE whose combos are named for an
+				// Recognised from the data rather than by hardcoding the range: a line whose combos are named for an
 				// archetype is that archetype's, and its spells go to all three of the archetype's classes. Another
 				// line under the same leading number is in the same shared block, so it is left UNATTRIBUTED rather
 				// than handed to the class that number would name - "grant too little rather than guess wrong", as the
@@ -1148,7 +1142,7 @@ namespace Faolan.Importer.Rdb
 						if (already.Contains(@class))
 							continue;
 
-						// Only a LINE-derived reading can disagree - an archetype fan-out is three classes by design.
+						// Only a line-derived reading can disagree - an archetype fan-out is three classes by design.
 						if (!archetypeLine)
 						{
 							conflicts++;
@@ -1173,10 +1167,10 @@ namespace Faolan.Importer.Rdb
 			return added;
 		}
 
-		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT
+		// the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are not
 		// player-facing spells - flag/test/spawner/wrapper buffs. Their name begins with an "XX" or "CTF" tag
-		// (as a whole token: "XX", "XX_", "XX ", "XX-", "CTF_", ... - not the start of a real word), case-insensitive,
-		// or the row is unnamed. A record nameless in its own 1040005 body is recovered only if NONE of its localized
+		// (as a whole token: "XX", "XX_", "XX ", "XX-", "CTF_",... - not the start of a real word), case-insensitive,
+		// or the row is unnamed. A record nameless in its own 1040005 body is recovered only if none of its localized
 		// names is such a marker.
 		private static bool IsDevMarker(string ldbName)
 		{
@@ -1201,16 +1195,16 @@ namespace Faolan.Importer.Rdb
 			(CharacterStatId)statId is CharacterStatId.Strength or CharacterStatId.Constitution
 				or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity;
 
-		// Reads the spell-data field table from a record body (the span AFTER the 12-byte RDB-Id header): the LONGEST
+		// Reads the spell-data field table from a record body (the span after the 12-byte RDB-Id header): the longest
 		// run of [fieldId u32][value u32] LE pairs with strictly-INCREASING fieldId in (0, 2000], starting at any
 		// offset - the spell-data grammar (the inverse of the item-template's strictly-decreasing table). Returns the
 		// fieldId -> value map of that best run.
-		// `internal` because --report spell-line-ids needs the SAME parse - a second copy of a grammar this fiddly
+		// `internal` because --report spell-line-ids needs the same parse - a second copy of a grammar this fiddly
 		// (a longest strictly-increasing run, not a fixed offset) is how a report quietly stops agreeing with the
 		// importer, exactly as RdbItemImporter.TryReadPropertyField already learned.
 		/// <summary>
-		///     Fills <see cref="Spell.DurationMs" /> from the client's ABILITY/EFFECT catalog (RDB type 1000621) for
-		///     rows the spell catalog (1040005) does not carry a duration for (#659).
+		///     Fills <see cref="Spell.DurationMs" /> from the client's ABILITY/effect catalog (RDB type 1000621) for
+		///     rows the spell catalog (1040005) does not carry a duration for.
 		/// </summary>
 		/// <remarks>
 		///     A buff can be catalogued as a `Spells` row without having a 1040005 record at all: the captures
@@ -1219,7 +1213,7 @@ namespace Faolan.Importer.Rdb
 		///     spell record, so nothing ever set its duration, while its own effect record states 1,440,000 cs and its
 		///     description says "for 4 hours".
 		///     <para>
-		///         ⚠️ It only ever FILLS an empty row, never overwrites one: where both catalogs hold a record, the
+		///         It only ever FILLS an empty row, never overwrites one: where both catalogs hold a record, the
 		///         spell record is the spell's own statement about itself.
 		///     </para>
 		/// </remarks>
@@ -1254,8 +1248,8 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     The ABILITY/EFFECT catalog's field table: the same strictly-increasing field run as
-		///     <see cref="ReadIncreasingFields" />, but its records interleave a TAG byte between each field id and its
+		///     The ABILITY/effect catalog's field table: the same strictly-increasing field run as
+		///     <see cref="ReadIncreasingFields" />, but its records interleave a tag byte between each field id and its
 		///     value - <c>[fieldId u32][tag u8][value u32]</c>, a 9-byte stride - and the run does not start on a word
 		///     boundary, so the spell reader cannot see it at all.
 		/// </summary>
@@ -1298,26 +1292,25 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     ⭐ The property run, ANCHORED on the string block that terminates it (#632), plus the byte offset just
+		///     The property run, ANCHORED on the string block that terminates it, plus the byte offset just
 		///     past it - which is where that block starts (see <see cref="ReadStringBlock" />).
 		/// </summary>
 		/// <remarks>
 		///     <para>
-		///         The run ends where the record's `[u32 21][u32 33]` name/description block begins - **every one of
-		///         the 21,502 shipped records has that pair, and only one has it twice** - so the run is found by
-		///         locating the block and walking BACKWARDS while the field ids strictly descend. That is exact where
-		///         the old rule was a guess.
+		///         The run ends where the record's `[u32 21][u32 33]` name/description block begins - every one of
+		///         the 21,502 shipped records has that pair, and only one has it twice - so the run is found by
+		///         locating the block and walking backwards while the field ids strictly descend, which is exact.
 		///     </para>
 		///     <para>
-		///         ⚠️ The old rule was "the LONGEST strictly-ascending run anywhere in the record wins", and it is
-		///         wrong on **2,010 of the 21,502 records (9.4%)**. The record's fixed 15-word HEAD opens with three
+		///         "The longest strictly-ascending run anywhere in the record wins" is not exact: it is wrong on
+		///         2,010 of the 21,502 records (9.4%). The record's fixed 15-word head opens with three
 		///         pairs whose ids happen to ascend - `(3|7, 15) (23, …) (76, 0)` at byte 4 - and that phantom run
 		///         BEATS the real one whenever a spell carries three property fields or fewer. Those records were
 		///         importing head words as properties: 1,207 reported a field `3` "Attack Speed", 1,203 a field `23`
 		///         "Static Instance", 1,167 a field `76` "Item Class", none of which the record states.
 		///     </para>
 		///     <para>
-		///         ⚠️ And it silently DROPPED real ones - 116 records lost field `294` Casting Time, 49 lost field `8`
+		///         And it silently dropped real ones - 116 records lost field `294` Casting Time, 49 lost field `8`
 		///         Duration, 143 lost the icon. A cast time that is missing reads as an instant spell, which is why
 		///         this is a data bug and not a tidiness one.
 		///     </para>
@@ -1337,7 +1330,7 @@ namespace Faolan.Importer.Rdb
 			startOffset = 0;
 			var fields = new Dictionary<uint, uint>();
 
-			// ⭐ The record STATES where its pair region ends. Word 4 is a `0x3F1` list frame - `(pairs + 1) * 0x3F1`
+			// The record states where its pair region ends. Word 4 is a `0x3F1` list frame - `(pairs + 1) * 0x3F1`
 			// - over every `[fieldId][value]` pair the record carries: the head's own, then the ascending property
 			// run, then any trailing resource reference. So the string block sits at exactly `20 + 8 * pairs`, which
 			// holds on 21,502 of 21,502 records.
@@ -1350,7 +1343,7 @@ namespace Faolan.Importer.Rdb
 					anchor = derived;
 			}
 
-			// ⚠️ The fallback SEARCHES for the block, and is deliberately second: one record carries the `[21][33]`
+			// The fallback SEARCHES for the block, and is deliberately second: one record carries the `[21][33]`
 			// pair twice, so a search that wins can anchor on a description's bytes rather than on the block.
 			for (var o = 0; anchor < 0 && o + 12 <= body.Length; o += 4)
 			{
@@ -1365,9 +1358,9 @@ namespace Faolan.Importer.Rdb
 
 			var p = anchor - 8;
 
-			// ⚠️ A RESOURCE reference can sit between the last property and the string block: 664 records end the run
-			// with `[1000000][n]` and 117 with `[1000014][n]`, both RDB TYPE ids rather than field ids. Skipping them
-			// is not optional - stopping there instead returned an EMPTY run for all 781, which silently emptied the
+			// A RESOURCE reference can sit between the last property and the string block: 664 records end the run
+			// with `[1000000][n]` and 117 with `[1000014][n]`, both RDB type ids rather than field ids. Skipping them
+			// is not optional - stopping there instead returned an empty run for all 781, which silently emptied the
 			// whole `Mounts` catalog on the first attempt at this (field 186 sits before one of them).
 			while (p >= 0 && body.ReadU32Le(p) >= FirstRdbTypeId)
 				p -= 8;
@@ -1390,8 +1383,8 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     ⭐ The record's FLAGS word - bit 2 is the mana-cost mode (#629/#630) and bit 24 the hide-from-tooltip
-		///     bit (#789). It sits **five words before the property run**, not at a fixed offset (#632).
+		///     The record's FLAGS word - bit 2 is the mana-cost mode and bit 24 the hide-from-tooltip
+		///     bit. It sits five words before the property run, not at a fixed offset.
 		/// </summary>
 		/// <remarks>
 		///     <para>
@@ -1400,9 +1393,9 @@ namespace Faolan.Importer.Rdb
 		///         to the record start.
 		///     </para>
 		///     <para>
-		///         ⚠️ The head is VARIABLE-LENGTH - 60 bytes on 20,538 records, 52 on 959 and 44 on 5 - so the old
-		///         fixed `record byte 52` lands on the wrong word for the short ones. It returned **0 for 936
-		///         records**, which forced their mana cost to read as absolute and their hide bit to read as clear,
+		///         The head is VARIABLE-length - 60 bytes on 20,538 records, 52 on 959 and 44 on 5 - so the old
+		///         fixed `record byte 52` lands on the wrong word for the short ones. It returned 0 for 936
+		///         records, which forced their mana cost to read as absolute and their hide bit to read as clear,
 		///         whatever the record said.
 		///     </para>
 		/// </remarks>
@@ -1426,11 +1419,11 @@ namespace Faolan.Importer.Rdb
 		private const int PairFrameOffset = 16;
 		private const int PairRegionStart = 20;
 
-		// The client's list count word, `(n + 1) * 0x3F1` - the same one the element lists use (#785).
+		// The client's list count word, `(n + 1) * 0x3F1` - the same one the element lists use.
 		private const uint ListFrameUnit = 0x3F1;
 
 		/// <summary>
-		///     ⭐ The record's own NAME and DESCRIPTION, which sit immediately after the property run (#632).
+		///     The record's own name and DESCRIPTION, which sit immediately after the property run.
 		/// </summary>
 		/// <remarks>
 		///     <para>
@@ -1439,13 +1432,13 @@ namespace Faolan.Importer.Rdb
 		///         description of length 0 is normal; a name of length 0 is not.
 		///     </para>
 		///     <para>
-		///         It is a large slice of the region #632 measured as never looked at — 190 of `Hellfire Stream`'s
-		///         1,338 body bytes — and it is the record's own text rather than the LDB's, which matters for the
+		///         It is a large slice of the record - 190 of `Hellfire Stream`'s 1,338 body bytes - and it is the
+		///         record's own text rather than the LDB's, which matters for the
 		///         1,594 spells LDB category 50210 has no name for. `Hellfire Stream` (8600) is one of them: the LDB
 		///         renders it as "spell 8600" and the record says `Hellfire Stream`.
 		///     </para>
 		///     <para>
-		///         ⚠️ Returns <c>Bytes = 0</c> rather than guessing when the shape does not hold (33 of 400 sampled
+		///         Returns <c>Bytes = 0</c> rather than guessing when the shape does not hold (33 of 400 sampled
 		///         records), which is a property-run detection that landed somewhere else, not a second grammar.
 		///     </para>
 		/// </remarks>
@@ -1468,19 +1461,19 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     ⭐ The record's two LIST-valued fields, `22` and `36`, and how many bytes they occupy (#632). 0 when the
+		///     The record's two list-valued fields, `22` and `36`, and how many bytes they occupy. 0 when the
 		///     record has none - 1,871 of the 21,502 carry them.
 		/// </summary>
 		/// <remarks>
 		///     <para>
-		///         Same shape as the string block, one step further: `[u32 22][u32 36]` and then each field's VALUE,
+		///         Same shape as the string block, one step further: `[u32 22][u32 36]` and then each field's value,
 		///         which is a `0x3F1`-framed list rather than a scalar or a string. Field 22's items are one word;
 		///         field 36's are three, and they are CRITERIA - `[id][value][operator]`, the same triple the elements
-		///         carry (#785/#790). Their operators are the same vocabulary: 35 distinct, max 166, against the
+		///         carry. Their operators are the same vocabulary: 35 distinct, max 166, against the
 		///         client's own `0..0x401` bound in `FUN_006e9f20`.
 		///     </para>
 		///     <para>
-		///         ⚠️ VARIABLE length - 32 bytes on 1,338 records but 24, 44, 56 and 80 on the rest, because both
+		///         VARIABLE length - 32 bytes on 1,338 records but 24, 44, 56 and 80 on the rest, because both
 		///         counts vary. Reading it as a fixed 32 finds only a third of them.
 		///     </para>
 		/// </remarks>
@@ -1507,11 +1500,11 @@ namespace Faolan.Importer.Rdb
 			return frame == 0 || frame % ListFrameUnit != 0 ? at : at + itemBytes * (int)(frame / ListFrameUnit - 1);
 		}
 
-		// The two LIST-valued field ids, the way 21/33 are the two TEXT-valued ones.
+		// The two list-valued field ids, the way 21/33 are the two text-valued ones.
 		private const uint ListFieldOne = 22;
 		private const uint ListFieldTwo = 36;
 
-		// The two field ids the string block opens with. 21 is the NAME slot and 33 the DESCRIPTION one, in the same
+		// The two field ids the string block opens with. 21 is the name slot and 33 the DESCRIPTION one, in the same
 		// id space as the property run - they are simply the fields whose values are text rather than a u32, which is
 		// why the ascending-run reader stops in front of them.
 		private const uint StringBlockNameField = 21;

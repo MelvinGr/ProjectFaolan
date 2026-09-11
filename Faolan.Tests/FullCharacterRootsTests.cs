@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			Hash = 0x12345678
 		};
 
-		// Entry ids are the ITEM's own identity now (#750), so uniqueness and stability are properties of the row
+		// Entry ids are the item's own identity now, so uniqueness and stability are properties of the row
 		// rather than of a formula: two copies of one template in two slots get different ids because they are
 		// different items, and re-rendering the same items twice gives the same ids because it is the same items.
 		[Fact]
@@ -65,12 +65,12 @@ namespace Faolan.Tests
 			Assert.Equal(ids.Count, ids.Distinct().Count());
 			Assert.Equal(recordIds.Count, recordIds.Distinct().Count());
 			Assert.Equal(ids, second.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList()); // stable across logins
-			// The low 32 bits ARE the instance id, under the retail epoch.
+			// The low 32 bits are the instance id, under the retail epoch.
 			Assert.Equal(new ulong[] { 11, 12, 13 }, ids.Order().Select(id => id & 0xFFFFFFFF));
 		}
 
 		// The equipped bag/resource-bag grow their containers: the backpack (kind 104) by Item.BagExtraSlots and the
-		// resource container (kind 112) by Item.ResourceBagExtraSlots, the same base+extra sizing (#12).
+		// resource container (kind 112) by Item.ResourceBagExtraSlots, the same base+extra sizing.
 		[Fact]
 		public void BuildContainers_EquippedBagsGrowTheirContainers()
 		{
@@ -135,10 +135,8 @@ namespace Faolan.Tests
 
 		// Bag items render at their cells, pos-ascending, whatever order the rows arrive in.
 		//
-		// This used to also cover the legacy FirstPosBag - an item that rendered at bag cell 1 with no row behind it, so
-		// a real row at cell 1 had to WIN over it and the two sources could otherwise claim the same cell. #750 removed
-		// that second source: the starter item is an ordinary bag item, and a cell has exactly one thing in it (the
-		// UNIQUE index on (owner, container, slot) is what makes that structural rather than a rule to remember).
+		// A bag cell holds exactly one thing: every item there is an ordinary row, and the unique index on
+		// (owner, container, slot) is what makes that structural rather than a rule to remember.
 		[Fact]
 		public void BuildContainers_RendersBagItems()
 		{
@@ -146,7 +144,7 @@ namespace Faolan.Tests
 			{
 				InBag(1, 3, Manacles, count: 2),
 				InBag(2, 1, Signet),
-				// No HARVESTED token - renders on a minted one (#723).
+				// No harvested token - renders on a minted one.
 				InBag(3, 5, new Item
 				{
 					Id = 9,
@@ -161,12 +159,12 @@ namespace Faolan.Tests
 			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
 			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the item
 
-			// The hash-less item used to be dropped here, which is what made a claim/AH item vanish on relog (#719).
+			// A hash-less item must still render - dropping it is what makes a claim/AH item vanish on relog.
 			Assert.Equal(AcgHash.Mint(9), bag[2].Item.ItemData.Hash);
 		}
 
-		// A GEMMED item restates its full gem list in slot_map, which is how it survives a relog (#750). Populated
-		// NOWHERE before, so every socketed item silently came back gemless.
+		// A gemmed item restates its full gem list in slot_map, which is how it survives a relog - an unpopulated
+		// slot_map brings every socketed item back gemless.
 		[Fact]
 		public void BuildContainers_RestatesSocketedGems()
 		{
@@ -196,10 +194,10 @@ namespace Faolan.Tests
 
 			var entry = Assert.Single(FullCharacterRoots.Containers(0x02000005, [gemmed])[1].Items);
 
-			// Ascending by socket index, whatever order they were added in, and each names the GEM - not the item.
+			// Ascending by socket index, whatever order they were added in, and each names the gem - not the item.
 			Assert.Equal(new uint[] { 0, 2 }, entry.Item.SlotMaps.Select(m => m.Slot));
 			Assert.All(entry.Item.SlotMaps, m => Assert.Equal(gem.Id, m.Item.Template1));
-			// The gem's own level, and a MINTED token (the corpus carries hash 0 on every captured gem block).
+			// The gem's own level, and a minted token (the corpus carries hash 0 on every captured gem block).
 			Assert.All(entry.Item.SlotMaps, m => Assert.Equal(80u, m.Item.Level));
 			Assert.All(entry.Item.SlotMaps, m => Assert.Equal(AcgHash.Mint(gem.Id), m.Item.Hash));
 		}
@@ -230,7 +228,7 @@ namespace Faolan.Tests
 		}
 
 		// The world-entry tail patch (live level + current vitals) must survive the tails serialize and leave
-		// everything else byte-stable: re-serializing with the SAME values is a no-op, and a changed level
+		// everything else byte-stable: re-serializing with the same values is a no-op, and a changed level
 		// reads back changed.
 		[Fact]
 		public void TailPatch_RoundTripsThroughTheTailsModel()
@@ -248,7 +246,7 @@ namespace Faolan.Tests
 
 			var original = FullCharSnapshotSubClassCodec.Build(parts.SubClass);
 
-			// The lead quest's LEVEL word (@+0x10) is a modelled field on the journal record, so writing it is an
+			// The lead quest's level word (@+0x10) is a modelled field on the journal record, so writing it is an
 			// ordinary value edit rather than a byte patch - and it stays fixed-width.
 			parts.SubClass.Quests.Records[0].Level = 42;
 			var patched = FullCharSnapshotSubClassCodec.Parse(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
@@ -256,8 +254,8 @@ namespace Faolan.Tests
 			Assert.Equal(original.Length, FullCharSnapshotSubClassCodec.Build(parts.SubClass).Length);
 
 			// The live-vitals patch slots round-trip too. The bigboy capture is the tails model's reference
-			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
-			// patch never fires. (MaxExp is read-only: it is authored by stat id on the SHEET, not positionally - #447.)
+			// fixture, so its stat table must be recognized - a silent skip here would mean the world-entry
+			// patch never fires. (MaxExp is read-only: it is authored by stat id on the sheet, not positionally.)
 			Assert.True(parts.SubClass.HasKnownRepeatedStatTable);
 			{
 				var maxExp = parts.SubClass.PostAccessBlock!.MaxExp;

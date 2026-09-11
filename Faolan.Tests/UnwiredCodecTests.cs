@@ -9,23 +9,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Which wire-proven codecs have NO live trigger - a builder that is byte-exact-locked by a golden but that no
-	// server code ever calls (#405).
+	// Which wire-proven codecs have no live trigger - a builder that is byte-exact-locked by a golden but that no
+	// server code ever calls.
 	//
-	// ⚠️ THIS EXISTS BECAUSE THE HAND-WRITTEN VERSION ROTTED. #405 carried the list as issue prose, and the #530
-	// codec sweep renamed or dissolved every single name on it - `CreateEditorRecordBuilder.BuildComboBookIir`,
-	// `MoveTaskCodec.BuildApproachTargetBody`, `SpellRecastActionBuilder.BuildChangeRecastTimeBody` and the rest all
-	// stopped existing, and nothing noticed, because prose has no compiler. The list has to be DERIVED to be worth
-	// having, so it is derived here and the allowlist below carries the reasons.
+	// The list is derived rather than hand-written, because a hand-written one rots: a rename dissolves every name
+	// on it and nothing notices, since prose has no compiler. It is derived here and the allowlist below carries
+	// the reasons.
 	//
 	// The gate is two-sided on purpose:
-	//   * a codec that becomes unwired without a documented reason FAILS - that is a builder quietly losing its
+	//   * a codec that becomes unwired without a documented reason fails - that is a builder quietly losing its
 	//     caller, which is the bug this is really watching for;
-	//   * an allowlisted codec that GAINS a caller also fails - the entry is now a lie and must come off, which is
-	//     what stops the list rotting the way the prose one did.
+	//   * an allowlisted codec that gains a caller also fails - the entry has become a lie and must come off, which
+	//     is what stops the list rotting.
 	public class UnwiredCodecTests
 	{
-		// A codec is UNWIRED when nothing outside `Codecs/` and the test project names it. Each entry needs a reason,
+		// A codec is unwired when nothing outside `Codecs/` and the test project names it. Each entry needs a reason,
 		// and the reason is the point: most of these are correct, not gaps.
 		private static readonly Dictionary<string, string> Unwired = new Dictionary<string, string>(StringComparer.Ordinal)
 		{
@@ -37,10 +35,10 @@ namespace Faolan.Tests
 			["ClientAddGuildRenownCodec"] = "guild renown is never awarded, so nothing calls it",
 			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it",
 
-			// The #874 batch: methods the corpus carries that nothing here ever sent. Decoded and byte-exact-pinned
-			// (UnsentMethodCodecTests) so the facts are executable, but each one's TRIGGER belongs to another ticket -
+			// Methods the corpus carries that nothing here ever sends. Decoded and byte-exact-pinned
+			// (UnsentMethodCodecTests) so the facts are executable, but each one's trigger belongs elsewhere -
 			// which is exactly the case this allowlist is for. A decode with no sender is not a gap; a decode with no
-			// RECORDED reason is.
+			// recorded reason is.
 			["CashRepositoryCodec"] = "the bank's cash line; nothing moves bank cash separately from the wallet yet (#654)",
 			["OpenSiteInBrowserCodec"] = "retail used it for its own item shop; we have no store and should not point a player's browser anywhere by default",
 			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
@@ -48,27 +46,6 @@ namespace Faolan.Tests
 			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363"
 		};
 
-		// UpdateTokenAmountCodec came OFF the list with #150: AlternateAdvancementService now credits and charges the
-		// three AA pools, so the wallet is written to and restated on the wire whenever it moves.
-		//
-		// BattleKeepInfoCodec came OFF the list with #147: CSPlayerAgentListener now answers 0x2042
-		// RequestBattleKeepInformation with the honest empty keep list (BattleKeepInfo.Empty) - the same shape as the
-		// zero-guild Massive-PvP board - instead of dropping the query as an unknown packet.
-
-		// DungeonPlayfieldCodec came OFF the list with #882. Its entry said "needs a playfield to be classified as a
-		// dungeon", and the group-finder capture IS that classification: both captured `01` frames land on a playfield
-		// the finder queues into (Black Castle / The Amphitheatre of Karutonia) and the `00` on an ordinary city
-		// login, so `GroupFinderActivityCatalog.IsFinderDestination` separates the two populations and the world-entry
-		// burst sends it. The entry became a lie the moment the sender existed, and this failed rather than rotting.
-
-		// The quest reward pair came OFF this list when #815 was wired: QuestRewardService now sends the offer from
-		// QuestProgressionService.CompleteObjective and the listener routes the c2s pick into it. That is the gate
-		// working in the direction it was built for - the entry said "no live trigger yet", and building the trigger
-		// made the entry a lie, which failed the run rather than rotting quietly.
-
-		// LockedToChanged came OFF the list in the same pass that wrote it (#405): retail sends it in the NPC-aggro
-		// bundle, right after HateListUpdate/ThreatLevel, and we now send all three. This is the gate doing its job in
-		// the direction that matters - the list said "no live trigger yet", and looking for the trigger found it.
 		[Fact]
 		public void EveryUnwiredCodec_IsDocumented_AndEveryDocumentedOneIsStillUnwired()
 		{
@@ -90,7 +67,7 @@ namespace Faolan.Tests
 
 		// Every codec that declares a standalone message: an IIR opcode, an IIR family, or an RPC method. Sub-record
 		// codecs (composed inside a larger body, never sent alone) declare nothing and are not in scope - having no
-		// caller of their own is what they ARE.
+		// caller of their own is what they are.
 		private static IEnumerable<Type> StandaloneMessageCodecs()
 		{
 			return typeof(Endpoints).Assembly.GetTypes()
@@ -98,12 +75,12 @@ namespace Faolan.Tests
 				.Where(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Any(f => f.Name is "Opcode" or "HandledTypes" or "Method" or "HandledMethods"));
 		}
 
-		// Everything that could legitimately CALL a codec: the server, the importer, the web tier and the MCP server.
+		// Everything that could legitimately call a codec: the server, the importer, the web tier and the MCP server.
 		// `Codecs/` itself is excluded (a codec composing another is not a live trigger) and so is the test project
 		// (a golden proving a builder is exactly the situation this looks for).
 		//
-		// ⚠️ **And so is `Faolan.Importer/Cli/ReportCli.*` - the `--report` diagnostics.** Those are read-only by
-		// definition, so one of them calling `Parse` says a message can be READ, never that anything SENDS it. Letting
+		// **And so is `Faolan.Importer/Cli/ReportCli.*` - the `--report` diagnostics.** Those are read-only by
+		// definition, so one of them calling `Parse` says a message can be read, never that anything sends it. Letting
 		// a report count as a caller would take a codec off this list without wiring it to anything in the world -
 		// silently, which is precisely the rot this gate exists to catch. It surfaced the moment `--report timeline`
 		// started decoding `AreaFormulaIIR`: the area/cone target selection is still unimplemented, and the gate would

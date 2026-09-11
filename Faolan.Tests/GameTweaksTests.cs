@@ -5,8 +5,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the OverrideGameTweaks (PlayerInterface 0x1A07) body byte-for-byte against retail. A single stray byte
-	// makes the client log "stream bad after 'overrides'" and drop the whole PlayerInterface route (applying 0 of
-	// the 19 tweaks instead of 19) - the bug fixed in 40d4bc0. The golden below is retail pkt#3's 630-byte body.
+	// makes the client log "stream bad after 'overrides'" and drop the whole PlayerInterface route, applying none of
+	// the tweaks. The golden below is retail packet 3's 630-byte body.
 	public class GameTweaksTests
 	{
 		private static readonly byte[] RetailGameTweaksBody =

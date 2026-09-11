@@ -10,13 +10,13 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact gates for the team/group, player-trade and friend-list messages against
-	// login_2-clients_group-trade-friend - two retail clients on one host, so every exchange is captured from BOTH
-	// sides in one file. The hex below is RETAIL's, lifted straight from that capture by frame number. The Python
-	// dissector that first read all 97 packets to their exact end was retired once these gates existed - it proved the
-	// same bytes, but by hand and against a corpus a plain clone does not have.
+	// login_2-clients_group-trade-friend - two retail clients on one host, so every exchange is captured from both
+	// sides in one file. The hex below is retail's, lifted straight from that capture by frame number: these gates
+	// prove the same bytes a Python dissector over all 97 packets does, without needing a corpus a plain clone does
+	// not have.
 	//
 	// The two captured players are 0x01317CF8 (a Necromancer) and 0x013184AE (a Demonologist), both in map 4020 -
-	// their classes are what the record's leading trailing-field carries, 0x29 and 0x2C. Their NAMES
+	// their classes are what the record's leading trailing-field carries, 0x29 and 0x2C. Their names
 	// appear below only because they are inside the bytes being asserted - the same exemption the other
 	// captured-name goldens carry (a pseudonym would change the string length and shift every length prefix).
 	public class TeamTradeFriendCodecTests
@@ -36,12 +36,12 @@ namespace Faolan.Tests
 				Name = "Strickenne",
 				Class = ConanClass.Demonologist,
 				// Both captured members are level 5 - which is exactly why this word read as a constant until the
-				// character-search bodies showed it taking 5/7/8/10 across several characters (#460).
+				// character-search bodies showed it taking 5/7/8/10 across several characters.
 				Level = 5,
 				MapId = 4020,
 				PerCharacterWord = 3,
-				// Re-framed off the corrected PlayfieldProxy boundary (#454): what used to be read as
-				// (3, 0x0159EA5C, 0x54) is one byte late - the leading 0x00 is the proxy's trailing bool.
+				// Framed off the PlayfieldProxy boundary: reading these as (3, 0x0159EA5C, 0x54) is one byte late - the
+				// leading 0x00 is the proxy's trailing bool.
 				OpaqueA = 0x00000301,
 				OpaqueB = 0x59EA5C54
 			};
@@ -113,7 +113,7 @@ namespace Faolan.Tests
 			Assert.Equal("0000dea90051dd9a" + NecromancerMemberHex, Convert.ToHexString(TeamMemberEventCodec.Build(0x0051DD9A, Necromancer())).ToLowerInvariant());
 		}
 
-		// f693 DispatchYouJoinedTeam - the whole roster. The member list is COUNT-FRAMED: retail's 0x00000BD3 is
+		// f693 DispatchYouJoinedTeam - the whole roster. The member list is count-framed: retail's 0x00000BD3 is
 		// 3 * 0x3F1 for two members, so this also gates that we frame the count rather than emit a constant.
 		[Fact]
 		public void Roster_IsByteExact()
@@ -124,10 +124,10 @@ namespace Faolan.Tests
 		}
 
 		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. Retail's packet also carries the
-		// carrier's [u32 0x0000001D] length prefix ahead of these bytes; that belongs to the SENDER (#530 rule 2), so
-		// WorldIir.Send writes it and the codec does not. Getting the pairing wrong is expensive in one direction: an
-		// unframed record through the verbatim sender made the client read the IIR type as a 234 MB payload length and
-		// drop the connection.
+		// carrier's [u32 0x0000001D] length prefix ahead of these bytes; that belongs to the sender, so WorldIir.Send
+		// writes it and the codec does not. Getting the pairing wrong is expensive in one direction: an unframed record
+		// through the verbatim sender makes the client read the IIR type as a 234 MB payload length and drop the
+		// connection.
 		[Fact]
 		public void AddToGroupIir_IsByteExact()
 		{
@@ -146,7 +146,7 @@ namespace Faolan.Tests
 		}
 
 		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape, and it
-		// is the bare ID32 several other methods already share, so #530 wave 7 folded it into EntityIdCodec.
+		// is the bare ID32 several other methods already share, so EntityIdCodec owns it.
 		[Fact]
 		public void Trade_CharacterRefMessages_AreByteExact()
 		{
@@ -162,7 +162,7 @@ namespace Faolan.Tests
 		}
 
 		// f1408 AddTradeItem - bag slot 5 of the backpack (container 104), into trade-window slot 1. The last field is
-		// the WINDOW slot, not a count: the client's own signature is (ID32 inventory, int itemPos, int destPos), and
+		// the window slot, not a count: the client's own signature is (ID32 inventory, int itemPos, int destPos), and
 		// there is no quantity in the message at all.
 		[Fact]
 		public void Trade_ParsesAddItem()
@@ -189,10 +189,10 @@ namespace Faolan.Tests
 			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(TradeAddedItemCodec.Build(new TradeAddedItem(entry, 1))).ToLowerInvariant());
 		}
 
-		// The friend-list entries retail restores at login, from `login-with-friends` f150 - SIX friends of six different
+		// The friend-list entries retail restores at login, from `login-with-friends` f150 - six friends of six different
 		// levels and classes, one of them offline. This is the data that settled the body: every trailing byte is a valid
-		// Class id while the level byte reads 7/10/5/8/10/5, so the two cannot be confused any more.
-		// The stamp is passed per case because it is NOT constant: five of the six friends carry 0x01EDA8B2 but Llewyl
+		// Class id while the level byte reads 7/10/5/8/10/5, so the two cannot be confused.
+		// The stamp is passed per case because it is not constant: five of the six friends carry 0x01EDA8B2 but Llewyl
 		// carries 0x01EDAF93 (1761 higher) and the offline one 0x6A64AD51 - so it is per-character, and the codec's
 		// default is just the value we have nothing better than.
 		[Theory]
@@ -201,13 +201,13 @@ namespace Faolan.Tests
 		[InlineData("013184bb010801eda8b21c", 0x013184BBu, true, 8, ConanClass.TempestOfSet, 0x01EDA8B2u)]
 		[InlineData("013184bd010a01eda8b22c", 0x013184BDu, true, 10, ConanClass.Demonologist, 0x01EDA8B2u)]
 		[InlineData("013184c0010501eda8b212", 0x013184C0u, true, 5, ConanClass.Barbarian, 0x01EDA8B2u)]
-		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, ConanClass.Demonologist, 0x6A64AD51u)] // the OFFLINE one
+		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, ConanClass.Demonologist, 0x6A64AD51u)] // the offline one
 		public void Friend_State_IsByteExact(string hex, uint id, bool online, byte level, ConanClass classId, uint stamp)
 		{
 			Assert.Equal(hex, Convert.ToHexString(FriendStateCodec.Build(id, online, level, classId, stamp)).ToLowerInvariant());
 		}
 
-		// f866 / f949 / f989 / f1038 / f1076 - the id -> NAME binding, the message whose absence renders NOTHING.
+		// f866 / f949 / f989 / f1038 / f1076 - the id -> name binding, the message whose absence renders nothing.
 		[Theory]
 		[InlineData("013184bd000000000006586174657061", 0x013184BDu, "Xatepa")]
 		[InlineData("013184c000000000000a54686f7277616c646972", 0x013184C0u, "Thorwaldir")]

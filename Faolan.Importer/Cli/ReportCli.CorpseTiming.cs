@@ -14,24 +14,24 @@ using Faolan.Importer.Extractors;
 namespace Faolan.Importer.Cli
 {
 	// `--report corpse-timing`: what retail actually does between a creature dying and the world forgetting it -
-	// when the loot bag appears and where, how long the BODY lies there, how long an unlooted bag lasts, and whether
+	// when the loot bag appears and where, how long the body lies there, how long an unlooted bag lasts, and whether
 	// the creature ever comes back.
 	//
-	// Written because all four of our numbers were invented and three of them were the wrong SHAPE, not just the wrong
-	// value. We held the bag back 3 s and then despawned the corpse to make room for it; retail drops the bag in the
-	// death's own packet burst as a separate dynel and leaves the body lying beside it for another half-minute. And we
-	// respawned the creature 15 s after it died - before its own corpse would have finished fading.
+	// Retail drops the bag in the death's own packet burst, as a separate dynel, and leaves the body lying beside it
+	// for another half-minute; the corpse is not despawned to make room for the bag, and the creature does not come
+	// back before its own corpse has finished fading. All four of those are shapes, not just values, which is why
+	// they are measured here rather than chosen.
 	//
-	// ## The respawn is NOT measured here - see `--report respawn-interval` (#855)
+	// ## The respawn is not measured here - see `--report respawn-interval`
 	//
-	// The obvious test - `death(H)` followed by `spawn(H)` - finds NOTHING, and believing it cost a whole cycle.
+	// The obvious test - `death(H)` followed by `spawn(H)` - finds nothing, and believing it cost a whole cycle.
 	// A handle is stable for as long as an entity LIVES (the same handle re-spawns at identical coords across
 	// interest churn), but a respawn is a new entity: retail allocates a fresh id for the revived creature. So the
-	// question is never what happened to the handle - it is whether the SAME CREATURE reappears AT the dead one's
+	// question is never what happened to the handle - it is whether the same creature reappears at the dead one's
 	// spawn point, and that measurement, with the filters it needs, lives in its own report now.
 	//
-	// What stays here is the CONTROL, because it is a fact about the corpse rather than about the respawn: three
-	// things produce a spawn of a DEAD handle and none of them is a respawn.
+	// What stays here is the control, because it is a fact about the corpse rather than about the respawn: three
+	// things produce a spawn of a dead handle and none of them is a respawn.
 	//   * the CORPSE being re-streamed as the player walks in and out of range of it - it is still an entity, so it
 	//     quits and re-spawns like anything else, and does so while the body is still there (one Cavecrawler three
 	//     times before its own fade). Hence `> corpseGone`, anchored on the FADE rather than the first quit.
@@ -39,13 +39,13 @@ namespace Faolan.Importer.Cli
 	//     is, which is what `Moved` exposes.
 	//   * a player's own resurrect, which is why player handles are excluded outright.
 	//
-	// ⚠️ There is no usable "the client watched and nothing came back" bound, and an earlier version of this report
-	// printed one. It cannot distinguish "no respawn happened" from "the client was not in range at the moment it
-	// did" - `Brutal Pirate 0xaa88` respawned at 150.0 s in the very capture whose witness window claimed 334 s of
-	// nothing. A non-observation of a respawn is worth nothing anywhere; only the observed intervals are.
+	// There is no usable "the client watched and nothing came back" bound, and the report deliberately prints none. It
+	// cannot distinguish "no respawn happened" from "the client was not in range at the moment it did" - one capture
+	// has a creature respawning at 150.0 s while its witness window claims 334 s of nothing. A non-observation of a
+	// respawn is worth nothing; only the observed intervals are.
 	//
-	// Exit code is 0 always - this is a measurement, not a gate. The populations move whenever captures are added
-	// (memory: a shipped-data check PRINTS rather than pins).
+	// The exit code is always 0 - this is a measurement, not a gate, and the populations move whenever captures are
+	// added, so it prints rather than pins.
 	public static partial class ReportCli
 	{
 		// The death record: BehaviorId 0x1F at phase 0x0004 (the same pair `--report death-timing` filters on).
@@ -57,7 +57,7 @@ namespace Faolan.Importer.Cli
 		private const double WorldCorpseFadeSeconds = 30.8;
 
 		// A bag is this kill's if it spawned within this long of the death. Retail's is 0.00 s; the window is wide
-		// enough to catch a late one and narrow enough not to swallow the NEXT kill in a pull.
+		// enough to catch a late one and narrow enough not to swallow the next kill in a pull.
 		private const double BagMatchWindowSeconds = 6.0;
 
 		private static void CorpseTiming(IReadOnlyList<NamedCapture> captures)
@@ -86,7 +86,7 @@ namespace Faolan.Importer.Cli
 						churnSpawns++;
 				}
 
-				// PLAYERS are not creatures: a player's death is followed by their own resurrect/re-entry spawn, which
+				// Players are not creatures: a player's death is followed by their own resurrect or re-entry spawn, which
 					// would read as the fastest "respawn" in the corpus if it were counted. NpcSpawnExtractor draws the
 					// same line at the same constant, which is why these handles never resolve to a name.
 					foreach (var death in events.Where(e => e.Kind == CorpseEventKind.Death && e.Handle < EntityHandles.CharacterInstanceBase))
@@ -101,7 +101,7 @@ namespace Faolan.Importer.Cli
 						fadeSecondsByClass[fade.ClassWord].Add(fade.FadeSeconds);
 					}
 
-					// ⚠️ The corpse's quit is the one AFTER its fade, not merely the first quit after the death. A dead
+					// The corpse's quit is the one after its fade, not merely the first quit after the death. A dead
 						// entity is still interest-managed - the player walks away from the body and it quits, walks back
 						// and it re-spawns - so the first quit is often that, tens of seconds early. The FADE is the
 						// teardown's own marker: it fires once, ~30.8 s in, and the handle is dropped just after it.
@@ -109,13 +109,13 @@ namespace Faolan.Importer.Cli
 						if (quit != null && fade != null)
 							quits.Add(quit.Seconds - death.Seconds);
 
-					// Did this creature come back? A spawn of a dead handle is NOT enough on its own - two other things
+					// Did this creature come back? A spawn of a dead handle is not enough on its own - two other things
 					// produce one, and both are common:
 					//   * the CORPSE being re-streamed as the player walks in and out of range of it. It is still an
 					//     entity, so it quits and re-spawns like anything else, and it does so while the body is still
 					//     there - one Cavecrawler does it three times before its own fade. Hence `> corpseGone`.
 					//   * the handle being REUSED for a different creature once the corpse is gone. That one lands
-					//     wherever the new creature is, so it fails `Moved` - a genuine respawn is AT the spawn point,
+					//     wherever the new creature is, so it fails `Moved` - a genuine respawn is at the spawn point,
 					//     which is where retail's revive puts it (and where every captured re-spawn of a live NPC is).
 					// Neither is filtered away silently: `Moved` is printed for every candidate, so a wrong call here
 					// is visible rather than assumed.
@@ -283,7 +283,7 @@ namespace Faolan.Importer.Cli
 					case SimpleCharFullUpdateCodec.Opcode:
 					case WorldObjectClasses.LootBag:
 					{
-						// ⚠️ `Body`, not `Record`: SpawnPacketBuilder's offsets are relative to `[u32 len][u32 subop]
+						// `Body`, not `Record`: SpawnPacketBuilder's offsets are relative to `[u32 len][u32 subop]
 						// [u32 class][u32 handle]...`, and `Record` has already eaten that leading length word. Reading
 						// them off `Record` silently yields a handle four bytes into the wrong field - which parses, and
 						// gives every spawn a plausible-looking wrong id.

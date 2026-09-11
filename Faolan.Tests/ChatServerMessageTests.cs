@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
 
 			Assert.Equal("0014", Convert.ToHexString(frame.AsSpan(0, 2)).ToLowerInvariant());
-			Assert.Equal(frame.Length - 4, (frame[2] << 8) | frame[3]); // bodyLen counts the bytes AFTER the 4-byte header
+			Assert.Equal(frame.Length - 4, (frame[2] << 8) | frame[3]); // bodyLen counts the bytes after the 4-byte header
 		}
 	}
 }

@@ -4,19 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// PlayStockphraseAsSubtitle (c2s, GameCharAgent 0x205E) - the client asking for one cutscene subtitle line:
-	//   [ID32 speaker: u32 class, u32 instance][u16 len][stock key ascii, "{stock_N}"][u32 threadContext]
-	// It answers with DispatchReceivedStockPhraseText on the same `threadContext`.
-	//
-	// Moved in from `StockConversationService.TryParsePlayStockphraseRequest` in #530 wave 7. That reader indexed the
-	// body at 8/10/10+len and returned false on a short one; reading it sequentially is what makes a body that merely
-	// has the right byte at 8 fail (rule 3), and the caller now reports a CodecParseException rather than "could not
-	// parse" with no detail.
+	/// <summary>
+	///     c2s <c>PlayStockphraseAsSubtitle</c> - the client asking for one cutscene subtitle line:
+	///     <c>[ID32 speaker][u16 len][stock key ascii, "{stock_N}"][u32 threadContext]</c>. The server answers with
+	///     <c>DispatchReceivedStockPhraseText</c> on the same <c>threadContext</c>.
+	/// </summary>
 	public static class PlayStockphraseAsSubtitleCodec
 	{
 		public const uint Method = (uint)GameCharAgentMethods.PlayStockphraseAsSubtitle;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(PlayStockphraseAsSubtitle value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -46,6 +43,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 	}
 
-	// PlayStockphraseAsSubtitle (0x205E). `StockKey` is the `{stock_N}` token keying the StockPhrases row.
+	/// <summary>
+	///     The PlayStockphraseAsSubtitle body. <c>StockKey</c> is the <c>{stock_N}</c> token keying the StockPhrases row.
+	/// </summary>
 	public sealed record PlayStockphraseAsSubtitle(uint SpeakerClass, uint SpeakerInstance, string StockKey, uint ThreadContext);
 }

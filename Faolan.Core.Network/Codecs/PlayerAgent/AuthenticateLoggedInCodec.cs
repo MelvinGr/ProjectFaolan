@@ -4,24 +4,28 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerAgent.AuthenticateLoggedIn(ID32 nAccount, uint32 nCookie) - how the client bootstraps the SECOND, short-lived
-	// PlayerAgent socket it opens mid-session (while in world) to push its settings and character preview. Gitea #611.
-	//
-	//   [u32 accountId][u32 cookie]
-	//
-	// It is `Authenticate` minus the trailing auth-status word, and the two it does carry are byte-identical to the ones
-	// the login connection sent: the same account id and the same session cookie, in all three captured sightings. The
-	// name is the client's - "already logged in", i.e. do not re-run the login, just attach this socket to the session -
-	// and the server's answer is the same `AuthenticateAck` the plain `Authenticate` gets.
-	//
-	// ⚠️ Its opcode 0x20EC is ALSO `ReceivedCharacterSettings`'. On this interface pair the 16-bit opcode is only the
-	// method varint's first group (`0x2080 | (constant & 0x7F)`), so it names nothing on its own - which is why the
-	// identity recorded below is the registration CONSTANT (#608 / #610), and why dispatch must key on that.
+	/// <summary>
+	///     <c>PlayerAgent.AuthenticateLoggedIn(ID32 nAccount, uint32 nCookie)</c> - how the client bootstraps the second,
+	///     short-lived PlayerAgent socket it opens mid-session, while in world, to push its settings and character
+	///     preview. The body is <c>[u32 accountId][u32 cookie]</c>.
+	/// </summary>
+	/// <remarks>
+	///     It is <c>Authenticate</c> minus the trailing auth-status word, and the two words it does carry are
+	///     byte-identical to the ones the login connection sent - the same account id and the same session cookie, in all
+	///     three captured sightings. The name is the client's: "already logged in", meaning do not re-run the login but
+	///     attach this socket to the session. The server's answer is the same <c>AuthenticateAck</c> the plain
+	///     <c>Authenticate</c> gets.
+	///     <para>
+	///         Its 16-bit opcode is shared with <c>ReceivedCharacterSettings</c>. On this interface pair that opcode is
+	///         only the method varint's first group, so it names nothing on its own, which is why the identity declared
+	///         below is the registration constant and why dispatch must key on that.
+	///     </para>
+	/// </remarks>
 	public static class AuthenticateLoggedInCodec
 	{
 		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.AuthenticateLoggedIn;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(AuthenticateLoggedIn value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -41,6 +45,6 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// The mid-session socket's bootstrap: which account, and the cookie the login connection was issued.
+	/// <summary>The mid-session socket's bootstrap: which account, and the cookie the login connection was issued.</summary>
 	public sealed record AuthenticateLoggedIn(uint AccountId, uint Cookie);
 }

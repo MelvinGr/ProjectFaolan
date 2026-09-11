@@ -6,43 +6,42 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// LootRemoveItemsIIR (0x70010162) - the per-take ACK that tells the client what to remove from the open bag
-	// window; the client removes it and compacts the window. 25 B for the single-slot case:
-	//   [subop][0xC87A LootBag][bagHandle][u8 env][u32 cash][ListFrame count][u32 removedPos ...]
-	//
-	// ⚠️ The two fields after the handle used to be read as `[u32 reserved][u8 marker]`, both required to be zero -
-	// a MISALIGNED split that is invisible while both are (#809). The client's own reader says otherwise: after the
-	// carrier's standard `[u8 env]`, `LootRemoveItemsIIR_c::ReadSubClass` (FUN_007A5950) reads ONE u32 into
-	// `this+0x3c` and then the count-framed list (FUN_004D4EF0, the generic `word/0x3F1 - 1` reader). Straddling
-	// those two made the u32 look like a zero word plus a stray byte, and 48 of the 148 captured records - every one
-	// carrying a non-zero value - were refused outright.
-	//
-	// ⭐ That u32 is the CASH taken out of the bag. Proven on the eight cash loots in
-	// `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city`: each `TryLootCash` is answered by a
-	// `DispatchUpdateCash` and this record, and the value equals the player's cash DELTA exactly, every time
-	// (21, 1, 30, 1, 3, 1, 3, 36). It is a strict alternative to the position list across all 148 captured records:
-	// a cash take sends `[cash=N][empty list]`, an item take `[cash=0][the slots]`, and neither ever sends both.
-	//
-	// The removed positions are a COUNT-FRAMED LIST, not a landmark plus a value. This used to be written as
-	// `[u32 0x00000007][u8 0xE2]`, straddling the word boundary, and described as "the 0x000007E2 landmark is a
-	// fixed constant here" - the exact mistake the project rule names: 0x7E2 is ListFrame.ForCount(1), every
-	// capture we have takes ONE slot at a time, and a single-element list is indistinguishable from a constant.
-	// Reading it aligned puts the u8 marker where its siblings carry one (NewLooterCodec has a u8 after the handle
-	// too) and leaves the list word 4-byte aligned. The bytes are unchanged - WorldLootTakeTests pins both captured
-	// frames.
-	//
-	// Decoded from loot-drag-1538 (a drag-only capture): drag srcPos=1 -> element=1, drag srcPos=0 -> element=0,
-	// single-item bags (srcPos 0) -> 0, loot-all -> 0. The OLD constant element=0 removed slot 0 on every take
-	// (#226-2: "first slot disappears"); a remaining-COUNT value (e.g. 2) named no real slot, so the dragged item
-	// was left in the bag.
-	//
-	// Whether a multi-slot take sends count>1 rather than N single-slot acks is UNVERIFIED - no capture takes two
-	// slots in one message. Gitea #453. [V0]
+	/// <summary>
+	///     LootRemoveItemsIIR - the per-take ack that tells the client what to remove from the open bag window, which it
+	///     then compacts. 25 bytes for the single-slot case:
+	///     <c>[subop][class][bagHandle][u8 env][u32 cash][ListFrame count][u32 removedPos ...]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The field after the carrier's env byte is a u32, not a zero word plus a stray marker byte: the client's
+	///     LootRemoveItemsIIR_c::ReadSubClass (FUN_007A5950) reads one u32 into this+0x3c and then the count-framed list
+	///     (FUN_004D4EF0, the generic frame reader). Straddling that boundary makes the u32 look like a zero word plus a
+	///     byte and refuses the 48 of 148 captured records that carry a non-zero value.
+	///     <para>
+	///         That u32 is the cash taken out of the bag, proven on the eight cash loots in
+	///         xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city: each TryLootCash is answered by a
+	///         DispatchUpdateCash and this record, and the value equals the player's cash delta exactly every time (21, 1,
+	///         30, 1, 3, 1, 3, 36). It is a strict alternative to the position list across all 148 captured records - a cash
+	///         take sends the cash with an empty list, an item take sends zero cash with the slots, and neither ever sends
+	///         both.
+	///     </para>
+	///     <para>
+	///         The removed positions are a count-framed list rather than a landmark plus a value. Every capture takes one
+	///         slot at a time, and a single-element list is indistinguishable from a constant; reading it aligned puts the
+	///         env byte where its siblings carry one (<see cref="NewLooterCodec" /> has one after the handle too) and leaves
+	///         the list word 4-byte aligned. Decoded from a drag-only capture: a drag from slot 1 gives element 1, from slot
+	///         0 element 0, a single-item bag 0, and loot-all 0. A constant element 0 removes the first slot on every take,
+	///         and a remaining-count value names no real slot at all, leaving the dragged item in the bag.
+	///     </para>
+	///     <para>
+	///         Whether a multi-slot take sends a count above 1 rather than several single-slot acks is unverified: no
+	///         capture takes two slots in one message. [V0]
+	///     </para>
+	/// </remarks>
 	public static class LootRemoveItemsCodec
 	{
 		public const uint Opcode = (uint)IirTypes.LootRemoveItemsIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(LootRemoveItemsIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -51,10 +50,12 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// The positions are carried VERBATIM, including an empty list (#453). An empty list used to be substituted with
-		// `[0]` - which reads as harmless "default to the first slot" and is not: the bare `ListFrame.ForCount(0)`
-		// (0x3F1) is a real captured shape, 50 of the 148 records in the corpus, sitting alongside each bag's removal
-		// message. Substituting made that shape inexpressible and turned a "removed nothing" into "removed slot 0".
+		/// <summary>
+		///     Builds the ack. The positions are carried verbatim, an empty list included: the bare empty-list frame is a
+		///     real captured shape, 50 of the 148 records in the corpus, sitting alongside each bag's removal message.
+		///     Substituting a single zero position for it makes that shape inexpressible and turns "removed nothing" into
+		///     "removed slot 0".
+		/// </summary>
 		public static byte[] Build(uint bagHandle, params uint[] removedPositions)
 		{
 			return Build(new LootRemoveItemsIIR(bagHandle, removedPositions));
@@ -91,7 +92,10 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// LootRemoveItemsIIR (0x70010162). `Cash` and `RemovedPositions` are alternatives - a take is one or the other,
-	// never both (148/148 captured records). `Env` is the carrier's env byte, 0 on every captured record.
+	/// <summary>
+	///     The LootRemoveItemsIIR body. <c>Cash</c> and <c>RemovedPositions</c> are alternatives - a take is one or the
+	///     other, never both, across all 148 captured records - and <c>Env</c> is the carrier's env byte, 0 on every
+	///     captured record.
+	/// </summary>
 	public sealed record LootRemoveItemsIIR(uint BagHandle, IReadOnlyList<uint> RemovedPositions, uint Cash = 0, byte Env = 0);
 }

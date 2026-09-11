@@ -6,17 +6,17 @@ using Xunit.Sdk;
 
 namespace Faolan.Tests
 {
-	// SpanReader is the sequential reader every codec's Parse is being moved onto (Gitea #530, wave 0), so it carries
-	// two properties the whole refactor rests on and neither is self-evident:
+	// SpanReader is the sequential reader every codec's Parse runs on, so it carries two properties the codecs rest
+	// on, neither of them self-evident:
 	//
-	//   1. Bounds are the READER's job. A short body throws CodecParseException naming the offset and the width, so a
+	//   1. Bounds are the reader's job. A short body throws CodecParseException naming the offset and the width, so a
 	//      codec never writes `if (body.Length < 26) return false;` again - and cannot silently succeed on a
 	//      truncated tail.
-	//   2. EnsureAtEnd() makes a grammar TOTAL. A codec that models three fields of an 84-byte body fails here
+	//   2. EnsureAtEnd() makes a grammar total. A codec that models three fields of an 84-byte body fails here
 	//      instead of looking correct, which is the failure mode the const-offset codecs had.
 	//
 	// The endianness pairs are tested against hand-written bytes rather than round-tripped through a writer: a
-	// round-trip passes even if BOTH sides are byte-swapped, which is exactly the bug worth catching on a protocol
+	// round-trip passes even if both sides are byte-swapped, which is exactly the bug worth catching on a protocol
 	// that is big-endian except where it isn't.
 	public class SpanReaderTests
 	{
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EnsureAtEnd_AfterAPartialDecode_ThrowsAndNamesTheLeftoverBytes()
 		{
-			// The whole point of rule 3: reading the fields you know about is NOT a successful parse.
+			// The whole point of rule 3: reading the fields you know about is not a successful parse.
 			var ex = AssertThrows([0x00, 0x00, 0x00, 0x01, 0xDE, 0xAD, 0xBE, 0xEF], "MagicBuffCodec", (ref SpanReader r) =>
 			{
 				Assert.Equal(1u, r.ReadU32Be());
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			Assert.True(r.AtEnd);
 		}
 
-		// Both spellings of every width, against bytes chosen so a swap is visible. Conan is big-endian EXCEPT
+		// Both spellings of every width, against bytes chosen so a swap is visible. Conan is big-endian except
 		// protobuf fixed32 floats and the client's RDB files - so the reader has to offer both and must not confuse
 		// them.
 		[Fact]
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 			Assert.True(r.AtEnd);
 		}
 
-		// The count-framed list word, read WITH its offset. 0x3F1 is an empty list and 0x7E2 a one-element one -
+		// The count-framed list word, read with its offset. 0x3F1 is an empty list and 0x7E2 a one-element one -
 		// both have shipped as "magic terminators", so the reader divides rather than compares, exactly like the
 		// client's own readers.
 		[Fact]
@@ -171,7 +171,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ReadListCount_OnANonFramingWord_ThrowsWithTheOffset()
 		{
-			// The whole reason ListFrame moved next to the reader: CountOf alone cannot say WHERE.
+			// The whole reason ListFrame moved next to the reader: CountOf alone cannot say where.
 			var ex = AssertThrows([0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x00, 0x12, 0x34], "GuildRankings", (ref SpanReader r) =>
 			{
 				r.ReadU32Be();

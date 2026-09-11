@@ -16,9 +16,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Consumable ON-USE spells (Items.OnUseSpell): pairs each used item's TemplateActionIIR with the self-ApplySpell it
-	// emits, so a use-a-consumable capture teaches the DB what buff a potion/food/drink applies. Depends on items (the
-	// rows it sets the column on). Upsert - it only writes items already present.
+	/// <summary>
+	///     Consumable on-use spells (Items.OnUseSpell): pairs each used item's TemplateActionIIR with the self-ApplySpell
+	///     it emits, so a use-a-consumable capture teaches the DB what buff a potion/food/drink applies.
+	/// </summary>
+	/// <remarks>
+	///     Depends on items (the rows it sets the column on) and only writes items already present.
+	/// </remarks>
 	public sealed class ConsumableUsesModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule), nameof(SpellsModule)];

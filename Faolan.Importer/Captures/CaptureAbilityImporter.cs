@@ -15,65 +15,65 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests the player's starting abilities from the retail 0x2052 ability-grant packets (the real wire format,
-	// NOT the C++ 0x4d scheme; see Faolan.Core.Network/Codecs/Combat/AddSpecialAbilityCodec.cs). The grant body carries
-	// the ability's Slot (template word) + Data0..4 identity quad; names are client-side (resolved by id).
-	//
-	// CLASS-AWARE: each create-flow capture is attributed to its character's class via the ChangeClass editor command
-	// it contains (numericValue/2 = class id; same convention as HandleCommandPacket).
-	//
-	// NB there is no Class=0 "generic" row, whatever this comment used to claim: BOTH the CK_ClassAbility_Class CHECK
-	// and GetClassAbilities' `ca.Class == @class` filter reject it, so a class-0 row would be unwritable AND unread.
-	// The universal kit is MATERIALISED per class instead - all 12 rows - by DeriveClassAbilitiesFromCreatesAsync.
-	// (The same stale "Class 0 = generic" claim is on ClassSpell; GetStartingSpells does honour `cs.Class == 0` there,
-	// but the CHECK still forbids writing one, so it is equally dead.)
+	/// <summary>
+	///     Harvests the player's abilities from the retail DispatchAddSpecialAbility (0x2052) grant packets and derives
+	///     the class-to-ability and class-to-combo access maps.
+	/// </summary>
+	/// <remarks>
+	///     The grant body carries the ability's Slot (template word) and the Data0..4 identity quad; names are
+	///     client-side, resolved by id (see <see cref="AddSpecialAbilityCodec" />). Each create-flow capture is attributed
+	///     to its character's class via the ChangeClass editor command it contains (numericValue/2 = class id; the same
+	///     convention as HandleCommandPacket).
+	///     There is no Class=0 "generic" row: both the CK_ClassAbility_Class check and GetClassAbilities' class filter
+	///     reject it, so the universal kit is materialised per class - all 12 rows - by
+	///     <see cref="DeriveClassAbilitiesFromCreatesAsync" />.
+	/// </remarks>
 	public static class CaptureAbilityImporter
 	{
 		private const uint ChangeClassSubOpcode = ScryScriptCodec.Opcode; // client->server character-editor script callback
 		private const uint ComboBookSubOpcode = ComboBookCodec.Opcode;
 
-		// A saved action-bar slot holding a COMBO (ShortcutBarReplyCodec's record `type`). The bar is the only
+		// A saved action-bar slot holding a combo (ShortcutBarReplyCodec's record `type`). The bar is the only
 		// per-character combo evidence for a character above the create flow.
 		private const uint ComboShortcutType = 3;
 		private const uint AddSpecialAbility = (uint)GameCharInterfaceMethods.DispatchAddSpecialAbility;
 
-		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
-		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
-		// instead; see ImportCharacterCombosAsync), so class membership comes from the catalog's name prefix (e.g.
-		// "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book validated that a catalog prefix reliably
-		// identifies the class, so these LITERAL class-name prefixes are trusted - and they are exactly the 8 archetypes
-		// that HAVE combos (matching the ellatha combos list), so casters (Necro/Demo/Priest/Tempest) correctly get none.
-		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_").
-		//
-		// The ARCHETYPE prefixes are handled beside this list rather than in it (#581): `Soldier_` / `Rogue_` /
-		// `Priest_` name an archetype, so each fans out to its three classes through `ConanArchetypes`.
-		//
-		// Every OTHER ambiguous prefix stays deliberately EXCLUDED (grant too little, not too much) - it maps to
-		// multiple or uncertain classes and needs a taxonomy + validation: the Tortage starters (Slave_/Oar_),
-		// feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack), NPC combos
-		// (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities. #581.
 		// How many of a tree's members must already be attributed before the tree may lend its class to the rest
-		// (#581, InheritTreeClassesAsync). Three, so a single stray row cannot define a tree; the trees this actually
-		// fires on carry 25-29 attributed members each.
+		// (InheritTreeClassesAsync). Three, so a single stray row cannot define a tree.
 		private const int MinTreeEvidence = 3;
 
-		// Combo names whose leading `_`-segment is NOT a feat tree - the NPC/monster/generic families. Excluded from
+		// Combo names whose leading `_`-segment is not a feat tree - the NPC/monster/generic families. Excluded from
 		// tree inheritance outright: `combo_npc_*` splits to `combo`, which would then be the same "tree" as the
 		// player-facing `Combo_Charge_*` family.
 		private static readonly string[] NonTreeComboPrefixes = ["combo_npc_", "monster", "generic"];
 
+		// The RDB combo-catalog name-prefix -> class map. Combos have no per-character grant to derive from (retail never
+		// re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot instead; see
+		// ImportCharacterCombosAsync), so class membership comes from the catalog's name prefix (e.g. "Herald_" =
+		// HeraldOfXotli). These are exactly the 8 archetypes that have combos, so the casters (Necro/Demo/Priest/Tempest)
+		// correctly get none. Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_").
+		// The archetype prefixes (`Soldier_` / `Rogue_` / `Priest_`) are handled beside this list rather than in it: each
+		// fans out to its three classes through `ConanArchetypes`. Every other ambiguous prefix stays deliberately
+		// excluded (grant too little, not too much): the Tortage starters (Slave_/Oar_), feat-tree names
+		// (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack), NPC combos (combo_npc_*), racials
+		// (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities map to multiple or uncertain classes.
 		private static readonly (string Prefix, ConanClass Class)[] ClassComboPrefixes =
 		[
 			("Guardian_", ConanClass.Guardian), ("Conqueror_", ConanClass.Conqueror), ("DarkTemplar_", ConanClass.DarkTemplar), ("Barbarian_", ConanClass.Barbarian), ("Ranger_", ConanClass.Ranger),
-			("Assassin_", ConanClass.Assassin), ("BearShaman_", ConanClass.BearShaman), ("Herald_", ConanClass.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
+			("Assassin_", ConanClass.Assassin), ("BearShaman_", ConanClass.BearShaman), ("Herald_", ConanClass.HeraldOfXotli) // capture-validated against a HoX 0x2076 combo book
 		];
 
-		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
-		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
-		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
-		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
-		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
-		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
+		/// <summary>
+		///     Derives the class-to-ability access map (ClassAbility) from the per-character grants
+		///     (CharacterAbility x Character).
+		/// </summary>
+		/// <remarks>
+		///     One row per (class, ability) that a captured character of that class holds, with the per-class unlock level
+		///     being the minimum level of that class's holders: create-flow characters land the universal kit at level 1,
+		///     while gameplay-only abilities land at their holders' high levels and are naturally gated out of a fresh
+		///     character. This is the multi-class source of access (Spellweaving lands under every captured caster class);
+		///     the ability RDB template carries no class or level.
+		/// </remarks>
 		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
 		{
 			var grants = await db
@@ -85,17 +85,14 @@ namespace Faolan.Importer.Captures
 				})
 				.ToListAsync();
 
-			// Mount abilities are excluded: they come with the MOUNT, not with a class (#303). The two characters that
-			// hold them are a level-80 Necromancer and a level-80 Demonologist - who are also the only two in the
-			// corpus that own a mount summon spell at all, so attributing them to those classes was mount OWNERSHIP
-			// showing through as if it were class kit. A level-80 Barbarian who buys a horse would have got nothing,
-			// and a mountless Necro six abilities for a mount they do not have. CharacterLoadout grants them from
-			// ownership instead.
+			// Mount abilities are excluded: they come with the mount, not with a class. Attributing them to the classes of
+			// the characters that happen to own a mount would be mount ownership showing through as class kit;
+			// CharacterLoadout grants them from ownership instead.
 			var abilities = await db.Abilities.ToListAsync();
 			var abilityIds = abilities.Where(a => !a.IsMountAbility).Select(a => a.Id).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 
-			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
+			// Skip characters with an invalid class (0/1): create-flow characters captured before class selection carry an
 			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
 			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
 			var inserted = 0;
@@ -105,12 +102,11 @@ namespace Faolan.Importer.Captures
 				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
 				if (existing.TryGetValue(g.Key, out var row))
 				{
-					// LOWER only. The level means "the earliest level this class is observed to have this ability", so
+					// Lower only. The level means "the earliest level this class is observed to have this ability", so
 					// the answer across two sources is the min of both - and this pass's evidence is weaker than the
-					// create pass's: a level-80 character holding an ability says nothing about when it unlocked, while
-					// a create dump IS the level-1 grant burst. Assigning unconditionally let the weaker source win and
-					// stamped the universal kit at the holder's level (23/80/24/80) for the four classes we have a
-					// character for, hiding it from every fresh character of those classes.
+					// create pass's: a levelled character holding an ability says nothing about when it unlocked, while
+					// a create dump is the level-1 grant burst. Assigning unconditionally would let the weaker source
+					// stamp the universal kit at the holder's level, hiding it from every fresh character of that class.
 					if (row.Level > minLevel)
 					{
 						row.Level = minLevel;
@@ -137,33 +133,30 @@ namespace Faolan.Importer.Captures
 		}
 
 		// The number of distinct classes an ability must be held by before "every eligible class holds it" is allowed to
-		// mean UNIVERSAL rather than "the two characters we happen to have are both casters". Two is exactly the pair of
-		// level-80 mages in the corpus, so two would make Spellweaving, the pet bar and the mount abilities universal -
-		// each of which we can independently say is NOT (Spellweaving is caster kit, the pet bar is Necro/Demo, and a
-		// mount ability comes with the MOUNT, docs/subsystems/mounts.md). Three is the first threshold those three fail.
+		// mean universal. Two classes can be a pair of casters that share class kit (Spellweaving, the pet bar) or a pair
+		// of mount owners (a mount ability comes with the mount, docs/subsystems/mounts.md); three is the first threshold
+		// those cases fail.
 		private const int UniversalWitnessClasses = 3;
 
-		// Widens the abilities a LEVELLED character earns - Search, Hide, Path of Asura - from the handful of classes we
-		// have a character for onto all twelve (#303).
-		//
-		// The problem this fixes: `DeriveClassAbilitiesAsync` can only see the four classes the corpus has a levelled
-		// character for (Assassin 23, HoX 24, Necro 80, Demo 80). Every ability those four earned above the create burst
-		// therefore lands on those four classes ONLY, so a level-80 Barbarian gets no Search, no Hide and no recall - not
-		// because retail withholds them but because nobody captured a Barbarian past level 1. That is a hole in the
-		// CORPUS being served to the client as if it were a rule.
-		//
-		// The rule, derived rather than hand-listed: an ability is universal when **every class that could have shown it
-		// to us did**. Concretely, for each ability, take the lowest level any holder had it at; the classes ELIGIBLE to
-		// witness it are those with a character at or above that level; and it is universal when the holders are exactly
-		// the eligible classes and there are at least `UniversalWitnessClasses` of them. Then it is materialised on all
-		// twelve at that lowest observed level.
-		//
-		// Why the eligibility test rather than "held by every class we have a character for": a level-5 Barbarian
-		// imported tomorrow must not un-universalise Search - it is below the level Search is ever seen at, so it is not
-		// evidence of absence. It only counts against an ability it is high enough to have earned.
-		//
-		// ⚠️ The level is an UPPER BOUND, not the unlock level: the assassin was 23 when captured, so all we know is
-		// "by 23". Granting at 23 is the conservative direction - never earlier than retail was observed to.
+		/// <summary>
+		///     Widens the abilities a levelled character earns - Search, Hide, Path of Asura - from the classes the corpus
+		///     has a levelled character for onto all twelve.
+		/// </summary>
+		/// <remarks>
+		///     <see cref="DeriveClassAbilitiesAsync" /> can only see the classes the corpus has a levelled character for,
+		///     so every ability earned above the create burst would otherwise land on those classes only: a hole in the
+		///     corpus served to the client as if it were a rule.
+		///     An ability is universal when every class that could have shown it did: for each ability, take the lowest
+		///     level any holder had it at; the classes eligible to witness it are those with a character at or above that
+		///     level; the ability is universal when the holders are exactly the eligible classes and there are at least
+		///     <see cref="UniversalWitnessClasses" /> of them. It is then materialised on all twelve at that lowest
+		///     observed level.
+		///     The eligibility test, rather than "held by every class we have a character for", means a low-level
+		///     character of a new class cannot un-universalise an ability it is too low to have earned: it only counts
+		///     against an ability it is high enough to have.
+		///     The level is an upper bound, not the unlock level: a holder captured at 23 only proves "by 23". Granting at
+		///     that level is the conservative direction - never earlier than retail was observed to.
+		/// </remarks>
 		public static async Task<(int Inserted, int Abilities)> DeriveUniversalLevelledAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
 		{
 			var holders = await db
@@ -183,9 +176,8 @@ namespace Faolan.Importer.Captures
 			var topLevelByClass = holders.GroupBy(h => h.Class).ToDictionary(g => g.Key, g => g.Max(h => (int)h.Level));
 
 			// Mount abilities are out of scope here too (see DeriveClassAbilitiesAsync): they are not something a
-			// LEVELLED character earns, so they must never be widened onto all twelve classes either. The three-witness
-			// guard below already rejects them today, but only because the corpus happens to hold exactly two mount
-			// owners - which is a coincidence to depend on, not a rule.
+			// levelled character earns, so they must never be widened onto all twelve classes. The witness guard below
+			// is not a substitute - it only rejects them while the corpus holds few mount owners.
 			var abilityIds = (await db.Abilities.ToListAsync()).Where(a => !a.IsMountAbility).Select(a => a.Id).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 
@@ -204,7 +196,7 @@ namespace Faolan.Importer.Captures
 				{
 					if (existing.TryGetValue((cls, ability.Key), out var row))
 					{
-						// Never RAISE a level: a class that already earns it earlier keeps its own evidence.
+						// Never raise a level: a class that already earns it earlier keeps its own evidence.
 						if (row is { Level: > 0 } && row.Level > minLevel)
 							row.Level = minLevel;
 
@@ -229,34 +221,25 @@ namespace Faolan.Importer.Captures
 			return (inserted, universal.Count);
 		}
 
-		// Seeds the UNIVERSAL level-1 ability kit onto every class (ClassAbility), from the create captures: the
-		// 0x2052 grants that follow a create. Rest needs to be granted to all classes, same with the
-		// directional attacks, etc. - these are basic combat/movement/UI abilities, not class kit (#296).
-		//
-		// The kit is the UNION across all 12 create dumps, granted to all 12 classes - NOT each dump's own subset.
-		// That is what the data says: all 12 dumps together yield only **8 distinct** ability ids (Rest, Upper Left /
-		// Upper Right / Overhead Attack, Toggle Combat, Switch Weapons, Crouch, Dash). If any were class-specific the
-		// union would be bigger, so every class grants a subset of ONE shared kit and the per-class differences are
-		// capture noise - a dump that missed a packet - not design. Taking each dump's own subset left Conqueror
-		// without Rest (its dump never shows the grant) while Guardian and the necro had it: an artefact, and exactly
-		// the kind of hole that then reads as intentional.
-		//
-		// A dump carries ~14 0x2052 PACKETS but only ~7 DISTINCT ids - the grants repeat - so count ids, not packets;
-		// the id-keyed dictionary collapses the duplicates for free. All 8 are already in the Abilities catalog.
-		//
-		// DetectClass resolves all 12 classes, but only to prove a dump IS a class create (a dump we can't attribute
-		// might be some other capture) - the kit itself is class-independent.
-		//
-		// This exists because DeriveClassAbilitiesAsync below can only see classes we imported a CHARACTER for, and we
-		// have exactly four (Assassin/Necro/HoX/Demo). That left the map in a state that was both wrong and
-		// unreproducible: DarkTemplar had ZERO abilities despite its create dump carrying 14 grants, while seven other
-		// classes held 7-8 rows apiece derived from characters that no longer exist - a from-scratch rebuild would
-		// simply have lost them, since that pass only ever inserts/updates. Sourcing from the captures makes the whole
-		// table reproducible and is the same trick starter-spells uses for spells: take the class from the capture,
-		// not from a character that may never have been imported.
-		//
-		// Level 1: a create grant IS the level-1 kit by definition. DeriveClassAbilitiesAsync still runs afterwards and
-		// contributes the gameplay-only abilities of the classes we do have characters for, at their real levels.
+		/// <summary>
+		///     Seeds the universal level-1 ability kit onto every class (ClassAbility) from the create captures: the
+		///     0x2052 grants that follow a create (Rest, the directional attacks, Toggle Combat, Switch Weapons, Crouch,
+		///     Dash - basic combat/movement/UI abilities, not class kit).
+		/// </summary>
+		/// <remarks>
+		///     The kit is the union across all create dumps, granted to all 12 classes - not each dump's own subset. The
+		///     dumps together yield only a handful of distinct ids; if any were class-specific the union would be bigger,
+		///     so every class grants a subset of one shared kit and the per-class differences are capture noise (a dump
+		///     that missed a packet), not design. Taking each dump's own subset would leave a class without Rest because
+		///     its dump never shows the grant.
+		///     A dump carries the same grant repeatedly, so ids are counted, not packets; the id-keyed dictionary collapses
+		///     the duplicates. DetectClass is used only to prove a dump is a class create - the kit itself is
+		///     class-independent.
+		///     Sourcing the kit from the captures rather than from imported characters makes the table reproducible from
+		///     scratch: <see cref="DeriveClassAbilitiesAsync" /> can only see classes a character was imported for, and
+		///     runs afterwards to contribute those classes' gameplay-only abilities at their real levels. A create grant is
+		///     the level-1 kit by definition.
+		/// </remarks>
 		public static async Task<(int Inserted, int Classes)> DeriveClassAbilitiesFromCreatesAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			var kit = new HashSet<uint>();
@@ -289,16 +272,12 @@ namespace Faolan.Importer.Captures
 				foreach (var abilityId in kit)
 				{
 					if (!abilityIds.Contains(abilityId))
-						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
+						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id
 
-					// The kit is level 1 BY DEFINITION - a create dump is the grant burst a level-1 character receives -
-					// so an existing row carrying a higher level is wrong and is corrected down, not left alone. This
-					// used to `continue` on any existing row, ceding the level to DeriveClassAbilitiesAsync below, which
-					// derives it from the CHARACTERS we imported. No create-flow character is in that table (only four
-					// leveled ones), so for exactly their four classes the min-of-holders was the leveled character's
-					// own level and the universal kit was stamped 23/80/24/80 instead of 1. A level-1 Assassin then
-					// matched NO abilities, was granted nothing, and - because the create flow keyed enter-world on the
-					// client barring a grant - never entered the world at all (#433, fixed separately).
+					// The kit is level 1 by definition - a create dump is the grant burst a level-1 character receives -
+					// so an existing row carrying a higher level is wrong and is corrected down, not left alone. Ceding
+					// the level to DeriveClassAbilitiesAsync would stamp the kit at an imported levelled character's own
+					// level, and a fresh character of that class would then match no abilities at all.
 					if (existing.TryGetValue((cls, abilityId), out var row))
 					{
 						if (row is not { Level: > 1 })
@@ -326,14 +305,17 @@ namespace Faolan.Importer.Captures
 			return (inserted, kit.Count);
 		}
 
-		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
-		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
-		// per-class unlock level. Idempotent.
-		//
-		// ⭐ The name prefix is the WEAKER of the two sources and runs second (#581). The client states the answer:
-		// `Combos.FeatId` is the WIRE feat id of the feat that GATES the combo, and `FeatGatedClasses` resolves it to
-		// a class or an archetype out of the feat's own name. Where both speak they agree on 134 combos with ZERO
-		// conflicts, which is what makes the feat authoritative for the handful where they differ.
+		/// <summary>
+		///     Derives the class-to-combo access map (ClassCombo) - the combo analogue of
+		///     <see cref="DeriveClassAbilitiesAsync" /> (which derives from grants; combos have none). Combo.Level supplies
+		///     the per-class unlock level. Idempotent.
+		/// </summary>
+		/// <remarks>
+		///     Three sources, strongest first: the gating feat (`Combos.FeatId` is the wire feat id of the feat that gates
+		///     the combo, and <see cref="FeatGating" /> resolves it to a class or an archetype out of the feat's own name),
+		///     then the catalog's name prefix, then tree inheritance. Where the feat and the prefix both speak they agree,
+		///     which is what makes the feat authoritative where they differ.
+		/// </remarks>
 		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger? logger = null)
 		{
 			var combos = await db
@@ -359,8 +341,8 @@ namespace Faolan.Importer.Captures
 				if (combo.Name == null)
 					continue;
 
-				// 1. the GATING FEAT, when it names a class or an archetype. Direct client evidence, and the only
-				//    source that can be NARROWER than the name: `Priest_05_damagedetaunt_Censuring_Strike_I_2hb`
+				// 1. The gating feat, when it names a class or an archetype. Direct client evidence, and the only
+				//    source that can be narrower than the name: `Priest_05_damagedetaunt_Censuring_Strike_I_2hb`
 				//    reads as all three priests by its prefix, and its feat says `Bear Shaman Class Feat 001` - which
 				//    is the class that actually wields a two-handed blunt.
 				var classes = gating.ClassesOf(combo.FeatId);
@@ -368,17 +350,17 @@ namespace Faolan.Importer.Captures
 				if (byFeat)
 					fromFeat++;
 				else
-					// 2. an ARCHETYPE-shared combo (`Soldier_`, `Rogue_`, `Priest_`) belongs to all THREE classes of
-					//    that archetype, so it fans out where a class-named prefix names one. It is the half no class
-					//    prefix could ever match, and the half the stacking-line route (#296) refuses too, because
-					//    those combos sit in the shared `20000`-`20008` block that reads as class 20 and is not one.
+					// 2. An archetype-shared combo (`Soldier_`, `Rogue_`, `Priest_`) belongs to all three classes of
+					//    that archetype, so it fans out where a class-named prefix names one. Those combos sit in the
+					//    shared `20000`-`20008` block that reads as class 20 and is not one, so no class prefix and no
+					//    stacking-line route could ever match them.
 					classes = ConanArchetypes.FromNamePrefix(combo.Name) is { } archetype
 						? ConanArchetypes.ClassesOf(archetype)
 						: ClassComboPrefixes.Where(p => combo.Name.StartsWith(p.Prefix, StringComparison.OrdinalIgnoreCase)).Select(p => p.Class).ToArray();
 
-				// The LEVEL is a second, separate question, and `Combos.Level <= 1` is the catalog's SENTINEL for
+				// The level is a second, separate question, and `Combos.Level <= 1` is the catalog's sentinel for
 				// "not stated" rather than level one (docs/subsystems/combos.md). The gating feat answers that too
-				// wherever every levelled combo it gates carries ONE level - which is exactly the archetype
+				// wherever every levelled combo it gates carries one level - which is exactly the archetype
 				// `X: Class Specific N` feats. `SneakAttack_*` is the case: sentinel level, gated by
 				// `Rogue: Class Specific 1`, whose three `Rogue_05_…` combos put it at level 5.
 				var level = combo.Level;
@@ -410,10 +392,10 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// A feat-derived answer REPLACES whatever a previous run's prefix guess wrote, so a narrowing actually
+				// A feat-derived answer replaces whatever a previous run's prefix guess wrote, so a narrowing actually
 				// narrows. Only ever applied when the feat spoke - the prefix rule stays purely additive, because it
-				// cannot tell "I have no opinion" from "no class", and a run against a DB whose Feats are not imported
-				// yet would otherwise delete the whole map.
+				// cannot tell "no opinion" from "no class", and a run against a DB whose Feats are not imported yet
+				// would otherwise delete the whole map.
 				if (!byFeat)
 					continue;
 
@@ -428,7 +410,7 @@ namespace Faolan.Importer.Captures
 			if (inserted > 0 || updated > 0 || removed > 0)
 				await db.SaveChangesAsync();
 
-			// 3. TREE INHERITANCE - the third source, and the weakest, which is why it runs last and only where the
+			// 3. Tree inheritance - the third source, and the weakest, which is why it runs last and only where the
 			//    tree has already spoken for itself.
 			var inherited = await InheritTreeClassesAsync(db, logger);
 
@@ -438,28 +420,27 @@ namespace Faolan.Importer.Captures
 			return (inserted + inherited, updated);
 		}
 
-		// A combo's FEAT TREE is the leading segment of its catalog name - `Halberdier_20a_multihit_Flashing_Arc_II`
-		// is in the `Halberdier` tree - and a tree belongs to ONE class. Where the tree's own members have already
-		// said which, by their gating feats, that answer applies to the rest of the tree (#581).
-		//
-		// ⭐ The three trees this resolves are unanimous and well-evidenced, which is the whole basis for trusting it:
-		// `Reaver` 29 of 30 members attributed, every one Barbarian; `Halberdier` 26 of 30, every one Guardian;
-		// `Liberator` 25 of 27, every one Conqueror. The stragglers are the members whose gating feat names a WEAPON
-		// line rather than a class (`Pole Arm Combos 20-40 1`) or an ability (`Combo - Skewer`) - a gap in what the
-		// feat NAME happens to say, not evidence that the combo belongs elsewhere.
-		//
-		// ⚠️ Three guards, each removing a way this could attribute a combo wrongly:
-		//
-		//   - **unanimity**: a tree whose attributed members name more than one class lends nothing. That is what
-		//     keeps the ARCHETYPE trees (`Soldier_` -> 3 classes, `Rogue_` -> 3) and the RACIAL dance combos
-		//     (`Cimmerian_` -> all 12) out of it - they are correctly multi-class and have nothing to inherit.
-		//   - **evidence floor**: fewer than <see cref="MinTreeEvidence" /> attributed members lends nothing, so one
-		//     stray row cannot define a tree.
-		//   - **NPC/monster names are excluded outright**, because their leading segment is not a tree at all
-		//     (`combo_npc_guardian_polearm_1_sweep` splits to `combo`, which would then collide with the
-		//     `Combo_Charge_*` family).
-		//
-		// It is ADDITIVE and never removes: like the prefix rule, it cannot tell "no opinion" from "no class".
+		/// <summary>
+		///     Lends a feat tree's class to its unattributed members. A combo's feat tree is the leading segment of its
+		///     catalog name (`Halberdier_20a_multihit_Flashing_Arc_II` is in the `Halberdier` tree) and a tree belongs
+		///     to one class; where the tree's own members have already said which, by their gating feats, that answer
+		///     applies to the rest of the tree.
+		/// </summary>
+		/// <remarks>
+		///     The stragglers a tree resolves are the members whose gating feat names a weapon line rather than a class
+		///     (`Pole Arm Combos 20-40 1`) or an ability (`Combo - Skewer`) - a gap in what the feat name happens to say,
+		///     not evidence that the combo belongs elsewhere. Three guards, each removing a way this could attribute a
+		///     combo wrongly:
+		///     unanimity - a tree whose attributed members name more than one class lends nothing, which keeps the
+		///     archetype trees (`Soldier_`, `Rogue_`) and the racial dance combos (`Cimmerian_`, all 12 classes) out of
+		///     it, as they are correctly multi-class;
+		///     an evidence floor - fewer than <see cref="MinTreeEvidence" /> attributed members lends nothing, so one
+		///     stray row cannot define a tree;
+		///     NPC/monster names are excluded outright, because their leading segment is not a tree at all
+		///     (`combo_npc_guardian_polearm_1_sweep` splits to `combo`, which would collide with the `Combo_Charge_*`
+		///     family).
+		///     It is additive and never removes: like the prefix rule, it cannot tell "no opinion" from "no class".
+		/// </remarks>
 		private static async Task<int> InheritTreeClassesAsync(IDatabaseContext db, ILogger? logger)
 		{
 			var combos = await db.Combos.Where(c => c.Name != null).Select(c => new
@@ -508,7 +489,7 @@ namespace Faolan.Importer.Captures
 			return inherited;
 		}
 
-		// The combo's feat TREE - the leading `_`-segment of its catalog name - or null when the name carries none, or
+		// The combo's feat tree - the leading `_`-segment of its catalog name - or null when the name carries none, or
 		// when it is an NPC/monster/generic combo whose leading segment is not a tree.
 		private static string? TreeOf(string name)
 		{
@@ -520,18 +501,20 @@ namespace Faolan.Importer.Captures
 			return split > 0 ? name[..split] : null;
 		}
 
-		// The UNIVERSAL combo kit: the combos every created character is granted regardless of class, written as a
-		// ClassCombo row per class (the combo twin of DeriveClassAbilitiesFromCreatesAsync). Idempotent.
-		//
-		// This is what the prefix derivation above structurally cannot produce. `DeriveClassCombosAsync` keys on the 8
-		// CLASS-name prefixes, but the universal kit is named by RACE - `Cimmerian_Dance_combo1..3`,
-		// `Khitan_…`, `Stygian_…`, `Aquilonian_…`: the 4 playable races' dance emotes, 12 combos (Gitea #416).
-		//
-		// ⚠️ Racially NAMED, universally GRANTED - the names invite a race-keyed grant and that is wrong. Across the
-		// corpus 19 characters covering every class receive the SAME 12 (all four races' dances), so the grant follows
-		// neither race nor class. That is also why this takes the INTERSECTION across create dumps where
-		// DeriveClassAbilitiesFromCreatesAsync takes the union: a create burst carries the class's own combos too (the
-		// Ranger's 14, the HoX's 21), and a union would hand every class the Ranger's.
+		/// <summary>
+		///     Seeds the universal combo kit - the combos every created character is granted regardless of class - as a
+		///     ClassCombo row per class (the combo twin of <see cref="DeriveClassAbilitiesFromCreatesAsync" />).
+		///     Idempotent.
+		/// </summary>
+		/// <remarks>
+		///     The prefix derivation cannot produce this: <see cref="DeriveClassCombosAsync" /> keys on the class-name
+		///     prefixes, but the universal kit is named by race - `Cimmerian_Dance_combo1..3`, `Khitan_…`, `Stygian_…`,
+		///     `Aquilonian_…`, the 4 playable races' dance emotes. They are racially named but universally granted: every
+		///     captured character, whatever its race or class, receives all four races' dances, so the grant follows
+		///     neither. That is also why this takes the intersection across create dumps where the ability kit takes the
+		///     union: a create burst carries the class's own combos too, and a union would hand every class one class's
+		///     combos.
+		/// </remarks>
 		public static async Task<(int Inserted, int Kit)> DeriveUniversalCombosFromCreatesAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures,
 			ILogger? logger = null)
 		{
@@ -557,7 +540,7 @@ namespace Faolan.Importer.Captures
 					kit.IntersectWith(granted);
 			}
 
-			// One dump can't establish "universal" - it is indistinguishable from that class's own kit.
+			// One dump cannot establish "universal" - it is indistinguishable from that class's own kit.
 			if (kit is not { Count: > 0 } || dumps < 2)
 			{
 				logger?.LogInformation("CaptureAbilityImporter: no universal combo kit ({Dumps} usable create dumps).", dumps);
@@ -599,9 +582,14 @@ namespace Faolan.Importer.Captures
 			return (inserted, kit.Count);
 		}
 
-		// rawPackets = ALL captures. Catalogs every ability's Id + Slot/Data identity seen on the wire (the Data quad is
-		// also its RDB 1000020 TEA key, so RdbAbilityImporter can name it). The class<->ability ACCESS and per-class
-		// unlock LEVEL are NOT set here - they are derived from the per-character grants (DeriveClassAbilitiesAsync).
+		/// <summary>
+		///     Catalogs every ability's Id plus Slot/Data identity seen on the wire across all captures (the Data quad is
+		///     also its RDB 1000020 TEA key, so RdbAbilityImporter can name it).
+		/// </summary>
+		/// <remarks>
+		///     The class-to-ability access and the per-class unlock level are not set here - they are derived from the
+		///     per-character grants (<see cref="DeriveClassAbilitiesAsync" />).
+		/// </remarks>
 		public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var grants = new Dictionary<uint, (uint Slot, uint D0, uint D1, uint D2, uint D3, uint D4)>();
@@ -623,11 +611,9 @@ namespace Faolan.Importer.Captures
 					a = new Ability
 					{
 						Id = id,
-						// ⚠️ NOT named here (#638). Six human-readable names used to be baked in from the retired archive
-						// sqlite, claiming to be "the only name source for these ability ids". They were not, and they
-						// were WRONG: the client calls 769094 "Upper Left Attack", not "Normal Attack Left". The names
-						// come from the client's own templates (`rdb-abilities` / `rdb-ldb-abilities`), which name all
-						// six; an ability left blank by a captures-only run is honestly unnamed rather than mis-named.
+						// Not named here: the names come from the client's own templates (`rdb-abilities` /
+						// `rdb-ldb-abilities`). An ability left blank by a captures-only run is honestly unnamed rather
+						// than mis-named.
 						Name = string.Empty
 					};
 					db.Abilities.Add(a);
@@ -650,10 +636,15 @@ namespace Faolan.Importer.Captures
 			return (grants.Count, inserted, updated);
 		}
 
-		// Seeds each captured character's granted ABILITY set (CharacterAbility rows) from the 0x2052 grants, keyed by
-		// the grant's RpcHeader receiver instance (= character id) - the ability twin of CaptureSpellImporter's learned-
-		// spell seeding. Abilities are NOT in the snapshot known-list, so this is the authoritative per-character set
-		// (the action bar is only shortcuts). Only characters already in the DB are touched; idempotent.
+		/// <summary>
+		///     Seeds each captured character's granted ability set (CharacterAbility rows) from the 0x2052 grants, keyed
+		///     by the grant's RpcHeader receiver instance (the character id) - the ability twin of CaptureSpellImporter's
+		///     learned-spell seeding.
+		/// </summary>
+		/// <remarks>
+		///     Abilities are not in the snapshot known-list, so this is the authoritative per-character set (the action bar
+		///     is only shortcuts). Only characters already in the DB are touched; idempotent.
+		/// </remarks>
 		public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var byCharacter = new Dictionary<uint, HashSet<uint>>();
@@ -672,24 +663,28 @@ namespace Faolan.Importer.Captures
 			return (characters, inserted);
 		}
 
-		// Seeds each captured character's COMBO book (CharacterCombo rows) from the ComboBookIIR grants (0x2000 carrier,
-		// sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (= character id). Combos are class/level
-		// content the client's combo book gains per level; a max-level imported character never dings, so this persisted
-		// set is what GrantCharacterCombos re-emits on login. Only characters already in the DB are touched; idempotent.
+		/// <summary>
+		///     Seeds each captured character's combo book (CharacterCombo rows) from the ComboBookIIR grants (PassBlob
+		///     carrier, sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (the character id).
+		/// </summary>
+		/// <remarks>
+		///     Combos are class/level content the client's combo book gains per level; a max-level imported character
+		///     never dings, so this persisted set is what GrantCharacterCombos re-emits on login. Only characters already
+		///     in the DB are touched; idempotent.
+		/// </remarks>
 		public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var byCharacter = new Dictionary<uint, HashSet<uint>>();
 			foreach (var packet in rawPackets)
 				TryReadCharacterGrant(packet, byCharacter, true);
 
-			// SECOND source: the character's own ACTION BAR. A ComboBookIIR only ever reaches a character during the
-			// create flow / early levels, so it covers exactly the characters the level filter skips and NONE of the
-			// ones we import - which is why this used to seed nothing at all. A saved bar, though, names combos
-			// directly: a type-3 shortcut IS a combo (see ShortcutBarReplyCodec), and every captured one resolves to a
-			// catalogued combo. It is a floor rather than the whole book - only what the player kept on the bar - but
-			// it is that character's real, evidenced set, and GrantCharacterCombos unions it with the class/level map.
+			// Second source: the character's own action bar. A ComboBookIIR only ever reaches a character during the
+			// create flow / early levels, so it covers exactly the characters the level filter skips and none of the
+			// imported ones. A saved bar names combos directly: a type-3 shortcut is a combo (see ShortcutBarReplyCodec).
+			// It is a floor rather than the whole book - only what the player kept on the bar - but it is that
+			// character's real, evidenced set, and GrantCharacterCombos unions it with the class/level map.
 			//
-			// Runs off CharacterShortcuts, so this module must run AFTER character-state (declared in its DependsOn).
+			// Runs off CharacterShortcuts, so this module must run after character-state (declared in its DependsOn).
 			foreach (var row in await db.CharacterShortcuts.Where(s => s.ShortcutType == ComboShortcutType).Select(s => new { s.CharacterId, s.TargetId }).ToListAsync())
 			{
 				if (!await db.Combos.AnyAsync(c => c.Id == row.TargetId))
@@ -711,21 +706,16 @@ namespace Faolan.Importer.Captures
 			return (characters, inserted);
 		}
 
-		// The character class chosen in this capture, read from its ChangeClass editor callback (client->server
-		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
-		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
-		// the capture carries no ChangeClass (e.g. a login capture) so its grants stay generic by default.
-		// Every packet of a create capture paired with the class that was SELECTED when it arrived (#581).
-		//
-		// ⚠️ `DetectClass` returns the FIRST `ChangeClass` in the capture and every caller filed the whole capture's
-		// grants under it. That is wrong whenever the player browsed the editor's class list, because retail sends the
-		// clicked class's spell/combo book each time so the UI can show it - so one capture legitimately carries
-		// several classes' books. The damage is visible in the shipped data: `ClassSpells` gives GUARDIAN all four
-		// archetype combo lines - Soldier 20002-20005 AND Rogue 20006-20007 AND Priest 20008, 22 rows a Guardian
-		// cannot have - and no other class has a single archetype-line spell. One capture, one attribution.
-		//
-		// Walking in ORDER fixes it without needing to know how many classes were browsed: the class is whatever the
-		// last callback selected, and packets before the first one have none.
+		/// <summary>
+		///     Every packet of a create capture paired with the class that was selected when it arrived: the class is
+		///     whatever the last ChangeClass callback selected, and packets before the first one have none.
+		/// </summary>
+		/// <remarks>
+		///     Unlike <see cref="DetectClass" /> (the first ChangeClass only), this is correct when the player browsed the
+		///     editor's class list: retail sends the clicked class's spell/combo book each time so the UI can show it, so
+		///     one capture legitimately carries several classes' books, and filing them all under one class would give
+		///     that class the others' kit.
+		/// </remarks>
 		internal static IEnumerable<(uint? Class, byte[] Packet)> PacketsWithSelectedClass(IReadOnlyList<byte[]> capture)
 		{
 			uint? current = null;
@@ -745,8 +735,8 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// The distinct classes a create capture SELECTED, in order of first appearance. More than one means the player
-		// browsed the editor, and that a per-capture attribution would have merged their books.
+		// The distinct classes a create capture selected, in order of first appearance. More than one means the player
+		// browsed the editor, and that a per-capture attribution would merge their books.
 		internal static IReadOnlyList<uint> SelectedClasses(IReadOnlyList<byte[]> capture)
 		{
 			var seen = new List<uint>();
@@ -757,7 +747,7 @@ namespace Faolan.Importer.Captures
 			return seen;
 		}
 
-		// How many COMBO grants one packet carries - the report's counter, so it reads the same reader the import does.
+		// How many combo grants one packet carries - the report's counter, so it reads the same reader the import does.
 		internal static int CountComboGrants(byte[] packet)
 		{
 			var one = new Dictionary<uint, HashSet<uint>>();
@@ -765,6 +755,11 @@ namespace Faolan.Importer.Captures
 			return one.Values.Sum(x => x.Count);
 		}
 
+		/// <summary>
+		///     The character class chosen in this capture, read from its first ChangeClass editor callback (the editor
+		///     sends class as 2x the real id, see HandleCommandPacket). Null when the capture carries no ChangeClass
+		///     (e.g. a login capture).
+		/// </summary>
 		internal static uint? DetectClass(IReadOnlyList<byte[]> capture)
 		{
 			foreach (var packetBytes in capture)
@@ -837,7 +832,7 @@ namespace Faolan.Importer.Captures
 			return (characters, inserted);
 		}
 
-		// 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].
+		// The DispatchAddSpecialAbility body, parsed by AddSpecialAbilityCodec (which validates the full shape).
 		private static void TryReadAddSpecialAbility(byte[] packetBytes, IDictionary<uint, (uint, uint, uint, uint, uint, uint)> grants)
 		{
 			try
@@ -848,8 +843,6 @@ namespace Faolan.Importer.Captures
 
 				var body = packet.BodyReader().ReadRemainingArray();
 
-				// The 0x2052 grant is exactly what AddSpecialAbilityCodec builds/parses (slot, id, data0, key1..4) - use its
-				// parser (which validates the full 81-byte shape) instead of re-reading the words by hand.
 				var ability = AddSpecialAbilityCodec.Parse(body);
 				if (ability.Id == 0)
 					return;
@@ -902,8 +895,7 @@ namespace Faolan.Importer.Captures
 
 					case 2:
 					{
-						// field 4 = token name, field 5 = value string; only field 4 is the command token. (Earlier
-						// this captured EVERY length-delimited field, so the trailing field overwrote the token.)
+						// Field 4 = token name, field 5 = value string; only field 4 is the command token.
 						var str = s.ReadStringByteLength();
 						if (field == 4)
 							token = str;
@@ -924,9 +916,8 @@ namespace Faolan.Importer.Captures
 			return true;
 		}
 
-		// Reads one per-character grant into byCharacter, keyed by the RpcHeader receiver (= character id): an ability
-		// grant (0x2052, ability id = body word 1, doubled) or a ComboBookIIR combo (0x2000 carrier, sub 0xA8BBEB7F,
-		// comboId at body offset 18 after [len][subop][marker][instance][u16 addflag]).
+		// Reads one per-character grant into byCharacter, keyed by the RpcHeader receiver (the character id): an ability
+		// grant (DispatchAddSpecialAbility) or a ComboBookIIR combo (PassBlob carrier), each read through its codec.
 		private static void TryReadCharacterGrant(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter, bool isCombo)
 		{
 			try

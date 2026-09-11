@@ -17,15 +17,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Validates the refactored repository's unit-of-work model end-to-end: each call uses a fresh short-lived
-	// context from a pooled factory, and detached entities round-trip correctly across calls. This is the safety
-	// net for the data-layer change (the game flows can't be exercised headless).
+	// Validates the repository's unit-of-work model end-to-end: each call uses a fresh short-lived context from a
+	// pooled factory, and detached entities round-trip correctly across calls. This is the safety net for the data
+	// layer, which the game flows cannot exercise headless.
 	public class DatabaseRepositoryTests
 	{
-		// Bank deposit/withdraw persistence (issue #124): a move into the personal bank (container 105) is written to
-		// CharacterInventory and the bank rebuilds from it (the bank is NOT in the login snapshot - it's delivered on
+		// Bank deposit/withdraw persistence: a move into the personal bank (container 105) is written to
+		// CharacterInventory and the bank rebuilds from it (the bank is not in the login snapshot - it is delivered on
 		// demand via BuildContainer from the kind-105 rows), so it survives relog. This is the data-layer contract
-		// behind PersistInventoryMove + BankHandler; the move handler just routes the kind-105 source/dest through it.
+		// behind PersistInventoryMove + BankHandler; the move handler routes the kind-105 source/dest through it.
 		[Fact]
 		public async Task BankDepositWithdraw_PersistsAndRebuilds()
 		{
@@ -88,8 +88,8 @@ namespace Faolan.Tests
 				var container = FullCharacterRoots.Container(bank, 50, 30, character.Id, banked);
 				Assert.Contains(container.Items, e => e.Pos == 3);
 
-				// Withdraw: bank slot 3 -> bag slot 0. A MOVE, so it is the SAME instance in the bag afterwards - which is
-				// the whole point of an item being a row rather than an address (#750).
+				// Withdraw: bank slot 3 -> bag slot 0. A move, so it is the same instance in the bag afterwards - which is
+				// the whole point of an item being a row rather than an address.
 				Assert.True(await repo.MoveCharacterItem(character.Id, bank, 3, bag, 0));
 
 				var held = await repo.GetCharacterItems(character.Id);
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// Persisted self-buffs (#274) round-trip with their absolute expiry, and SaveCharacterBuffs is replace-all -
+		// Persisted self-buffs round-trip with their absolute expiry, and SaveCharacterBuffs is replace-all -
 		// the second snapshot wholly replaces the first, so a cancelled/expired buff drops out. This is the data-layer
 		// contract behind PlayerPersistenceService (snapshot on logout) + RestoreBuffs (re-apply on entry).
 		[Fact]
@@ -238,7 +238,7 @@ namespace Faolan.Tests
 					TestDb.SeedWorld(ctx, accountId, realmId);
 				}
 
-				// Vitals are DERIVED from (Class, Level) (#578) - there is no row to cascade-insert, and a reloaded
+				// Vitals are derived from (Class, Level) - there is no row to cascade-insert, and a reloaded
 				// character reports the same ceiling as the one just created because both compute it.
 				var created = await repo.CreateCharacter(accountId, realmId);
 				Assert.True(created.MaxVitals(VitalAttributes.LevelOneBase).Health > 0);
@@ -302,8 +302,8 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				// 1) Nothing worn yet. An UNDRESSED character is an empty worn set, not a missing row: since #750 there is
-				// no equipment row whose absence could mean anything else.
+				// 1) Nothing worn yet. An undressed character is an empty worn set, not a missing row: there is no equipment
+				// row whose absence could mean anything else.
 				Assert.Empty(await repo.GetEquippedItems(characterId));
 
 				// 2) Wear one item and put another in the bag.
@@ -352,8 +352,8 @@ namespace Faolan.Tests
 						Name = "R",
 						IpAddress = "127.0.0.1",
 						Port = 1
-					}); // #324: RealmId FK
-						// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
+					}); // RealmId FK
+						// ItemId is FK-restricted to Items.Id, so seed the referenced catalog items first.
 					ctx.Items.Add(new Item
 					{
 						Id = 0x7530,
@@ -406,9 +406,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The inventory-cell unit of work behind equip/unequip persistence: upsert parks an item into a bag
-		// cell, a second upsert in another cell coexists (the FirstPosBag regression this replaces), re-upsert
-		// updates in place, clear removes the row - all across short-lived contexts.
+		// The inventory-cell unit of work behind equip/unequip persistence: upsert parks an item into a bag cell, a
+		// second upsert in another cell coexists, re-upsert updates in place, clear removes the row - all across
+		// short-lived contexts.
 		[Fact]
 		public async Task InventorySlot_UpsertAndClear_RoundTripAcrossContexts()
 		{
@@ -483,10 +483,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// Vitals FOLLOW the class/level committed by the editor with nothing to regenerate or keep in sync, because
-		// they are computed rather than stored (#578). This used to assert that a MaxStats row was updated in place
-		// and that exactly one existed; the row is gone, so what is left to prove is that the committed class is what
-		// the character reports.
+		// Vitals follow the class/level committed by the editor with nothing to regenerate or keep in sync, because
+		// they are computed rather than stored: what there is to prove is that the committed class is what the
+		// character reports.
 		[Fact]
 		public async Task MaxVitals_OnNameCommit_FollowTheCommittedClass()
 		{
@@ -669,9 +668,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The auction-house BUY -> mail data path: a listing is resolvable by saleId and removed on buy; the system
+		// The auction-house buy -> mail data path: a listing is resolvable by saleId and removed on buy; the system
 		// mail (with the escrowed item) round-trips by recipient and wire id, the read flag flips, an attachment can be
-		// taken (removed) leaving the mail, and delete cascades the remaining attachments. Backs TODO §9a Step 3.
+		// taken (removed) leaving the mail, and delete cascades the remaining attachments.
 		[Fact]
 		public async Task TradepostBuyMail_DataPath_RoundTrips()
 		{
@@ -688,8 +687,8 @@ namespace Faolan.Tests
 						Name = "R",
 						IpAddress = "127.0.0.1",
 						Port = 1
-					}); // #324: RealmId FK
-						// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
+					}); // RealmId FK
+						// The listing's ItemId (search key) and Template (instance, where the key lives) are both FK-restricted
 						// to Items.Id, so seed both referenced catalog items.
 					ctx.Items.Add(new Item
 					{
@@ -755,10 +754,10 @@ namespace Faolan.Tests
 				await repo.RemoveMailAttachment(0x20d82b631c0c578f, 0x20d82b62d02b198b);
 				var afterTake = await repo.GetMailByWireId(0x20d82b631c0c578f);
 				Assert.True(afterTake!.IsRead);
-				// The attachment must be GONE FROM THE DB, not just from a nav the caller already mutated: the row
-				// surviving means the item can be taken again after a relog (a dupe) and the mail can never be
-				// deleted. RemoveMailAttachment takes the WIRE id but the FK is to the ROW key, and the uint/ulong
-				// widening made the mismatch compile and silently delete nothing. (#368)
+				// The attachment must be gone from the DB, not just from a nav the caller already mutated: the row
+				// surviving means the item can be taken again after a relog (a dupe) and the mail can never be deleted.
+				// RemoveMailAttachment takes the wire id while the FK is to the row key, and uint/ulong widening makes that
+				// mismatch compile and silently delete nothing.
 				Assert.Empty(afterTake.Attachments);
 
 				// Delete the mail.
@@ -771,10 +770,10 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The web and game logins used to disagree about case: Identity's FindByNameAsync normalises to upper-case, so
-		// the web let you in as "Faolan" for a row that said "faolan", while Database.GetAccount(name) - the game's
-		// UniverseAgent lookup and the `.account` GM command - matched exactly and did not. Same account, same
-		// password, different answer depending on which door you used.
+		// The web and game logins must agree about case. Identity's FindByNameAsync normalises to upper-case, so the
+		// web accepts "Faolan" for a row that says "faolan", while Database.GetAccount(name) - the game's UniverseAgent
+		// lookup and the `.account` GM command - matches exactly. Same account, same password, and the answer must not
+		// depend on which door was used.
 		[Theory]
 		[InlineData("faolan")]
 		[InlineData("Faolan")]
@@ -840,10 +839,10 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #590: a feat's SPELL boost reaches combat as `spellId -> percent x 100`, which takes TWO hops the query has
-		// to get right - CharacterFeats holds the WIRE feat id while the modifier rows are keyed by the TEMPLATE id
-		// (different id spaces, hence FeatIdMaps), and the modifier then names a spell LINE that fans out to every
-		// RANK. This is Decomposition rank 5 in miniature: one feat, one line, three ranks of the spell.
+		// A feat's spell boost reaches combat as `spellId -> percent x 100`, which takes two hops the query has
+		// to get right - CharacterFeats holds the wire feat id while the modifier rows are keyed by the template id
+		// (different id spaces, hence FeatIdMaps), and the modifier then names a spell line that fans out to every
+		// rank. Decomposition rank 5 in miniature: one feat, one line, three ranks of the spell.
 		[Fact]
 		public async Task SpellBoosts_ResolveThroughTheIdMapAndFanOutToEveryRank()
 		{
@@ -871,7 +870,7 @@ namespace Faolan.Tests
 					ctx.Feats.Add(new Feat { Id = templateId, Name = "Decomposition", BaseName = "Decomposition" });
 					ctx.Feats.Add(new Feat { Id = otherTemplateId, Name = "Untrained", BaseName = "Untrained" });
 					ctx.FeatSpellModifiers.Add(new FeatSpellModifier { FeatId = templateId, Sequence = 0, SpellLineId = line, PercentHundredths = 3500, EffectKind = 53075 });
-					// A modifier on a feat the character has NOT trained, on the same line: it must not leak in.
+					// A modifier on a feat the character has not trained, on the same line: it must not leak in.
 					ctx.FeatSpellModifiers.Add(new FeatSpellModifier { FeatId = otherTemplateId, Sequence = 0, SpellLineId = line, PercentHundredths = 9900, EffectKind = 53075 });
 					// Three ranks of the boosted line, plus one spell on another line that must stay unboosted.
 					ctx.Spells.Add(new Spell { Id = 144675, Name = "Flesh to Worms (Rank 3)", GuiStackingLine = line });
@@ -896,11 +895,11 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #697: a feat's COMBO bonuses reach combat as `comboId -> bonus`, through the same two hops the spell boosts
-		// take. Two things this has to get right that the spell query does not: the two source tables mean DIFFERENT
-		// things (one weapon attack vs the combo as a whole) so they land in different fields, and their UNITS differ
+		// A feat's combo bonuses reach combat as `comboId -> bonus`, through the same two hops the spell boosts
+		// take. Two things this has to get right that the spell query does not: the two source tables mean different
+		// things (one weapon attack vs the combo as a whole) so they land in different fields, and their units differ
 		// - `FeatComboAttackModifier.DpsPercent` is a whole percent and `FeatComboModifier` is hundredths, which is
-		// the client's own doing (#593). A single sum would be wrong by 100x on one of them.
+		// the client's own doing. A single sum would be wrong by 100x on one of them.
 		[Fact]
 		public async Task ComboBonuses_KeepTheTwoKindsApartAndNormaliseTheirUnits()
 		{
@@ -925,17 +924,17 @@ namespace Faolan.Tests
 					ctx.Feats.Add(new Feat { Id = templateId, Name = "Brutal Cyclone", BaseName = "Brutal Cyclone" });
 					ctx.Feats.Add(new Feat { Id = otherTemplateId, Name = "Untrained", BaseName = "Untrained" });
 
-					// The OPENING attack: +30% damage (a whole percent) and +400 crit rating.
+					// The opening attack: +30% damage (a whole percent) and +400 crit rating.
 					ctx.FeatComboAttackModifiers.Add(new FeatComboAttackModifier
 					{
 						FeatId = templateId, Sequence = 0, ComboId = comboId, AttackSlot = ComboAttackSlot.Opening, DpsPercent = 30, CriticalChanceRating = 400, EffectKind = 53250
 					});
-					// The FINISHING attack of the same combo, on the same feat - a second row, not a merge.
+					// The finishing attack of the same combo, on the same feat - a second row, not a merge.
 					ctx.FeatComboAttackModifiers.Add(new FeatComboAttackModifier
 					{
 						FeatId = templateId, Sequence = 1, ComboId = comboId, AttackSlot = ComboAttackSlot.Finishing, DpsPercent = 5, EffectKind = 53250
 					});
-					// The WHOLE-combo axis, in hundredths: +20.00%.
+					// The whole-combo axis, in hundredths: +20.00%.
 					ctx.FeatComboModifiers.Add(new FeatComboModifier { FeatId = templateId, Sequence = 0, ComboId = comboId, DamagePercentHundredths = 2000, EffectKind = 53209 });
 					// An untrained feat's modifier on another combo: it must not leak in.
 					ctx.FeatComboModifiers.Add(new FeatComboModifier { FeatId = otherTemplateId, Sequence = 0, ComboId = otherComboId, DamagePercentHundredths = 9900, EffectKind = 53209 });
@@ -963,7 +962,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #697: a character's PROCS resolve through the same wire->template feat map as its combo bonuses, and only the
+		// A character's procs resolve through the same wire-to-template feat map as its combo bonuses, and only the
 		// feats it actually holds contribute - an untrained feat's proc on the same line must not leak in.
 		[Fact]
 		public async Task FeatProcs_ResolveThroughTheWireFeatMap_ForHeldFeatsOnly()
@@ -992,7 +991,7 @@ namespace Faolan.Tests
 					// A line proc (after casting Wave of Life) and a combo proc, on the held feat.
 					ctx.FeatProcs.Add(new FeatProc { FeatId = templateId, Sequence = 0, SpellLineId = lineId, SelfSpellId = 4053206, Trigger = (uint)FeatProcTrigger.Cast, Amount = 200, EffectKind = 53070 });
 					ctx.FeatProcs.Add(new FeatProc { FeatId = templateId, Sequence = 1, ComboId = comboId, TargetSpellId = 1234, Trigger = (uint)FeatProcTrigger.Damage, Amount = 10, EffectKind = 53212 });
-					// An untrained feat's proc on the SAME line: must not leak in.
+					// An untrained feat's proc on the same line: must not leak in.
 					ctx.FeatProcs.Add(new FeatProc { FeatId = otherTemplateId, Sequence = 0, SpellLineId = lineId, SelfSpellId = 999, Trigger = (uint)FeatProcTrigger.Cast, Amount = 200, EffectKind = 53070 });
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
@@ -1010,12 +1009,11 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #835: an ambient spawn-area pool builds its creature from the TYPE, so the type's APPEARANCE navigations have
+		// An ambient spawn-area pool builds its creature from the type, so the type's appearance navigations have
 		// to come back populated. Lazy loading is off by design, so a missing Include is not an error - the collection
-		// simply arrives EMPTY and the spawn body goes out with no morph table and no worn equipment. That is exactly
-		// how every ambient NPC in the world ended up naked, and how it STAYED naked after the type rows were filled
-		// in: the rows existed, the query never loaded them. Asserting the navigations are non-empty is the only thing
-		// that catches it - a row count would have passed throughout.
+		// simply arrives empty and the spawn body goes out with no morph table and no worn equipment, which renders
+		// the NPC naked. Asserting the navigations are non-empty is the only thing that catches it - a row count
+		// passes either way.
 		[Fact]
 		public async Task GetResolvedSpawnAreas_LoadsTheTypesAppearance_NotJustItsStatCore()
 		{
@@ -1099,7 +1097,7 @@ namespace Faolan.Tests
 				Assert.NotNull(type!.StatCore);
 				Assert.NotEmpty(type.Morphs); // the hair/face table - empty here means a naked, featureless spawn body
 				var worn = Assert.Single(type.Equipment);
-				Assert.NotNull(worn.Item); // the builder reads the worn item's identity THROUGH this navigation
+				Assert.NotNull(worn.Item); // the builder reads the worn item's identity through this navigation
 				Assert.Equal("NPC_Pirate_sailor_chest", worn.Item.Name);
 			}
 			finally

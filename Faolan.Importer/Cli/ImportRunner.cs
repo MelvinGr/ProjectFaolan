@@ -5,9 +5,14 @@ using System.Threading.Tasks;
 
 namespace Faolan.Importer.Cli
 {
-	// Runs a resolved module plan inside ONE transaction, prints each module's summary + a full table delta,
-	// and either commits or (under --dry-run) rolls the whole thing back. Migrations must already have run
-	// (they can't execute inside a user transaction) - the caller migrates before invoking this.
+	/// <summary>
+	///     Runs a resolved module plan inside one transaction, prints each module's summary and a full table delta,
+	///     and either commits or, under --dry-run, rolls the whole thing back.
+	/// </summary>
+	/// <remarks>
+	///     Migrations must already have run: they cannot execute inside a user transaction, so the caller migrates
+	///     before invoking this.
+	/// </remarks>
 	public static class ImportRunner
 	{
 		public static async Task<int> RunAsync(ImportContext ctx, IReadOnlyList<IImportModule> plan)
@@ -27,9 +32,9 @@ namespace Faolan.Importer.Cli
 				var mode = ctx.ModeFor(module.Name);
 				if (!module.SupportedModes.Contains(mode))
 				{
-					// Deterministic, and NOT SupportedModes.First() - that is a HashSet, so its order is unspecified
-					// and the fallback could differ between runs. Preference order is Upsert (refresh in place, the
-					// closest thing to any request), then Overwrite, then Insert.
+					// Deterministic, and deliberately not SupportedModes.First(): that is a HashSet, so its order is
+					// unspecified and the fallback could differ between runs. The preference order is Upsert (refresh
+					// in place, the closest thing to any request), then Overwrite, then Insert.
 					var fallback = new[] { WriteMode.Upsert, WriteMode.Overwrite, WriteMode.Insert }.First(module.SupportedModes.Contains);
 					await ctx.Out.WriteLineAsync($"[{module.Name}] WARNING: mode '{mode}' unsupported; using '{fallback}'.");
 					mode = fallback;
@@ -45,11 +50,10 @@ namespace Faolan.Importer.Cli
 				}
 				catch (Exception e)
 				{
-					// The plan is ONE transaction, so a module throwing must still abort everything - a half-applied
-					// plan is not a state we want to commit, and swallowing the failure to carry on would be exactly
-					// the silent fallback this codebase refuses. What was missing is WHICH module died and what it
-					// took with it: #819's rdb-quest-catalog crash surfaced as a bare NullReferenceException, and the
-					// seven modules sequenced after it went missing with nothing saying so. Name both, then rethrow.
+					// The plan is one transaction, so a module throwing must abort everything: a half-applied plan is
+					// not a state to commit, and swallowing the failure to carry on would be a silent fallback. Name
+					// the module that died and the ones it took with it, then rethrow - without that the failure
+					// surfaces as a bare exception and the modules sequenced after it go missing with nothing said.
 					var skipped = plan.Skip(i + 1).Select(m => m.Name).ToList();
 					await ctx.Out.WriteLineAsync($"[{module.Name}] FAILED: {e.GetType().Name}: {e.Message}");
 					await ctx.Out.WriteLineAsync(skipped.Count == 0

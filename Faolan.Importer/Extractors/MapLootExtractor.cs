@@ -5,13 +5,13 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// One item template observed in a captured loot bag on a given map (#273).
+	// One item template observed in a captured loot bag on a given map.
 	public sealed record MapLootPoolEntry(uint MapId, uint ItemTemplateId);
 
-	// Builds the per-map loot pool (#273): tracks the current map (MapChange 5D85BFC7, same as WorldObjectExtractor),
+	// Builds the per-map loot pool: tracks the current map (MapChange 5D85BFC7, same as WorldObjectExtractor),
 	// then for every loot bag (LootBagFullUpdateIIR 0xF096251E) parses its ProtoLootBagIIR inventory and emits each
 	// item template against the current map. The captured bags read as STATIC map bags (world-entry burst objects),
-	// so this is a MAP pool, not a per-NPC table - good enough for "NPCs on map X drop items map X's real bags held".
+	// so this is a map pool, not a per-NPC table - good enough for "NPCs on map X drop items map X's real bags held".
 	// Sibling of WorldObjectExtractor (which keeps the bag as a world object); this one lifts only the contents.
 	public static class MapLootExtractor
 	{

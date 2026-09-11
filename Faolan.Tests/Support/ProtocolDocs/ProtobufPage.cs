@@ -9,10 +9,10 @@ using ProtoBuf;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/protobuf.md from the COMPILED protobuf-net message types (AocProtocol.g.cs), read
+	// Generates docs/protocol/gen/protobuf.md from the compiled protobuf-net message types (AocProtocol.g.cs), read
 	// by reflection over their [ProtoContract]/[ProtoMember] attributes. The attributes are what actually drive the
 	// wire, so the page can't disagree with what the codecs (de)serialize. The point of the page is to surface the
-	// per-field ENCODING - especially ZigZag (signed varint) and FixedSize (little-endian fixed32/64) - because
+	// per-field encoding - especially ZigZag (signed varint) and FixedSize (little-endian fixed32/64) - because
 	// mis-reading a ZigZag field as a plain varint silently halved every identity value in the character editor.
 	public static class ProtobufPage
 	{

@@ -5,13 +5,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchOpenTradepost (s2c) - the auction-house ACCESS POINT: where the auctioneer stands and how far the client
-	// lets the player wander before the window closes.
-	//   [f32 x][f32 y][f32 z][f32 radius]     (raw-body floats, BIG-endian)
-	// The client runs a within-radius check against this, which is why a cold open needs a real position (the capture
-	// shows DispatchOpenTradepost precedes TradepostOpen).
-	//
-	// Was `TradepostResponses.BuildAccessPointBody` (#530 wave 7); byte-exact in TradepostResponseTests.
+	/// <summary>
+	///     <c>DispatchOpenTradepost</c> - the auction-house access point: where the auctioneer stands and how far the
+	///     client lets the player wander before the window closes.
+	///     <c>[f32 x][f32 y][f32 z][f32 radius]</c>, raw-body floats, big-endian.
+	/// </summary>
+	/// <remarks>
+	///     The client runs a within-radius check against this, which is why a cold open needs a real position - the
+	///     capture shows DispatchOpenTradepost preceding TradepostOpen. Byte-exact in <c>TradepostResponseTests</c>.
+	/// </remarks>
 	public static class OpenTradepostCodec
 	{
 		public const uint Method = (uint)TradepostInterfaceMethods.DispatchOpenTradepost;
@@ -19,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// The radius retail sends with the Tortage auctioneer.
 		public const float AccessRadius = 15.0f;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(OpenTradepost value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -54,6 +56,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// DispatchOpenTradepost.
+	/// <summary>The DispatchOpenTradepost body.</summary>
 	public sealed record OpenTradepost(Vector3 Position, float Radius);
 }

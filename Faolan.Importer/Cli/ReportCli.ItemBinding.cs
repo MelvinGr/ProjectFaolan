@@ -10,14 +10,14 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report item-binding` (#756): what makes an item BIND, measured on both sides at once - the client's own rule,
-	// read out of its item-tooltip builder, evaluated over every RDB template we hold a key for; and the wire's
-	// `Flags` word (stat 0), taken from the DUMPS at the two moments it can change - an item ARRIVING
+	// `--report item-binding`: what makes an item bind, measured on both sides at once - the client's own rule, read
+	// out of its item-tooltip builder and evaluated over every RDB template a key is held for; and the wire's
+	// `Flags` word (stat 0), taken from the dumps at the two moments it can change - an item arriving
 	// (DispatchAddItem) and a later DispatchSetItemStat on stat 0.
 	//
 	// ## Where the rule comes from
 	//
-	// The client names the three tooltip lines itself. They are LDB category-100 tokens, and the token NAMES are in
+	// The client names the three tooltip lines itself. They are LDB category-100 tokens, and the token names are in
 	// the exe's `InventoryGUI\ItemInfoView.cpp` string block, consecutive with their neighbours:
 	//
 	//     CurrentlyEquipped · DropsInPvP · BoundToCharacter · BindsOnPickup · BindsOnEquip · NotCancelable ·
@@ -30,12 +30,12 @@ namespace Faolan.Importer.Cli
 	// `ItemInfoView::UpdateFromItem` (FUN_014d5980) picks between them with two predicates over the item:
 	//
 	//     binds on EQUIP  (FUN_014d51a0)  getProp(177) & 0x20                     "More Flags" bit 5
-	//                                  || getProp(499) > 1 && getProp(30) & 0x04  "Power Level" > 1 AND "Can" bit 2
+	//                                  || getProp(499) > 1 && getProp(30) & 0x04  "Power Level" > 1 and "Can" bit 2
 	//     binds on PICKUP (FUN_014d5210)  AcgItemData_t::GetInterpolatedItem(quad)[+0xC8] >> 26 & 1
-	//     is bound NOW                    the ITEM's own flag test, vt+0xA0 with 0x04000000 - i.e. wire stat 0 bit 26
+	//     is bound NOW                    the item's own flag test, vt+0xA0 with 0x04000000 - i.e. wire stat 0 bit 26
 	//
 	// `[+0xC8]` is the interpolated item's Flags word: `InventoryGame_c::AddTemplateItem` (FUN_0076e9f0) reads exactly
-	// that dword and writes it into the new item's **stat 0**, so the template's `Flags` property IS the item's
+	// that dword and writes it into the new item's stat 0, so the template's `Flags` property is the item's
 	// starting Flags. That is the link this report measures.
 	//
 	// ## What it prints
@@ -50,7 +50,7 @@ namespace Faolan.Importer.Cli
 		private const uint BoundFlagBit = 1u << 26;
 
 		// The property fields the client's two binding predicates read. Named by the client's own stat-name table
-		// (LDB 615): field ids in an item template ARE wire stat ids.
+		// (LDB 615): field ids in an item template are wire stat ids.
 		private const uint FlagsField = 0; // "Flags"       - the starting stat-0 word; bit 26 is the bound flag
 		private const uint CanField = 30; // "Can"          - bit 2 participates in the bind-on-equip rule
 		private const uint MoreFlagsField = 177; // "More Flags" - bit 5 alone makes an item bind on equip
@@ -217,14 +217,14 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  binds on equip (total)             : {byMoreFlags + byQualityAndCan + both} of {properties.Count}");
 			Console.WriteLine($"  does not bind on equip             : {neither}");
 
-			// The Can bit on its own is nearly universal, so the clause is really carried by the QUALITY gate; saying
+			// The Can bit on its own is nearly universal, so the clause is really carried by the quality gate; saying
 			// so keeps the next reader from reading "Can bit 2" as the binding flag.
 			var canBit = properties.Values.Count(t => (t.Value(CanField) & 0x04) != 0);
 			var quality = properties.Values.Count(t => t.Value(PowerLevelField) > 1);
 			Console.WriteLine($"  (of which: {canBit} carry Can bit 2 at all, {quality} carry PowerLevel > 1 - whichever is the RARER is the one doing the work)");
 			Console.WriteLine();
 
-			// ⚠️ The quality term. `Item.Quality` IS field 499, but it is filled by a LENIENT reader
+			// The quality term. `Item.Quality` is field 499, but it is filled by a lenient reader
 			// (RdbItemImporter.TryReadQualityAnywhere) that scans the whole record, while this report reads the head
 			// property table only - so where 499 sits past the display-name string the two disagree, and since
 			// `Quality > 1` is the clause that actually discriminates, a disagreement flips the binding answer.
@@ -233,8 +233,8 @@ namespace Faolan.Importer.Cli
 			var byQuality = items.Count(i => i.BindsOnEquip);
 			var byHeadTable = properties.Count(p => BindsOnEquip(p.Value));
 			Console.WriteLine($"  cross-check: {byQuality} bind on equip via Items.Quality (what SHIPS), {byHeadTable} via this report's head-table 499 - a gap of {byQuality - byHeadTable}.");
-			// Only disagreements that FLIP the predicate are interesting. Comparing the raw values instead reports 149
-			// templates, ~130 of them a NULL Quality against a head-table 0 - the same answer written two ways, which
+			// Only disagreements that flip the predicate are interesting. Comparing the raw values instead reports 149
+			// templates, ~130 of them a null Quality against a head-table 0 - the same answer written two ways, which
 			// buries the 21 that actually change what binds.
 			var disagreeing = items
 				.Where(i => properties.TryGetValue(i.Id, out var t) && (uint?)i.Quality > 1 != t.Value(PowerLevelField) > 1)
@@ -252,12 +252,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 		}
 
-		// The wire half, from the DUMPS (not the corpus slice - an absolute count has to come from the dumps).
+		// The wire half, from the dumps (not the corpus slice - an absolute count has to come from the dumps).
 		//
-		// Two sightings matter and they are different questions. A DispatchAddItem is the moment an item is CREATED
-		// in a container, so its Flags are the BIRTH state - which is what `AddTemplateItem` says should equal the
-		// template's own Flags. A stat-0 DispatchSetItemStat is a later TRANSITION of that word on an existing cell,
-		// which is the binding event itself; #756 had never seen one until the 2026-08-09 equip capture.
+		// Two sightings matter and they are different questions. A DispatchAddItem is the moment an item is created in
+		// a container, so its Flags are the birth state - which is what `AddTemplateItem` says should equal the
+		// template's own Flags. A stat-0 DispatchSetItemStat is a later transition of that word on an existing cell,
+		// which is the binding event itself, and the corpus carries very few of them.
 		private static void PrintWireFlags(IReadOnlyList<NamedCapture> captures, IReadOnlyDictionary<uint, ItemTemplateProperties.Table> properties,
 			IReadOnlyDictionary<uint, string> names)
 		{

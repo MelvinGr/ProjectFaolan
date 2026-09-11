@@ -4,10 +4,11 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A computed VALUE, not a table (#578). It used to be a one-to-one row beside Character, but it is a pure
-	// function of (Class, Level) and the character's attributes - so storing it only created something that could
-	// disagree with the level, which is exactly what happened: a combat level-up wrote the new Level and left the row
-	// behind, and the next login re-seeded current health from the stale ceiling. Build it with For().
+	/// <summary>
+	///     A computed value, not a table: the vitals ceiling is a pure function of (Class, Level) and the character's
+	///     attributes, so a stored copy can only disagree with the level it was computed for. Build it with
+	///     <see cref="For" />.
+	/// </summary>
 	public class CharacterMaxStats
 	{
 		// Player-facing values (what the character sheet shows), e.g. Health 1270. The on-wire ×100 vitals scale
@@ -16,81 +17,75 @@ namespace Faolan.Core.Database.Tables
 		public uint Mana { get; set; }
 		public uint Stamina { get; set; }
 
-		// The FullChar snapshot stat block (TailsPostAccessBlock) carries, besides the character's CURRENT value for
-		// each pool, the class BASE the client reads into a parallel slot. Authoring the WHOLE per-class block (both
-		// slots) keeps it internally consistent - patching only one slot and leaving the other at the Strie template's
-		// Rogue value was the suspected #4 (wrong mana) / "gear vanished" inconsistency.
-		// Returned in display units (the block scales ×100 at write time). #186/#4/#580.
+		/// <summary>
+		///     The FullChar snapshot stat block (TailsPostAccessBlock) carries, besides the character's current value
+		///     for each pool, the class base the client reads into a parallel slot. Authoring the whole per-class block
+		///     (both slots) keeps it internally consistent; patching only one slot leaves the other at a template's
+		///     value for some other class. Returned in display units (the block scales ×100 at write time).
+		/// </summary>
 		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(ConanClass @class, ushort level)
 		{
-			// The three "base" slots are the CLASS BASE - the same quantity a live vitals push carries in stat
+			// The three "base" slots are the class base - the same quantity a live vitals push carries in stat
 			// 0x0001/0x01F9/0x01FB - which the client tops up with its own attribute/gear/feat terms to get the number
-			// it draws. The three current slots are this instance, which IS that topped-up number (see For()).
+			// it draws. The three current slots are this instance, which is that topped-up number (see For()).
 			var (hpBase, manaBase, staminaBase) = ClassBaseHundredths(@class, level);
 
 			return (Health, hpBase / 100, Mana, manaBase / 100, Stamina, staminaBase / 100);
 		}
 
 		/// <summary>
-		///     A character's three pools, in DISPLAY units, BEFORE the flat gear/feat pool bonuses (a +75 health ring)
+		///     A character's three pools, in display units, before the flat gear/feat pool bonuses (a +75 health ring)
 		///     the caller adds on top - see <c>EntityVitals.FromCharacter</c>. Two terms, both from the client's own
 		///     <c>HitsManaAndStamina_c</c> table (RDB 1000511):
 		///     <list type="bullet">
-		///         <item>the class/level BASE curve (<see cref="ClassBaseHundredths" />), columns [2..7], and</item>
-		///         <item>the ATTRIBUTE-scaled top-up (<see cref="AttributeScaledHundredths" />), columns [8..13],</item>
+		///         <item>the class/level base curve (<see cref="ClassBaseHundredths" />), columns [2..7], and</item>
+		///         <item>the attribute-scaled top-up (<see cref="AttributeScaledHundredths" />), columns [8..13],</item>
 		///     </list>
-		///     plus the class/level <c>ClassAttributeBases</c> pool rows (#444) when the caller has them - the
-		///     "class-feat" HealthMax that gives a Ranger +5 health at level 1 and a level-80 Necromancer +386.
-		///     <para>
-		///         This is retail's DISPLAYED maximum, and it is what the server's ceiling must be: retail's own
-		///         vitals push carries the full pool under the CURRENT id (AssassinL23 at full: <c>HpCur 127000</c>) while
-		///         the base rides the max id (<c>HpBase 77200</c>), so a server ceiling that is not the displayed max
-		///         shows up in-client as a current above (or below) the bar - health 1314 against a 1270 max (#580).
-		///     </para>
-		///     <para>
-		///     <para>
-		///         ⚠️ DemoL80's 177 is now NARROWED, and it is not one thing (#588). `ActiveWeaponSet` is never set by
-		///         the character importer, so every imported character defaults to <c>Primary</c> - and DemoL80's
-		///         SECONDARY set (Jagged Cut +12 Con and Fetish of Caged Fiends +35, against Mindraker's +34) is worth
-		///         13 more Constitution, i.e. 104 more health. That takes the shortfall 177 -> 73.
-		///         <list type="bullet">
-		///             <item>The remaining 73 is NOT Constitution: 73 is not a multiple of the health weight (8), so
-		///                 no attribute total produces it. It is a FLAT health term - a <c>HealthMax</c> record worth
-		///                 73 that our item data does not carry.</item>
-		///             <item>It is not the vanity slots either, and that is worth writing down because they look like
-		///                 the obvious candidate: DemoL80's Canvas Belt (+4 Con) and Northfur Cloak (+23 Con) would add
-		///                 216 health, overshooting by 143. Excluding them, which is what we do, is right.</item>
-		///             <item>Feats are ruled out separately (#589): the pipeline is intact and DemoL80 trained none
-		///                 that grant <c>HealthMax</c>.</item>
-		///         </list>
-		///         What is NOT recoverable today is which weapon set was drawn. There is no capture signal for it -
-		///         the swap is observable (the server stamps the newly-active main slot on a
-		///         <c>SwitchWeaponsButton</c>) but a login carries no such event, and the client derives its own
-		///         display from the equipment container. So the 177 -> 73 above is arithmetic that FITS, not a
-		///         measurement, and the default stays <c>Primary</c> rather than being guessed the other way.
-		///     </para>
-		///     <para>
-		///         ⛔ <b>And the four candidate signals are now checked rather than assumed absent</b> (#588). The
-		///         client's stat registry names four that would say it - <c>EquippedWeapons</c> (274),
-		///         <c>WeaponItemType</c> (508), <c>WeaponAnimSet</c> (615), <c>WeaponFlags</c> (863) - and
-		///         <c>--report stat-series</c> finds <b>none of them in any captured StatIIR</b>. The spawn's own
-		///         protobuf carries no weapon-set field either, and <c>--report weapon-set-drawn</c> shows the
-		///         equipment list cannot stand in for it: DemoL80's spawn lists slots <c>[6,20,21]</c>, i.e. BOTH sets
-		///         at once, which is the case the render list cannot decide (138 of 10,990 captured spawns are like
-		///         that). So this is a measured negative, not an unexamined gap - a new capture would have to catch
-		///         the swap itself.
-		///     </para>
-		///         VERIFIED, not fitted. It reproduces the retail character sheet exactly at:
-		///         all TWELVE classes at level 1 (Guardian 130, Conqueror 168, Dark Templar 128/281/178, Assassin
-		///         98/236, Barbarian 118, Ranger 133, the priests 88/171, Bear Shaman 108/171/178, Herald 89/246/121,
-		///         the mages 89/246 - every health, mana and stamina anchor, including Guardian's 178.5 stamina
-		///         rounding to the captured 179); and at level 23/24/80 against the four captured characters'
-		///         world-entry pushes - AssassinL23 (Assassin L23) 1270/1148/74, Hakotep (Herald L24) 1414/759/1584,
-		///         NecroL80 (Necromancer L80) 6341 health and 6523 mana, DemoL80 (Demonologist L80) 5830 mana. Ten of the
-		///         eleven measurable pools land on the captured value to the point; the eleventh (DemoL80's health) is
-		///         177 low because our item data for that character is short, not because the curve is.
-		///     </para>
+		///     plus the class/level <c>ClassAttributeBases</c> pool rows when the caller has them - the "class-feat"
+		///     HealthMax that gives a Ranger +5 health at level 1 and a level-80 Necromancer +386.
 		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         This is retail's displayed maximum, and it is what the server's ceiling must be: retail's own
+		///         vitals push carries the full pool under the current id (AssassinL23 at full: <c>HpCur 127000</c>)
+		///         while the base rides the max id (<c>HpBase 77200</c>), so a server ceiling that is not the
+		///         displayed max shows up in-client as a current above (or below) the bar - health 1314 against a 1270
+		///         max.
+		///     </para>
+		///     <para>
+		///         Verified, not fitted. It reproduces the retail character sheet exactly at all twelve classes at
+		///         level 1 (Guardian 130, Conqueror 168, Dark Templar 128/281/178, Assassin 98/236, Barbarian 118,
+		///         Ranger 133, the priests 88/171, Bear Shaman 108/171/178, Herald 89/246/121, the mages 89/246 - every
+		///         health, mana and stamina anchor, including Guardian's 178.5 stamina rounding to the captured 179);
+		///         and at level 23/24/80 against the four captured characters' world-entry pushes - AssassinL23
+		///         (Assassin L23) 1270/1148/74, the Herald L24 1414/759/1584, NecroL80 (Necromancer L80) 6341 health
+		///         and 6523 mana, DemoL80 (Demonologist L80) 5830 mana. Ten of the eleven measurable pools land on
+		///         the captured value to the point; the eleventh (DemoL80's health) is 177 low because our item data
+		///         for that character is short, not because the curve is.
+		///     </para>
+		///     <para>
+		///         DemoL80's 177 is narrowed, and it is not one thing. <c>ActiveWeaponSet</c> is never set by the
+		///         character importer, so every imported character defaults to <c>Primary</c> - and DemoL80's
+		///         secondary set (Jagged Cut +12 Con and Fetish of Caged Fiends +35, against Mindraker's +34) is worth
+		///         13 more Constitution, i.e. 104 more health, taking the shortfall to 73. The remaining 73 is not
+		///         Constitution (73 is not a multiple of the health weight, 8): it is a flat <c>HealthMax</c> term our
+		///         item data does not carry. It is not the vanity slots (DemoL80's Canvas Belt +4 Con and Northfur
+		///         Cloak +23 Con would add 216, overshooting by 143; excluding them is right), and feats are ruled out
+		///         separately (DemoL80 trained none that grant <c>HealthMax</c>).
+		///     </para>
+		///     <para>
+		///         Which weapon set was drawn is not recoverable from a capture. The swap is observable (the server
+		///         stamps the newly-active main slot on a <c>SwitchWeaponsButton</c>) but a login carries no such
+		///         event, and the client derives its own display from the equipment container. The four stat ids
+		///         the client's registry names for it - <c>EquippedWeapons</c> (274), <c>WeaponItemType</c> (508),
+		///         <c>WeaponAnimSet</c> (615), <c>WeaponFlags</c> (863) - appear in no captured StatIIR
+		///         (<c>--report stat-series</c>), the spawn's own protobuf carries no weapon-set field, and the
+		///         equipment list cannot stand in for it: DemoL80's spawn lists slots <c>[6,20,21]</c>, i.e. both
+		///         sets at once (<c>--report weapon-set-drawn</c>; 138 of 10,990 captured spawns are like that). So
+		///         the 177 -&gt; 73 above is arithmetic that fits, not a measurement, and the default stays
+		///         <c>Primary</c>.
+		///     </para>
+		/// </remarks>
 		public static CharacterMaxStats For(ConanClass @class, ushort level, VitalAttributes attributes,
 			IReadOnlyDictionary<CharacterStatId, int>? classAttributeBase = null)
 		{
@@ -104,7 +99,7 @@ namespace Faolan.Core.Database.Tables
 				Stamina = Pool(baseStamina, attrStamina, CharacterStatId.StaminaMax)
 			};
 
-			// A class WITHOUT a pool (an Assassin's mana) has a 0 base AND 0 attribute columns, and must stay 0: the
+			// A class without a pool (an Assassin's mana) has a 0 base and 0 attribute columns, and must stay 0: the
 			// client hides a bar whose max is 0, and retail keeps sending 0 there even for an Assassin wearing a +74
 			// mana item (whose 74 is a flat gear bonus the caller adds afterwards).
 			uint Pool(uint classBase, uint attributeTerm, CharacterStatId pool)
@@ -112,9 +107,9 @@ namespace Faolan.Core.Database.Tables
 				if (classBase == 0)
 					return 0;
 
-				// ClassAttributeBase.Amount is the RAW WIRE value and the pools are the ×100 stats, so it divides by
-				// the stat's scale exactly like the attributes do. Adding it raw put a level-1 Necromancer at 89 + 100
-				// health.
+				// ClassAttributeBase.Amount is the raw wire value and the pools are the ×100 stats, so it divides by
+				// the stat's scale exactly like the attributes do (added raw it would put a level-1 Necromancer at
+				// 89 + 100 health).
 				var hundredths = classBase + attributeTerm + (uint)Math.Max(0, classAttributeBase?.GetValueOrDefault(pool) ?? 0);
 
 				// One rounding, at the end. The wire is hundredths and the sheet is whole points, and Guardian level 1
@@ -124,21 +119,28 @@ namespace Faolan.Core.Database.Tables
 			}
 		}
 
-		// Retail's CLASS BASE for the three pools at `level`, in WIRE hundredths - the exact value retail puts in
-		// stat 0x0001 / 0x01F9 / 0x01FB. Sourced from the client's own `HitsManaAndStamina_c` table (RDB 1000511,
-		// `--report rdb-class-vitals`), whose 95 records are 5 races x 19 class slots carrying 14 x i32; the six
-		// words below are `[2..4]` (base, hundredths) and `[5..7]` (growth, thousandths) of a class's record. The
-		// growth divides by 10 because it is stored one decimal finer than the base.
-		//
-		//   base(level) = baseWord + growthWord * (level - 1) / 10
-		//
-		// VERIFIED, not fitted: it reproduces the max in all 16 captured retail level-up pushes (the 0x96B8DC59 that
-		// follows a NewLevelIIR) exactly, across 6 classes and levels 2-5, including Guardian's non-integral stamina
-		// (172.5 + 25.3 = 197.8 -> the captured 19780). See docs/rdb/client-data-tables.md.
-		//
-		// ⚠️ THIS IS NOT THE DISPLAYED MAX - it is the first of its terms. The client tops it up with the attribute
-		// term below plus gear and feats, and an L23 Assassin whose sheet reads 1270 has a class base of 772. Wiring
-		// it as the ceiling would LOWER every character's pools; the ceiling is For().
+		/// <summary>
+		///     Retail's class base for the three pools at <paramref name="level" />, in wire hundredths - the exact
+		///     value retail puts in stat 0x0001 / 0x01F9 / 0x01FB. Sourced from the client's own
+		///     <c>HitsManaAndStamina_c</c> table (RDB 1000511, <c>--report rdb-class-vitals</c>), whose 95 records are
+		///     5 races x 19 class slots carrying 14 x i32; the six words in <see cref="ClassBaseCurve" /> are
+		///     <c>[2..4]</c> (base, hundredths) and <c>[5..7]</c> (growth, thousandths) of a class's record. The
+		///     growth divides by 10 because it is stored one decimal finer than the base:
+		///     <code>
+		///     base(level) = baseWord + growthWord * (level - 1) / 10
+		///     </code>
+		/// </summary>
+		/// <remarks>
+		///     Verified, not fitted: it reproduces the max in all 16 captured retail level-up pushes (the vitals push
+		///     that follows a NewLevelIIR) exactly, across 6 classes and levels 2-5, including Guardian's non-integral
+		///     stamina (172.5 + 25.3 = 197.8 -&gt; the captured 19780). See <c>docs/rdb/client-data-tables.md</c>.
+		///     <para>
+		///         This is not the displayed max - it is the first of its terms. The client tops it up with the
+		///         attribute term plus gear and feats, and an L23 Assassin whose sheet reads 1270 has a class base of
+		///         772. Wiring it as the ceiling would lower every character's pools; the ceiling is
+		///         <see cref="For" />.
+		///     </para>
+		/// </remarks>
 		public static (uint Health, uint Mana, uint Stamina) ClassBaseHundredths(ConanClass @class, ushort level)
 		{
 			ArgumentOutOfRangeException.ThrowIfZero(level); // level 0 is not a character state - creation allocates at 1
@@ -155,29 +157,29 @@ namespace Faolan.Core.Database.Tables
 		}
 
 		/// <summary>
-		///     The ATTRIBUTE-scaled part of each pool, in WIRE hundredths: what the client adds to the class base off
+		///     The attribute-scaled part of each pool, in wire hundredths: what the client adds to the class base off
 		///     the character's Strength/Constitution/… . RDB 1000511's trailing six columns are the per-point weights
 		///     in thousandths - <c>8000,0,0,2000,2000,2000</c> for an Assassin, i.e. 8 health per Constitution and 2
 		///     stamina per point of each of three attributes.
 		/// </summary>
 		/// <remarks>
-		///     ✅ SETTLED FROM THE CLIENT (#587), which the corpus could not do. Each pool has its own accessor and
-		///     the stat ids it reads ARE the attribute set - no inference:
+		///     Which attributes feed which pool is settled from the client, which the corpus cannot do (every captured
+		///     caster carries equal Wisdom and Dexterity - 110/110 on both level-80 mages, 33/33 on the Herald - so
+		///     the captures cannot separate them). Each pool has its own accessor and the stat ids it reads are the
+		///     attribute set:
 		///     <list type="bullet">
 		///         <item><c>FUN_0111aa30</c> health - reads <c>0x326</c> alone, and calls the one-weight lookup
 		///             <c>FUN_0113e730</c>, which returns <c>w[8]/10 x score</c>.</item>
-		///         <item><c>FUN_0111ab60</c> mana - reads <c>0x328</c> and <c>0x32A</c>, and ONLY those two, then
+		///         <item><c>FUN_0111ab60</c> mana - reads <c>0x328</c> and <c>0x32A</c>, and only those two, then
 		///             calls the two-weight <c>FUN_0113e7d0</c>: <c>w[9]/10 x Intelligence + w[10]/10 x Wisdom</c>.</item>
 		///         <item><c>FUN_0111ad20</c> stamina - reads <c>0x324</c>, <c>0x326</c> and <c>0x32E</c>.</item>
 		///     </list>
-		///     So mana really is Intelligence + Wisdom and <c>0x32E</c> Dexterity appears in the STAMINA accessor and
-		///     nowhere near mana. It used to be the one term with slack - every captured caster happens to carry equal
-		///     Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus could not
-		///     separate them and this shipped as a reading. It is now a measurement.
+		///     So mana is Intelligence + Wisdom, and <c>0x32E</c> Dexterity appears in the stamina accessor and
+		///     nowhere near mana.
 		///     <para>
-		///         The column ORDER is settled with it, which the table alone also cannot show (every class's weights
+		///         The column order is settled with it, which the table alone also cannot show (every class's weights
 		///         are equal within a pool - health 8; mana 3,3; stamina 2,2,2): <c>[8]</c> Constitution, <c>[9]</c>
-		///         Intelligence, <c>[10]</c> Wisdom. See docs/rdb/client-data-tables.md.
+		///         Intelligence, <c>[10]</c> Wisdom. See <c>docs/rdb/client-data-tables.md</c>.
 		///     </para>
 		/// </remarks>
 		public static (uint Health, uint Mana, uint Stamina) AttributeScaledHundredths(ConanClass @class, VitalAttributes attributes)
@@ -225,7 +227,7 @@ namespace Faolan.Core.Database.Tables
 			};
 		}
 
-		// RDB 1000511's TRAILING six words per class, in thousandths per attribute point: the health column, the two
+		// RDB 1000511's trailing six words per class, in thousandths per attribute point: the health column, the two
 		// mana columns, and the three stamina columns. A class without a pool carries zeroes in that pool's columns
 		// (an Assassin's `8000,0,0,2000,2000,2000`), which is what keeps a poolless class at 0 rather than growing a
 		// bar off its attributes. Copied from `--report rdb-class-vitals` like the base curve above.

@@ -3,106 +3,90 @@ using Faolan.Core.Extensions;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// The PlayfieldProxy stream (client `FUN_00a6a600`): `[u8 version 'b'][u32 x8][u8 bool]` - a reference to a
-	// playfield and, when it is pinned, to one live INSTANCE of it. Eight slots, six of which are known:
+	// playfield and, when it is pinned, to one live instance of it. Eight slots, six of which are known:
 	//
-	//   [0] class word  - PlayfieldClass (0xC79C) normally. NOT a constant: it also carries the instance's DIFFICULTY
-	//                     MODE - see the note below. The revive body uses 0xC7A0 (see ResurrectionSpotsBody: the
-	//                     0xC79C/0xC79E/0xC7A0 selection is per-PACKET and still undecoded)
+	//   [0] class word  - PlayfieldClass (0xC79C) normally; it also carries the instance's difficulty mode, see below.
+	//                     The revive body uses 0xC7A0 (see ResurrectionSpotsBody: the 0xC79C/0xC79E/0xC7A0 selection is
+	//                     per-packet and undecoded)
 	//   [1] map id
-	//   [2] the instance OWNER's ID32 TYPE, and
-	//   [3] the instance OWNER's ID32 INSTANCE - one pair, not two unrelated words (#512, see below)
+	//   [2] the instance owner's ID32 type, and
+	//   [3] the instance owner's ID32 instance - one pair, not two unrelated words (see below)
 	//   [4] always 0 in every capture
-	//   [5] a small COUNT, not a flag - 1, 2, 4, 5, 6 and 8 all occur (117/16/5/5/3/2). The teleport records only
-	//       ever carry 0 or 1, which is why this used to be modelled as a "ready flag"; the PlayfieldFIIR embedding
-	//       disproves that. What it counts is undecoded [V0] - the best-fitting reading is the map copy's ORDINAL:
-	//       the back-to-back Spider Caverns entries (#309) carry 1 with token 0x50B36B then 2 with the CONSECUTIVE
-	//       token 0x50B36C, i.e. the player's second minted copy of that map. It is NOT the difficulty (that is [0]
-	//       alone): the 4/5/6/8 values occur on maps with no epic mode. We keep emitting 1.
-	//   [6] InstanceWord (0x9C50 = 40016) - a constant that rides with a pinned instance; NOT an entity class id
-	//       (it is below the 50000 base, see EntityClass)
-	//   [7] the playfield INSTANCE token
+	//   [5] a small count, not a flag - 1, 2, 4, 5, 6 and 8 all occur (117/16/5/5/3/2); the teleport records only ever
+	//       carry 0 or 1. What it counts is undecoded [V0]; the best-fitting reading is the map copy's ordinal - the
+	//       back-to-back Spider Caverns entries carry 1 with token 0x50B36B then 2 with the consecutive token
+	//       0x50B36C, i.e. the player's second minted copy of that map. It is not the difficulty (that is [0] alone):
+	//       the 4/5/6/8 values occur on maps with no epic mode. We emit 1.
+	//   [6] InstanceWord (0x9C50 = 40016) - a constant that rides with a pinned instance; not an entity class id (it is
+	//       below the 50000 base, see EntityClass)
+	//   [7] the playfield instance token
 	//
-	// This was private to TeleportCodec until TeamMemberRecord turned out to embed one (Gitea #454): that record
-	// carried the proxy as `Field7`..`Field15`, misaligned by a byte because `Field7 = 0x00000162` had swallowed the
-	// version byte ('b' = 0x62). Read aligned, both captured members decode into all ten fields exactly, which is
-	// also what identifies 0x01EDA8B2 - shared by two different players in the same map - as an instance TOKEN
-	// rather than the constant or timestamp it had been read as. [V0 on the token semantics: structural evidence
-	// across two codecs, not yet checked in-client.]
+	// The slot notes are what three independent embeddings agree on (the teleport records, TeamMemberRecord and
+	// PlayfieldFIIR); widen the evidence across all three before narrowing a slot's name. Read aligned, both captured
+	// team members decode into all ten fields exactly, which is what identifies 0x01EDA8B2 - shared by two different
+	// players in the same map - as an instance token. [V0 on the token semantics: structural evidence across two
+	// codecs, not checked in-client.]
 	//
-	// ⚠️ The slot notes above are what THREE embeddings agree on (teleport, team member, PlayfieldFIIR). Two of them
-	// only became visible when the third was composed here - "[2] is always 0" and "[5] is a ready flag" were both
-	// true of the first two embeddings and false of the wire. Widen the evidence before narrowing a slot's name.
+	// [2]+[3] are the instance's owner as an ID32. Across the corpus the pair takes four shapes, and each is an owner:
 	//
-	// <b>[2]+[3] are the instance's OWNER as an ID32 (#512).</b> They used to be read as "a per-map word" and "a
-	// character handle, 0 elsewhere", which is what two of the three embeddings happen to look like. Across the corpus
-	// the pair only ever takes three shapes, and each is an owner:
+	//   (0, 0)                     no owner - an ordinary shared playfield. The common case.
+	//   (2, <id>)                  a personal instance. Type 2 appears on exactly the maps that are always private -
+	//                              King Conan's castle (2040), Tortage Night (4022), the Conarch Armory (5007). The
+	//                              revive body's "character handle" is this same slot, i.e. the owner there is the
+	//                              player.
+	//   (0xDEA9, <teamId>)         a team-owned instance - 0xDEA9 (57001) is the team/guild class. Entering the
+	//                              Amphitheatre of Karutonia (1092) as a group carries team 0x000F08DB here, the exact
+	//                              id DispatchYouJoinedTeam had just announced and that the `~Team` channel subscribed
+	//                              to seconds earlier.
+	//   (0, <characterId>)         a personal instance that names its owner without the type-2 tag. 47 of the 218
+	//                              bodies across all dumps carry ownerType 0 with a non-zero owner; every one is map
+	//                              4010 (the Tortage beach island) in a create/login capture, and the id is the
+	//                              player's own character id (35022073 in `Barbarian-create`). So map 4010 is
+	//                              instanced even though it carries no owner type: do not read "type 2 means personal"
+	//                              as "anything else is shared".
 	//
-	//   (0, 0)                     no owner - an ordinary SHARED playfield. The common case.
-	//   (2, <id>)                  a PERSONAL instance. Type 2 appears on exactly the maps that are always private -
-	//                              King Conan's castle (2040), Tortage Night (4022), the Conarch Armory (5007) - which
-	//                              is why it looked per-map: those maps are never anything else. The revive body's
-	//                              "character handle" is this same slot, i.e. the owner there is the player.
-	//   (0xDEA9, <teamId>)         a TEAM-owned instance - 0xDEA9 (57001) is the team/guild class. Observed once, and
-	//                              decisively: entering the Amphitheatre of Karutonia (1092) as a group carries team
-	//                              0x000F08DB here, the exact id DispatchYouJoinedTeam had just announced and that the
-	//                              `~Team` channel subscribed to seconds earlier.
-	//   (0, <characterId>)         ⚠️ a FOURTH shape - added 2026-08-09. "Only ever three shapes" was measured over
-	//                              183 bodies; sweeping all 132 dumps finds 218, and 47 of them carry ownerType 0
-	//                              with a NON-zero owner. Every one is map 4010 (the Tortage beach island) in a
-	//                              create/login capture, and the id is the player's own character id - 35022073 in
-	//                              `Barbarian-create`, which appears in 482 packets of that trace including
-	//                              `SendCharacterSettings` and `LoginConnectReady`. So the beach is a personal
-	//                              instance that names its owner WITHOUT the type-2 tag.
+	// So "whose copy of this playfield is this" is answered by these two words, and Map.PlayfieldFieldA storing a 2 per
+	// map is correct for those three maps precisely because they are always personally owned.
 	//
-	//                              Our builder already emits exactly this: BuildMapChange sends
-	//                              `(PlayfieldFieldA ?? 0, character.Id)` whenever the map is instanced, so nothing
-	//                              is wrong in the code - only in this note. It matters because reading the pair as
-	//                              "type 2 means personal" makes 4010 look SHARED, and it is not.
-	//
-	// So "whose copy of this playfield is this" is answered by these two words, and Map.PlayfieldFieldA storing a 2
-	// per map stays correct for those three maps precisely because they are always personally owned.
-	//
-	// <b>[0] carries the DIFFICULTY MODE (#511).</b> Across all 183 captured PlayfieldFIIRs the class word is 0xC79C
-	// 182 times and 0xCABC exactly once - and that once is the annotated `enered epic instance` entry, to the SAME map
-	// (1004, the Spider Caverns) the `energed normal instance` entry 34 s earlier had reached with 0xC79C. Same map id,
-	// same everything else; the mode is this word. That is one observation, but it is the cleanest kind: a controlled
-	// A/B on one map, minutes apart, with the player narrating which was which.
+	// [0] carries the difficulty mode. Across all 183 captured PlayfieldFIIRs the class word is 0xC79C 182 times and
+	// 0xCABC exactly once - the annotated `enered epic instance` entry, to the same map (1004, the Spider Caverns) the
+	// `energed normal instance` entry 34 s earlier had reached with 0xC79C.
 	public sealed record PlayfieldProxy(uint MapId, uint ClassWord = PlayfieldProxy.PlayfieldClass, uint OwnerId = 0, uint Slot5 = 0, uint InstanceWord = 0, uint InstanceToken = 0,
 		bool Trailing = false, uint OwnerType = 0)
 	{
-		// [0] for every proxy except the revive body's - and, per the note above, the NORMAL difficulty mode.
+		/// <summary>[0] for every proxy except the revive body's, and the normal difficulty mode.</summary>
 		public const uint PlayfieldClass = 0x0000C79C;
 
-		// [0] on an EPIC instance (#511), and the word is not merely correlated with the mode - it is the END of a
-		// chain the corpus shows whole, twice, 34 seconds apart on the SAME door and the SAME map:
-		//
-		//   LookAt(the Spider Caverns door 0x8C5) -> UseDynel -> DispatchScryShowMessageBox "Do you want to travel to
-		//   the Spider Caverns?" -> ScryMessageBoxAnswer[0] -> IntendedTeleportIIR + PlayfieldFIIR carrying THIS word
-		//
-		// and the only thing that differs between the two runs is the answer's OPTION INDEX: `1` -> 0xC79C and the
-		// player narrating "energed normal instance", `2` -> 0xCABC and "enered epic instance". So the difficulty is
-		// PICKED at the message box and CARRIED here, which is what makes this a decode rather than two separate
-		// observations that happen to agree. See ScryMessageBoxAnswerCodec for the picker's own half.
+		/// <summary>[0] on an epic instance.</summary>
+		/// <remarks>
+		///     The difficulty is picked at the scry message box and carried here. The corpus shows the whole chain twice,
+		///     34 seconds apart on the same door and the same map: LookAt(the Spider Caverns door 0x8C5) -> UseDynel ->
+		///     DispatchScryShowMessageBox "Do you want to travel to the Spider Caverns?" -> ScryMessageBoxAnswer[0] ->
+		///     IntendedTeleportIIR + PlayfieldFIIR carrying this word. Only the answer's option index differs: `1` yields
+		///     0xC79C and `2` yields 0xCABC. See ScryMessageBoxAnswerCodec for the picker's own half.
+		/// </remarks>
 		public const uint EpicPlayfieldClass = 0x0000CABC;
 
-		// [2] when the instance belongs to a TEAM - the team/guild class word, the same 0xDEA9 a team's own ID32 uses.
+		/// <summary>[2] when the instance belongs to a team - the same 0xDEA9 class word a team's own ID32 uses.</summary>
 		public const uint TeamOwnerType = 0x0000DEA9;
 
-		// [2] when the instance is PERSONAL (King Conan's castle, Tortage Night, the Conarch Armory).
+		/// <summary>[2] when the instance is personal (King Conan's castle, Tortage Night, the Conarch Armory).</summary>
 		public const uint PersonalOwnerType = 0x00000002;
 
-		// [6] on a proxy whose instance is pinned.
+		/// <summary>[6] on a proxy whose instance is pinned.</summary>
 		public const uint PinnedInstanceWord = 0x00009C50;
 
-		// [5] on a teleport record whose instance is pinned. Kept as a named constant because that IS the value the
-		// teleport bodies carry - but see the slot note above: 1 is the common case of a count, not a boolean true.
+		/// <summary>[5] on a teleport record whose instance is pinned.</summary>
+		/// <remarks>
+		///     Named because that is the value the teleport bodies carry, but per the slot notes above 1 is the common
+		///     case of a count, not a boolean true.
+		/// </remarks>
 		public const uint Ready = 0x00000001;
 
 		public const byte Version = 0x62; // 'b'
 
-		// A SUB-RECORD's composition pair: this value is only ever read/written inside a larger body (PlayfieldFIIR,
-		// the teleport records, a team-member record), so both halves are `internal` (#530 rule 1). The value stopped
-		// implementing `ICodec<PlayfieldProxy>` in wave 7 - a wire value does not serialize itself.
+		// A sub-record's composition pair: this value is only ever read/written inside a larger body (PlayfieldFIIR,
+		// the teleport records, a team-member record), so both halves are `internal`.
 		internal static PlayfieldProxy Read(ref SpanReader r)
 		{
 			r.ReadU8(); // version 'b'
@@ -121,10 +105,10 @@ namespace Faolan.Core.Network.Codecs.World
 		/// <summary>Whether this playfield is a private copy at all - i.e. whether anyone owns it.</summary>
 		public bool IsInstanced => OwnerType != 0;
 
-		/// <summary>Whether the owning entity is a TEAM (a group instance) rather than a single character.</summary>
+		/// <summary>Whether the owning entity is a team (a group instance) rather than a single character.</summary>
 		public bool IsTeamOwned => OwnerType == TeamOwnerType;
 
-		/// <summary>Whether this is an EPIC-difficulty copy of the playfield rather than a normal one.</summary>
+		/// <summary>Whether this is an epic-difficulty copy of the playfield rather than a normal one.</summary>
 		public bool IsEpic => ClassWord == EpicPlayfieldClass;
 
 		internal void Write(FaolanStream s)
@@ -141,15 +125,20 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(Trailing ? (byte)0x01 : (byte)0x00);
 		}
 
-		// A proxy naming a map but no particular instance of it - the "begin teleport" form. `epic` selects the
-		// difficulty class word (#309/#511) - the captured epic begin differs from the normal one in that word alone.
+		/// <summary>A proxy naming a map but no particular instance of it - the "begin teleport" form.</summary>
+		/// <param name="epic">
+		///     Selects the difficulty class word; the captured epic begin differs from the normal one in that word alone.
+		/// </param>
 		public static PlayfieldProxy ForMap(uint mapId, bool epic = false)
 		{
 			return new PlayfieldProxy(mapId, epic ? EpicPlayfieldClass : PlayfieldClass);
 		}
 
-		// A proxy pinned to one live playfield instance - the form a destination announce and a team-member record
-		// both carry. `epic` selects the difficulty class word (#309/#511).
+		/// <summary>
+		///     A proxy pinned to one live playfield instance - the form a destination announce and a team-member record
+		///     both carry.
+		/// </summary>
+		/// <param name="epic">Selects the difficulty class word.</param>
 		public static PlayfieldProxy ForInstance(uint mapId, uint instanceToken, bool epic = false)
 		{
 			return new PlayfieldProxy(mapId, epic ? EpicPlayfieldClass : PlayfieldClass, InstanceWord: PinnedInstanceWord, Slot5: Ready, InstanceToken: instanceToken);

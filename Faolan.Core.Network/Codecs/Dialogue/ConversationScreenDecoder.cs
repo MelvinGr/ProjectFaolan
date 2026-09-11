@@ -8,21 +8,23 @@ using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// Lifts a captured conversation PACKET (rpcHeader included) into the structured Knubot-screen columns (#188), so
-	// the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag} + the Screens rows (each decoded here
-	// as raw remoteformat XML, columnized by ConversationScreenCodec.Parse) and the runtime builds the screen from
-	// fields.
-	//
-	// ⚠️ NOT a message codec, and deliberately not on the #530 uniform surface: it is a FRAME-level scanner over
-	// whole captured packets, so it owns the rpcHeader (§9 D keeps frame code out of the codec shape) and it must be
-	// able to say "this packet is not a conversation packet" while sweeping a mixed capture. It no longer DECODES
-	// anything itself - the bodies go through KnubotCodec / SetDialogueCameraCodec, which is what retires the
-	// duplicate Knubot HandledTypes declaration this file used to carry (#530 §3). Its own conversion rides wave 8
-	// with the rest of the importer's reading.
-	//
-	// The non-Knubot packets in a conversation node (~48 of 355 in faolan.db) are NOT dialogue text - they are
-	// DispatchSetDialogueCamera (GameCharAgent 0xA9ECB95D -> GameCharInterface 0x8B87F791): the
-	// cinematic conversation camera. No remoteformat text, so nothing to structure.
+	/// <summary>
+	///     Lifts a captured conversation packet, rpcHeader included, into the structured Knubot-screen columns, so the
+	///     importer can populate <c>ConversationPacket.{SubOpcode,Env,Field,Flag}</c> plus the Screens rows - each decoded
+	///     here as raw remoteformat XML and columnized by <c>ConversationScreenCodec.Parse</c> - and the runtime builds
+	///     the screen from fields.
+	/// </summary>
+	/// <remarks>
+	///     Not a message codec, and deliberately not on the uniform codec surface: it is a frame-level scanner over whole
+	///     captured packets, so it owns the rpcHeader and must be able to say "this packet is not a conversation packet"
+	///     while sweeping a mixed capture. It decodes nothing itself - the bodies go through <c>KnubotCodec</c> and
+	///     <see cref="SetDialogueCameraCodec" />.
+	///     <para>
+	///         The non-Knubot packets in a conversation node (~48 of 355 in faolan.db) are not dialogue text: they are
+	///         <c>DispatchSetDialogueCamera</c>, the cinematic conversation camera, which carries no remoteformat text
+	///         and so has nothing to structure.
+	///     </para>
+	/// </remarks>
 	public static class ConversationScreenDecoder
 	{
 		public const uint AnswerList = (uint)IirTypes.KnubotAnswerListIIR; // 0xF164A4A5
@@ -31,10 +33,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public const uint OpenChatWindow = (uint)IirTypes.KnubotOpenChatWindowIIR; // 0x045B0B0F
 		public const uint SetDialogueCamera = SetDialogueCameraCodec.Method; // an RPC method, not an IIR sub
 
-		// The same method as the two bytes that END the rpcHeader - the method field's tag 0x20 followed by its
-		// varint, whose whole of a sub-0x80 index is one group. This is the one place the decoder needs that view,
-		// because it scans the frame by offset instead of parsing it; `SetDialogueCamera` above is the method itself,
-		// which is what ConversationPacket.SubOpcode stores (#615).
+		// The same method as the two bytes that end the rpcHeader - the method field's tag followed by its varint, whose
+		// whole of a sub-0x80 index is one group. This is the one place the decoder needs that view, because it scans the
+		// frame by offset instead of parsing it; `SetDialogueCamera` above is the method itself, which is what
+		// ConversationPacket.SubOpcode stores.
 		private static readonly ushort SetDialogueCameraWireOpcode = WireOpcode.Of(SetDialogueCameraCodec.Method);
 
 		public static Columns? Decode(byte[] data)
@@ -70,20 +72,19 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				KnubotAppendTextIIR text => new Columns((ConversationSubOpcode)sub, text.Env, text.TextType, text.Trailing, [Latin1(text.Xml)], senderInstance),
 				KnubotAnswerListIIR list => new Columns((ConversationSubOpcode)sub, list.Env, null, null, list.Strings.Select(Latin1).ToList(), senderInstance),
 
-				// The close's stored Field is its TextType, the same slot AppendText's is (#809). It used to be read
-				// as the string COUNT of a list that is not there; the two agree on every s2c record, which all carry
-				// TextType 1 and one screen, so a re-import produces the same rows.
+				// The close's stored Field is its TextType, the same slot AppendText's is. Every s2c record carries TextType 1 and
+				// one screen.
 				KnubotCloseChatWindowIIR close => new Columns((ConversationSubOpcode)sub, close.Env, close.TextType, null, [Latin1(close.Text)], senderInstance),
 				_ => null
 			};
 		}
 
-		// DispatchSetDialogueCamera (a method in the rpcHeader, not an IIR sub). We store the GameCharAgent
-		// sender instance (varies per conversation) + the typed camera args; the npc/player are re-addressed live at
-		// send time.
+		// DispatchSetDialogueCamera (a method in the rpcHeader, not an IIR sub). The GameCharAgent sender instance, which
+		// varies per conversation, and the typed camera args are stored; the npc and player are re-addressed live at send
+		// time.
 		private static Columns? DecodeCamera(byte[] data, int headerLen, int start)
 		{
-			// the method's two wire bytes end the rpcHeader (at headerLen-2 from the header start @ offset 12).
+			// The method's two wire bytes end the rpcHeader, at headerLen-2 from the header start at offset 12.
 			if (10 + headerLen + 2 > data.Length || data.ReadU16Be(10 + headerLen) != SetDialogueCameraWireOpcode)
 				return null;
 
@@ -134,11 +135,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return inst;
 		}
 
-		// The decoded columns of one conversation packet. Screens is the raw remoteformat screen XML list (the
-		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToStoredRow).
-		// SenderInstance is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the
-		// send path re-frames from columns instead of the raw Data blob; Camera holds the SetDialogueCamera
-		// arguments (#410), null on every Knubot packet.
+		// The decoded columns of one conversation packet. Screens is the raw remoteformat screen XML list, which the
+		// importer columnizes into ConversationScreen rows via ConversationScreenColumns.ToStoredRow. SenderInstance is the
+		// rpcHeader caller endpoint instance, which retail varies per conversation, stored so the send path re-frames from
+		// columns instead of a raw blob; Camera holds the SetDialogueCamera arguments and is null on every Knubot packet.
 		public sealed record Columns(ConversationSubOpcode SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null,
 			CameraArgs? Camera = null);
 	}

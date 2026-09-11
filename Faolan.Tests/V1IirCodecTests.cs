@@ -10,8 +10,8 @@ namespace Faolan.Tests
 	// (docs/re/v1-iir-readers.md) - Parse(captured) -> Build must reproduce the capture, and the fields must decode as
 	// the reader does. Retires RegenIIR / LockedToChangedIIR / ChainKillIIR from the V1 (no-codec) tier.
 	//
-	// ⚠️ The captured bodies below are the WHOLE carrier payload, so their leading four bytes are the u32 length -
-	// which #530 rule 2 moved off the codecs and onto the sender. `Record(hex)` drops it; the wire is unchanged.
+	// The captured bodies below are the whole carrier payload, so their leading four bytes are the u32 length -
+	// which belongs to the sender rather than to the codec. `Record(hex)` drops it.
 	public class V1IirCodecTests
 	{
 		[Fact]
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 		}
 
 		// SetShadowCoverageIIR (0xD6C1F0CC) - the last V1 IIR type. Both captured pairs are the same exchange: the
-		// CLIENT reports its shadow coverage (env 0x01) and the server echoes it back (env 0x00). Two characters on
+		// client reports its shadow coverage (env 0x01) and the server echoes it back (env 0x00). Two characters on
 		// two maps, both carrying 100.
 		[Theory]
 		[InlineData("00000011d6c1f0cc0000c3501101b4f50100000064", 0x1101b4f5u, 0x01)] // Hakotep, c2s
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			Assert.Equal(body, SetShadowCoverageCodec.Build(c));
 		}
 
-		// The direction lives in the env byte, and Build defaults to the SERVER's - sending the client's value back at
+		// The direction lives in the env byte, and Build defaults to the server's - sending the client's value back at
 		// it would be reporting the client's own reading as if it were ours.
 		[Fact]
 		public void SetShadowCoverage_BuildDefaultsToTheServerEnv()
@@ -143,7 +143,7 @@ namespace Faolan.Tests
 			var body = Record("000000116ba109360000c35001316e7100000003f1");
 			var sb = SpellBookCodec.Parse(body);
 			Assert.Equal(0x01316e71u, sb.Handle);
-			Assert.Equal(0, sb.Count); // 0x3F1 IS the empty list, not a marker
+			Assert.Equal(0, sb.Count); // 0x3F1 is the empty list, not a marker
 			Assert.Equal(body, SpellBookCodec.Build(sb));
 		}
 
@@ -170,7 +170,7 @@ namespace Faolan.Tests
 			Assert.Equal(body, UpdateInventoryCodec.Build(u));
 		}
 
-		// The captured payload WITHOUT its leading u32 length - the sender's, since #530 rule 2.
+		// The captured payload without its leading u32 length, which belongs to the sender.
 		private static byte[] Record(string hex)
 		{
 			return Convert.FromHexString(hex)[4..];

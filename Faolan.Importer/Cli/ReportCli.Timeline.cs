@@ -22,22 +22,22 @@ using ProtoBuf;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report timeline` - ONE flat chronological account of a single capture: what the session did, in order,
+	// `--report timeline` - one flat chronological account of a single capture: what the session did, in order,
 	// with every id resolved from our own data.
 	//
 	// It replaces a Python script that re-derived the same wire grammar by hand (tools/capture/timeline.py, retired).
-	// That is the whole reason this lives here: the offsets a timeline needs ARE the codecs, and a second
+	// That is the whole reason this lives here: the offsets a timeline needs are the codecs, and a second
 	// implementation of them drifts - the Python one shipped four wrong offsets (playfield, QuestIIR, PetIIR, the
 	// item template) before they were caught by eye. Here the decode comes from WorldQuest / StatDamageCodec /
 	// HateListCodec / AbilityGrantBody / the generated protobuf types, all of which golden tests already gate.
 	//
 	// Two things it can do that the script could not:
-	//   - names come from the Opcodes.cs ENUMS, so they cannot go stale the way a tshark dump's `Method` column does
-	//     (tshark_dumps_carry_stale_opcode_names) and there is no source-parsing regex to get wrong;
-	//   - LDB text is decrypted INLINE from the key the wire itself carries, so dialogue and quest lines read as
+	//   - names come from the Opcodes.cs enums, so they cannot go stale the way a tshark dump's `Method` column does
+	//     and there is no source-parsing regex to get wrong;
+	//   - LDB text is decrypted inline from the key the wire itself carries, so dialogue and quest lines read as
 	//     English in the timeline - including screens our own ConversationScreens table has never captured.
 	//
-	// It is deliberately NOT sectioned and has no brief/verbose modes: one event per line, always detailed. Reading a
+	// It is deliberately not sectioned and has no brief/verbose modes: one event per line, always detailed. Reading a
 	// session as it happened is the job, and an event and its consequence must not land under different headings.
 	public static partial class ReportCli
 	{
@@ -114,24 +114,24 @@ namespace Faolan.Importer.Cli
 			TimelineFooter(events, look, suppressed, refused);
 		}
 
-		// A line the PLAYER typed, as opposed to one the server pushed at them. The c2s side is the honest test: an
+		// A line the player typed, as opposed to one the server pushed at them. The c2s side is the honest test: an
 		// NPC bark and the server's echo of the player's own line are both s2c `CharacterChat` on the chat tier and
-		// look identical, while `ChatVicinity` / `ChannelChat` going UP the wire can only have been typed.
+		// look identical, while `ChatVicinity` / `ChannelChat` going up the wire can only have been typed.
 		private static bool IsPlayerChat(TimelineEvent e)
 		{
 			return e.Direction == "c2s" && e.Name is "ChatVicinity" or "ChannelChat" or "Whisper";
 		}
 
-		// The ANNOTATION INDEX, printed under the header.
+		// The ANNOTATION index, printed under the header.
 		//
 		// The maintainer narrates what he is doing in /say as he plays, which is the only record of INTENT a capture
 		// carries - and it is scattered through ten thousand lines. Lifting it to the top turns the dump into a
 		// labelled index: "17:44:47 just put 1 skillpoint in run speed" is a pointer straight at four packets that
 		// would otherwise have to be found by hand.
 		//
-		// ⚠️ **A line describes something that already happened.** The lag is ~5 s and it runs BACKWARDS: by the time
-		// a line is typed the event is over, and the player's NEXT action can land inside the window. So an annotation
-		// names an EVENT, never "the packets nearest to it" - attribute traffic only when the message text, a named
+		// A line describes something that already happened. The lag is ~5 s and it runs BACKWARDS: by the time
+		// a line is typed the event is over, and the player's next action can land inside the window. So an annotation
+		// names an event, never "the packets nearest to it" - attribute traffic only when the message text, a named
 		// token or a matching id corroborates it.
 		private static void TimelineAnnotations(List<TimelineEvent> events, TimelineLookups look)
 		{
@@ -153,7 +153,7 @@ namespace Faolan.Importer.Cli
 			return direction.Length > 0 ? direction[..1] : "?";
 		}
 
-		// The only trailing block. NOT a section of the narrative - it is the part of the capture our own data could
+		// The only trailing block. not a section of the narrative - it is the part of the capture our own data could
 		// not name, which is the finding a timeline run exists to surface, and it is silent when there is nothing.
 		private static void TimelineFooter(List<TimelineEvent> events, TimelineLookups look, Dictionary<string, int> suppressed,
 			Dictionary<string, int> refused)
@@ -175,9 +175,9 @@ namespace Faolan.Importer.Cli
 			if (unnamedMethod.Count > 0)
 				Console.WriteLine($"# methods not in Opcodes.cs: {string.Join(", ", unnamedMethod)}");
 
-			// ⭐ The decode-coverage line. A codec that THROWS on retail traffic models a shape the live service does
+			// The decode-coverage line. A codec that THROWS on retail traffic models a shape the live service does
 			// not send, and one such line is invisible in ten thousand - as a per-message count over a session it is a
-			// finding. It is deliberately separate from the two lists above: those are messages we cannot NAME, this
+			// finding. It is deliberately separate from the two lists above: those are messages we cannot name, this
 			// one is messages we name and then fail to read.
 			if (refused.Count > 0)
 			{
@@ -186,17 +186,17 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// handle -> label. Entity handles are SESSION-VOLATILE, so they cannot be looked up; they are resolved through
-		// the capture itself, by matching a spawn body's POSITION against NpcSpawns/WorldObjects on this playfield.
+		// handle -> label. Entity handles are session-VOLATILE, so they cannot be looked up; they are resolved through
+		// the capture itself, by matching a spawn body's position against NpcSpawns/WorldObjects on this playfield.
 		//
-		// ⚠️ Five classes are excluded rather than matched, or they take the name of whatever they stood near:
-		// the player, summoned PETS (they follow the player - one matched a "Brutal Pirate" 22u away), OTHER
-		// PLAYERS (a character id is far above the entity-handle range; one standing inside 2u of a vendor came out
-		// labelled "Trader"), and LOOT BAGS + TOMBSTONES. The last two are dynamic in the same way: they spawn where
+		// Five classes are excluded rather than matched, or they take the name of whatever they stood near:
+		// the player, summoned PETS (they follow the player - one matched a "Brutal Pirate" 22u away), other
+		// players (a character id is far above the entity-handle range; one standing inside 2u of a vendor came out
+		// labelled "Trader"), and loot bags + TOMBSTONES. The last two are dynamic in the same way: they spawn where
 		// something DIED or was dropped, so they can never have a WorldObjects row and the nearest static is simply
 		// whatever the fight happened to be near. 8 of the 9 in the necromancer play2 capture were wrong - a corpse
 		// bag labelled "Climbing Point (+19u)", a tombstone labelled "Genzio's House (+16u)" - and the only right one
-		// was the one with nothing inside 25u to steal a name from (#560). A bare handle is honest; a confident wrong
+		// was the one with nothing inside 25u to steal a name from. A bare handle is honest; a confident wrong
 		// name is not. (That also crossed entity CLASSES, LootBag 0xC87A taking a ClimbingDynel 0xC87D name; gating
 		// the match on class would need a class column on WorldObject, and with the dynamic types gone there is no
 		// observed case left that needs it.)
@@ -210,13 +210,9 @@ namespace Faolan.Importer.Cli
 			var labels = new Dictionary<uint, string>();
 			uint mapId = 0;
 
-			// ⚠️ The map each event was seen ON, not "the map the capture ended on" (#818). This used to resolve every
-			// entity in the session against a single `mapId` - whatever the LAST MapChange left behind - so a capture
-			// that visited two playfields could only ever name the entities of one of them. It showed up as an
-			// asymmetry between two halves of one session: play4 ends in Tortage and named Redrik/Cramaleico/Delia
-			// while every White Sands entity stayed a bare handle, and play3 ends in White Sands and could not name
-			// Tina or anyone else in the city. Same shape as the spawn-importer bug this ticket is about - one
-			// "current" variable outliving the thing it was current for.
+			// The map each event was seen on, not "the map the capture ended on". Resolving every entity against a
+			// single `mapId` - whatever the last MapChange left behind - lets a capture that visited two playfields
+			// name the entities of only one of them: one "current" variable outliving the thing it was current for.
 			var mapAt = new uint[events.Count];
 			for (var i = 0; i < events.Count; i++)
 			{
@@ -224,7 +220,7 @@ namespace Faolan.Importer.Cli
 				mapAt[i] = mapId;
 				switch (e.Name)
 				{
-					// Same rule as the spawn importer (#818): a MapChange we cannot read CLEARS the map rather than
+					// Same rule as the spawn importer: a MapChange we cannot read CLEARS the map rather than
 					// leaving the previous one standing. Entities are named by matching their position against the
 					// current map's spawn table, so a stale id here would label this playfield's NPCs with the names
 					// of the one the player just left - the report's own version of the mis-attribution that bug caused.
@@ -293,7 +289,7 @@ namespace Faolan.Importer.Cli
 			return labels;
 		}
 
-		// The spawn position, at the SAME named offsets the spawn builder writes and NpcSpawnExtractor reads
+		// The spawn position, at the same named offsets the spawn builder writes and NpcSpawnExtractor reads
 		// (SpawnPacketBuilder.Pos*Offset) - little-endian floats. Sharing the constants is the point: a timeline that
 		// re-derived them would be one more place for them to drift.
 		private static (float X, float Y, float Z)? SpawnPosition(byte[] raw)
@@ -312,10 +308,10 @@ namespace Faolan.Importer.Cli
 		// One line's worth of meaning. Every branch goes through a CODEC where one exists - that is the point of the
 		// report living here rather than in a script - and states the id it could not resolve where one does not.
 		//
-		// A codec's Parse is written for the bodies its subsystem SENDS and may throw on a shape a capture happens to
+		// A codec's Parse is written for the bodies its subsystem sends and may throw on a shape a capture happens to
 		// carry (HateListCodec does, on a shorter body than it models). A diagnostic that reads arbitrary retail
 		// traffic must not die on one message: the line degrades to its raw hex, which is still the evidence, and the
-		// run continues. Swallowing it here is deliberate and is NOT a licence for a codec to be wrong - the raw hex
+		// run continues. Swallowing it here is deliberate and is not a licence for a codec to be wrong - the raw hex
 		// on the line is exactly what shows a decode is missing.
 		private static string Describe(TimelineEvent e, TimelineLookups look, Dictionary<uint, string> labels,
 			Dictionary<string, int> refused)
@@ -326,7 +322,7 @@ namespace Faolan.Importer.Cli
 			}
 			catch (Exception ex)
 			{
-				// ⭐ Counted, not just printed. A codec that throws on retail traffic is the most useful thing a
+				// Counted, not just printed. A codec that throws on retail traffic is the most useful thing a
 				// timeline run can find, and one line in ten thousand is invisible - the footer says which codecs
 				// refused how many records, which is a decode-coverage measurement over a whole session.
 				refused[e.Name] = refused.GetValueOrDefault(e.Name) + 1;
@@ -336,9 +332,8 @@ namespace Faolan.Importer.Cli
 
 		private static string DescribeCore(TimelineEvent e, TimelineLookups look, Dictionary<uint, string> labels)
 		{
-			// Every IIR codec now takes the CONTENT (from the sub-opcode on) - #530 rule 2 moved the carrier's u32
-			// length out of the codecs and onto the sender, which retired the split where half of them read the length
-			// first. `raw` is still the framed bytes, for the branches that have no codec yet.
+			// Every IIR codec takes the content, from the sub-opcode on: the carrier's u32 length belongs to the
+			// sender, not to a codec. `raw` is still the framed bytes, for the branches that have no codec yet.
 			var raw = e.Raw;
 			var content = e.Content;
 			switch (e.Name)
@@ -348,7 +343,7 @@ namespace Faolan.Importer.Cli
 					return $"account \"{Encoding.Latin1.GetString(raw, 2, Math.Min(raw.ReadU16Be(0), raw.Length - 2))}\"";
 				}
 
-				// Through the CODEC, not a fixed offset (#818). Reading the map at raw+34 printed the right number
+				// Through the CODEC, not a fixed offset. Reading the map at raw+34 printed the right number
 				// while PlayfieldFCodec was REFUSING these bodies outright - so the footer's "codecs refused" census,
 				// the most valuable thing this report produces, stayed silent about the refusal that was actively
 				// corrupting the spawn import. A report that decodes a message its own codec cannot read is not a
@@ -392,8 +387,8 @@ namespace Faolan.Importer.Cli
 				case "QuestIIR":
 				{
 					var quest = QuestCodec.Parse(content);
-					// ⚠️ State 4 means COMPLETED only s2c. The client sends the identical record UP to abandon a quest
-					// (`QuestIIR_c` is its `DeleteQuest`), and over the whole corpus c2s carries state 4 and NOTHING
+					// State 4 means COMPLETED only s2c. The client sends the identical record up to abandon a quest
+					// (`QuestIIR_c` is its `DeleteQuest`), and over the whole corpus c2s carries state 4 and nothing
 					// ELSE - 3 of them, against 50 s2c completions and 47 s2c updates. Labelling one "(completed)"
 					// reads a deletion as its opposite, which is exactly what it did on the group-finder capture where
 					// the player deleted a quest to make journal room.
@@ -418,16 +413,15 @@ namespace Faolan.Importer.Cli
 				}
 				case "MagicBuffIIR":
 				{
-					// applyFrom is the CASTER and applyTo is who the buff lands on - the carrier handle is the TARGET.
-					// This line had them the other way round until #530 wave 4 merged the three MagicBuffIIR emitters
-					// and settled which endpoint is which (the NPC-cast golden pins it: applyFrom = the caster's spawn).
+					// applyFrom is the caster and applyTo is who the buff lands on - the carrier handle is the target.
+					// The NPC-cast golden pins it: applyFrom is the caster's spawn.
 					var buff = MagicBuffCodec.Parse(content);
 					var wireId = MagicBuffIds.WireIdOf(buff.SpellBaseId, buff.Form);
 					var name = look.Spells.TryGetValue(buff.SpellBaseId, out var sn) ? sn : $"spell {buff.SpellBaseId}";
 					var at = buff.ApplyTo != 0 && buff.ApplyTo != buff.ApplyFrom ? $" -> {Ent(labels, buff.ApplyTo)}" : "";
 					var end = buff.Form == MagicBuffIds.FormEnd ? " (end)" : "";
 
-					// A buff can carry NO caster (#614) - retail zeroes the class word. Say so rather than attributing
+					// A buff can carry no caster - retail zeroes the class word. Say so rather than attributing
 					// it to entity 0, which is a real handle space.
 					var from = buff.ApplyFrom is { } caster ? Ent(labels, caster) : "(no caster)";
 					return $"{from} buff {name}{at}{end} [0x{wireId:x}]";
@@ -437,7 +431,7 @@ namespace Faolan.Importer.Cli
 					// The Tortage destiny/tutorial STEP driver. Without this the whole intro sequence
 					// (StartFixed3d -> WelcomeTutorial -> ApproachCasilda -> CombatTutorial -> QuestRewards)
 					// reads as undifferentiated hex, which is exactly the part of a create/beach capture one
-					// opens a timeline to follow. int_parameter is the ZIGZAG-DECODED script-group id (#234).
+					// opens a timeline to follow. int_parameter is the ZIGZAG-decoded script-group id.
 					var scry = ScryScriptCodec.Parse(content).Script;
 					var step = scry.type is ProtoScryScriptIIR.Type.ScriptMessage or ProtoScryScriptIIR.Type.PlayOrSkipQuestion
 					           && scry.StringParameterOne.Length > 0
@@ -498,16 +492,15 @@ namespace Faolan.Importer.Cli
 				case "SimpleDynelVisualChangeIIR":
 				{
 					// Through the codec rather than off byte 20: `Kind` is the client's own visual-change selector and
-					// several of them carry a resource NAME (an animation, a mesh) that byte 20 could never show.
+					// several of them carry a resource name (an animation, a mesh) that byte 20 could never show.
 					var visual = SimpleDynelVisualChangeCodec.Parse(content);
 					var named = string.IsNullOrEmpty(visual.Name) ? "" : $" \"{visual.Name}\"";
 					var words = visual.Words.Count == 0 ? "" : " " + string.Join(" ", visual.Words.Select(w => $"0x{w:x}"));
 					return $"{Ent(labels, visual.Handle)} visual kind 0x{visual.Kind:x2}{named}{words}";
 				}
 
-				// ⭐ The single busiest non-noise record in a gameplay capture - 720 of them in the herald play2 dump,
-				// every one of which used to print as raw hex. `BehaviorId` is the CLIENT's own command catalog and
-				// `Args` is a `CommandMessage`, so a line can say what the entity actually DID.
+				// The single busiest non-noise record in a gameplay capture. `BehaviorId` is the client's own command
+				// catalog and `Args` is a `CommandMessage`, so a line can say what the entity actually did.
 				case "BehaviorControlCenterIIR":
 				{
 					return Behavior(BehaviorControlCenterCodec.Parse(content), look, labels);
@@ -521,7 +514,7 @@ namespace Faolan.Importer.Cli
 					return $"{Ent(labels, update.EntityHandle)} {stats}";
 				}
 
-				// The three POSE records. Position is what a reader is after in all of them, and `StopIIR` doubly so -
+				// The three pose records. Position is what a reader is after in all of them, and `StopIIR` doubly so -
 				// it is where an NPC came to rest, which is the evidence a patrol/leash reading is checked against.
 				case "StopIIR":
 				{
@@ -587,9 +580,8 @@ namespace Faolan.Importer.Cli
 
 				case "LootRemoveItemsIIR":
 				{
-					// The cash take and the item take are the same message and strict alternatives (#811), so saying
-					// "loses slot(s)" with an empty list - which is what a cash take used to print - names the wrong
-					// half of it.
+					// The cash take and the item take are the same message and strict alternatives, so "loses slot(s)"
+					// with an empty list would name the wrong half of it.
 					var removed = LootRemoveItemsCodec.Parse(content);
 					return $"bag {Ent(labels, removed.BagHandle)} loses " + (removed.Cash > 0
 						? $"{removed.Cash} tin"
@@ -647,7 +639,7 @@ namespace Faolan.Importer.Cli
 					return $"{spots.Spots.Count} resurrection spot(s) from {Pos(spots.ReferencePosition)}";
 				}
 
-				// The pick-one-of-N reward exchange (#815). The offer names each option through the item catalog, so a
+				// The pick-one-of-N reward exchange. The offer names each option through the item catalog, so a
 				// reward list reads as the three weapons the player was actually shown rather than three template ids.
 				case "QuestRewardNotifyIIR":
 				{
@@ -681,10 +673,10 @@ namespace Faolan.Importer.Cli
 					};
 				}
 
-				// ⚠️ `DynelHandle` is the element's TYPE ID, not a handle - `Build(frameHandle, action)` passes
+				// `DynelHandle` is the element's type ID, not a handle - `Build(frameHandle, action)` passes
 				// `action.TypeId` into that slot. Printing it as an entity would name it after whatever spawn happened
 				// to share the number. The generic text scrape still runs, because several action types carry a
-				// RESOURCE NAME in the tail ("Ignore.particleeffect") and that is the readable half of the line.
+				// RESOURCE name in the tail ("Ignore.particleeffect") and that is the readable half of the line.
 				case "GameActionListIIR":
 				{
 					var list = GameActionListCodec.Parse(content);
@@ -737,17 +729,16 @@ namespace Faolan.Importer.Cli
 
 		// One behaviour record: WHO, which command, which phase of it, and what the CommandMessage says about it.
 		//
-		// This is the busiest record in a gameplay capture by a wide margin and it used to print as raw hex - which
-		// meant every swing, cast, combo step, equip and object interaction in a session was invisible in the one
-		// report meant to say what the session did.
+		// This is the busiest record in a gameplay capture by a wide margin: every swing, cast, combo step, equip and
+		// object interaction in a session goes through it, so a raw-hex rendering hides most of what happened.
 		//
 		// Three sources make the line readable, and all three are already gated elsewhere:
-		//   * `BehaviorId` is the CLIENT's own command classmap (#536), so `0x0F` reads `CombatMelee` and not a number;
+		//   * `BehaviorId` is the client's own command classmap, so `0x0F` reads `CombatMelee` and not a number;
 		//   * `Seq` is the phase - `BehaviorAnimations.SeqBegin` and its siblings name the four that matter;
 		//   * `Args` is a `CommandMessage` protobuf, which carries the combo step, the execution status and the
 		//     animation id the record is otherwise silent about.
 		//
-		// ⚠️ The args are parsed defensively. `Describe`'s catch would degrade the WHOLE line to hex on a body whose
+		// The args are parsed defensively. `Describe`'s catch would degrade the whole line to hex on a body whose
 		// args a future field breaks, and the actor/command/phase are worth having without them.
 		private static string Behavior(BehaviorControlCenterIIR bcc, TimelineLookups look, Dictionary<uint, string> labels)
 		{
@@ -764,7 +755,7 @@ namespace Faolan.Importer.Cli
 				if (args.ShouldSerializeBccActionId())
 					detail.Add($"action {args.BccActionId}");
 
-				// ⭐ The combo id IS the `Combos` primary key, so a swing names its own combo with no correlation -
+				// The combo id is the `Combos` primary key, so a swing names its own combo with no correlation -
 				// and combos are not in `Spells`, which is why the obvious lookup would miss every one.
 				if (args.ShouldSerializeComboId())
 					detail.Add("combo " + (look.Combos.TryGetValue(args.ComboId, out var comboName)
@@ -784,7 +775,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// The tail belongs to the COMMAND rather than to this record (see BehaviorControlCenterCodec), so its
-			// LENGTH is what a timeline can honestly say - and it is a real signal: a no-tail command and a 39-byte
+			// length is what a timeline can honestly say - and it is a real signal: a no-tail command and a 39-byte
 			// PlayAnimation are the same record shape until you look at it.
 			var tail = bcc.Tail.Length == 0 ? "" : $" +{bcc.Tail.Length} B tail";
 			return $"{Ent(labels, bcc.Actor)} {command} {phase}{delay}"
@@ -800,11 +791,11 @@ namespace Faolan.Importer.Cli
 
 		// One conversation message, through KnubotCodec - which NPC, and what was said or picked.
 		//
-		// ⚠️ These are the lines a reader of a quest capture actually wants, and they were the WORST served by the
-		// generic text scrape (#556): a Knubot body is [player][env][npc] followed by the payload, so the two bytes
+		// These are the lines a reader of a quest capture actually wants, and they were the WORST served by the
+		// generic text scrape: a Knubot body is [player][env][npc] followed by the payload, so the two bytes
 		// PlainString found were the low half of the NPC handle - every one of them printed as "y)" (0x27929 = Turach)
 		// rather than as dialogue. The answer list was worse still: it carries every option the player was offered and
-		// the scrape showed only the first, the same first-record-wins truncation the journal had (#557).
+		// the scrape showed only the first, the same first-record-wins truncation the journal had.
 		private static string Dialogue(KnubotIIR message, TimelineLookups look, Dictionary<uint, string> labels)
 		{
 			var who = Ent(labels, message.NpcHandle);
@@ -833,8 +824,8 @@ namespace Faolan.Importer.Cli
 
 				case KnubotCloseChatWindowIIR close:
 				{
-					// The close carries one screen that is the EMPTY sentinel in every capture - LDB[100][0], which
-					// resolves to "" now that the plaintext categories are readable (#561). Printing it would leave a
+					// The close carries one screen that is the empty sentinel in every capture - LDB[100][0], which
+					// resolves to "" now that the plaintext categories are readable. Printing it would leave a
 					// dangling colon, so an empty screen renders as nothing rather than as an empty quote.
 					var closing = look.Text(close.Text);
 					return $"closes dialogue with {who}" + (closing.Length > 0 ? ": " + closing : "");
@@ -849,14 +840,13 @@ namespace Faolan.Importer.Cli
 
 		// The whole J-panel journal, through QuestJournalCodec.
 		//
-		// ⚠️ This line used to fall through to the generic `look.Text(raw)`, which matches the FIRST <remoteformat> tag
-		// in a body and stops - so all four journals in the necromancer play2 capture printed the same thing, the
-		// container title "[Destiny 01] Shipwrecked", while 10 to 16 records per message were dropped in silence
-		// (#557). A journal carries three header strings plus TWO per quest (title cat 50301, sub-line cat 50303) plus
+		// The generic `look.Text(raw)` matches the first <remoteformat> tag in a body and stops, so it would print
+		// only the container title and drop the ten-plus records that follow it in silence. A journal carries three
+		// header strings plus two per quest (title cat 50301, sub-line cat 50303) plus
 		// two more for the highlighted entry, and it is re-sent whole on every change, so it grows as the chain
 		// advances: 11 records at frame 875, 17 by frame 6115.
 		//
-		// The sub-line is deliberately NOT printed. It is the multi-sentence objective blurb, and six of them would
+		// The sub-line is deliberately not printed. It is the multi-sentence objective blurb, and six of them would
 		// bury the line the reader came for; the title is what identifies a quest. `>` marks the entry the journal
 		// highlights - the quest just accepted or advanced.
 		private static string Journal(QuestJournalIIR journal, TimelineLookups look)
@@ -878,9 +868,8 @@ namespace Faolan.Importer.Cli
 			return string.Join(" | ", parts);
 		}
 
-		// The stat delta and its cause, through StatDamageCodec - now by NAME rather than by index into a bag of
-		// seventeen words (#530 wave 4). Like combat damage the delta is display-scaled x100, which makes a
-		// damage-over-time tick read -7.07.
+		// The stat delta and its cause, through StatDamageCodec, by name rather than by index. Like combat damage the
+		// delta is display-scaled x100, which makes a damage-over-time tick read -7.07.
 		private static string StatDelta(byte[] content, TimelineLookups look, Dictionary<uint, string> labels)
 		{
 			var msg = StatDamageCodec.Parse(content);

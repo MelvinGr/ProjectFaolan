@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// AddCharacterFeats keeps ONE row per feat BASE - the highest rank held (Gitea #251).
+	// AddCharacterFeats keeps one row per feat base - the highest rank held.
 	//
 	// A feat id is composite (base*100 + rank) and retail stores only the current rank: no captured character carries
-	// two ranks of one base. The repository used to dedup on the exact id, so ranking a feat up left BOTH rows, which
-	// would put an entry on the spawn's feat list that retail never sends and lengthen the pre-IIR frame with it.
+	// two ranks of one base. Deduping on the exact id instead would leave both rows behind on a rank-up, putting an
+	// entry on the spawn's feat list that retail never sends and lengthening the pre-IIR frame with it.
 	//
-	// Runs against a real throwaway SQLite DB rather than a fake, because the rank-up is a DELETE + INSERT (FeatId is
+	// Runs against a real throwaway SQLite DB rather than a fake, because the rank-up is a delete + INSERT (FeatId is
 	// part of the primary key) and that is exactly the part worth exercising for real.
 	public class CharacterFeatTrainingTests
 	{
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 			var (repo, options, path) = NewDb();
 			try
 			{
-				// Two feats trained in order, then the FIRST is ranked up. It must not become a third entry, and it
+				// Two feats trained in order, then the first is ranked up. It must not become a third entry, and it
 				// must not jump to the end of the list - the wire order is train order.
 				await repo.AddCharacterFeats(CharacterId, [80001u, 90000u]);
 				await repo.AddCharacterFeats(CharacterId, [80004u]);

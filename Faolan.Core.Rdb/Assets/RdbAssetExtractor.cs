@@ -10,10 +10,10 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// The RDB -> 3D-model pipeline (Gitea #275): resolve a model's asset graph from its MESHINDEXFILE manifest and build
-	// a glb from it - the geometry (RDB type 1010001, decoded by RenderMeshReader), the FCTX textures (-> PNG/DDS), and
-	// (for skinned bodies) the skeleton + skin weights. Also dumps the raw geometry blob / a DDS texture set on request
-	// for offline analysis.
+	// The RDB to 3D-model pipeline: resolve a model's asset graph from its MESHINDEXFILE manifest and build a glb from
+	// it - the geometry (RDB type 1010001, decoded by RenderMeshReader), the FCTX textures (converted to PNG or DDS)
+	// and, for skinned bodies, the skeleton and skin weights. It also dumps the raw geometry blob or a DDS texture set
+	// on request, for offline analysis.
 	public static class RdbAssetExtractor
 	{
 		// A humanoid rig used as a last-resort fallback when auto-selection finds no skeleton covering a mesh's palette.
@@ -39,10 +39,10 @@ namespace Faolan.Core.Rdb.Assets
 		// Texture container type ids worth converting/dumping (FCTX variants + the PNG/JPEG types from rdbreader's enum).
 		private static readonly uint[] FctxTypes = [1010004, 1010006, 1010218, 1066606, 1066610];
 
-		// Assemble several models (e.g. a character's body + head + equipment, all authored in the same bind-pose space)
+		// Assemble several models (a character's body, head and equipment, all authored in the same bind-pose space)
 		// into one glb by concatenating their sub-meshes. Per-mesh diffuse is embedded when the mesh carries a material;
-		// skinned character bodies have none (item-system bound) so render untextured for now. No skinning/pose applied -
-		// a static bind-pose assembly, which is all a "view my character" page needs.
+		// skinned character bodies carry none, being item-system bound, so they render untextured. No skinning or pose
+		// is applied - this is a static bind-pose assembly, which is all a "view my character" page needs.
 		public static AssembleResult Assemble(RdbReader rdb, IReadOnlyList<uint> meshIndexIds, string outPath)
 		{
 			var all = new List<RenderMeshReader.SubMesh>();
@@ -94,7 +94,7 @@ namespace Faolan.Core.Rdb.Assets
 
 			// Worn equipment: skinned armor meshes are authored in the SAME body-world bind-pose space as the body, so
 			// they overlay directly with no transform. Which meshindex an equipped item maps to is resolved offline from
-			// the item template's field-9 sub-record (#275 SOLVED, ItemLookResolver). Each piece carries its own diffuse
+			// the item template's field-9 sub-record (ItemLookResolver). Each piece carries its own diffuse
 			// via the mesh-index materials / header refs; pieces with none render untextured.
 			if (equipmentMeshIndexIds is { Count: > 0 })
 			{
@@ -211,8 +211,9 @@ namespace Faolan.Core.Rdb.Assets
 		}
 
 		// Build a character glb in memory: a body (skinned RenderMesh id) + (optionally) a head seated at the body's neck.
-		// Heads are authored in head-local space, so the head is translated so its base aligns with the body's top ring
-		// centroid - a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), fine for a static view.
+		// Heads are authored in head-local space, so the head is translated until its base aligns with the body's top
+		// ring centroid - a geometric stand-in for the skeleton's head-bone transform (see SkeletonReader), which is
+		// enough for a static view.
 		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyRenderMeshId, uint? headMeshIndexId, uint? hairRenderMeshId = null)
 		{
 			var body = ReadTexturedBody(rdb, bodyRenderMeshId);
@@ -240,7 +241,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// The item's 3D display model (the inventory/world mesh shown in equipment slots): decrypt the item template
 		// (TEA, key = the item's Data1..4), read property field 12 = the display MESHINDEXFILE id, and render it. Null
-		// when the item has no display mesh (armour pieces carry only a worn-look id, the still-open gear RE in #275).
+		// when the item has no display mesh - armour pieces carry only a worn-look id.
 		public static byte[]? BuildItemModelGlb(RdbReader rdb, uint itemId, uint d1, uint d2, uint d3, uint d4)
 		{
 			if (ItemDisplayMeshIndex(rdb, itemId, [d1, d2, d3, d4]) is not { } meshIndexId)
@@ -282,7 +283,7 @@ namespace Faolan.Core.Rdb.Assets
 		}
 
 		/// <summary>
-		///     What a body atlas's dilation is deciding, both ways (#294): the colour heuristic's gutter mask beside
+		///     What a body atlas's dilation is deciding, both ways: the colour heuristic's gutter mask beside
 		///     the mesh's own UV coverage, the latter rasterized with V as-is AND flipped so the orientation is
 		///     measured rather than assumed. Printed by `--report body-atlas-coverage`. Takes any of the three ids a
 		///     body is reached by - a CHARACTERCREATOR <body monsterdataid>, a MESHINDEXFILE manifest, or a bare
@@ -691,11 +692,12 @@ namespace Faolan.Core.Rdb.Assets
 		}
 
 		// Resolve a CHARACTERCREATOR body monsterdataid to its primary skinned body RenderMesh id (RDB type 1010001). The
-		// MonsterData (1010201) lists the body's component meshes as <mesh> ids that are EITHER a MESHINDEXFILE (1010030,
-		// e.g. the male race bodies) OR a RenderMesh (1010001, e.g. the female race bodies) - we normalise both to the
+		// MonsterData (1010201) lists the body's component meshes as <mesh> ids that are either a MESHINDEXFILE (1010030,
+		// e.g. the male race bodies) or a RenderMesh (1010001, e.g. the female race bodies) - we normalise both to the
 		// underlying RenderMesh id and keep the one with the most vertices (the full body, vs. tiny detail meshes). Null if
 		// none is locally readable. This is the authoritative per-race/sex body (CHARACTERCREATOR <body monsterdataid>);
-		// the old hardcoded MESHINDEXFILE table pointed the female bodies at a censored/wrong atlas + CDN-only meshes.
+		// a hardcoded MESHINDEXFILE table cannot serve it, as it points the female bodies at a censored atlas and at
+		// CDN-only meshes.
 		public static uint? ResolveBodyRenderMesh(RdbReader rdb, uint monsterDataId)
 		{
 			if (monsterDataId == 0 || !rdb.TryGet(MonsterDataFile.Type, monsterDataId, out var e) || !rdb.CanRead(e))
@@ -904,15 +906,13 @@ namespace Faolan.Core.Rdb.Assets
 			// edge-padding a game engine does at texture-build time; the raw RDB atlas lacks it). Island pixels are kept
 			// exactly; decals below paste onto those island pixels. Cached per source atlas inside the dilator.
 			//
-			// #294: hand the dilator the MESH's own UV coverage where the caller has the geometry, so "gutter" is the
-			// texels no triangle samples rather than the texels that look like the background. The colour heuristic
-			// flattened a smooth patch of upper chest, because tan skin and a tan background are not separable by
-			// colour; a UV triangle is not an opinion about the colour.
+			// The dilator is handed the mesh's own UV coverage wherever the caller has the geometry, so "gutter" means
+			// the texels no triangle samples rather than the texels that look like the background. The colour heuristic
+			// alone flattens a smooth patch of upper chest, because tan skin and a tan background are not separable by
+			// colour, while a UV triangle is not an opinion about the colour.
 			rgba = BodyAtlasDilator.Dilate(rgba, w, h, subs == null
 				? null
 				: BodyAtlasUvCoverage.TryRasterize(subs, w, h));
-
-			//TODO: Scale 2x as test
 
 			// Ghidra (ProjectTextureOperation_c / FUN_00d88d50, projecttextureoperation.cpp): the decal is pasted into the
 			// base diffuse's TEXTURE space as a rect centred at (ucoord, vcoord), half-size = decalDim * scale*0.01 * 0.5 /
@@ -1083,8 +1083,9 @@ namespace Faolan.Core.Rdb.Assets
 			if (!rdb.CanRead(e))
 				return ("cdn", e.Size, null); // on-demand, and no mirror configured (or it already missed on this hash)
 
-			// A CDN texture is pulled through the mirror exactly as the viewer's own TryDecodeTexture does - the dump
-			// used to hard-skip every one, which is 11,051 of type 1010004, 4,649 of 1066606 and 580 of 1010013.
+			// A CDN texture is pulled through the mirror exactly as the viewer's own TryDecodeTexture does. Skipping
+			// them instead would lose most of the texture corpus: types 1010004, 1066606 and 1010013 are largely
+			// on-demand.
 			var payload = rdb.ReadDecompressed(e);
 			if (payload.Length == 0)
 				return ("cdn-miss", e.Size, null); // the mirror could not serve it; RdbReader returns empty, not a throw
@@ -1137,10 +1138,10 @@ namespace Faolan.Core.Rdb.Assets
 		}
 
 		// Mount a sub-rig (the head's facial rig, or the hair rig) onto a body rig under the shared bone (rig_bone_Head).
-		// We take the sub-tree of `source` rooted at that shared bone, SEAT it by translation `seat` (aligning the two
-		// shared bones' world positions, keeping the sub-rig's own orientation so a face/hairstyle isn't flipped), and
-		// re-parent the sub-tree root under the body's shared bone so it FOLLOWS head/neck posing. Each appended bone keeps
-		// its own seated world for inverse-bind; bones are `prefix`ed to stay distinct (the mesh palette is prefixed too).
+		// The sub-tree of `source` rooted at that shared bone is seated by translation `seat` - aligning the two shared
+		// bones' world positions and keeping the sub-rig's own orientation, so a face or hairstyle is not flipped - and
+		// its root is re-parented under the body's shared bone so it follows head and neck posing. Each appended bone
+		// keeps its own seated world for inverse-bind; bones are prefixed to stay distinct, as the mesh palette is.
 		// Appends in place to `combined`. The sub-rig's mesh verts must be seated by the same `seat`.
 		private static void MountSubRig(List<SkeletonReader.Bone> combined, IReadOnlyList<SkeletonReader.Bone> source, string sharedBone, string prefix, Vector3 seat)
 		{
@@ -1290,7 +1291,7 @@ namespace Faolan.Core.Rdb.Assets
 				return subs;
 
 			// The MIXD detail map (2nd header ref) as a tangent-space normal map, so the body shows the muscle/ab/navel
-			// relief the flat diffuse omits (#293).
+			// relief the flat diffuse omits.
 			var normal = BuildBodyNormal(rdb, blob);
 			return subs
 				.Select(s => s with

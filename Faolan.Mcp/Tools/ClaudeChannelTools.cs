@@ -9,9 +9,9 @@ namespace Faolan.Mcp.Tools
 	///     Claude's voice in the game: every client is subscribed to the in-game "Claude" channel on login, and these
 	///     tools broadcast or whisper onto it under the Claude identity (via <see cref="IChatServerDispatcher" />).
 	///     <para>
-	///         OUTBOUND ONLY - there is no read tool, because nothing ingests player chat for Claude any more (the
-	///         channel log and the stdio bridge over it were removed on 2026-08-30). A player's post on the channel
-	///         is relayed and persisted to the chat history like any other channel's, and reaches Claude nowhere.
+	///         Outbound only: there is no read tool, because nothing ingests player chat. A player's post on the
+	///         channel is relayed and persisted to the chat history like any other channel's, and reaches Claude
+	///         nowhere.
 	///     </para>
 	/// </summary>
 	[McpServerToolType]

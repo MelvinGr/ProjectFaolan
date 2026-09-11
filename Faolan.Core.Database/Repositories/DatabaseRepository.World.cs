@@ -31,26 +31,26 @@ namespace Faolan.Core.Database.Repositories
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
 
 		/// <summary>
-		///     Which LINE each of <paramref name="questIds" /> sits on, at what level and step - the three words the
-		///     quest-marker rules read off a definition, and nothing else (#939).
+		///     Which line each of <paramref name="questIds" /> sits on, at what level and step - the three words the
+		///     quest-marker rules read off a definition, and nothing else.
 		/// </summary>
 		/// <remarks>
-		///     A projection, not an entity load: the marker resolver used to fetch every held quest's full definition
-		///     through <see cref="GetQuestDefinition" /> - the five-level Include - ONE QUERY EACH, once per NPC it was
-		///     asked about, to read these three columns. For a level-80 that was ~1,565 graph loads per NPC.
+		///     A projection, not an entity load: fetching every held quest's full definition through
+		///     <see cref="GetQuestDefinition" /> - the five-level Include - one query each, once per NPC the resolver is
+		///     asked about, is ~1,565 graph loads per NPC for a level-80.
 		/// </remarks>
 		Task<Dictionary<uint, QuestLineMembership>> GetQuestLineMembership(IReadOnlyCollection<uint> questIds);
 
 		/// <summary>
-		///     The completed-journal read (#938): the definitions for <paramref name="questIds" /> with ONLY their
+		///     The completed-journal read: the definitions for <paramref name="questIds" /> with only their
 		///     <c>TextRefs</c>, and only the lines those quests sit on, with no navigations at all.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ Shaped by what the completed tab RENDERS - a title and a sub-line per quest, grouped under a line's
-		///     three names - and nothing else. <see cref="GetQuestDefinitions" /> is the ACTIVE journal's read and
+		///     Shaped by what the completed tab renders - a title and a sub-line per quest, grouped under a line's
+		///     three names - and nothing else. <see cref="GetQuestDefinitions" /> is the active journal's read and
 		///     carries the whole graph (goals, their regions and vertices, reward options, the line's rewards)
-		///     because the active journal needs it; using it for the completed tab was a five-level Include over
-		///     every quest the character had ever finished, on every login: 2.6 s for a level-80 with 1,565
+		///     because the active journal needs it; using it for the completed tab is a five-level Include over
+		///     every quest the character has ever finished, on every login: 2.6 s for a level-80 with 1,565
 		///     completions, against 79 ms for a level-4.
 		/// </remarks>
 		Task<(QuestDefinition[] Definitions, QuestLine[] Lines)> GetCompletedJournal(IReadOnlyCollection<uint> questIds);
@@ -58,13 +58,13 @@ namespace Faolan.Core.Database.Repositories
 
 		/// <summary>
 		///     The template the character is (or was) escorting: the <c>TrailingRefId</c> of the first Escort goal on
-		///     any Active or Completed quest they hold, or 0 (#940).
+		///     any Active or Completed quest they hold, or 0.
 		/// </summary>
 		/// <remarks>
-		///     One projection over the goal rows. <c>TortageIntroService</c> used to answer this by loading EVERY quest
-		///     the character had ever held with the five-level Include and walking their goals - 4.3-4.9 s of every
-		///     world entry for a level-80, paid to ask whether Casilda is still captive. "First" is the held order the
-		///     walk had: lowest quest id, then lowest goal id.
+		///     One projection over the goal rows. Answering it by loading every quest the character has ever held with
+		///     the five-level Include and walking their goals costs 4.3-4.9 s of every world entry for a level-80, paid
+		///     to ask whether Casilda is still captive. "First" is the held order that walk has: lowest quest id, then
+		///     lowest goal id.
 		/// </remarks>
 		Task<uint> GetEscorteeTemplateId(uint characterId);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
@@ -76,8 +76,8 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		// By the row's own derived id - the stable key. It used to take (mapId, capturedHandle), which meant a GM
-		// .delete resolved a LIVE wire handle straight against a column (see LiveWorldObject).
+		// By the row's own derived id - the stable key. Taking (mapId, capturedHandle) instead would resolve a live
+		// wire handle straight against a column (see LiveWorldObject).
 		public async Task<int> DeleteWorldObject(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -98,9 +98,9 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// The named sub-areas of a playfield - the client's own trigger volumes that float the area banner when a
-		// player walks in (#348/#513/#679). Every one carries its boundary polygon: containment is a point-in-polygon
-		// walk, so a volume without vertices would silently never fire. (Lazy loading is deliberately off, so the
-		// Include is required - see CLAUDE.md.)
+		// player walks in. Every one carries its boundary polygon: containment is a point-in-polygon walk, so a volume
+		// without vertices would silently never fire. (Lazy loading is deliberately off, so the Include is required -
+		// see CLAUDE.md.)
 		public async Task<MapRegion[]> GetAreaBannerRegions(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -110,20 +110,18 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The destinations offered from one dialogue SCREEN - the list screen, which is where retail charges the fare
-		// (#514). Empty for every other screen in the game, which is the common case and not an error.
+		// The destinations offered from one dialogue screen - the list screen, which is where retail charges the fare.
+		// Empty for every other screen in the game, which is the common case and not an error.
 		//
-		// #646: this used to fetch by NPC NAME and then filter the result down to this screen, which asked the database
-		// a question ("what does this name offer?") that the caller then narrowed to the one it actually had - and it
-		// asked it with the ambiguous half of the NPC's identity. The screen IS half of the table's primary key, so
-		// keying on it is both narrower and exact.
+		// Keyed on the screen rather than the NPC's display name: the screen is half of the table's primary key, so it
+		// is both narrower and exact, while a name is the ambiguous half of an NPC's identity.
 		public async Task<TravelDestination[]> GetTravelDestinationsFrom(uint fromNodeId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.TravelDestinations.Where(d => d.FromNodeId == fromNodeId).ToArrayAsync();
 		}
 
-		// The trip a single dialogue PICK buys, by the table's full primary key. Null when that branch sells no trip -
+		// The trip a single dialogue pick buys, by the table's full primary key. Null when that branch sells no trip -
 		// true of every other conversation branch, so it is the normal answer rather than an error.
 		public async Task<TravelDestination?> GetTravelDestination(uint fromNodeId, uint optionId)
 		{
@@ -131,18 +129,18 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.TravelDestinations.FirstOrDefaultAsync(d => d.FromNodeId == fromNodeId && d.OptionId == optionId);
 		}
 
-		// By NPC display NAME - for the `.travel` GM bootstrap ONLY, because a GM types a name. Nothing on the retail
-		// path resolves a traveller this way any more (#646).
+		// By NPC display name - for the `.travel` GM bootstrap only, because a GM types a name. Nothing on the retail
+		// path resolves a traveller this way.
 		public async Task<TravelDestination[]> GetTravelDestinationsByNpcName(string npcName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.TravelDestinations.Where(d => d.NpcName == npcName).ToArrayAsync();
 		}
 
-		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry (#504). A hazard is the
-		// BEHAVIOUR half, so its region comes with it, boundary polygon and all: containment is a point-in-polygon
-		// test, and a hazard without vertices is not a hazard. (Lazy loading is deliberately off, so the Includes are
-		// required - see CLAUDE.md.)
+		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry. A hazard is the behaviour
+		// half, so its region comes with it, boundary polygon and all: containment is a point-in-polygon test, and a
+		// hazard without vertices is not a hazard. (Lazy loading is deliberately off, so the Includes are required -
+		// see CLAUDE.md.)
 		public async Task<MapHazard[]> GetMapHazards(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -153,8 +151,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The volumes a playfield forbids riding in (#681). Boundary polygon included for the same reason as every
-		// other consumer: containment is a point-in-polygon walk, and lazy loading is off.
+		// The volumes a playfield forbids riding in. Boundary polygon included for the same reason as every other
+		// consumer: containment is a point-in-polygon walk, and lazy loading is off.
 		public async Task<MapRegion[]> GetNoMountRegions(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -173,8 +171,8 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx
 				.MapLootEntries.Where(e => e.MapId == mapId)
 				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
-				// No `Hash != 0` here - every item has a wire token since #723 (harvested or minted), so that filter
-				// would only drop the templates our harvest has not reached. A name is still required.
+				// No `Hash != 0` here - every item has a wire token (harvested or minted), so that filter would only drop
+				// the templates our harvest has not reached. A name is still required.
 				.Where(i => !string.IsNullOrEmpty(i.Name) && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
@@ -193,21 +191,21 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.QuestLines.Include(l => l.Rewards).OrderBy(a => a.QuestLineId).ToArrayAsync();
 		}
 
-		// The pick-one-of-N reward list a quest's completion offers (#815), resolved CAPTURE-FIRST.
+		// The pick-one-of-N reward list a quest's completion offers, resolved capture-first.
 		//
 		// Two sources, and they are not equals. A harvested `QuestRewardOptions` row is retail's own offer, read off the
-		// wire; the client's quest catalog only ever states rewards on the LINE, and for the single offer we have
-		// captured the two DISAGREE - quest 10928 offered three Acolyte weapons while its line 386 holds one
+		// wire; the client's quest catalog only ever states rewards on the line, and for the single offer we have
+		// captured the two disagree - quest 10928 offered three Acolyte weapons while its line 386 holds one
 		// "Exponent's Gloves" and those three ids appear on no line at all. Where a capture and the client's data
 		// disagree the capture wins, so the harvested set is taken whole and the catalog is not consulted.
 		//
 		// The catalog fallback covers the 615 lines that carry a genuine multi-item optional set and that no capture
-		// has ever watched complete. It fires only on the line's FINAL quest - the client's own test, the last entry of
-		// the line's list - because a line reward is the payoff for finishing the line.
-		// ⭐ That timing was written as a decision and is an observation now (#893): 574 captured last-step journal
-		// records carry their line's catalog lists as the quest's own obj1/obj2, and every mid step carries them as the
-		// obj3/obj4 preview instead. The disagreement quoted above (10928 vs its line) is the two halves of that - the
-		// quest's own set and the line's - not a capture contradicting the catalog.
+		// has ever watched complete. It fires only on the line's final quest - the client's own test, the last entry of
+		// the line's list - because a line reward is the payoff for finishing the line. That timing is an observation:
+		// 574 captured last-step journal records carry their line's catalog lists as the quest's own obj1/obj2, and
+		// every mid step carries them as the obj3/obj4 preview instead. The disagreement quoted above (10928 vs its
+		// line) is the two halves of that - the quest's own set and the line's - not a capture contradicting the
+		// catalog.
 		public async Task<QuestRewardOption[]> GetQuestRewardOptions(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -224,7 +222,7 @@ namespace Faolan.Core.Database.Repositories
 				return [];
 
 			// Projected onto the same row type so the caller has one shape to build from. Pos is re-numbered densely
-			// from the catalog's own order: the client answers with an INDEX into the list we send, which is not the
+			// from the catalog's own order: the client answers with an index into the list we send, which is not the
 			// catalog's `Pos` (that numbers fixed and optional rewards in one sequence).
 			var line = await ctx.QuestLineRewards.AsNoTracking()
 				.Where(r => r.QuestLineId == quest.QuestLineId && r.Optional)
@@ -243,8 +241,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToArray();
 		}
 
-		// The items a quest's completion GRANTS outright - the record's obj1 (#893): the harvested own set's
-		// non-optional rows, or on the line's last step with nothing harvested, the line's catalog `reward` list.
+		// The items a quest's completion grants outright - the record's obj1: the harvested own set's non-optional
+		// rows, or on the line's last step with nothing harvested, the line's catalog `reward` list.
 		public async Task<QuestRewardOption[]> GetQuestGuaranteedRewards(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -291,10 +289,10 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// Goals bring their ReachArea region + ring (#521); same reason as GetRespawnPoints - lazy loading is off,
-			// so an un-Included navigation is silently null/empty rather than loaded on touch.
+			// Goals bring their ReachArea region + ring; same reason as GetRespawnPoints - lazy loading is off, so an
+			// un-Included navigation is silently null/empty rather than loaded on touch.
 			// Rewards (this quest's own set) and Line.Rewards (the line's, from the catalog) feed the journal record's
-			// four reward lists (#893); the Item rows behind them come through GetItems, keyed by template.
+			// four reward lists; the Item rows behind them come through GetItems, keyed by template.
 			return await ctx
 				.QuestDefinitions.Include(q => q.TextRefs)
 				.Include(q => q.Goals)
@@ -305,14 +303,6 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
-		// The batched form of GetQuestDefinition, for the login path. The snapshot needs a definition for EVERY quest in
-		// the character's journal, and doing that one id at a time meant one round trip - and one fresh DbContext - per
-		// quest: 158 of them for a level-23 character (~3.0s) and 1512 for a level-80 one (~25.3s), on a path retail
-		// completes in 0.8s. Same Includes as the singular form, so callers get identical rows.
-		//
-		// Split query for the same reason it is on GetNpcSpawns: TextRefs, Goals and each Goal's region ring are three
-		// collection levels, and one JOIN multiplies them together. Chunked so a journal of any size stays clear of a
-		// provider's IN-list ceiling - the round trips are then per 500 quests, not per quest.
 		public async Task<(QuestDefinition[] Definitions, QuestLine[] Lines)> GetCompletedJournal(IReadOnlyCollection<uint> questIds)
 		{
 			if (questIds.Count == 0)
@@ -364,6 +354,14 @@ namespace Faolan.Core.Database.Repositories
 			return result;
 		}
 
+		// The batched form of GetQuestDefinition, for the login path. The snapshot needs a definition for every quest in
+		// the character's journal, and doing that one id at a time is one round trip - and one fresh DbContext - per
+		// quest: 158 of them for a level-23 character (~3.0s) and 1512 for a level-80 one (~25.3s), on a path retail
+		// completes in 0.8s. Same Includes as the singular form, so callers get identical rows.
+		//
+		// Split query for the same reason it is on GetNpcSpawns: TextRefs, Goals and each Goal's region ring are three
+		// collection levels, and one JOIN multiplies them together. Chunked so a journal of any size stays clear of a
+		// provider's in-list ceiling - the round trips are then per 500 quests, not per quest.
 		public async Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds)
 		{
 			if (questIds.Count == 0)
@@ -387,18 +385,6 @@ namespace Faolan.Core.Database.Repositories
 			return [.. definitions];
 		}
 
-		// The character's held quests in the given STATE, each paired with its definition, in CharacterQuests order -
-		// as ONE batched read. Null (the default) takes every held quest.
-		//
-		// ⚠️ This is THE way to ask "the player's quests and what they require". Every goal-matching path needs the
-		// pair, and each used to walk the quests calling GetQuestDefinition per quest: a query per quest, each on its
-		// own DbContext. Those paths are live ones - a kill, a pickup, a door use, a loot, the 0x2020 spawn poll - so
-		// the cost was paid over and over during play, and the escort lookup walked COMPLETED quests too (1500+ on a
-		// level-80 character). Batching it at the call site worked but had to be re-derived every time; here it is
-		// impossible to get wrong.
-		//
-		// A quest whose definition is missing is DROPPED, which is what every caller already did - the ones reading
-		// `def?.Goals` fell through to `goal == null -> continue`, the rest tested `def == null` explicitly.
 		public async Task<uint> GetEscorteeTemplateId(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -411,6 +397,17 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync();
 		}
 
+		// The character's held quests in the given state, each paired with its definition, in CharacterQuests order -
+		// as one batched read. Null (the default) takes every held quest.
+		//
+		// This is the way to ask "the player's quests and what they require". Every goal-matching path needs the pair,
+		// and these are live paths - a kill, a pickup, a door use, a loot, the spawn poll - so walking the quests
+		// calling GetQuestDefinition per quest costs a query, on its own DbContext, over and over during play; the
+		// escort lookup walks completed quests too (1500+ on a level-80 character). Batching at the call site works but
+		// has to be re-derived every time.
+		//
+		// A quest whose definition is missing is dropped, which is what every caller wants: the ones reading
+		// `def?.Goals` fall through to `goal == null -> continue`, the rest test `def == null` explicitly.
 		public async Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null)
 		{
 			var held = await GetCharacterQuests(characterId, state);
@@ -426,15 +423,15 @@ namespace Faolan.Core.Database.Repositories
 		// per-line id list, which QuestIndexRegions.ForQuests turns into a block's `AreaQuestIds` and its
 		// (sequence, remaining) pair.
 		//
-		// ⚠️ Restricted to steps that have journal TEXT REFS, and that filter is load-bearing on the login path. The
-		// client's quest catalog (RDB 1000104) contributed 3011 quests no capture ever showed, and 56 of the 82
+		// Restricted to steps that have journal text refs, and that filter is load-bearing on the login path. The
+		// client's quest catalog (RDB 1000104) contributes 3011 quests no capture ever showed, and 56 of the 82
 		// snapshot-eligible quests share a line with one; without this filter their index block would list ids the
 		// captures never carried and a `remaining` count to match, which is a region we cannot prove against any
 		// capture going out on a live login. Having text refs is the right test rather than a provenance flag: this
-		// list IS what the journal renders, and a quest with no journal text cannot be rendered in it. It splits the
+		// list is what the journal renders, and a quest with no journal text cannot be rendered in it. It splits the
 		// two sources exactly - all 2037 captured quests have refs, all 3011 catalog-only ones have none.
 		//
-		// ⚠️ Do NOT filter on JournalSequence != 0 instead. 0 is a legitimate captured value (74 captured quests carry
+		// Do not filter on JournalSequence != 0 instead. 0 is a legitimate captured value (74 captured quests carry
 		// it; 182 lines list every quest with 0), so that would drop real steps.
 		public async Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId)
 		{
@@ -445,8 +442,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The batched form, for the login quest INDEX: it needs the catalog of every line the character holds a quest in,
-		// and asking line by line was a query each. Same filter and same JournalSequence order as the singular form, so a
+		// The batched form, for the login quest index: it needs the catalog of every line the character holds a quest in,
+		// and asking line by line is a query each. Same filter and same JournalSequence order as the singular form, so a
 		// line's list is identical either way - a line with no qualifying step is simply absent, exactly as an empty
 		// array from the singular form would be.
 		public async Task<Dictionary<uint, QuestDefinition[]>> GetQuestDefinitionsByLines(IReadOnlyCollection<uint> questLineIds)
@@ -475,7 +472,7 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// The discovery volume + its ring come along: WorldSimulation tests containment per player per second, and
 			// a lazy load there would be a query per point per tick (lazy loading is off anyway, so it would silently
-			// be an EMPTY ring instead - a region that can never contain anyone).
+			// be an empty ring instead - a region that can never contain anyone).
 			return await ctx
 				.RespawnPoints.Include(r => r.DiscoveryRegion)
 				.ThenInclude(g => g!.Vertices)
@@ -483,12 +480,12 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// Include the WORD rows: they are not decoration, they are part of the wire record. WorldObjectGeometryCodec
+		// Include the word rows: they are not decoration, they are part of the wire record. WorldObjectGeometryCodec
 		// writes the geometry-node words and then the per-class trailer (1 u32 for Door and ClimbingDynel, 5 for
 		// Destructible, none for SimpleDynel) straight out of this navigation, and the repo does not lazy-load - so
-		// without the Include those objects go out SHORT and the client's ReadSubClass fails on them and drops them:
+		// without the Include those objects go out short and the client's ReadSubClass fails on them and drops them:
 		// "ReadSubClass for IIR 866480048 (DoorFullUpdateIIR_c) failed ... datasize left in stream=0". Doors, climbing
-		// vines and destructibles simply never appeared, while SimpleDynel props - which own no words - looked fine.
+		// vines and destructibles then never appear, while SimpleDynel props - which own no words - look fine.
 		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -496,7 +493,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 	}
 
-	// The quest-marker rules' view of a definition (#939): its line, its level (the silver band), its step (the
+	// The quest-marker rules' view of a definition: its line, its level (the silver band), its step (the
 	// line-reached gate). See IWorldRepository.GetQuestLineMembership.
 	public sealed record QuestLineMembership(uint QuestId, uint QuestLineId, uint Level, uint JournalSequence);
 }

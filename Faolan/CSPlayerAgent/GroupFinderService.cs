@@ -12,22 +12,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// The group-finder signup flow (#511), built message-for-message from the one capture that walks it end to end
+	// The group-finder signup flow, built message-for-message from the one capture that walks it end to end
 	// (chat-annotated-4, t=1061..1104 - docs/subsystems/playfield-instance-ownership.md has the annotated trace):
 	//
 	//   c RequestNeededRole(activity)      -> s DispatchGroupFinderReceivedNeededRole
 	//   c QueueGroupFinder(bits, _, priv)  -> s DispatchGroupFinderSignupFailed        (quest log at the cap)
-	//                                      -> s DispatchGroupFinderSelectRoles          (accepted; no-arg, #801)
+	//                                      -> s DispatchGroupFinderSelectRoles          (accepted; no-arg)
 	//   c SelectGroupFinderRoles(roles)    -> s DispatchGroupFinderSignupSuccess + DispatchGroupFinderReadyCheck
 	//   c ReadyGroupFinder(true, _)        -> s DispatchGroupFinderReadyCheckStatus + DispatchCharacterLookingForTeamStatus
 	//                                         + DispatchYouJoinedTeam (the team forms - solo = the annotated
 	//                                           "entered as private team") + DispatchGroupFinderStartActivity
-	//                                      -> the world tier teleports into the activity's playfield, which the
-	//                                         team now OWNS (#512: the proxy's owner pair is (0xDEA9, teamId))
+	//                                      -> the world tier teleports into the activity's playfield, which the team
+	//                                         now owns (the proxy's owner pair is (0xDEA9, teamId))
 	//
-	// A composed collaborator of the CsPlayerAgent listener, like TeamService/RaidService. Matchmaking proper is
-	// NOT modelled - every signup runs the solo/private-team path the capture shows; a queuer who is already in a
-	// team takes that team along instead of a fresh solo one.
+	// Matchmaking proper is not modelled: every signup runs the solo private-team path the capture shows, and a queuer
+	// who is already in a team takes that team along instead of a fresh solo one.
 	public sealed class GroupFinderService(ILogger<CsPlayerAgentListener> logger, ICharacterQuestRepository database, TeamService teams, IGameServerDispatcher gameServerDispatcher)
 	{
 		// RDB 1000516 `Quest_MaxQuestPerPremiumPlayer` = 45 (the free-player twin is 30). Every account here is
@@ -44,10 +43,10 @@ namespace Faolan.CSPlayerAgent
 		private const uint CapturedCurrentChild = 2;
 		private const uint CapturedNextChild = 3;
 
-		// Where an activity ENTERS is the client's own table now, not the single captured pair: `ActivityId` is RDB
+		// Where an activity enters is the client's own table now, not the single captured pair: `ActivityId` is RDB
 		// 1000627's 1-based record sequence, and the capture is what proves it rather than an assumed indexing -
 		// activity 38 is record 38 is playfield 1092 at the exact arrival the captured N3Teleport used. See
-		// GroupFinderActivityCatalog. An activity the table addresses by LANDMARK rather than by coordinate still
+		// GroupFinderActivityCatalog. An activity the table addresses by landmark rather than by coordinate still
 		// completes the signup flow and logs, because a landmark needs a per-playfield table we do not hold.
 
 		// characterId -> the signup that passed the quest gate, held until the ready check resolves it.
@@ -58,11 +57,11 @@ namespace Faolan.CSPlayerAgent
 			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderReceivedNeededRole, GroupFinderNeededRoleCodec.Build(activityId, CapturedNeededRoles));
 		}
 
-		// c2s RequestRotatingActivityChildInfo (0x2083): the finder window asks which child of a ROTATING activity is
-		// running now. Retail answered `(1, 2, 3)` in all five captured replies across two captures - the same
-		// sitting, so that is one moment of its rotation schedule rather than a measured rule. We run no rotation
-		// schedule, so the captured pair is what goes out, with the requested activity echoed back as the client's
-		// own field list has it. #882.
+		// c2s RequestRotatingActivityChildInfo (0x2083): the finder window asks which child of a rotating activity is
+		// running now. Retail answered `(1, 2, 3)` in all five captured replies across two captures of the same
+		// sitting, so that is one moment of its rotation schedule rather than a measured rule. No rotation schedule is
+		// run here, so the captured pair goes out with the requested activity echoed back, as the client's own field
+		// list has it.
 		public async Task HandleRequestRotatingActivityChildInfo(INetworkClient client, uint activityId)
 		{
 			logger.LogDebug("GroupFinder: rotating-activity child info asked for activity {Activity}; answering with the captured rotation.", activityId);
@@ -89,8 +88,8 @@ namespace Faolan.CSPlayerAgent
 
 			_pendingSignups[characterId] = request;
 
-			// The accept is the no-arg 0x20C3: the client opens its groupFinder_roleSelect window on it (#801) and
-			// answers with SelectGroupFinderRoles.
+			// The accept is the no-arg 0x20C3: the client opens its groupFinder_roleSelect window on it and answers
+			// with SelectGroupFinderRoles.
 			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderSelectRoles, []);
 		}
 
@@ -134,7 +133,7 @@ namespace Faolan.CSPlayerAgent
 			await Send(client, CSPlayerInterfaceMethods.DispatchCharacterLookingForTeamStatus,
 				LookingForGroupStatusCodec.Build(new LookingForGroupStatus(false, "")));
 
-			// The private team (#512): retail's DispatchYouJoinedTeam here carries a ONE-member roster, and the
+			// The private team: retail's DispatchYouJoinedTeam here carries a one-member roster, and the
 			// instance entered three seconds later names that team as its owner. A queuer already in a team takes
 			// that team along instead.
 			var teamId = await teams.FormGroupFinderTeam(characterId);
@@ -158,11 +157,11 @@ namespace Faolan.CSPlayerAgent
 			await gameServerDispatcher.TeleportCharacter(characterId, destination.MapId, destination.Arrival);
 		}
 
-		// c2s LeaveGroupFinder: withdraw from the queue. #882's captures answer all three withdrawals with
-		// DispatchGroupFinderRemoved carrying the LDB token `GroupFinderLeaderDequeued` (silent = 0) about 0.3 s
-		// later, so the answer goes out whether or not we were holding a signup - the client is asking to be taken
-		// out of the finder, and retail confirms that, not our bookkeeping. Leaving the ENTERED instance is the
-		// zone-line path, not this; that push carries the other token and rides the Authenticate flow.
+		// c2s LeaveGroupFinder: withdraw from the queue. The captures answer all three withdrawals with
+		// DispatchGroupFinderRemoved carrying the LDB token `GroupFinderLeaderDequeued` (silent = 0) about 0.3 s later,
+		// so the answer goes out whether or not a signup was held - the client is asking to be taken out of the finder,
+		// and retail confirms that rather than the server's bookkeeping. Leaving the entered instance is the zone-line
+		// path instead; that push carries the other token and rides the Authenticate flow.
 		public async Task HandleLeave(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;

@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the SpawnPlayer position/rotation migration: the generated ProtoVec3 / ProtoQuat must serialize to the
-	// exact bytes the packet used to hand-roll - protobuf fixed32 tags (0x0D/0x15/0x1D/0x25) followed by each
-	// component as a little-endian IEEE-754 float (FaolanStream.WriteFloat is little-endian). If this drifts, the
-	// SpawnPlayer 0x2000 packet would change shape and the client could reject the spawn.
+	// The generated ProtoVec3 / ProtoQuat must serialize to exactly the bytes SpawnPlayer carries: protobuf fixed32
+	// tags (0x0D/0x15/0x1D/0x25), each followed by one component as a little-endian IEEE-754 float. The hand-encoded
+	// reference below is that layout spelled out. If the two drift apart the SpawnPlayer 0x2000 packet changes shape
+	// and the client can reject the spawn.
 	public class SpawnTransformGoldenTests
 	{
 		[Theory, InlineData(0f, 0f, 0f, 1f), InlineData(0.5f, -0.5f, 0.25f, -0.75f)]
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 				W = w
 			}.ToProtobuf();
 
-			Assert.Equal(20, bytes.Length); // 4 * 5 - the old 0x14 length prefix
+			Assert.Equal(20, bytes.Length); // 4 components * (1 tag + 4 float bytes)
 			Assert.Equal(Convert.ToHexString(HandRolledQuat(x, y, z, w)), Convert.ToHexString(bytes));
 		}
 
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 				Z = z
 			}.ToProtobuf();
 
-			Assert.Equal(15, bytes.Length); // 3 * (1 tag + 4 float bytes) - the old 0x0F length prefix
+			Assert.Equal(15, bytes.Length); // 3 components * (1 tag + 4 float bytes)
 			Assert.Equal(Convert.ToHexString(HandRolledVec3(x, y, z)), Convert.ToHexString(bytes));
 		}
 

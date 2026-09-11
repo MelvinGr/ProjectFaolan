@@ -19,7 +19,8 @@ namespace Faolan.Web.Components.Pages
 
 		protected override async Task OnInitializedAsync()
 		{
-			// Account-only page: bounce to login when signed out (Routes uses a plain RouteView, so no [Authorize] gate).
+			// An account-only page: bounce to login when signed out. Routes uses a plain RouteView, so there is no
+			// [Authorize] gate to do it.
 			if (AuthState == null || (await AuthState).User is not { Identity.IsAuthenticated: true } user || !uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var accountId))
 			{
 				Nav.NavigateTo("/login", true);

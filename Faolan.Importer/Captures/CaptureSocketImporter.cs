@@ -12,33 +12,40 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// The GEMS socketed into an EXISTING character's items, harvested from the captured login snapshots (#750).
-	//
-	// This exists because the characters module is INSERT-ONLY: it skips a character already in the DB, so a database
-	// that predates sockets can never pick them up from it, and re-importing the characters wholesale is not an option
-	// (it would delete locally created ones and every bit of play state with them). Sockets are additive per-item state,
-	// so they get their own pass - the same reason the bank has one.
-	//
-	// The match is exact, not heuristic. A character's DB id IS its on-wire instance (CaptureCharacterImporter keeps the
-	// retail spawn handle as the id), and the snapshot is addressed by instance, so a snapshot resolves to one character
-	// by id. Within it, an entry resolves to one item by (container, slot), and the harvest only writes when the entry's
-	// TEMPLATE agrees with the item that is there - anything else means the character has been played since the capture
-	// and the cell now holds something else.
+	/// <summary>
+	///     The gems socketed into an existing character's items, harvested from the captured login snapshots.
+	/// </summary>
+	/// <remarks>
+	///     The characters module is insert-only: it skips a character already in the DB, so a database that predates
+	///     sockets can never pick them up from it, and re-importing the characters wholesale would delete locally created
+	///     ones and every bit of play state with them. Sockets are additive per-item state, so they get their own pass -
+	///     the same reason the bank has one.
+	///     The match is exact, not heuristic. A character's DB id is its on-wire instance (CaptureCharacterImporter keeps
+	///     the retail spawn handle as the id), and the snapshot is addressed by instance, so a snapshot resolves to one
+	///     character by id. Within it, an entry resolves to one item by (container, slot), and the harvest only writes
+	///     when the entry's template agrees with the item that is there - anything else means the character has been
+	///     played since the capture and the cell now holds something else.
+	/// </remarks>
 	public static class CaptureSocketImporter
 	{
-		// What one run did. `SocketedSeen` vs `Matched` is the number that matters and the reason it is reported at all:
-		// a run that writes nothing looks identical to a run with nothing to write, and the difference is whether the
-		// captured cells still line up with the database. They stop lining up when the corpus is RE-DUMPED after the
-		// characters were imported - the pass picks the largest snapshot per instance, and a re-dump can make a
-		// different one the largest, so the character's bag was built from one snapshot and is now being read against
-		// another. A bare count would report that as success.
+		/// <summary>
+		///     What one run did.
+		/// </summary>
+		/// <remarks>
+		///     <c>SocketedSeen</c> vs <c>Matched</c> is the number that matters: a run that writes nothing looks identical
+		///     to a run with nothing to write, and the difference is whether the captured cells still line up with the
+		///     database. They stop lining up when the corpus is re-dumped after the characters were imported - the pass
+		///     picks the largest snapshot per instance, and a re-dump can make a different one the largest, so the
+		///     character's bag was built from one snapshot and is now being read against another. A bare count would
+		///     report that as success.
+		/// </remarks>
 		public readonly record struct SocketImport(int Characters, int Sockets, int SocketedSeen, int Matched, IReadOnlyCollection<uint> UnresolvedGems);
 
 		public static async Task<SocketImport> ImportAsync(DatabaseContext db, IEnumerable<CapturedPacket> packets)
 		{
-			// Instance -> snapshot bodies, pooled across captures. An analyzer-truncated snapshot fails to parse, so
-			// every candidate is kept and RootOf falls through them largest-first - the same way the character import
-			// does it.
+			// Instance -> snapshot bodies, pooled across captures. A truncated snapshot fails to parse, so every
+			// candidate is kept and RootOf falls through them largest-first - the same way the character import does
+			// it.
 			var byInstance = new Dictionary<uint, List<byte[]>>();
 			foreach (var packet in packets)
 			{
@@ -91,7 +98,7 @@ namespace Faolan.Importer.Captures
 
 						matched++;
 
-						// The captured gem list is the WHOLE truth about that item's sockets, so it replaces what is
+						// The captured gem list is the whole truth about that item's sockets, so it replaces what is
 						// there rather than merging: a merge could only leave a gem the capture says was removed.
 						item.Sockets.Clear();
 						foreach (var (socket, gem) in SnapshotRoot.SocketsOf(entry))
@@ -134,7 +141,7 @@ namespace Faolan.Importer.Captures
 				try
 				{
 					// The body opens with the record's own u32 carrier length, which belongs to the sender - the record
-					// itself starts behind it (#530 rule 2).
+					// itself starts behind it.
 					return SnapshotRoot.Of(body.AsSpan(4));
 				}
 				catch

@@ -3,16 +3,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One character's standing with one faction (Gitea #310): a SIGNED point total, clamped to the client's own
+	// One character's standing with one faction: a signed point total, clamped to the client's own
 	// bounds. The rank is not stored - it is a pure function of the points through `FactionLadder`, and storing a
 	// derived value is how the two drift apart.
 	//
-	// ⭐ The scale is SIGNED and symmetric, which is the part nothing but the client's tuning sheet stated: it runs
-	// −1,100,000 … +1,100,000 with a ±5,000 NEUTRAL band in the middle, not 0 … 1,000,000. That is what makes the
+	// The scale is signed and symmetric, which is the part nothing but the client's tuning sheet stated: it runs
+	// −1,100,000 … +1,100,000 with a ±5,000 neutral band in the middle, not 0 … 1,000,000. That is what makes the
 	// rival-pair rule expressible - farming one side of a pair pushes you below the band with them, i.e. hostile,
 	// while the same kills push you up with their rival. See FactionLadder and docs/subsystems/factions.md.
 	//
-	// KEY is the natural (CharacterId, FactionId). A row exists only once a character has moved off zero with that
+	// Key is the natural (CharacterId, FactionId). A row exists only once a character has moved off zero with that
 	// faction, so absence means neutral rather than unknown - which is why the read path treats a missing row as 0
 	// instead of seeding sixteen rows per character.
 	[PrimaryKey(nameof(CharacterId), nameof(FactionId))]

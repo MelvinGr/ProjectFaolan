@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `GameActionTooltip` is a transcription of the client's tooltip dispatch (#782), and its own artifact
+	// `GameActionTooltip` is a transcription of the client's tooltip dispatch, and its own artifact
 	// `docs/re/gameaction-tooltip-dispatch.tsv` is the dump it was read out of. So the gate that is worth having is
-	// that the two AGREE - a hand-edited alias that the disassembly does not support fails here.
+	// that the two agree - a hand-edited alias that the disassembly does not support fails here.
 	public class GameActionTooltipTests
 	{
 		private static readonly string DispatchTsv = TestPaths.Repo("docs", "re", "gameaction-tooltip-dispatch.tsv");
@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		public void SentenceKinds_MatchTheDisassembly()
 		{
 			// The dump's `aliasSentence` column is the literal `MOV ECX,<id>` the branch issues before fetching its
-			// category-170 string. A row whose alias is its OWN id is the identity case and carries no alias here.
+			// category-170 string. A row whose alias is its own id is the identity case and carries no alias here.
 			var fromDump = File.ReadAllLines(DispatchTsv)
 				.Where(l => !l.StartsWith('#') && l.Contains('\t'))
 				.Select(l => l.Split('\t'))
@@ -32,8 +32,8 @@ namespace Faolan.Tests
 			Assert.Equal(fromDump.OrderBy(x => x.Key), GameActionTooltip.SentenceKinds.OrderBy(x => x.Key));
 		}
 
-		// ⭐ The branch set decides whether a missing sentence is OUR debt or the client's own behaviour, so it has to
-		// stay in step with the same dump. Every row of the dispatch TSV is a branched kind by construction.
+		// The branch set decides whether a missing sentence is our debt or the client's own behaviour, so it has to
+		// stay in step with the same dump. Every row of the dispatch tsv is a branched kind by construction.
 		[Fact]
 		public void HasTooltipBranch_CoversEveryDispatchedKind()
 		{
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 		// An identity lookup must stay an identity lookup: a kind not in the alias table is its own sentence key, and
 		// nothing may quietly redirect it.
 		[Theory]
-		[InlineData(53045u, 53045u)] // Modify - the alias TARGET, never itself aliased
+		[InlineData(53045u, 53045u)] // Modify - the alias target, never itself aliased
 		[InlineData(53088u, 53088u)] // FilteredAreaFormula
 		[InlineData(53220u, 53045u)] // InterpolatedModify draws itself as Modify
 		[InlineData(53062u, 53054u)] // SpellLineStatModifier -> SpellStatModifier
@@ -66,8 +66,8 @@ namespace Faolan.Tests
 			Assert.Equal(expected, GameActionTooltip.SentenceKind(kind));
 		}
 
-		// ⭐ The rule at the head of FUN_0149aa30, which is what makes a `Hit` element's SENTENCE a function of its
-		// VALUES rather than of its type.
+		// The rule at the head of FUN_0149aa30, which is what makes a `Hit` element's sentence a function of its
+		// values rather than of its type.
 		[Theory]
 		[InlineData(0x1Bu, -500, "DamageHealth")]
 		[InlineData(0x1Bu, 500, "HealHealth")]

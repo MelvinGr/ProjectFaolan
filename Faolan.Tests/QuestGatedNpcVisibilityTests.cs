@@ -7,22 +7,22 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #574: a quest-gated NPC must stay visible while ANY quest still needs it, not only while the ONE goal flagged
+	// A quest-gated NPC must stay visible while any quest still needs it, not only while the one goal flagged
 	// `GatesTargetVisibility` is active.
 	//
 	// The Casilda chain softlocked on exactly that. Scavenger Tuut is revealed by 13479 "The Scavenger" (the flagged
-	// Kill goal), but 13563 "The Scavenger's Key" (Loot) targets him too - and killing him COMPLETES 13479, the only
+	// Kill goal), but 13563 "The Scavenger's Key" (Loot) targets him too - and killing him completes 13479, the only
 	// quest that was revealing him. He is `NoRespawn` besides, a story kill target that stays dead. So once his loot
 	// bag was gone - expiry, or a server restart, since bags are live world state and are not persisted - Tuut was
 	// invisible for good, the key unobtainable and Casilda unfreeable. Reported in-client: "killed tuut but did not
 	// loot ... she is still locked".
 	public class QuestGatedNpcVisibilityTests
 	{
-		private const uint Tuut = 11561; // the Scavenger Tuut NPC TEMPLATE (#521: the map is keyed by template, not name)
+		private const uint Tuut = 11561; // the Scavenger Tuut NPC template (#521: the map is keyed by template, not name)
 		private const uint TheScavenger = 13479; // Kill Tuut - the goal that carries GatesTargetVisibility
-		private const uint TheScavengersKey = 13563; // Loot the key OFF Tuut - targets him, but is not the flagged goal
+		private const uint TheScavengersKey = 13563; // Loot the key off Tuut - targets him, but is not the flagged goal
 
-		// The GALLEY Saddur - a second template sharing the beach Saddur's display name, on the Stygian Galley (4000)
+		// The galley Saddur - a second template sharing the beach Saddur's display name, on the Stygian Galley (4000)
 		// rather than Tortage Island (4010). No quest targets it and nothing flags it, so it must not be gated.
 		private const uint GalleySaddur = 2993;
 
@@ -36,9 +36,10 @@ namespace Faolan.Tests
 			Assert.Contains(TheScavengersKey, reveals); // ...and the Loot quest keeps him visible to hand the key over
 		}
 
-		// #521: the gate used to key on the NAME, which stamped GateQuestIds + NoRespawn onto EVERY same-named template.
-		// `Saddur` is two of them and goal 3490 flags only the Tortage Island one (9500), so the Stygian Galley Saddur
-		// was hidden from every player not carrying a Tortage Island quest they cannot have yet - on the intro playfield.
+		// The gate keys on the template, not the name: a name stamps GateQuestIds + NoRespawn onto every same-named
+		// template. `Saddur` is two of them and goal 3490 flags only the Tortage Island one (9500), so the Stygian
+		// Galley Saddur - on the intro playfield - would be hidden from every player not carrying a Tortage Island
+		// quest they cannot have yet.
 		[Fact]
 		public async Task ASameNamedNpcThatNoQuestTargets_IsNotGated()
 		{
@@ -51,8 +52,8 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task TheFlagStillDecidesWhoIsGatedAtAll()
 		{
-			// Widening the REVEAL set must not widen the GATED set: an NPC no goal flags stays ungated, so a
-			// mechanically-resolved kill target (#521) does not hide its population or stop respawning. Every gated
+			// Widening the reveal set must not widen the gated set: an NPC no goal flags stays ungated, so a
+			// mechanically-resolved kill target does not hide its population or stop respawning. Every gated
 			// template must own at least one flagged goal.
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
@@ -66,9 +67,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #708: staying dead is a SEPARATE query off a separate column. Both story targets want both today, which is
+		// Staying dead is a separate query off a separate column. Both story targets want both today, which is
 		// what let one column answer both questions - the split is what makes the first quest-only target that must
-		// RESPAWN (a repeatable or retryable quest) expressible at all.
+		// respawn (a repeatable or retryable quest) expressible at all.
 		[Fact]
 		public async Task StayingDead_IsItsOwnFlag_NotImpliedByTheGate()
 		{

@@ -1,13 +1,17 @@
 namespace Faolan.GameServer.World
 {
-	// Lets a behaviour run at its own cadence on top of a faster base game tick (Gitea #404).
-	// The loop ticks at a high base rate (so continuous systems - movement/respawn - stay smooth); slower rate-based
-	// systems (e.g. vitals regen at 1 Hz) accumulate the base dt and fire when their interval has elapsed.
-	//
-	// Fire-once semantics (for rate-based behaviours): when the interval is reached it reports the TOTAL elapsed time
-	// since the last fire and resets, so the behaviour can dt-scale its effect (e.g. regen ~= rate * elapsed). It does
-	// NOT fire multiple times to "catch up" on a long stall, which avoids a spiral of death; a true fixed-step
-	// (carry-remainder, fire-N-times) accumulator can be added if a discrete-step system needs it.
+	/// <summary>
+	///     Lets a behaviour run at its own cadence on top of a faster base game tick: the loop ticks at a high base
+	///     rate so continuous systems such as movement and respawn stay smooth, while slower rate-based systems - such
+	///     as vitals regen at 1 Hz - accumulate the base delta and fire when their interval has elapsed.
+	/// </summary>
+	/// <remarks>
+	///     Fire-once semantics: when the interval is reached it reports the total elapsed time since the last fire and
+	///     resets, so the behaviour can scale its effect by that (regen is rate times elapsed). It does not fire
+	///     several times to catch up on a long stall, which avoids a spiral of death. A true fixed-step accumulator -
+	///     carrying the remainder and firing N times - would be a separate type, for a discrete-step system that needs
+	///     one.
+	/// </remarks>
 	public sealed class TickAccumulator
 	{
 		private readonly double _interval;
@@ -21,8 +25,14 @@ namespace Faolan.GameServer.World
 				: double.Epsilon;
 		}
 
-		// Adds `dt` seconds. When the accumulated time reaches the interval, returns true with `elapsed` = the total
-		// accumulated time since the last fire (>= interval) and resets; otherwise returns false with elapsed = 0.
+		/// <summary>
+		///     Adds <paramref name="dt" /> seconds.
+		/// </summary>
+		/// <returns>
+		///     True, with <paramref name="elapsed" /> set to the total accumulated time since the last fire (at least
+		///     the interval), when the interval is reached - and the accumulator resets. Otherwise false, with
+		///     <paramref name="elapsed" /> 0.
+		/// </returns>
 		public bool Advance(double dt, out double elapsed)
 		{
 			if (dt > 0)

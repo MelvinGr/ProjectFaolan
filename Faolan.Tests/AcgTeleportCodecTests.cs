@@ -5,18 +5,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ACG instance-entry exchange (#821) - the confirmation box retail puts up before moving the player into a
+	// The ACG instance-entry exchange - the confirmation box retail puts up before moving the player into a
 	// personal instance, and the client's answer.
 	//
 	// Oracle: xxx_mage-necromancer_login_play3, the Tortage harbour rowboat to White Sands Night (10803), which is the
-	// ONLY capture of this flow in the whole corpus. The player narrated it as it happened - "about to enter white
+	// only capture of this flow in the whole corpus. The player narrated it as it happened - "about to enter white
 	// sands night (via boat object) there is a confirmation to enter (saying bound to <charname>)" - and the arrival
 	// carries an `InstanceOwnerAndResetTime` feedback token, so the box really is the instance bind prompt.
 	//
 	//   476.4 f4555 s DispatchACGTeleportChoice   (the box)
 	//   524.5 f4732 c RequestACGTeleport          (yes - 48 s later)
 	//   524.8       s IntendedTeleportIIR 10803
-	//   525.0       s N3TeleportIIR -> spawn point "PlayerSpawnPoint"   (#814)
+	//   525.0       s N3TeleportIIR -> spawn point "PlayerSpawnPoint"
 	//   525.4       s DispatchRedirectToServer gs013-nj4:7021
 	public class AcgTeleportCodecTests
 	{
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(AcgTeleportChoiceCodec.Build(parsed)));
 		}
 
-		// ⚠️ The playfield CLASS word is what marks this destination as an ACG instance, and it is NOT the class an
+		// The playfield class word is what marks this destination as an ACG instance, and it is not the class an
 		// ordinary cross-map announce carries (0xC79C). It is the only discriminator we have: `Maps.PlayfieldInstanced`
 		// cannot serve, because it is 1 on 529 of the 530 maps we hold - ordinary doors point at "instanced" maps all
 		// day, City of Tortage included.

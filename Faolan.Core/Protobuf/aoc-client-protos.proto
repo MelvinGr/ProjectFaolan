@@ -130,8 +130,8 @@ message ProtoDeleteItemIIR {
 message ProtoFullCharacterIIR {
   // PACKED on the wire: all 81 captured roots that carry this field encode it as field-1 wiretype-2, never as
   // repeated varints. proto2 does not pack by default, so without this protobuf-net writes it UNPACKED and the
-  // root stops re-encoding byte-exactly from its very first byte (#385). (generic_stats and child_id are the
-  // only other repeated scalars in this schema; neither appears populated in ANY capture, so their packing is
+  // root stops re-encoding byte-exactly from its very first byte. (generic_stats and child_id are the
+  // only other repeated scalars in this schema; neither appears populated in any capture, so their packing is
   // unproven and deliberately left alone - do not mark them packed on the strength of this one.)
   repeated uint32 character_tag = 1 [packed=true];
   optional uint32 free_feat_respecs = 2;

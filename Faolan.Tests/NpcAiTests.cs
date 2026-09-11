@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// NPC aggro + attack AI on the tick (Gitea #404): a living NPC with a player in aggro
+	// NPC aggro + attack AI on the tick: a living NPC with a player in aggro
 	// range swings on a fixed cadence, emitting an NpcAttack effect for the listener to turn into a vitals hit.
 	public class NpcAiTests
 	{
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			zone.Add(far);
 			zone.Add(near);
 
-			// The engage tick also carries the combat-mode (weapon-draw, #218) effect, so select the attack itself.
+			// The engage tick also carries the combat-mode (weapon-draw) effect, so select the attack itself.
 			var effects = world.Tick(WorldState.NpcAttackInterval);
 			Assert.Same(near, effects.Single(e => e.Type == WorldTickEffectType.NpcAttack).Target);
 		}
@@ -117,7 +117,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void DeadNpc_EmitsNoHeartbeat()
 		{
-			// #225: a dead NPC awaiting respawn must NOT heartbeat - its handle is being torn down, and a pulse for a
+			// A dead NPC awaiting respawn must not heartbeat - its handle is being torn down, and a pulse for a
 			// corpse the client is despawning would reference a handle in flux. The emit sits past the IsDead gate.
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
@@ -140,7 +140,7 @@ namespace Faolan.Tests
 			zone.Add(player);
 
 			// The engage tick emits NpcEnterCombat carrying the aggroed target (so the broadcaster can push HateList/
-			// ThreatLevel, #216).
+			// ThreatLevel).
 			var enter = world.Tick(WorldState.NpcAttackInterval).Single(e => e.Type == WorldTickEffectType.NpcEnterCombat);
 			Assert.Same(player, enter.Target);
 		}
@@ -158,8 +158,8 @@ namespace Faolan.Tests
 			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval))); // no aggro -> no attack/combat effects
 		}
 
-		// #804: retail's `AIDefaults_ChaseDeaggroDelayTime` (5) - a mob that loses its target holds its ground for the
-		// delay before turning for home, so stepping out of aggro range and straight back in is ONE engagement.
+		// Retail's `AIDefaults_ChaseDeaggroDelayTime` (5) - a mob that loses its target holds its ground for the
+		// delay before turning for home, so stepping out of aggro range and straight back in is one engagement.
 		[Fact]
 		public void LosingTheTarget_DoesNotTurnForHomeUntilTheDeaggroDelayHasPassed()
 		{
@@ -211,8 +211,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void LiveNpc_EmitsHeartbeat_OncePerInterval()
 		{
-			// #225/#766: an ordinary NPC's idle behaviour is now the ambient ANIMATION, on its own per-entity clock -
-			// there is no per-tick heartbeat pulse to fire at all. Non-hostile so no aggro/move effects muddy it.
+			// An ordinary NPC's idle behaviour is the ambient animation, on its own per-entity clock - there is no
+			// per-tick heartbeat pulse to fire at all. Non-hostile so no aggro/move effects muddy it.
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			var npc = NpcTemplate(1, 0, 0, hostile: false);
@@ -256,9 +256,10 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step, and a
-			// chase MoveTask is only broadcast once the NPC has accumulated a retail-sized segment (#272 throttle:
-			// MoveBroadcastSegment), so a single 0.5s step (3.5u) is below threshold - tick until the first move fires.
+			// The engage tick also carries the combat-mode (weapon-draw) effect alongside the chase step, and a
+			// chase MoveTask is only broadcast once the NPC has accumulated a retail-sized segment (the
+			// MoveBroadcastSegment throttle), so a single 0.5s step (3.5u) is below threshold - tick until the first move
+			// fires.
 			WorldTickEffect? move = null;
 			for (var i = 0; i < 10 && move == null; i++)
 			{
@@ -274,7 +275,7 @@ namespace Faolan.Tests
 			Assert.Same(player, move.Value.Target);
 
 			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
-			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
+			// origin (the from of the MoveFrom -> Position segment the client interpolates).
 			Assert.True(npc.Position.X is > 0 and < 10);
 			Assert.Equal(0f, npc.MoveFrom.X);
 		}
@@ -290,14 +291,14 @@ namespace Faolan.Tests
 			zone.Add(player);
 
 			// First contact swings immediately (cooldown starts at 0), targeting the player. The same engage tick also
-			// emits the combat-mode (weapon-draw, #218) effect, so pick the attack out of the pair.
+			// emits the combat-mode (weapon-draw) effect, so pick the attack out of the pair.
 			var first = world.Tick(0.1);
 			var attack = first.Single(e => e.Type == WorldTickEffectType.NpcAttack);
 			Assert.Same(npc, attack.Entity);
 			Assert.Same(player, attack.Target);
 
 			// Within the interval, no further swing. (The mob may still flush a trailing walk-up step toward contact
-			// range, #272 - that's an NpcMove, not a swing - so assert on the attack itself, not on emptiness.)
+			// range - that is an NpcMove, not a swing - so assert on the attack itself, not on emptiness.)
 			Assert.DoesNotContain(world.Tick(WorldState.NpcAttackInterval / 2), e => e.Type == WorldTickEffectType.NpcAttack);
 			// Once the interval elapses, it swings again.
 			Assert.Single(world.Tick(WorldState.NpcAttackInterval), e => e.Type == WorldTickEffectType.NpcAttack);
@@ -309,7 +310,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			zone.Add(NpcTemplate(1, 0, 0));
-			// Right above the NPC (1u horizontal) but a storey up - through a floor (#284 vertical-delta gate).
+			// Right above the NPC (1u horizontal) but a storey up - through a floor (the vertical-delta gate).
 			var player = new WorldEntity(2, 4010, true, "P2", null!)
 			{
 				Position = new Vector3(1, WorldState.NpcAggroVerticalRange + 2f, 0)
@@ -326,12 +327,11 @@ namespace Faolan.Tests
 			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1, 1), CombatResolver.ResolveNpcAttackDamage(0, 0));
 		}
 
-		// #572: an NPC's swing must be in the SAME unit as the pool it lands in. It was not - the curve is measured in
-		// wire units (level * 100) while every live pool is the ÷100 display value - so a level-1 mob swung 100 into a
-		// 63-point pool and a level-3 swung 300 into a level-1 player's 88, killing on contact. The test above passed
-		// throughout: monotonic-and-floored is true on either scale, which is exactly how this shipped. This pins the
-		// RATIO instead, which is the thing that was wrong and the thing retail actually measured (~1.5% of a
-		// same-level pool per hit).
+		// An NPC's swing must be in the same unit as the pool it lands in. The curve is measured in wire units
+		// (level * 100) while every live pool is the /100 display value, so reading it at the wrong scale has a level-1
+		// mob swinging 100 into a 63-point pool and a level-3 swinging 300 into a level-1 player's 88, killing on
+		// contact. The monotonic-and-floored test above is true on either scale and cannot see it; this pins the ratio
+		// instead, which is what retail actually measures (~1.5% of a same-level pool per hit).
 		[Fact]
 		public void ResolveNpcAttackDamage_IsASmallFractionOfASameLevelPool_NotWireUnits()
 		{
@@ -348,9 +348,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #488: the level-GAP penalty, pinned to the measurement it was built from rather than to its own constants.
-		// Each row is (mob level, player level, the measured `x model` band from `--report npc-damage`'s BY ATTACKER
-		// section) - so if the table is ever retuned, this fails against RETAIL, not against a copy of the code.
+		// The level-gap penalty, pinned to the measurement it was built from rather than to its own constants.
+		// Each row is (mob level, player level, the measured `x model` band from `--report npc-damage`'s by attacker
+		// section) - so if the table is ever retuned, this fails against retail, not against a copy of the code.
 		//
 		// The gap-6 row is the loose one on purpose: it is one template's 11 hits at 0.42, with a single 0.76 sighting
 		// from an above-curve archetype beside it.
@@ -366,11 +366,11 @@ namespace Faolan.Tests
 		[InlineData(73u, 80u, 0.08, 0.16)]
 		[InlineData(70u, 80u, 0.08, 0.16)]
 		[InlineData(59u, 80u, 0.08, 0.16)]
-		// A mob ABOVE the player is deliberately un-penalised (two single-hit rows are not enough to amplify on).
+		// A mob above the player is deliberately un-penalised (two single-hit rows are not enough to amplify on).
 		[InlineData(42u, 23u, 0.9, 1.1)]
 		public void ResolveNpcAttackDamage_ReproducesTheMeasuredLevelGapCurve(uint npcLevel, uint playerLevel, double low, double high)
 		{
-			// The measured ratio is over `level * 100` in WIRE units; the resolver answers in display units, so the
+			// The measured ratio is over `level * 100` in wire units; the resolver answers in display units, so the
 			// comparison is against the same curve in display units.
 			var unpenalised = CombatResolver.ResolveNpcAttackDamage(npcLevel, npcLevel);
 			var actual = CombatResolver.ResolveNpcAttackDamage(npcLevel, playerLevel);
@@ -378,18 +378,18 @@ namespace Faolan.Tests
 			Assert.InRange((double)actual / unpenalised, low, high);
 		}
 
-		// #479: the per-level line BREAKS at the top of the range. Pinned to the measurement rather than to the
+		// The per-level line breaks at the top of the range. Pinned to the measurement rather than to the
 		// constant, in the same style as the gap table above: each row is a level and the `x model` band
-		// `--report npc-damage` measures for the attackers at it, scored against the SAME unpenalised curve the
+		// `--report npc-damage` measures for the attackers at it, scored against the same unpenalised curve the
 		// report scores against (`level * 100`), so retuning the model fails this against retail.
 		//
-		// ⭐ The rows at 78-80 include `Wharf Rat Thug` / `Boros` / `Ravenous Crocodile Follower`, all `NpcType = 4`
-		// (no nameplate rank at all) - which is what says the factor is the BAND and not a boss multiplier.
+		// The rows at 78-80 include `Wharf Rat Thug` / `Boros` / `Ravenous Crocodile Follower`, all `NpcType = 4`
+		// (no nameplate rank at all) - which is what says the factor is the band and not a boss multiplier.
 		[Theory]
 		// Below the knee: the line holds. Level 74-75 measure 0.96-1.35 over 54 hits, four templates.
 		[InlineData(74u, 0.9, 1.4)]
 		[InlineData(75u, 0.9, 1.4)]
-		// ⚠️ 76 and 77 have NO captured hits, so they deliberately keep the old line - the knee is somewhere in
+		// 76 and 77 have no captured hits, so they deliberately keep the lower line - the knee is somewhere in
 		// (75, 78] and placing it would be inventing. This row pins that choice, not a measurement.
 		[InlineData(76u, 0.9, 1.4)]
 		[InlineData(77u, 0.9, 1.4)]
@@ -399,17 +399,16 @@ namespace Faolan.Tests
 		[InlineData(80u, 2.5, 3.6)]
 		public void ANpcAtTheTopOfTheRange_HitsAboutThreeTimesThePerLevelLine(uint npcLevel, double low, double high)
 		{
-			// The line itself, in the report's own terms: level x NpcAttackDamagePerLevel, unpenalised, in display
-			// units so it compares with the resolver's answer.
-			// Compare in WIRE units on both sides, which is the report's own scale - NpcAttackDamageWire is the entry
-			// point it scores against, and taking the display value here would divide one side and not the other.
+			// The line itself, in the report's own terms: level x NpcAttackDamagePerLevel, unpenalised. Compared in wire
+			// units on both sides, which is the report's own scale - NpcAttackDamageWire is the entry point it scores
+			// against, and taking the display value here would divide one side and not the other.
 			var line = CombatResolver.NpcAttackDamagePerLevel * npcLevel;
 			var actual = CombatResolver.NpcAttackDamageWire(npcLevel, npcLevel);
 
 			Assert.InRange(actual / (double)line, low, high);
 		}
 
-		// #671: a mob that SHOOTS deals about a fifth of what one that swings does, and the factor is independent of
+		// A mob that shoots deals about a fifth of what one that swings does, and the factor is independent of
 		// the level gap. Pinned to the three well-sampled bow templates (`Poacher Marksman` 8758 at 0.17 over 31
 		// hits, 13961 at 0.18 over 18, `Bat Pict Archer` 937 at 0.21 over 70 - all at gap 0-1, where the per-level
 		// curve itself is verified).
@@ -426,7 +425,7 @@ namespace Faolan.Tests
 			Assert.InRange((double)ranged / melee, 0.15, 0.25);
 		}
 
-		// ⚠️ The ratio cannot hold at the BOTTOM of the range, and that is the floor doing its job rather than the
+		// The ratio cannot hold at the bottom of the range, and that is the floor doing its job rather than the
 		// factor failing: a level-3 archer's fifth is 0.57 of a display point, and a hit that lands for 0 reads as a
 		// miss. So the low levels are asserted as "still lands, still softer than a swing" instead.
 		[Theory]
@@ -441,14 +440,14 @@ namespace Faolan.Tests
 			Assert.True(ranged <= CombatResolver.ResolveNpcAttackDamage(level, level));
 		}
 
-		// The archetype is read off the item CATALOG, never off a name (#244): three unrelated bow names, one answer.
+		// The archetype is read off the item catalog, never off a name: three unrelated bow names, one answer.
 		[Theory]
 		[InlineData(30017u, 6u, true)] // bow
 		[InlineData(30018u, 6u, true)] // crossbow
 		[InlineData(30019u, 6u, true)] // thrown
 		[InlineData(30011u, 6u, false)] // 1h edge - the common melee case
 		[InlineData(30016u, 6u, false)] // polearm
-		[InlineData(30017u, 8u, false)] // a bow in the OFF hand is not what the mob attacks with
+		[InlineData(30017u, 8u, false)] // a bow in the off hand is not what the mob attacks with
 		public void NpcWeapon_ReadsTheRangedArchetypeFromTheItemCategory(uint category, uint pos, bool expected)
 		{
 			var equipment = new[]
@@ -466,9 +465,8 @@ namespace Faolan.Tests
 			Assert.False(NpcWeapon.IsRanged([]));
 		}
 
-		// The regression that motivated the ticket, stated in the terms it was reported in: a level-80 player wading
-		// through level-70 mobs used to take TEN TIMES what retail deals. Not a restatement of the table above - this
-		// is the consequence, in the pool the damage actually lands in.
+		// The consequence in the pool the damage actually lands in, rather than a restatement of the table above: a
+		// level-80 player wading through level-70 mobs takes fractions of a percent a hit.
 		[Fact]
 		public void ALevel70Mob_BarelyScratchesALevel80Player()
 		{
@@ -500,13 +498,13 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(respawned, "a dead NPC should respawn once its delay elapses");
-			// It reappears at its ORIGINAL spawn point, not where it was killed (#246).
+			// It reappears at its original spawn point, not where it was killed.
 			Assert.Equal(npc.Route.SpawnPosition, npc.Position);
 			Assert.Equal(npc.Route.SpawnPosition, npc.MoveFrom);
 		}
 
-		// The ambient idle animation (#766) fires on each NPC's own clock, so the "no aggro/attack happened" assertions
-		// filter it out - they care that no COMBAT effect was produced, not that the tick was silent.
+		// The ambient idle animation fires on each NPC's own clock, so the "no aggro/attack happened" assertions
+		// filter it out - they care that no combat effect was produced, not that the tick was silent.
 		private static IEnumerable<WorldTickEffect> NonHeartbeat(IReadOnlyList<WorldTickEffect> effects)
 		{
 			return effects.Where(e => e.Type != WorldTickEffectType.NpcAmbientAnimation);

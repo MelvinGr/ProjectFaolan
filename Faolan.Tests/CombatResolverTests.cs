@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #395: melee damage is driven by the equipped weapon's min/max (RDB fields 286/285, decoded from the client's
+	// Melee damage is driven by the equipped weapon's min/max (RDB fields 286/285, decoded from the client's
 	// GUIGetMin/MaxDamage), not a flat level value. This pins the resolver's weapon-vs-fallback behaviour.
 	public class CombatResolverTests
 	{
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void NoWeapon_FallsBackToTheLevelPlaceholder()
 		{
-			// Unarmed / no imported weapon damage == the old level curve (20 + level*5).
+			// Unarmed, or no imported weapon damage, falls back to the level curve (20 + level*5).
 			Assert.Equal(20 + 10 * 5, CombatResolver.ResolveMeleeDamage(null, null, 10));
 			Assert.Equal(CombatResolver.ResolveSpellDamage(0, 8), CombatResolver.ResolveMeleeDamage(null, null, 8));
 		}
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 			Assert.Equal(baseDmg, CombatResolver.ResolveSpellDamage(123, 10)); // no gear = base
 		}
 
-		// #697: the percent step the spell-line feat boost and the combo feat bonuses share, so the two cannot drift
+		// The percent step the spell-line feat boost and the combo feat bonuses share, so the two cannot drift
 		// on rounding or on the floor rule. The unit is hundredths of a percent - 3000 is +30%.
 		[Theory]
 		[InlineData(100, 0, 100)] // no bonus is the identity, not a x1 round-trip
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			Assert.Equal(1, CombatResolver.ApplyPercentBonus(100, -50000));
 		}
 
-		// #633: a SPELL states its own crit chance, in hundredths of a percent - 250 is 2.50%, the modal value, and
+		// A spell states its own crit chance, in hundredths of a percent - 250 is 2.50%, the modal value, and
 		// what `Fires of Gehenna` and `Shockstrike` carry. The caster's Critical Rating adds on the melee curve
 		// (rating/10 percent = rating x 10 hundredths).
 		[Theory]
@@ -106,10 +106,10 @@ namespace Faolan.Tests
 			Assert.Equal(expected, CombatResolver.SpellCritChanceHundredths(spellChance, rating));
 		}
 
-		// ⚠️ The load-bearing negative. A spell whose record states NO chance does not crit at all - it does NOT fall
+		// The load-bearing negative. A spell whose record states no chance does not crit at all - it does not fall
 		// back to the melee base. That base exists because everyone crits sometimes with a weapon; extending it here
 		// would give the 20,278 spell records that say nothing a 5% crit on no evidence, and the whole value of the
-		// field is that the client is saying WHICH spells crit.
+		// field is that the client is saying which spells crit.
 		[Fact]
 		public void SpellCritChance_IsZeroWhenTheRecordStatesNone()
 		{
@@ -144,9 +144,9 @@ namespace Faolan.Tests
 			Assert.Equal(expected, CombatResolver.ApplySpellCritDamage(damage, spellCritDamage, rating));
 		}
 
-		// ⚠️ Roughly half the carriers hold a bare `1` on one or both columns. It is NOT special-cased, and this is
+		// Roughly half the carriers hold a bare `1` on one or both columns. It is not special-cased, and this is
 		// the gate that says it does not need to be: read literally, a 1 is a 0.01% chance of a crit worth +0.01%,
-		// which is a spell that does not meaningfully crit - self-consistent, and never a crit that hits for LESS
+		// which is a spell that does not meaningfully crit - self-consistent, and never a crit that hits for less
 		// than a normal hit.
 		[Fact]
 		public void SpellCrit_TheBareOneSentinelIsHarmlessReadLiterally()
@@ -175,12 +175,12 @@ namespace Faolan.Tests
 			var score = expected == CharacterStatId.Intelligence ? 110u : 40u;
 
 			Assert.Equal(score * 600 / 1000, CombatResolver.ResolveMagicDamage(0, @class, attributes));
-			// The worn-gear rating is added FLAT on top of the attribute term, not scaled by it.
+			// The worn-gear rating is added flat on top of the attribute term, not scaled by it.
 			Assert.Equal(52 + score * 600 / 1000, CombatResolver.ResolveMagicDamage(52, @class, attributes));
 		}
 
-		// RDB field 847 is a per-spell OVERRIDE of the class rule - the six Demonologist spells that scale off Wisdom
-		// where their class scales off Intelligence. 0 means "no override", NOT "no scaling".
+		// RDB field 847 is a per-spell override of the class rule - the six Demonologist spells that scale off Wisdom
+		// where their class scales off Intelligence. 0 means "no override", not "no scaling".
 		[Fact]
 		public void MagicDamage_SpellScalingAttribute_OverridesTheClassRule()
 		{
@@ -231,12 +231,12 @@ namespace Faolan.Tests
 			Assert.True(greatsword > dagger); // the whole point: the weapon drives the damage
 		}
 
-		// The CLIENT'S OWN mitigation curve, pinned to its GameCode/ArmorMitigation trace (2026-07-26). NecroL80: level 80,
+		// The client's own mitigation curve, pinned to its GameCode/ArmorMitigation trace (2026-07-26). NecroL80: level 80,
 		// gear armour 2017, raw Strength 710 (displayed 71). Both trace points are reproduced, which is what makes this a
 		// verification rather than a plausible formula:
-		//   with ApprenticeLevel unset (the bug): adjusted -168246 -> Final Mitigation 0.938747
-		//   with ApprenticeLevel = level (fixed):  adjusted    2157 -> Final Mitigation 0.0982419
-		// TWO characters, independently: TotalArmorValue = armour + AttributeBonus, where the bonus is
+		//   with ApprenticeLevel unset:        adjusted -168246 -> Final Mitigation 0.938747
+		//   with ApprenticeLevel = level:      adjusted    2157 -> Final Mitigation 0.0982419
+		// Two characters, independently: TotalArmorValue = armour + AttributeBonus, where the bonus is
 		// ((rawStrength - 10) / 10) * 2.0 = 140 for both (each has raw Strength 710 / displayed 71).
 		[Theory]
 		[InlineData(2017u, 0.0982419)] // NecroL80      - client: TotalArmorValue 2157, Final Mitigation 0.0982419
@@ -289,19 +289,19 @@ namespace Faolan.Tests
 			Assert.Equal(0, CombatResolver.MitigationFraction(2017, 0, 710));
 		}
 
-		// The MAGICAL twin, pinned to the two magical lookups in the same client trace. NecroL80, level 80, so the target
+		// The magical twin, pinned to the two magical lookups in the same client trace. NecroL80, level 80, so the target
 		// is 80 * 46.0625 = 3685; the client logs no intermediates on this branch, so these were solved from the final
-		// fraction and cross-checked against the logged AdjustedRoll - and both `adjusted` values land on EXACTLY the
+		// fraction and cross-checked against the logged AdjustedRoll - and both `adjusted` values land on exactly the
 		// Protection scores from her character sheet, which is what confirms the branch and the target.
 		[Theory]
 		[InlineData(80u, 342u, 0.0464043, 90.7191)] // NecroL80  L80 - Protection Cold / Electrical / Fire
 		[InlineData(80u, 55u, 0.00746269, 98.5075)] // NecroL80  L80 - Protection Holy / Unholy
 		[InlineData(80u, 270u, 0.036635, 92.673)] // DemoL80  L80 - a second character, different Protection
 		[InlineData(80u, 119u, 0.0161465, 96.7707)] // DemoL80  L80
-		// LEVEL 23 - the case that actually tests the level NORMALISATION, since the target is level * 46.0625
+		// Level 23 - the case that actually tests the level normalisation, since the target is level * 46.0625
 		// (1059.4375 here, not 3685). The four L80 rows above cannot distinguish a per-level target from a constant.
 		[InlineData(23u, 13u, 0.0061355, 98.7729)] // AssassinL23 L23 assassin
-		// NB AssassinL23's other protection group solves to 19.5 - FRACTIONAL - so it cannot be expressed here: the client's
+		// NB AssassinL23's other protection group solves to 19.5 - fractional - so it cannot be expressed here: the client's
 		// protection is not necessarily integral (roll 98.1594 -> final 0.009203 -> adjusted 19.500). Our uint-based
 		// API therefore rounds; a defender with a half-point of protection mitigates a hair less than the client says.
 		public void ProtectionMitigationFraction_ReproducesTheClientsMagicalLookups(uint level, uint protection, double expectedFraction, double expectedAdjustedRoll)
@@ -310,7 +310,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(expectedFraction, fraction, 5);
 			// the client's AdjustedRoll is 100 - (adjusted / target * 100), which the same numbers must reproduce
-			// 4 decimals, matching the precision the client PRINTS: the exact value is 98.507462686..., logged as 98.5075.
+			// 4 decimals, matching the precision the client prints: the exact value is 98.507462686..., logged as 98.5075.
 			Assert.Equal(expectedAdjustedRoll, 100.0 - protection / (level * CombatResolver.TargetProtectionPerLevel) * 100.0, 4);
 		}
 
@@ -327,8 +327,8 @@ namespace Faolan.Tests
 			Assert.Equal(50, CombatResolver.ApplyMagicMitigation(100, CombatResolver.ProtectionHalfMitigation));
 		}
 
-		// #629/#630: the mana a cast costs is the client's own formula over RDB field 132, not a level placeholder,
-		// and which of its two modes applies is STATED by bit 2 of the record's flags word rather than guessed from
+		// The mana a cast costs is the client's own formula over RDB field 132, not a level placeholder,
+		// and which of its two modes applies is stated by bit 2 of the record's flags word rather than guessed from
 		// the magnitude. The numbers are the shipped catalog's - Ice Strike (Rank 6) carries 9 with the bit set, Dark
 		// Knowledge (Rank 4) 42200 with it clear - so a regression shows up as a real spell costing the wrong thing.
 		[Theory]
@@ -337,10 +337,10 @@ namespace Faolan.Tests
 		[InlineData(5, 6523, true, 326)] // Pestilential Blast (Rank 6)
 		[InlineData(100, 6523, true, 6523)] // the whole pool
 		[InlineData(42200, 6523, false, 422)] // Dark Knowledge (Rank 4): flat, in wire hundredths
-		[InlineData(12800, 900, false, 128)] // ...its rank 2, and a flat cost does NOT scale with the pool
+		[InlineData(12800, 900, false, 128)] // ...its rank 2, and a flat cost does not scale with the pool
 		[InlineData(12800, 6523, false, 128)]
 		// The 215 records where the flag and the old `<= 100 is a percent` heuristic disagree are all of this shape:
-		// a tiny FLAT cost the magnitude rule read as a percentage. 1 means 0.01 mana, not 1% of the pool.
+		// a tiny flat cost the magnitude rule read as a percentage. 1 means 0.01 mana, not 1% of the pool.
 		[InlineData(1, 6523, false, 0)]
 		public void SpellManaCost_ReadsFieldInTheModeTheRecordStates(int field, uint maxMana, bool isPercent, uint expected)
 		{

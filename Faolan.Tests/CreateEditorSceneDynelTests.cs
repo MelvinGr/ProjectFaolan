@@ -15,10 +15,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Proves the create-editor SCENE PROPS (the SimpleDynelFullUpdateIIR records the initial burst streams) are
+	// Proves the create-editor scene props (the SimpleDynelFullUpdateIIR records the initial burst streams) are
 	// reconstructible from the committed faolan.db WorldObjects (map 4000) via WorldObjectCodec - the same
-	// DB-source path the world-entry login replay uses (issue #189 item 2). Each burst record is matched to its row
-	// by IDENTITY (display_name - NOT position: two props overlap at one spot) and rebuilt with the burst's own
+	// DB-source path the world-entry login replay uses. Each burst record is matched to its row
+	// by identity (display_name - not position: two props overlap at one spot) and rebuilt with the burst's own
 	// handle + the create session's playfield token; the rebuilt body must equal the captured record byte-for-byte.
 	// This is the gate that lets the verbatim dynel records be driven from rows instead of replayed.
 	public class CreateEditorSceneDynelTests
@@ -40,12 +40,12 @@ namespace Faolan.Tests
 			{
 				var identity = ExtractDisplayName(body);
 				// Every prop now has a DB row: the importer keys WorldObjects by (position, identity), so localized
-				// 3072626 and 347659 - which share an exact spot - both survive the dedup (#222).
+				// 3072626 and 347659 - which share an exact spot - both survive the dedup.
 				Assert.True(rowsByIdentity.TryGetValue(identity, out var row), $"no DB row for handle 0x{handle:X8} (identity '{identity}')");
 
 				var built = WorldObjectCodec.Build(row, handle, CreateSessionPlayfield);
-				// The codec returns [u32 subOpcode][record] (its [u32 len] is the sender's, #530 rule 2); the burst's
-				// Iir() helper writes both of those words itself, so the comparable record is built[4..].
+				// The codec returns [u32 subOpcode][record] (its [u32 len] belongs to the sender); the burst's Iir()
+				// helper writes both of those words itself, so the comparable record is built[4..].
 				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(built.AsSpan(4).ToArray()));
 				rebuilt++;
 			}
@@ -53,9 +53,9 @@ namespace Faolan.Tests
 			Assert.Equal(18, rebuilt);
 		}
 
-		// End-to-end: running the actual initial burst WITH a DB (the committed faolan.db) emits exactly the golden
+		// End-to-end: running the actual initial burst with a DB (the committed faolan.db) emits exactly the golden
 		// bytes - i.e. the live scene-prop loop (EditorSceneDynelHandles -> WorldObjectCodec build from the row keyed
-		// by captured handle) reproduces InitialBurst.bin. The dynels are SPAWNED FROM the DB, not verbatim, so this
+		// by captured handle) reproduces InitialBurst.bin. The dynels are spawned from the DB, not verbatim, so this
 		// locks the wired DB path, not just WorldObjectCodec in isolation.
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
 			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
 
-			// The burst's GameTime resync anchor is generated from the wall clock (#351), so feed the instant this
+			// The burst's GameTime resync anchor is generated from the wall clock, so feed the instant this
 			// capture was taken - the anchor's own low word as unix epoch seconds - to keep the burst byte-identical.
 			await CreateEditorBursts.SendRetailCreateEditorInitialBurst(client, repo, DateTimeOffset.FromUnixTimeSeconds(0x6A1D3837));
 

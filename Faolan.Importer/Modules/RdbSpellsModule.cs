@@ -21,7 +21,7 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Rdb;
 
 		// It writes `Spells.DurationMs` from property field 8 unconditionally, and a family of records leaves that
-		// field empty - so an rdb-spells run on its own reinstates the 0/1 ms rows `buff-durations` fixed (#659).
+		// field empty - so an rdb-spells run on its own would reinstate the 0/1 ms rows `buff-durations` corrects.
 		public IReadOnlyList<string> RequiredAfter => [nameof(BuffDurationsModule)];
 
 		public string Description => "Named spell records (cast time/name) + the mount catalog from the RDB.";

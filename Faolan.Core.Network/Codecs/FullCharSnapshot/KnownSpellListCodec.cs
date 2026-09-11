@@ -4,19 +4,25 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The per-character KNOWN list carried inside the 0x737A6DF9 FullChar snapshot tails (the spellbook region): a
-	// 0x3F1-framed list of 12-byte records, one per spell/feat the character knows. Decoded byte-exact from the
-	// Faolanx (clean fresh necromancer) login snapshot - its list is exactly the 2 create-spells - and matches the
-	// empty list in the beach template (count 0x3F1, 0 records).
-	//
-	// Record (big-endian): [u32 id][u32 0xFFFFFFFF][u8 0x00 x3][u8 type]. The 0xFFFFFFFF is the (unbound) bar slot;
-	// type 2 = spell, type 5 = feat/ability. A fresh character's list is just its learned spells (type 2) - the 3
-	// Normal Attacks do NOT appear here (Faolanx's list has no type-5 records), so this carries spells only.
-	//
-	// Composed by SubClassPostAccessBlockCodec (#543), which carries it as the block's optional spellbook list - it
-	// used to be laid out inline as words at the block tail, because it sat INSIDE the flat u32 view the block was.
-	// The value is what production builds (KnownSpellLists.FromSpellIds); KnownSpellListScan is what the importer
-	// lifts a captured one with.
+	/// <summary>
+	///     The per-character known list carried inside the FullChar snapshot tails (the spellbook region): a count-framed
+	///     list of 12-byte records, one per spell or feat the character knows.
+	/// </summary>
+	/// <remarks>
+	///     Decoded byte-exact from the Faolanx (clean fresh necromancer) login snapshot, whose list is exactly the two
+	///     create-spells, and matching the empty list in the beach template.
+	///     <para>
+	///         Each record is big-endian <c>[u32 id][u32 0xFFFFFFFF][u8 0x00 x3][u8 type]</c>. The 0xFFFFFFFF is the
+	///         unbound bar slot; type 2 is a spell and type 5 a feat or ability. A fresh character's list is just its
+	///         learned spells (type 2) - the three Normal Attacks do not appear, since Faolanx's list has no type-5
+	///         records - so this carries spells only.
+	///     </para>
+	///     <para>
+	///         Composed by <see cref="SubClassPostAccessBlockCodec" />, which carries it as the block's optional spellbook
+	///         list. The value is what production builds (<c>KnownSpellLists.FromSpellIds</c>);
+	///         <see cref="KnownSpellListScan" /> is what the importer lifts a captured one with.
+	///     </para>
+	/// </remarks>
 	public static class KnownSpellListCodec
 	{
 		// The "no bound bar slot" word every record carries in its second position.
@@ -28,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// [u32 id][u32 0xFFFFFFFF][u32 type]
 		public const int RecordSize = 12;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(KnownSpellList value)
 		{
 			using var s = new FaolanStream();
@@ -74,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		}
 	}
 
-	// The known list: one record per spell/feat the character knows.
+	/// <summary>The known list: one record per spell or feat the character knows.</summary>
 	public sealed record KnownSpellList
 	{
 		public List<KnownSpellRecord> Records { get; init; } = [];

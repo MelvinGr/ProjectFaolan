@@ -13,26 +13,26 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Extractors
 {
 	// A harvested door->destination link: a zone-line world object (SourceMap + Name + spawn position) that, when
-	// USED, teleported the player to DestMap at the arrival position. Src position keys it back to the WorldObject row
+	// used, teleported the player to DestMap at the arrival position. Src position keys it back to the WorldObject row
 	// (two doors can share a name across maps); Dest is the truth extracted from the N3Teleport the server sent.
 	//
-	// `ConfirmKey` is the CONFIRMATION BOX this door raises before travelling, if it raises one (#637): the 20-character
+	// `ConfirmKey` is the CONFIRMATION BOX this door raises before travelling, if it raises one: the 20-character
 	// localized-format key of the DispatchScryShowMessageBox the server sent between the use and the teleport. Empty for
 	// a door that teleports straight through - which is most of them. The box's `id` is always the destination map and
 	// its category always 520, so the key is the only per-door datum in it.
 	// `AcgPlayfieldClass` is non-zero when the server answered this door with an ACG bind box instead of teleporting
-	// (#821); such a link carries NO arrival, because the box's own n3Teleport names a spawn POINT rather than
-	// coordinates (#814). A null arrival is already a real state here - the teleport falls back to the map default.
+	// ; such a link carries no arrival, because the box's own n3Teleport names a spawn point rather than
+	// coordinates. A null arrival is already a real state here - the teleport falls back to the map default.
 	public sealed record TeleportLink(uint SourceMapId, string SourceName, float SrcX, float SrcY, float SrcZ, uint DestMapId, float? DestX, float? DestY, float? DestZ, string ConfirmKey = "", uint AcgPlayfieldClass = 0);
 
 	// Harvests zone-line teleport destinations from captured gameplay: a client UseObject (BehaviorControlCenterIIR
-	// actionType 0x12) on a door (DoorFullUpdateIIR 0x33A56FB0 OR SimpleDynelFullUpdateIIR 0x66AEDD50) followed by the
+	// actionType 0x12) on a door (DoorFullUpdateIIR 0x33A56FB0 or SimpleDynelFullUpdateIIR 0x66AEDD50) followed by the
 	// server's IntendedTeleport (0x10D27BC0) + N3Teleport (0x5A32F0D7). Both wire encodings are harvested (see
 	// TeleportCodec):
-	//   - CROSS-map (a full changemap handoff): the N3Teleport carries the destination WHOLE - a PlayfieldProxy
-	//     (`[0x62][0xC79C][destMapId]`) + a spawn-position blob (tag 0x00018704 + Vector3 BE).
-	//   - SAME-map (a same-playfield reposition, e.g. the Thirsty Dog Inn): the N3Teleport uses a 0xC7A0 proxy with
-	//     map 0 and the arrival position INLINE; the destination MAP (== the current map) comes from the preceding
+	//   - cross-map (a full changemap handoff): the N3Teleport carries the destination whole - a PlayfieldProxy
+	//     (`[0x62][0xC79C][destMapId]`) + a spawn-position blob (tag 0x00018704 + Vector3 be).
+	//   - same-map (a same-playfield reposition, e.g. the Thirsty Dog Inn): the N3Teleport uses a 0xC7A0 proxy with
+	//     map 0 and the arrival position INLINE; the destination map (== the current map) comes from the preceding
 	//     IntendedTeleport's 0xC79C proxy.
 	// The used object is resolved by precisely parsing the UseObject target handle and matching it against the doors
 	// streamed on the CURRENT map. Only doors actually walked through in a capture are recoverable; the rest keep a
@@ -40,12 +40,12 @@ namespace Faolan.Importer.Extractors
 	public static class WorldTeleportExtractor
 	{
 		// UseObject -> teleport window. A cross-map handoff sends the N3Teleport within a handful of packets, but a
-		// same-map (same-playfield) relocation streams the new locale's entities BETWEEN the IntendedTeleport and the
+		// same-map (same-playfield) relocation streams the new locale's entities between the IntendedTeleport and the
 		// N3Teleport, so the arrival record can be ~90 packets out (Hoxxling inn: UseObject #10369 -> N3Teleport #10459).
 		private const int LookaheadPackets = 150;
 
 		// The world-object classes that can be teleporter doors: DoorFullUpdateIIR (0x33A56FB0, the Tarantia/castle
-		// zone-lines) AND SimpleDynelFullUpdateIIR (0x66AEDD50, which also backs same-playfield doors like the Thirsty
+		// zone-lines) and SimpleDynelFullUpdateIIR (0x66AEDD50, which also backs same-playfield doors like the Thirsty
 		// Dog Inn). A link is only ever created when a used object is followed by an N3Teleport, so tracking the broader
 		// SimpleDynel class as a candidate is harmless (decor/benches never emit a teleport). The module enriches the
 		// same two classes (a subset of the WorldObjectExtractor object families that actually back doors).
@@ -93,12 +93,12 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				// Only a handle that is actually a tracked door produces a link - the used object is named in the
-				// behaviour TAIL, not in its args (see BehaviorTailScan).
+				// behaviour tail, not in its args (see BehaviorTailScan).
 				if (!zoneLines.TryGetValue(BehaviorTailScan.InteractTargetHandle(interact.Tail), out var used))
 					continue;
 
-				// The destination MAP comes from the IntendedTeleport (0x10D27BC0, PlayfieldProxy 0xC79C) - present for
-				// BOTH a cross-map handoff and a same-playfield reposition. The arrival POSITION comes from the following
+				// The destination map comes from the IntendedTeleport (0x10D27BC0, PlayfieldProxy 0xC79C) - present for
+				// both a cross-map handoff and a same-playfield reposition. The arrival position comes from the following
 				// N3Teleport (0x5A32F0D7): a cross-map teleport carries it after the 0x00018704 blob tag; a same-map one
 				// carries it INLINE right after the record's envelope byte (its own proxy is 0xC7A0, map 0). So read the
 				// map from the IntendedTeleport and the position from the N3Teleport.
@@ -110,12 +110,12 @@ namespace Faolan.Importer.Extractors
 				{
 					var q = packets[j];
 
-					// #637: the travel confirmation box, if this door raises one. It is an RPC method body, not an IIR,
-					// so it has to be read before the IIR filter below. Only the localized KEY is kept: the box's `id`
+					// the travel confirmation box, if this door raises one. It is an RPC method body, not an IIR,
+					// so it has to be read before the IIR filter below. Only the localized key is kept: the box's `id`
 					// is the destination map and its category is always 520, both of which are re-derivable.
 					//
-					// ⚠️ The category gate is load-bearing, not defensive. The scry message box is a general script
-					// dialog and the corpus carries a NON-travel one (category 10035) inside a door's lookahead window,
+					// The category gate is load-bearing, not defensive. The scry message box is a general script
+					// dialog and the corpus carries a non-travel one (category 10035) inside a door's lookahead window,
 					// which without this gate is harvested as that door's travel key. Every one of the 14 travel boxes
 					// is category 520 with `id` equal to the destination the same sequence then teleports to.
 					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchScryShowMessageBox))
@@ -130,20 +130,20 @@ namespace Faolan.Importer.Extractors
 						continue;
 					}
 
-					// #821: the ACG INSTANCE BIND box. When the destination is a personal instance the server answers the
+					// the ACG instance BIND box. When the destination is a personal instance the server answers the
 					// use with this instead of teleporting - and the teleport itself only follows if the player says
 					// yes, 48 s later in the capture, far outside this window. So the box CLOSES the sequence: it
 					// states the destination map outright, and the arrival is deliberately left null because the
-					// eventual n3Teleport names a spawn POINT rather than coordinates (#814).
-					// ⚠️ Parsed straight off `Body`, NOT through `TryParse` - that helper is for IIR carriers and returns
+					// eventual n3Teleport names a spawn point rather than coordinates.
+					// Parsed straight off `Body`, not through `TryParse` - that helper is for IIR carriers and returns
 					// false on a plain RPC body, which silently dropped this link. The scry-box branch above reads its
 					// body the same direct way for the same reason.
 					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchACGTeleportChoice))
 					{
 						var acg = AcgTeleportChoiceCodec.Parse(q.Body);
 
-						// The ARRIVAL is not in this exchange - the eventual n3Teleport names a spawn POINT rather
-						// than coordinates (#814), and it only fires once the player accepts, after a server redirect.
+						// The ARRIVAL is not in this exchange - the eventual n3Teleport names a spawn point rather
+						// than coordinates, and it only fires once the player accepts, after a server redirect.
 						// So it is read from where the player actually STOOD on arrival: the origin of the
 						// DispatchValidResurrectionSpots the destination playfield sends at world entry, which is the
 						// live player position (in a capture where the player had walked first, that origin has moved
@@ -154,11 +154,11 @@ namespace Faolan.Importer.Extractors
 						break;
 					}
 
-					// #821: the ACG INSTANCE BIND box. When the destination is a personal instance the server answers the
+					// the ACG instance BIND box. When the destination is a personal instance the server answers the
 					// use with this instead of teleporting - and the teleport only follows if the player says yes,
 					// 48 s later in the capture and far outside this window. So the box CLOSES the sequence: it states
 					// the destination map outright, and the arrival stays null because the eventual n3Teleport names a
-					// spawn POINT rather than coordinates (#814). A null arrival is already a real state here.
+					// spawn point rather than coordinates. A null arrival is already a real state here.
 					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchACGTeleportChoice))
 					{
 						if (!q.TryParse(AcgTeleportChoiceCodec.Parse, out var acg))
@@ -198,7 +198,7 @@ namespace Faolan.Importer.Extractors
 					}
 
 					// A cross-map record states its arrival in the spawn blob; a same-map one carries it inline, and
-					// an all-zero inline slot means the record does not name one. A NAMED spawn point (#814) states no
+					// an all-zero inline slot means the record does not name one. A named spawn point states no
 					// coordinates at all, so there is no arrival to harvest and the link is skipped rather than
 					// recorded at the origin - a TeleportLink exists to carry the destination coordinates.
 					// The box only counts as this trip's confirmation when it named the map the trip then went to -
@@ -221,7 +221,7 @@ namespace Faolan.Importer.Extractors
 		// position), keeping the first. Consistent captures yield the same destination; a genuine ambiguity would show
 		// as two entries with the same source but different destinations (none observed).
 		// Where the player stood after an ACG instance entry: the first DispatchValidResurrectionSpots origin sent
-		// AFTER the destination playfield announces itself. Null when the capture never followed the trip through -
+		// after the destination playfield announces itself. Null when the capture never followed the trip through -
 		// a box the player declined, or one raised at the very end of a capture.
 		private static Vector3? AcgArrival(IReadOnlyList<CapturedPacket> packets, int from, uint destMapId)
 		{
@@ -261,8 +261,8 @@ namespace Faolan.Importer.Extractors
 
 
 
-		// The destination map a teleport record NAMES, or 0. Present on the IntendedTeleport for BOTH teleport kinds
-		// and on a CROSS-map N3Teleport; a SAME-map N3Teleport's proxy is the revive class with map 0, so it names
+		// The destination map a teleport record names, or 0. Present on the IntendedTeleport for both teleport kinds
+		// and on a cross-map N3Teleport; a same-map N3Teleport's proxy is the revive class with map 0, so it names
 		// none and the caller falls back to the IntendedTeleport map / the current map.
 		private static uint DestinationMap(TeleportIIR teleport)
 		{

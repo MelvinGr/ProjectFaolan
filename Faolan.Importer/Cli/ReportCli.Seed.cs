@@ -12,7 +12,7 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// `--report sql-seed [--report-arg <dir>]` (#411): the dialect-neutral SQL seed - the game DATA as ONE file
+		// `--report sql-seed [--report-arg <dir>]`: the dialect-neutral SQL seed - the game data as one file
 		// that loads into SQLite and Postgres alike. Writes to the repo root by default, which is where faolan.sql is
 		// committed.
 		private static async Task<int> SqlSeed(string? outputDir)
@@ -25,8 +25,8 @@ namespace Faolan.Importer.Cli
 			return 0;
 		}
 
-		// `--report apply-seed [--dry-run]` (#412): upgrade an EXISTING database's game content from faolan.sql.
-		// The seed only loads itself into an EMPTY database, so this is how a database you have been playing on picks
+		// `--report apply-seed [--dry-run]`: upgrade an EXISTING database's game content from faolan.sql.
+		// The seed only loads itself into an empty database, so this is how a database you have been playing on picks
 		// up newer content - as a merge that leaves characters and everything else player-owned alone.
 		private static int ApplySeed()
 		{
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Cli
 			return 0;
 		}
 
-		// Rewrites the content between the named markers (<!-- MARKER:start -->/<!-- MARKER:end -->) in README.md,
+		// Rewrites the content between the named markers (<!-- marker:start -->/<!-- marker:end -->) in README.md,
 		// leaving the rest untouched.
 		private static void UpdateReadmeSection(string marker, string block)
 		{

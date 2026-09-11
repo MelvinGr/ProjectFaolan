@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Golden-byte test for GameCharInterface.DispatchRemoveItem (s2c 0x201F) - the live mid-session item REMOVE,
+	// Golden-byte test for GameCharInterface.DispatchRemoveItem (s2c 0x201F) - the live mid-session item remove,
 	// the counterpart to DispatchAddItem (0x2020). Decoded from the hoxxling/strickenbla gameplay captures, where
 	// every 0x201F removal body is 16 bytes: [container ID32 = 0x71/equipped + charId][u32 pos][u32 amount].
 	// We rebuild the body from those fields and assert it matches the capture byte for byte.

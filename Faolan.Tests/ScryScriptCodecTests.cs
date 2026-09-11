@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exactness guard for the ScryScriptIIR (0xA36D3B74) builders, added when they moved off a hand-written
-	// protobuf writer onto the generated ProtoScryScriptIIR (Gitea #386 sweep). The expected bodies are what the
-	// hand-written writer produced, so these pin the conversion rather than merely re-asserting the new code.
+	// Byte-exactness guard for the ScryScriptIIR (0xA36D3B74) builders, which write through the generated
+	// ProtoScryScriptIIR. The expected bodies come from an independent hand-written protobuf writer, so these pin the
+	// encoding rather than re-asserting the builder against itself.
 	//
-	// The interesting one is field 3. It is a sint32 (ZIGZAG), but the callers pass the RAW WIRE VARINT - the
+	// The interesting one is field 3. It is a sint32 (zigzag), but the callers pass the raw wire varint - the
 	// values came straight out of captures. BuildStartScriptGroup(_, 48126) must therefore still put 48126 on the
 	// wire (`18 FE F7 02`), not zigzag(48126). Across the corpus field 3 is even 1151 times and odd 14 - the
 	// signature of zigzag over mostly-positive values - so 48126 really denotes int_parameter 24063.

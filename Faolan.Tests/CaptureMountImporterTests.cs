@@ -12,16 +12,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The mount harvest (#27): a player-cast SummonMount renders only if the mount creature ("Fading Black Horse")
+	// The mount harvest: a player-cast SummonMount renders only if the mount creature ("Fading Black Horse")
 	// is in the DB to spawn. CaptureMountImporter must lift it out of the real mount captures' FA015807 spawns and
-	// seed it under the never-loaded sentinel Mounts map, resolvable by the name its summon spell carries (#627).
+	// seed it under the never-loaded sentinel Mounts map, resolvable by the name its summon spell carries.
 	public class CaptureMountImporterTests
 	{
 		[Fact]
 		public async Task Import_HarvestsTheFadingBlackHorse_UnderTheMountMap()
 		{
 			// A committed slice of one capture: the Fading Black Horse plus a stride sample of the other creatures
-			// spawned around it, so the importer still has to SELECT the wanted mount by name out of a crowd of
+			// spawned around it, so the importer still has to select the wanted mount by name out of a crowd of
 			// unwanted ones rather than being handed it alone. The leading MapChange is load-bearing - NpcSpawnExtractor
 			// tracks the current map and drops every spawn it sees before one.
 			var packets = CapturedFixture.Packets("mount-spawns.bin").Select(p => new CapturedPacket(0, true, CapturedPacket.Wire(GameInterfaceMethods.DispatchPassBlob), p.Iir, p.Full)).ToList();
@@ -35,8 +35,8 @@ namespace Faolan.Tests
 				await using var db = NewContext(dbPath);
 				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
-				// The catalog the harvest selects against (#627): a mount is a Mounts row keyed by its summon spell,
-				// and the SPELL's name is the creature name the captured spawn has to match. Real values - spell
+				// The catalog the harvest selects against: a mount is a Mounts row keyed by its summon spell,
+				// and the spell's name is the creature name the captured spawn has to match. Real values - spell
 				// 4076785 is 0x3E34F1, the mount id the capture's SummonMount carries.
 				db.Spells.Add(new Spell { Id = 0x3E34F1u, Name = "Fading Black Horse" });
 				db.Mounts.Add(new Mount { Id = 0x3E34F1u, CreatureId = 0x00313C9Bu });
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 				Assert.True(seen >= 1, "expected at least one mount creature harvested from the capture");
 				Assert.True(seeded >= 1);
 
-				// Mounts are now TYPES (#307), not sentinel-map NpcSpawn placements: the creature builds wholly from
+				// Mounts are types, not sentinel-map NpcSpawn placements: the creature builds wholly from
 				// columns via TryBuildFromType, so its type carries a lifted stat core (no NpcTemplate.Data blob).
 				var mountTypes = await db.NpcTemplates.Include(t => t.StatCore).ToListAsync(TestContext.Current.CancellationToken);
 				Assert.Contains(mountTypes, t => string.Equals(t.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && t.StatCore?.IirHeader != null);

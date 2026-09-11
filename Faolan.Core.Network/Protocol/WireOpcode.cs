@@ -2,29 +2,28 @@ using System;
 
 namespace Faolan.Core.Network.Protocol
 {
-	// The two bytes you read off a hex dump for an RpcHeader's method field: the field's tag `0x20`, then the varint's
-	// FIRST group. It is what the Wireshark plugin labels "Opcode", what `tshark_dump.sh` records as `"Opcode"` in a
-	// `.tshark.json`, and what the codebase called an opcode for years.
-	//
-	// ⚠️ **It is a RENDERING of `Rpc.Method`, never an identity.** #615 renumbered the method enums onto
-	// `method_instance` itself and deleted `Rpc.Opcode`, because this view is not injective: it keeps 7 bits of the
-	// constant plus a continuation flag, so on the hash-registered PlayerAgent/PlayerInterface pair two methods share
-	// it - `0x20EC` is BOTH `ReceivedCharacterSettings` and `AuthenticateLoggedIn` (#608/#613). On the fifteen
-	// index-registered classes it happens to be exact (an index <= 0xFF is one varint group, or two whose first group
-	// equals it), but "exact on most classes" is precisely the property that let a lossy value be used as a key.
-	//
-	// So this exists for the two jobs a rendering is for, and no others:
-	//   * naming a frame you are looking at in a capture or a dump (docs/protocol/gen/opcodes.md, the timeline report);
-	//   * meeting a value that was RECORDED in this space by something outside our code - the tshark dumps'
-	//     `CapturedPacket.WireOpcode`, and the u16 that ends a captured rpcHeader.
-	// Anything that DISPATCHES, keys a table, or declares a codec's identity uses `Rpc.Method` and a `*Methods` member.
-	//
-	// It is one function because it was three: `PlayerAgentMethodIds.ObservedOpcode`, the importer's dump comparisons
-	// and the dialogue decoder's header scan each spelled the same shift out longhand.
+	/// <summary>
+	///     The two bytes a hex dump shows for an RpcHeader's method field: the field's tag <c>0x20</c>, then the
+	///     varint's first group. It is what the Wireshark plugin labels "Opcode" and what <c>tshark_dump.sh</c> records
+	///     as <c>"Opcode"</c> in a <c>.tshark.json</c>.
+	/// </summary>
+	/// <remarks>
+	///     It is a rendering of <c>Rpc.Method</c>, never an identity. The view is not injective: it keeps 7 bits of the
+	///     constant plus a continuation flag, so on the hash-registered PlayerAgent/PlayerInterface pair two methods
+	///     share it - 0x20EC is both <c>ReceivedCharacterSettings</c> and <c>AuthenticateLoggedIn</c>. On the fifteen
+	///     index-registered classes it happens to be exact, and "exact on most classes" is exactly what makes it unsafe
+	///     as a key.
+	///     <para>
+	///         It exists for the two jobs a rendering is for, and no others: naming a frame being looked at in a capture
+	///         or a dump (docs/protocol/gen/opcodes.md, the timeline report), and meeting a value recorded in this space
+	///         by something outside this codebase - the tshark dumps' <c>CapturedPacket.WireOpcode</c>, and the u16 that
+	///         ends a captured rpcHeader. Anything that dispatches, keys a table, or declares a codec's identity uses
+	///         <c>Rpc.Method</c> and a <c>*Methods</c> member.
+	///     </para>
+	/// </remarks>
 	public static class WireOpcode
 	{
-		// The method field's protobuf tag (field 4, wire type 0) in the high byte - so method 0 reads as `0x2000`,
-		// which is why every interface's first method used to be written that way.
+		// The method field's protobuf tag (field 4, wire type 0) in the high byte, so method 0 reads as `0x2000`.
 		public const ushort MethodTag = 0x2000;
 
 		// `WriteVarint`'s first byte for this constant - its low 7 bits, with the continuation bit set when more groups

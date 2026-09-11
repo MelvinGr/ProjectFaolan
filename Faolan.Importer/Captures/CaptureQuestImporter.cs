@@ -15,26 +15,28 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Seeds each captured character's quest journal (CharacterQuest rows) from three s2c sources on the 0x2000 carrier,
-	// parsed by WorldQuest's inverse codecs (each carries the player handle == character id, see
-	// player_handle_equals_character_id, so quests attribute to the character):
-	//   - QuestLogList (0x504B7924): the BULK J-panel quest set - the whole log in ONE packet (up to ~22 ids/char), so
-	//     this is the primary source of a character's held quests. Its ids are entered Active (the log list carries no
-	//     per-entry state).
-	//   - QuestIIR (0x97E02314): per-quest STATE events; the last state per (char, quest) WINS over the log-list Active
-	//     entry - retail sends a completed quest as Active then Completed, so this is what marks a quest Completed.
-	//   - QuestGoal (0x0774C8C1): the goal update KIND for the matching quest (met / partial / closed) - not a count (#525).
-	//   - the FullChar SNAPSHOT's Quest_c JOURNAL region (SnapshotJournalReader): the character's J-panel at login, one
-	//     record per HELD quest. Authoritative for what a character actually holds - it overrides the completed sweep
-	//     below, whose regex cannot tell a journal title record from a completed-archive one.
-	//   - the FullChar SNAPSHOT (0x737A6DF9, DispatchPassBlob): the login snapshot embeds the character's COMPLETED-quest
-	//     log - hundreds of quests for a high-level char, one <remoteformat category=50301> title record each (the
-	//     lvl-80 necro's is a 625 KB snapshot with ~1540 of them). These are entered Completed; the snapshot is addressed
-	//     to the player, so Receiver.Instance == the character id. This is the only source of the completed archive - the
-	//     incremental QuestIIR/log-list packets only ever carry the currently-held quests.
-	// A char's quest ids are unioned across ALL captures (different sessions hold different quests). No QuestDefinition
-	// is required - CharacterQuest.QuestId has no FK - so quests we have no journal-content for still record as held.
-	// Idempotent: updates an existing row, else inserts. Only characters already in the DB are touched.
+	/// <summary>
+	///     Seeds each captured character's quest journal (CharacterQuest rows) from the s2c quest sources on the PassBlob
+	///     carrier, parsed by the quest codecs.
+	/// </summary>
+	/// <remarks>
+	///     Each source carries the player handle, which equals the character id, so quests attribute to the character:
+	///     the QuestLogList (MainQuestUpdate) is the bulk J-panel quest set - the whole log in one packet, the primary
+	///     source of a character's held quests; its ids are entered Active (the log list carries no per-entry state).
+	///     QuestIIR carries per-quest state events; the last state per (character, quest) wins over the log-list Active
+	///     entry - retail sends a completed quest as Active then Completed, so this is what marks a quest Completed.
+	///     QuestGoal carries the goal update kind for the matching quest (met / partial / closed) - not a count.
+	///     The FullChar snapshot's Quest_c journal region (SnapshotJournalReader) is the character's J-panel at login,
+	///     one record per held quest, and is authoritative for what a character actually holds.
+	///     The FullChar snapshot also embeds the character's completed-quest log (one category-50301 title record each);
+	///     these are entered Completed. The snapshot is addressed to the player, so Receiver.Instance is the character
+	///     id. This is the only source of the completed archive - the incremental packets only ever carry the
+	///     currently-held quests.
+	///     A character's quest ids are unioned across all captures (different sessions hold different quests). No
+	///     QuestDefinition is required - CharacterQuest.QuestId has no FK - so quests with no journal content still
+	///     record as held. Idempotent: updates an existing row, else inserts. Only characters already in the DB are
+	///     touched.
+	/// </remarks>
 	public static class CaptureQuestImporter
 	{
 		private const uint SnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
@@ -42,20 +44,17 @@ namespace Faolan.Importer.Captures
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
-			// char -> questId -> the LAST QuestGoalIIR update seen. The packet carries an update KIND, not a running
-			// count (#525), so this says whether the goal is met - not how far along it is.
+			// char -> questId -> the last QuestGoalIIR update seen. The packet carries an update kind, not a running
+			// count, so this says whether the goal is met - not how far along it is.
 			var goalUpdateByChar = new Dictionary<uint, Dictionary<uint, QuestGoalUpdate>>();
 			var logListByChar = new Dictionary<uint, HashSet<uint>>(); // char -> quest ids from the QuestLogList (the J-panel log)
 			var completedByChar = new Dictionary<uint, HashSet<uint>>(); // char -> completed quest ids from the snapshot log
-			var journalByChar = new Dictionary<uint, HashSet<uint>>(); // char -> HELD quest ids from the snapshot's Quest_c region
+			var journalByChar = new Dictionary<uint, HashSet<uint>>(); // char -> held quest ids from the snapshot's Quest_c region
 			foreach (var packet in rawPackets)
 			{
 				TryRead(packet, stateByChar, goalUpdateByChar, logListByChar, completedByChar);
 
-				// The snapshot's Quest_c region IS the character's J-panel at login - one record per HELD quest. Without
-				// it the completed-title regex below swept those same quests into the COMPLETED archive (their title
-				// records are byte-identical in form), so a character's real journal was stored inside-out: NecroL80's 27
-				// held quests all Completed, and 17 unrelated session-touched quests marked Active.
+				// The snapshot's Quest_c region is the character's J-panel at login - one record per held quest.
 				if (SnapshotJournalReader.TryRead(packet, out var journalChar, out var journal))
 				{
 					if (!journalByChar.TryGetValue(journalChar, out var held))
@@ -68,7 +67,7 @@ namespace Faolan.Importer.Captures
 			if (stateByChar.Count == 0 && logListByChar.Count == 0 && completedByChar.Count == 0 && journalByChar.Count == 0)
 				return (0, 0);
 
-			// The full set of characters we saw ANY quest data for (completed log, active log list, and/or state events).
+			// The full set of characters with any quest data (completed log, active log list, and/or state events).
 			var allChars = new HashSet<uint>(stateByChar.Keys);
 			allChars.UnionWith(logListByChar.Keys);
 			allChars.UnionWith(completedByChar.Keys);
@@ -91,8 +90,7 @@ namespace Faolan.Importer.Captures
 						merged[id] = QuestState.Completed;
 				}
 
-				// The snapshot journal overrides the completed sweep: a quest with a Quest_c record was HELD at login,
-				// and its title record is what the regex above just mis-filed as completed.
+				// The snapshot journal overrides the completed archive: a quest with a Quest_c record was held at login.
 				if (journalByChar.TryGetValue(characterId, out var heldIds))
 				{
 					foreach (var id in heldIds)
@@ -120,11 +118,10 @@ namespace Faolan.Importer.Captures
 				var touched = false;
 				foreach (var (questId, state) in merged)
 				{
-					// A QuestGoalIIR states a KIND, not a count (#525): Satisfied/Advanced mean the goal is MET, Progress
-					// means it moved by an amount the packet never carries. So only a met goal can be turned into a
-					// number here - it becomes the required count (at least 1) - and a partial tick leaves whatever the
-					// row already had, rather than inventing a figure. Before #525 the raw word was stored as the count,
-					// which seeded captured characters with a GoalProgress of 1, 2 or 3 that meant nothing.
+					// A QuestGoalIIR states a kind, not a count: Satisfied/Advanced mean the goal is met, Progress means
+					// it moved by an amount the packet never carries. So only a met goal can be turned into a number
+					// here - it becomes the required count (at least 1) - and a partial tick leaves whatever the row
+					// already had, rather than inventing a figure.
 					var met = goalUpdates.TryGetValue(questId, out var update) && update != QuestGoalUpdate.Progress;
 
 					if (existing.TryGetValue(questId, out var row))
@@ -170,10 +167,10 @@ namespace Faolan.Importer.Captures
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
 
-				// The FullChar snapshot embeds the COMPLETED-quest journal (#390). Read it TYPED via
-				// SnapshotJournalReader.TryReadCompleted (as CompletedQuestExtractor does) instead of regex-scanning the
-				// whole packet for category-50301 titles: the regex also swept up the ACTIVE journal's titles (the reason
-				// journalByChar had to override them back), whereas the typed region returns ONLY the completed archive.
+				// The FullChar snapshot embeds the completed-quest journal. Read it typed via
+				// SnapshotJournalReader.TryReadCompleted (as CompletedQuestExtractor does): the typed region returns only
+				// the completed archive, whereas a scan for category-50301 titles would also sweep up the active
+				// journal's titles.
 				if (inner.Length >= 4 && inner.ReadU32Be(0) == SnapshotSubOpcode)
 				{
 					var charId = packet.Receiver.Instance;
@@ -195,9 +192,9 @@ namespace Faolan.Importer.Captures
 					return;
 				}
 
-				// DISPATCH on the record's own sub-opcode rather than trying each codec until one returns true: the
-				// codecs' Parse is strict and THROWS (#530 rule 4), and "try until one succeeds" would abort the whole
-				// packet the moment the first candidate rejected it.
+				// Dispatch on the record's own sub-opcode rather than trying each codec until one returns true: the
+				// codecs' Parse is strict and throws, and "try until one succeeds" would abort the whole packet the
+				// moment the first candidate rejected it.
 				if (inner.Length < 4)
 					return;
 

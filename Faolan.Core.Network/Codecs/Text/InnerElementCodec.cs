@@ -6,22 +6,25 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// Byte-exact parse/build of a remoteformat INNER element - the value a `<parameter>` carries, and the value a
-	// world object's display slot carries. These were the last serialized-XML blobs in the model
-	// (ConversationScreenParameter.InnerRaw, WorldObject.DisplayName); this is what lets them be columns.
-	//
-	// A rule-1a STRING codec (#530): `string Build(InnerElement)` / `InnerElement Parse(string)`.
-	//
-	// The whole grammar, verified over ALL 8232 stored values (every one parses AND rebuilds byte-identically):
-	//   <localized token="T" category="C" flags="F" key="K" >    - an LDB reference by NAME token
-	//   <localized id="I" category="C" flags="F" key="K" >       - an LDB reference by numeric id
-	//   <stringentry string="S" flags="F" >                      - a literal the client renders verbatim
-	//   <remoteformat id="I" category="C" key="K" knubot="N"  ></remoteformat>  - a nested parameter-less root
-	//
-	// `flags` is the grammatical gender/declension the localized text is rendered against, and `key` is the
-	// harvested client-validated content hash. Both are carried as the raw ATTRIBUTE TEXT the capture holds, XML
-	// entities included (`&#39;`, `&quot;`, `&#36;`) - the client is fed these bytes verbatim and re-escaping is not
-	// round-trip safe. Same rule as StockPhrase.FormatKey.
+	/// <summary>
+	///     Byte-exact parse and build of a remoteformat inner element - the value a <c>parameter</c> carries, and the
+	///     value a world object's display slot carries. A string codec: <c>string Build(InnerElement)</c> /
+	///     <c>InnerElement Parse(string)</c>.
+	/// </summary>
+	/// <remarks>
+	///     The whole grammar, verified over all 8232 stored values, every one of which parses and rebuilds
+	///     byte-identically:
+	///     <code>
+	///     &lt;localized token="T" category="C" flags="F" key="K" &gt;    an LDB reference by name token
+	///     &lt;localized id="I" category="C" flags="F" key="K" &gt;       an LDB reference by numeric id
+	///     &lt;stringentry string="S" flags="F" &gt;                      a literal the client renders verbatim
+	///     &lt;remoteformat id="I" category="C" key="K" knubot="N"  &gt;&lt;/remoteformat&gt;  a nested parameter-less root
+	///     </code>
+	///     <c>flags</c> is the grammatical gender or declension the localized text is rendered against, and <c>key</c> is
+	///     the harvested client-validated content hash. Both are carried as the raw attribute text the capture holds, XML
+	///     entities included, because the client is fed these bytes verbatim and re-escaping is not round-trip safe. Same
+	///     rule as <c>StockPhrase.FormatKey</c>.
+	/// </remarks>
 	public static class InnerElementCodec
 	{
 		private static readonly Regex LocalizedRx =
@@ -32,8 +35,8 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		private static readonly Regex StringEntryRx = new Regex("^<stringentry string=\"(?<s>[^\"]*)\" flags=\"(?<flags>[^\"]*)\" >$", RegexOptions.Compiled);
 
-		// Attribute ORDER and spacing are part of the bytes, not cosmetic - note the DOUBLE space before the
-		// remoteformat's '>', which is its empty-antitag slot.
+		// Attribute order and spacing are part of the bytes rather than cosmetic - note the double space before the
+		// remoteformat's closing bracket, which is its empty-antitag slot.
 		public static string Build(InnerElement value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -65,9 +68,8 @@ namespace Faolan.Core.Network.Codecs.Text
 			}
 		}
 
-		// THROWS on anything that is not one of the three shapes (rule 4), so a caller REJECTS a value it cannot
-		// rebuild rather than storing it. There is no blob column left to fall back on. It used to return null for
-		// exactly that reason; the throw serves the same purpose and cannot be ignored by accident.
+		// Throws on anything that is not one of these shapes, so a caller rejects a value it cannot rebuild rather than
+		// storing it. There is no blob column to fall back on.
 		public static InnerElement Parse(string text)
 		{
 			if (string.IsNullOrEmpty(text))

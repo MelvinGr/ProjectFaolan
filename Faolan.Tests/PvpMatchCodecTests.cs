@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The custom-match payloads (#146): PvPMatchRules_c and the i_cMatch it rides in. ⚠️ ZERO captured instances
+	// The custom-match payloads: PvPMatchRules_c and the i_cMatch it rides in. Zero captured instances
 	// exist (no captured session ever creates or fills a match), so there is no golden to pin - the layout is
 	// client-recovered (reader FUN_01346ef0 / writer FUN_00558880 / copier FUN_00547070 agree; see the codecs and
-	// docs/re/minigame-massivepvp-messages.md). What CAN be gated without a capture is what these do: the
+	// docs/re/minigame-massivepvp-messages.md). What can be gated without a capture is what these do: the
 	// round-trip, the Silent gate on the leader ID32 tail, and the wire size arithmetic the client's own struct
 	// stride implies. The first captured match body replaces this with a real golden.
 	public class PvpMatchCodecTests
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		private static PvpMatchRules Rules(bool silent)
 		{
 			// The community-server debug command's own defaults (2 teams of 3..6, 900 s, the map word the debug view
-			// shows) - values the CLIENT ships, not invented ones.
+			// shows) - values the client ships, not invented ones.
 			return new PvpMatchRules(MatchType: 4, MapId: 5003, NumberOfTeams: 2, TeamSizeMin: 3, TeamSizeMax: 6, Password: "", TimeLimitSeconds: 900, ScoreLimit: 100,
 				FieldH: 0, HasPassword: false, Silent: silent, QueueType: 0);
 		}
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 			Assert.Single(parsed.Roster);
 			Assert.Equal("Faolan", parsed.Roster[0].Name);
 
-			// The leader ID32 is the copier's fifo chooser (YouCreatedMatch vs YouJoinedMatch) and rides ONLY a
+			// The leader ID32 is the copier's fifo chooser (YouCreatedMatch vs YouJoinedMatch) and rides only a
 			// non-silent match - the same byte gates the announcement and the tail, in the client's reader and
 			// copier alike.
 			Assert.Equal(silent ? 0u : 0x1234u, parsed.LeaderId);

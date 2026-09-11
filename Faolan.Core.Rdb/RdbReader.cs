@@ -9,10 +9,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
-	// Reads the Age of Conan client Resource DataBase. The offset index is `le.idx` (magic IBDR, version 5 for
-	// AoC / 7 for TSW); the bulk data is in `NN.rdbdata`. Each entry maps a (type, id) to a (file, offset, size);
-	// the entry data is wrapped `IOz1` + uncompressedSize(4) + a zlib stream. Format: docs/rdb/rdb-extraction.md.
-	// Validated end-to-end against a real client (TextStrings 1030002 -> TDC2 strings).
+	/// <summary>
+	///     Reads the Age of Conan client Resource DataBase.
+	/// </summary>
+	/// <remarks>
+	///     The offset index is <c>le.idx</c> (magic IBDR, version 5 for AoC / 7 for TSW); the bulk data is in
+	///     <c>NN.rdbdata</c>. Each entry maps a (type, id) to a (file, offset, size); the entry data is wrapped
+	///     <c>IOz1</c> plus uncompressedSize(4) plus a zlib stream. Format:
+	///     <c>docs/rdb/rdb-extraction.md</c>. Validated end-to-end against a real client (TextStrings 1030002 to TDC2
+	///     strings).
+	/// </remarks>
 	public sealed class RdbReader : IDisposable
 	{
 		private static readonly HttpClient Http = new HttpClient
@@ -26,29 +32,37 @@ namespace Faolan.Core.Rdb
 
 		private readonly string _rdbDir;
 
-		// The mirror's own ROUTE for on-demand RDB resources, which is fixed by Faolan.Web.Content
-		// (`/{tag}/upm/{**rest}` with tag `gameupdate`) and mirrors retail's own
-		// `aoc-eu-gameupdate.live.ageofconan.com/upm/rdb/res/<md5>`. It lives here rather than in every caller's
-		// config so a configured base is just the mirror's ADDRESS - `http://127.0.0.1:7081` - and nobody has to
-		// remember the path.
+		/// <summary>
+		///     The mirror's own route for on-demand RDB resources, set by Faolan.Web.Content
+		///     (<c>/{tag}/upm/{**rest}</c> with tag <c>gameupdate</c>) and mirroring retail's own
+		///     <c>aoc-eu-gameupdate.live.ageofconan.com/upm/rdb/res/&lt;md5&gt;</c>. It lives here rather than in
+		///     every caller's config so that a configured base is just the mirror's address.
+		/// </summary>
 		private const string MirrorRoute = "/gameupdate/upm/rdb";
 
-		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.Web.Content mirror's base address,
-		// e.g. "http://127.0.0.1:7081". On-demand resources aren't in the local NN.rdbdata files; their payload is
-		// content-addressed by the entry's 16-byte md5 at <base><MirrorRoute>/res/<hex[0:2]>/<hex[2:3]>/<hex[3:]>. The
-		// proxy is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
-		// cold miss). Misses are negative-cached so a dead/absent resource is only attempted once per process.
+		/// <summary>
+		///     Optional CDN source for on-demand resources (file == 0xFF): the Faolan.Web.Content mirror's base
+		///     address, e.g. "http://127.0.0.1:7081". On-demand resources are not in the local NN.rdbdata files; their
+		///     payload is content-addressed by the entry's 16-byte md5 at
+		///     <c>&lt;base&gt;&lt;MirrorRoute&gt;/res/&lt;hex[0:2]&gt;/&lt;hex[2:3]&gt;/&lt;hex[3:]&gt;</c>. The proxy
+		///     is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
+		///     cold miss). Misses are negative-cached so a dead or absent resource is only attempted once per process.
+		/// </summary>
 		private readonly string? _cdnBaseUrl;
 
-		// Resolve a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Builds a
-		// lookup on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
+		/// <summary>
+		///     Resolves a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Built
+		///     on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
+		/// </summary>
 		private Dictionary<(uint, uint), Entry>? _byKey;
 		public IReadOnlyList<Entry> Entries => _entries;
-
-		// Every (type, id) the index states MORE THAN ONCE, with how many entries carry it - computed at parse, so
-		// the answer costs nothing to ask and is the same whether or not anything ever calls TryGet. Empty on this
-		// client; a non-empty list means an override layer is present and `TryGet`'s last-wins rule is live. Kept as
-		// data rather than a log line because this project has no logger - the caller that has one prints it
+		/// <summary>
+		///     Every (type, id) the index states more than once, with how many entries carry it - computed at parse,
+		///     so the answer costs nothing to ask and is the same whether or not anything ever calls
+		///     <see cref="TryGet" />. Empty on this client; a non-empty list means an override layer is present and
+		///     <see cref="TryGet" />'s last-wins rule is live. Kept as data rather than a log line because this
+		///     project has no logger - the caller that has one prints it (<c>--only rdb-inventory</c> does).
+		/// </summary>
 		// (`--only rdb-inventory` does).
 		private readonly List<(uint Type, uint Id, int Count)> _duplicateKeys = [];
 		public IReadOnlyList<(uint Type, uint Id, int Count)> DuplicateKeys => _duplicateKeys;
@@ -74,15 +88,20 @@ namespace Faolan.Core.Rdb
 				fs.Dispose();
 			_dataFiles.Clear();
 		}
-
-		// True if the entry's payload is (likely) readable - a local rdbdata entry, or a CDN entry with a configured
-		// source that hasn't already missed. A CDN "hit" is optimistic: the actual fetch may still 404 (then it's
+		/// <summary>
+		///     True if the entry's payload is likely readable - a local rdbdata entry, or a CDN entry with a
+		///     configured source that has not already missed. A CDN hit is optimistic: the actual fetch may still 404
+		///     (then it is negative-cached and <see cref="ReadRaw" /> returns empty), which the asset callers already
+		///     treat as missing.
+		/// </summary>
 		// negative-cached and ReadRaw returns empty), which the asset callers already treat as "missing".
 		public bool CanRead(Entry e)
 		{
 			return e.IsLocal || (_cdnBaseUrl != null && e.Hash.Length >= 16 && !_cdnMisses.Contains(Convert.ToHexStringLower(e.Hash)));
 		}
-
+		/// <summary>
+		///     The proxy URL for a CDN (file == 0xFF) entry, or null if no source is configured or the hash is absent.
+		/// </summary>
 		// The proxy URL for a CDN (file == 0xFF) entry, or null if no source is configured / the hash is absent.
 		public string? CdnUrl(Entry e)
 		{
@@ -97,18 +116,22 @@ namespace Faolan.Core.Rdb
 		{
 			return _entries.Where(e => e.Type == type);
 		}
-
-		// Reads an entry's payload, unwrapping the IOz1 + zlib container. Returns the decompressed bytes (which
+		/// <summary>
+		///     Reads an entry's payload, unwrapping the IOz1 plus zlib container. Returns the decompressed bytes
+		///     (which begin with the 12-byte RDB-Id data header), or the raw bytes if it is not an IOz1/zlib entry.
+		/// </summary>
 		// begin with the 12-byte RDB-Id data header), or the raw bytes if it isn't an IOz1/zlib entry.
 		public byte[] ReadDecompressed(Entry e)
 		{
 			return UnwrapIOz1(ReadRaw(e));
 		}
-
-		// Reads an RDBH-encrypted entry (only item-templates, RDB types 1000020/1000620, are RDBH). The 20-byte
-		// header is `"RDBH" + ver=1 + flags=1 + plainLen + reserved`; the ciphertext is TEA-ECB encrypted with the
-		// item's per-template key (= ProtoDecryptionKey = Item.Data1..4). Decrypts, truncates to plainLen, then
-		// unwraps the inner IOz1/zlib. If the entry isn't RDBH, falls back to the plain IOz1 unwrap (key ignored).
+		/// <summary>
+		///     Reads an RDBH-encrypted entry (only item templates, RDB types 1000020/1000620, are RDBH). The 20-byte
+		///     header is <c>"RDBH" + ver=1 + flags=1 + plainLen + reserved</c>; the ciphertext is TEA-ECB encrypted
+		///     with the item's per-template key (the <c>ProtoDecryptionKey</c>, <c>Item.Data1..4</c>). Decrypts,
+		///     truncates to plainLen, then unwraps the inner IOz1/zlib. If the entry is not RDBH, falls back to the
+		///     plain IOz1 unwrap and the key is ignored.
+		/// </summary>
 		public byte[] ReadDecrypted(Entry e, ReadOnlySpan<uint> teaKey)
 		{
 			var raw = ReadRaw(e);
@@ -123,12 +146,17 @@ namespace Faolan.Core.Rdb
 			return UnwrapIOz1(inner);
 		}
 
-		// ⚠️ LAST entry wins when a (type, id) appears more than once (#834). That is the patch semantic - a later
-		// index entry is an override of the earlier one - and it is a DECISION, not the incidental result of a
-		// `GroupBy(...).First()`, which is what this used to be. THIS client's `le.idx` has zero duplicate keys
-		// (measured: v5, 873,588 entries, 0 collisions), so the rule changes nothing today; it exists so that if a
-		// patch layer ever does add a second entry, the consumer gets the NEW copy rather than silently the old one.
-		// `DuplicateKeys` is how that stops being silent either way.
+		/// <summary>
+		///     Resolves a (type, id) to its entry.
+		/// </summary>
+		/// <remarks>
+		///     The last entry wins when a (type, id) appears more than once. That is the patch semantic - a later
+		///     index entry is an override of the earlier one - and it is a decision, not the incidental result of a
+		///     <c>GroupBy(...).First()</c>. This client's <c>le.idx</c> has zero duplicate keys (measured: v5,
+		///     873,588 entries, 0 collisions), so the rule changes nothing today; it exists so that if a patch layer
+		///     ever does add a second entry, the consumer gets the new copy rather than silently the old one.
+		///     <see cref="DuplicateKeys" /> is how that stops being silent either way.
+		/// </remarks>
 		public bool TryGet(uint type, uint id, out Entry entry)
 		{
 			if (_byKey == null)
@@ -141,13 +169,16 @@ namespace Faolan.Core.Rdb
 			return _byKey.TryGetValue((type, id), out entry);
 		}
 
-		// Counts entries per type (for the type-inventory phase).
+		/// <summary>Counts entries per type, for the type-inventory phase.</summary>
 		public IEnumerable<(uint Type, int Count)> TypeCounts()
 		{
 			return _entries.GroupBy(e => e.Type).Select(g => (g.Key, g.Count())).OrderByDescending(x => x.Item2);
 		}
-
-		// Synchronously GET a CDN entry's blob through the mirror proxy. Returns empty (and negative-caches the hash) on
+		/// <summary>
+		///     Synchronously GETs a CDN entry's blob through the mirror proxy. Returns empty (and negative-caches the
+		///     hash) on any failure - no source configured, network error, or a 404 (resource not on the CDN, or CDN
+		///     unreachable).
+		/// </summary>
 		// any failure - no source configured, network error, or a 404 (resource not on the CDN / CDN unreachable).
 		private byte[] FetchCdn(Entry e)
 		{
@@ -194,7 +225,7 @@ namespace Faolan.Core.Rdb
 			var version = b.ReadU32Le(4);
 			var numEntries = (int)b.ReadU32Le(24);
 
-			// Detail record: v5 = 11 u32 (44 B), v7 = 28 B. Both put file at byte 0 (low byte), offset at byte 4,
+			// Detail record: v5 is 11 u32 (44 B), v7 is 28 B. Both put file at byte 0 (low byte), offset at byte 4,
 			// size at byte 8 - only the stride differs.
 			var detailStride = version == 5
 				? 44
@@ -210,22 +241,25 @@ namespace Faolan.Core.Rdb
 				var id = b.ReadU32Le(indexOff + i * 8 + 4);
 
 				var d = detailOff + i * detailStride;
-				var file = b[d] & 0xff; // unk0 & 0xff
+				var file = b[d] & 0xff;
 				var offset = b.ReadU32Le(d + 4);
 				var size = b.ReadU32Le(d + 8);
 
-				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
+				var hash = b.AsSpan(d + 28, 16).ToArray(); // content md5, the CDN path hash for file==0xFF resources
 				_entries.Add(new Entry(type, id, file, offset, size, hash));
 			}
 
 			CensusDuplicateKeys();
 		}
 
-		// One pass over the parsed entries recording any (type, id) stated more than once. #834: the old key index
-		// resolved a collision with `First()` and said nothing, so a patch layer's entry would have been served
-		// STALE and the symptom would have read as wrong CONTENT rather than a wrong pick. Counting here means the
-		// question "does this client's index collide?" is answered by the reader itself instead of needing a
-		// hand-written index parser to rule it out, which is what #832's audit actually had to do.
+		/// <summary>
+		///     One pass over the parsed entries recording any (type, id) stated more than once.
+		/// </summary>
+		/// <remarks>
+		///     A key index that resolved a collision silently would serve a patch layer's entry stale, and the symptom
+		///     would read as wrong content rather than a wrong pick. Counting here means "does this client's index
+		///     collide?" is answered by the reader itself instead of by a hand-written index parser.
+		/// </remarks>
 		private void CensusDuplicateKeys()
 		{
 			var counts = new Dictionary<(uint, uint), int>(_entries.Count);
@@ -266,13 +300,13 @@ namespace Faolan.Core.Rdb
 		}
 
 		/// <summary>
-		///     Whether this entry is TEA-ENCRYPTED (an <c>RDBH</c> wrapper) and so needs a per-template key, rather
+		///     Whether this entry is TEA-encrypted (an <c>RDBH</c> wrapper) and so needs a per-template key, rather
 		///     than being readable with none.
 		/// </summary>
 		/// <remarks>
 		///     Asked of a whole type it is a census the record's own header cannot give: the RDBH header carries no
-		///     category tag, so the split is the closest thing to a KIND the bytes state. #415 pairs it with the LDB
-		///     name category, which states the kind from outside, and the two agree.
+		///     category tag, so the split is the closest thing to a kind the bytes state. It agrees with the LDB name
+		///     category, which states the kind from outside.
 		/// </remarks>
 		public bool IsEncrypted(Entry e)
 		{
@@ -284,10 +318,12 @@ namespace Faolan.Core.Rdb
 			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
 		}
 
-		// The entry's bytes exactly as the pack file holds them - still RDBH-wrapped and still encrypted when it is an
-		// encrypted record. Every ordinary caller wants ReadDecompressed / ReadDecrypted instead; this exists for the
-		// one job that needs the CIPHERTEXT rather than the content: hunting a record's TEA key by trial decryption
-		// (FeatKeyScanner, #877). Named for what it gives you so nobody reaches for it by accident.
+		/// <summary>
+		///     The entry's bytes exactly as the pack file holds them - still RDBH-wrapped and still encrypted when it
+		///     is an encrypted record. Every ordinary caller wants <see cref="ReadDecompressed" /> or
+		///     <see cref="ReadDecrypted" /> instead; this exists for the one job that needs the ciphertext rather than
+		///     the content: hunting a record's TEA key by trial decryption (<c>FeatKeyScanner</c>).
+		/// </summary>
 		public byte[] ReadRawEntry(Entry e)
 		{
 			return ReadRaw(e);

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spawn-duplicates`: is a cluster of near-identical STATIONARY spawns one NPC harvested twice, or a
-	// genuinely tight retail placement? (Gitea #718, and #765 for the concrete Scruffy case.)
+	// `--report spawn-duplicates`: is a cluster of near-identical stationary spawns one NPC harvested twice, or a
+	// genuinely tight retail placement?
 	//
 	// The decision itself lives in `StationaryPlacementResolver`, which is also what the `npcs` import stamps
 	// `PlacementId` from - so this report cannot show a verdict the importer would not act on, and the two cannot
@@ -59,17 +59,17 @@ namespace Faolan.Importer.Cli
 			CrossMapDuplicates(rows, await db.Maps.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Name ?? "?"), captures);
 		}
 
-		// ⭐ The duplicate class the section above STRUCTURALLY cannot see (#728). `StationaryPlacementResolver`
+		// The duplicate class the section above STRUCTURALLY cannot see. `StationaryPlacementResolver`
 		// groups by `(MapId, NpcTemplateId, ClassId)`, so two records of one NPC filed under two map ids are never
-		// compared - and a map's SUB-AREAS are separate playfield ids sharing one coordinate space, which is exactly
+		// compared - and a map's sub-AREAS are separate playfield ids sharing one coordinate space, which is exactly
 		// how that happens.
 		//
-		// ⚠️ A pair is not a defect (#728): a row records that retail streamed this NPC to a client in that playfield,
+		// A pair is not a defect: a row records that retail streamed this NPC to a client in that playfield,
 		// and near a boundary retail streams the neighbour's NPCs across it - so both rows are true and both are
 		// served, each to its own map. What follows is a census of where that happens, not a list to act on. What this puts a number on is which map PAIRS overlap, how much of the smaller map is involved,
 		// and whether the twins agree on the columns a re-harvest of the same NPC would agree on - then
 		// `CrossMapSightings` below decides, and on the corpus it decides against the legitimate reading on two of
-		// the three pairs. Tortage day/night was the example of a legitimate pair and it is NOT one: one capture
+		// the three pairs. Tortage day/night was the example of a legitimate pair and it is not one: one capture
 		// files the same spot under both ids.
 		private static void CrossMapDuplicates(IReadOnlyList<NpcSpawn> rows, IReadOnlyDictionary<uint, string> maps, IReadOnlyList<NamedCapture> captures)
 		{
@@ -105,7 +105,7 @@ namespace Faolan.Importer.Cli
 				var onA = bucket.Select(p => p.A.Id).Distinct().Count();
 				var onB = bucket.Select(p => p.B.Id).Distinct().Count();
 				var totalB = rows.Count(r => r.MapId == b);
-				// ⭐ Level and Health are what a SECOND harvest of the same NPC reproduces; a genuinely different
+				// Level and Health are what a second harvest of the same NPC reproduces; a genuinely different
 				// population at the same spot is free to differ. So the agreement rate is the discriminator that
 				// costs no captures - 100% reads as one placement recorded twice, anything less as two populations.
 				var agree = bucket.Count(p => p.A.Level == p.B.Level && p.A.Health == p.B.Health);
@@ -118,8 +118,8 @@ namespace Faolan.Importer.Cli
 			CrossMapSightings(pairs.Keys, captures, maps);
 		}
 
-		// ⭐ The DECISIVE test for a cross-map pair, and it needs no timestamps (#728). If ONE capture sighted the
-		// same template at the same spot under BOTH map ids, then no second population is involved: the extractor
+		// The DECISIVE test for a cross-map pair, and it needs no timestamps. If one capture sighted the
+		// same template at the same spot under both map ids, then no second population is involved: the extractor
 		// re-keyed mid-stream and one physical NPC was filed twice. If instead each side is only ever sighted by
 		// captures that saw that map alone, the two are two populations and the pair is a coincidence of geometry -
 		// which is what Tortage day/night should look like.
@@ -154,26 +154,26 @@ namespace Faolan.Importer.Cli
 			CrossMapVotes(mapPairs, sightings, maps);
 		}
 
-		// ⭐⭐ A DIAGNOSTIC, NOT A DEFECT LIST. A cross-map pair is TWO TRUE OBSERVATIONS, and both rows are wanted
-		// (#728, settled by the maintainer: *"spawns are for the map (id) they are on"*).
+		// A diagnostic, not a defect list. A cross-map pair is two true observations and both rows are wanted:
+		// spawns belong to the map id they are on.
 		//
 		// A row means "retail streamed this NPC to a client standing in this playfield". Near a sub-area boundary
 		// retail streams the neighbour's NPCs across it, so it genuinely sends that Wharf Rat both to a player in the
-		// Common District AND to one standing in Old Tarantia looking in. Two rows record two things retail did.
+		// Common District and to one standing in Old Tarantia looking in. Two rows record two things retail did.
 		// `GetNpcSpawns(mapId)` then serves strictly by map and a player is on exactly one map, so no client ever
-		// receives both and nothing is doubled - keeping both is what reproduces retail on BOTH sides of the boundary,
+		// receives both and nothing is doubled - keeping both is what reproduces retail on both sides of the boundary,
 		// and deleting either is what would break it (an NPC popping out of existence at a district line).
 		//
-		// ⚠️ The one real divergence, and it is cosmetic: the two rows are independent entities in two zones, so a rat
+		// The one real divergence, and it is cosmetic: the two rows are independent entities in two zones, so a rat
 		// killed by someone in the Common District is still standing for an observer in Old Tarantia. Retail has one
 		// NPC streamed across the line. Not worth a shared-entity model.
 		//
-		// ⛔ The vote below is printed to show that the obvious "resolve it" rule FAILS, so nobody builds one later.
+		// The vote below is printed to show that the obvious "resolve it" rule FAILS, so nobody builds one later.
 		// "A spot's true map is the one most captures agree on" answers `2000` 15 times out of 15, by 8 captures to 1
 		// - against the maintainer, who had just walked it and puts them in 2020.
 		//
-		// The mechanism is general, which is why this is a trap and not a bad-luck sample: **an NPC near a sub-area
-		// boundary is seen far more often from OUTSIDE it than from inside**, so the vote counts OBSERVERS rather than
+		// The mechanism is general, which is why this is a trap and not a bad-luck sample: an NPC near a sub-area
+		// boundary is seen far more often from outside it than from inside, so the vote counts OBSERVERS rather than
 		// placements and the majority is the population that never went in. The sighting counts say it plainly - the
 		// single "losing" capture is `..._annotated_3` with 145 Wharf Rat sightings, the session that walked the
 		// district, against 1-17 glancing sightings in each of the eight "winners".

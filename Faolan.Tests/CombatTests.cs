@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			Assert.Equal(3276u + 20 * 53u, CombatResolver.NpcMaxHealthForLevel(80)); // +53/level past the L60 anchor
 		}
 
-		// #76: the NPC max-HP fallback (for un-captured creatures) is fitted to the captured civilian baseline.
+		// The NPC max-HP fallback (for un-captured creatures) is fitted to the captured civilian baseline.
 		[Theory, InlineData(1u, 63u), InlineData(20u, 933u), InlineData(40u, 2217u), InlineData(60u, 3276u), InlineData(35u, 1952u), InlineData(45u, 2481u)]
 		// anchor: L1 baseline (27 NPCs)
 		// anchor: L20 (43 NPCs)
@@ -175,7 +175,7 @@ namespace Faolan.Tests
 			Assert.Equal(v.MaxMana, v.Mana);
 		}
 
-		// #375: a resurrection point's RestorationLevel is the PERCENT of max you come back with - 344 of the 538
+		// A resurrection point's RestorationLevel is the percent of max you come back with - 344 of the 538
 		// imported points restore 10, 157 restore 100. The two edge cases matter more than the arithmetic: a point
 		// with no value must not revive you at 0% (i.e. dead), and a tiny percent of a small pool must still leave you
 		// alive rather than truncating to 0.
@@ -199,14 +199,14 @@ namespace Faolan.Tests
 		{
 			var v = EntityVitals.FromMax(63, 63, 63);
 
-			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current AND max id per vital, in
+			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current and max id per vital, in
 			// .Set order (current then max per vital; ids in-client verified, see CharacterStatId):
 			// count(06) + HealthCurrent(001B) + HealthMax(0001) + StaminaCurrent(01F8) + StaminaMax(01F9)
 			//           + ManaCurrent(01FA) + ManaMax(01FB), each = 0x189C.
 			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(v.ToVitalsBlock())));
 		}
 
-		// #586: the CURRENTS-only form, which is what retail sends when a pool MOVES (a hit, a cast, the regen tick).
+		// The currents-only form, which is what retail sends when a pool moves (a hit, a cast, the regen tick).
 		// Measured over the corpus with `--report vitals-shape`: 3,694 of the 4,900 0x96B8DC59 blocks on a handle that
 		// is not the session's own carry exactly these three ids, and only 16 carry the six-record form.
 		[Fact]

@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A melee swing's reach (#696). The target handle a swing carries is the CLIENT's, and the server is the only
-	// thing that can bound it - the client range-checks a SPELL itself and never sends an out-of-range cast, but it
+	// A melee swing's reach. The target handle a swing carries is the client's, and the server is the only
+	// thing that can bound it - the client range-checks a spell itself and never sends an out-of-range cast, but it
 	// always sends the swing. `CombatTargeting.ResolveSwingReach` is that bound.
 	//
-	// The case these tests exist for is the INSTANCED one. The first cut of the gate resolved the target through
-	// `TryGetZone(MapId)`, which only ever finds the DEFAULT instance, so on a Solo map it found nothing and fell
+	// The case these tests exist for is the instanced one. The first cut of the gate resolved the target through
+	// `TryGetZone(MapId)`, which only ever finds the default instance, so on a Solo map it found nothing and fell
 	// open - and it was tested on Tortage Island (4010), which is exactly such a map, so it shipped doing nothing
 	// while looking correct in review. The session log that "proved" the check ran and measured a small distance
 	// shows a swing landing on a mob standing untouched at its own spawn 21.3u away, which is the signature of a
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		}
 
 		// The reach is measured in three dimensions, so a mob on the ledge directly above you is as unreachable as one
-		// the same distance away on the flat. (The cleave CONE ignores height on purpose - that is a compass arc - but
+		// the same distance away on the flat. (The cleave cone ignores height on purpose - that is a compass arc - but
 		// the distance a blade travels is not a compass question.)
 		[Fact]
 		public void HeightCountsTowardTheDistance()
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			Assert.Equal(MeleeReach.TooFar, CombatTargeting.ResolveSwingReach(world, attacker, 2, out _));
 		}
 
-		// A target in ANOTHER copy of the same map is not reachable - the instancing split is what stops one player's
+		// A target in another copy of the same map is not reachable - the instancing split is what stops one player's
 		// swing landing in someone else's private Tortage.
 		[Fact]
 		public void TargetInAnotherInstanceOfTheSameMap_IsNotInZone()

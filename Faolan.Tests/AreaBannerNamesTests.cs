@@ -8,16 +8,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The area-banner recovery (#679): the hash that turns a banner id into a client string, and the join that decides
+	// The area-banner recovery: the hash that turns a banner id into a client string, and the join that decides
 	// which playfield's region a recovered id belongs to.
 	//
-	// These run with NO client RDB - the hash is arithmetic and the join is fed hand-built regions - which is the
-	// point: the shipped rows in faolan.db are gated by MapRegionGeometryTests, and this gates the RULES that produced
-	// them, including the ones that must keep REFUSING to produce a row.
+	// These run with no client RDB - the hash is arithmetic and the join is fed hand-built regions - which is the
+	// point: the shipped rows in faolan.db are gated by MapRegionGeometryTests, and this gates the rules that produced
+	// them, including the ones that must keep refusing to produce a row.
 	public class AreaBannerNamesTests
 	{
 		// The arithmetic the whole recovery rests on, and the thing that settled a story about the ids being renumbered
-		// by a client patch: the banner id is a PARAMETER inside the localized token, and the LDB key is elf28 of the
+		// by a client patch: the banner id is a parameter inside the localized token, and the LDB key is elf28 of the
 		// whole token string. 3474586 is the "Castle Approach" banner captured on Tarantia Noble District, and 19303910
 		// is the category-50025 id its token hashes to.
 		[Theory]
@@ -68,8 +68,8 @@ namespace Faolan.Tests
 			Assert.Contains(AreaBannerNames.Normalise(text), AreaBannerNames.RegionForms(region).Select(AreaBannerNames.Normalise));
 		}
 
-		// The POSSESSIVE has to be offered as an alternative rather than normalised away, because the client is
-		// inconsistent about it in BOTH directions: `Ymirs Tongue` keeps the s for "Ymir's Tongue" and `BA_LionMarket`
+		// The possessive has to be offered as an alternative rather than normalised away, because the client is
+		// inconsistent about it in both directions: `Ymirs Tongue` keeps the s for "Ymir's Tongue" and `BA_LionMarket`
 		// drops it for "The Lion's Market". Collapsing every possessive would fix one and break the other.
 		[Theory]
 		[InlineData("Ymirs Tongue", "Ymir's Tongue")]
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			Assert.Contains(AreaBannerNames.Normalise(region), AreaBannerNames.TextForms(text).Select(AreaBannerNames.Normalise));
 		}
 
-		// ...and the pairs it must NOT join. Normalisation drops punctuation and a widget prefix, never a word: two
+		// ...and the pairs it must not join. Normalisation drops punctuation and a widget prefix, never a word: two
 		// different places staying apart is what stops the join inventing rows.
 		[Theory]
 		[InlineData("Scout Camp", "Crossroads")]
@@ -109,7 +109,7 @@ namespace Faolan.Tests
 		}
 
 		// The block gate, which is the whole reason the join is safe. "Outlaw Camp" names a region on 41 playfields and
-		// so has 41 recovered ids; only the one inside THIS playfield's numbering can be its own.
+		// so has 41 recovered ids; only the one inside this playfield's numbering can be its own.
 		[Fact]
 		public void AGenericName_TakesTheIdInsideThePlayfieldsOwnBlock()
 		{
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 			Assert.Equal(4553228u, matches.Single(m => m.RegionName == "Outlaw Camp").AreaNameId);
 		}
 
-		// A name that matches ONCE in the whole client is still refused when it lands nowhere near the playfield's own
+		// A name that matches once in the whole client is still refused when it lands nowhere near the playfield's own
 		// numbering. This is map 1010's `Fifo-CimmerianSettlement`: "Cimmerian Settlement" is recovered exactly once,
 		// at 711411, while every other banner on that playfield is 37098xx - so the id is some other place of the same
 		// name. Uniqueness is not evidence of belonging here.
@@ -139,7 +139,7 @@ namespace Faolan.Tests
 			Assert.Contains(notes, n => n.Contains("Fifo-CimmerianSettlement"));
 		}
 
-		// A lone anchor with nothing near it is not a block - unless the WIRE put it there. A captured id needs no
+		// A lone anchor with nothing near it is not a block - unless the wire put it there. A captured id needs no
 		// corroboration; a single name match does, or one playfield's chance collision becomes another's banner.
 		[Fact]
 		public void ALoneNameMatch_IsNotABlock_ButALoneCapturedIdIs()
@@ -169,9 +169,9 @@ namespace Faolan.Tests
 			Assert.Equal(3906077u, Assert.Single(matches).AreaNameId);
 		}
 
-		// ⚠️ The guard that keeps a playfield's own numbering authoritative (#680). The same places are named on
-		// several playfields - Ymir's Pass's areas exist under 269xxx, 3822xxx AND 3908xxx - so a playfield's regions
-		// can name-match a whole coherent cluster that belongs to a COPY of it. Where the wire has said where this
+		// The guard that keeps a playfield's own numbering authoritative. The same places are named on
+		// several playfields - Ymir's Pass's areas exist under 269xxx, 3822xxx and 3908xxx - so a playfield's regions
+		// can name-match a whole coherent cluster that belongs to a copy of it. Where the wire has said where this
 		// playfield's ids live, only a block holding a captured id counts. Without this, Ymir's Pass imported eight
 		// regions off another playfield's block.
 		[Fact]
@@ -225,7 +225,7 @@ namespace Faolan.Tests
 			Assert.Contains(notes, n => n.Contains("BA_Bridge") && n.Contains("not unique"));
 		}
 
-		// Only the CROSSING-NOTIFIER volumes are candidates. The same place name is also carried by audio and
+		// Only the crossing-notifier volumes are candidates. The same place name is also carried by audio and
 		// collision regions, and a region that never tells the server the player entered it cannot fire a
 		// server-sent banner - so matching one would put the banner on a volume nothing crosses.
 		[Fact]

@@ -12,19 +12,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Loot-window interaction flow (loot-all / single-drag / cash / close), decoded in protocol_loot_interaction:
-	//   UL 0x2043 TryLootAll   [loot typetag 0xC87A][bag handle]              -> grant every bag item, then fade
-	//   UL 0x2044 CloseLootBag [typetag][bag handle]                          -> drop the window without taking
-	//   UL 0x2045 TryLootCash  [typetag][bag handle]                          -> credit the bag's coins to the wallet
-	//   UL 0x2046 TryLootItem  [typetag][bag handle][display index]           -> grant the one dragged item
-	// Two collaborators, one per question (#826): `LootBroadcaster` owns the loot LIFECYCLE - the corpse drop, the
-	// bag's fade/close, and (as its `Bags`) what is in each bag - while this service is the orchestration the
-	// dispatch switch used to carry inline: it pulls items off the bag and grants them through the IEconomyOutbound
-	// port. (It used to take the whole `WorldBroadcaster` plus its `Bags` property, on the reasoning that a loot bag
-	// is a world entity. It is - but that is the visibility system SERVING loot, not the two being one job.)
-	// Extracted out of GameServerListener as a composed collaborator, mirroring ShopService (#200): the switch cases are now thin
-	// one-liners delegating here, like the shop cases. Our client does NOT local-add from the bag (verified -
-	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
+	/// <summary>
+	///     The loot-window interaction flow: loot-all, single drag, cash, and close.
+	/// </summary>
+	/// <remarks>
+	///     The client's four requests, decoded in <c>protocol_loot_interaction</c>:
+	///     <code>
+	///     TryLootAll   [loot typetag 0xC87A][bag handle]                 -> grant every bag item, then fade
+	///     CloseLootBag [typetag][bag handle]                             -> drop the window without taking
+	///     TryLootCash  [typetag][bag handle]                             -> credit the bag's coins to the wallet
+	///     TryLootItem  [typetag][bag handle][display index]              -> grant the one dragged item
+	///     </code>
+	///     <para>
+	///         <see cref="LootBroadcaster" /> owns the loot lifecycle - the corpse drop, the bag's fade and close, and
+	///         (as its <c>Bags</c>) what each bag holds - while this service is the orchestration on top: it pulls items
+	///         off the bag and grants them through the <see cref="IEconomyOutbound" /> port.
+	///     </para>
+	///     <para>
+	///         The client does not add the item locally from the bag, so the server-side item grant is what actually
+	///         delivers it; a persist-only take leaves the item un-takeable in the window.
+	///     </para>
+	/// </remarks>
 	public sealed class LootService
 	{
 		private readonly IChatServerDispatcher _chat;
@@ -45,9 +53,15 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// Grants one looted item, and puts it BACK on the bag if the grant fails (full backpack / an item the snapshot
-		// cannot build). The bag hands each item over exactly once, so discarding the result - which is what this code
-		// did - destroyed the loot and then logged the take as a success. Returns whether the player actually got it.
+		/// <summary>
+		///     Grants one looted item, returning it to the bag when the grant fails - a full backpack, or an item the
+		///     snapshot cannot build.
+		/// </summary>
+		/// <remarks>
+		///     The bag hands each item over exactly once, so the caller must act on the result: discarding it destroys
+		///     the loot and reports the take as a success.
+		/// </remarks>
+		/// <returns>Whether the player actually received the item.</returns>
 		private async Task<bool> GrantLootedItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null, int? preferredSlot = null)
 		{
 			if (await _outbound.GrantItemToBackpack(client, itemTemplateId, preferredSlot: preferredSlot) != null)
@@ -60,7 +74,7 @@ namespace Faolan.GameServer.World
 			return false;
 		}
 
-		// CloseLootBag: the client closed the loot window without taking everything.
+		/// <summary>The client closed the loot window without taking everything.</summary>
 		public async Task HandleCloseLootBag(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // loot typetag (0xC87A)
@@ -68,14 +82,20 @@ namespace Faolan.GameServer.World
 			await _loot.CloseLootBag(client, bagHandle);
 		}
 
-		// 0x2043 TryLootAll: the loot-all click. Grant every item the bag carries into the backpack (persist + live
-		// DispatchAddItem); the bag hands them over once (TakeBagItems clears them), and coins ride TryLootCash.
+		/// <summary>
+		///     The loot-all click: grants every item the bag carries into the backpack, persisting and pushing each one.
+		/// </summary>
+		/// <remarks>
+		///     The bag hands its items over exactly once - <c>TakeBagItems</c> clears them - and coins ride
+		///     <see cref="HandleLootCash" /> instead.
+		/// </remarks>
 		public async Task HandleLootAll(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 
-			// Capture the bag's source NPC BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
+			// Read the bag's source NPC before taking: loot-all empties and consumes the bag, and the loot-quest goal
+			// needs the source.
 			var source = _loot.Bags.BagSource(client, bagHandle);
 
 			var items = _loot.Bags.TakeBagItems(client, bagHandle);
@@ -87,32 +107,34 @@ namespace Faolan.GameServer.World
 
 				granted++;
 
-				// Quest chain (#261): the goal is satisfied by RECEIVING its quest item, so it
-				// advances per granted item - not once per loot-all. Looting a bag without that item in it, or a
-				// take that bounced off a full backpack, advances nothing.
+				// A loot goal is satisfied by receiving its quest item, so it advances per granted item rather than
+				// once per loot-all. A bag without that item in it, or a take that bounced off a full backpack,
+				// advances nothing.
 				await _questProgression.AdvanceLootGoals(client, source.Name!, itemTemplateId, source.TemplateId);
 			}
 
 			if (items.Count > 0)
 			{
-				// Count what the player actually RECEIVED, not what the bag handed over - the two differ when the
-				// backpack fills up mid-loot, and the returned items keep the bag open (AfterLootTake fades it only
-				// once it is truly empty).
+				// Count what the player received, not what the bag handed over: the two differ when the backpack fills
+				// up mid-loot, and the returned items keep the bag open, since AfterLootTake fades it only once it is
+				// truly empty.
 				_logger.LogInformation("Loot: granted {Granted} of {Count} item(s) from bag 0x{Bag:X8} to {Player}.", granted, items.Count, bagHandle, client.Session.Character?.Name);
 			}
 
-			// Confirm the take + (since loot-all empties it) consume/fade the bag. A loot-all removes EVERY item slot
-			// the bag handed over, and retail says so in one message listing them all - the contiguous run [0..n-1]
-			// (#453). Passing nothing here sent a one-element [0] and left the client showing every slot but the first.
+			// Confirm the take and, since loot-all empties it, consume and fade the bag. A loot-all removes every item
+			// slot the bag handed over and retail says so in one message listing them all, the contiguous run
+			// [0..n-1]; a shorter list leaves the client showing the slots it does not name.
 			await _loot.AfterLootTake(client, bagHandle, [.. Enumerable.Range(0, items.Count).Select(i => (uint)i)]);
 		}
 
-		// 0x2045 TryLootCash: credit the bag's coins. Coins AUTO-LOOT when the window opens - this is the client's very
-		// first word about a bag, sent before the player takes anything, so it is not a "loot the money" action the
-		// player can decline. Measured over the corpus: 67 of 70 bags open with it, and the canonical sequence is
-		// TryLootCash -> TryLootAll -> CloseLootBag (63 bags), or TryLootCash -> TryLootItem -> CloseLootBag (4).
-		// Nothing to do differently server-side - credit what the client asks for - but it is why a bag that held only
-		// coins is already empty by the time any item take happens.
+		/// <summary>Credits the bag's coins to the player's wallet.</summary>
+		/// <remarks>
+		///     Coins auto-loot when the window opens: this is the client's first word about a bag, sent before the
+		///     player takes anything, so it is not an action the player can decline. Across the corpus 67 of 70 bags
+		///     open with it, and the canonical sequence is TryLootCash -> TryLootAll -> CloseLootBag (63 bags) or
+		///     TryLootCash -> TryLootItem -> CloseLootBag (4). The server simply credits what the client asks for, but
+		///     it is why a bag that held only coins is already empty by the time any item take happens.
+		/// </remarks>
 		public async Task HandleLootCash(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // loot typetag (0xC87A)
@@ -125,7 +147,7 @@ namespace Faolan.GameServer.World
 				character.Money += cash;
 				await _database.SetCharacterMoney(character.Id, character.Money);
 				await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
-				// Retail follows the balance update with the bag-window removal of the money row (#809).
+				// Retail follows the balance update with the bag-window removal of the money row.
 				await LootBroadcaster.AfterLootCash(client, bagHandle, cash);
 				_logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 			}
@@ -133,17 +155,19 @@ namespace Faolan.GameServer.World
 				_logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);
 		}
 
-		// 0x2046 TryLootItem: a single drag of one item out of the loot window.
+		/// <summary>A single drag of one item out of the loot window.</summary>
+		/// <remarks>
+		///     The client's own signature is
+		///     <c>TryLootItem(const ID32&amp; i_cLootBagID, int i_nItemPos, const ID32&amp; i_cCharID, int
+		///     i_nDesiredPosition)</c> (docs/re/aoc-client-rpc-methods.json). <c>i_nItemPos</c> runs over the bag's
+		///     display indices while <c>i_nDesiredPosition</c> is the backpack slot the player dropped the item on; the
+		///     two captured multi-loot sequences show the latter tracking the player's own filling backpack
+		///     (0,1,2,...,5,6). The desired slot is honoured as a request only: an occupied or out-of-range slot falls
+		///     back to the first free one, because a drag onto a full slot must put the item somewhere rather than
+		///     failing or overwriting what is there.
+		/// </remarks>
 		public async Task HandleLootItem(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			// TryLootItem(const ID32& i_cLootBagID, int i_nItemPos, const ID32& i_cCharID, int i_nDesiredPosition) -
-			// the client's own signature (docs/re/aoc-client-rpc-methods.json). The handler used to stop after
-			// i_nItemPos and leave 12 bytes on the body, which hid i_nDesiredPosition entirely: the player DRAGS the
-			// item onto a specific backpack slot and that word is the slot they dropped it on. The two captured
-			// multi-loot sequences make the meaning unambiguous: i_nItemPos runs over the bag's display indices while
-			// i_nDesiredPosition tracks the player's own filling backpack (0,1,2,...,5,6). It is now honoured (#462) -
-			// as a REQUEST: an occupied or out-of-range slot still falls back to the first free one, because a drag
-			// onto a full slot must put the item somewhere rather than failing or overwriting what is there.
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 			var itemIndex = body.ReadUInt32(); // i_nItemPos - which item (display index) the player dragged
@@ -156,10 +180,10 @@ namespace Faolan.GameServer.World
 			var source = _loot.Bags.BagSource(client, bagHandle);
 			var item = _loot.Bags.TakeBagItem(client, bagHandle, (int)itemIndex);
 			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex, (int)desiredPosition))
-				await _questProgression.AdvanceLootGoals(client, source.Name!, item.Value, source.TemplateId); // #261: the goal wants THIS item
+				await _questProgression.AdvanceLootGoals(client, source.Name!, item.Value, source.TemplateId); // The goal wants this one item
 
-			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
-			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.
+			// Confirm the take: tell the client to remove the dragged slot from the open window. AfterLootTake consumes
+			// and fades the bag only once it is fully emptied, so a partial drag leaves it open with the rest.
 			await _loot.AfterLootTake(client, bagHandle, itemIndex);
 		}
 	}

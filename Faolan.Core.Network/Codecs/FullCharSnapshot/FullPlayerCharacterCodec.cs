@@ -6,39 +6,36 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The FullChar (0x737A6DF9) snapshot RECORD - the world-entry player state, both directions in one type.
-	//
-	//   [u32 FullPlayerCharacterIIR][u32 typeTag = Character][u32 instance][u8 flag][u32 rootLength][root][sub-class]
-	//
-	// The [flag][rootLength] pair is the client's blob-length frame (n3InfoItemRemote::Construct -> FUN_00cbfb80):
-	// the client reads exactly rootLength bytes, and those bytes are the WHOLE ProtoFullCharacterIIR root. The root
-	// is decoded/encoded TYPED (protobuf-net, IExtensible => lossless); the sub-class is
-	// FullCharSnapshotSubClassCodec. A pure structural split/assembly - no byte scanning.
-	//
-	// The record's own u32 carrier length belongs to the SENDER (#530 rule 2), not here.
-	//
-	// ⚠️ WHY READ AND WRITE LIVE TOGETHER. They used to be split across two projects that could not see each other:
-	// the reader here, and the prefix builder + assembly on GameServerListener in the server host. Nothing forced
-	// them to agree, and they did not. The reader skipped a 3-byte "field5" after the length; the writer appended
-	// those same 3 bytes verbatim. That "field5" was never a frame - it is the root's OWN first field
-	// (`subscription_flags`, 5), which happens to encode as exactly 3 bytes on the two level-1 beach captures the
-	// model came from. So both halves were self-consistent on the beach and every golden passed, while the reader
-	// failed on EVERY level-80 snapshot (silently, inside the importer's catch - imported characters came out with
-	// no carried inventory) and the writer put subscription_flags on the wire twice.
-	//
-	// One type, one statement of the model, with a Build/Parse round-trip gate over it - that is what makes the
-	// drift impossible rather than merely unlikely. Same class of bug as the 0x7E2 "constant", see
-	// [[list_frame_0x3f1_count_word]]: a shape that is "constant across N captures" means nothing when all N
-	// captures are the degenerate case.
+	/// <summary>
+	///     The FullChar snapshot record - the world-entry player state, both directions in one type:
+	///     <c>[u32 FullPlayerCharacterIIR][u32 typeTag][u32 instance][u8 flag][u32 rootLength][root][sub-class]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The <c>[flag][rootLength]</c> pair is the client's blob-length frame
+	///     (<c>n3InfoItemRemote::Construct</c> into FUN_00cbfb80): the client reads exactly <c>rootLength</c> bytes, and
+	///     those bytes are the whole <c>ProtoFullCharacterIIR</c> root. The root is decoded and encoded typed
+	///     (protobuf-net, <c>IExtensible</c>, so lossless); the sub-class is
+	///     <see cref="FullCharSnapshotSubClassCodec" />. A pure structural split and assembly, with no byte scanning. The
+	///     record's own u32 carrier length belongs to the sender.
+	///     <para>
+	///         Read and write live together deliberately. Split across two projects that cannot see each other, nothing
+	///         forces the two halves to agree: a reader that skips a 3-byte "field5" after the length and a writer that
+	///         appends those same bytes are each self-consistent, while that "field5" is really the root's own first
+	///         field (<c>subscription_flags</c>), which happens to encode as exactly 3 bytes on a level-1 beach capture.
+	///         One type, one statement of the model, with a Build/Parse round-trip gate over it, is what makes that drift
+	///         impossible rather than merely unlikely - the same class of trap as reading a single-element list frame as
+	///         a constant.
+	///     </para>
+	/// </remarks>
 	public static class FullPlayerCharacterCodec
 	{
 		public const uint Opcode = (uint)IirTypes.FullPlayerCharacterIIR;
 
-		// [u8 flag][u32 BE rootLength]. The flag is 0 on every captured snapshot; asserted rather than skipped, so
-		// a body that carries something else there fails loudly instead of shifting the root by a byte.
+		// [u8 flag][u32 BE rootLength]. The flag is 0 on every captured snapshot; asserted rather than skipped, so a body
+		// that carries something else there fails loudly instead of shifting the root by a byte.
 		private const byte BlobFlag = 0x00;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(FullPlayerCharacterIIR value)
 		{
 			using var s = new FaolanStream();
@@ -83,6 +80,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		}
 	}
 
-	// The snapshot: whose it is, the typed inventory root, and the tails.
+	/// <summary>The snapshot: whose it is, the typed inventory root, and the tails.</summary>
 	public sealed record FullPlayerCharacterIIR(uint Instance, ProtoFullCharacterIIR Root, FullCharSnapshotSubClass SubClass);
 }

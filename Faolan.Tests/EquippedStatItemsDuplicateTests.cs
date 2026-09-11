@@ -10,22 +10,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #585: two identical rings are TWO occupied slots, and the stat they grant has to count twice.
+	// Two identical rings are two occupied slots, and the stat they grant has to count twice.
 	//
-	// `GetEquippedStatItems` built a HashSet of the worn item ids and returned one Item per DISTINCT id - contradicting
-	// its own comment ("Preserve one entry per occupied slot (duplicates included) so a stat granted by two worn copies
-	// stacks") and the interface doc. Everything downstream reads the aggregate: max health/stamina/mana, the five
-	// attribute scores, and - since #580 put the attributes INTO the pool curve - the attribute-scaled part of every
-	// pool as well. So a character wearing two of the same ring was short on all of it, silently.
+	// `GetEquippedStatItems` returns one entry per occupied slot, duplicates included. A HashSet of the worn item ids
+	// would return one Item per distinct id, and everything downstream reads the aggregate: max health/stamina/mana,
+	// the five attribute scores, and - because the attributes feed the pool curve - the attribute-scaled part of every
+	// pool as well. A character wearing two of the same ring would be short on all of it, silently.
 	//
-	// The distinct set is still what the query takes: `IN (...)` cannot use a duplicate. The fix is that the RESULT is
-	// rehydrated from the original per-slot sequence, not from the set.
+	// The distinct set is still what the query takes: `IN (...)` cannot use a duplicate. The result is rehydrated from
+	// the original per-slot sequence, not from the set.
 	public class EquippedStatItemsDuplicateTests
 	{
 		[Fact]
 		public async Task TwoIdenticalRings_AreReturnedTwice_SoTheirStatStacks()
 		{
-			// A WRITABLE copy of the shipped fixture rather than a bare EnsureCreated: Character hangs off Account,
+			// A writable copy of the shipped fixture rather than a bare EnsureCreated: Character hangs off Account,
 			// Realm and Map, and the fixture already carries the seeded realm/account and the map rows.
 			var path = Path.Combine(Path.GetTempPath(), $"faolan-equip-dupes-{System.Guid.NewGuid():N}.db");
 			File.Copy(TestDb.GameDatabase, path);
@@ -44,7 +43,7 @@ namespace Faolan.Tests
 					});
 					ctx.Items.Add(new Item { Id = 4242, Name = "Ring of the Same" });
 					ctx.Items.Add(new Item { Id = 4243, Name = "A Different Ring" });
-					// The same template in BOTH ring slots - two occupied slots, two instances.
+					// The same template in both ring slots - two occupied slots, two instances.
 					foreach (var (slot, template) in new[]
 					         {
 						         (CharacterEquipmentSlot.LeftRing, 4242u), (CharacterEquipmentSlot.RightRing, 4242u), (CharacterEquipmentSlot.Neck, 4243u)

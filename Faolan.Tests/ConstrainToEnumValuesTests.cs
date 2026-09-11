@@ -11,7 +11,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// [ConstrainToEnumValues] emits "<Column> IN (<the enum's declared members>)". That is exactly wrong for a [Flags]
-	// enum - a legitimate combination is not a declared member, so the CHECK would reject it - and nothing about it
+	// enum - a legitimate combination is not a declared member, so the check would reject it - and nothing about it
 	// fails at build or migration time: it would surface as a constraint violation from the database on the first
 	// SaveChanges that stored a combination. So the attribute skips flags enums, loudly.
 	public class ConstrainToEnumValuesTests
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			public State State { get; set; }
 		}
 
-		// EF caches the built model per context type + provider, so without this only the FIRST test in the class would
+		// EF caches the built model per context type + provider, so without this only the first test in the class would
 		// run OnModelCreating - and the warning assertions would pass or fail purely on test order.
 		private sealed class AlwaysRebuild : IModelCacheKeyFactory
 		{
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			{
 				using var ctx = new Ctx(new DbContextOptionsBuilder<Ctx>().UseSqlite("Data Source=:memory:")
 					.ReplaceService<IModelCacheKeyFactory, AlwaysRebuild>().Options);
-				// CHECK constraints live on the DESIGN-TIME model - the runtime model is read-optimized and drops them.
+				// Check constraints live on the design-time model - the runtime model is read-optimized and drops them.
 				var model = ctx.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model;
 				var names = model.GetEntityTypes().SelectMany(e => e.GetCheckConstraints()).Select(c => c.Name ?? throw new InvalidOperationException("a CHECK constraint without a name")).ToArray();
 				return (names, stderr.ToString());
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("CK_Row_Privileges", Build().Constraints);
 		}
 
-		// Skipping SILENTLY would be the worst outcome: the author keeps the attribute, believes the column is
+		// Skipping silently would be the worst outcome: the author keeps the attribute, believes the column is
 		// constrained, and nothing ever says otherwise. The warning has to name the property and the reason.
 		[Fact]
 		public void SkippingAFlagsEnum_WarnsNamingTheProperty()
@@ -107,17 +107,17 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("Row.State", warnings); // and says nothing about the one it did constrain
 		}
 
-		// The rule the attribute's own remarks state - "put it on CLOSED enums only: NOT open ones like
-		// CharacterStatId" - applied to the REAL model rather than restated in prose (#452).
+		// The rule the attribute's own remarks state - "put it on closed enums only: Not open ones like
+		// CharacterStatId" - applied to the real model rather than restated in prose.
 		//
 		// It was stated twice (on the attribute and in DatabaseContext.OnModelCreating) and violated twice, and the
 		// violation was harmless only by luck: every stat id in the shipped ItemStatModifiers and ClassAttributeBases
-		// happens to be a declared member. `FeatEffect.StatId` is what it looks like when the luck runs out - the SAME
-		// id space, where feats touch 158 ids of which 127 are undeclared, so a CHECK there would reject four fifths
+		// happens to be a declared member. `FeatEffect.StatId` is what it looks like when the luck runs out - the same
+		// id space, where feats touch 158 ids of which 127 are undeclared, so a check there would reject four fifths
 		// of the table. An importer meeting an unnamed id would have failed as a SQLite constraint violation a long
 		// way from the schema decision that caused it.
 		//
-		// CharacterStatId is the only open enum today; the gate is written against the ATTRIBUTE's own reason - the
+		// CharacterStatId is the only open enum today; the gate is written against the attribute's own reason - the
 		// enum carrying Unknown fillers for undecoded ids - so a second open enum is caught the day it gets one.
 		[Fact]
 		public void NoOpenEnumColumnIsConstrained()
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 				$"fails the CHECK on insert and reads as a corrupt capture. Offending columns: {string.Join(", ", offenders)}");
 		}
 
-		// An enum is OPEN when it declares placeholders for values it has not decoded yet - the property the
+		// An enum is open when it declares placeholders for values it has not decoded yet - the property the
 		// attribute's remarks single CharacterStatId out for. A closed enum names every value it accepts.
 		private static bool IsOpen(Type enumType)
 		{

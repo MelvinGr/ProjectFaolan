@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #197: the create-editor post-morph trio is now fired by the deterministic batch-drained trigger
+	// The create-editor post-morph trio is fired by the deterministic batch-drained trigger
 	// (FlushPostMorphBurstOnBatchDrained, called from GameServerListener.ReceivedBatchComplete when the recv that
-	// carried Finish + the SetMorphValue burst drains) instead of the ~350ms debounce. This locks the trigger's
+	// carried Finish + the SetMorphValue burst drains) rather than by a debounce. This locks the trigger's
 	// guard logic: it sends the trio exactly once, only after the customization has been committed (Finish/a morph
 	// bumped MorphActivitySequence), and never twice (so the batch-drain trigger + the fallback timer can't double).
 	public class PostMorphBurstTriggerTests
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 			var service = new CreateFlowService(NullLogger.Instance, null!, null!, null!, null!, null!, null!);
 			var client = new RecordingNetworkClient(Instance);
 
-			// Not armed yet (no Finish / no morph seen) -> a drained batch must NOT send the trio.
+			// Not armed yet (no Finish / no morph seen) -> a drained batch must not send the trio.
 			await CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 			Assert.Empty(client.Sent);
 			Assert.False(client.Session.PostMorphBurstSent);

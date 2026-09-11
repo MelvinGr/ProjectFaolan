@@ -10,23 +10,19 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report item-level-check`: does every shipped `Items.Level` match the level retail puts on the wire?
-	// (Gitea #729, moved out of `ItemLevelTests`; the defect it exists for is #725.)
 	//
-	// The bug: the shipped levels predated the visible git history and 12 measurable templates disagreed with every
-	// captured source - always by exactly a factor of ten (Royal Signet 72 -> 7, Necklace of Tireless Sagacity
-	// 80 -> 8, Small Chipped Fang 10 -> 1). Nothing corrected them, because the only writer set `Level` on INSERT and
-	// skipped any template already in `Items` - the same first-record-wins shape that cost us the item hash in #719.
+	// The defect it exists for is a level that disagrees with every captured source by exactly a factor of ten, which
+	// a writer that sets `Level` on insert and skips any template already in `Items` can never correct.
 	//
-	// ⭐ **Why it is a REPORT and not a test**, and it is the same argument as `--report npc-pose-check`: it compares
-	// importer OUTPUT (`faolan.db`) against importer INPUT (the dumps). As a test it read the input through
-	// `fixtures.bin`'s corpus half - a frozen, derived slice - so the two populations diverge the moment captures are
-	// added, and the gate then judges the shipped value against evidence it has already outgrown. The sanctioned fix
-	// for that (regenerate the extract) rebaselines twenty-odd unrelated gates in one unreviewable commit, which is
-	// why the pressure is always to weaken the gate instead. Run against the real dumps there is no second population
-	// and no such failure mode.
+	// It is a report and not a test, the same argument as `--report npc-pose-check`: it compares importer output
+	// (`faolan.db`) against importer input (the dumps). As a test the input would come through `fixtures.bin`'s
+	// corpus half - a frozen, derived slice - so the two populations diverge the moment captures are added, and the
+	// gate then judges the shipped value against evidence it has already outgrown. The sanctioned fix for that,
+	// regenerating the extract, rebaselines twenty-odd unrelated gates in one unreviewable commit. Run against the
+	// real dumps there is no second population and no such failure mode.
 	//
-	// ⚠️ What stays a TEST is the part that is a property of the CODE rather than of the data: the snapshot reader
-	// itself is gated by the corpus round-trips (#384/#390/#391). This report asserts nothing about parsing.
+	// What stays a test is the part that is a property of the code rather than of the data: the snapshot reader
+	// itself is gated by the corpus round-trips. This report asserts nothing about parsing.
 	public static partial class ReportCli
 	{
 		// How much of the corpus-visible population must actually carry a shipped level before the equality check
@@ -94,7 +90,7 @@ namespace Faolan.Importer.Cli
 
 			var failed = false;
 
-			// The premise the whole column rests on: the level is a per-TEMPLATE property, so one column can hold it.
+			// The premise the whole column rests on: the level is a per-template property, so one column can hold it.
 			if (varying.Count > 0)
 			{
 				failed = true;

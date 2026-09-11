@@ -6,9 +6,11 @@ using System.Reflection;
 
 namespace Faolan.Web.Services
 {
-	// One editable scalar property of an entity, bound to an input in the DB editor (port of the desktop
-	// PropertyEditorViewModel). Reads/writes the live tracked entity by reflection, converting from the string/bool
-	// the UI supplies. Navigation properties and collections are skipped (see Editable).
+	/// <summary>
+	///     One editable scalar property of an entity, bound to an input in the DB editor. It reads and writes the live
+	///     tracked entity by reflection, converting from the string or bool the UI supplies. Navigation properties and
+	///     collections are skipped; see <see cref="Editable" />.
+	/// </summary>
 	public sealed class DbEditorField
 	{
 		private readonly PropertyInfo _prop;
@@ -32,7 +34,9 @@ namespace Faolan.Web.Services
 
 		public string Name => _prop.Name;
 
-		// Text (and enum) values flow through here; the setter converts to the property's CLR type.
+		/// <summary>
+		///     Text and enum values flow through here; the setter converts to the property's CLR type.
+		/// </summary>
 		public string Text
 		{
 			get => _prop.GetValue(_entity)?.ToString() ?? "";
@@ -70,7 +74,10 @@ namespace Faolan.Web.Services
 			return System.Convert.ChangeType(text, Type, CultureInfo.InvariantCulture);
 		}
 
-		// The editable scalar properties of an entity: public read/write, no indexers, a scalar/enum CLR type.
+		/// <summary>
+		///     The editable scalar properties of an entity: public, readable and writable, without indexers, and of a
+		///     scalar or enum CLR type.
+		/// </summary>
 		public static IReadOnlyList<DbEditorField> Editable(object entity)
 		{
 			return entity

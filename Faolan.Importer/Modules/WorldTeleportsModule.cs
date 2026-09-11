@@ -18,15 +18,15 @@ namespace Faolan.Importer.Modules
 {
 	// Zone-line teleport destinations: enriches the DoorFullUpdateIIR world objects that are teleporters with their
 	// destination (map + arrival), harvested from captured UseObject->N3Teleport sequences (WorldTeleportExtractor).
-	// A door actually walked through in a capture gets its destination WHOLE (map + arrival position); the rest are
-	// then resolved by NAME against the client's playfield table (ZoneLineNames, #341), which yields the destination
+	// A door actually walked through in a capture gets its destination whole (map + arrival position); the rest are
+	// then resolved by name against the client's playfield table (ZoneLineNames), which yields the destination
 	// map but no arrival - the runtime falls back to that map's default spawn. Whatever neither pass can place keeps
 	// InteractAction=None. Depends on world-objects (the rows it enriches must exist).
 	public sealed class WorldTeleportsModule : IImportModule
 	{
 		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
 
-		// #883: how far the client table's teleport TRIGGER point may sit from the door OBJECT's own position. Wider
+		// how far the client table's teleport trigger point may sit from the door OBJECT's own position. Wider
 		// than PositionTolerance on purpose - those two are the same import's coordinates for the same thing, these
 		// are two different things (the trigger sits in front of the door). Measured: 58% of matchable rows land
 		// within 0.5 u, 90.9% within 8 u, and the tail past that is a different door.
@@ -70,7 +70,7 @@ namespace Faolan.Importer.Modules
 				}
 			}
 
-			// Enrich BOTH door classes the extractor harvests: DoorFullUpdateIIR zone-lines AND the SimpleDynel doors
+			// Enrich both door classes the extractor harvests: DoorFullUpdateIIR zone-lines and the SimpleDynel doors
 			// (e.g. the Thirsty Dog Inn) - WorldTeleportExtractor.DoorSubOpcodes.
 			var zoneLines = await ctx.Db.WorldObjects.Where(o => WorldTeleportExtractor.DoorSubOpcodes.Contains(o.SubOpcode)).ToListAsync();
 
@@ -93,7 +93,7 @@ namespace Faolan.Importer.Modules
 				row.DestinationX = link.DestX;
 				row.DestinationY = link.DestY;
 				row.DestinationZ = link.DestZ;
-				// #821: non-zero only when the server answered this door with an ACG bind box. Stored as the wire
+				// non-zero only when the server answered this door with an ACG bind box. Stored as the wire
 				// class word rather than a bool - see WorldObject.DestinationPlayfieldClass for why.
 				row.DestinationPlayfieldClass = link.AcgPlayfieldClass == 0
 					? null
@@ -101,7 +101,7 @@ namespace Faolan.Importer.Modules
 				matched++;
 			}
 
-			// TIER 2 (#883): the client's own teleport table. Runs AFTER the capture harvest and BEFORE the name
+			// tier 2: the client's own teleport table. Runs after the capture harvest and before the name
 			// fallback, which is exactly its standing: better than guessing from a door's name, worse than a
 			// capture (it has no arrival position, and the capture is what retail actually did).
 			var (fromRdb, rdbAmbiguous) = ResolveFromClientTable(ctx, zoneLines);
@@ -120,13 +120,13 @@ namespace Faolan.Importer.Modules
 				$"{confirms} destination map(s) carry a travel confirmation box (#637).");
 		}
 
-		// #637: the "Do you want to travel to <map>?" confirmation box, scoped to the DESTINATION map (Map.TravelConfirmKey
+		// the "Do you want to travel to <map>?" confirmation box, scoped to the DESTINATION map (Map.TravelConfirmKey
 		// says why). A harvested link whose capture showed a box between the use and the teleport marks its destination
 		// map as confirming, and carries the localized key the box named it with.
 		//
-		// A link with NO box does NOT clear a key - "this walk-through showed no box" and "this map never confirms" are
+		// A link with no box does not clear a key - "this walk-through showed no box" and "this map never confirms" are
 		// different statements, and only `--mode overwrite` (which clears above) is entitled to the second. A conflict
-		// (two links to one map disagreeing on the key) would be the signal that this is per-DOOR after all; none is
+		// (two links to one map disagreeing on the key) would be the signal that this is per-door after all; none is
 		// observed, so the first key wins and the disagreement is logged rather than silently resolved.
 		private static async Task<int> WriteTravelConfirmsAsync(ImportContext ctx, IReadOnlyList<TeleportLink> links)
 		{
@@ -155,9 +155,9 @@ namespace Faolan.Importer.Modules
 			return written;
 		}
 
-		// #341: the doors no capture walked through. Their NAME is the playfield they lead to, so the client's own
+		// the doors no capture walked through. Their name is the playfield they lead to, so the client's own
 		// playfield table resolves them (ZoneLineNames) - map only, never an arrival position, which stays wire-only
-		// truth. Runs AFTER the capture harvest and only over rows it left inert, so a harvested destination always
+		// truth. Runs after the capture harvest and only over rows it left inert, so a harvested destination always
 		// wins. Doors whose name matches no playfield are left alone: a "Lever" and a zone-line to a playfield the
 		// client does not ship are indistinguishable from here, and marking them would make every lever complain.
 		private static async Task<(int Named, int Ambiguous)> ResolveByNameAsync(ImportContext ctx, IReadOnlyList<WorldObject> zoneLines)
@@ -195,7 +195,7 @@ namespace Faolan.Importer.Modules
 					continue;
 
 				// Cross-playfield by construction - the same-playfield cases are the two `continue`s above. A null
-				// destination is deliberate on a tie: the row is a zone-line (its name IS a playfield), so the server
+				// destination is deliberate on a tie: the row is a zone-line (its name is a playfield), so the server
 				// should say it has no known destination instead of playing the door-open animation at it.
 				row.InteractAction = InteractAction.ProxyTeleport;
 				row.DestinationMapId = dest;
@@ -211,26 +211,26 @@ namespace Faolan.Importer.Modules
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
 		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
-		// #883: TIER 2 - the client's own complete teleport table (RDB 1000087). The capture harvest can only ever see
+		// tier 2 - the client's own complete teleport table (RDB 1000087). The capture harvest can only ever see
 		// a door somebody walked through on camera (160 links over 24 maps); this table states all 675 outright.
 		//
 		// PRECEDENCE, and each step of it is measured rather than assumed (`--report teleport-match`):
-		//   * a CAPTURED link always wins. It carries the arrival POSITION, which this table does not have at all,
-		//     and it is what retail actually did. ⚠️ The two differ in a way that matters: the table is a DESIGN-TIME
+		//   * a captured link always wins. It carries the arrival position, which this table does not have at all,
+		//     and it is what retail actually did. The two differ in a way that matters: the table is a design-time
 		//     export naming a canonical destination, and the runtime picks a variant of it. Of the 45 doors where both
 		//     sources speak, 41 agree and the 4 that do not are day/night or state variants of the same place -
 		//     `Renton's House` (4572) vs `Renton's House Night` (4582), `Villa Camillus` vs `Villa Camillus - Cursed`.
-		//     So the table is right about WHICH PLACE and the capture is right about WHICH INSTANCE OF IT.
-		//   * this table beats the #341 NAME fallback, which is why it runs first. Two of those four disagreements are
+		//     So the table is right about which place and the capture is right about which instance of it.
+		//   * this table beats the name fallback, which is why it runs first. Two of those four disagreements are
 		//     against a name guess, and on `City of Tortage Night` the table's `Renton's House Night` is plainly the
 		//     better answer than the name match's daytime `Renton's House`.
 		//
-		// ⚠️ The match is POSITION-ONLY - the table carries no door name, so `NearestZoneLine`'s name check is not
+		// The match is position-only - the table carries no door name, so `NearestZoneLine`'s name check is not
 		// available here. Guarded two ways: a hard 8 u cap (90.9% of measurable rows land inside it, 58% inside 0.5 u)
 		// and a runner-up test, because the danger of a position-only key is picking the neighbouring door rather than
 		// missing. Nothing is written for a row that already has a destination.
 		//
-		// ⚠️ Only 88 of the 675 rows can be matched at all today, because 587 are on maps with no imported world
+		// Only 88 of the 675 rows can be matched at all today, because 587 are on maps with no imported world
 		// objects. That is the world data being incomplete, not a defect here - the yield grows on its own as maps land.
 		private static (int Resolved, int Ambiguous) ResolveFromClientTable(ImportContext ctx, IReadOnlyList<WorldObject> zoneLines)
 		{
@@ -278,7 +278,7 @@ namespace Faolan.Importer.Modules
 					: InteractAction.ProxyTeleport;
 				row.DestinationMapId = teleport.DestMapId;
 
-				// NO arrival: the table does not carry one, and the runtime already falls back to the destination
+				// no arrival: the table does not carry one, and the runtime already falls back to the destination
 				// map's default spawn for exactly this case. Writing an invented position would be the worse bug.
 				row.DestinationX = row.DestinationY = row.DestinationZ = null;
 				resolved++;

@@ -10,54 +10,56 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// The bounds/geometry record that follows a world object's identity message - the client's shared reader
 	// FUN_0080c620, decoded in docs/re/iir-readers-combat-world.md and verified against all 1052 captured rows.
-	// This is what the `KdTreeTail` blob used to hold verbatim (#410); the record is now built from typed columns:
+	// The record is built from typed columns:
 	//
 	//   [u32 assetId][u32 assetType]     an RDB resource reference - 1010030 MESHINDEXFILE / 1010001 RenderMesh /
 	//                                    1010201 MONSTERDATA, nothing else in the corpus
 	//   [u32 nameLen][name]              length-prefixed ASCII; empty in 1029/1052 rows ("object_closed" otherwise)
-	//   [u32 nodeCount][node x 6 u32]    24 bytes per node; EMPTY in 1028/1052 rows, exactly one node in the rest
+	//   [u32 nodeCount][node x 6 u32]    24 bytes per node; empty in 1028/1052 rows, exactly one node in the rest
 	//   [f32 min xyz][f32 max xyz]       the AABB (the client derives centre/extent as (max-min)*0.5)
 	//   [u32][u32][u8 flag]
 	//
-	// followed by the PER-CLASS trailer, which is what makes the record's length vary by object class: none for
+	// followed by the per-class trailer, which is what makes the record's length vary by object class: none for
 	// SimpleDynel, 5 u32 for Destructible, 1 for Door and Climbing. Those are WorldObjectWord rows.
 	//
-	// ⭐ The DESTRUCTIBLE trailer's first two words are the object's HEALTH PAIR (#498) - `[0] = current`,
-	// `[1] = max`, and `[2..4]` are 0 on all 976 captured destructibles. Measured over the shipped rows, and the
-	// populations name themselves:
+	// The Destructible trailer's first two words are the object's health pair - `[0] = current`, `[1] = max`, and
+	// `[2..4]` are 0 on all 976 captured destructibles. Measured over the shipped rows, the populations name
+	// themselves:
 	//
 	//   max        rows  what they are
-	//   1,000,000   524  Poitain's `Location Object - Keep / Walls / Towers / Tavern / ...` - the UNBUILT guild-city
+	//   1,000,000   524  Poitain's `Location Object - Keep / Walls / Towers / Tavern / ...` - the unbuilt guild-city
 	//                    plot markers ("at the site, there is a marker stone", LDB 50020/689), uniform and undamaged
-	//   1,000       193  harvest nodes (#494) - the ONE band where current varies, 142 of them mid-harvest
-	//   100M..300M  221  Border Kingdoms' BUILT battlekeep, tiered in the name and in the health:
+	//   1,000       193  harvest nodes - the one band where current varies, 142 of them mid-harvest
+	//   100M..300M  221  Border Kingdoms' built battlekeep, tiered in the name and in the health:
 	//                      wall 100M (II) / 150M (III) · tower 125M / 175M · building 150M / 200M · `Keep III` 300M
 	//
-	// So the health pair is also the category discriminator `HarvestCatalog` already relies on, and the tier ladder
-	// is +50M per tier with a +25M step per class. See docs/subsystems/guilds.md.
+	// So the health pair is also the category discriminator `HarvestCatalog` relies on, and the tier ladder is +50M
+	// per tier with a +25M step per class. See docs/subsystems/guilds.md.
 	//
-	// LootBag (chests) is the exception and is NOT handled here: its trailer is the container's loot CONTENTS
-	// ([u32 len][ProtoLootBagIIR]), which is session state, not placement truth - the captured contents are
-	// deliberately not persisted and WorldObjectCodec appends a clean empty scaffold instead (LootContainerTemplate,
-	// which already worked this way for spawned bags).
+	// LootBag (chests) is the exception and is not handled here: its trailer is the container's loot contents
+	// ([u32 len][ProtoLootBagIIR]), which is session state rather than placement truth - the captured contents are
+	// deliberately not persisted and WorldObjectCodec appends a clean empty scaffold instead (LootContainerTemplate).
 	//
-	// NOT a codec, deliberately (#530 rule 1): this is the WorldObject COLUMNS <-> that region mapping, and the
-	// region's length depends on the row's object CLASS (the per-class trailer below), so it is not a standalone
-	// message with a self-describing body. Row<->value mapping is #533's subject.
+	// Not a codec: this is the WorldObject columns mapped to and from that region, and the region's length depends on
+	// the row's object class (the per-class trailer below), so it is not a standalone message with a self-describing
+	// body.
 	public static class WorldObjectGeometryColumns
 	{
 		// The two named slots of the Destructible trailer (see the class comment). Trailer ordinals, not byte offsets.
 		public const int HealthCurrentWord = 0;
 		public const int HealthMaxWord = 1;
 
-		// An object with no bounds writes an INVERTED box rather than zeros: min = +FLT_MAX, max = -FLT_MAX. Kept as
-		// the actual float values in the columns (no sentinel translation) so the record round-trips bit-for-bit.
-		//
-		// `currentHealth` is the object's LIVE health, stamped over the captured `HealthCurrentWord` - the health twin
-		// of the door's live `isClosed` (#598). Null (the import/round-trip path) writes the row verbatim.
-		// ⚠️ It is load-bearing, not cosmetic: 142 of the 193 shipped harvest nodes were CAPTURED mid-harvest, one of
-		// them at 1/1000, so without this a fresh zone renders most of its nodes empty while the server holds them
-		// full - a node the player can still harvest ten times but whose bar reads 0%.
+		/// <summary>Writes the geometry record for a row.</summary>
+		/// <param name="currentHealth">
+		///     The object's live health, stamped over the captured <see cref="HealthCurrentWord" /> - the health twin of
+		///     the door's live `isClosed`. Null (the import and round-trip path) writes the row verbatim. It is
+		///     load-bearing: 142 of the 193 shipped harvest nodes were captured mid-harvest, one of them at 1/1000, so
+		///     without it a fresh zone renders most of its nodes empty while the server holds them full.
+		/// </param>
+		/// <remarks>
+		///     An object with no bounds writes an inverted box rather than zeros: min = +FLT_MAX, max = -FLT_MAX. The
+		///     columns keep the actual float values, with no sentinel translation, so the record round-trips bit-for-bit.
+		/// </remarks>
 		public static byte[] ToWire(WorldObject row, uint? currentHealth = null)
 		{
 			var name = row.GeometryName ?? "";
@@ -96,10 +98,14 @@ namespace Faolan.Core.Network.Codecs.World
 			return stream.ToArray();
 		}
 
-		// Fills the row's geometry columns + word rows from the captured record, and reports how many bytes it
-		// consumed - the caller re-Builds and compares, so a shape this grammar does not cover cannot be
-		// half-imported. `consumed` is short of `tail.Length` exactly for LootBag, whose remaining bytes are the
-		// captured loot contents (dropped on purpose, see the class comment).
+		/// <summary>Fills the row's geometry columns and word rows from the captured record.</summary>
+		/// <param name="consumed">
+		///     How many bytes were read. Short of <paramref name="tail" />'s length exactly for LootBag, whose remaining
+		///     bytes are the captured loot contents - dropped on purpose, see the class comment.
+		/// </param>
+		/// <remarks>
+		///     The caller re-builds and compares, so a shape this grammar does not cover cannot be half-imported.
+		/// </remarks>
 		public static bool TryParse(WorldObject row, ReadOnlySpan<byte> tail, out int consumed)
 		{
 			consumed = 0;

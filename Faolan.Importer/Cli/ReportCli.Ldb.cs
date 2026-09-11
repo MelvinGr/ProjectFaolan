@@ -12,8 +12,8 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// Decrypts each Ability's RDB 1000020 entry with its stored Data1..4 TEA key (same scheme as item templates, #137)
-		// and dumps the printable strings - the ability NAME lives in that (encrypted-but-key-available) template.
+		// Decrypts each Ability's RDB 1000020 entry with its stored Data1..4 TEA key - the same scheme item templates
+		// use - and dumps the printable strings: the ability name lives in that template.
 		private static void AbilityNames(string rdbDir)
 		{
 			using var db = OpenDb();
@@ -42,13 +42,13 @@ namespace Faolan.Importer.Cli
 				var fields = ReadIncreasingFields(body.AsSpan(12));
 				var fieldStr = string.Join(" ", fields.OrderBy(f => f.Key).Select(f => $"{f.Key}={f.Value}"));
 
-				// Abilities are the SAME 1000020 template layout as items, spells and feats, so the shared parser
-				// applies - but the answer is that they carry NO stat-modifier region. Of the 27 decryptable
+				// Abilities are the same 1000020 template layout as items, spells and feats, so the shared parser
+				// applies - but the answer is that they carry no stat-modifier region. Of the 27 decryptable
 				// abilities only 10 yield anything and all 10 are the parser's documented false-positive mode: the
 				// "stats" are the directional ids the field table already shows (Upper Left Attack -> 201, Overhead
 				// -> 203), or zero-valued (the four pet commands -> stats 1..4 = 0), or a kind-range number as an
 				// amount (a mount ability -> 1890 = 53202). Their kinds (53043, 53251) are none of the flat/percent
-				// tags either. Shown here so the emptiness is visible rather than assumed - do NOT import these.
+				// tags either. Shown here so the emptiness is visible rather than assumed - do not import these.
 				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
 				var modStr = mods.Count == 0
 					? ""
@@ -57,16 +57,16 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// The client's own STAT-NAME table: LDB category 615 is an id -> name map keyed by the WIRE STAT ID (the same
-		// id space as the 0x96B8DC59 vitals block, the FullChar snapshot stat sheet, the item [2][9] modifier region and
-		// the spell stat effects).
+		// The client's own stat-name table: LDB category 615 is an id -> name map keyed by the wire stat id - the same
+		// id space as the 0x96B8DC59 vitals block, the FullChar snapshot stat sheet, the item [2][9] modifier region
+		// and the spell stat effects.
 		//
-		// Like every LDB category it is LOCALIZED - one page per language, all carrying the same ids - so the page must
-		// be CRIBBED, not picked by order (taking the last page yields Korean). The crib is the same one the spell/item
-		// name reports use (#291/#300), against the ids we had already named the hard way: the English page is the one
-		// whose text matches CharacterStatId's own names. That cross-check is also what makes this a linter and not just
-		// a dump - a name we invented that disagrees with the client's is a bug, and an enum id absent from the table is
-		// one we named from somewhere else (Ghidra, tooltips) and should stay justified in its comment.
+		// Like every LDB category it is localized - one page per language, all carrying the same ids - so the page
+		// must be cribbed rather than picked by order, since taking the last page yields Korean. The crib is the one
+		// the spell and item name reports use: the English page is the one whose text matches CharacterStatId's own
+		// names. That cross-check is also what makes this a linter rather than a dump - a locally invented name that
+		// disagrees with the client's is a bug, and an enum id absent from the table is one named from somewhere else
+		// (Ghidra, tooltips) and should stay justified in its comment.
 		private static void LdbStatNames(string rdbDir, string? outDir)
 		{
 			using var rdb = OpenRdb(rdbDir);

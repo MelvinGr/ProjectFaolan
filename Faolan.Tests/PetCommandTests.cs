@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The pet command bar's twelve codes (#307). These gate the DERIVATION, not just the numbers - the numbers are only
+	// The pet command bar's twelve codes. These gate the derivation, not just the numbers - the numbers are only
 	// as good as the argument that placed them, so it is the argument that has to keep holding.
 	public class PetCommandTests
 	{
-		// The client's contiguous `PetCommand_*` string block, in binary order. That order IS the enum's order, and it
+		// The client's contiguous `PetCommand_*` string block, in binary order. That order is the enum's order, and it
 		// is the whole basis for the codes below.
 		private static readonly string[] ClientOrder =
 		[
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			Assert.Equal(ClientOrder.Length, Enum.GetValues<PetCommand>().Length); // nothing invented alongside it
 		}
 
-		// The three codes the annotated captures attribute, and the ONLY reason the base is 0x1EF rather than a guess.
+		// The three codes the annotated captures attribute, and the only reason the base is 0x1EF rather than a guess.
 		// If any of these three stops matching its capture note, the alignment has to be re-derived from scratch.
 		[Theory]
 		[InlineData(0x1F4u, PetCommand.AllAssist)] // "set app pets to assist"
@@ -69,9 +69,9 @@ namespace Faolan.Tests
 			Assert.Equal([0x1EF], fitting);
 		}
 
-		// The independent second derivation: the bar's ability slots map to the all-pets codes in DESCENDING order.
-		// It was missed originally because only an ascending relation was looked for, and it agrees with the string
-		// block on exactly the pair that was unattributed - so the two unknowns are settled twice over, not once.
+		// The independent second derivation: the bar's ability slots map to the all-pets codes in descending order.
+		// It is a descending relation - easy to miss if only an ascending one is looked for - and it agrees with the
+		// string block on exactly the pair that block leaves unattributed, so the two unknowns are settled twice over.
 		[Theory]
 		[InlineData(264u, PetCommand.AllAssist)] // Ability "Pet Assist"
 		[InlineData(263u, PetCommand.AllFollow)] // Ability "Pet Follow"

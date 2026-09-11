@@ -13,15 +13,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Ambient NPC chatter (per-NPC bark lines). The barks are chat-server CharacterChat (0x0022) local-says whose body
-	// is [u32 senderHandle][u16 len][<remoteformat token="sayinchat(N)|conversationM(K)|<Group>" ...>]. The dialogue is
-	// SPECIFIC to the NPC that says it, so it is keyed by the NPC's TEMPLATE (NpcStats.f4 / NpcTemplate.TemplateId), NOT by
-	// name - several distinct templates share a display name (7 "Nobleman"/"Noblewoman" rows), and only the exact
-	// template captured barking gets the lines; the others stay silent until captured.
-	//
-	// The shared tshark reader keeps only the Conan stream, so spawns come from ctx.Captures (via NpcSpawnExtractor,
-	// which decodes the TemplateId out of the FA015807 CharacterIIR) while the ChatServer 0x0022 barks are read from
-	// the matching *.tshark.json directly. Correlation: bark sender handle -> the spawn's TemplateId (same capture).
+	/// <summary>
+	///     Ambient NPC chatter (per-NPC bark lines). The barks are chat-server CharacterChat (0x0022) local-says whose
+	///     body is [u32 senderHandle][u16 len][&lt;remoteformat token="sayinchat(N)|conversationM(K)|&lt;Group&gt;"...&gt;].
+	/// </summary>
+	/// <remarks>
+	///     A bark is specific to the NPC that says it, so rows are keyed by the NPC's template
+	///     (NpcStats.f4 / NpcTemplate.TemplateId), not by name: several distinct templates share a display name, and
+	///     only the exact template captured barking gets the lines; the others stay silent until captured.
+	///     The shared tshark reader keeps only the Conan stream, so spawns come from ctx.Captures (via
+	///     NpcSpawnExtractor, which decodes the TemplateId out of the FA015807 CharacterIIR) while the ChatServer 0x0022
+	///     barks are read from the matching *.tshark.json directly. Correlation: bark sender handle -> the spawn's
+	///     TemplateId within the same capture.
+	/// </remarks>
 	public sealed class NpcChatterModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];
@@ -92,11 +96,10 @@ namespace Faolan.Importer.Modules
 				}
 			}
 
-			// Attach to the exact NpcTemplate type by TemplateId (unique - one NpcTemplate row per template).
+			// One NpcTemplate row per TemplateId.
 			var npcByTemplate = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n);
 
-			// The client's own line catalog, when an RDB is available. Without one the module runs exactly as before -
-			// captures only - so a corpus-only import is unchanged rather than silently thinner.
+			// The client's own line catalog, when an RDB is available. Without one the module imports captured lines only.
 			var catalog = string.IsNullOrWhiteSpace(ctx.RdbDir)
 				? null
 				: BarkCatalog.Load(ctx.RdbDir, ctx.RdbProxyBase);
@@ -110,25 +113,24 @@ namespace Faolan.Importer.Modules
 				if (!npcByTemplate.TryGetValue(template, out var npc))
 					continue;
 
-				// Load the parameter CHILDREN too, and delete them explicitly. Removing a parent EF loaded without its
-				// children leaves EF unaware of them, so it cannot order their delete ahead of the new rows' insert -
-				// which collided on the child key the moment the slots became rows (#493).
+				// Load the parameter children too, and delete them explicitly. Removing a parent EF loaded without its
+				// children leaves EF unaware of them, so it cannot order their delete ahead of the new rows' insert and
+				// the insert collides on the child key.
 				var existing = await ctx.Db.NpcChatter.Include(c => c.Parameters).Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
 				ctx.Db.NpcChatterParameter.RemoveRange(existing.SelectMany(c => c.Parameters));
 				ctx.Db.NpcChatter.RemoveRange(existing);
 
-				// Deduped by the bark's KEY, not by its captured text. Two sightings of one bark differ in the text
-				// whenever it names the addressed player - `value="7;NecroL80"` vs `value="7;Sonja"` are two strings and
-				// one line - so a text-keyed set yields two rows on the same (template, channel, sayinchat) key. That
-				// was latent while a bark carried at most one name-only slot; it surfaced as a duplicate-key insert on
-				// the parameter child table as soon as the slots became rows (#493).
+				// Deduped by the bark's key, not by its captured text. Two sightings of one bark differ in the text
+				// whenever it names the addressed player (`value="7;NecroL80"` vs `value="7;Sonja"` are two strings and
+				// one line), so a text-keyed set would yield two rows on the same (template, channel, sayinchat) key
+				// and a duplicate-key insert on the parameter child table.
 				var byKey = new Dictionary<(string Channel, uint SayInChat), Core.Database.Tables.NpcChatter>();
 				foreach (var text in texts)
 				{
-					// COLUMNIZED, not stored verbatim: a bark whose token/attributes we cannot lift is REJECTED rather
+					// Columnized, not stored verbatim: a bark whose token/attributes cannot be lifted is rejected rather
 					// than kept as a blob, and the columns must rebuild the captured string byte-for-byte - the runtime
 					// has no raw-text path to fall back to. Same rule as ConversationScreenCodec.Parse.
-					// NpcChatterCodec.Parse THROWS on a non-bark (#530 rule 4); re-thrown here naming the template.
+					// NpcChatterCodec.Parse throws on a non-bark; re-thrown here naming the template.
 					NpcChatterBark bark;
 					try
 					{
@@ -144,10 +146,10 @@ namespace Faolan.Importer.Modules
 
 					row.NpcTemplateId = npc.TemplateId;
 
-					// Gate WITH the captured parameter value, then store WITHOUT it. The one bark that has a parameter
+					// Gate with the captured parameter value, then store without it. The one bark that has a parameter
 					// is the sendtell crier's `DetectedChar.name`, whose captured value is the capturing player's real
-					// character name - session state the runtime regenerates, and which must never reach faolan.sql
-					// (#417). Proving the round trip first means a bark we cannot reproduce still fails here.
+					// character name - session state the runtime regenerates, and which must never reach faolan.sql.
+					// Proving the round trip first means a bark that cannot be reproduced still fails here.
 					if (NpcChatterCodec.Build(row, parameterValue) != text)
 						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not byte-exact round-trippable from columns: {text}");
 
@@ -164,43 +166,29 @@ namespace Faolan.Importer.Modules
 				npcs++;
 			}
 
-			// HARVEST the rest of each captured group's conversation from the client's own LDB (#331). A capture only
-			// ever catches the lines an NPC happened to say while someone was recording - five of Lord Ovidius's eleven
-			// - and the client ships the whole set, in PLAINTEXT, at an id computable from the token we already hold.
-			// So this fills in the siblings of every (channel, group) a capture has proved, for the same template.
+			// Harvest the rest of each captured group's conversation from the client's own LDB. A capture only catches
+			// the lines an NPC happened to say while someone was recording, and the client ships the whole set, in
+			// plaintext, at an id computable from the token already held. This fills in the siblings of every
+			// (channel, group) a capture has proved, for the same template, under three restrictions:
 			//
-			// ⚠️ ONLY for a group with a SINGLE speaker. A bark group is often a two-hander: `RenownBystanderLovers`
-			// is one conversation shared by the Nobleman and the Noblewoman, and the client's line set interleaves
-			// them (`2` is Lord Ovidius on his sons, `3` is her answering "That's just dreadful, Lord Ovidius"). The
-			// captures assign 3/8/16/23 to her and 6/19 to him, so the split is real - and it is NOT mechanically
-			// recoverable: strict alternation from those anchors reproduces every line except the last, which is hers
-			// and would be given to him. Harvesting a shared group would therefore put her lines in his mouth, which
-			// is worse than the silence it replaces.
+			// - Only a group with a single captured speaker. A bark group is often a two-hander (`RenownBystanderLovers`
+			//   is one conversation shared by the Nobleman and the Noblewoman, with the client's line set interleaving
+			//   them), and the split is not mechanically recoverable from the captured anchors. Harvesting a shared
+			//   group would put one speaker's lines in the other's mouth, which is worse than silence. "One captured
+			//   speaker" is weaker than "one real speaker" (`RenownBystanderWomen` is a two-hander whose voices are
+			//   both noblewomen, captured from one template); that is acceptable while it holds and stops harvesting
+			//   the moment a capture shows a second template in the group.
+			// - Slot-free lines only: one carrying `{TopGloryName}` or `{DetectedChar.name}` needs a matching
+			//   <parameter> filled from live server state, and adding the row without it would put an unrenderable
+			//   bark in an NPC's mouth.
+			// - Ambient channels only. On a conditional channel the script's own state picks the line, so a random pick
+			//   from its siblings says something the condition would have excluded (`RenownCrier/sendtell` is mostly
+			//   stages of a guild-advertising transaction, and the slot-free filter selects against the NPC's own lines
+			//   there).
 			//
-			// ⚠️ The test is "one captured speaker", which is weaker than "one real speaker" and is the residual
-			// assumption here: `RenownBystanderWomen` is plainly a two-hander too, but both its voices are noblewomen
-			// and only one template was ever captured saying it, so its lines all land on that template. That is the
-			// right call while it holds - a noblewoman saying a noblewoman's line is right either way - and it breaks
-			// the moment a capture shows a second template in the group, which is exactly when this rule stops
-			// harvesting it.
-			//
-			// Slot-free lines only: one carrying `{TopGloryName}` or `{DetectedChar.name}` needs a matching
-			// <parameter> filled from live server state, and adding the row without it would put an unrenderable bark
-			// in an NPC's mouth.
-			//
-			// ⚠️ AMBIENT channels only (#717). On a CONDITIONAL channel the script's own state picks the line, so a
-			// random pick from its siblings says something the condition would have excluded. `RenownCrier/sendtell` is
-			// the proof: 18 lines, of which 13 are stages of a guild-advertising TRANSACTION ("For only 20 silver,
-			// {DetectedGuildName} can benefit from my influence", "...for another {AdvertiseMinutes} minutes"). Worse,
-			// the slot-free filter above SELECTS AGAINST the NPC's own lines there - all 13 carry a slot, so the one
-			// line that got through was `10` "Excuse me, I wanted to ask you something.", which is not a thing the
-			// crier says on noticing you at all. In-client he greeted with it, which is how this was found.
-			//
-			// The row's FormatKey stays EMPTY, and that is correct rather than a gap: the key is only read when a
-			// string is marked encrypted, and this category is not - `--report npc-chatter` prints
-			// "category 50015 (sayinchat): flags=0 -> PLAINTEXT: no key needed". A harvested line needs no key, and a
-			// zero key is therefore how a harvested row is TOLD APART from a captured one (see NpcChatterCodec.ToRow,
-			// which now throws rather than producing one).
+			// The row's FormatKey stays empty: the key is only read when a string is marked encrypted, and this
+			// category is plaintext (`--report npc-chatter` prints the category's flags). A zero key is how a harvested
+			// row is told apart from a captured one.
 			if (catalog is { IsPlaintext: true })
 			{
 				var speakers = captured
@@ -214,7 +202,6 @@ namespace Faolan.Importer.Modules
 						if (speakers.GetValueOrDefault((suffix.Group, suffix.Channel, suffix.ChannelCount)) != 1)
 							continue; // a two-hander - see above
 
-						// #717: a conditional channel's siblings belong to the script's STATES, not to a random pick.
 						// Asked through the same TriggerOf the runtime dispatches on, so the harvest and the send cannot
 						// disagree about which channels are ambient.
 						if (NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(byKey.Values.First(r => r.Channel == suffix.Channel && r.Group == suffix.Group))) != BarkTrigger.Ambient)

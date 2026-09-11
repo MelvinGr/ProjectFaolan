@@ -9,7 +9,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the byte-exact output of the server's verbatim packet bursts so they can be converted from literal
-	// byte blobs to explicit WriteHeader()/Write*() calls WITHOUT changing a single wire byte (the client is
+	// byte blobs to explicit WriteHeader()/Write*() calls without changing a single wire byte (the client is
 	// proven to accept these exact bytes; any drift hangs it on the loading screen). The golden .bin is captured
 	// once from the pre-conversion code, committed, and asserted forever after. Each burst is fully determined by
 	// the client instance, so a fixed instance gives deterministic output.
@@ -23,12 +23,12 @@ namespace Faolan.Tests
 			return AssertBurstStable("CreationScriptBurst", CreateEditorBursts.SendRetailCreateEditorCreationScriptBurst);
 		}
 
-		// NOTE: the InitialBurst golden is asserted by CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden
-		// instead - its galley scene-prop dynels are now SPAWNED FROM the DB (WorldObjectCodec), so the burst needs a DB
-		// to reproduce the golden; a bare no-DB run here would omit them.
+		// Note: the InitialBurst golden is asserted by CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden
+		// instead - its galley scene-prop dynels are spawned from the DB, so the burst needs a DB to reproduce the
+		// golden; a bare no-DB run here would omit them.
 
-		// NOTE: the WorldPrepBurst golden was retired with SendWorldPrepBurst - the create-flow world-prep grant burst
-		// was proven redundant in-client and removed; grants now come from the shared class-driven world-entry loadout.
+		// Note: there is no WorldPrepBurst golden - the create flow's grants come from the shared class-driven
+		// world-entry loadout.
 
 		private static async Task AssertBurstStable(string name, Func<RecordingNetworkClient, Task> run, uint instance = TestInstance)
 		{
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			await run(client);
 			var bytes = client.Sent.SelectMany(p => p).ToArray();
 
-			// The golden comes out of the fixture archive, which does NOT write itself: a missing entry throws with the
+			// The golden comes out of the fixture archive, which does not write itself: a missing entry throws with the
 			// `--report fixture-set` line rather than blessing whatever the code just produced. Auto-creating it (what
 			// this did while the goldens were loose files) makes the gate assert that the code equals itself.
 			var golden = Golden.Bytes(name);

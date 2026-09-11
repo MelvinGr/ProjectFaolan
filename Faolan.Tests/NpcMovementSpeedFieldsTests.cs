@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #714: "why is there no per-NPC movement speed to import?" answered against the CORPUS ITSELF rather than against
-	// the all-NULL columns it produced.
+	// "why is there no per-NPC movement speed to import?" answered against the corpus itself rather than against
+	// the all-null columns it produced.
 	//
-	// `NpcStatCores.RunSpeed`, `.MaxRunSpeed` and `.OocMovementMultiplier` are NULL on all 1,018 shipped rows. That is
-	// only evidence of a harvest gap if the mapping works, so #646 kept the columns on the strength of
-	// `NpcStatCoreColumnsTests.EveryStatCoreProtoField_SurvivesTheRoundTrip_EvenTheOnesNoCaptureSets`. This gate closes
+	// `NpcStatCores.RunSpeed`, `.MaxRunSpeed` and `.OocMovementMultiplier` are null on all 1,018 shipped rows. That is
+	// only evidence of a harvest gap if the mapping works, which is what
+	// `NpcStatCoreColumnsTests.EveryStatCoreProtoField_SurvivesTheRoundTrip_EvenTheOnesNoCaptureSets` says. This gate closes
 	// the loop from the other end: it walks every captured spawn in the corpus and asks the protobuf directly whether
-	// retail ever SET the fields (proto presence, not a zero value - see ShouldSerialize).
+	// retail ever set the fields (proto presence, not a zero value - see ShouldSerialize).
 	//
 	// If retail ever does send one, this fails and the movement-speed question reopens with real data behind it.
 	public class NpcMovementSpeedFieldsTests
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					continue;
 
-				// `npc_stats` present IS the record being a creature rather than a player (the same signal
+				// `npc_stats` present is the record being a creature rather than a player (the same signal
 				// CharacterStatsFlags_Bit28_IsTheNpcBit checks the flag against).
 				if (read.Message.npc_stats == null)
 					continue;
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 
 				npcRecords++;
 
-				// Proto PRESENCE, so an explicit 0 would still count as "retail sent it".
+				// Proto presence, so an explicit 0 would still count as "retail sent it".
 				if (npc.ShouldSerializeRunSpeed())
 					present.Add($"run_speed={npc.RunSpeed} on {read.Message.Name} in {source}");
 				if (npc.ShouldSerializeMaxRunSpeed())

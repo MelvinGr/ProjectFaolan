@@ -14,12 +14,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The realm's service graph resolves (#826). Sixty-odd world services moved out of GameServerListener's ctor and
-	// into `AddRealmGameServer`, which trades a compile-time construction sequence for a runtime one - so a missing
-	// registration is no longer a build error. It used to be a failed BOOT, found by starting the server; this makes
-	// it a test.
+	// The realm's service graph resolves. `AddRealmGameServer` builds the sixty-odd world services through the
+	// container, which is a runtime construction sequence rather than a compile-time one - so a missing registration
+	// is not a build error, and without this gate it would surface as a failed boot.
 	//
-	// `ValidateOnBuild` walks every registration's constructor and reports EVERY unsatisfied dependency at once,
+	// `ValidateOnBuild` walks every registration's constructor and reports every unsatisfied dependency at once,
 	// without invoking a single factory - so nothing here touches a database, a socket or the file system.
 	public class GameServerCompositionTests
 	{
@@ -35,7 +34,7 @@ namespace Faolan.Tests
 			Assert.NotNull(provider);
 		}
 
-		// The realm registration provides the BARE, realm-tagged `ILogger` every composed service takes. Its category
+		// The realm registration provides the bare, realm-tagged `ILogger` every composed service takes. Its category
 		// is what lets a multi-realm deployment tell two realms' lines apart in one log, so it is asserted rather than
 		// assumed - a plain `ILogger` registration that lost the tag would be invisible otherwise.
 		[Fact]
@@ -51,7 +50,7 @@ namespace Faolan.Tests
 			Assert.NotNull(logger);
 		}
 
-		// ⚠️ The guard on the registration above: a bare `ILogger` singleton is realm-scoped, so any OTHER
+		// The guard on the registration above: a bare `ILogger` singleton is realm-scoped, so any other
 		// container-resolved type asking for a non-generic ILogger would silently inherit the GameServer's realm
 		// category. Every listener takes `ILogger<T>` (or, for the GameServer, the factory it tags with) - this fails
 		// if a new one starts taking the bare form.

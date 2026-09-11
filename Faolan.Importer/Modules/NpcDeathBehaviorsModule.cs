@@ -16,8 +16,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-creature death animation (the death BccIIR behaviorId), harvested from captured NPC kills (#362). Enriches
-	// NpcTemplate.DeathBehaviorId by name; un-harvested types keep NULL and the runtime falls back to the humanoid id.
+	// Per-creature death animation (the death BccIIR behaviorId), harvested from captured NPC kills. Enriches
+	// NpcTemplate.DeathBehaviorId by name; un-harvested types keep null and the runtime falls back to the humanoid id.
 	public sealed class NpcDeathBehaviorsModule : IImportModule
 	{
 		// No hard DependsOn (mirrors NpcDispositionModule): enriches whatever NpcTemplates exist; registration order
@@ -65,9 +65,9 @@ namespace Faolan.Importer.Modules
 					updated++;
 				}
 
-				// A zero means no record of this creature stated a length (see the extractor), and NULL is how that is
+				// A zero means no record of this creature stated a length (see the extractor), and null is how that is
 				// carried - writing 0 would send a zero-length death animation instead of falling back to the
-				// animation's own (#781).
+				// animation's own.
 				var activation = death.ActivationTime == 0 ? (uint?)null : death.ActivationTime;
 				if (template.DeathActivationTime != activation)
 				{

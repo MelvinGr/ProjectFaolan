@@ -6,13 +6,18 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Decodes an Age of Conan RDB skeleton (type 1010002) - the bind-pose bone hierarchy a skinned mesh / ANIMSYS
-	// references (#275 Phase 3). Validated against the 71-bone player skeleton (id 14853): composing each bone's local
-	// transform down the parent chain yields anatomically-correct world positions (Hips y=1.057, Neck 1.766, Head 1.898).
-	//
-	// Layout: 12-byte RDB-Id header, u32 version, u32 boneCount, then per bone:
-	//   [u32 nameLen][name][float4 quat xyzw][float3 translation][u32 childCount][u32 × childCount child indices]
-	// Quaternion + translation are LOCAL (relative to parent); world = parentWorld * local.
+	/// <summary>
+	///     Decodes an Age of Conan RDB skeleton (type 1010002): the bind-pose bone hierarchy a skinned mesh or the
+	///     ANIMSYS references. On the 71-bone player skeleton (id 14853), composing each bone's local transform down
+	///     the parent chain yields anatomically correct world positions — Hips at y=1.057, Neck at 1.766, Head at
+	///     1.898.
+	/// </summary>
+	/// <remarks>
+	///     The layout is a 12-byte RDB-Id header, a u32 version and a u32 bone count, then per bone
+	///     <c>[u32 nameLen][name][float4 quat xyzw][float3 translation][u32 childCount][u32 × childCount child
+	///     indices]</c>. The quaternion and translation are local, relative to the parent, so
+	///     <c>world = parentWorld * local</c>.
+	/// </remarks>
 	public static class SkeletonReader
 	{
 		public static IReadOnlyList<Bone> Read(ReadOnlySpan<byte> blob)
@@ -51,10 +56,15 @@ namespace Faolan.Core.Rdb.Assets
 			return bones;
 		}
 
-		// Resolve parents from the child lists, then compose each bone's world matrix by walking up the parent chain.
-		// The walk is iterative with a visited guard: a handful of shipped skeletons have a CYCLIC parent chain (a bone
-		// reachable as its own ancestor), which would otherwise recurse forever and StackOverflow (uncatchable) the moment
-		// we scan the whole 1010002 corpus to auto-pick a rig.
+		/// <summary>
+		///     Resolves parents from the child lists, then composes each bone's world matrix by walking up the parent
+		///     chain.
+		/// </summary>
+		/// <remarks>
+		///     The walk is iterative and carries a visited guard because a handful of shipped skeletons have a cyclic
+		///     parent chain, with a bone reachable as its own ancestor. A recursive walk would overflow the stack —
+		///     uncatchably — as soon as the whole 1010002 corpus is scanned to auto-pick a rig.
+		/// </remarks>
 		private static void ComposeWorld(List<Bone> bones)
 		{
 			for (var i = 0; i < bones.Count; i++)
@@ -70,7 +80,7 @@ namespace Faolan.Core.Rdb.Assets
 			for (var i = 0; i < bones.Count; i++)
 			{
 				seen.Clear();
-				// world = local_i * local_parent * local_grandparent * ... (row-vector convention).
+				// world = local_i * local_parent * local_grandparent * ..., in the row-vector convention.
 				var world = Matrix4x4.Identity;
 				var j = i;
 				while (j >= 0 && j < bones.Count && seen.Add(j))

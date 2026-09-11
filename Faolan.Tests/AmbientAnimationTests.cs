@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #766: a standing NPC performs its creature's ambient idle animations, which is what makes a street look inhabited
+	// A standing NPC performs its creature's ambient idle animations, which is what makes a street look inhabited
 	// rather than lined with statues. Retail streams them as BehaviorId.Emote records - see
 	// BehaviorAnimations.AmbientEmote for the byte-exact record and `--report ambient-animation` for the measurements
 	// these gates encode.
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ACreatureWithNoCapturedAnimations_StandsStill()
 		{
-			// The honest gap. 222 of the shipped creature types were captured idling; the rest get NOTHING rather than a
+			// The honest gap. 222 of the shipped creature types were captured idling; the rest get nothing rather than a
 			// borrowed animation, because an animation belonging to another creature may not even exist on its skeleton.
 			var (world, npc) = Idler([]);
 
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			// Retail's own split, not a guess about what looks right: 24,432 of the 25,750 attributable captured Emote
 			// records land on an actor with no MoveTask in the preceding 10s.
 			//
-			// ⚠️ A route walk is MODEL-ONLY - it does not stream, so it never sets `Moving`. Gating on that flag alone
+			// A route walk is model-only - it does not stream, so it never sets `Moving`. Gating on that flag alone
 			// would have every patroller in Old Tarantia stopping to scratch itself while walking down the street, which
 			// is why this gate walks a real beat rather than setting a flag.
 			var beat = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 200) };
@@ -115,7 +115,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EveryShippedAnimation_StatesADurationAndBelongsToAKnownCreature()
 		{
-			// Gates the harvested rows in faolan.db. A zero duration would tell the client an animation of no length AND
+			// Gates the harvested rows in faolan.db. A zero duration would tell the client an animation of no length and
 			// schedule the next one immediately, so the creature would flicker between animations forever - the failure
 			// the importer's "no stated activation_time" skip exists to prevent, checked here on what actually shipped.
 			using var ctx = new DatabaseContext(TestDb.ReadOnly(TestPaths.FaolanDb));

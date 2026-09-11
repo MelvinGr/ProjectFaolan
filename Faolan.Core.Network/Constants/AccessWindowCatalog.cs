@@ -3,12 +3,15 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Core.Network.Constants
 {
-	// AUTO-GENERATED (#258, re-carved to the client's PlayfieldAccessHolder grammar in #464) from
-	// BeachTailsTemplate.bin via the access-window typed model - the game-static PFAccessWindow_ playfield
-	// catalog the FullChar snapshot tails carry, identical for every character. Replaces the embedded
-	// AccessWindowTable.bin blob; SnapshotTails emits these byte-for-byte (AccessWindowCatalogTests). To
-	// regenerate if the content revision ever changes: parse BeachTailsTemplate.bin ->
-	// FullCharSnapshotSubClass.AccessWindowEntries and re-emit.
+	/// <summary>
+	///     The game-static <c>PFAccessWindow_</c> playfield catalog the FullChar snapshot tails carry, identical for
+	///     every character. Carved to the client's <c>PlayfieldAccessHolder</c> grammar.
+	/// </summary>
+	/// <remarks>
+	///     Generated from BeachTailsTemplate.bin; <c>SnapshotTails</c> emits these byte-for-byte
+	///     (<c>AccessWindowCatalogTests</c>). To regenerate when the content revision changes, parse
+	///     BeachTailsTemplate.bin into <c>FullCharSnapshotSubClass.AccessWindowEntries</c> and re-emit.
+	/// </remarks>
 	public static class AccessWindowCatalog
 	{
 		public static readonly IReadOnlyList<PfAccessWindowEntry> Entries =

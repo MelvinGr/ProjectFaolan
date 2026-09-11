@@ -11,11 +11,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Daily challenges (#509). The model is the client's - twelve stats, five category caps, three meta caps - and
-	// the two behaviours gated here are the two the CORPUS states:
+	// Daily challenges. The model is the client's - twelve stats, five category caps, three meta caps - and
+	// the two behaviours gated here are the two the corpus states:
 	//
-	//   * a cap is a THRESHOLD, not a clamp (a captured character sits at DailyQuestsCompleted 7 against a cap of 3),
-	//     so the challenge completes on the step that CROSSES it and not again afterwards;
+	//   * a cap is a threshold, not a clamp (a captured character sits at DailyQuestsCompleted 7 against a cap of 3),
+	//     so the challenge completes on the step that crosses it and not again afterwards;
 	//   * a completion moves four counters together in one push - the three metas and the lifetime tally.
 	//
 	// Plus the reset, which is the part with no wire evidence at all and therefore the part most worth pinning
@@ -78,13 +78,13 @@ namespace Faolan.Tests
 			var sheet = await ReadSheet(h.Database);
 			Assert.Equal(3u, sheet[CharacterStatId.DailyQuestsCompleted]);
 
-			// ⭐ The lockstep the capture shows: all four at once, all at 1.
+			// The lockstep the capture shows: all four at once, all at 1.
 			Assert.Equal(1u, sheet[CharacterStatId.DailyDailyCounter]);
 			Assert.Equal(1u, sheet[CharacterStatId.DailyWeeklyCounter]);
 			Assert.Equal(1u, sheet[CharacterStatId.DailyMonthlyCounter]);
 			Assert.Equal(1u, sheet[CharacterStatId.CounterDailyChallenges]);
 
-			// ⚠️ A fourth completion must NOT complete the challenge again - the counter runs past its cap (retail's
+			// A fourth completion must not complete the challenge again - the counter runs past its cap (retail's
 			// own characters do), so a `>=` test would re-award on every further quest for the rest of the day.
 			await h.Service.RecordQuestLineCompleted(h.Client, Character, now);
 
@@ -112,7 +112,7 @@ namespace Faolan.Tests
 			Assert.Equal(1u, sheet[CharacterStatId.DailyQuestsCompleted]);
 			Assert.Equal(0u, sheet[CharacterStatId.DailyDailyCounter]);
 
-			// The weekly/monthly tallies count CHALLENGES, not activity, so a daily rollover leaves them alone - and
+			// The weekly/monthly tallies count challenges, not activity, so a daily rollover leaves them alone - and
 			// the lifetime counter is never cleared by anything (the achievement ladder counts it to 500).
 			Assert.Equal(1u, sheet[CharacterStatId.DailyWeeklyCounter]);
 			Assert.Equal(1u, sheet[CharacterStatId.DailyMonthlyCounter]);

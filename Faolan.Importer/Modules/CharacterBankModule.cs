@@ -16,9 +16,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-character personal BANK (CharacterInventory container kind 105) from the on-demand BankIIR packets - the
-	// bank is not in the login snapshot, so it needs its own pass. Needs characters (attribution) + items (the
-	// templates the bank references).
+	/// <summary>
+	///     Per-character personal bank (CharacterInventory container kind 105) from the on-demand BankIIR packets; the
+	///     bank is not in the login snapshot, so it needs its own pass. Needs characters (attribution) and items (the
+	///     templates the bank references).
+	/// </summary>
 	public sealed class CharacterBankModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(ItemsModule)];

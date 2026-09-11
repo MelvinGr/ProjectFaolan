@@ -7,22 +7,22 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spell-recast [--report-arg <spellId>]`: where a spell's cooldown actually lives (#271).
+	// `--report spell-recast [--report-arg <spellId>]`: where a spell's cooldown actually lives.
 	//
 	// docs/re/spell-recast-source.md established that the base recast is `GameActionTypes.KeyValue` (0x2f9) on a
-	// GameAction ELEMENT attached to the spell, fetched by the tooltip through the spell's virtual slot 0x84 - and
+	// GameAction element attached to the spell, fetched by the tooltip through the spell's virtual slot 0x84 - and
 	// left "which record holds those elements" open, having eliminated the property run and field 321.
 	//
-	// It is the spell record's own ELEMENT region - the same region a feat's spell modifiers live in, read by the
+	// It is the spell record's own element region - the same region a feat's spell modifiers live in, read by the
 	// same `ItemTemplateStatModifiers.ParseElements`. Nothing new had to be decoded; the region was simply never
-	// looked at for a recast, because the search was framed as "which property FIELD is it" and a property field is
+	// looked at for a recast, because the search was framed as "which property field is it" and a property field is
 	// not what the client reads. `Life Leech` (220979) carries
 	// `SetSpellLineRecastTime(line 41026, 3000)` = the 30 s its retail tooltip shows.
 	public static partial class ReportCli
 	{
 		private const uint SpellRecordType = 1040005;
 
-		// The four recast GameAction types (docs/re/gameaction-keylists.tsv). Two SET a recast and two ADJUST one;
+		// The four recast GameAction types (docs/re/gameaction-keylists.tsv). Two set a recast and two ADJUST one;
 		// only the setters are a spell's own base - `ChangeRecastTime` / `ChangeLineRecastTime` are the feat/AA
 		// modifiers `FUN_007e1230` adds to a base the client already holds.
 		private static readonly Dictionary<uint, string> RecastKinds = new Dictionary<uint, string>

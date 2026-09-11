@@ -6,10 +6,10 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden byte test for the hand-built fallback SpawnPlayer summary blocks (Send0x2000_SpawnPlayer). Those blocks
-	// are now the generated client-schema types ProtoCoreCharacterIIR.CharacterStats (f4) / PlayerStats (f6); this
-	// locks their serialized bytes so the fallback spawn stays wire-stable. The golden hex was captured from the
-	// previous bespoke SpawnPlayerSummary/SpawnSummaryStats models (proven byte-identical before they were deleted).
-	// NOTE: CharacterStats.radius is sint32/zig-zag, so the wire value 100 = a semantic radius of 50.
+	// are the generated client-schema types ProtoCoreCharacterIIR.CharacterStats (f4) / PlayerStats (f6); this locks
+	// their serialized bytes so the fallback spawn stays wire-stable. The golden hex comes from an independently
+	// written model of the same two blocks, proven byte-identical to these.
+	// Note: CharacterStats.radius is sint32/zig-zag, so the wire value 100 = a semantic radius of 50.
 	public class SpawnSummaryGoldenTests
 	{
 		private const string GoldenStats = "080110910118CC014020580A68818306800100";

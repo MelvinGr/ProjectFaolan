@@ -11,22 +11,20 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The whole-corpus gate for SimpleCharFullUpdateCodec: every captured FA015807 - player and NPC alike - is
-	// decoded to its exact last byte and re-encoded byte-for-byte (Gitea #475, #530 wave 5b).
+	// decoded to its exact last byte and re-encoded byte-for-byte.
 	//
-	// The post-IIR was carried as an opaque `byte[] Records` described as "session runtime state the simulation
-	// re-derives". It is one grammar for both families:
+	// The post-IIR is one grammar for both families, not opaque "session runtime state the simulation re-derives":
 	//
-	//   [header][first record, ending in the buff list's frame][ACTIVE BUFFS]
-	//   [entry slot]                             NPC: the morph table · PLAYER: 14-byte entries + the ID list
+	//   [header][first record, ending in the buff list's frame][active buffs]
+	//   [entry slot]                             NPC: the morph table · player: 14-byte entries + the ID list
 	//   [the three closing pair lists]
 	//
 	// The entry slot is the one genuine difference, which is why the two looked like unrelated formats - and the
-	// "single record" forms turn out to be this shape with an EMPTY slot rather than a form of their own.
+	// "single record" forms turn out to be this shape with an empty slot rather than a form of their own.
 	public class SimpleCharFullUpdateCorpusTests
 	{
-		// The acceptance bar for a decoded region (#475): what the reader takes apart, the writer puts back byte for
-		// byte - across every capture that contains it, not one fixture. This is #530's corpus round-trip gate,
-		// reached early for the one IIR that used to have three emitters.
+		// The acceptance bar for a decoded region: what the reader takes apart, the writer puts back byte for
+		// byte - across every capture that contains it, not one fixture.
 		[Fact]
 		public void EveryCapturedSpawn_ParsesToTheExactByte_AndReEncodes()
 		{
@@ -59,14 +57,14 @@ namespace Faolan.Tests
 			Assert.True(unread.Count == 0, $"{unread.Count} captured spawns did not decode:\n  " + string.Join("\n  ", unread.Take(10)));
 			Assert.True(mismatches.Count == 0, $"{mismatches.Count} captured spawns did not re-encode byte-exact:\n  " + string.Join("\n  ", mismatches.Take(10)));
 
-			// Pinned to the FULL corpus. The family is told apart by the first record's MOVE-TASK SLOT: an NPC has
-			// one, a player's first record IS the buff list's framing word (length 4). The 317 player streams are the
-			// 286 the old player-only codec read plus the 31 whose entry slot is EMPTY - there the player's
-			// [count][entryTableX][marker] and the NPC's [count][two words] are the same twelve bytes, so the two
-			// readings do not disagree about anything and either reproduces the stream.
+			// Pinned to the full corpus. The family is told apart by the first record's move-task slot: an NPC has
+			// one, a player's first record is the buff list's framing word (length 4). Of the 317 player streams, 31
+			// have an empty entry slot - there the player's [count][entryTableX][marker] and the NPC's [count][two
+			// words] are the same twelve bytes, so the two readings do not disagree about anything and either
+			// reproduces the stream.
 			//
-			// This was 99.95% until the buff count stopped being searched for. Reading it off the end of the first
-			// record resolves the last six, including the one whose ASCII is scrambled in 4-byte groups - a
+			// Reading the buff count off the end of the first record, rather than searching for it, is what resolves
+			// the last six - including the one whose ASCII is scrambled in 4-byte groups, a
 			// mis-reassembled TCP segment, which reads fine because the corruption is inside a string rather than in
 			// the framing.
 			Assert.Equal(17717, census.Values.Sum());
@@ -74,9 +72,9 @@ namespace Faolan.Tests
 			Assert.Equal(17400, census["npc"]);
 		}
 
-		// The first record's move-task slot (#477) - the last region of the spawn stream that was carried as bytes.
-		// It was written up as "runtime state the simulation re-derives, 20..1,273 bytes"; it is the entity's current
-		// MoveTask, in the same modes the MoveTaskIIR packet uses, and we have parsed that grammar since #53.
+		// The first record's move-task slot. It reads as "runtime state the simulation re-derives, 20..1,273 bytes"
+		// and is not: it is the entity's current MoveTask, in the same modes the MoveTaskIIR packet uses, parsed by the
+		// same grammar.
 		[Fact]
 		public void EveryFirstRecordSlot_IsAMoveTask()
 		{
@@ -101,7 +99,7 @@ namespace Faolan.Tests
 				}
 			}
 
-			// Pinned to the FULL corpus. Every NPC stream has the slot; every player stream lacks it.
+			// Pinned to the full corpus. Every NPC stream has the slot; every player stream lacks it.
 			Assert.Equal(317, noSlot);
 			Assert.Equal(14153, emptySlot);
 			Assert.Equal(3247, withTask);
@@ -118,11 +116,11 @@ namespace Faolan.Tests
 			}, modes);
 		}
 
-		// Every buff group the reader finds, on NPCs and players alike, is a ScaffoldBuffGroup with exactly ONE
+		// Every buff group the reader finds, on NPCs and players alike, is a ScaffoldBuffGroup with exactly one
 		// record (the inner frame the flat carve knew as "Kind = ForCount(1)" - a spawn carrying two records of one
 		// spell has never been captured). The spell ids are the proof that this is a buff list and not an
 		// arithmetic coincidence: they resolve in our own catalog and read as a buff bar - and nine of them turn up
-		// on NPCs, two of those being necromancer PET summons.
+		// on NPCs, two of those being necromancer pet summons.
 		[Fact]
 		public void EverySixtyByteRecordTheReaderFinds_IsAScaffoldBuff()
 		{
@@ -147,27 +145,27 @@ namespace Faolan.Tests
 				}
 			}
 
-			// 1471 records over ALL 17,717 captured streams - player and NPC alike. The old census read 670, because
+			// 1471 records over all 17,717 captured streams - player and NPC alike. The old census read 670, because
 			// it only counted the streams the NPC-shaped decoder accepted; the player-only ones carry buffs too and
 			// were simply never walked by that gate.
 			Assert.Equal(1471, records);
 
-			// ⚠️ TargetClass is EntityClass.Character on 1469 of them and ZERO on exactly two. The field was written up
+			// TargetClass is EntityClass.Character on 1469 of them and zero on exactly two. The field was written up
 			// as "EntityClass.Character on all 941" from the narrower census - a claim the wider one breaks. It is
-			// CARRIED, not asserted, so that record round-trips (the whole-record gate above reproduces it); asserting
+			// carried, not asserted, so that record round-trips (the whole-record gate above reproduces it); asserting
 			// the class here would have rejected a real captured stream.
 			Assert.Equal(new Dictionary<uint, int> { [EntityClass.Character] = 1469, [0] = 2 }, classes);
 
 			// The nine that appear on NPC spawns, all rows in Spells: Runed Flesh (Rank 5 / Rank 1), Ether Channel,
 			// Undead Minion: Mutilator, Deathless Acolyte: Arcanist, Hearty Meal, Shrink, Stagger, Frozen Hatred. Two
-			// are necromancer PET summons and one is the Frozen Hatred proc - corroboration from a direction this
-			// walk knows nothing about (#307/#140).
+			// are necromancer pet summons and one is the Frozen Hatred proc - corroboration from a direction this
+			// walk knows nothing about.
 			uint[] onNpcs = [222825, 1148789, 1151265, 1220007, 1366140, 3161312, 3774365, 3911037, 4377209];
 			Assert.All(onNpcs, id => Assert.Contains(id, spellIds));
 			Assert.DoesNotContain(0u, spellIds);
 
-			// ⚠️ 0..83, and 83 is ABOVE the level cap. So the field is level-LIKE - #438 identified it as the caster's
-			// level by a separate route - but this corpus does not prove it IS the level, and asserting 1..80 here
+			// 0..83, and 83 is above the level cap. So the field is level-like - it is identified as the caster's level
+			// by a separate route - but this corpus does not prove it is the level, and asserting 1..80 here
 			// would have written a wrong bound into a gate. (The narrower NPC-only census read 5..82; the player
 			// streams it skipped carry a 0, which is another reason the field is carried rather than bounded.)
 			Assert.Equal(0u, casterLevels.Min());

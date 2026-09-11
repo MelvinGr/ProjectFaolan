@@ -12,15 +12,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Inventory
 {
-	// The player's action bar / hotbar (#71). The client persists its bar as it drags shortcuts (AddShortcut
-	// 0x206E / RemoveShortcut / UpdateShortcut) into CharacterShortcut rows, and requests the saved bar at login
-	// (RequestShortcutBar 0x206D), which we answer with ShortcutBarReply (0x2076) rebuilt from those rows so the
-	// bar survives relog. Extracted out of the GameServerListener dispatch switch as a composed collaborator
-	// (#200): the switch cases are now thin one-liners delegating here, like the loot/shop cases.
+	// The player's action bar. The client persists its bar as it drags shortcuts (AddShortcut 0x206E,
+	// RemoveShortcut, UpdateShortcut) into CharacterShortcut rows, and requests the saved bar at login
+	// (RequestShortcutBar 0x206D), which is answered with ShortcutBarReply (0x2076) rebuilt from those rows so the bar
+	// survives a relog.
 	//
-	// NB the in-game AddShortcut branch lives here, but the AddShortcut opcode (0x206E) ALSO doubles as the
-	// create-editor enter-world signal - that create-flow branch stays on the listener (it's #197 handshake glue),
-	// which routes to HandleAddShortcut only for the in-game case.
+	// The in-game AddShortcut branch lives here, but the AddShortcut opcode (0x206E) also doubles as the create-editor
+	// enter-world signal; that create-flow branch stays on the listener, which routes to HandleAddShortcut only for the
+	// in-game case.
 	public sealed class ShortcutBarService
 	{
 		private static readonly ProtoEndpoint ReplySender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
@@ -33,8 +32,8 @@ namespace Faolan.GameServer.Inventory
 			_logger = logger;
 		}
 
-		// AddShortcut (0x206E, in-game branch): the player dragged an ability/item onto the bar. Persist the slot
-		// (upsert - re-dragging overwrites); the login RESTORE is rebuilt from these rows (SendRestoredBar).
+		// AddShortcut (0x206E, in-game branch): the player dragged an ability or item onto the bar. The slot is upserted,
+		// so re-dragging overwrites, and the login restore is rebuilt from these rows (SendRestoredBar).
 		public async Task HandleAddShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			// GameCharAgent.AddShortcut(int i_eType, int i_nPosition, uint32 i_nData, uint32 i_nInventoryType) - the
@@ -43,7 +42,7 @@ namespace Faolan.GameServer.Inventory
 			var slotId = body.ReadUInt32(); // i_nPosition: client slot id (ranges 0x64.. and 0x4E20.. = bar pages)
 			var sourceId = body.ReadUInt32(); // i_nData: ability id or item ref
 			// i_nInventoryType: which container i_nData indexes into. Zero in all 192 captured AddShortcuts (types
-			// 4 x156, 2 x30, 3 x6) - no capture drags an ITEM onto the bar, which is presumably what would set it.
+			// 4 x156, 2 x30, 3 x6) - no capture drags an item onto the bar, which is what would presumably set it.
 			var inventoryType = body.ReadUInt32();
 
 			if (client.Session.Character != null)
@@ -62,10 +61,10 @@ namespace Faolan.GameServer.Inventory
 			_logger.LogInformation("RemoveShortcut slot 0x{Slot:X4}.", slot);
 		}
 
-		// UpdateShortcut: body = [u32 slot][u32 flag][u32 container]. Partial decode (#71, NecroL80
-		// randomActions/changemap captures): the slot is in the bar-PAGE range (0x4E20.., not the 0x64.. item
-		// range), container is always 0x68 (the backpack kind), and flag is 0/1. The bar's restorable contents ride
-		// AddShortcut; this bar-page toggle's exact semantics are still fuzzy, so it stays log-only.
+		// UpdateShortcut: body = [u32 slot][u32 flag][u32 container]. Partially decoded from the NecroL80
+		// randomActions and changemap captures: the slot is in the bar-page range (0x4E20.., not the 0x64.. item
+		// range), container is always 0x68 (the backpack kind), and flag is 0 or 1. The bar's restorable contents ride
+		// AddShortcut; this bar-page toggle's semantics are not pinned, so it stays log-only.
 		public Task HandleUpdateShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var slot = body.ReadUInt32();
@@ -77,9 +76,9 @@ namespace Faolan.GameServer.Inventory
 		}
 
 		// RequestShortcutBar (0x206D): the client asks for its saved hotbar at login; reply with the restored bar.
-		// Sent from the GameCharAgent world conversation (sub-id 0x58 / the client instance), NOT echoed from the
-		// request bytes - the 0x206D request's receiver carries no instance, so echoing it produced an empty-instance
-		// sender the client silently dropped (#71: bar stayed empty in every slot though the body was byte-exact).
+		// Sent from the GameCharAgent world conversation (sub-id 0x58 and the client instance), never echoed from the
+		// request bytes: the 0x206D request's receiver carries no instance, so echoing it produces an empty-instance
+		// sender that the client silently drops, leaving every bar slot empty despite a byte-exact body.
 		// Retail sends 0x2076 from this same endpoint as the 0x2052 grants (login capture pkt 182 vs 237).
 		public async Task SendRestoredBar(INetworkClient client)
 		{

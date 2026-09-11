@@ -98,9 +98,9 @@ namespace Faolan.Web.Services
 		///     being a GM. Returns the stored value.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ An all-zero mask is normalised to null. On the wire the two are the same thing - ANY non-zero value
-		///     flips the retail client into GM mode, so "a GM with no privileges" cannot be expressed - and keeping a
-		///     0 around would be a second way to say "not a GM" that `IsGm` would disagree with.
+		///     An all-zero mask is normalised to null. On the wire the two are the same thing - any non-zero value flips
+		///     the retail client into GM mode, so "a GM with no privileges" cannot be expressed - and keeping a 0 around
+		///     would be a second way to say "not a GM" that <c>IsGm</c> would disagree with.
 		/// </remarks>
 		public async Task<uint?> SetGmLevelAsync(uint accountId, uint? mask)
 		{

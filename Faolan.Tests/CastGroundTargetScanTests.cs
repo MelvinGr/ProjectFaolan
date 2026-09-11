@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void RejectsEntityTargetedCast()
 		{
-			// f377 Ice Strike trailer: lead byte 01 then a ZEROED Vector3 (the target rides SpellTarget, not the trailer).
+			// f377 Ice Strike trailer: lead byte 01 then a zeroed Vector3 (the target rides SpellTarget, not the trailer).
 			var trailer = Convert.FromHexString("010000000000000000000000c800");
 
 			Assert.False(CastGroundTargetScan.TryReadPosition(trailer, out var pos));

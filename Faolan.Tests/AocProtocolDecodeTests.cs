@@ -17,9 +17,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the protobuf schema reverse-engineered from AgeOfConan.exe (Faolan.Core/Protobuf/aoc-client-protos.proto, generated to
-	// Faolan.Core/Protobuf/AocProtocol.g.cs) decodes the REAL captured inventory wire bytes - and that the
+	// Faolan.Core/Protobuf/AocProtocol.g.cs) decodes the real captured inventory wire bytes - and that the
 	// decoded ProtoAcgItem.key1 (a ProtoDecryptionKey) is exactly the item's Data1..4 quad, i.e. the per-item TEA
-	// key that unlocks its RDBH item template. Ties capture -> typed protobuf -> decryption key together.
+	// key that unlocks its rdbh item template. Ties capture -> typed protobuf -> decryption key together.
 	public class AocProtocolDecodeTests
 	{
 		private const uint Hash = 1129664565;
@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// Proves protobuf-net re-serializes BYTE-IDENTICALLY to the captured wire - both a single inventory entry and
+		// Proves protobuf-net re-serializes byte-identically to the captured wire - both a single inventory entry and
 		// the whole 0x737A6DF9 snapshot body (ProtoFullCharacterIIR). This is the guarantee that lets the typed schema
 		// replace the hand-rolled SnapshotItems / FullPlayerCharacterCodec without changing any output byte.
 		[Fact]

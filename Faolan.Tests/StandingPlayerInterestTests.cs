@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #778: the interest pass nobody drove - the one for a player STANDING STILL while the world walks past them.
+	// The interest pass nobody drove - the one for a player standing still while the world walks past them.
 	//
 	// Every other pass is triggered by the player: `BroadcastPlayerMove`, `BroadcastPlayerEntry`,
-	// `RefreshQuestVisibility`. Nothing was triggered by the SUBJECT moving, and `BroadcastNpcMove` only sends to
+	// `RefreshQuestVisibility`. Nothing was triggered by the subject moving, and `BroadcastNpcMove` only sends to
 	// viewers who already hold the handle - so an NPC that walked out of range froze on the standing player's screen
 	// for ever, and one that walked in was invisible until they next moved. It cannot hang off the NPC's own move
-	// effect either: a route walker emits none (#716 issues the beat to the client and walks it there), so the
+	// effect either: a route walker emits none (the beat is issued to the client, which walks it there), so the
 	// entities most in need of it are exactly the ones with no move to hook.
 	public class StandingPlayerInterestTests
 	{
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		{
 			var (broadcaster, client, player, npc) = Harness();
 
-			// The player already sees it - Known AND Confirmed, since #245 only despawns what the client built.
+			// The player already sees it - Known and Confirmed, since a despawn only goes to a client that built it.
 			player.Knowledge.Known.Add(NpcHandle);
 			player.Knowledge.Confirmed.Add(NpcHandle);
 
@@ -58,8 +58,8 @@ namespace Faolan.Tests
 			Assert.Contains(NpcHandle, player.Knowledge.Known);
 		}
 
-		// The other direction, and the one a standing player could NEVER get before: a walker that arrived from
-		// outside the range produces an ARRIVAL. Asserted on the resolve rather than on the dispatched packet - the
+		// The other direction, and the one a standing player could never get before: a walker that arrived from
+		// outside the range produces an arrival. Asserted on the resolve rather than on the dispatched packet - the
 		// spawn send reads the quest-giver map, and what is new here is the pass running at all, not how a spawn is
 		// framed (`DispatchInterest` is shared verbatim with the player-move path).
 		[Fact]
@@ -76,7 +76,7 @@ namespace Faolan.Tests
 			Assert.Equal(player.Handle, arrival.Recipient.Handle);
 		}
 
-		// #245's gate still holds on this path: a handle the client never confirmed building is dropped SILENTLY.
+		// The confirmed-build gate holds on this path too: a handle the client never confirmed is dropped silently.
 		// Sending an n3ToClientQuit for one crashes a still-loading client on the unknown handle.
 		[Fact]
 		public async Task AnUnconfirmedHandle_IsForgottenWithoutADespawnPacket()
@@ -92,11 +92,11 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
-		// ⛔ ...and it does NOT run for a player whose world entry has not yet DELIVERED its packets. World entry places
+		// ...and it does not run for a player whose world entry has not yet delivered its packets. World entry places
 		// the player in the zone (which is what makes them visible to this sweep) seconds before it flushes the
 		// MapChange/snapshot/NPC burst, so without this gate the tick got there first: it streamed every in-range NPC
 		// to a client that had not been told which playfield it was in, stamped with the zone's minted fallback token
-		// rather than the map's. The client drops those, and because the sweep SEEDS them into Known the entry burst
+		// rather than the map's. The client drops those, and because the sweep seeds them into Known the entry burst
 		// then finds nothing in range ("0 in-range NPCs") and never corrects it - every NPC in the entry radius stays
 		// invisible for the whole session while remaining alive server-side, taking and dealing damage.
 		[Fact]
@@ -109,15 +109,15 @@ namespace Faolan.Tests
 			await broadcaster.ResolveInterest(client);
 
 			Assert.Empty(client.Sent);
-			// and crucially NOT seeded: a seeded handle is one the entry burst will skip as already known.
+			// And crucially not seeded: a seeded handle is one the entry burst will skip as already known.
 			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
-		// ⚠️ The other half of #778: BOUNDARY CHURN. A flat radius has no memory, so a walker whose beat happens to
+		// The other half of the problem: boundary churn. A flat radius has no memory, so a walker whose beat happens to
 		// run along the interest edge crosses it twice per lap and is spawned and despawned every time - a whole
 		// FA015807 spawn record each way, for an NPC that never actually goes anywhere.
 		//
-		// This paces one NPC back and forth across the line and counts the RESOLVE, not the packets: the despawn half
+		// This paces one NPC back and forth across the line and counts the resolve, not the packets: the despawn half
 		// is gated on `Confirmed`, which only a client poll sets, so counting sends would score a churning pass as
 		// quiet for the wrong reason (the second despawn is suppressed, the spawns are not). The events are the
 		// churn; what reaches the wire depends on what the client has confirmed.
@@ -144,7 +144,7 @@ namespace Faolan.Tests
 			Assert.True(events <= 1, $"a walker dithering across the interest edge resolved {events} interest events; it never moved more than 3 units");
 		}
 
-		// ⛔ ...and the band is a DESPAWN-side rule only. An entity inside it that the player does NOT already hold
+		// ...and the band is a despawn-side rule only. An entity inside it that the player does not already hold
 		// must not be introduced - otherwise the effective interest range is simply 165 u and the churn has moved
 		// outward rather than gone away.
 		[Fact]
@@ -159,7 +159,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(NpcHandle, player.Knowledge.Known);
 		}
 
-		// ...while one the player DOES hold is kept there, which is the whole point of the band.
+		// ...while one the player does hold is kept there, which is the whole point of the band.
 		[Fact]
 		public void AKnownNpcInsideTheHysteresisBand_IsKept()
 		{
@@ -195,7 +195,7 @@ namespace Faolan.Tests
 			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
-			// The sweep only runs for a client whose world entry has FLUSHED its packets; a player standing still is
+			// The sweep only runs for a client whose world entry has flushed its packets; a player standing still is
 			// past that by definition. The window where it is false has its own gate below.
 			client.Session.WorldEntryDelivered = true;
 			var player = new WorldEntity(PlayerHandle, MapId, true, "Standing", client);

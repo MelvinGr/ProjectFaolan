@@ -9,19 +9,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report npc-pose-check`: does every shipped `NpcStatCores` row carry the pose and idle animation the type is
-	// USUALLY caught in, or one it was caught in once? (Gitea #729, moved out of `NpcStatCoreColumnsTests`.)
+	// usually caught in, or one it was caught in once?
 	//
-	// The bug it exists for: a `bcc_state` / `anim_idle_id` is the mode over the type's sightings, so a type whose one
-	// captured representative happened to be mid-emote ships that emote as its permanent pose. The Citizen shipped a
-	// state its own sightings outnumbered 57 to 1.
+	// The defect it exists for: a `bcc_state` / `anim_idle_id` is the mode over the type's sightings, so a type whose
+	// one captured representative happened to be mid-emote ships that emote as its permanent pose.
 	//
-	// ⭐ **Why it is a REPORT and not a test.** It compares importer OUTPUT (`faolan.db`) against importer INPUT (the
-	// dumps), and as a test it read the input through `fixtures.bin`'s corpus half - a frozen, derived slice. The two
-	// populations diverge the moment captures are added: on 2026-08-08 template 14227 (Knight) shipped `anim_idle_id`
-	// 42024 from a run over the real dumps while the extract, still at the old capture set, called 42024 an outlier at
-	// 12:2 out of a sample of fourteen. The gate was judging the shipped value against evidence it had already
-	// outgrown, and the sanctioned fix - regenerate the extract - rebaselines twenty-odd unrelated gates in one
-	// commit. Run against the real dumps there is no second population and no such failure mode.
+	// Why it is a report and not a test. It compares importer output (`faolan.db`) against importer input (the
+	// dumps). As a test it would read the input through `fixtures.bin`'s corpus half - a frozen, derived slice - and
+	// the two populations diverge the moment captures are added, so the gate would judge a shipped value against
+	// evidence it has already outgrown. Run against the real dumps there is no second population and no such failure
+	// mode.
 	//
 	// It also means the `minimumEvidence` floor the test needed can go: that existed only to stop a thin frozen sample
 	// outvoting a fuller live one.
@@ -86,7 +83,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  shipped cores checked: {checkedStates} bcc_state, {checkedIdles} anim_idle_id " +
 				$"(of {cores.Count} carrying one; the rest have no sighting in this corpus).");
 
-			// ⚠️ A type captured in exactly ONE pose says nothing - the gate is about a value its own sightings
+			// A type captured in exactly one pose says nothing - the gate is about a value its own sightings
 			// contradict, so it needs types seen in more than one.
 			var mixed = states.Count(kv => kv.Value.Count > 1);
 			Console.WriteLine($"  {mixed} template(s) captured in more than one bcc_state - the population the check has teeth over.");

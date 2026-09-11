@@ -5,12 +5,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact round-trip for the dynel-family full-update records (#187, docs/re/iir-readers-combat-world.md):
+	// Byte-exact round-trip for the dynel-family full-update records (docs/re/iir-readers-combat-world.md):
 	// Door (typeWord 0xC748) and TombStone (0xC87B). Oracles are captured bodies (full record incl. length prefix).
 	// Proves the codec splits the record into [header][env][length-prefixed identity blob][opaque geometry tail] and
 	// rebuilds it byte-exact - the same lift SimpleDynelIdentityCodec does, extended to the door/destructible/
-	// climbing/tombstone family. The leading u32 record length belongs to the SENDER (#530 rule 2), so it is sliced
-	// off before the codec sees it.
+	// climbing/tombstone family. The leading u32 record length belongs to the sender, so it is sliced off before the
+	// codec sees it.
 	public class WorldObjectCodecTests
 	{
 		private const string DoorBody =
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.Equal(hex[8..], Convert.ToHexStringLower(WorldObjectCodec.Build(p)));
 		}
 
-		// The captured record WITHOUT its leading u32 length (#530 rule 2).
+		// The captured record without its leading u32 length.
 		private static byte[] Record(string hex)
 		{
 			return Convert.FromHexString(hex)[4..];

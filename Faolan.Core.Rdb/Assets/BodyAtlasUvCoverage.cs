@@ -3,18 +3,22 @@ using System.Collections.Generic;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Which texels of a body atlas the mesh actually SAMPLES, by rasterizing the mesh's own UV triangles (#294).
-	//
-	// This is what `BodyAtlasDilator` wants and could not have: the dilator's colour+flatness test is a guess at
-	// "is this pixel background", and the tan gutter is close enough to tan skin that a smooth patch of real chest
-	// passes both guards and gets flattened. A UV triangle covering a texel is not a guess - that texel is drawn on
-	// the character, so it is skin by definition, and one no triangle covers is never drawn, so nothing is lost by
-	// filling it.
-	//
-	// ⚠️ Conservative on purpose: a texel is covered if the triangle touches it AT ALL (centre-inside fill plus the
-	// three edges walked), not only if its centre is inside. The two errors are not symmetric - a missed island
-	// texel gets blurred away and shows as an artifact, while an extra covered texel merely goes unfilled in a
-	// region the mesh does not sample.
+	/// <summary>
+	///     Which texels of a body atlas the mesh actually samples, found by rasterizing the mesh's own UV triangles.
+	/// </summary>
+	/// <remarks>
+	///     This is the authoritative answer <see cref="BodyAtlasDilator" /> needs: the dilator's colour and flatness
+	///     test only guesses at "is this pixel background", and the tan gutter is close enough to tan skin that a
+	///     smooth patch of real chest passes both guards and gets flattened. A UV triangle covering a texel is not a
+	///     guess — that texel is drawn on the character, so it is skin by definition — and a texel no triangle covers
+	///     is never drawn, so nothing is lost by filling it.
+	///     <para>
+	///         Coverage is deliberately conservative: a texel counts as covered if the triangle touches it at all
+	///         (the centre-inside fill plus all three edges walked), not only if its centre is inside. The two errors
+	///         are not symmetric — a missed island texel gets blurred away and shows as an artifact, while an extra
+	///         covered texel merely goes unfilled in a region the mesh does not sample.
+	///     </para>
+	/// </remarks>
 	public static class BodyAtlasUvCoverage
 	{
 		/// <summary>
@@ -46,7 +50,7 @@ namespace Faolan.Core.Rdb.Assets
 					var (bu, bv) = Uv(sub, sub.Indices[t + 1]);
 					var (cu, cv) = Uv(sub, sub.Indices[t + 2]);
 
-					// UVs outside [0,1] are a legal tiling address, and the tile is a property of the TRIANGLE, not of
+					// UVs outside [0,1] are a legal tiling address, and the tile is a property of the triangle, not of
 					// each corner: wrapping the corners independently would tear a triangle that straddles a tile
 					// boundary into one spanning the whole atlas. Shift all three by the same whole-tile offset
 					// instead, so the shape survives and anything still off the edge is simply clipped by Mark.
@@ -72,8 +76,10 @@ namespace Faolan.Core.Rdb.Assets
 			}
 		}
 
-		// Walk a UV edge marking every texel it crosses (DDA). This is what catches the sliver triangles a
-		// centre-inside test drops entirely - and an island's OUTLINE is exactly where the seam artifacts are.
+		/// <summary>
+		///     Walks a UV edge with a DDA, marking every texel it crosses. This is what catches the sliver triangles a
+		///     centre-inside test drops entirely, and an island's outline is exactly where the seam artifacts are.
+		/// </summary>
 		private static void Edge(bool[] covered, int w, int h, float x0, float y0, float x1, float y1)
 		{
 			var steps = (int)MathF.Ceiling(MathF.Max(MathF.Abs(x1 - x0), MathF.Abs(y1 - y0))) + 1;

@@ -31,21 +31,21 @@ namespace Faolan.Core.Database.Tables
 		public string Code { get; set; } = "";
 
 		// Wire claim type: 6 = plain item claim; 4 = account-currency / point grant.
-		public uint ClaimType { get; set; } = 6; // TODO: make Enum
+		public uint ClaimType { get; set; } = 6;
 
-		// Max charges - the second tail word [remaining][MAX]. NULL (wire 0) = infinite. For a finite claim it equals
+		// Max charges - the second tail word [remaining][MAX]. Null (wire 0) = infinite. For a finite claim it equals
 		// Quantity when fresh (so the initial list has remaining == max) and stays fixed as Quantity decrements, so the
 		// sub-0x05 redeem ack sends [remaining][max].
 		public uint? MaxCharges { get; set; }
 
-		// Remaining charges - the "Amount" column. NULL = INFINITE (shown as ∞; the claim is not consumed on redeem, so
+		// Remaining charges - the "Amount" column. Null = infinite (shown as ∞; the claim is not consumed on redeem, so
 		// an ordinary item claim can be collected any number of times). A finite value N is a multi-charge claim
-		// ("Double XP", 20) that delivers ONE per redeem and decrements until it hits 0, when the row is removed. On the
+		// ("Double XP", 20) that delivers one per redeem and decrements until it hits 0, when the row is removed. On the
 		// wire (the first of the tail pair [remaining][max]) infinite is 0.
 		public uint? Quantity { get; set; }
 
-		// The item's LEVEL as shown in the window (the u64 after the template on the wire). NOT the stack count: the
-		// capture's redeem delivered ONE item despite Level 5 (see ClaimEntry). Cosmetic server-side; sent verbatim.
-		public ulong Level { get; set; } // TODO: Just use item.level?
+		// The item's level as shown in the window (the u64 after the template on the wire). Not the stack count: the
+		// capture's redeem delivered one item despite Level 5 (see ClaimEntry). Cosmetic server-side; sent verbatim.
+		public ulong Level { get; set; }
 	}
 }

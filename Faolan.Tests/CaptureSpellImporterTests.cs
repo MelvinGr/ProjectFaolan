@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		private const string ApplySpellHex =
 			"000000731bd646d2000000170a070d13ce71b11056120a0d47c1676c10d4cb8b402000000000506b87e3160000c3500802e5d400003dfa48000000c3500802e5d400000000000000000000000100010000000100000000003dfa480000005000000000000000000000000000000050000000001534b945";
 
-		// A real-format DispatchLearnSpell grant (#73): GameCharAgent 0xa9ecb95d -> GameCharInterface 0x8b87f791
+		// A real-format DispatchLearnSpell grant: GameCharAgent 0xa9ecb95d -> GameCharInterface 0x8b87f791
 		// (receiver instance = DemoL80's character id 0x110099bd), body = [u32 spellId 0x4213cd]. Framing matches
 		// TsharkCaptureReader.Rebuild; the CRC is a placeholder (Rpc.Parse does not enforce the CRC, and the importer
 		// filters on opcode/class-pair/body only).
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 						Name = ""
 					});
 					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-					// DemoL80 is the grant's target; the other character must NOT receive the spell.
+					// DemoL80 is the grant's target; the other character must not receive the spell.
 					db.Characters.Add(new Character
 					{
 						Id = DemoL80Id,

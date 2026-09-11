@@ -7,13 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Guards RdbItemImporter's template-text reader against the #202 regression: the string header is `[u32 tag]
-	// [u16 nameLen][u16 descLen]`, and reading the name length as a u32 folds the second word into its high bytes, so
-	// any name followed by a description blew past the 1024 guard and was dropped - which is why 225 real items had
-	// blank names while the ~900 with a zero second word worked.
+	// Guards RdbItemImporter's template-text reader: the string header is `[u32 tag][u16 nameLen][u16 descLen]`, and
+	// reading the name length as a u32 folds the second word into its high bytes, so any name followed by a
+	// description blows past the 1024 guard and is dropped - the shape that left 225 real items with blank names
+	// while the ~900 with a zero second word worked.
 	//
-	// ⭐ That second word was called a FLAGS word ("nonzero when the string is escaped") until #891 measured it: it is
-	// the DESCRIPTION's length. Across the 3,587 decrypted templates that carry a clean name it is nonzero on 875, and
+	// That second word is the description's length, not a flags word meaning "the string is escaped". Across the 3,587 decrypted templates that carry a clean name it is nonzero on 875, and
 	// on all 875 the bytes after the name are printable for exactly that many bytes - no exceptions. The correlation
 	// that suggested "escaping" does not hold either: 752 of the 875 have no escape in the name at all.
 	//
@@ -29,8 +28,8 @@ namespace Faolan.Tests
 			Assert.Equal("Mantle of Kuthchemes", RdbItemImporter.ExtractName(t));
 		}
 
-		// The #202 fix: a nonzero second word made the old u32 length read reject this name. It is the real record's
-		// own pairing - `Aspirant\'s Cap` really is followed by a 24-byte "No description available" (#891) - and the
+		// A nonzero second word is what a u32 length read folds in, rejecting this name. It is the real record's own
+		// pairing - `Aspirant\'s Cap` really is followed by a 24-byte "No description available" - and the
 		// apostrophe is escaped in the template.
 		[Fact]
 		public void EscapedApostrophe_WithADescription_IsResolvedAndUnescaped()

@@ -53,7 +53,7 @@ RPC class **CSPlayerAgent** (id `0x6DD55614`) · C2S (client→server call)
 | `0x16` | `0x2016` | `SetCommunityServerOptions` |  |
 | `0x17` | `0x2017` | `StartVoteKick` |  |
 | `0x18` | `0x2018` | `VoteKickAnswer` |  |
-| `0x19` | `0x2019` | `StartVoteRetreat` | StartVoteRetreat(), NO params. The "observed [u32 0xC350][u32 clientInstance] at login" was 0x201E ClientRequestGuildInfo mis-attributed (#458) |
+| `0x19` | `0x2019` | `StartVoteRetreat` | StartVoteRetreat(), no params |
 | `0x1A` | `0x201A` | `VoteRetreatAccept` |  |
 | `0x1B` | `0x201B` | `VoteRetreatReject` |  |
 | `0x1C` | `0x201C` | `AcceptGuildInvitation` |  |
@@ -205,7 +205,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x1E` | `0x201E` | `DispatchTeamSummonRequestFailedInvalidPF` |  |
 | `0x1F` | `0x201F` | `DispatchTeamSummonRequestFailedAlreadyInSameInstance` |  |
 | `0x20` | `0x2020` | `DispatchWarningTeamSizeTooLarge` |  |
-| `0x21` | `0x2021` | `DispatchTeamIsFull` | its override raises the feedback token of the same name (#876) |
+| `0x21` | `0x2021` | `DispatchTeamIsFull` | its override raises the feedback token of the same name |
 | `0x22` | `0x2022` | `DispatchYouGotKickedFromTeam` |  |
 | `0x23` | `0x2023` | `DispatchVoteKickStarted` |  |
 | `0x24` | `0x2024` | `DispatchVoteKickFailed` |  |
@@ -215,9 +215,9 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x28` | `0x2028` | `DispatchDeleteCanceledMail` |  |
 | `0x29` | `0x2029` | `DispatchDeleteCanceledMailItem` |  |
 | `0x2A` | `0x202A` | `DispatchGuildInvite` |  |
-| `0x2B` | `0x202B` | `DispatchGuildKick` | its override raises the feedback token of the same name (#876) |
-| `0x2C` | `0x202C` | `DispatchGuildDisbanded` | its override raises the feedback token of the same name (#876) |
-| `0x2D` | `0x202D` | `DispatchGuildLeave` | its override raises the feedback token of the same name (#876) |
+| `0x2B` | `0x202B` | `DispatchGuildKick` | its override raises the feedback token of the same name |
+| `0x2C` | `0x202C` | `DispatchGuildDisbanded` | its override raises the feedback token of the same name |
+| `0x2D` | `0x202D` | `DispatchGuildLeave` | its override raises the feedback token of the same name |
 | `0x2E` | `0x202E` | `DispatchGuildMemberLeft` |  |
 | `0x2F` | `0x202F` | `DispatchGuildMemberJoined` |  |
 | `0x30` | `0x2030` | `DispatchGuildMemberUpdate` |  |
@@ -225,7 +225,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x32` | `0x2032` | `DispatchGuildGMPromoteFeedback` |  |
 | `0x33` | `0x2033` | `DispatchGuildGMDemoteFeedback` |  |
 | `0x34` | `0x2034` | `DispatchGuildInviteNoSuchName` |  |
-| `0x35` | `0x2035` | `DispatchGuildInviteTargetOffline` | its override raises the feedback token of the same name (#876) |
+| `0x35` | `0x2035` | `DispatchGuildInviteTargetOffline` | its override raises the feedback token of the same name |
 | `0x36` | `0x2036` | `DispatchGuildPvPPointInfo` |  |
 | `0x37` | `0x2037` | `DispatchGuildRenownInfo` |  |
 | `0x38` | `0x2038` | `DispatchGuildRankingsUpdate` |  |
@@ -246,21 +246,21 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x47` | `0x2047` | `DispatchGuildTakenName` |  |
 | `0x48` | `0x2048` | `DispatchGuildBadName` |  |
 | `0x49` | `0x2049` | `DispatchGuildNameWaitTime` |  |
-| `0x4A` | `0x204A` | `DispatchGuildCurrentlyInGuild` | its override raises the feedback token of the same name (#876) |
-| `0x4B` | `0x204B` | `DispatchGuildLevelRequirementFailed` | its override raises the feedback token of the same name (#876) |
-| `0x4C` | `0x204C` | `DispatchGuildStandingInvitation` | its override raises the feedback token of the same name (#876) |
-| `0x4D` | `0x204D` | `DispatchGuildAlreadyGuilded` | its override raises the feedback token of the same name (#876) |
+| `0x4A` | `0x204A` | `DispatchGuildCurrentlyInGuild` | its override raises the feedback token of the same name |
+| `0x4B` | `0x204B` | `DispatchGuildLevelRequirementFailed` | its override raises the feedback token of the same name |
+| `0x4C` | `0x204C` | `DispatchGuildStandingInvitation` | its override raises the feedback token of the same name |
+| `0x4D` | `0x204D` | `DispatchGuildAlreadyGuilded` | its override raises the feedback token of the same name |
 | `0x4E` | `0x204E` | `DispatchGuildOnInviteCooldown` |  |
-| `0x4F` | `0x204F` | `DispatchGuildCantDemote` | its override raises the feedback token of the same name (#876) |
+| `0x4F` | `0x204F` | `DispatchGuildCantDemote` | its override raises the feedback token of the same name |
 | `0x50` | `0x2050` | `DispatchGuildTaxError` |  |
 | `0x51` | `0x2051` | `DispatchGuildInvalidGoverningForm` |  |
 | `0x52` | `0x2052` | `DispatchGuildUpdateCash` |  |
-| `0x53` | `0x2053` | `DispatchSubscriptionRequirementFailed` | its override raises the feedback token of the same name (#876) |
+| `0x53` | `0x2053` | `DispatchSubscriptionRequirementFailed` | its override raises the feedback token of the same name |
 | `0x54` | `0x2054` | `DispatchGuildTaxChanged` |  |
 | `0x55` | `0x2055` | `DispatchGuildGoverningFormChanged` |  |
 | `0x56` | `0x2056` | `DispatchGuildRecruitmentModeChanged` |  |
 | `0x57` | `0x2057` | `DispatchGuildMessageOfTheDayChanged` |  |
-| `0x58` | `0x2058` | `DispatchGuildDescriptionChanged` | its override raises the feedback token of the same name (#876) |
+| `0x58` | `0x2058` | `DispatchGuildDescriptionChanged` | its override raises the feedback token of the same name |
 | `0x59` | `0x2059` | `DispatchGuildNameChanged` |  |
 | `0x5A` | `0x205A` | `DispatchGMGuildNameChanged` |  |
 | `0x5B` | `0x205B` | `DispatchGuildMemberList` |  |
@@ -275,14 +275,14 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x64` | `0x2064` | `DispatchRemoveGuildFeat` |  |
 | `0x65` | `0x2065` | `DispatchGuildRankChanged` |  |
 | `0x66` | `0x2066` | `DispatchGuildApplicationRequest` |  |
-| `0x67` | `0x2067` | `DispatchGuildNoInvitersOnline` | its override raises the feedback token of the same name (#876) |
+| `0x67` | `0x2067` | `DispatchGuildNoInvitersOnline` | its override raises the feedback token of the same name |
 | `0x68` | `0x2068` | `DispatchGuildApplicationRejected` |  |
 | `0x69` | `0x2069` | `DispatchGuildMergeRequest` |  |
 | `0x6A` | `0x206A` | `DispatchGuildMergeRequestFailed` |  |
 | `0x6B` | `0x206B` | `DispatchGuildCityBooked` |  |
 | `0x6C` | `0x206C` | `DispatchGuildCityBookingFailed` |  |
 | `0x6D` | `0x206D` | `DispatchNewVulnerabilityWindowData` |  |
-| `0x6E` | `0x206E` | `DispatchGuildCityReachedTier3` | the override's own log string NAMES it (#876) |
+| `0x6E` | `0x206E` | `DispatchGuildCityReachedTier3` | the override's own log string names it |
 | `0x6F` | `0x206F` | `DispatchGuildIsMassivePvPCityOwner` |  |
 | `0x70` | `0x2070` | `DispatchGuildIsMassivePvPCityAttacker` |  |
 | `0x71` | `0x2071` | `DispatchFeedbackMessage` |  |
@@ -296,26 +296,26 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x79` | `0x2079` | `DispatchPvPMatchMakingPlayerKicked` |  |
 | `0x7A` | `0x207A` | `DispatchPvPMatchMakingErrorCode` |  |
 | `0x7B` | `0x207B` | `DispatchPvPMatchMakingYouJoinedMatch` |  |
-| `0x7C` | `0x207C` | `DispatchPvPMatchMakingMatchRemoved` | the override's own log string NAMES it (#876) |
+| `0x7C` | `0x207C` | `DispatchPvPMatchMakingMatchRemoved` | the override's own log string names it |
 | `0x7D` | `0x207D` | `DispatchPvPMatchMakingMatchInfo` |  |
 | `0x7E` | `0x207E` | `DispatchPvPMatchMakingSearchResult` |  |
 | `0x7F` | `0x207F` | `DispatchPvPMatchMakingStartClicked` |  |
 | `0x80` | `0x2080` | `DispatchPvPMatchMakingYouAreInMatchMaking` |  |
-| `0x81` | `0x2081` | `DispatchPvPMatchMakingRemovedFromMatchMaking` | its override raises the feedback token of the same name (#876) |
-| `0x82` | `0x2082` | `DispatchPvPMatchMakingCowardRemovedFromMatchMaking` | its override raises the feedback token of the same name (#876) |
+| `0x81` | `0x2081` | `DispatchPvPMatchMakingRemovedFromMatchMaking` | its override raises the feedback token of the same name |
+| `0x82` | `0x2082` | `DispatchPvPMatchMakingCowardRemovedFromMatchMaking` | its override raises the feedback token of the same name |
 | `0x83` | `0x2083` | `DispatchPvPMatchMakingMatchSay` |  |
 | `0x84` | `0x2084` | `DispatchPvPMatchMakingCollectingMorePlayers` |  |
 | `0x85` | `0x2085` | `DispatchPvPMatchMakingNewMatchLeader` |  |
 | `0x86` | `0x2086` | `DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking` |  |
-| `0x87` | `0x2087` | `DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier` | its override raises the feedback token of the same name (#876) |
-| `0x88` | `0x2088` | `DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader` | its override raises the feedback token of the same name (#876) |
+| `0x87` | `0x2087` | `DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier` | its override raises the feedback token of the same name |
+| `0x88` | `0x2088` | `DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader` | its override raises the feedback token of the same name |
 | `0x89` | `0x2089` | `DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide` |  |
 | `0x8A` | `0x208A` | `DispatchPvPMatchMakingCantLockToSideMustPickASideFirst` |  |
 | `0x8B` | `0x208B` | `DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide` |  |
 | `0x8C` | `0x208C` | `DispatchPvPMatchMakingCharacterNowLockedToSide` |  |
 | `0x8D` | `0x208D` | `DispatchPvPMatchMakingCharacterNoLongerLockedToSide` |  |
-| `0x8E` | `0x208E` | `DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch` | its override raises the feedback token of the same name (#876) |
-| `0x8F` | `0x208F` | `DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier` | its override raises the feedback token of the same name (#876) |
+| `0x8E` | `0x208E` | `DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch` | its override raises the feedback token of the same name |
+| `0x8F` | `0x208F` | `DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier` | its override raises the feedback token of the same name |
 | `0x90` | `0x2090` | `DispatchPvPMatchMakingTeamJoined` |  |
 | `0x91` | `0x2091` | `DispatchPvPMatchMakingRaidJoined` |  |
 | `0x92` | `0x2092` | `DispatchPvPMatchMakingInfoRequestReturn` |  |
@@ -333,9 +333,9 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x9E` | `0x209E` | `DispatchRaidInvitationTimedOut` |  |
 | `0x9F` | `0x209F` | `DispatchRaidTargetDeclinedRaidInvite` |  |
 | `0xA0` | `0x20A0` | `DispatchRaidYouAreNoLongerInvited` |  |
-| `0xA1` | `0x20A1` | `DispatchRaidYouWereKickedFromRaid` | its override raises the feedback token of the same name (#876) |
+| `0xA1` | `0x20A1` | `DispatchRaidYouWereKickedFromRaid` | its override raises the feedback token of the same name |
 | `0xA2` | `0x20A2` | `DispatchRaidCantInviteInvalidSubscriptionFlags` |  |
-| `0xA3` | `0x20A3` | `DispatchRaidCantJoinInvalidSubscriptionFlags` | its override raises the feedback token of the same name (#876) |
+| `0xA3` | `0x20A3` | `DispatchRaidCantJoinInvalidSubscriptionFlags` | its override raises the feedback token of the same name |
 | `0xA4` | `0x20A4` | `DispatchRaidCantCreateInvalidMemberSubscriptionFlags` |  |
 | `0xA5` | `0x20A5` | `DispatchMassivePvpInfoRequestReturn` |  |
 | `0xA6` | `0x20A6` | `DispatchMassivePvPBattleQueueFeedback` |  |
@@ -344,7 +344,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xA9` | `0x20A9` | `DispatchBattleKeepInfoRequestReturnPhase1And2` |  |
 | `0xAA` | `0x20AA` | `DispatchBattleKeepInfoRequestReturnPhase3And4` |  |
 | `0xAB` | `0x20AB` | `DispatchYouGotMailNotification` |  |
-| `0xAC` | `0x20AC` | `DispatchItemSoldNotification` | its override raises the feedback token of the same name (#876) |
+| `0xAC` | `0x20AC` | `DispatchItemSoldNotification` | its override raises the feedback token of the same name |
 | `0xAD` | `0x20AD` | `DispatchDebugFullGameServerList` |  |
 | `0xAE` | `0x20AE` | `DispatchDebugGameServerConnected` |  |
 | `0xAF` | `0x20AF` | `DispatchDebugGameServerDisconnected` |  |
@@ -364,7 +364,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xBD` | `0x20BD` | `DispatchDebugRemoveIDFromMatchMaking` |  |
 | `0xBE` | `0x20BE` | `DispatchItemSalesUpdateBalance` |  |
 | `0xBF` | `0x20BF` | `DispatchItemSalesCoupons` |  |
-| `0xC0` | `0x20C0` | `DispatchItemSalesReportNoConnectionToBillingServer` | the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this NAME is ours (#876) |
+| `0xC0` | `0x20C0` | `DispatchItemSalesReportNoConnectionToBillingServer` | the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this name is ours |
 | `0xC1` | `0x20C1` | `DispatchCSFeedback` |  |
 | `0xC2` | `0x20C2` | `DispatchGroupFinderSignupFailed` |  |
 | `0xC3` | `0x20C3` | `DispatchGroupFinderSelectRoles` |  |
@@ -395,7 +395,7 @@ ChatServer chat — **no RpcHeader** (raw opcode) · S2C
 | `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
 | `0x0022` | `CharacterChat` |  |
 | `0x0023` | `SystemMessage` |  |
-| `0x0025` | `FriendPresence` | [u64 0][u32 stamp][u16][u8][string name] - pushed BEFORE the add reply, by NAME |
+| `0x0025` | `FriendPresence` | [u64 0][u32 stamp][u16][u8][string name] - pushed before the add reply, by name |
 | `0x0028` | `FriendAdded` | [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state |
 | `0x0029` | `FriendRemoved` | [u32 characterId] - the removal echoed back |
 | `0x003C` | `ChannelSubscription` |  |
@@ -410,10 +410,10 @@ ChatServer chat — **no RpcHeader** (raw opcode) · C2S
 | Opcode | Name | Note |
 |--------|------|------|
 | `0x0000` | `Hello` |  |
-| `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12) |
-| `0x0028` | `AddFriend` | [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step) |
+| `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] |
+| `0x0028` | `AddFriend` | [u32 characterId] - the friend list is chat-tier and one-sided (no accept step) |
 | `0x0029` | `RemoveFriend` | [u32 characterId] |
-| `0x002A` | `SetSocialStatus` | [u32 SocialStatus] - the player's own presence, what a friend's list row shows (#892) |
+| `0x002A` | `SetSocialStatus` | [u32 SocialStatus] - the player's own presence, what a friend's list row shows |
 | `0x0041` | `ChannelChat` | client posts a message to a chat channel: [byte type][u32 channelId][string][0000] |
 | `0x0064` | `ChatReady` | small chat-init handshake the client sends after the channel subscriptions (000102) |
 
@@ -751,7 +751,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x6F` | `0x206F` | `DispatchTradePartnerAddedItem` |  |
 | `0x70` | `0x2070` | `DispatchTradeAddedItem` |  |
 | `0x71` | `0x2071` | `DispatchClientNoLongerAcceptedTrade` |  |
-| `0x72` | `0x2072` | `DispatchPartnerNoLongerAcceptedTrade` | #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus. |
+| `0x72` | `0x2072` | `DispatchPartnerNoLongerAcceptedTrade` | fires the trade-window refresh signal and nothing else. Never sent in the corpus. |
 | `0x73` | `0x2073` | `DispatchTradePartnerRemovedItem` |  |
 | `0x74` | `0x2074` | `DispatchTradeRemovedItem` |  |
 | `0x75` | `0x2075` | `DispatchDeleteCachedLDBData` |  |
@@ -852,7 +852,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x01` | `0x2001` | `DispatchAckAuthenticate` |  |
 | `0x02` | `0x2002` | `DispatchRedirectToServer` |  |
 | `0x03` | `0x2003` | `DispatchOnDisconnectGame` |  |
-| `0x04` | `0x2004` | `DispatchQuitGame` | GameInterface_t::OnQuitGame (#792) |
+| `0x04` | `0x2004` | `DispatchQuitGame` | GameInterface_t::OnQuitGame |
 | `0x05` | `0x2005` | `DispatchPong` |  |
 | `0x06` | `0x2006` | `DispatchPongWithPacketTiming` |  |
 | `0x07` | `0x2007` | `DispatchInfoToUser` |  |
@@ -862,7 +862,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x0B` | `0x200B` | `DispatchReportDimesionID` |  |
 | `0x0C` | `0x200C` | `DispatchReportServerID` |  |
 | `0x0D` | `0x200D` | `DispatchDataSink` |  |
-| `0x0E` | `0x200E` | `DispatchKicked` | ⚠️ was DispatchClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked` (#876) |
+| `0x0E` | `0x200E` | `DispatchKicked` | not ClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked` |
 | `0x0F` | `0x200F` | `DispatchDisplayPlayfieldAccessPopup` |  |
 
 ## IirTypes
@@ -909,31 +909,31 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 | method_instance | Reads as | Name | Note |
 |-----------------|----------|------|------|
 | `0x00C46317` | `0x2097` | `VerifyClientStillConnected` |  |
-| `0x0C09CA25` | `0x20A5` | `SendCharacterSettingsCheckSumMap` | was "SmallCharList" |
+| `0x0C09CA25` | `0x20A5` | `SendCharacterSettingsCheckSumMap` |  |
 | `0x0FE09F03` | `0x2083` | `LoginQueuePosition` |  |
 | `0x1562CE84` | `0x2084` | `HardcoreLevelSet` |  |
 | `0x15F7AF22` | `0x20A2` | `SendSubscriptionSettings` |  |
-| `0x206B6EE5` | `0x20E5` | `SendCharacterPreview` | was "Ox20E5" |
-| `0x233605B9` | `0x20B9` | `SendCharacterSettings` | was "Ox20B9" |
+| `0x206B6EE5` | `0x20E5` | `SendCharacterPreview` |  |
+| `0x233605B9` | `0x20B9` | `SendCharacterSettings` |  |
 | `0x23A632FA` | `0x20FA` | `ChatServerConnectReady` |  |
 | `0x3E8F0623` | `0x20A3` | `OfflineLevelApplied` |  |
-| `0x4F91A58C` | `0x208C` | `PlayerSetupComplete` | was "SendCharacterRealmData" |
-| `0x52454C9C` | `0x209C` | `OnFacebookTokenResult` | was "Ox209C" - the reply to c2s LoadFacebookToken |
+| `0x4F91A58C` | `0x208C` | `PlayerSetupComplete` |  |
+| `0x52454C9C` | `0x209C` | `OnFacebookTokenResult` | the reply to c2s LoadFacebookToken |
 | `0x5AED2A60` | `0x20E0` | `CSServerConnectReady` |  |
-| `0x5CE97913` | `0x2093` | `CharacterUnlocked` | was "Ox2093" - the reply to c2s UnlockCharacter |
-| `0x5DC18991` | `0x2091` | `AuthenticateAck` | was "InitAuth" |
+| `0x5CE97913` | `0x2093` | `CharacterUnlocked` | the reply to c2s UnlockCharacter |
+| `0x5DC18991` | `0x2091` | `AuthenticateAck` |  |
 | `0x7955BD80` | `0x2080` | `OnFacebookFriendSignedUp` |  |
 | `0x7C47F763` | `0x20E3` | `OverrideGameTweaks` |  |
 | `0x88750390` | `0x2090` | `OnUpdateFacebookFriends` |  |
 | `0x9625EB4A` | `0x20CA` | `CharacterNeedsNewName` |  |
 | `0xA7C86A29` | `0x20A9` | `SetStats` |  |
-| `0xC414C5EF` | `0x20EF` | `UpdateClientPlayerData` | was "SendCharacterList" |
+| `0xC414C5EF` | `0x20EF` | `UpdateClientPlayerData` | the character list |
 | `0xD4063CA0` | `0x20A0` | `LoginProblem` |  |
 | `0xD4C59816` | `0x2096` | `ResetLanguage` |  |
 | `0xD8B66C79` | `0x20F9` | `LoginConnectReady` |  |
 | `0xE33EBAE1` | `0x20E1` | `TeleportProblem` |  |
 | `0xE8EAD4F8` | `0x20F8` | `SuggestNicknameResult` |  |
-| `0xF899B14C` | `0x20CC` | `SetDimensionList` | was "SendRealmList" (a dimension IS a realm) |
+| `0xF899B14C` | `0x20CC` | `SetDimensionList` | the realm list (a dimension is a realm) |
 
 ## TradepostAgentMethods
 
@@ -993,9 +993,9 @@ RPC class **UniverseInterface** (id `0x0C384054`) · S2C (server→client dispat
 
 | method_instance | Reads as | Name | Note |
 |-----------------|----------|------|------|
-| `0x00` | `0x2000` | `DispatchChallenge` | (was "InitiateAuthentication" - it carries the DH challenge reply) |
-| `0x01` | `0x2001` | `DispatchAckAuthenticate` | carries the PlayerAgent realm handoff (was "SendPlayerAgentRealm") |
+| `0x00` | `0x2000` | `DispatchChallenge` | carries the DH challenge reply |
+| `0x01` | `0x2001` | `DispatchAckAuthenticate` | carries the PlayerAgent realm handoff |
 | `0x02` | `0x2002` | `DispatchLoginProblem` |  |
 | `0x03` | `0x2003` | `DispatchSetUpdateManager` |  |
 | `0x04` | `0x2004` | `DispatchSetUniverseManagerError` |  |
-| `0x05` | `0x2005` | `DispatchSetRegionState` | (was "SetRegion") |
+| `0x05` | `0x2005` | `DispatchSetRegionState` |  |

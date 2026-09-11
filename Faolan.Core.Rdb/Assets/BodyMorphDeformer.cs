@@ -3,33 +3,45 @@ using System.Collections.Generic;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Body-proportion morphs for the 3D character viewer (#275), reverse-engineered from AgeOfConan.exe
-	// ApplyMorph (FUN_00fede10) plus a live gdb capture of the char-create deform-node array
-	// (docs/rdb/body-morph-re.md, data in docs/re/body_morphs_aqf.json).
-	//
-	// AoC body morphs are NOT vertex blend shapes — each slider scales a weighted set of deform JOINTS, and
-	// the skinned mesh follows. We approximate the skinning with a radial soft-deform about each joint's
-	// captured world position (weighted by the captured joint weight), so the deformation sits at the
-	// authentic influence centres with the authentic per-joint falloff instead of guessed regions. (Exact
-	// replication = linear-blend skinning with the captured node skeleton + the mesh's BLENDINDICES/WEIGHT;
-	// that ties into the #275 rig-import follow-up.) The captured joints are the Aquilonian-female body; other
-	// humanoid bodies share the joint topology and are close enough for the viewer.
+	/// <summary>
+	///     Body-proportion morphs for the 3D character viewer. The joint data comes from AgeOfConan.exe's ApplyMorph
+	///     (FUN_00fede10) plus a live capture of the char-create deform-node array; see docs/rdb/body-morph-re.md, with
+	///     the data in docs/re/body_morphs_aqf.json.
+	/// </summary>
+	/// <remarks>
+	///     AoC body morphs are not vertex blend shapes: each slider scales a weighted set of deform joints and the
+	///     skinned mesh follows. <see cref="Apply" /> approximates that skinning with a radial soft-deform about each
+	///     joint's captured world position, weighted by the captured joint weight, so the deformation sits at the
+	///     authentic influence centres with the authentic per-joint falloff. <see cref="ApplyLbs" /> is the exact path,
+	///     applying linear-blend skinning against the mesh's own blend indices and weights, and is preferred whenever
+	///     the caller has a skeleton to hand.
+	///     <para>
+	///         The captured joints are the Aquilonian-female body. Other humanoid bodies share the joint topology and
+	///         are close enough for the viewer.
+	///     </para>
+	/// </remarks>
 	public static class BodyMorphDeformer
 	{
 		private const float Gain = 0.55f;
 
-		// A joint's influence radius (model units) and the displacement gain that turns a node scale into the
-		// radial vertex displacement the skinning would produce. Tuned against the in-client morphs.
+		/// <summary>
+		///     A joint's influence radius in model units. Together with <see cref="Gain" /> it turns a node scale into
+		///     the radial vertex displacement the skinning would produce; both are tuned against the in-client morphs.
+		/// </summary>
 		private const float Radius = 0.18f;
 
-		// (slider accessor, morph name) for the 7 body sliders.
+		/// <summary>
+		///     The (slider accessor, morph name) pair for each of the seven body sliders.
+		/// </summary>
 		private static readonly (Func<Morphs, float> Value, string Name)[] Sliders =
 		[
 			(m => m.Arm, "arm"), (m => m.Chest, "chest"), (m => m.Bosom, "bosom"), (m => m.Stomach, "stomach"), (m => m.Arse, "arse"), (m => m.Thigh, "thigh"), (m => m.Leg, "leg")
 		];
 
-		// Captured Aquilonian-female deform-joint data: per morph the CHARACTERCREATOR min/max scale + the
-		// weighted joints (world position, influence weight) the slider drives.
+		/// <summary>
+		///     Captured Aquilonian-female deform-joint data: per morph, the CHARACTERCREATOR min/max scale and the
+		///     weighted joints (world position, influence weight) the slider drives.
+		/// </summary>
 		private static readonly Dictionary<string, MorphDef> Defs = new Dictionary<string, MorphDef>
 		{
 			["arm"] = new MorphDef(-0.0500f, 0.0500f,
@@ -67,7 +79,10 @@ namespace Faolan.Core.Rdb.Assets
 			])
 		};
 
-		// Deform the body submesh positions in place. positions = the rendered base mesh's xyz array. No-op if neutral.
+		/// <summary>
+		///     Deforms the body submesh positions in place; a no-op for neutral morphs.
+		/// </summary>
+		/// <param name="positions">The rendered base mesh's xyz array.</param>
 		public static void Apply(float[] positions, Morphs morphs)
 		{
 			if (morphs.IsNeutral)
@@ -86,7 +101,7 @@ namespace Faolan.Core.Rdb.Assets
 				if (slider == 0 || !Defs.TryGetValue(name, out var def))
 					continue;
 
-				// DB slider [-100,100] -> t -> client node-scale via the captured asymmetric min/max.
+				// Map the DB slider's [-100, 100] to the client node scale via the captured asymmetric min/max.
 				var t = Math.Clamp(slider / 100f, -1f, 1f);
 				var strength = (t >= 0
 					? t * def.Max
@@ -106,7 +121,7 @@ namespace Faolan.Core.Rdb.Assets
 						if (falloff < 0.02f)
 							continue;
 
-						// Radial scale about the joint: push verts out (fat) / in (thin) by the node scale.
+						// Radial scale about the joint: push vertices out (fat) or in (thin) by the node scale.
 						var k = amp * falloff;
 						positions[v * 3] += dx * k;
 						positions[v * 3 + 1] += dy * k;
@@ -116,11 +131,17 @@ namespace Faolan.Core.Rdb.Assets
 			}
 		}
 
-		// LBS morph (the exact path #275): instead of the radial approximation, displace each vertex using the mesh's
-		// REAL skin weights. Each morph joint maps to the nearest skeleton bone; that bone gets a morph SCALE; a vertex
-		// then scales away from each bone it's weighted to, by skin-weight x bone-scale. boneWorld = bone name -> world
-		// position; the per-vertex influences are the mesh's BlendBones (local palette indices) + BlendWeights + palette.
-		// Returns a new positions array (or the same instance if neutral / nothing maps).
+		/// <summary>
+		///     The linear-blend-skinning morph: displaces each vertex using the mesh's own skin weights rather than the
+		///     radial approximation of <see cref="Apply" />. Each morph joint maps to the nearest skeleton bone, that
+		///     bone takes a morph scale, and a vertex then scales away from every bone it is weighted to by
+		///     skin weight × bone scale.
+		/// </summary>
+		/// <param name="boneWorld">Bone name to world position.</param>
+		/// <returns>
+		///     A new positions array, or <paramref name="positions" /> itself when the morphs are neutral or no joint
+		///     maps to a bone.
+		/// </returns>
 		public static float[] ApplyLbs(float[] positions, int[] blendBones, float[] blendWeights, string[] palette, IReadOnlyDictionary<string, (float X, float Y, float Z)> boneWorld, Morphs morphs)
 		{
 			if (morphs.IsNeutral || boneWorld.Count == 0)
@@ -172,7 +193,7 @@ namespace Faolan.Core.Rdb.Assets
 					if (li < 0 || li >= palette.Length || palette[li] is not { } bn || !boneScale.TryGetValue(bn, out var scale) || !boneWorld.TryGetValue(bn, out var bp))
 						continue;
 
-					// LBS scale about the bone: vertex moves out/in proportional to its distance from the bone.
+					// Scale about the bone: the vertex moves out or in proportionally to its distance from the bone.
 					var ws = w * scale;
 					dx += ws * (vx - bp.X);
 					dy += ws * (vy - bp.Y);
@@ -205,7 +226,10 @@ namespace Faolan.Core.Rdb.Assets
 			return best;
 		}
 
-		// The 7 body-proportion sliders as stored in CharacterBodies (raw editor units, range about [-100,100]).
+		/// <summary>
+		///     The seven body-proportion sliders as stored in CharacterBodies, in raw editor units spanning roughly
+		///     [-100, 100].
+		/// </summary>
 		public readonly record struct Morphs(float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg)
 		{
 			public bool IsNeutral => Arm == 0 && Chest == 0 && Bosom == 0 && Stomach == 0 && Arse == 0 && Thigh == 0 && Leg == 0;

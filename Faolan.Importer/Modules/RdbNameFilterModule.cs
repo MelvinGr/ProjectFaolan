@@ -8,9 +8,9 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// The client's OWN quest catalog (RDB 1000104, #569) - 2181 quest lines / 5042 quests / 7301 goals with the
-	// designers' names in plaintext. Everything else in the quest tables came from captures, so it covered only what a
-	// captured character held; this covers the game. It ADDS and NAMES and never overwrites captured wire data.
+	/// <summary>
+	///     The client's forbidden-word list for character names (RDB 1065100), stored hashed.
+	/// </summary>
 	public sealed class RdbNameFilterModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

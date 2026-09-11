@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Respawn-point selection (Gitea #404): a dead player respawns at the CLOSEST point they
+	// Respawn-point selection: a dead player respawns at the closest point they
 	// know - an always-known starter or one they've discovered.
 	public class RespawnResolverTests
 	{
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		public void ClosestKnown_IgnoresUndiscoveredPoints()
 		{
 			var beach = Point(1, 100, 0, true);
-			var nearButUnknown = Point(2, 1, 0); // closer, but NOT discovered
+			var nearButUnknown = Point(2, 1, 0); // closer, but not discovered
 			var points = new[] { beach, nearButUnknown };
 
 			// Knows only the always-known beach -> respawns there despite the closer unknown point.
@@ -55,8 +55,8 @@ namespace Faolan.Tests
 			Assert.Same(nearDiscovered, target);
 		}
 
-		// #517: the outlaw split. Every shady point in the RDB is AlwaysKnown, so the only question a resolve
-		// answers is WHICH half of the map's points a character is allowed to land in.
+		// The outlaw split. Every shady point in the RDB is AlwaysKnown, so the only question a resolve
+		// answers is which half of the map's points a character is allowed to land in.
 		[Fact]
 		public void Resolve_CriminalTakesTheShadyPointEvenWhenANormalOneIsCloser()
 		{

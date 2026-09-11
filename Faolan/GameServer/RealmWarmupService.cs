@@ -9,24 +9,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	// Builds the once-per-SERVER catalogs at startup instead of leaving them to the first player who triggers each
-	// subsystem (Gitea #938). Every one of these is a lazily built singleton behind its own load lock: correct as a
-	// lazy load, but it means whoever first casts, is first hit, or first walks up to a quest giver pays the whole
-	// build inside their world entry - the "first player in the map" spike.
+	// Builds the once-per-server catalogs at startup instead of leaving them to the first player who triggers each
+	// subsystem. Every one of them is a lazily built singleton behind its own load lock: correct as a lazy load, but it
+	// means whoever first casts, is first hit, or first walks up to a quest giver pays the whole build inside their
+	// world entry - the "first player in the map" spike.
 	//
-	// ⭐ These costs are once per PROCESS and shared by every map, so warming them here is a pure win with no
-	// downside: the work happens anyway, and doing it at startup takes it off the critical path of a live entry.
-	// Measured on this checkout's data (`--report`-style entry profile): BuffStatEffects ~400 ms, the combo catalog
-	// ~35 ms, the quest-giver/goal-target maps ~15 ms, plus the pool- and triggered-effect tables.
+	// These costs are once per process and shared by every map, so warming them here takes work that happens anyway off
+	// the critical path of a live entry. Measured on this checkout's data: BuffStatEffects ~400 ms, the combo catalog
+	// ~35 ms, the quest-giver and goal-target maps ~15 ms, plus the pool and triggered-effect tables.
 	//
-	// ⚠️ It does NOT warm per-MAP state (a zone's NPCs, its terrain). That is a different lifetime - once per map,
-	// not once per server - and eagerly loading every map's zone at startup would build worlds no one has entered
-	// and take instance ownership (#268) for a player who may never arrive. The entry path already warms the
-	// terrain of the map being entered off the tick; the zone NPC load stays lazy. See #938.
+	// It deliberately does not warm per-map state (a zone's NPCs, its terrain). That is a different lifetime - once per
+	// map rather than once per server - and eagerly loading every map's zone at startup would build worlds no one has
+	// entered and take instance ownership for a player who may never arrive. The entry path warms the terrain of the
+	// map being entered off the tick; the zone NPC load stays lazy.
 	//
-	// ⚠️ Fire-and-forget on ApplicationStarted, exactly as RealmStatusService flips Online: StartAsync is too early
-	// (the container is still being built) and blocking it would delay the listeners binding. A warm that throws is
-	// logged and swallowed - the lazy load behind each still runs on first use, so a failed warm degrades to the old
+	// Fire-and-forget on ApplicationStarted, exactly as RealmStatusService flips Online: StartAsync is too early, with
+	// the container still being built, and blocking it would delay the listeners binding. A warm that throws is logged
+	// and swallowed, because the lazy load behind each still runs on first use, so a failed warm degrades to the lazy
 	// behaviour rather than breaking the server.
 	public sealed class RealmWarmupService : IHostedService
 	{

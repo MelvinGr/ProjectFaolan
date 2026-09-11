@@ -16,8 +16,8 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// #284: bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
-		// in the DB that has terrain, so the GAME SERVER can serve ground-snap + line-of-sight from these small files
+		// bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
+		// in the DB that has terrain, so the GAME server can serve ground-snap + line-of-sight from these small files
 		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
 		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
 		private static async Task TerrainExport(string rdbDir, string outDir)
@@ -28,7 +28,7 @@ namespace Faolan.Importer.Cli
 
 			var mapIds = await db.Maps.Select(m => m.Id).OrderBy(id => id).ToListAsync();
 
-			// Which playfields share each tilemap (#832). 1066611 is emitted PER PLAYFIELD and carries that playfield's
+			// Which playfields share each tilemap. 1066611 is emitted per PLAYFIELD and carries that playfield's
 			// own props baked into the surface, so a single map's grid is not the bare terrain: Tortage Island 4010,
 			// City of Tortage 4020/4022 and the End Battle 4030 all name `tilemap ID="4040"` and are one physical
 			// terrain, each read differently because each carries its own trees or buildings. The whole RDB is scanned
@@ -47,11 +47,11 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				// The terrain under ALL of them: props only add height, so the lowest reading across the group is the
+				// The terrain under all of them: props only add height, so the lowest reading across the group is the
 				// ground. See RdbHeightmap.TryLowerEnvelope for the measurement that settles this.
 				if (heightmap.Length > 0 && siblings.TryGetValue(mapId, out var group) && group.Count > 1)
 				{
-					// This map's own grid goes FIRST: it fixes the shape the envelope is written in, so a sibling
+					// This map's own grid goes first: it fixes the shape the envelope is written in, so a sibling
 					// sampled at another resolution is skipped instead of deciding the output.
 					var bodies = new List<byte[]> { heightmap };
 					bodies.AddRange(group.Where(id => id != mapId).Select(id => ReadResource(rdb, RdbHeightmap.ResourceType, id)).Where(b => b.Length > 0));
@@ -82,7 +82,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  map {mapId}: heightmap {heightmap.Length / 1024} KB + collision {collision.Length / 1024} KB -> {size / 1024} KB");
 			}
 
-			// Prune what this run did NOT write. A .terrain file left behind for a map that has since lost its terrain
+			// Prune what this run did not write. A.terrain file left behind for a map that has since lost its terrain
 			// (or left the Maps table) is not inert: the game server loads purely by filename, so it would keep serving
 			// ground-snap and line-of-sight off a stale bake with nothing to indicate it. Only *.terrain in the output
 			// directory is ever touched.
@@ -156,12 +156,12 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Re-run the NpcSpawnArea creature resolver (#363/#489). The resolver resets its own machine assignments and
-		// re-derives every tier, so this is idempotent and is how a change to the resolution RULES reaches the
+		// Re-run the NpcSpawnArea creature resolver. The resolver resets its own machine assignments and
+		// re-derives every tier, so this is idempotent and is how a change to the resolution rules reaches the
 		// committed faolan.db without a full RDB spawn re-import. Manual assignments (`.setnpcgroup`) are never touched.
 		//
 		// It needs the RDB only for the groups' wander polylines, which the containment tier uses as its membership
-		// test (#491) and which are deliberately not stored in the DB. Running without them would silently apply
+		// test and which are deliberately not stored in the DB. Running without them would silently apply
 		// WEAKER rules than the importer and produce a different faolan.db, so the RDB is required rather than
 		// optional. Run:
 		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas --Content:RdbDir <dir>

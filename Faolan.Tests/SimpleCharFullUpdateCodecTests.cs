@@ -18,9 +18,9 @@ namespace Faolan.Tests
 	//   SpawnDemoRandomActions- both ending pair lists non-empty
 	//   SpawnHeraldBuffed       - active buffs (two 60-byte buff records)
 	//
-	// ⚠️ The goldens are whole captured BODIES; the codec builds the RECORD, because the leading u32 length belongs
-	// to the framing sender (#530 rule 2). So every comparison here is against `body[4..]`, and the four bytes it
-	// drops are the sender's - nothing about the record changed.
+	// The goldens are whole captured bodies; the codec builds the record, because the leading u32 length belongs
+	// to the framing sender. So every comparison here is against `body[4..]`, and the four bytes it drops are the
+	// sender's.
 	public class SimpleCharFullUpdateCodecTests
 	{
 		// The generated CharacterIIR component slot must agree with the existing splice path: re-encoding the
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(2, s.Post.BuffRecords.Count);
 
-			// The list is decoded to the client's own carve now (#475 flat, #658 grouped): per SPELL a group whose
+			// The list is decoded to the client's own carve: per spell a group whose
 			// inner list holds the records - each with the standard [EntityClass.Character][handle] reference to the
 			// character it is running on and a timer pair whose remaining half never exceeds its total.
 			Assert.All(s.Post.BuffRecords, g =>
@@ -87,19 +87,20 @@ namespace Faolan.Tests
 		{
 			var s = SimpleCharFullUpdateCodec.Parse(Record("SpawnNecroKingsCastle"));
 
-			// The scaffold with one feat spec carrying 25 feats. The 339 the old model reported included the 5
-			// bytes of the embedded CoreCharacter header its parse happened to cut into; those are the message's.
+			// The scaffold with one feat spec carrying 25 feats. The 339 in the capture includes the 5 bytes of the
+			// embedded CoreCharacter header, which belong to the message rather than to the scaffold.
 			Assert.Equal(339 - 5, s.PreIir.ByteCount);
-			// His first appearance element is his BEARD (*beardmesh_3181878, wire key 0x2B6) - the value the old
-			// 8-bytes-off carve called "EntryTableX". He has no face-paint element: retail's slot 1 is vacated
-			// (his Word2 ordinals run 2..15), i.e. he removed it (#466).
+			// His first appearance element is his beard (*beardmesh_3181878, wire key 0x2B6), not an "EntryTableX"
+			// scalar. He has no face-paint element: retail's slot 1 is vacated
+			// (his Word2 ordinals run 2..15), i.e. he removed it.
 			Assert.Equal(14, s.Post.Slot.Appearance.Count);
 			Assert.Equal(0x2B6u, s.Post.Slot.Appearance[0].MorphId);
 			Assert.Equal(8, s.Post.EndPairs.Count);
 			Assert.Equal(new ScaffoldPair(10, -14375), s.Post.EndPairs[0]);
 		}
 
-		// Rule 4: Parse is strict. It used to be a TryParse whose `false` every caller had to remember to check.
+		// Parse is strict: a non-spawn body throws rather than returning a `false` every caller has to remember to
+		// check.
 		[Fact]
 		public void Parse_RejectsNonSpawnBodies()
 		{
@@ -118,7 +119,7 @@ namespace Faolan.Tests
 			Assert.Empty(s.Post.BuffRecords);
 
 			// Strie: 7 weighted appearance elements, slot ordinals 1..7, weight 1.0, opening with the always-sent
-			// face paint (0xB7 = *texscript_183875 - what the old carve read as the "EntryTableX" scalar).
+			// face paint (0xB7 = *texscript_183875).
 			var slot = s.Post.Slot;
 			Assert.Equal(7, slot.Appearance.Count);
 			Assert.Equal(0xB7u, slot.Appearance[0].MorphId);
@@ -127,8 +128,8 @@ namespace Faolan.Tests
 			Assert.Equal(0x311u, slot.Appearance[1].MorphId);
 			Assert.All(slot.Appearance, e => Assert.Equal("", e.Text));
 
-			// 15 ability/feat ids: the archetype ability (300, Rogue) first - the old carve's "closer value" - then
-			// 14 ascending; all rank 0. The list's frame word is what the old carve called the closer's TAG.
+			// 15 ability/feat ids: the archetype ability (300, Rogue) first, then 14 ascending; all rank 0. The list
+			// opens with its own frame word.
 			Assert.Equal(15, slot.Skills.Count);
 			Assert.Equal(300u, slot.Skills[0].Id);
 			Assert.Equal(0xD48u, slot.Skills[1].Id);

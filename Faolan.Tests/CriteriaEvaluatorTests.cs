@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The criteria stack machine (#790/#791). Every case here is a shape the client's own
+	// The criteria stack machine. Every case here is a shape the client's own
 	// `CriteriaItem_t::CheckCriteria` produces - the operator numbers are `CriteriaOperator`, which carries only names
 	// the client states, so a test that passes here is a test against retail's vocabulary rather than ours.
 	public class CriteriaEvaluatorTests
@@ -15,7 +15,7 @@ namespace Faolan.Tests
 			return new ItemTemplateStatModifiers.Criterion(id, value, (uint)op);
 		}
 
-		// A stat lookup over a fixed sheet. ⚠️ Anything unlisted reads NULL - "this entity cannot supply that stat" -
+		// A stat lookup over a fixed sheet. Anything unlisted reads null - "this entity cannot supply that stat" -
 		// which is a different answer from 0 and is what keeps an unresolvable comparison from dropping an effect.
 		private static System.Func<CharacterStatId, int?> Sheet(params (CharacterStatId Stat, int Value)[] stats)
 		{
@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		}
 
 		// The overwhelmingly common case: an element with no conditions applies. 59,907 of the catalog's criteria
-		// carry id 0, but the ELEMENTS carrying none at all are the bulk, and they must stay unconditional.
+		// carry id 0, but the elements carrying none at all are the bulk, and they must stay unconditional.
 		[Fact]
 		public void AnEmptyRun_IsUnconditional()
 		{
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			Assert.Equal(permits, CriteriaEvaluator.Permits(criteria, Sheet((CharacterStatId.Level, level)), null, out _));
 		}
 
-		// ⭐ The client's own reading: a run with no logic operator is a CONJUNCTION - it logs "Implicitly ANDing all
+		// The client's own reading: a run with no logic operator is a conjunction - it logs "Implicitly ANDing all
 		// criteria!" when the stack does not reduce to one entry.
 		[Fact]
 		public void LeftoversAreImplicitlyAnded()
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			Assert.True(CriteriaEvaluator.Permits([falseCmp, C(0, 0, CriteriaOperator.Not)], sheet, null, out _));
 		}
 
-		// ⚠️ The client fails the whole run on an under-flowing expression ("Too few entries!") rather than inventing
+		// The client fails the whole run on an under-flowing expression ("Too few entries!") rather than inventing
 		// an operand, and so does this.
 		[Fact]
 		public void AnUnderflowingLogicOperator_FailsTheRun()
@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			Assert.False(CriteriaEvaluator.Permits([C(0, 0, CriteriaOperator.Not)], Sheet(), null, out _));
 		}
 
-		// ⭐ `TargetStat` is the same comparison read off the OTHER entity - the one axis a caster/target pair is for.
+		// `TargetStat` is the same comparison read off the other entity - the one axis a caster/target pair is for.
 		[Fact]
 		public void TargetStat_ReadsTheTargetNotTheCaster()
 		{
@@ -103,8 +103,8 @@ namespace Faolan.Tests
 			Assert.False(CriteriaEvaluator.Permits(criteria, Sheet((CharacterStatId.Level, 80)), Sheet((CharacterStatId.Level, 1)), out _));
 		}
 
-		// ⚠️ THE policy decision, pinned so it cannot drift silently: an operator we cannot evaluate lets the element
-		// through and is COUNTED. Failing it closed would drop effects that are applied today - a regression wearing
+		// The policy decision, pinned so it cannot drift silently: an operator we cannot evaluate lets the element
+		// through and is counted. Failing it closed would drop effects that are applied today - a regression wearing
 		// the shape of a fix - and 36.6% of the catalog's criteria sightings are still unnamed operators.
 		[Fact]
 		public void AnUnknownOperator_PermitsAndIsCounted()
@@ -116,9 +116,9 @@ namespace Faolan.Tests
 			Assert.Equal(1, unevaluated);
 		}
 
-		// ⚠️ A SELECTOR is not a condition. It pushes nothing, so a run that is one selector plus one comparison must
-		// answer the comparison - if the selector pushed a boolean the implicit AND would read one entry too many.
-		// ⚠️ The companion to the unknown-operator policy: a comparison on a stat the subject cannot supply also
+		// A selector is not a condition. It pushes nothing, so a run that is one selector plus one comparison must
+		// answer the comparison - if the selector pushed a boolean the implicit and would read one entry too many.
+		// The companion to the unknown-operator policy: a comparison on a stat the subject cannot supply also
 		// permits, and is counted. Reading it as 0 would make `Larger` fail and remove an effect that applies today.
 		[Fact]
 		public void AComparisonOnAnUnsuppliedStat_PermitsAndIsCounted()

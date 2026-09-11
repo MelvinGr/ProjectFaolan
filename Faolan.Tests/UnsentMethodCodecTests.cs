@@ -9,14 +9,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The captured-but-never-sent methods from #874, each pinned against the body the corpus actually carries.
+	// The captured-but-never-sent methods, each pinned against the body the corpus actually carries.
 	// `--report method-bodies --report-arg <name>` is the oracle for every one of them.
 	//
-	// Several carry ONE frame, so there is no variance to carve by; what pins those is the client's own signature
+	// Several carry one frame, so there is no variance to carve by; what pins those is the client's own signature
 	// adding up to the captured length exactly. That is stated per case rather than assumed.
 	public class UnsentMethodCodecTests
 	{
-		// ⭐ The 106-byte `DispatchTeamMemberUpdate` body is `TeamMemberEventCodec`'s, exactly - the same
+		// The 106-byte `DispatchTeamMemberUpdate` body is `TeamMemberEventCodec`'s, exactly - the same
 		// [teamClass][teamId][TeamMemberRecord] the join / leave / new-leader trio uses. A byte-exact round-trip is
 		// what turns that from a guess into the reason the method joins their HandledMethods.
 		private static readonly byte[] CapturedTeamMemberUpdate = Convert.FromHexString(
@@ -29,13 +29,13 @@ namespace Faolan.Tests
 			var parsed = TeamMemberEventCodec.Parse(CapturedTeamMemberUpdate);
 
 			Assert.Equal(0x000F08DBu, parsed.TeamId);
-			Assert.Equal("Necr80", parsed.Member.Name); // the captured record's own bytes, pseudonymised above (#465)
+			Assert.Equal("Necr80", parsed.Member.Name); // the captured record's own bytes, pseudonymised above
 			Assert.Equal(CapturedTeamMemberUpdate, TeamMemberEventCodec.Build(parsed));
 
 			Assert.Contains(CSPlayerInterfaceMethods.DispatchTeamMemberUpdate, TeamMemberEventCodec.HandledMethods);
 		}
 
-		// [u32 nCharID][u16 len][ascii] - and nCharID is a BARE handle, with no 0xC350 class word. 4 + 2 + 10 = 16
+		// [u32 nCharID][u16 len][ascii] - and nCharID is a bare handle, with no 0xC350 class word. 4 + 2 + 10 = 16
 		// accounts for the whole captured frame.
 		[Fact]
 		public void UpdateName_IsABareHandleAndAString()
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, CashRepositoryCodec.Build(0UL));
 		}
 
-		// The corpus carries BOTH values of this one - 00 in a city session, 01 inside an instance - so it is a real
+		// The corpus carries both values of this one - 00 in a city session, 01 inside an instance - so it is a real
 		// per-playfield flag and not a constant.
 		[Theory]
 		[InlineData(0x00, false)]
@@ -100,7 +100,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, RankingCountdownCodec.Build(12));
 		}
 
-		// ⚠️ Eight frames, all byte-identical zero. The round-trip is all this can gate; what the field SELECTS is
+		// Eight frames, all byte-identical zero. The round-trip is all this can gate; what the field selects is
 		// not observable from a corpus that only ever asks for 0.
 		[Fact]
 		public void RequestGetEffect_IsOneWordAndTheCorpusOnlyEverAsksForZero()

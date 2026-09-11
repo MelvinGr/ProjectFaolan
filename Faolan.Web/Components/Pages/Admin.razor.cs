@@ -20,7 +20,7 @@ namespace Faolan.Web.Components.Pages
 		private async Task ChangeType(uint id, string? value)
 		{
 			if (id == SelfId)
-				return; // don't change your own privileges
+				return; // An account cannot change its own privileges.
 			if (!Enum.TryParse<WebAccountType>(value, out var type))
 				return;
 
@@ -50,7 +50,7 @@ namespace Faolan.Web.Components.Pages
 		private async Task SetBan(uint id, bool banned)
 		{
 			if (banned && id == SelfId)
-				return; // never ban yourself
+				return; // An account cannot ban itself.
 
 			var state = await AdminSvc.SetBannedAsync(id, banned);
 			if (state == null)

@@ -1,11 +1,14 @@
 namespace Faolan.GameServer.World
 {
-	// The stages a killed NPC's corpse passes through, in order, driven by WorldEntity.TickCorpse. Ordered so a
-	// comparison ("has this death already got past Fade?") is the natural test - the sequence never runs backwards
-	// within one death, and a revive resets it to None.
-	//
-	// The timings are retail's, measured over 128 NPC deaths in the capture corpus; see WorldEntity.CorpseFadeSeconds
-	// for the numbers and what they overturned (the bag used to BE the corpse, three seconds later).
+	/// <summary>
+	///     The stages a killed NPC's corpse passes through, in order, driven by <see cref="WorldEntity.TickCorpse" />.
+	/// </summary>
+	/// <remarks>
+	///     Ordered so a comparison - "has this death already got past Fade?" - is the natural test: the sequence never
+	///     runs backwards within one death, and a revive resets it to <see cref="None" />. The timings are retail's,
+	///     measured over 128 NPC deaths in the capture corpus; see <see cref="WorldEntity.CorpseFadeSeconds" /> for the
+	///     numbers.
+	/// </remarks>
 	public enum CorpseStage
 	{
 		None = 0, // alive, or dead but not yet ticked

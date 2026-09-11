@@ -7,13 +7,13 @@ namespace Faolan.Tests
 {
 	// The two IIRs a timeline needs that had no codec: which spell was applied, and what the player had selected.
 	// Bytes are lifted verbatim from xxx_mage-necromancer_login_play2_tortage_city_first-quests, with the u32 length
-	// prefix stripped - codecs take the IIR CONTENT.
+	// prefix stripped - codecs take the IIR content.
 	public class MagicBuffLookAtCodecTests
 	{
 		// Short-form apply: the pet buffing the player with Fatality (5070797 = 0x4D5FCD).
 		private const string ShortBuff = "6b87e3160000c35001317cf800004d5fcd010000c35001317cf8";
 
-		// Long form (84 B on the wire): opens identically and ECHOES the spell id later, which is what pins offset 13.
+		// Long form (84 B on the wire): opens identically and echoes the spell id later, which is what pins offset 13.
 		private const string LongBuff =
 			"6b87e3160000c35001317cf80000119122000000c35001317cf80000000000000000001446e900010000000100000000001191220000000500000000000000000000000000000005000000000b9aeb25";
 
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => MagicBuffCodec.Parse(notAMagicBuff));
 		}
 
-		// Selecting Turach, then clearing the selection. A zero target is a DESELECT, not an absent field.
+		// Selecting Turach, then clearing the selection. A zero target is a deselect, not an absent field.
 		[Fact]
 		public void LookAt_ParsesSelectAndDeselect()
 		{
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x01317CF8u, select.Subject);
 			Assert.Equal(0x00027929u, select.Target); // Turach
 
-			// A cleared selection: BOTH target words are zeroed rather than the field being absent.
+			// A cleared selection: Both target words are zeroed rather than the field being absent.
 			var cleared = LookAtCodec.Parse(LookAtCodec.Build(0x01317CF8, 0));
 			Assert.Equal(0u, cleared.Target);
 			Assert.Equal(0u, cleared.TargetClass);

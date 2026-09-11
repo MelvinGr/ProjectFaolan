@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void UpdateCash_Spend_UsesReasonZero()
 		{
-			// The DemoL80 capture shows a DECREASED balance with reason 0 (a purchase): 0x2638 after 0x26E8.
+			// The DemoL80 capture shows a decreased balance with reason 0 (a purchase): 0x2638 after 0x26E8.
 			Assert.Equal("000000000000263800000000", Convert.ToHexStringLower(UpdateCashCodec.Build(new UpdateCash(0x2638, UpdateCashReason.Spend))));
 		}
 	}

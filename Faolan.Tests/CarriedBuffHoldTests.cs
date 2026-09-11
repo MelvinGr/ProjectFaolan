@@ -6,14 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #907: a live buff must survive a ZONE CHANGE, because the entity that held it does not.
+	// A live buff must survive a zone change, because the entity that held it does not.
 	//
-	// `PlayerRegistry` is keyed by CONNECTION and a map change tears the world connection down, so the re-entry
+	// `PlayerRegistry` is keyed by connection and a map change tears the world connection down, so the re-entry
 	// builds a brand-new `WorldEntity` and everything the old one held that is not persisted is dropped. For a
 	// debuff that is not cosmetic: with no `ActiveBuff` entry left, `TickBuffExpiry` never expires it and never
-	// sends its removal twin, and the client — which keeps its own icon list across a map change — shows it at 0s
-	// for ever. Exactly one `Butcher` stuck that way in the reported session: the one live at the instant of the
-	// teleport, with every earlier one having expired normally.
+	// sends its removal twin, and the client - which keeps its own icon list across a map change - shows it at 0s
+	// for ever. Only the buff live at the instant of the teleport is affected.
 	public class CarriedBuffHoldTests
 	{
 		private const uint Character = 0x0100_0001;
@@ -40,7 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x0007_F45Fu, carried.Value.CasterHandle); // …with the NPC that cast it, so the twin mirrors the apply
 		}
 
-		// ⚠️ An ALREADY-EXPIRED buff is dropped rather than carried. The tick removes an expired buff and sends its
+		// An already-expired buff is dropped rather than carried. The tick removes an expired buff and sends its
 		// twin, so one still in the map at tear-down is one the tick has not reached yet — carrying a dead one would
 		// re-arm an icon the client has already been told about.
 		[Fact]
@@ -64,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Single(hold.Consume(Character));
 		}
 
-		// ⭐ Consuming EMPTIES the hold. Without that a second world entry — a teleport straight back, a relog —
+		// Consuming empties the hold. Without that a second world entry — a teleport straight back, a relog —
 		// would re-arm buffs that have long since expired, which is the same stuck icon from the other direction.
 		[Fact]
 		public void ConsumingIsOneShot()
@@ -82,7 +81,7 @@ namespace Faolan.Tests
 			Assert.Empty(new CarriedBuffHold().Consume(Character));
 		}
 
-		// Carrying an all-expired set must CLEAR any earlier hold rather than leave it standing — otherwise a second
+		// Carrying an all-expired set must clear any earlier hold rather than leave it standing — otherwise a second
 		// zone change would restore the first one's buffs.
 		[Fact]
 		public void CarryingNothingLive_ClearsWhatWasHeld()
@@ -95,7 +94,7 @@ namespace Faolan.Tests
 			Assert.Empty(hold.Consume(Character));
 		}
 
-		// The hold is per CHARACTER — two players changing zone at once must not inherit each other's debuffs.
+		// The hold is per character — two players changing zone at once must not inherit each other's debuffs.
 		[Fact]
 		public void TheHoldIsPerCharacter()
 		{

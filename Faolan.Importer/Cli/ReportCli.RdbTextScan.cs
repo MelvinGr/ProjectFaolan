@@ -6,9 +6,9 @@ using System.Text;
 namespace Faolan.Importer.Cli
 {
 	// `--report rdb-text-scan --report-arg <needle>[,<needle>...][:local][:<type>]`: every RDB record whose
-	// DECOMPRESSED body contains a given ASCII string, counted by record TYPE.
+	// DECOMPRESSED body contains a given ASCII string, counted by record type.
 	//
-	// ⚠️ It is the TEXT twin of `rdb-word-scan`, and it exists because a raw grep over `RDB/*.rdbdata` answers a
+	// It is the text twin of `rdb-word-scan`, and it exists because a raw grep over `RDB/*.rdbdata` answers a
 	// different question than it appears to. Most records are zlib-compressed in the pack, so a string that is
 	// plainly present in the game is absent from the file bytes - and "grep found nothing in the RDB" then reads as
 	// "the client does not ship this name" when it means "the client does not ship it UNCOMPRESSED". Every hit this
@@ -18,7 +18,7 @@ namespace Faolan.Importer.Cli
 	// usually 8-bit, but XML payloads and a few tables are wide) - getting the width wrong turns a real hit into a
 	// false negative, the same trap `rdb-word-scan` documents for endianness.
 	//
-	// ⚠️ Same CDN warning as `rdb-word-scan`, for the same reason: the default sweep FETCHES CDN-backed records over
+	// Same CDN warning as `rdb-word-scan`, for the same reason: the default sweep FETCHES CDN-backed records over
 	// HTTP one at a time and runs for the better part of an hour. It still defaults to the full sweep, because the
 	// value of the report is its MISS and a local-only miss means "absent from the local packs" rather than "absent
 	// from the shipped game". Pass `:local` for the quick partial pass; the header says so when you do.
@@ -38,8 +38,8 @@ namespace Faolan.Importer.Cli
 			var options = parts.Skip(1).ToArray();
 			var localOnly = options.Any(o => o.Equals("local", StringComparison.OrdinalIgnoreCase));
 
-			// ⭐ `:case` makes the search CASE-SENSITIVE (#331). The default fold is right for "does the client know
-			// this word at all", and WRONG for the question that fold cannot even express: *in which case* does it
+			// `:case` makes the search CASE-SENSITIVE. The default fold is right for "does the client know
+			// this word at all", and wrong for the question that fold cannot even express: *in which case* does it
 			// store it. `RenownBystanderLovers` hits `1000010` either way, because that table is lowercased by the
 			// build - so a case-insensitive hit there says nothing about whether the CamelCase spelling the token
 			// hash needs exists anywhere. Only a case-sensitive sweep can answer that, in either direction.
@@ -91,7 +91,7 @@ namespace Faolan.Importer.Cli
 				if (scanned % 5000 == 0)
 					Console.WriteLine($"  ... {scanned} records ({hits.Values.Sum(h => h.Values.Sum())} hits so far)");
 
-				// Lower-case the body ONCE per record rather than once per needle: the case-fold is the expensive part
+				// Lower-case the body once per record rather than once per needle: the case-fold is the expensive part
 				// and every needle searches the same bytes.
 				var lower = body;
 				if (!caseSensitive)

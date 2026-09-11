@@ -13,26 +13,26 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The RpcHeader is protobuf and its method field is ONE varint - not a `[u16 opcode][headerData tail]` pair
-	// (Gitea #319/#320/#609/#610). These gates hold the fold in place: that the split was byte-identical (so nothing on
-	// the wire moved), that the two bytes a hex dump shows are a derived RENDERING of the method (`WireOpcode`) rather
-	// than a field, and that the header is now read strictly rather than carried through as opaque bytes.
+	// The RpcHeader is protobuf and its method field is one varint - not a `[u16 opcode][headerData tail]` pair.
+	// These gates hold that reading in place: that the split is byte-identical (so nothing on the wire moves), that
+	// the two bytes a hex dump shows are a derived rendering of the method (`WireOpcode`) rather than a field, and
+	// that the header is read strictly rather than carried through as opaque bytes.
 	//
-	// Since #615 the method enums ARE the `method_instance` constant, so `Rpc.Opcode` is gone entirely and a send
-	// carries its member's value with no arithmetic in between - which is what `AMethodEnumMemberIsTheWireField` says.
+	// The method enums are the `method_instance` constant, so there is no `Rpc.Opcode` and a send carries its
+	// member's value with no arithmetic in between - which is what `AMethodEnumMemberIsTheWireField` says.
 	//
 	// Measured over the corpus: 404,208 of 404,210 field-4 frames carry a well-formed varint whose first group is the
 	// dump's low byte. The two misses are not packets - they sit inside a desynced decompressed region of one capture
-	// and fail an independent CRC recompute under every alignment (#609).
+	// and fail an independent CRC recompute under every alignment.
 	public class RpcHeaderTests
 	{
 		private static readonly ProtoEndpoint Agent = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x08);
 		private static readonly ProtoEndpoint Character = Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceType, 0x3BC035EC);
 
-		// What the code used to split into `[u16 opcode][headerData]` is ONE protobuf field: tag 0x20 (field 4, varint)
-		// whose value is the method's registration constant, whole. This is the gate that says the two readings are
-		// byte-identical, method by method, against the client's own registration tables. It is also why `0x2080` is the
-		// boundary and why the old trailing byte was always exactly `0x01`: those are properties of a varint's first
+		// What reads as `[u16 opcode][headerData]` is one protobuf field: tag 0x20 (field 4, varint) whose value is the
+		// method's registration constant, whole. This is the gate that says the two readings are byte-identical, method
+		// by method, against the client's own registration tables. It is also why `0x2080` is the boundary and why the
+		// trailing byte of the two-byte reading is always exactly `0x01`: those are properties of a varint's first
 		// group, not of a marker.
 		[Fact]
 		public void TheOpcodeIsTheMethodVarint()
@@ -43,13 +43,13 @@ namespace Faolan.Tests
 				var opcode = PlayerAgentMethodIds.ObservedOpcode(method);
 				var varint = Varint(method);
 
-				// What a dump reads IS the field tag plus the varint's first group - which is exactly how the header used
+				// What a dump reads is the field tag plus the varint's first group - which is exactly how the header used
 				// to be cut, so the observed opcode falls out of the constant with nothing left over.
 				Assert.Equal(0x20, opcode >> 8);
 				Assert.Equal(varint[0], (byte)(opcode & 0xFF));
 
-				// ...and the frame carries the CONSTANT, not that reading - which is the whole point, since the reading
-				// names two methods (#613).
+				// ...and the frame carries the constant, not that reading - which is the whole point, since the reading
+				// names two methods.
 				Assert.Equal(method, Rpc.Parse(new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty).Serialize()).Method);
 			}
 
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 		}
 
 		// The half a "constant marker" reading could never account for: the second group appears exactly at method 128
-		// and is always exactly 0x01 up to 255, because that is what a varint's second group IS. 0x2080 is the lowest
+		// and is always exactly 0x01 up to 255, because that is what a varint's second group is. 0x2080 is the lowest
 		// value in the whole corpus whose dump reading carries the byte, and 12,056 sightings are all 0x01.
 		[Theory, InlineData(0x00, 1, 0x2000), InlineData(0x7F, 1, 0x207F), InlineData(0x80, 2, 0x2080), InlineData(0x85, 2, 0x2085),
 		 InlineData(0x82, 2, 0x2082), InlineData(0xFF, 2, 0x20FF)]
@@ -72,15 +72,15 @@ namespace Faolan.Tests
 			if (expectedGroups == 2)
 				Assert.Equal(0x01, varint[1]);
 
-			// …and the two bytes a dump shows are the tag plus that first group, which is why an index-registered
-			// method used to be WRITTEN as `0x2000 + index` (#615 renumbered the enums onto the index itself).
+			// ...and the two bytes a dump shows are the tag plus that first group, which is why an index-registered
+			// method renders as `0x2000 + index`.
 			Assert.Equal((ushort)dumpReading, WireOpcode.Of(method));
 			Assert.Equal(varint[0], (byte)(WireOpcode.Of(method) & 0xFF));
 		}
 
 		// A send supplies nothing and still carries the whole varint: the pong's method is 130, so the second group goes
-		// out without a call site remembering it. Before #609 every method >= 128 that did not hand-pass a `0x01` went
-		// out a byte short, and three sites hand-passed one on methods that must not carry it.
+		// out without a call site remembering it. Hand-passing the continuation byte at the call site gets both halves
+		// wrong - a method >= 128 goes out a byte short, and one below the boundary goes out a byte long.
 		[Fact]
 		public void ASendCarriesTheWholeMethodVarint()
 		{
@@ -91,8 +91,8 @@ namespace Faolan.Tests
 			Assert.Equal(pong.Method, Rpc.Parse(pong.Serialize()).Method);
 		}
 
-		// …and a method below the boundary stays bare, which is the half the trade replies used to get wrong: all seven
-		// are methods 0x68-0x6E (104-110) and every one hand-passed a `0x01` retail's captures do not carry.
+		// ...and a method below the boundary stays bare: all seven trade replies are methods 0x68-0x6E (104-110) and
+		// none of them carries the trailing `0x01` retail's captures do not have.
 		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.DispatchClientAcceptedTrade), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
 		 InlineData(GameCharInterfaceMethods.DispatchCharacterNameReply)]
 		public void ALowIndexSend_StaysOneGroup(GameCharInterfaceMethods method)
@@ -103,10 +103,10 @@ namespace Faolan.Tests
 			Assert.Single(Varint(rpc.Method));
 		}
 
-		// #792: the two no-arg GameCharInterface methods the server now SENDS carry a zero-length body and one varint
-		// group. Both were `Reserved0xNN` until the client's own vtable named what they do, and the corpus pinned when
-		// they arrive: `DispatchAbortTrade` answers `CloseShop` (152 of 153 frames) and `0x1B` precedes every
-		// `IntendedTeleportIIR` (102 of 102). A body of any length here would be a different message.
+		// The two no-arg GameCharInterface methods the server sends carry a zero-length body and one varint group.
+		// The client's own vtable names what they do, and the corpus pins when they arrive: `DispatchAbortTrade`
+		// answers `CloseShop` (152 of 153 frames) and `0x1B` precedes every `IntendedTeleportIIR` (102 of 102). A body
+		// of any length here would be a different message.
 		[Theory, InlineData(GameCharInterfaceMethods.DispatchAbortTrade, 0x6A), InlineData(GameCharInterfaceMethods.DispatchTeleportStarted, 0x1B)]
 		public void ANoArgWorldMethod_SendsAnEmptyBody(GameCharInterfaceMethods method, int expected)
 		{
@@ -117,9 +117,9 @@ namespace Faolan.Tests
 			Assert.Equal(0, Rpc.Parse(rpc.Serialize()).Body.Length);
 		}
 
-		// The collision #608 is about, stated as bytes: the SAME opcode with two different method varints is two
-		// different methods, and only the whole field tells them apart. Retail sends all four; an opcode-keyed dispatch
-		// would read an 8-byte `AuthenticateLoggedIn` as the no-arg `ReceivedCharacterSettings` ack.
+		// The collision, stated as bytes: the same opcode with two different method varints is two different methods,
+		// and only the whole field tells them apart. Retail sends all four; an opcode-keyed dispatch would read an
+		// 8-byte `AuthenticateLoggedIn` as the no-arg `ReceivedCharacterSettings` ack.
 		[Theory, InlineData(PlayerAgentMethods.ReceivedCharacterSettings, 0x20EC), InlineData(PlayerAgentMethods.AuthenticateLoggedIn, 0x20EC),
 		 InlineData(PlayerAgentMethods.VerifyLanguageSetting, 0x20D6), InlineData(PlayerAgentMethods.UpdateCharacterPreview, 0x20D6)]
 		public void OneOpcode_CanNameTwoMethods(PlayerAgentMethods method, int opcode)
@@ -127,18 +127,18 @@ namespace Faolan.Tests
 			var frame = new Rpc(Agent, Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02), method, ReadOnlyMemory<byte>.Empty).Serialize();
 			var parsed = Rpc.Parse(frame);
 
-			// Both members of a pair READ the same in a dump...
+			// Both members of a pair read the same in a dump...
 			Assert.Equal((ushort)opcode, PlayerAgentMethodIds.ObservedOpcode(parsed.Method));
 
-			// ...and the method is what tells them apart - it is the only identity the frame has (#613).
+			// ...and the method is what tells them apart - it is the only identity the frame has.
 			Assert.Equal(method, (PlayerAgentMethods)parsed.Method);
 		}
 
 		// The four login handoffs, whole: header field 3 (`full_routing_context`) restating PlayerInterface#1, then the
-		// method constant. The expected bytes are the literals the handoff shipped before the fold, which are the
-		// captured retail bytes (118 sightings each) - so the construction is proven against retail, not against itself.
-		// The codebase used to read all four as one invented opcode `0x1A07` with an opaque 13-byte "session blob";
-		// `0x1A 0x07` is field 3's tag plus its length, and the blob is the endpoint plus the method (#609/#610).
+		// method constant. The expected bytes are the captured retail bytes (118 sightings each) - so the construction
+		// is proven against retail, not against itself. Read as an opcode `0x1A07` plus an opaque 13-byte "session
+		// blob" they make no sense: `0x1A 0x07` is field 3's tag plus its length, and the blob is the endpoint plus
+		// the method.
 		[Theory, InlineData(PlayerInterfaceMethods.ChatServerConnectReady, "1a070d3857157d100120fae5989d02"), InlineData(PlayerInterfaceMethods.CSServerConnectReady, "1a070d3857157d100120e0d4b4d705"),
 		 InlineData(PlayerInterfaceMethods.LoginConnectReady, "1a070d3857157d100120f9d8d9c50d"), InlineData(PlayerInterfaceMethods.OverrideGameTweaks, "1a070d3857157d100120e3ee9fe207")]
 		public void TheLoginHandoffs_ReproduceTheCapturedHeaders(PlayerInterfaceMethods method, string expected)
@@ -166,40 +166,40 @@ namespace Faolan.Tests
 			var valid = new Rpc(Agent, Character, GameCharInterfaceMethods.DispatchPong, ReadOnlyMemory<byte>.Empty).Serialize();
 			Assert.Equal(0x82u, Rpc.Parse(valid).Method);
 
-			// A trailing byte after the method varint: it belonged to no field, and used to be kept verbatim as
-			// "headerData" - which is how a spurious 0x01 rode the trade replies for years without anything noticing.
+			// A trailing byte after the method varint belongs to no field, so it must be rejected rather than carried
+			// through as opaque "headerData" - which is how a spurious 0x01 can ride a reply unnoticed.
 			Assert.Throws<InvalidDataException>(() => Rpc.Parse(WithHeaderSuffix(valid, [0x7F])));
 
 			// A field the schema has but no captured frame carries (routing_destination, field 5).
 			Assert.Throws<InvalidDataException>(() => Rpc.Parse(WithHeaderSuffix(valid, [0x2A, 0x00])));
 
-			// The method varint truncated mid-continuation - the failure mode the old split could NOT survive, since a
-			// missing group silently renames the method. `20 82 01` minus its last byte.
+			// The method varint truncated mid-continuation: a missing group silently renames the method, so it has to
+			// throw. `20 82 01` minus its last byte.
 			Assert.Throws<InvalidDataException>(() => Rpc.Parse(WithoutHeaderSuffix(valid, 1)));
 
 			// A header with no method_instance at all: the two endpoints and nothing else.
 			Assert.Throws<InvalidDataException>(() => Rpc.Parse(WithoutHeaderSuffix(valid, 3)));
 		}
 
-		// The strictness, against RETAIL. Every captured frame in the fixture archive must parse under the strict header
+		// The strictness, against retail. Every captured frame in the fixture archive must parse under the strict header
 		// reader and re-serialize to the bytes it arrived as. This is the gate that says the fold is safe on real
 		// traffic rather than on frames the test built: a header shape the corpus carries and the reader rejects fails
 		// here, and so does any field the reader accepts but cannot write back.
 		//
-		// Compared from offset 8 - past the length and the crc32 - because the corpus stores REBUILT packets whose CRC
+		// Compared from offset 8 - past the length and the crc32 - because the corpus stores rebuilt packets whose CRC
 		// is a placeholder (TsharkCaptureReader.Rebuild); the header and body are the captured bytes, and the header is
 		// what this change touches.
 		[Fact]
-		// ⚠️ **"Every captured frame" means every frame IN THE ARCHIVE SLICE, and that slice cannot see one whole
+		// **"Every captured frame" means every frame in the archive slice, and that slice cannot see one whole
 		// class of defect.** `CorpusExtract` carries IIR-carrier bodies only - MoveTaskIIR, SimpleCharFullUpdateIIR,
 		// MagicBuffIIR and the rest - and every one of those rides `PassBlob`, whose `method_instance` is **0**. A
-		// zero needs one varint group, so a bug in how the header's method VARINT is written is structurally
+		// zero needs one varint group, so a bug in how the header's method varint is written is structurally
 		// invisible here.
 		//
 		// It was invisible: the importer's capture reader rebuilt that field from the dump's two-byte "Opcode",
-		// which is the tag plus the varint's FIRST GROUP only, and 18,882 of 544,386 captured frames - every Ping
+		// which is the tag plus the varint's first group only, and 18,882 of 544,386 captured frames - every Ping
 		// and Pong, the whole hash-registered login tier - therefore ended mid-varint and were refused by this very
-		// parser. This test passed throughout (#881).
+		// parser. This test passed throughout.
 		//
 		// The whole-corpus counterpart is `--report frame-health`, which parses every frame in the real dumps rather
 		// than the slice. Keep both: this one guards the round-trip, that one guards the population.
@@ -210,11 +210,11 @@ namespace Faolan.Tests
 			{
 				var parsed = Rpc.Parse(entry.Full);
 
-				// The archive records the two bytes the dump read for the method field. They are a RENDERING of the
+				// The archive records the two bytes the dump read for the method field. They are a rendering of the
 				// parsed method, so recomputing them from it reproduces the archived value on every frame - including
-				// the hash-registered pair, where that rendering is all a dump can show and is not an identity (#613).
+				// the hash-registered pair, where that rendering is all a dump can show and is not an identity.
 				// The archived value stays in wire space: fixtures.bin cannot be regenerated without the private
-				// corpus, so #615 converts at the comparison rather than redefining the stored field.
+				// corpus, so the conversion happens at the comparison rather than by redefining the stored field.
 				Assert.Equal((ushort)entry.Opcode, WireOpcode.Of(parsed.Method));
 
 				Assert.Equal(entry.Full[8..], parsed.Serialize()[8..]);
@@ -225,11 +225,10 @@ namespace Faolan.Tests
 			Assert.True(frames > 40_000, $"expected the whole corpus, walked only {frames} frames");
 		}
 
-		// #615, stated: a `*Methods` member IS the `method_instance` this frame writes, on BOTH kinds of class, with no
-		// base added or subtracted anywhere. That is what let `Rpc.Opcode`, `HasOpcode`, `MethodIndexBase` and the
-		// ushort constructor overloads all delete - and it is what makes a dispatch `switch ((FooMethods)packet.Method)`
-		// rather than arithmetic. Asserted end to end (build -> serialize -> parse), so a conversion sneaking back in
-		// anywhere on that path fails here.
+		// A `*Methods` member is the `method_instance` this frame writes, on both kinds of class, with no base added
+		// or subtracted anywhere. That is what makes a dispatch `switch ((FooMethods)packet.Method)` rather than
+		// arithmetic. Asserted end to end (build -> serialize -> parse), so a conversion sneaking in anywhere on that
+		// path fails here.
 		[Fact]
 		public void AMethodEnumMemberIsTheWireField()
 		{

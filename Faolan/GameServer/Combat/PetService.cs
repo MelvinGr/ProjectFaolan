@@ -15,10 +15,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// A player's summoned PET (#307, docs/subsystems/summon-pet-decode.md): summon, the timed variant's
-	// extend-or-summon, and dismissal. All three are wire + world-model work over the broadcaster and the
-	// simulation - the listener only ever forwarded them - so they live here and are reached through
-	// ISpellEffectOutbound (the cast path) and the QueuePetCommand handler (the pet bar).
+	/// <summary>
+	///     A player's summoned pet: summon, the timed variant's extend-or-summon, and dismissal
+	///     (docs/subsystems/summon-pet-decode.md).
+	/// </summary>
+	/// <remarks>
+	///     All three are wire and world-model work over the broadcaster and the simulation. They are reached through
+	///     <see cref="ISpellEffectOutbound" /> for the cast path and through the QueuePetCommand handler for the pet
+	///     bar.
+	/// </remarks>
 	public sealed class PetService
 	{
 		private readonly NpcBroadcaster _npcs;
@@ -34,15 +39,18 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
-		// Shared pet-summon (#307, docs/subsystems/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
-		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
-		// mark the owner. Reached from the CastSpell hook (a spell carrying a SummonPet effect) through ISpellEffectOutbound.
-		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
+		/// <summary>
+		///     Spawns the creature, binds it as a real pet by emitting the PetIIR owner-assign - which is what makes the
+		///     client show the pet bar and send QueuePetCommand 0x205b - makes it follow, and marks the owner
+		///     (docs/subsystems/summon-pet-decode.md).
+		/// </summary>
+		/// <param name="combat">Picks the PetIIR kind triple: combat or social.</param>
+		/// <returns>Null when no spawnable template matches.</returns>
 		public async Task<WorldEntity?> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat, uint pointCost = 0)
 		{
-			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (columns: StatCore + Equipment + Morphs), no world
-			// placement. Fall back to the placement path only for a world-placed creature, so a
-			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
+			// Spawn the pet from its creature type (StatCore, Equipment and Morphs columns), with no world placement.
+			// Fall back to the placement path only for a world-placed creature, so a creature whose stat core has not
+			// been lifted to the type can still be summoned as a follower.
 			var npcType = await _database.GetNpcByName(petTemplate);
 			var entity = npcType != null
 				? await _npcs.SpawnPetForPlayer(client, npcType)
@@ -54,10 +62,9 @@ namespace Faolan.GameServer.Combat
 			entity.OwnerHandle = owner;
 			await client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, b =>
 				b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Assign(owner, entity.Handle, combat
-					// ⭐ The pet's own POINT COST rides here (#823) - `f2` is what the client's pet-point bar counts, and
-					// this used to be the constant 2 for every pet in the game. `pointCost` is the SUMMONING SPELL's
-					// `SummonPointCost`; a pet with no spell behind it summons at 0, which is
-					// the value retail's own social pets carry rather than an invented one.
+					// The pet's own point cost rides here: `f2` is what the client's pet-point bar counts, and
+					// `pointCost` is the summoning spell's `SummonPointCost`. A pet with no spell behind it summons
+					// at 0, which is the value retail's own social pets carry.
 					? PetBindings.CombatKind(pointCost)
 					: PetBindings.SocialKind)))));
 
@@ -65,11 +72,16 @@ namespace Faolan.GameServer.Combat
 			return entity;
 		}
 
-		// Summons a pet that lives for `duration`, or EXTENDS the one already out. Frozen Hatred's fatality pet is the
-		// shape this serves (#140): "the Frozen Hatred pet appears and is under your control for 60 seconds. If you
-		// already have a Frozen Hatred pet, the duration of the pet will increase by another 60 seconds. This timer is
-		// capped at 5 minutes." (in-client tooltip). One field carries both halves - DespawnAt is pushed out on each
-		// fatality and clamped to the cap, and the world tick fades whatever it finds expired.
+		/// <summary>
+		///     Summons a pet that lives for <paramref name="duration" />, or extends the one already out.
+		/// </summary>
+		/// <remarks>
+		///     Frozen Hatred's fatality pet is the shape this serves - its in-client tooltip reads "the Frozen Hatred
+		///     pet appears and is under your control for 60 seconds. If you already have a Frozen Hatred pet, the
+		///     duration of the pet will increase by another 60 seconds. This timer is capped at 5 minutes." One field
+		///     carries both halves: <c>DespawnAt</c> is pushed out on each fatality and clamped to the cap, and the
+		///     world tick fades whatever it finds expired.
+		/// </remarks>
 		public async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan? cap, uint pointCost = 0)
 		{
 			var owner = _simulation.PlayerWorldEntity(client);
@@ -106,8 +118,10 @@ namespace Faolan.GameServer.Combat
 			_logger.LogInformation("Timed pet '{Pet}' summoned for '{Player}' for {Seconds:F0}s.", petTemplate, client.Session.Character?.Name, duration.TotalSeconds);
 		}
 
-		// The pet bar's DISMISS (all three of its spellings - see HandlePetCommand): retail's PetIIR mode-1 remove,
-		// then the n3ToClientQuit despawn.
+		/// <summary>
+		///     The pet bar's dismiss, in all three of its spellings (see <see cref="HandlePetCommand" />): retail's
+		///     PetIIR mode-1 remove, then the n3ToClientQuit despawn.
+		/// </summary>
 		public async Task DismissPet(INetworkClient client, uint petHandle)
 		{
 			var owner = client.Session.Character.Id;
@@ -120,18 +134,28 @@ namespace Faolan.GameServer.Combat
 				: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);
 		}
 
-		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
-		// [u32 command]. The command set is the client's own twelve, recovered in #307 - see PetCommand for the
-		// derivation and for the two conclusions it overturned (docs/subsystems/summon-pet-decode.md).
-		//
-		// DISMISSAL is the only family that ACTS today: retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. The
-		// stance commands need pet-side combat AI (a pet picking and engaging a target), which does not exist - a
-		// summoned minion only follows, via SetNpcFollow. They are logged rather than silently dropped so the bar's
-		// traffic is visible while that is built.
-		//
-		// All three dismissal codes are honoured, not just the captured one: `DismissFollower` (0x1F8) is what the
-		// corpus shows, but `Dismiss` and `AllDismiss` are the same act from the per-pet and all-pets bars, and
-		// answering only the captured spelling would leave the other two bars' buttons dead.
+		/// <summary>
+		///     QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
+		///     [u32 command].
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The command set is the client's own twelve - see <see cref="PetCommand" /> and
+		///         docs/subsystems/summon-pet-decode.md for the derivation.
+		///     </para>
+		///     <para>
+		///         Dismissal is the only family that acts: retail's PetIIR mode-1 remove plus the n3ToClientQuit
+		///         despawn. The stance commands need pet-side combat AI - a pet picking and engaging a target - which
+		///         does not exist, since a summoned minion only follows. They are logged rather than silently dropped
+		///         so the bar's traffic stays visible.
+		///     </para>
+		///     <para>
+		///         All three dismissal codes are honoured, not just the captured one: <c>DismissFollower</c> (0x1F8) is
+		///         what the corpus shows, but <c>Dismiss</c> and <c>AllDismiss</c> are the same act from the per-pet
+		///         and all-pets bars, and answering only the captured spelling would leave the other two bars' buttons
+		///         dead.
+		///     </para>
+		/// </remarks>
 		internal async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // type 0xC350

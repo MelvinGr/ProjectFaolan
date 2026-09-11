@@ -13,12 +13,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Seeds each captured character's personal BANK (CharacterInventory rows in container kind 105) from the on-demand
-	// BankIIR packets - the bank is NOT in the login FullChar snapshot (unlike the bags, which CaptureCharacterImporter
-	// already imports), it is streamed when the player opens the bank. Record framing (see BankService):
-	//   0x2000 carrier -> [u32 subop=0x0BA1C1CB][u32 0xC350][u32 charInstance][u8 01][u32 BE blobLen][ProtoInventoryGame]
-	// The blob is the standard container proto (kind 105 + InventoryListEntry items). The LAST BankIIR per character
-	// wins (the bank can be re-sent after a move). Only DB characters are touched; the bank container is replaced.
+	/// <summary>
+	///     Seeds each captured character's personal bank (container kind 105) from the on-demand BankIIR packets.
+	/// </summary>
+	/// <remarks>
+	///     The bank is not in the login FullChar snapshot (unlike the bags, which <see cref="CaptureCharacterImporter" />
+	///     imports); it is streamed when the player opens the bank. Record framing (see BankService):
+	///     PassBlob carrier -> [u32 subop][u32 0xC350][u32 charInstance][u8 01][u32 be blobLen][ProtoInventoryGame].
+	///     The blob is the standard container proto (kind 105 + InventoryListEntry items). The last BankIIR per character
+	///     wins (the bank can be re-sent after a move). Only DB characters are touched; the bank container is replaced.
+	/// </remarks>
 	public static class CaptureBankImporter
 	{
 		private const int BlobOffset = 17; // subop(4) + 0xC350(4) + charInstance(4) + flag(1) + blobLen(4)
@@ -52,7 +56,7 @@ namespace Faolan.Importer.Captures
 				foreach (var entry in container.Items)
 				{
 					// The banked item keeps its crafter and its socketed gems, same as a carried one - the BankIIR is the
-					// same ProtoInventoryGame shape, so both ride it too (#727/#750).
+					// same ProtoInventoryGame shape.
 					if (CapturedItemInstances.From(entry, characterId, kind, knownTemplates, unresolvedGems) is not { } instance)
 						continue;
 

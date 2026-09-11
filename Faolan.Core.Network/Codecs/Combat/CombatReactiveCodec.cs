@@ -5,30 +5,32 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// CombatReactiveIIR (0x54C02089) - the reactive element list: declares to the client which spellweave elements the
-	// caster can ADD while in the trance. This is what lets the client send the 0x03-tagged adds, and a component add's
-	// index indexes INTO this list.
-	//
-	//   [subop][class][caster][u32 fieldA=0][u8 tag=0x01][N x u32 elementBaseId]
-	//
-	// elementBaseId = full spell id >> 8 (necro: Arcane Renewal 0x396AE9, Arcane Surge 0x3969D8, Parasite Host
-	// 0x37E6D9, Death God 0x396A22, Death 0x396A3D). A per-add re-send zeroes the just-used element (cooldown); pass 0
-	// for a consumed slot to reproduce that. `tag` 0x01 is a constant "list active" flag.
-	//
-	// Decoded in tools/capture/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving
-	// (caster 0x0802E5D4); docs/subsystems/combos.md.
+	/// <summary>
+	///     CombatReactiveIIR - the reactive element list, declaring which spellweave elements the caster may add while in
+	///     the trance. It is what lets the client send the 0x03-tagged adds, and a component add's index indexes into this
+	///     list. Layout: <c>[subop][class][caster][u32 fieldA=0][u8 tag=0x01][N x u32 elementBaseId]</c>.
+	/// </summary>
+	/// <remarks>
+	///     elementBaseId is the full spell id shifted right by 8 (necromancer: Arcane Renewal 0x396AE9, Arcane Surge
+	///     0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D). A per-add re-send zeroes the just-used
+	///     element for its cooldown; pass 0 for a consumed slot to reproduce that. Decoded in
+	///     tools/capture/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving (caster 0x0802E5D4);
+	///     see docs/subsystems/combos.md.
+	/// </remarks>
 	public static class CombatReactiveCodec
 	{
 		public const uint Opcode = (uint)IirTypes.CombatReactiveIIR;
 
-		// The "list active" flag every captured s2c record carries.
+		/// <summary>The "list active" flag every captured s2c record carries.</summary>
 		public const byte ActiveTag = 0x01;
 
-		// The c2s tag on a component ADD - the packet that carries the picked element's index in the list slot. Its
-		// 0x02-tagged twin is the ack and carries an EMPTY list, which is the whole difference between the two.
+		/// <summary>
+		///     The c2s tag on a component add - the packet carrying the picked element's index in the list slot. Its
+		///     0x02-tagged twin is the ack and carries an empty list, which is the only difference between the two.
+		/// </summary>
 		public const byte AddComponentTag = 0x03;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CombatReactiveIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -58,8 +60,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var fieldA = r.ReadU32Be();
 			var tag = r.ReadU8();
 
-			// The element list runs to the end of the record - it carries no count of its own, which is why the reader
-			// has to be told where the body stops rather than deriving it. A trailing partial word throws.
+			// The element list runs to the end of the record: it carries no count of its own, so the reader has to be
+			// told where the body stops rather than deriving it. A trailing partial word throws.
 			var elements = new uint[r.Remaining / sizeof(uint)];
 			for (var i = 0; i < elements.Length; i++)
 				elements[i] = r.ReadU32Be();
@@ -75,6 +77,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// CombatReactiveIIR (0x54C02089).
+	/// <summary>The CombatReactiveIIR body.</summary>
 	public sealed record CombatReactiveIIR(uint Caster, uint FieldA, byte Tag, uint[] ElementBaseIds);
 }

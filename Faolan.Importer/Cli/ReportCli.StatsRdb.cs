@@ -17,28 +17,28 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// `CHARACTER_HP_MANA_STAMINA` (RDB type 1000511) - the client's per-class BASE vitals curve, decoded from its own
+		// `CHARACTER_HP_MANA_STAMINA` (RDB type 1000511) - the client's per-class base vitals curve, decoded from its own
 		// parser (`HitsManaAndStamina_c::ReadFromRDB`, whose assert states the record size: 14 x int32).
 		//
 		//   [12-byte header][i32 version][i32 count][count x 14 x i32]
 		//
-		// Each record is keyed [race][class]; fields 2..4 are the L1 BASE health/mana/stamina (/100) and 5..7 their
+		// Each record is keyed [race][class]; fields 2..4 are the L1 base health/mana/stamina (/100) and 5..7 their
 		// per-level growth (/1000), so `base/100 + (level-1) * growth/1000` reproduces the captured snapshot sheet's stat
 		// 1 / 507 / 505 exactly for every captured character. See docs/rdb/client-tweak-table.md. Gitea #3.
-		// #444: the class attribute BASE. It lives in RDB type 1000020 - the ITEM-template type - as PLAINTEXT templates
-		// (no TEA key), one per class per level, each NAMING itself "<Class> Class Feat <NNN>". Their stat records are
-		// read by the ordinary item parser, so this only became readable once that scan went byte-granular (#441).
+		// the class attribute base. It lives in RDB type 1000020 - the item-template type - as plaintext templates
+		// (no TEA key), one per class per level, each naming itself "<Class> Class Feat <NNN>". Their stat records are
+		// read by the ordinary item parser, so this only became readable once that scan went byte-granular.
 		//
-		// ⚠️ What this report does NOT establish is the id -> LEVEL mapping. `templateId = base + (level - 1)` is
+		// What this report does not establish is the id -> level mapping. `templateId = base + (level - 1)` is
 		// verified against all four client-observed anchors (Assassin L23 = 3074028+22, Herald of Xotli L24 =
-		// 3130632+23, Necromancer L80 = 1173784+79, Demonologist L80 = 1126680+79), but the per-class BASE cannot be
+		// 3130632+23, Necromancer L80 = 1173784+79, Demonologist L80 = 1126680+79), but the per-class base cannot be
 		// recovered structurally: entries sharing the class name from other feat series are interleaved inside the id
 		// range, so neither "lowest id" nor "longest monotonic contiguous window" finds it (the latter truncates the
 		// Assassin's real 80 to 70). The name's <NNN> is not the level either - three consecutive Assassin templates
-		// are all "Class Feat 021" - and no property field carries the level (field 33 is a per-CLASS code: Assassin
+		// are all "Class Feat 021" - and no property field carries the level (field 33 is a per-class code: Assassin
 		// 23, Herald of Xotli 30, Necromancer 26, Demonologist 27).
 		//
-		// So a class's base needs ONE client observation to anchor it: log a character of that class in with the
+		// So a class's base needs one client observation to anchor it: log a character of that class in with the
 		// ClientInterface + GameCode/ItemData channels on and read the template id it loads. This report gives the
 		// candidate set and their values; the anchor gives the offset.
 		private static void ClassAttributeRuns(string rdbDir, string? outDir)
@@ -57,7 +57,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{cls,-16} {byLevel.Count,3}/{ClassAttributeBaseModule.MaxLevel} levels from {candidates.Count,3} candidates   " +
 								  string.Join("  ", checks));
 
-				// Every candidate, by the block its NAME declares - so a block carrying more than its ten levels (a
+				// Every candidate, by the block its name declares - so a block carrying more than its ten levels (a
 				// stray from another feat series sharing the class name) is visible rather than silently truncated.
 				foreach (var block in candidates.GroupBy(t => t.BlockFirstLevel).OrderBy(g => g.Key))
 				{
@@ -125,22 +125,22 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Gitea #441: every keyed item's TEMPLATE-SCALING inputs next to its EXPLICIT [2][9] stat records, as CSV, so the
+		// every keyed item's template-SCALING inputs next to its EXPLICIT [2][9] stat records, as CSV, so the
 		// scaling formula can be FITTED on the items that carry both and then applied to the ones that carry none.
 		//
 		// Why this exists: only ~24% of items carry explicit stat records. The rest are "template-scaled" - a high-level
-		// piece like Talons of Dark Terror has a rich in-client tooltip but ZERO records, so its armor/health never
-		// reaches the server and a geared character's bars cap far below what the client draws (#3). The scaling inputs
-		// are the property-table fields every one of them DOES carry: 54 = item level, 499 = quality tier, 496 = the
+		// piece like Talons of Dark Terror has a rich in-client tooltip but zero records, so its armor/health never
+		// reaches the server and a geared character's bars cap far below what the client draws. The scaling inputs
+		// are the property-table fields every one of them does carry: 54 = item level, 499 = quality tier, 496 = the
 		// per-item budget that tracks quality (3250/3500 at tier 3, 4000/5000 at tier 4), 360, 41, 21, plus the search
 		// CATEGORY (30000 armor / 30020 neck / 30023 cloak) which stands in for the slot.
 		//
-		// Writing BOTH sides in one row is the point: an item with an explicit Armor/HealthMax record is ground truth for
+		// Writing both sides in one row is the point: an item with an explicit Armor/HealthMax record is ground truth for
 		// what the same inputs must produce, and there is no need to ask the client for a tooltip to fit against.
 		// Every stat id the item [2][9] stat-modifier region carries, with how many templates carry it and its value
-		// range - the whole region, NOT just RdbItemImporter's whitelist. The question it answers is the one that
-		// keeps coming up when a consumer lands: "is this rating actually ON any item, or would importing it be dead
-		// weight?" (#401 asked it of BonusArmor/BonusProtection.)
+		// range - the whole region, not just RdbItemImporter's whitelist. The question it answers is the one that
+		// keeps coming up when a consumer lands: is this rating actually on any item, or would importing it be dead
+		// weight?
 		private static void RegionStatCensus(string rdbDir)
 		{
 			using var db = OpenDb();
@@ -263,7 +263,7 @@ namespace Faolan.Importer.Cli
 						: "");
 				}
 
-				// The explicit side: the region record for each stat we care about, at RAW wire scale (the fit divides).
+				// The explicit side: the region record for each stat we care about, at raw wire scale (the fit divides).
 				cells.AddRange(stats.Select(s =>
 				{
 					var hit = region.FirstOrDefault(m => m.StatId == (uint)s);
@@ -282,8 +282,8 @@ namespace Faolan.Importer.Cli
 
 		// --report vitals-shape [--report-arg <capture-name-substring>]
 		//
-		// WHICH stat ids retail puts in a 0x96B8DC59 StatUpdateIIR, grouped by the RECORD SET the block carries and
-		// by whose handle it is on (#586). We send all six vitals ids - HpCur/HpMax/StamCur/StamMax/ManaCur/ManaMax -
+		// which stat ids retail puts in a 0x96B8DC59 StatUpdateIIR, grouped by the record set the block carries and
+		// by whose handle it is on. We send all six vitals ids - HpCur/HpMax/StamCur/StamMax/ManaCur/ManaMax -
 		// for every entity; the claim this measures is that retail sends only the three CURRENTS on a non-player
 		// handle, and six only on the player's own.
 		//

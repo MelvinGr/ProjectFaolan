@@ -7,47 +7,55 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// The server-INITIATED BehaviorControlCenterIIR forms, as VALUE factories over `BehaviorControlCenterIIR`.
-	//
-	// Not a codec: nothing here encodes or decodes: each method names one behaviour and returns the record for it, and
-	// `BehaviorControlCenterCodec.Build` is what turns it into bytes. That is the same treatment `MoveTaskNodes` got in
-	// wave 3, and for the same reason - these forms share parameter lists (`(uint actor, uint targetHandle, string
-	// remoteformat)` describes both the sit and the standup), so `Build` overloads could not tell them apart.
-	//
-	// Every animation's `args` share one protobuf shape: {f1 = animActionId, f3 = <p3>, f5 = 8, f6 = <p6>, then either
-	// an f10 target sub-message or an f11 scalar}. The animActionId indexes the client's animation-action table
-	// (spellweave trance 42041, chair-sit 42052, standup 42053 all sit in the same run). The tail is behaviour-specific.
+	/// <summary>
+	///     The server-initiated <see cref="BehaviorControlCenterIIR" /> forms, as value factories.
+	/// </summary>
+	/// <remarks>
+	///     Not a codec: nothing here encodes or decodes. Each method names one behaviour and returns the record for it, and
+	///     <see cref="BehaviorControlCenterCodec" />.Build turns it into bytes. They are factories rather than Build
+	///     overloads because the forms share parameter lists - <c>(uint actor, uint targetHandle, string remoteformat)</c>
+	///     describes both the sit and the standup - so an overload could not tell them apart.
+	///     <para>
+	///         Every animation's args share one protobuf shape: {f1 = animActionId, f3 = phase, f5 = 8, f6, then either an
+	///         f10 target sub-message or an f11 scalar}. The animActionId indexes the client's animation-action table
+	///         (spellweave trance 42041, chair-sit 42052 and standup 42053 all sit in the same run). The tail is
+	///         behaviour-specific.
+	///     </para>
+	/// </remarks>
 	public static class BehaviorAnimations
 	{
-		// World-object action animations - the actor plays a NAMED animation aimed at a target object, with a feedback
-		// remoteformat (decode_sit.py, path-of-azura sit-bench capture). BehaviorId.ObjectInteraction, seq begin; the
-		// anim string + blend constants below are byte-exact vs F2795 (sit) / F2840 (standup). animActionId sits beside
-		// the spellweave actions in the same table (42052/42053). Sitting on a bench is
-		// startobjectaction(33)|turnon_execute(4).
+		// World-object action animations - the actor plays a named animation aimed at a target object, with a feedback
+		// remoteformat (tools/capture/decode_sit.py, path-of-azura sit-bench capture). BehaviorId.ObjectInteraction,
+		// seq begin; the anim string and blend constants below are byte-exact against F2795 (sit) / F2840 (standup).
+		// Sitting on a bench is startobjectaction(33)|turnon_execute(4).
 
 		public const ushort SeqBegin = 0x0004;
 		public const ushort SeqComplete = 0x000A;
 
-		// The seq the trailing hold-assert uses (F2801); the leading hold-echo uses SeqBegin (F2793).
+		/// <summary>The seq the trailing hold-assert uses (F2801); the leading hold-echo uses SeqBegin (F2793).</summary>
 		public const ushort SeqObjectHold = 0x000F;
 
-		// NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
+		/// <summary>NPC animation acks are server-initiated, so the echoed sequence is constant, not a client seq.</summary>
 		private const ushort NpcAttackAckSeq = 0x0004;
 
 		private const uint IdleBehaviorAction = 41413; // the capture's `08 c5 c3 02` varint
 
-		// The search stance's `activation` word - 159 on both captured classes, so it is the record's constant and not
-		// the per-character part (that is the action id; see StartingData.SearchStanceAction).
+		/// <summary>
+		///     The search stance's activation word - 159 on both captured classes, so it is the record's constant rather than
+		///     the per-character part (that is the action id; see StartingData.SearchStanceAction).
+		/// </summary>
 		private const uint SearchActivation = 159;
 
-		// Entering hide is the one stance whose `flags` is not 8. Both captured classes send 10.
+		/// <summary>Entering hide is the one stance whose flags word is not 8. Both captured classes send 10.</summary>
 		private const uint SneakHideEnterFlags = 10;
 
-		// The GENERIC cast animation - shared by resting and the Path of Asura recall, so it says "this character is
-		// casting", not which spell. The spell is in the tail.
+		/// <summary>
+		///     The generic cast animation, shared by resting and the Path of Asura recall: it says "this character is
+		///     casting", not which spell. The spell is in the tail.
+		/// </summary>
 		private const uint RestCastAction = 177216;
 
-		// The `Resting` spell (3164147), and its cast time in centiseconds - the Spells row says 20,500 ms.
+		/// <summary>The Resting spell (3164147) and its cast time in centiseconds; the Spells row states 20,500 ms.</summary>
 		private const uint RestingSpell = 0x3047F3;
 		private const uint RestActivation = 2050;
 
@@ -58,49 +66,57 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private const uint SitAnimAction = 42052;
 		private const uint StandAnimAction = 42053;
 
-		// The achievement VISTA's object action (#780). It reuses the chair-sit animation ACTION id - the gesture is
-		// content, `social_item_accept_2`, and the action id only says which animation TABLE slot plays it - and its
-		// blend is the whole reason the camera does not start at once: retail's `StartClientSideScryScriptWithParams`
-		// lands 5.04 s after this record, i.e. when the gesture ends.
+		/// <summary>
+		///     The achievement vista's object action. It reuses the chair-sit animation action id - the gesture itself is
+		///     content (social_item_accept_2) and the action id only says which animation table slot plays it - and its blend
+		///     is why the camera does not start at once: retail's StartClientSideScryScriptWithParams lands 5.04 s after this
+		///     record, when the gesture ends.
+		/// </summary>
 		private const uint VistaAnimAction = SitAnimAction;
 		private const string VistaAnimName = "social_item_accept_2";
 
-		// How long that gesture runs - the record's blend, and therefore how long the camera start waits.
+		/// <summary>How long that gesture runs - the record's blend, and therefore how long the camera start waits.</summary>
 		public const float VistaGestureSeconds = 5.0f;
 		private const float VistaBlend = VistaGestureSeconds;
 
-		// The object class the vista remoteformat names - the client's own word for the mechanism (capture:
-		// startobjectaction(7)|interaction(2)|GenericAchievementVista).
+		/// <summary>
+		///     The object class the vista remoteformat names - the client's own word for the mechanism; retail sends
+		///     startobjectaction(7)|interaction(2)|GenericAchievementVista.
+		/// </summary>
 		private const string VistaObjectClass = "GenericAchievementVista";
 
-		// The caster's component-ADD gesture on each weave add - a begin/complete pair carrying the added element
-		// (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=SpellTarget{caster}},
-		// tail [1][element][0x01][0][0][0][completeFlag].
+		/// <summary>
+		///     The caster's component-add gesture on each weave add - a begin/complete pair carrying the added element
+		///     (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=Target{caster}}, tail
+		///     [1][element][0x01][0][0][0][completeFlag].
+		/// </summary>
 		private const uint SpellweaveAddAction = 186463;
 
-		// The caster's trance-EXIT animation on spellweave cancel/fire (cancel-weave capture, frame 141.61): behaviorId
-		// 1, args {f1=ExitAction, f3=6, f5=8, f6=0, f11=79}, tail [4][0x27][0][0][0]. Without it the buffs clear but
-		// the character stays stuck in the trance pose. Action params are capture-derived (necro).
+		/// <summary>
+		///     The caster's trance-exit animation on spellweave cancel/fire (cancel-weave capture, frame 141.61): behaviorId
+		///     1, args {f1=ExitAction, f3=6, f5=8, f6=0, f11=79}, tail [4][0x27][0][0][0]. Without it the buffs clear but the
+		///     character stays stuck in the trance pose. The action parameters are capture-derived (necromancer).
+		/// </summary>
 		private const uint SpellweaveExitAction = 41302;
 
-		// The caster's TRANCE-POSE animation on spellweave ACTIVATE (tools/capture/decode_spellweave.py frame 1645):
-		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, tail [0x27][1][0][0][0]. Without it the
-		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
+		/// <summary>
+		///     The caster's trance-pose animation on spellweave activate (tools/capture/decode_spellweave.py, frame 1645):
+		///     behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, tail [0x27][1][0][0][0]. Without it the
+		///     trance buffs render but the character stays idle. The action parameters are capture-derived (necromancer).
+		/// </summary>
 		private const uint SpellweaveTranceAction = 42041;
 
-		// The generic REGISTRATION form (#189/#234/#267): the header plus a `CommandMessage` naming the behaviour
-		// slot, its id and its phase, with an optional 20-byte "bound" tail. It is what the create-editor burst
-		// streams for every entity it brings into play, and what a scripted NPC pose (Casilda's captive/freed) rides.
-		//
-		// protobuf-net omits an unset optional and emits fields in ascending number order, so the optional
-		// f2/f4/f11/f12 land exactly where the hand-written writer used to put them. `form` is the wire SEQ: 0x0004
-		// for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint, between phase and
-		// field5). The bound tail (`[u32 boundA][u32 boundB][12 x 00]`) is decoded in
-		// tools/capture/decode_behaviorcc.py.
-		//
-		// Lived as `CreateEditorRecordBuilder.Bcc` until #530 wave 7, which is why the Casilda pose in `Faolan/` had to
-		// re-prepend the sub-opcode by hand: the only way to reach it was through a helper that had already sliced it
-		// off for the burst.
+		/// <summary>
+		///     The generic registration form: the header plus a <see cref="CommandMessage" /> naming the behaviour slot, its
+		///     id and its phase, with an optional 20-byte "bound" tail. It is what the create-editor burst streams for every
+		///     entity it brings into play, and what a scripted NPC pose (Casilda's captive/freed) rides.
+		/// </summary>
+		/// <remarks>
+		///     protobuf-net omits an unset optional and emits fields in ascending number order, so the optional
+		///     f2/f4/f11/f12 land where retail puts them. <paramref name="form" /> is the wire seq: 0x0004 for the common
+		///     registration, while the rarer 0x0007 subtype adds protobuf field 4 (a varint between phase and field 5). The
+		///     bound tail ([u32 boundA][u32 boundB][12 x 00]) is decoded in tools/capture/decode_behaviorcc.py.
+		/// </remarks>
 		public static BehaviorControlCenterIIR Registration(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint? field2 = null, uint? field4 = null,
 			uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = SeqBegin)
 		{
@@ -130,21 +146,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(handle, form, slot, message.ToProtobuf(), tail);
 		}
 
-		// The COMPANION-LOCOMOTION registration retail installs on a freed escortee (#827) - the slot-9 behaviour that
-		// lets her WALK, with the full 88-byte behaviour-state tail rather than the short bound form.
-		//
-		// ⚠️ Sending the SHORT form is what left Casilda sliding through a standing animation for three rounds of
-		// fixes: the movement packets were retail-exact and arriving, and the behaviour that animates them was being
-		// registered with a truncated tail. Retail's record (Hoxxling_..._login_gameplay idx 2106, 124 bytes) carries:
-		//
-		//   [u32 0x12][u32 0] + five more zero words   28 bytes - the short bound tail is only its first 20
-		//   6 x NullIdentity.Pair                      48 bytes - the doubled unset-identity sentinel
-		//   [u32 1][u32 1][u32 1]                      12 bytes - the state triple the create-world companion form
-		//                                                         also carries (the comment on ItemRegistration notes
-		//                                                         it as "a small state pair (e.g. 0,1,1)")
-		//
-		// NOT built through `ItemRegistration`: that form binds a behaviour to an EQUIPPED ITEM and wants a handle, a
-		// 4-char tag and two transforms, none of which this record has. Same length family, different record.
+		/// <summary>
+		///     The companion-locomotion registration retail installs on a freed escortee: the slot-9 behaviour that lets her
+		///     walk, carrying the full 88-byte behaviour-state tail rather than the short bound form.
+		/// </summary>
+		/// <remarks>
+		///     The short bound tail is not enough here - the escortee then slides through a standing animation however exact
+		///     the movement packets are. Retail's record (Hoxxling_..._login_gameplay idx 2106, 124 bytes) carries:
+		///     <code>
+		///     [u32 0x12][u32 0] + five more zero words   28 bytes - the short bound tail is only its first 20
+		///     6 x NullIdentity.Pair                      48 bytes - the doubled unset-identity sentinel
+		///     [u32 1][u32 1][u32 1]                      12 bytes - the state triple the create-world companion form
+		///                                                           also carries
+		///     </code>
+		///     It is deliberately not built through <see cref="ItemRegistration" />: that form binds a behaviour to an
+		///     equipped item and wants a handle, a 4-char tag and two transforms, none of which this record has. Same length
+		///     family, different record.
+		/// </remarks>
 		public static BehaviorControlCenterIIR CompanionLocomotion(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6)
 		{
 			var message = new CommandMessage
@@ -164,18 +182,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(handle, SeqBegin, slot, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// The LONG (116-byte) registration: the same head as `Registration` plus an 88-byte behaviour-state tail that
-		// binds the behaviour to an EQUIPPED ITEM (the three records in the WorldPrep stream each pair with one of that
-		// burst's DispatchAddItem equipment pieces - the item's handle, its 4-char entity tag and its transform all
-		// match):
-		//   [u32 index][u32 someId][u32 itemHandle][u32 itemHandle][u32 0][u32 1][char[4] tag]
-		//   [byte[16] transform][byte[16] transform][8-byte ownerStamp][8-byte ownerStamp][12 zero bytes]
-		// The item handle + 4-char tag are repeated; the 16-byte transform is the item's pose packed as four
-		// big-endian u32 (the same x/y/z + rotation values the paired DispatchAddItem carries as fixed32 protobuf
-		// fields), also repeated; `ownerStamp` (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
-		// recurs across the whole WorldPrep burst (semantics unpinned). The trailing 3 u32 are 0 in the WorldPrep
-		// equipment records but carry a small state pair (e.g. 0,1,1) in the create-world cutscene's mount/companion
-		// long form. Decoded from WorldPrepBurst.bin by tools/capture/decode_create_iir_records.py.
+		/// <summary>
+		///     The long (116-byte) registration: the same head as <see cref="Registration" /> plus an 88-byte behaviour-state
+		///     tail that binds the behaviour to an equipped item. The three records in the WorldPrep stream each pair with one
+		///     of that burst's DispatchAddItem equipment pieces - item handle, 4-char entity tag and transform all match.
+		///     <code>
+		///     [u32 index][u32 someId][u32 itemHandle][u32 itemHandle][u32 0][u32 1][char[4] tag]
+		///     [byte[16] transform][byte[16] transform][8-byte ownerStamp][8-byte ownerStamp][12 zero bytes]
+		///     </code>
+		/// </summary>
+		/// <remarks>
+		///     The item handle and 4-char tag are repeated; the 16-byte transform is the item's pose packed as four
+		///     big-endian u32 (the same x/y/z and rotation values the paired DispatchAddItem carries as fixed32 protobuf
+		///     fields), also repeated. <c>ownerStamp</c> (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
+		///     recurs across the whole WorldPrep burst; its semantics are unpinned. The trailing three u32 are 0 in the
+		///     WorldPrep equipment records and carry a small state triple (0, 1, 1) in the create-world cutscene's
+		///     mount/companion long form. Decoded from WorldPrepBurst.bin by tools/capture/decode_create_iir_records.py.
+		/// </remarks>
 		public static BehaviorControlCenterIIR ItemRegistration(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag,
 			byte[] transform, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
 		{
@@ -205,11 +228,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return Registration(handle, slot, behaviorId, phase, field5, field6) with { Tail = itemTail.ToArray() };
 		}
 
-		// The object-action STATE record (behaviorId 0x12) that HOLDS the player in the seated pose. The sit ANIMATION
-		// (PlayerSitOnObject) alone plays the sit-down transition then reverts to idle; retail brackets it with this
-		// state record (F2793 seq=SeqBegin BEFORE the animation, F2801 seq=SeqObjectHold AFTER) so the client commits to
-		// "using" the bench and stays seated until standup. f10 targets the PLAYER; the tail = [objectClass][objectHandle]
-		// [action]. Byte-exact vs F2793 / F2801.
+		/// <summary>
+		///     The object-action state record (behaviorId 0x12) that holds the player in the seated pose.
+		/// </summary>
+		/// <remarks>
+		///     The sit animation (<see cref="PlayerSitOnObject" />) on its own plays the sit-down transition and then reverts
+		///     to idle. Retail brackets it with this state record - F2793 at SeqBegin before the animation, F2801 at
+		///     <see cref="SeqObjectHold" /> after it - so the client commits to using the bench and stays seated until
+		///     standup. Field 10 targets the player; the tail is [objectClass][objectHandle][action]. Byte-exact against
+		///     F2793 / F2801.
+		/// </remarks>
 		public static BehaviorControlCenterIIR BenchSitState(uint actor, ushort seq, uint benchHandle)
 		{
 			var args = new CommandMessage
@@ -227,16 +255,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, seq, (uint)BehaviorId.UseDynel, args, tail.ToArray());
 		}
 
-		// The short-form "this entity is alive and idling" assert (#225): `BehaviorId.BccAction` carrying the one fixed
-		// idle animation and nothing else. It is what starts a standing creature's IDLE animation instead of leaving it
-		// frozen on its spawn pose. Decoded byte-exact from the mount capture (frame 105); `tick` is the per-actor
-		// `commandqueue_server_id`, which steps by 1 (29,246 of 29,996 captured steps), so the args length grows as its
-		// varint widens.
-		//
-		// ⚠️ It is NOT a heartbeat, however long this codebase treated it as one. Measured over the corpus's 37,965
-		// captured records (`--report ambient-animation`): 7,969 actors, and the records per actor are p50 **1**, p90 2.
-		// Retail asserts it once as an entity comes into view and then leaves it alone. What actually recurs is
-		// `AmbientEmote` below - a different command, with a different animation every time.
+		/// <summary>
+		///     The short-form "this entity is alive and idling" assert: <c>BehaviorId.BccAction</c> carrying the one fixed
+		///     idle animation and nothing else. It starts a standing creature's idle animation instead of leaving it frozen on
+		///     its spawn pose. Byte-exact against the mount capture (frame 105); <paramref name="tick" /> is the per-actor
+		///     commandqueue_server_id, which steps by 1 (29,246 of 29,996 captured steps), so the args length grows as its
+		///     varint widens.
+		/// </summary>
+		/// <remarks>
+		///     Despite the name this is not periodic: over the corpus's 37,965 captured records (--report ambient-animation)
+		///     across 7,969 actors, the records per actor are p50 1 and p90 2. Retail asserts it once as an entity comes into
+		///     view and then leaves it alone. The record that recurs is <see cref="AmbientEmote" />, a different command with
+		///     a different animation each time.
+		/// </remarks>
 		public static BehaviorControlCenterIIR Heartbeat(uint actor, uint tick)
 		{
 			var args = new CommandMessage
@@ -250,20 +281,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, NpcAttackAckSeq, (uint)BehaviorId.BccAction, args, []);
 		}
 
-		// The AMBIENT ANIMATION (#766): a standing NPC plays a random one of its creature's idle behaviours - a citizen
-		// leaning on a wall, scratching, looking round - as a `BehaviorId.Emote` with NO tail. This is what makes a
-		// street look inhabited rather than populated by statues, and it is the recurring ambient record retail
-		// actually sends: 25,778 captured over 2,909 actors, p50 3 records each (p90 15).
-		//
-		// `durationCentiseconds` is the animation's own length, and the client is told it: `activation_time` (field 12)
-		// is on 25,562 of the 25,778, and 76 of the 118 animation ids state exactly ONE value for it - the duration
-		// belongs to the ANIMATION, which is why it is stored beside the animation id rather than decided per send.
-		//
-		// The next ambient animation is scheduled for after this one FINISHES: over 22,696 consecutive pairs, the gap
-		// divided by the previous record's `activation_time`-as-centiseconds has p10 exactly 1.0 and falls below 0.9
-		// on 121 (0.5%). The creature then STANDS for a while - p10 0.1s, p50 2.2s, p90 19.0s - and plays another.
-		//
-		// Byte-exact against frame 90 of `NecroL80_..._chat-annotated-3` (actor 0x000304ED, animation 42115, 3580cs).
+		/// <summary>
+		///     The ambient animation: a standing NPC plays a random one of its creature's idle behaviours - leaning on a wall,
+		///     scratching, looking round - as a <c>BehaviorId.Emote</c> with no tail. It is the recurring ambient record retail
+		///     sends: 25,778 captured over 2,909 actors, p50 3 records each (p90 15). Byte-exact against frame 90 of
+		///     NecroL80_..._chat-annotated-3 (actor 0x000304ED, animation 42115, 3580cs).
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="durationCentiseconds" /> is the animation's own length and the client is told it:
+		///     activation_time (field 12) is present on 25,562 of the 25,778 records, and 76 of the 118 animation ids state
+		///     exactly one value for it. The duration belongs to the animation, which is why it is stored beside the animation
+		///     id rather than decided per send.
+		///     <para>
+		///         The next ambient animation is scheduled for after this one finishes: over 22,696 consecutive pairs the gap
+		///         divided by the previous record's activation_time has p10 exactly 1.0 and falls below 0.9 on 121 (0.5%). The
+		///         creature then stands for a while - p10 0.1 s, p50 2.2 s, p90 19.0 s - and plays another.
+		///     </para>
+		/// </remarks>
 		public static BehaviorControlCenterIIR AmbientEmote(uint actor, uint animationId, uint tick, uint durationCentiseconds)
 		{
 			var args = new CommandMessage
@@ -278,50 +312,57 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.Emote, args, []);
 		}
 
-		// The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/subsystems/combat.md, was
-		// undecoded). Structurally the SAME record as the player's targeted-hit attack ack, but the roles are SWAPPED -
-		// top-level actor = the NPC, args.Target + the result-block target = the player it hit - and the args carry NO
-		// Mode field (the player-only distinguisher). Sending it makes the client play the NPC's swing animation + the
-		// player's hit-react. The damage here is the floating combat number; the authoritative HP move still rides the
-		// world-tick StatUpdate (kept separate so we don't double-apply).
-		// Decoded in tools/capture/decode_combat_npc_ack.py (98/98 frames); byte-exact against frame 6472 of the strickenbla
-		// capture. The animation params (typeId/swingCounter/f5/f11/f12) + the result codes (resultType/resultK1/resultK2)
-		// are not semantically decoded - capture-typical defaults for the live send, the exact captured values for the golden.
-		//
-		// `comboId` (#623) is the `Combos` row this swing performs, 0 for a plain one. Retail puts it in the SAME
-		// `combo_id` field a player's own combo swing uses - 427 of the 1,504 captured NPC melee acks carry one -
-		// and never a `combo_attack_num` beyond the implicit 0, because an NPC combo is a single `action` marker
-		// with no key sequence to step through (`--report combo-swings`).
+		/// <summary>
+		///     The NPC counter-attack animation ack - see docs/subsystems/combat.md. Structurally the same record as the
+		///     player's targeted-hit attack ack with the roles swapped: the top-level actor is the NPC, args.Target and the
+		///     result-block target are the player it hit, and the args carry no Mode field (that one is player-only, and is
+		///     the NPC-vs-player tell). Sending it makes the client play the NPC's swing animation and the player's hit-react.
+		/// </summary>
+		/// <remarks>
+		///     The damage here is the floating combat number only; the authoritative HP move rides the world-tick StatUpdate,
+		///     kept separate so it is not applied twice. Decoded in tools/capture/decode_combat_npc_ack.py (98/98 frames) and
+		///     byte-exact against frame 6472 of the strickenbla capture. The animation parameters
+		///     (typeId/swingCounter/f5/f11/f12) and the result codes (resultType/resultK1/resultK2) are not semantically
+		///     decoded: the defaults are capture-typical values for the live send, and the goldens pin the exact captured ones.
+		///     <para>
+		///         <paramref name="comboId" /> is the Combos row this swing performs, 0 for a plain swing. Retail puts it in
+		///         the same combo_id field a player's own combo swing uses - 427 of the 1,504 captured NPC melee acks carry one
+		///         - and never a combo_attack_num beyond the implicit 0, because an NPC combo is a single action marker with no
+		///         key sequence to step through (--report combo-swings).
+		///     </para>
+		/// </remarks>
 		public static BehaviorControlCenterIIR NpcAttackAck(uint npcHandle, uint playerHandle, uint damage, uint typeId, uint swingCounter, uint f5 = 24, uint f11 = 64, uint f12 = 56,
 			byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, uint comboId = 0)
 		{
 			return NpcAttackAck(npcHandle, playerHandle, damage, typeId, swingCounter, NpcAttackAckSeq, BehaviorId.CombatMelee, f5, f11, f12, resultType, resultK1, resultK2, comboId);
 		}
 
-		// The BEHAVIOUR a shot rides on, and the two phases of one (#676).
-		//
-		// A ranged NPC's swing is `Combat:Ranged` (0x10), not `Combat:Melee` - a different behaviour id, one extra
-		// trailing byte on the result block, and TWO records per shot rather than one: a BEGIN at seq 0x0004 and a
-		// COMPLETE at seq 0x000A, which the corpus sends in near-equal numbers (212 / 196 over 424 records) carrying
-		// the SAME swing counter, the same combo id and a byte-identical tail. Melee has no such pair - its 2,117
-		// records are seq 0x0004 on 1,957 of them and it carries no complete.
-		//
-		// ⚠️ The complete may also carry `anim_random` (field 4), and we do not send it: it is on only 26 of the 196
-		// captured completes, so omitting it is sending a subset of what retail sends rather than inventing a value.
+		/// <summary>
+		///     The two phases of a ranged shot. A ranged NPC's swing is Combat:Ranged (0x10), not Combat:Melee: a different
+		///     behaviour id, one extra trailing byte on the result block, and two records per shot rather than one - a begin
+		///     at seq 0x0004 and a complete at seq 0x000A, which the corpus sends in near-equal numbers (212 / 196 over 424
+		///     records) carrying the same swing counter, the same combo id and a byte-identical tail. Melee has no such pair:
+		///     1,957 of its 2,117 records are seq 0x0004 and it sends no complete.
+		/// </summary>
+		/// <remarks>
+		///     The complete may also carry anim_random (field 4). We omit it deliberately - it is on only 26 of the 196
+		///     captured completes, so leaving it out sends a subset of retail rather than an invented value.
+		/// </remarks>
 		public const ushort RangedBeginSeq = 0x0004;
 		public const ushort RangedCompleteSeq = 0x000A;
 
-		// The `bcc_action_id` a ranged NPC shot names, the ranged twin of melee's 0xBEEC. The corpus clusters it at
-		// 77813-77817 with the same per-NPC jitter melee shows, and 77817 is the modal value (146 of 424).
+		/// <summary>
+		///     The bcc_action_id a ranged NPC shot names, the ranged twin of melee's 0xBEEC. The corpus clusters it at
+		///     77813-77817 with the same per-NPC jitter melee shows; 77817 is the modal value (146 of 424).
+		/// </summary>
 		public const uint NpcShotBehaviorType = 77817;
 
 		public static BehaviorControlCenterIIR NpcAttackAck(uint npcHandle, uint playerHandle, uint damage, uint typeId, uint swingCounter, ushort sequence, BehaviorId behavior, uint f5 = 24,
 			uint f11 = 64, uint f12 = 56, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, uint comboId = 0)
 		{
 			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f7=combo, f10=Target{f1=0xC350, f2=player}, f11, f12}.
-			// NO f2/Mode - that field is present only on player-initiated actions and is the NPC-vs-player tell.
-			// CommandMessage field 10 is the TARGET - a ProtoID32 { type, instance }, not the "spell target" the old
-			// hand-reconstructed schema called it: its first word is an entity class (Gitea #387).
+			// No f2/Mode: that field is present only on player-initiated actions. CommandMessage field 10 is the target,
+			// a ProtoID32 { type, instance } whose first word is an entity class.
 			var message = new CommandMessage
 			{
 				BccActionId = typeId,
@@ -337,48 +378,57 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			var args = message.ToProtobuf();
 
-			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 81 bytes with the roles
-			// swapped, and it was written out in both files until #530 wave 7. A ranged shot's block closes with one
-			// extra 0x00, which is the only thing that differs (#676).
+			// The result block is BehaviorAcks': the player's targeted-hit ack sends the same 81 bytes with the roles
+			// swapped. A ranged shot's block closes with one extra 0x00, the only difference between the two.
 			var ranged = behavior == BehaviorId.CombatRanged;
 			return new BehaviorControlCenterIIR(npcHandle, sequence, (uint)behavior, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2, ranged));
 		}
 
-		// Sit the actor on a world object (a bench): plays "chair_sit_calm" aimed at the object. `remoteformat` is the
-		// object-action feedback descriptor (SitRemoteformat, or a captured literal in tests). Byte-exact vs F2795.
+		/// <summary>
+		///     Sits the actor on a world object (a bench): plays "chair_sit_calm" aimed at the object.
+		///     <paramref name="remoteformat" /> is the object-action feedback descriptor (<see cref="SitRemoteformat" />, or a
+		///     captured literal in tests). Byte-exact against F2795.
+		/// </summary>
 		public static BehaviorControlCenterIIR PlayerSitOnObject(uint actor, uint targetHandle, string remoteformat)
 		{
 			return ObjectActionAnimation(actor, SitAnimAction, 10, 0, EntityClass.SimpleDynel, targetHandle, SitAnimName, 2, 0x86, SitBlend, remoteformat, 0x4C);
 		}
 
-		// Stand the actor back up. Sent in answer to the CLIENT's standup request (behaviour 1, phase 2) - not inferred
-		// from movement, which is what we used to do; see the behaviour-1 branch in GameServerListener.Inbound.
-		// Byte-exact vs F2840.
+		/// <summary>
+		///     Stands the actor back up, in answer to the client's standup request (behaviour 1, phase 2) rather than inferred
+		///     from movement; see the behaviour-1 branch in GameServerListener.Inbound. Byte-exact against F2840.
+		/// </summary>
 		public static BehaviorControlCenterIIR PlayerStandUp(uint actor, uint targetHandle, string remoteformat)
 		{
 			return ObjectActionAnimation(actor, StandAnimAction, 12, 20, EntityClass.SimpleDynel, targetHandle, StandAnimName, 0, 0, 0f, remoteformat, 0x01);
 		}
 
-		// The sit feedback remoteformat: token = startobjectaction(33)|turnon_execute(4)|<objectClass>, category 50026,
-		// key = the object's localized action key ("" when we haven't imported it - the key drives the subtitle lookup,
-		// not the animation).
+		/// <summary>
+		///     The sit feedback remoteformat: token startobjectaction(33)|turnon_execute(4)|&lt;objectClass&gt;, category
+		///     50026, and the object's localized action key. The key is empty when it has not been imported; it drives the
+		///     subtitle lookup, not the animation.
+		/// </summary>
 		public static string SitRemoteformat(string objectClass, string key = "")
 		{
 			return $"<remoteformat token=\"startobjectaction(33)|turnon_execute(4)|{objectClass}\" category=\"50026\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
 		}
 
-		// The achievement VISTA's object action (#780): the player plays a five-second "accept" gesture at the
-		// viewpoint, and the camera fly-through starts when it ends. Same record as the bench sit - it is the same
-		// `startobjectaction` mechanism - with the vista's own animation, phase and blend. Byte-exact vs f4029.
+		/// <summary>
+		///     The achievement vista's object action: the player plays a five-second "accept" gesture at the viewpoint and the
+		///     camera fly-through starts when it ends. The same record as the bench sit - the same startobjectaction mechanism
+		///     - with the vista's own animation, phase and blend. Byte-exact against f4029.
+		/// </summary>
 		public static BehaviorControlCenterIIR PlayerViewVista(uint actor, uint targetHandle, string remoteformat)
 		{
 			return ObjectActionAnimation(actor, VistaAnimAction, 5, 0, EntityClass.SimpleDynel, targetHandle, VistaAnimName, 2, 0, VistaBlend, remoteformat, 0x01);
 		}
 
-		// The vista feedback remoteformat. The CLIENT names the mechanism here - `GenericAchievementVista` - which is
-		// what says retail has a content PATTERN for viewpoints rather than one scripted object. `actionIndex` is the
-		// object's own action slot and appears twice, in the token and as the record's one string parameter; `key` is
-		// the localized action key, empty for the same reason as the sit's.
+		/// <summary>
+		///     The vista feedback remoteformat. The client names the mechanism itself - GenericAchievementVista - so retail
+		///     has a content pattern for viewpoints rather than one scripted object. <paramref name="actionIndex" /> is the
+		///     object's own action slot and appears twice, in the token and as the record's one string parameter;
+		///     <paramref name="key" /> is the localized action key, empty for the same reason as the sit's.
+		/// </summary>
 		public static string VistaRemoteformat(uint actionIndex, string key = "")
 		{
 			return $"<remoteformat token=\"startobjectaction({actionIndex})|interaction(2)|{VistaObjectClass}\" category=\"50026\" key=\"{key}\" knubot=\"0\"  >" +
@@ -420,11 +470,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(caster, SeqBegin, 1, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// The SEARCH stance (#505), retail's answer to `PerformSpecialAction` 0x064. Slot `BehaviorId.Search`, form 4,
-		// flags 8, `activation` 159 - identical on both captured classes, which is why only `animActionId` is a
-		// parameter (`StartingData.SearchStanceAction`). The five-byte tail is zero in every capture but one, where
-		// its FIRST byte is 1; that byte is passed rather than pinned, since one differing sighting is not a constant.
-		// [necro f15625 / f2898, hox f3461]
+		/// <summary>
+		///     The search stance, retail's answer to PerformSpecialAction 0x064: slot BehaviorId.Search, form 4, flags 8,
+		///     activation 159. All of that is identical on both captured classes, which is why only
+		///     <paramref name="animActionId" /> is a parameter (StartingData.SearchStanceAction). The five-byte tail is zero
+		///     in every capture but one, where its first byte is 1; that byte is a parameter rather than a constant, since one
+		///     differing sighting does not pin it. [necro f15625 / f2898, hox f3461]
+		/// </summary>
 		public static BehaviorControlCenterIIR SearchStance(uint actor, uint animActionId, uint phase, byte lead = 0)
 		{
 			var message = ArgsPrefix(animActionId, phase, 0);
@@ -436,12 +488,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.Search, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// ENTERING hide (#505), retail's answer to `PerformSpecialAction` 0x068. Slot `BehaviorId.SneakHide`, form 4,
-		// and - unlike every other stance here - `flags` 10 rather than 8, with the client's own command id echoed
-		// back in `CommandqueueClientId`. The four-byte tail is the SHADOW COVERAGE the client just reported in its
-		// SetShadowCoverageIIR (100 in every observation, hence a parameter rather than a constant: the client
-		// computes it from local lighting, which is the whole reason it is the one that sends it).
-		// [necro f830 / f15643, hox f3420]
+		/// <summary>
+		///     Entering hide, retail's answer to PerformSpecialAction 0x068: slot BehaviorId.SneakHide, form 4, and - unlike
+		///     every other stance here - flags 10 rather than 8, with the client's own command id echoed back in
+		///     CommandqueueClientId. The four-byte tail is the shadow coverage the client just reported in its
+		///     SetShadowCoverageIIR: 100 in every observation, but a parameter rather than a constant because the client
+		///     computes it from local lighting. [necro f830 / f15643, hox f3420]
+		/// </summary>
 		public static BehaviorControlCenterIIR SneakHideEnter(uint actor, uint animActionId, uint phase, uint clientCommandId, uint shadowCoverage)
 		{
 			var message = ArgsPrefix(animActionId, phase, 0);
@@ -454,10 +507,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.SneakHide, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// LEAVING hide (#505). Same slot as the enter, but back to `flags` 8 with no client command id, an eight-byte
-		// zero tail, and - the part worth noticing - an action id that is NOT class-specific: both captured characters
-		// exit with `StartingData.SneakHideExitAction`. The enter animation is the character's own sneak pose; the
-		// exit is the shared stand-up. [necro f843 / f15660, hox f3452]
+		/// <summary>
+		///     Leaving hide: the same slot as the enter, but back to flags 8 with no client command id and an eight-byte zero
+		///     tail. The action id is not class-specific - both captured characters exit with
+		///     StartingData.SneakHideExitAction - because the enter animation is the character's own sneak pose while the exit
+		///     is the shared stand-up. [necro f843 / f15660, hox f3452]
+		/// </summary>
 		public static BehaviorControlCenterIIR SneakHideExit(uint actor, uint animActionId, uint phase)
 		{
 			var message = ArgsPrefix(animActionId, phase, 0);
@@ -465,17 +520,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.SneakHide, message.ToProtobuf(), new byte[8]);
 		}
 
-		// RESTING (#505), retail's answer to `PerformSpecialAction` 0x06A. It is not a stance record like search or
-		// hide at all - it is a self-CAST of the spell the client calls `Resting` ("Recovering health, mana, energy,
-		// and stamina"), which is why it rides slot 4 `MagicAttack` with a spell target and a cast time.
-		//
-		// Two things make this the most solidly evidenced action on the page, not the least:
-		//   - `RestCastAction` (177216) is the GENERIC cast animation, shared with the Path of Asura recall, so it is
-		//     neither class- nor spell-specific. Six sightings across five captures and four characters, necromancer
-		//     and Herald of Xotli alike, all carry it.
-		//   - `activation` 2050 is not a magic number: it is the `Resting` spell row's own 20,500 ms cast time in
-		//     centiseconds, which is what the whole args block is saying - "this character is casting Resting".
-		// The 22-byte tail is byte-identical in every sighting and carries the wire spell id (base << 8 | rank).
+		/// <summary>
+		///     Resting, retail's answer to PerformSpecialAction 0x06A. It is not a stance record like search or hide: it is a
+		///     self-cast of the spell the client calls Resting ("Recovering health, mana, energy, and stamina"), which is why
+		///     it rides slot 4 MagicAttack with a spell target and a cast time.
+		/// </summary>
+		/// <remarks>
+		///     RestCastAction (177216) is the generic cast animation, shared with the Path of Asura recall, so it is neither
+		///     class- nor spell-specific; six sightings across five captures and four characters, necromancer and Herald of
+		///     Xotli alike, all carry it. The activation word 2050 is the Resting spell row's own 20,500 ms cast time in
+		///     centiseconds. The 22-byte tail is byte-identical in every sighting and carries the wire spell id
+		///     (base &lt;&lt; 8 | rank).
+		/// </remarks>
 		public static BehaviorControlCenterIIR RestCast(uint actor, uint phase)
 		{
 			var message = ArgsPrefix(RestCastAction, phase, 0);
@@ -488,14 +544,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, SeqBegin, 4, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// The standup feedback remoteformat: shows "Standing up" as the on-screen feedback.
+		/// <summary>The standup feedback remoteformat: shows "Standing up" as the on-screen feedback.</summary>
 		public static string StandRemoteformat()
 		{
 			return "<remoteformat id=\"0\" category=\"0\" key=\"\" knubot=\"0\"  ><parameter value=\"7;Standing up\" /></remoteformat>";
 		}
 
-		// The args every animation shares: a CommandMessage {bcc_action_id, commandqueue_server_id, flags=8,
-		// execution_status}. Callers set Target (field 10) or RechargeTime (field 11) before serializing.
+		/// <summary>
+		///     The args every animation shares: a CommandMessage {bcc_action_id, commandqueue_server_id, flags=8,
+		///     execution_status}. Callers set Target (field 10) or RechargeTime (field 11) before serializing.
+		/// </summary>
 		private static CommandMessage ArgsPrefix(uint animActionId, uint p3, uint p6)
 		{
 			return new CommandMessage
@@ -507,8 +565,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 			};
 		}
 
-		// A world-object action animation: the actor plays `animName` aimed at a target object, carrying a feedback
-		// remoteformat. tail = [u32 a][u16 nameLen][animName][u32 b][f32 blend][4x00][u16 rfLen][remoteformat][u32 trailer].
+		/// <summary>
+		///     A world-object action animation: the actor plays <paramref name="animName" /> aimed at a target object,
+		///     carrying a feedback remoteformat. The tail is
+		///     [u32 a][u16 nameLen][animName][u32 b][f32 blend][4x00][u16 rfLen][remoteformat][u32 trailer].
+		/// </summary>
 		private static BehaviorControlCenterIIR ObjectActionAnimation(uint actor, uint animActionId, uint p3, uint p6, uint targetClass, uint targetHandle, string animName, uint tailA,
 			uint tailB, float blend, string remoteformat, uint trailer)
 		{
@@ -522,24 +583,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(tailB)
 				.WriteFloat(blend)
 				.WriteArray(new byte[4])
-				// The remoteformat is a LENGTH-PREFIXED string, exactly like animName above - not a "flag" byte followed
-				// by loose text, which is how this used to be written. The two captured records prove it: the sit's
-				// prefix is 0xAA (170) and its string is 170 bytes, the standup's is 0x84 (132) for a 132-byte string.
-				// Those lengths were baked in as constants, so every GENERATED remoteformat (ours differ from the capture's
-				// - we emit key="" until the object's localized action key is imported) shipped a prefix that overstated
-				// the string. The client then read past the end and dropped the whole record:
-				//   "Figos ID 0 sent a too short IIR UNKNOWN Key) ... datasize left in stream=141, raw=217"
-				// which is why sitting on a bench played nothing and the character stood straight back up.
-				// WriteString emits [u16 len][latin1], and 4 zeros + a u16 length is byte-identical to the 5 zeros + u8
-				// this replaces for any string under 256 bytes - so the captured goldens still match to the byte.
+				// The remoteformat is a length-prefixed string, exactly like animName above, and the prefix must be
+				// computed from the string actually sent: a generated remoteformat differs in length from the captured
+				// one (we emit key="" until the object's localized action key is imported), and a prefix that overstates
+				// the string makes the client read past the end and drop the whole record ("Figos ID 0 sent a too short
+				// IIR UNKNOWN Key) ... datasize left in stream=141"). The two captured records pin the encoding: the
+				// sit's prefix is 0xAA (170) for a 170-byte string, the standup's 0x84 (132) for a 132-byte one.
 				.WriteString(remoteformat)
 				.WriteUInt32(trailer);
 
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.ObjectInteraction, message.ToProtobuf(), tail.ToArray());
 		}
 
-		// Field 10 - who/what the animation is aimed at. A ProtoID32 { type, instance }; the old model called it a
-		// "spell target" with a spell_id first word, which it never was (Gitea #387).
+		/// <summary>Field 10 - who or what the animation is aimed at, as a ProtoID32 { type, instance }.</summary>
 		private static ProtoID32 Target(uint entityClass, uint instance)
 		{
 			return new ProtoID32

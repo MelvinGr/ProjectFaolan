@@ -9,40 +9,40 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// Property-table field 128: the spell's LINE id, shared by all its ranks.
+		// Property-table field 128: the spell's line id, shared by all its ranks.
 		private const uint SpellLineField = 128;
 
 		// Property-table field 132: the mana cost, in whichever of its two modes the (undecoded) flag selects - see
 		// SpellManaMode and RdbSpellImporter.ManaCostField.
 		private const uint SpellManaCostField = 132;
 
-		// Byte 52 of a spell record - word 13, the FLAGS word, and the one the client keeps at `spell + 0xC8` (#630).
+		// Byte 52 of a spell record - word 13, the FLAGS word, and the one the client keeps at `spell + 0xC8`.
 		// Its bit 2 is what picks a percent-of-pool mana cost over a flat one.
 		private const int SpellFlagsWordOffset = 52;
 
 		// --report spell-line-ids [--report-arg <lineId>]
 		//
-		// The SPELL-LINE id every spell template carries in property-table field 128 (#590). It is what a feat's
+		// The spell-line id every spell template carries in property-table field 128. It is what a feat's
 		// modifier record references: `Decomposition` points at 41000 and `Flesh to Worms` carries 41000, so a feat's
 		// "+35% on Flesh to Worms" resolves through this and nothing else.
 		//
 		// The id is `ConanClass x 1000 + lineIndex` - Necromancer (41) owns 41000 Flesh to Worms, 41001 Pestilential
-		// Blast, 41005 Ice Strike - which is why the same line id is shared by every RANK of a spell, and why a feat
+		// Blast, 41005 Ice Strike - which is why the same line id is shared by every rank of a spell, and why a feat
 		// can name a spell without naming a rank.
 		//
 		// --report spell-mana-mode [--report-arg <threshold>]   (default threshold 100)
 		//
-		// #630: the client reads spell field 132 (the mana cost) in TWO modes - a percentage of the caster's mana
+		// the client reads spell field 132 (the mana cost) in two modes - a percentage of the caster's mana
 		// pool, or an absolute cost in wire hundredths - and picks between them with bit 2 of a flag word on the
 		// loaded spell object (`*(uint*)(spell + 0xC8) >> 2 & 1`, FUN_008d6f70). What FILLS that word is unknown, so
 		// `CombatResolver.ResolveSpellManaCost` picks the mode by MAGNITUDE instead: <= 100 is a percent.
 		//
-		// This asks the catalog whether any OTHER field determines the same split. For every field F the record
+		// This asks the catalog whether any other field determines the same split. For every field F the record
 		// carries, it buckets the records by F's value and measures how PURE each bucket is with respect to the
-		// percent/flat class. A field that IS the flag (or that carries it) partitions perfectly: every one of its
+		// percent/flat class. A field that is the flag (or that carries it) partitions perfectly: every one of its
 		// values sees only percents or only flats. Ranked by purity, so a partial signal is visible too.
 		//
-		// ⚠️ The class comes from the heuristic being tested, so this cannot CONFIRM the heuristic - only find a field
+		// The class comes from the heuristic being tested, so this cannot CONFIRM the heuristic - only find a field
 		// that agrees with it. A perfect separator would be strong evidence; the absence of one says the flag is not
 		// in the ascending property run at all, which is itself worth knowing (it would point at the record's fixed
 		// head, or at data outside the record).
@@ -134,11 +134,11 @@ namespace Faolan.Importer.Cli
 				? "\nNo field covering at least half the catalog separates the two modes cleanly."
 				: $"\nPERFECT SEPARATORS covering >= half the catalog: {string.Join(", ", separators.Select(s => s.Field))}");
 
-			// The client does not read a MODE field - it reads one BIT of a flag word (`spell + 0xC8 >> 2 & 1`). So
+			// The client does not read a mode field - it reads one BIT of a flag word (`spell + 0xC8 >> 2 & 1`). So
 			// the value-bucket sweep above is the wrong shape if the record stores that word packed: a bitmask field
 			// takes hundreds of values, each seen a handful of times, and looks like noise. Test the bits directly.
 			//
-			// A field ABSENT from a record is not a zero bit - it is no statement at all - so the absent records are
+			// A field absent from a record is not a zero bit - it is no statement at all - so the absent records are
 			// counted separately rather than folded into the 0 side, where they would manufacture agreement.
 			Console.WriteLine("\nBit sweep - is some single BIT of some field the selector?\n");
 			Console.WriteLine($"{"field",6} {"bit",4} {"records",8} {"agree",8}  set:pct/flat  clear:pct/flat");
@@ -181,22 +181,22 @@ namespace Faolan.Importer.Cli
 				? "\nNo single bit of any field covering at least half the catalog selects the mode."
 				: $"\nSELECTOR BITS: {string.Join(", ", perfectBits.Select(b => $"field {b.Field} bit {b.Bit}"))}");
 
-			// Third shape: the flag may not be a VALUE at all. A field that is written only when the spell is in one
-			// mode makes its own PRESENCE the statement, and both sweeps above are blind to that - they only ever look
+			// Third shape: the flag may not be a value at all. A field that is written only when the spell is in one
+			// mode makes its own presence the statement, and both sweeps above are blind to that - they only ever look
 			// at the records carrying the field, where a perfectly one-sided field looks pure but tiny.
 			Console.WriteLine("\nPresence sweep - is a field's mere PRESENCE the statement?\n");
 			Console.WriteLine($"{"field",6} {"on pct",8} {"of",6} {"on flat",8} {"of",6}  {"one-sided coverage",18}");
 
 			foreach (var x in perField
 				         .Select(kv => (Field: kv.Key, P: kv.Value.Sum(v => v.Value.Percent), F: kv.Value.Sum(v => v.Value.Flat)))
-				         // How much of ONE class it covers while staying out of the other - 1.0 would be the flag.
+				         // How much of one class it covers while staying out of the other - 1.0 would be the flag.
 				         .Select(x => (x.Field, x.P, x.F, Score: Math.Max(x.P == 0 ? 0 : (double)x.F / flats * (x.P == 0 ? 1 : 0), x.F == 0 ? (double)x.P / percents : 0)))
 				         .OrderByDescending(x => x.Score)
 				         .ThenByDescending(x => x.P + x.F)
 				         .Take(12))
 				Console.WriteLine($"{x.Field,6} {x.P,8} {percents,6} {x.F,8} {flats,6}  {x.Score,18:P2}");
 
-			// Fourth shape: the record's fixed HEAD, at word granularity, bit by bit. Same test as the field bit
+			// Fourth shape: the record's fixed head, at word granularity, bit by bit. Same test as the field bit
 			// sweep, over the region the property reader never reaches.
 			Console.WriteLine($"\nHead-word bit sweep - the first {HeadWords} words of the record body:\n");
 			Console.WriteLine($"{"word",5} {"@byte",6} {"bit",4} {"agree",8}  set:pct/flat  clear:pct/flat");
@@ -231,7 +231,7 @@ namespace Faolan.Importer.Cli
 			foreach (var b in headBits.OrderByDescending(x => x.Agreement).Take(15))
 				Console.WriteLine($"{b.Word,5} {b.Word * 4,6} {b.Bit,4} {b.Agreement,8:P2}  {b.SetP,5}/{b.SetF,-5} {b.ClearP,7}/{b.ClearF,-5}");
 
-			// The answer is word 13 bit 2 (see SpellFlagsWordOffset). Where it and the magnitude heuristic DISAGREE is
+			// The answer is word 13 bit 2 (see SpellFlagsWordOffset). Where it and the magnitude heuristic disagree is
 			// the only interesting set left, because one of them is wrong there - so list it rather than summarising
 			// it away. Every disagreement is the same direction: the heuristic says percent, the flag says flat.
 			Console.WriteLine($"\nWhere the flag (word {SpellFlagsWordOffset / 4} bit 2) and the <= {threshold} heuristic disagree:\n");
@@ -271,7 +271,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {d.Id,9} {d.Name,-44} {d.Cost}");
 		}
 
-		// ⚠️ A spell template's property table ASCENDS, where an item's strictly DESCENDS (RdbItemImporter's
+		// A spell template's property table ASCENDS, where an item's strictly DESCENDS (RdbItemImporter's
 		// TryReadPropertyField). Same [fieldId][value] grammar, opposite direction - reusing the item reader here
 		// finds nothing at all.
 		private static void SpellLineIds(string rdbDir, string? arg)
@@ -329,11 +329,11 @@ namespace Faolan.Importer.Cli
 		// The spell records' (type 1040005) property table, three ways:
 		//   --report-arg <decimal id>     one spell's whole field table
 		//   --report-arg field:<n>        every spell CARRYING field n, with its name and the value - the view that
-		//                                 says whether an unread field is worth importing (#633)
+		//                                 says whether an unread field is worth importing
 		//   (no arg)                      a histogram of how often each field id appears, with samples
 		//
-		// Written for #274 (find the DURATION field) and kept because every later field decode has needed one of the
-		// three - a field is only decodable once you can see WHICH spells carry it, which the histogram cannot say.
+		// Every field decode needs one of the three views: a field is only decodable once you can see which spells
+		// carry it, which the histogram alone cannot say.
 		private static void SpellFields(string rdbDir, string? arg)
 		{
 			using var rdb = OpenRdb(rdbDir);
@@ -411,7 +411,7 @@ namespace Faolan.Importer.Cli
 
 			// Every field id, not a top-N: the tail is where the undecoded ones live. The name comes from the
 			// client's own static stat-name table (CharacterStatId, `docs/re/aoc-client-stat-names.tsv`) - the
-			// spell record's field ids ARE that namespace, which is what names the 0x300+ run outright.
+			// spell record's field ids are that namespace, which is what names the 0x300+ run outright.
 			foreach (var kv in counts.OrderByDescending(k => k.Value))
 			{
 				var name = Enum.GetName(typeof(CharacterStatId), kv.Key) ?? "";

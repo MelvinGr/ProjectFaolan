@@ -5,18 +5,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The rule that decides which capture of a screen SURVIVES when several captured the same one.
+	// The rule that decides which capture of a screen survives when several captured the same one.
 	//
 	// It needs its own tests because the corpus barely exercises it: of 242 merge keys only 29 have more than one
-	// candidate, and only TWO of those differ in packet count - so a regression here would sail through a full
+	// candidate, and only two of those differ in packet count - so a regression here would sail through a full
 	// import untouched. It matters more than that coverage suggests, because it is also the rule an incremental
-	// import has to apply against already-stored rows (Gitea #419): a truncated dump must never displace a screen
+	// import has to apply against already-stored rows: a truncated dump must never displace a screen
 	// already captured in full.
 	public class ConversationMergeRuleTests
 	{
 		private const uint TypeId = 42008;
 
-		// COMPLETENESS decides: the capture with more response packets wins, whichever order they arrive in.
+		// Completeness decides: the capture with more response packets wins, whichever order they arrive in.
 		[Theory]
 		[InlineData(false)]
 		[InlineData(true)]
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, Assert.Single(merged).Packets.Count);
 		}
 
-		// The grant is harvested from whichever capture happened to walk the ACCEPT branch. It must survive even when
+		// The grant is harvested from whichever capture happened to walk the accept branch. It must survive even when
 		// that capture loses the completeness contest - otherwise re-importing a dump that only browsed the dialogue
 		// would silently un-grant the quest.
 		[Fact]
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 			Assert.Equal(["", "0", "0>1"], merged.Select(e => e.AnswerPath).OrderBy(p => p.Length).ThenBy(p => p).ToArray());
 		}
 
-		// A quest-state-gated variant is a SEPARATE screen, not a competitor: Casilda's pre- and post-quest greetings
+		// A quest-state-gated variant is a separate screen, not a competitor: Casilda's pre- and post-quest greetings
 		// share (name, type, path) and must both survive, or the runtime loses the ability to serve either.
 		[Fact]
 		public void QuestGatedVariantsAreNotMergedTogether()
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			Assert.Equal(2, merged.Count);
 		}
 
-		// #646: two NPCs that SHARE a display name but are different templates are different NPCs, and their walks must
+		// Two NPCs that share a display name but are different templates are different NPCs, and their walks must
 		// not union into one screen. This is the case the name key could not express - "Halen van Dummy" is the internal
 		// name of 27 templates in the shipped data - and it merged silently, before the fold ever saw them.
 		[Fact]

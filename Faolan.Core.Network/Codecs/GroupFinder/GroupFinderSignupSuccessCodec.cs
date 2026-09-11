@@ -5,10 +5,14 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderSignupSuccess (0x20C4): the signup went through. The body is the QueueGroupFinder
-	// activity vector echoed back, then one byte - captured as [0x0FC4][00000000][00000020][00000000][00], i.e.
-	// the request's own three words with the trailing bools collapsed to a single 0 (chat-annotated-4 frame 11923).
-	// What that byte means is unobserved beyond 0; it is modelled as a flag and always sent 0.
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderSignupSuccess</c> - the signup went through. The body is the
+	///     <c>QueueGroupFinder</c> activity vector echoed back, then one byte.
+	/// </summary>
+	/// <remarks>
+	///     Captured as the request's own three words with the trailing bools collapsed to a single 0 (chat-annotated-4
+	///     frame 11923). What that byte means is unobserved beyond 0, so it is modelled as a flag and always sent 0.
+	/// </remarks>
 	public static class GroupFinderSignupSuccessCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderSignupSuccess;

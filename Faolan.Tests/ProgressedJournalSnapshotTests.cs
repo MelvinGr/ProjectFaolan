@@ -10,12 +10,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The whole-corpus gate for the FULL snapshot split (prefix + root + tails) on PROGRESSED journals - Gitea #384.
+	// The whole-corpus gate for the full snapshot split (prefix + root + tails) on progressed journals.
 	//
 	// Every other snapshot golden in this suite is pinned on the two level-1 Strie beach assets, and the beach
-	// journal is the degenerate case: exactly ONE held quest. With one quest, "the objective region follows the
+	// journal is the degenerate case: exactly one held quest. With one quest, "the objective region follows the
 	// record" and "the objective region follows the list" are the same offset, so a reader that treats the @609
-	// objective region as a separate TOP-LEVEL region parses the beach fine and desyncs on the second record of
+	// objective region as a separate top-level region parses the beach fine and desyncs on the second record of
 	// any real journal - which is what happened ("Quest_c record: marker 0x2 != 0x412" on every level-80 capture).
 	//
 	// This reads the tshark corpus directly (as ProtocolCitationTests/QuestTests do) so it covers the L23/L24/L80
@@ -30,13 +30,13 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// The WHOLE RECORD must survive the typed model byte-for-byte on every captured snapshot - the #384
-		// regression surface, plus the prefix and the protobuf root.
+		// The whole record must survive the typed model byte-for-byte on every captured snapshot - the sub-class, the
+		// prefix and the protobuf root.
 		//
-		// It asserted on the SUB-CLASS alone until #538 landed: 7 of the 151 captured roots re-encoded exactly one
-		// byte shorter, because protobuf-net writes a single-element `[packed=true]` repeated field UNPACKED while
-		// retail packs it (`character_tag`). `ProtobufExtensions.ToProtobuf` takes that decision back now, so the
-		// gate covers what actually goes on the wire rather than two thirds of it.
+		// The root is part of it because protobuf-net writes a single-element `[packed=true]` repeated field unpacked
+		// while retail packs it (`character_tag`), which leaves 7 of the 151 captured roots exactly one byte shorter.
+		// `ProtobufExtensions.ToProtobuf` takes that decision back, so the gate covers what goes on the wire rather
+		// than two thirds of it.
 		[Fact]
 		public void EveryCapturedSnapshot_RoundTrips_ByteExact()
 		{
@@ -92,11 +92,11 @@ namespace Faolan.Tests
 		// tshark corpus.
 		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
 		{
-			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
+			// Reads the committed corpus extract rather than the capture repo, so the suite runs from a plain clone.
 			// Bodies are byte-identical to the corpus' BodyHex and keep their "<capture id>#<index>" provenance.
 			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.FullPlayerCharacterIIR))
 			{
-				// BodyHex is the body WITH its leading u32 length; callers want everything after it.
+				// BodyHex is the body with its leading u32 length; callers want everything after it.
 				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)
 					continue; // truncated capture - the TCP-reassembly gap on compressed downloads

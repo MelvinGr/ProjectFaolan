@@ -23,13 +23,14 @@ namespace Faolan.PlayerAgent
 		private static readonly ProtoEndpoint ServiceConnectionSender = Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08);
 
 		// `full_routing_context` (RpcHeader field 3) for the four login handoffs: they are addressed to the
-		// ServiceConnection, so they restate the PlayerInterface object the method actually fires on. Constant across
-		// all 472 captured frames - instance 1, never the character or account id (#610).
+		// ServiceConnection, so they restate the PlayerInterface object the method fires on. Constant across all 472
+		// captured frames - instance 1, never the character or account id.
 		private static readonly ProtoEndpoint PlayerInterfaceRoutingContext = Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01);
 
-		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
-		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's
-		// address, not the process-global config. Resolved from the selected character (ClientInstance is set at EnterWorld).
+		// The active character's realm - the routing target for the world, chat and guild handoffs. Every service the
+		// client is about to connect to lives in that realm's process, so all three handoffs advertise that realm's
+		// address rather than the process-global config. Resolved from the selected character (ClientInstance is set at
+		// EnterWorld).
 		private async Task<Realm> ResolveActiveRealm(INetworkClient client)
 		{
 			var character = client.Session.Character
@@ -37,18 +38,18 @@ namespace Faolan.PlayerAgent
 			return await Database.GetRealm(character.RealmId) ?? throw new Exception($"Character {character.Id:X8} has no realm to route to.");
 		}
 
-		// #573: re-establishes `Session.Character` when the client resumes the login sequence PAST character selection.
-		// The handoff block (CsPlayerAgent/ChatServer/GameServer) is driven by `ReceivedCharacterSettings`, which
+		// Re-establishes `Session.Character` when the client resumes the login sequence past character selection. The
+		// handoff block (CsPlayerAgent, ChatServer, GameServer) is driven by `ReceivedCharacterSettings`, which
 		// normally arrives after `LoginCharacter` has selected the character - but a client whose connection was
-		// replaced mid-flow (the server restarted under it) re-sends the later step WITHOUT the earlier one. Every
-		// sender in that block then dereferences a null `Session.Character`, which threw and dropped the connection,
-		// so the client reconnected, resumed at the same step and was dropped again - a login loop, observed live.
+		// replaced mid-flow, because the server restarted under it, re-sends the later step without the earlier one.
+		// Every sender in that block would then dereference a null `Session.Character`, drop the connection, and the
+		// client would reconnect, resume at the same step and be dropped again: a login loop.
 		//
-		// The account row remembers which character it was playing: `ClientInstance` is written and SAVED at
-		// LoginCharacter, and is the pre-selection-safe field `SendCharacterList` already relies on. So the session is
-		// rebuilt from it rather than the client being bounced. Returns false when there is genuinely nothing to
-		// recover (a fresh account that has never entered a character), and the caller then skips the handoff block
-		// instead of throwing - the client is simply out of sequence, which is not a server error.
+		// The account row remembers which character it was playing: `ClientInstance` is written and saved at
+		// LoginCharacter, and is the pre-selection-safe field `SendCharacterList` relies on, so the session is rebuilt
+		// from it rather than the client being bounced. Returns false when there is genuinely nothing to recover (a
+		// fresh account that has never entered a character), and the caller then skips the handoff block instead of
+		// throwing - the client is out of sequence, which is not a server error.
 		private async Task<bool> EnsureSessionCharacter(INetworkClient client)
 		{
 			if (client.Session.Character != null)
@@ -72,8 +73,9 @@ namespace Faolan.PlayerAgent
 
 			using var body = new FaolanStream();
 			// The account's current character instance (0 on a first login, the last-played id afterwards). This is the
-			// character-SELECTION screen - no character is selected yet, so Session.Character is null here; ClientInstance
-			// is the pre-selection-safe account field. (Do NOT "clean up" to Session.Character.Id - it NREs here.)
+			// character-selection screen, so no character is selected yet and Session.Character is null here;
+			// ClientInstance is the pre-selection-safe account field and must not be replaced with
+			// Session.Character.Id.
 			body.WriteUInt32(client.Session.Account.ClientInstance);
 			body.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 
@@ -169,13 +171,13 @@ namespace Faolan.PlayerAgent
 		private async Task SendRealmList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realms = await Database.GetRealms();
-			// #922: the stored flag says a host CLAIMED to be serving; the heartbeat says whether it still is. A realm
-			// that crashed and was never restarted keeps its Online for ever, and advertising it hands players to a
-			// host that is not there - so the list shows the EFFECTIVE status, Online only while the stamp is fresh.
-			// Read here rather than filtered in the query: a down realm still belongs on the select screen, greyed.
+			// The stored flag says a host claimed to be serving; the heartbeat says whether it still is. A realm that
+			// crashed and was never restarted keeps its Online for ever, and advertising it hands players to a host
+			// that is not there - so the list shows the effective status, Online only while the stamp is fresh. Read
+			// here rather than filtered in the query: a down realm still belongs on the select screen, greyed.
 			var now = DateTimeOffset.UtcNow;
 
-			// The record layout, and which of its fields the client actually reads, live in the codec (#931).
+			// The record layout, and which of its fields the client actually reads, live in the codec.
 			var entries = realms.Select(realm => new DimensionEntry(
 				realm.Id,
 				RealmLiveness.Effective(realm.OnlineStatus, realm.LastSeenUtc, now),
@@ -185,9 +187,7 @@ namespace Faolan.PlayerAgent
 				realm.Type,
 				realm.Language)
 			{
-				// The bitfield the client actually resolves the realm's language from (#933). It used to be a
-				// hard-coded 1, which sets the English bit - right by accident for an English realm and impossible
-				// to change for any other.
+				// The bitfield the client resolves the realm's language from; bit 0 is English.
 				LanguageFlags = RealmLanguageFlags.For(realm.Language)
 			}).ToArray();
 
@@ -195,13 +195,13 @@ namespace Faolan.PlayerAgent
 		}
 
 		// The reply to GetStartupData: every character's stored select-screen preview, then the settings checksum map.
-		// That is retail's order and content (Faolanx_mage-necromancer_login frames 8-9) - the previews come FIRST, one
+		// That is retail's order and content (Faolanx_mage-necromancer_login frames 8-9) - the previews come first, one
 		// packet each and only for the characters that have one, then one map covering all of them.
 		//
-		// ⚠️ The map's per-character string is the md5 of that character's stored SETTINGS archive (#611), which is how
-		// the client decides whether its cached copy is current; it is EMPTY for a character that has never uploaded
-		// any. It used to be the account's auth challenge - a 32-hex-char value of the right shape and the wrong
-		// meaning, so it advertised a checksum for settings the server did not hold and no cached copy could ever match.
+		// The map's per-character string is the md5 of that character's stored settings archive, which is how the client
+		// decides whether its cached copy is current; it is empty for a character that has never uploaded any. It must
+		// be that md5 and nothing else of the same shape, or it advertises a checksum for settings the server does not
+		// hold and no cached copy can match.
 		private async Task SendSmallCharList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
@@ -219,32 +219,32 @@ namespace Faolan.PlayerAgent
 				]))));
 		}
 
-		// The client sends its own md5 with each settings upload, and it is the value we hand back in the checksum map.
-		// We store the payload rather than the string and recompute it, which only works because the two agree - so say
-		// so out loud if they ever do not, instead of serving a checksum no cached client copy will match.
+		// The client sends its own md5 with each settings upload, and that is the value handed back in the checksum map.
+		// The payload is stored rather than the string and the md5 recomputed, which only works while the two agree -
+		// so a disagreement is said out loud rather than serving a checksum no cached client copy will match.
 		private void WarnOnCheckSumMismatch(string method, ClientSettingsBuffer buffer, string declared)
 		{
 			if (buffer.CheckSum != declared)
 				Logger.LogWarning("{Method}: the client declared md5 {Declared} but the payload hashes to {Computed} - the checksum map will advertise the computed one.", method, declared, buffer.CheckSum);
 		}
 
-		// The md5 the client compares its cache against, over the COMPRESSED archive - see ClientSettingsBuffer.CheckSum.
+		// The md5 the client compares its cache against, over the compressed archive - see
+		// ClientSettingsBuffer.CheckSum.
 		private static string CheckSumOf(byte[]? settings)
 		{
 			return settings is { Length: > 0 } ? ClientSettingsBufferCodec.Parse(settings).CheckSum : "";
 		}
 
 		// The reply receiver echoes the request's caller endpoint (packet.Sender), passed through by the handler - it is
-		// client-specific and can't be generated (see the UniverseAgent migration / ce487719).
+		// client-specific and cannot be generated.
 		//
 		// PlayerInterface s2c uniquely carries a 32-bit method id in the header after the opcode. Nothing here appends
-		// it: `Rpc` derives it from (receiver class, opcode) like every other interface's header tail (#609), so the
-		// PlayerRpc helper that used to thread it through is gone. Only OverrideGameTweaks still says its tail out
-		// loud, because its tail is not a method id.
+		// it: `Rpc` derives it from (receiver class, opcode) like every other interface's header tail. Only
+		// OverrideGameTweaks states its tail out loud, because that tail is not a method id.
 		//
-		// The archive itself is whatever the client last uploaded for this character (#611), handed back verbatim so its
-		// chat tabs, dock bars and per-character preferences come back with it. A character that has never uploaded one
-		// gets the EMPTY buffer, which is the 12-byte body retail sends in all 118 captured sightings.
+		// The archive itself is whatever the client last uploaded for this character, handed back verbatim so its chat
+		// tabs, dock bars and per-character preferences come back with it. A character that has never uploaded one gets
+		// the empty buffer, which is the 12-byte body retail sends in all 118 captured sightings.
 		private async Task SendCharacterSettings(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characterId = client.Session.Character.Id;

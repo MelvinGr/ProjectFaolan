@@ -10,10 +10,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #918: a TIMED ban (`.kickban`) used to schedule its own lift with an in-process `Task.Delay`, so a restart
-	// inside the window left the account banned until someone ran `.unban` by hand - and a restart that spanned the
-	// whole window could not release it either. The lift is now a property of the DATA: `Account.BanExpiresAt` is
-	// written with the state, and the login gate lifts it when the moment has passed.
+	// A timed ban (`.kickban`) lifts itself from the data, not from an in-process timer: `Account.BanExpiresAt` is
+	// written with the ban state, and the login gate lifts it when the moment has passed. That keeps the window exact
+	// across a restart, including one that spans the whole window.
 	public class AccountBanExpiryTests
 	{
 		[Fact]
@@ -36,7 +35,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// The other half of "survives a restart in both directions": a server that comes back INSIDE the window must
+		// The other half of "survives a restart in both directions": a server that comes back inside the window must
 		// still hold the ban.
 		public async Task ATimedBan_IsNotLiftedBeforeItsMoment()
 		{
@@ -50,7 +49,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ An INDEFINITE ban (`.ban`, no expiry) must never be caught by the sweep, however long it has stood.
+		// An indefinite ban (`.ban`, no expiry) must never be caught by the sweep, however long it has stood.
 		public async Task AnIndefiniteBan_IsNeverLifted()
 		{
 			await WithAccount(async (repo, accountId) =>
@@ -63,7 +62,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ A state change SUPERSEDES a pending lift. Without this an indefinite `.ban` laid over an unexpired
+		// A state change supersedes a pending lift. Without this an indefinite `.ban` laid over an unexpired
 		// `.kickban` would inherit its expiry and silently release itself - the state would say "banned for ever" and
 		// the data would disagree.
 		public async Task AnIndefiniteBanOverATimedOne_DoesNotInheritTheExpiry()

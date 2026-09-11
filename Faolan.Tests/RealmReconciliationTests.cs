@@ -10,13 +10,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Reconciling the declared realms into the Realms table: config owns the STATIC half of a row, the host that
+	// Reconciling the declared realms into the Realms table: config owns the static half of a row, the host that
 	// serves the realm owns the live half, and nothing owns the right to delete one.
 	//
-	// ⭐ The line between those halves is what every gate here is really about. A realm row is three things wearing
+	// The line between those halves is what every gate here is really about. A realm row is three things wearing
 	// one name - static deployment config, the live columns (OnlineStatus + LastSeenUtc, plus LoadStatus, which is
 	// population), and the parent of four foreign keys - and only the first is declarable. A reconciler that reached
-	// past that line would undo #909/#922 quietly: it would let a file claim a host is up.
+	// past that line would quietly let a config file claim a host is up.
 	public class RealmReconciliationTests : IDisposable
 	{
 		private readonly string _path = Path.Combine(Path.GetTempPath(), $"faolan-realms-{Guid.NewGuid():N}.db");
@@ -41,7 +41,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⭐ ...and nothing declared with a POPULATED table does nothing at all. This is what keeps every existing
+		// ...and nothing declared with a populated table does nothing at all. This is what keeps every existing
 		// deployment byte-identical: a database whose realm carries some other id (it was DB-generated) must not gain
 		// a second realm from a declaration nobody made.
 		public async Task NothingDeclared_LeavesAPopulatedTableAlone()
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ A realm CREATED here is not a realm anybody said is up. It starts Offline with no heartbeat, which
+		// A realm created here is not a realm anybody said is up. It starts Offline with no heartbeat, which
 		// RealmLiveness reads as down even if the flag said otherwise - so declaring a realm never advertises a host
 		// that has not claimed it.
 		public async Task ACreatedRealm_StartsOfflineWithNoHeartbeat()
@@ -102,8 +102,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⭐ The gate this whole file exists for. Config rewrites the static columns of a realm that is CURRENTLY
-		// SERVING and must not touch the three live ones - a file cannot observe that a host is up, and LoadStatus is
+		// The gate this whole file exists for. Config rewrites the static columns of a realm that is currently
+		// serving and must not touch the three live ones - a file cannot observe that a host is up, and LoadStatus is
 		// a population count nothing computes yet. Writing any of them here would make every restart overwrite what
 		// the live world knows.
 		public async Task ReconcilingARunningRealm_NeverTouchesTheLiveColumns()
@@ -141,8 +141,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⭐ A realm-role process passes its own id, which keeps "a realm process writes only its own row" (#909/#922)
-		// true of the static columns too. Realm 3 is declared and absent, and must STAY absent - this process has no
+		// A realm-role process passes its own id, which keeps "a realm process writes only its own row"
+		// true of the static columns too. Realm 3 is declared and absent, and must stay absent - this process has no
 		// business creating another host's row.
 		public async Task ScopingToOneRealm_WritesOnlyThatRow()
 		{
@@ -169,7 +169,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// ⚠️ A row the config has dropped is REPORTED, never deleted. Characters, guilds, mail and auction listings FK
+		// A row the config has dropped is reported, never deleted. Characters, guilds, mail and auction listings FK
 		// a realm, so removing one is a data migration - and a config edit that silently orphaned a server's worth of
 		// characters would be the worst possible way to find that out.
 		public async Task AnUndeclaredRow_IsReportedAndLeftStanding()

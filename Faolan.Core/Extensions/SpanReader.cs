@@ -6,34 +6,39 @@ using ProtoBuf;
 
 namespace Faolan.Core.Extensions
 {
-	// The SEQUENTIAL twin of SpanExtensions: same primitive set, same names, but the offset is held by the reader
-	// instead of written at the call site. `body.ReadU32Be(13)` becomes `r.ReadU32Be()` - the 13 stops existing.
-	//
-	// That is the entire point, and it is a correctness property rather than a style one. A codec that reads at fixed
-	// offsets has NOT decoded the bytes before those offsets, so it cannot tell a correct body from one that merely
-	// happens to carry the right word at 13; the offset is a claim about a grammar nobody wrote down. Reading
-	// sequentially and finishing with EnsureAtEnd() makes the grammar total: every byte is either consumed by a
-	// modelled field or the parse fails and says how many were left. See MagicBuffCodec's long form for the case this
-	// was built for - three fields read at offsets, 60-odd bytes never looked at, and no way for a test to notice.
-	//
-	// Bounds are the reader's job, not each codec's: every read that would run past the end throws
-	// CodecParseException naming the offset, the width it wanted and what was left. So a codec never needs a
-	// defensive length check, and `if (body.Length < 26) return false;` stops being a thing codecs write.
-	//
-	// Endianness follows the wire and the two spellings are NOT interchangeable: Conan is big-endian, EXCEPT protobuf
-	// fixed32 floats and the client's own RDB/asset files, which are little-endian (see `protocol_float_endianness`).
-	// Both are offered at every width, deliberately - a missing overload is what sends the next call site back to a
-	// hand-sliced BinaryPrimitives call.
-	//
-	// ReadListCount() is here because `ListFrame` moved down into this namespace alongside it. That matters for
-	// diagnostics rather than tidiness: ListFrame.CountOf on its own can only say "0x1234 is not a framing word",
-	// while the reader knows WHERE it read it - and the count-framed list is the protocol's most trap-laden
-	// primitive (see ListFrame's own header for the three subsystems that shipped a 0x7E2 "constant").
+	/// <summary>
+	///     The sequential twin of <see cref="SpanExtensions" />: same primitive set, same names, but the offset is
+	///     held by the reader instead of written at the call site - <c>body.ReadU32Be(13)</c> becomes
+	///     <c>r.ReadU32Be()</c> and the 13 stops existing.
+	/// </summary>
+	/// <remarks>
+	///     That is a correctness property rather than a style one. A codec that reads at fixed offsets has not decoded
+	///     the bytes before those offsets, so it cannot tell a correct body from one that merely happens to carry the
+	///     right word at 13; the offset is a claim about a grammar nobody wrote down. Reading sequentially and
+	///     finishing with <see cref="EnsureAtEnd" /> makes the grammar total: every byte is either consumed by a
+	///     modelled field or the parse fails and says how many were left.
+	///     <para />
+	///     Bounds are the reader's job, not each codec's: every read that would run past the end throws
+	///     <see cref="CodecParseException" /> naming the offset, the width it wanted and what was left. A codec
+	///     therefore never writes a defensive length check of its own.
+	///     <para />
+	///     Endianness follows the wire and the two spellings are not interchangeable: Conan is big-endian, except
+	///     protobuf fixed32 floats and the client's own RDB/asset files, which are little-endian. Both are offered at
+	///     every width, deliberately - a missing overload is what sends the next call site back to a hand-sliced
+	///     <c>BinaryPrimitives</c> call.
+	///     <para />
+	///     <see cref="ReadListCount" /> lives here, alongside <see cref="ListFrame" />, for diagnostics rather than
+	///     tidiness: <see cref="ListFrame.CountOf" /> on its own can only say "0x1234 is not a framing word", while
+	///     the reader knows where it read it - and the count-framed list is the protocol's most trap-laden primitive.
+	/// </remarks>
 	public ref struct SpanReader
 	{
 		private readonly ReadOnlySpan<byte> _data;
 
-		// Optional, for the exception message only. Pass nameof(TheCodec) from Parse; the stack trace names it too.
+		/// <summary>
+		///     Optional, for the exception message only. Pass <c>nameof(TheCodec)</c> from <c>Parse</c>; the stack
+		///     trace names it too.
+		/// </summary>
 		private readonly string? _codec;
 
 		private int _position;
@@ -45,7 +50,7 @@ namespace Faolan.Core.Extensions
 			_position = 0;
 		}
 
-		// True when every byte has been consumed. EnsureAtEnd() is the assertion form and is what Parse calls.
+		/// <summary>True when every byte has been consumed. <see cref="EnsureAtEnd" /> is the assertion form.</summary>
 		public readonly bool AtEnd => _position >= _data.Length;
 
 		public readonly int Length => _data.Length;
@@ -56,8 +61,10 @@ namespace Faolan.Core.Extensions
 
 		// ---- framing -----------------------------------------------------------------------------------------
 
-		// The whole-body assertion that makes rule 3 mechanical. Called at the end of every Parse: if the grammar
-		// stopped early, this is what turns a silent partial decode into a failure that names the leftover bytes.
+		/// <summary>
+		///     The whole-body assertion every <c>Parse</c> ends with: if the grammar stopped early, this is what turns
+		///     a silent partial decode into a failure that names the leftover bytes.
+		/// </summary>
 		public readonly void EnsureAtEnd()
 		{
 			if (AtEnd)
@@ -66,8 +73,11 @@ namespace Faolan.Core.Extensions
 			throw CodecParseException.Trailing(_codec, _position, Remaining, Preview());
 		}
 
-		// Asserts the next big-endian u32 equals `expected` and consumes it. The IIR/type word at the head of a body
-		// is the usual caller: reading it and checking it are one operation, so a codec cannot forget the check.
+		/// <summary>
+		///     Asserts the next big-endian u32 equals <paramref name="expected" /> and consumes it. The IIR/type word
+		///     at the head of a body is the usual caller: reading it and checking it are one operation, so a codec
+		///     cannot forget the check.
+		/// </summary>
 		public uint ExpectU32Be(uint expected, string? what = null)
 		{
 			var offset = _position;
@@ -78,9 +88,11 @@ namespace Faolan.Core.Extensions
 			return actual;
 		}
 
-		// The same assertion at the other widths. Constant lead flags, reserved words and version words are just as
-		// much part of a grammar as the type word, and a codec that merely SKIPS them cannot tell a correct body from
-		// one carrying something else there.
+		/// <summary>
+		///     The same assertion at the other widths. Constant lead flags, reserved words and version words are as
+		///     much part of a grammar as the type word, and a codec that merely skips them cannot tell a correct body
+		///     from one carrying something else there.
+		/// </summary>
 		public ushort ExpectU16Be(ushort expected, string? what = null)
 		{
 			var offset = _position;
@@ -111,15 +123,19 @@ namespace Faolan.Core.Extensions
 			return actual;
 		}
 
-		// The remaining bytes WITHOUT consuming them - for discriminating a message family before committing to a
-		// shape. Prefer ExpectU32Be/PeekU32Be; this is the escape hatch.
+		/// <summary>
+		///     The remaining bytes without consuming them - for discriminating a message family before committing to a
+		///     shape. Prefer <see cref="ExpectU32Be" />/<see cref="PeekU32Be" />; this is the escape hatch.
+		/// </summary>
 		public readonly ReadOnlySpan<byte> PeekRemaining()
 		{
 			return _data[_position..];
 		}
 
-		// The next big-endian u32 without consuming it. Used by family codecs (rule 5) to pick the concrete record
-		// before parsing it.
+		/// <summary>
+		///     The next big-endian u32 without consuming it. Used by family codecs to pick the concrete record before
+		///     parsing it.
+		/// </summary>
 		public readonly uint PeekU32Be()
 		{
 			return Peek(4).ReadU32Be(0);
@@ -130,13 +146,16 @@ namespace Faolan.Core.Extensions
 			Take(count);
 		}
 
-		// The element count of a count-framed list: a u32 == (count + 1) * 0x3F1, which the client's own readers
-		// divide rather than compare. A word that is not a valid multiple is a decode failure, reported WITH the
-		// offset - the thing ListFrame.CountOf cannot say on its own.
-		//
-		// ⚠️ Reading this as a constant is the single most repeated mistake in this protocol: 0x7E2 is a ONE-element
-		// list and 0x3F1 is an EMPTY one, and both have shipped as "magic terminators". If a grammar has a constant
-		// where a list could be, it is probably this. See ListFrame.
+		/// <summary>
+		///     The element count of a count-framed list: a u32 equal to <c>(count + 1) * 0x3F1</c>, which the client's
+		///     own readers divide rather than compare. A word that is not a valid multiple is a decode failure,
+		///     reported with the offset - the thing <see cref="ListFrame.CountOf" /> cannot say on its own.
+		/// </summary>
+		/// <remarks>
+		///     Reading this word as a constant is the most repeated mistake in this protocol: 0x7E2 is a one-element
+		///     list and 0x3F1 an empty one, and both read as magic terminators. Where a grammar has a constant and a
+		///     list could stand, it is probably this. See <see cref="ListFrame" />.
+		/// </remarks>
 		public int ReadListCount()
 		{
 			var offset = _position;
@@ -169,8 +188,11 @@ namespace Faolan.Core.Extensions
 			return Take(checked((int)ReadU32Be()));
 		}
 
-		// Everything left. A codec that calls this is declaring the tail opaque - legitimate for a not-yet-decoded
-		// region, but it also satisfies EnsureAtEnd() trivially, so it must be a deliberate, commented choice.
+		/// <summary>
+		///     Everything left. A codec that calls this is declaring the tail opaque - legitimate for a not-yet-decoded
+		///     region, but it also satisfies <see cref="EnsureAtEnd" /> trivially, so it must be a deliberate,
+		///     commented choice.
+		/// </summary>
 		public ReadOnlySpan<byte> ReadRemaining()
 		{
 			return Take(Remaining);
@@ -213,9 +235,12 @@ namespace Faolan.Core.Extensions
 			return new Quaternion(ReadF32Be(), ReadF32Be(), ReadF32Be(), ReadF32Be());
 		}
 
-		// WIRE STRINGS ARE RAW BYTES - Latin1, never ASCII or UTF-8. The client's BinaryStream::ReadString memcpy's
-		// the length-prefixed bytes straight into a std::string without transcoding, so Latin1 (a bijection over
-		// 0x00-0xFF) is the only mapping that round-trips. See FaolanStream.ReadString for the full note.
+		/// <summary>
+		///     Wire strings are raw bytes - Latin1, never ASCII or UTF-8. The client's <c>BinaryStream::ReadString</c>
+		///     copies the length-prefixed bytes straight into a <c>std::string</c> without transcoding, so Latin1 (a
+		///     bijection over 0x00-0xFF) is the only mapping that round-trips. See <c>FaolanStream.ReadString</c> for
+		///     the full note.
+		/// </summary>
 		public string ReadStringU16Length()
 		{
 			return Encoding.Latin1.GetString(ReadBytesU16Length());
@@ -231,10 +256,15 @@ namespace Faolan.Core.Extensions
 			return Encoding.Latin1.GetString(ReadBytesU8Length());
 		}
 
-		// A C-style NUL-terminated string. Rarer than the length-prefixed forms above and only used where the client
-		// itself terminates rather than counts - the PFAccessWindow_ catalog's short codes are the live case. Throws
-		// (rather than returning what it has) when the terminator is missing, since an unterminated string means the
-		// grammar is wrong, not that the string runs to the end.
+		/// <summary>
+		///     A C-style NUL-terminated string. Rarer than the length-prefixed forms above and only used where the
+		///     client itself terminates rather than counts - the <c>PFAccessWindow_</c> catalog's short codes are the
+		///     live case.
+		/// </summary>
+		/// <exception cref="CodecParseException">
+		///     The terminator is missing. An unterminated string means the grammar is wrong, not that the string runs
+		///     to the end of the body.
+		/// </exception>
 		public string ReadStringNullTerminated()
 		{
 			var start = _position;
@@ -247,22 +277,28 @@ namespace Faolan.Core.Extensions
 			throw CodecParseException.Unexpected(_codec, start, "a NUL-terminated string", "no terminator before the end of the body");
 		}
 
-		// A length-prefixed protobuf message - the read counterpart to FaolanStream.WriteProtobufByteLength. The
-		// prefix is a single BYTE, which is what the Conan carrier messages use around their protobuf payloads.
+		/// <summary>
+		///     A length-prefixed protobuf message - the read counterpart to
+		///     <c>FaolanStream.WriteProtobufByteLength</c>. The prefix is a single byte, which is what the Conan
+		///     carrier messages use around their protobuf payloads.
+		/// </summary>
 		public T ReadProtobufByteLength<T>() where T : IExtensible
 		{
 			return ReadBytesU8Length().FromProtobuf<T>();
 		}
 
-		// A protobuf message behind a u32 BE length prefix - the read counterpart to
-		// FaolanStream.WriteArrayUInt32Length(msg.ToProtobuf()). The two prefix widths are both real on the wire: the
-		// 0x2000 IIR carriers use u8 (above) while the RPC method bodies that embed an inventory entry use u32.
+		/// <summary>
+		///     A protobuf message behind a u32 big-endian length prefix - the read counterpart to
+		///     <c>FaolanStream.WriteArrayUInt32Length(msg.ToProtobuf())</c>. Both prefix widths are real on the wire:
+		///     the 0x2000 IIR carriers use u8 (above) while the RPC method bodies that embed an inventory entry use
+		///     u32.
+		/// </summary>
 		public T ReadProtobufU32Length<T>() where T : IExtensible
 		{
 			return ReadBytesU32Length().FromProtobuf<T>();
 		}
 
-		// A base-128 varint (protobuf LEB128) - the read counterpart to FaolanStream.WriteVarint.
+		/// <summary>A base-128 varint (protobuf LEB128) - the read counterpart to <c>FaolanStream.WriteVarint</c>.</summary>
 		public ulong ReadVarint()
 		{
 			var offset = _position;
@@ -296,8 +332,11 @@ namespace Faolan.Core.Extensions
 			return Convert.ToHexString(shown) + (tail.Length > shown.Length ? "..." : "");
 		}
 
-		// The single bounds check every read goes through, without advancing. Kept separate from Take so the peeking
-		// members can be `readonly` - a readonly member calling a mutating one copies the whole struct (CS8656).
+		/// <summary>
+		///     The single bounds check every read goes through, without advancing. Kept separate from <c>Take</c> so
+		///     the peeking members can be <c>readonly</c> - a readonly member calling a mutating one copies the whole
+		///     struct (CS8656).
+		/// </summary>
 		private readonly ReadOnlySpan<byte> Peek(int count)
 		{
 			ArgumentOutOfRangeException.ThrowIfNegative(count);

@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// STATIONARY placement pooling (#718/#765): which near-identical stationary spawns are one NPC harvested twice.
+	// STATIONARY placement pooling: which near-identical stationary spawns are one NPC harvested twice.
 	//
 	// A separate module rather than a step of `npcs`, for the same reason `npc-disposition` is: it only STAMPS
 	// `PlacementId` on rows that already exist, so it can be re-run on its own against a new corpus without

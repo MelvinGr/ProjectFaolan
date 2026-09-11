@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #244: NpcSpawnBuilder.BuildBody assembles the whole FA015807 record with NO captured template (header +
+	// NpcSpawnBuilder.BuildBody assembles the whole FA015807 record with no captured template (header +
 	// transform-with-token + pre-IIR + CoreChar header + message + post-IIR). Driven from golden captures, decomposed
 	// into the same inputs the live path (BuildLive) feeds it: the built record must parse back and carry the expected
 	// post-IIR shape - the minimal form for an animal, the appearance/morph table for a humanoid.
@@ -24,8 +24,8 @@ namespace Faolan.Tests
 
 			Assert.Empty(morphs); // an animal carries no appearance table
 			Assert.Equal(golden.Handle, built.Handle);
-			// The rebuilt post-IIR carries the GOLDEN's own movement mode, because the builder reads it off the
-			// message rather than taking it as a parameter (#605) - which is what makes the two copies agree.
+			// The rebuilt post-IIR carries the golden's own movement mode, because the builder reads it off the
+			// message rather than taking it as a parameter - which is what makes the two copies agree.
 			Assert.Equal(golden.Post.MovementMode, built.Post.MovementMode);
 			Assert.Equal(PostIirBytes(SpawnPostIirs.Npc(golden.Post.MovementMode)), PostIirBytes(built.Post));
 		}

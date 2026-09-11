@@ -3,15 +3,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ChatMarkup - the chat/system-line type. The client renders these as markup, so the DEFAULT has to be escaping:
-	// the reason this type exists is that every call site used to hand-write "&lt;handle&gt;", and any text that came
-	// from a PLAYER went to other clients verbatim.
+	// ChatMarkup - the chat/system-line type. The client renders these as markup, so the default has to be escaping.
+	// Without it every call site hand-writes "&lt;handle&gt;", and text that came from a player reaches other clients
+	// verbatim.
 	public class ChatMarkupTests
 	{
 		[Fact]
 		public void ImplicitConversionFromString_Escapes()
 		{
-			// The whole point: a plain usage string now survives to the client as typed.
+			// A plain usage string survives to the client exactly as typed.
 			ChatMarkup message = "Usage: .kill [<handle> | self]";
 
 			Assert.Equal("Usage: .kill [&lt;handle&gt; | self]", message.Value);
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 		{
 			// Ampersand must be replaced before the others, or "&lt;" produced by the '<' pass would become "&amp;lt;".
 			Assert.Equal("&lt;a&gt;", ChatMarkup.Escape("<a>"));
-			Assert.Equal("&amp;lt;", ChatMarkup.Escape("&lt;")); // already-escaped input escapes ONCE more, visibly
+			Assert.Equal("&amp;lt;", ChatMarkup.Escape("&lt;")); // already-escaped input escapes once more, visibly
 		}
 
 		[Theory]
@@ -69,8 +69,8 @@ namespace Faolan.Tests
 		[InlineData("", "")]
 		[InlineData("plain text", "plain text")] // fast path: untouched when there is nothing to escape
 		[InlineData("a & b", "a &amp; b")]
-		// Quotes and apostrophes ride through UNTOUCHED. The client does not decode &apos;, so escaping it put the
-		// literal text "&apos;" in the chat window (#448 GM-command reply, 2026-07-29). Settled against the client's
+		// Quotes and apostrophes ride through untouched. The client does not decode &apos;, so escaping it put the
+		// literal text "&apos;" in the chat window (seen in a GM-command reply, 2026-07-29). Settled against the client's
 		// own LDB content: &apos; appears 0 times in 2,164,982 strings while 228,544 carry a literal apostrophe.
 		[InlineData("say \"hi\"", "say \"hi\"")]
 		[InlineData("it's", "it's")]

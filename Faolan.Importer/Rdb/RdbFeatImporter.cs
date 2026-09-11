@@ -13,21 +13,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Rdb
 {
-	// Builds the FEAT catalog (Gitea #251) from the client's RDB, with no key crack and no capture.
+	// Builds the feat catalog from the client's RDB, with no key crack and no capture.
 	//
-	// RDB type 1000020 holds items AND feats. An item template is TEA-encrypted and opens with `RDBH`; a PLAINTEXT
-	// record opens with its own TYPE word, so ~20.8% of the 98,048 read without a key - and that share is essentially
+	// RDB type 1000020 holds items and feats. An item template is TEA-encrypted and opens with `RDBH`; a plaintext
+	// record opens with its own type word, so ~20.8% of the 98,048 read without a key - and that share is essentially
 	// the feats, because the items are the encrypted part. `--report feat-catalog` prints the split.
 	//
-	// ⚠️ There is no "TB magic", despite how this reads in a hex dump: 0x000F4254 IS 1000020, which happens to render
-	// as `TB\x0f\x00`. Feats, spells (1040005) and items share ONE layout -
+	// There is no "TB magic", despite how this reads in a hex dump: 0x000F4254 is 1000020, which happens to render
+	// as `TB\x0f\x00`. Feats, spells (1040005) and items share one layout -
 	//   [u32 type][u32 id][u32 1000000][...u32 fields...][text][stat-modifier region]
 	// - which is why the modifier region has one shared parser (ItemTemplateStatModifiers) rather than a reader per
 	// subsystem. See docs/subsystems/feats.md.
 	public static class RdbFeatImporter
 	{
 		// Word [44] on a feat record. The item templates that survive in plaintext carry 0x200; every other value in
-		// the catalog is a sub-650-row rump of TEST/debug entries.
+		// the catalog is a sub-650-row rump of test/debug entries.
 		public const uint FeatFlags = 0x10000005;
 
 		// One effect element: 8 fixed descriptor words then (StatId, Value).
@@ -40,8 +40,8 @@ namespace Faolan.Importer.Rdb
 		// 19,163 of the feats and none of the items).
 		private const uint FeatDisplayNameCategory = 50220;
 
-		// The client's own feat TABLE: FeatTable_t::LoadStaticData reads this resource and its entries carry the
-		// wire-id -> template-id pair (#467).
+		// The client's own feat table: FeatTable_t::LoadStaticData reads this resource and its entries carry the
+		// wire-id -> template-id pair.
 		private const uint FeatTableId = 1;
 		private const uint FeatTableType = 1000042;
 		private const int MapEntryLength = 48;
@@ -50,7 +50,7 @@ namespace Faolan.Importer.Rdb
 		private const int PrereqSlots = 3;
 		private const int MapHeaderLength = 20;
 
-		// The client's FEATCLASS table (#862): `FeatClassTable_c` loads this resource and reports
+		// The client's FEATCLASS table: `FeatClassTable_c` loads this resource and reports
 		// "Could not load featclass info" when it cannot. Same 20-byte header as the id map, then `count` 40-byte
 		// entries of ten words - see ParseClassEntries for the columns.
 		private const uint FeatClassType = 1000043;
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Rdb
 		private const int ClassEntryLength = 40;
 		private const int ClassEntryWords = 10;
 
-		// The client's feat POINT COST table (#150): the same `FeatClassTable_c` cluster, loaded beside the one
+		// The client's feat point COST table: the same `FeatClassTable_c` cluster, loaded beside the one
 		// above and reported as "Could not load feat point cost info." when it fails. Twelve-byte records, and the
 		// count is the FIFTH word - see ParsePerkCosts.
 		private const uint PerkCostType = 1000099;
@@ -69,7 +69,7 @@ namespace Faolan.Importer.Rdb
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 
-			// #925: the template's inline name is an AUTHORING name; the client draws the feat from LDB category
+			// the template's inline name is an AUTHORING name; the client draws the feat from LDB category
 			// 50220, keyed by the same template id. They agree on most feats and diverge on 983 rows - see
 			// `--report feat-name-check`, which is the measurement this rule is derived from and the check on it.
 			var displayNames = new Dictionary<uint, string>();
@@ -78,7 +78,7 @@ namespace Faolan.Importer.Rdb
 					displayNames[id] = text;
 			var labelIds = LabelCounts(displayNames);
 
-			// Read the client's feat TABLE first: it gates the sweep below. A template the table POINTS AT is a feat by
+			// Read the client's feat table first: it gates the sweep below. A template the table POINTS at is a feat by
 			// definition, which is a far better test than the Flags heuristic - Hakotep's Hellfire (3187268) carries
 			// Flags 0x5, not 0x10000005, and was silently excluded until the id map was used as the authority.
 			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
@@ -113,7 +113,7 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// Either the client's feat table points at it, or it carries the feat Flags value. The union matters:
-				// the table covers 6,593 templates (every feat the WIRE can name) while Flags reaches a wider catalog
+				// the table covers 6,593 templates (every feat the wire can name) while Flags reaches a wider catalog
 				// the table does not enumerate.
 				if (body.Length < 48 || Word(body, 0) != TemplateType || (Word(body, 44) != FeatFlags && !mappedTemplates.Contains(e.Id)))
 					continue;
@@ -125,7 +125,7 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				// ⚠️ ParseName stays on the AUTHORING name: Tree/Group/BaseName/Rank are derived from its `:` and
+				// ParseName stays on the AUTHORING name: Tree/Group/BaseName/Rank are derived from its `:` and
 				// rank-suffix structure, which the displayed name does not always carry. Only `Name` is corrected.
 				var parsed = ParseName(name);
 				var displayed = PreferDisplayName(name, displayNames.GetValueOrDefault(e.Id), labelIds);
@@ -152,13 +152,13 @@ namespace Faolan.Importer.Rdb
 				});
 			}
 
-			// The wire-id -> template-id map (#467). Delete+reinsert: it is wholly derived from one RDB resource.
+			// The wire-id -> template-id map. Delete+reinsert: it is wholly derived from one RDB resource.
 			var mapRows = 0;
 			var prereqRows = 0;
 			if (map.Count > 0)
 			{
-				// TWO saves, deliberately. FeatPrereq cascades off FeatIdMap, so deleting the old map rows and adding
-				// the new ones in ONE change-tracker run makes EF cascade the delete onto the prereq rows we just
+				// Two saves, deliberately. FeatPrereq cascades off FeatIdMap, so deleting the stale map rows and
+				// adding the new ones in one change-tracker run makes EF cascade the delete onto the prereq rows just
 				// added - they vanish on save, silently, and the table ends up empty.
 				db.FeatPrereqs.RemoveRange(await db.FeatPrereqs.ToListAsync());
 				db.FeatIdMaps.RemoveRange(await db.FeatIdMaps.ToListAsync());
@@ -176,7 +176,7 @@ namespace Faolan.Importer.Rdb
 					mapRows++;
 				}
 
-				// Only edges whose OWNER is a mapped feat: the FK points at FeatIdMap, and an orphan edge would fail
+				// Only edges whose owner is a mapped feat: the FK points at FeatIdMap, and an orphan edge would fail
 				// the insert rather than being quietly useful.
 				var mapped = map.Select(m => m.Wire).ToHashSet();
 				foreach (var (wire, sequence, requires) in prereqs)
@@ -194,7 +194,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// The client's featclass table (#862). Delete+reinsert like the id map: it too is wholly derived from one
+			// The client's featclass table. Delete+reinsert like the id map: it too is wholly derived from one
 			// RDB resource, and it is keyed by the client's own row id so a re-import renumbers nothing. No FK to
 			// FeatIdMap, so it needs no ordering against the block above.
 			var classRows = 0;
@@ -213,8 +213,8 @@ namespace Faolan.Importer.Rdb
 					classRows++;
 				}
 
-				// #150: the AA perk prices, keyed by the row ids just inserted. A cost naming a row the featclass
-				// table does not carry is DROPPED rather than imported without its placement - on the shipped data
+				// the AA perk prices, keyed by the row ids just inserted. A cost naming a row the featclass
+				// table does not carry is dropped rather than imported without its placement - on the shipped data
 				// there are none, and a silent orphan would be a worse answer than a smaller count.
 				var known = classEntries.Select(e => e.Id).ToHashSet();
 				foreach (var cost in perkCosts.Where(c => known.Contains(c.FeatClassEntryId)))
@@ -255,8 +255,8 @@ namespace Faolan.Importer.Rdb
 				updated++;
 			}
 
-			// The SPELL modifiers (#590), the same delete+reinsert and for the same reason. Written before the stat
-			// effects only because both scope their delete to every feat PARSED, and doing them together keeps that
+			// The spell modifiers, the same delete+reinsert and for the same reason. Written before the stat
+			// effects only because both scope their delete to every feat parsed, and doing them together keeps that
 			// one rule visible in one place.
 			var spellModRows = 0;
 			var spellTouched = featSpellMods.Keys.ToHashSet();
@@ -265,7 +265,7 @@ namespace Faolan.Importer.Rdb
 			{
 				for (var i = 0; i < list.Count; i++)
 				{
-					// The KIND picks the target column - a line under 53075, a single spell under 53030 - exactly as it
+					// The kind picks the target column - a line under 53075, a single spell under 53030 - exactly as it
 					// does on FeatSpellStatModifier. Never both.
 					var isLine = list[i].Kind == LineHitPercentKind;
 					db.FeatSpellModifiers.Add(new FeatSpellModifier
@@ -281,8 +281,8 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// The spell-scoped STAT modifiers and the spell GRANTS (#593), on the same delete+reinsert rule and scoped
-			// the same way - to every feat PARSED, not just those that still yield rows.
+			// The spell-scoped stat modifiers and the spell grants, on the same delete+reinsert rule and scoped
+			// the same way - to every feat parsed, not just those that still yield rows.
 			var spellStatModRows = 0;
 			db.FeatSpellStatModifiers.RemoveRange(await db.FeatSpellStatModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
 			foreach (var (featId, list) in featSpellStatMods.Where(kv => kv.Value.Count > 0))
@@ -318,7 +318,7 @@ namespace Faolan.Importer.Rdb
 
 			// Effects are delete+reinsert per feat: the list is wholly derived from the record, so reconciling element
 			// by element would only risk leaving a stale tail behind.
-			// The combo upgrades (#593), on the same delete+reinsert rule and the same PARSED scope as the three above.
+			// The combo upgrades, on the same delete+reinsert rule and the same parsed scope as the three above.
 			var comboModRows = 0;
 			db.FeatComboModifiers.RemoveRange(await db.FeatComboModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
 			foreach (var (featId, list) in featComboMods.Where(kv => kv.Value.Count > 0))
@@ -338,7 +338,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// The per-ATTACK combo modifiers (#593), same rule and same scope again.
+			// The per-attack combo modifiers, same rule and same scope again.
 			var comboAttackModRows = 0;
 			db.FeatComboAttackModifiers.RemoveRange(await db.FeatComboAttackModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
 			foreach (var (featId, list) in featComboAttackMods.Where(kv => kv.Value.Count > 0))
@@ -361,7 +361,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// The PROCS (#593), same rule and same scope again.
+			// The PROCS, same rule and same scope again.
 			var procRows = 0;
 			db.FeatProcs.RemoveRange(await db.FeatProcs.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
 			foreach (var (featId, list) in featProcs.Where(kv => kv.Value.Count > 0))
@@ -387,7 +387,7 @@ namespace Faolan.Importer.Rdb
 			var effectRows = 0;
 			var wanted = featEffects.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
 
-			// Scoped to every feat PARSED, not just those that still yield effects. Keying the delete off the results
+			// Scoped to every feat parsed, not just those that still yield effects. Keying the delete off the results
 			// means a feat whose list becomes empty - because the parse got stricter - keeps its old rows for ever, so
 			// a change that REMOVES bad data would leave the bad data sitting there.
 			var touched = featEffects.Keys.ToHashSet();
@@ -398,7 +398,7 @@ namespace Faolan.Importer.Rdb
 				for (var i = 0; i < list.Count; i++)
 				{
 					// The ramp is null on every kind but the interpolated family, so these three columns are null on
-					// all but ~340 of the 23k rows (#599).
+					// all but ~340 of the 23k rows.
 					var ramp = list[i].Ramp;
 					db.FeatEffects.Add(new FeatEffect
 					{
@@ -406,9 +406,9 @@ namespace Faolan.Importer.Rdb
 						Sequence = i,
 						StatId = (CharacterStatId)list[i].StatId,
 						EffectKind = list[i].Kind,
-						// ⛔ REINTERPRETED, not converted. `WireAmount` is the record's word carried unsigned and the
+						// REINTERPRETED, not converted. `WireAmount` is the record's word carried unsigned and the
 						// word is signed - `Pet Mastery`'s Pet Damage Coefficient is -550 per rank, not 4294966746
-						// (#863). An `unchecked` cast is what puts the sign back; a range check would throw on data
+						// . An `unchecked` cast is what puts the sign back; a range check would throw on data
 						// that is perfectly well-formed.
 						Value = unchecked((int)list[i].WireAmount),
 						HighValue = ramp?.HighValue,
@@ -424,8 +424,8 @@ namespace Faolan.Importer.Rdb
 
 			var grantLevels = await DeriveClassSpellGrantLevels(db, logger);
 
-			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
-			// says so - see the type-id guard in ParseSpellStatModifiers (Gitea #595).
+			// Never silent: a mis-sliced element is data we chose not to import, and the count is the only place that
+			// says so - see the type-id guard in ParseSpellStatModifiers.
 			if (misSlicedElements > 0)
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
@@ -443,16 +443,16 @@ namespace Faolan.Importer.Rdb
 		//   "Light Blade Training 1"                       -> (null, null, Light Blade Training, 1)
 		// A name that fits none of it keeps BaseName = the whole name and Rank = 0, so nothing is lost to a parse that
 		// did not apply.
-		// #925: adopt the client's displayed name where it is provably the SAME name, better spelled - and where it
-		// is a label the LDB gives to THIS feat alone.
+		// adopt the client's displayed name where it is provably the same name, better spelled - and where it
+		// is a label the LDB gives to this feat alone.
 		//
-		// ⛔ Deliberately NOT a blanket "prefer the LDB string". Measured over the 983 rows where the two differ:
+		// Deliberately not a blanket "prefer the LDB string". Measured over the 983 rows where the two differ:
 		//   * 88 pairs - the LDB entry is TRUNCATED. Feat 780269 is `Spell - Dark Hand`; its other ranks are
 		//     `Spell - Dark Han`. Ours is the correct string there and adopting theirs would break it.
-		//   * 778 rows - the LDB label is SHARED by several feat ids (`Advanced Riding` covers eighteen, `HP`
+		//   * 778 rows - the LDB label is shared by several feat ids (`Advanced Riding` covers eighteen, `HP`
 		//     thirty). A generic feat's authoring name encodes class, subject, band and rank; the label does not, so
 		//     adopting it would collapse distinct feats onto one string. Ours is the more informative name there.
-		//   * 15 rows - a UNIQUE label that genuinely disagrees (`Gemcutter Novice` where the client names each
+		//   * 15 rows - a unique label that genuinely disagrees (`Gemcutter Novice` where the client names each
 		//     crafting tier, `Tactical Mastery` where the client says `Hemorrhage`). The client draws the label, so
 		//     it is what a player ever saw; a label no other id carries cannot collapse anything, so it is adopted.
 		// So the rule is a containment test plus a uniqueness test, not a preference: take theirs when ours is a
@@ -541,7 +541,7 @@ namespace Faolan.Importer.Rdb
 
 		private static readonly Regex RankSuffix = new Regex(@"\s+(\((?<n>\d{1,3})\)|(?<n>\d{1,3}))$", RegexOptions.Compiled);
 
-		// The record's NAME and DESCRIPTION. TWO shapes exist, and knowing only the first is what left 3,633 plaintext
+		// The record's name and DESCRIPTION. two shapes exist, and knowing only the first is what left 3,633 plaintext
 		// records looking nameless - including every feat the three captured characters hold:
 		//
 		//   u32 form:  [u32 len][name]                                - a name alone
@@ -549,7 +549,7 @@ namespace Faolan.Importer.Rdb
 		//
 		// Template 3187268 (the Hellfire hakotep unlocks on tape) is the u16 form: `08 00 4B 00 "Hellfire" "Reduces
 		// the casting time of Hellfire Breath, but increases the re-use time."`. Both are scanned and whichever
-		// VALIDATES wins; the u16 form is tried first because a length PAIR landing two printable runs back to back is
+		// VALIDATES wins; the u16 form is tried first because a length pair landing two printable runs back to back is
 		// a far stronger signature than one u32 that merely looks plausible.
 		//
 		// Returns ("", "") when neither fits, so an unreadable record is skipped rather than guessed at.
@@ -581,11 +581,11 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// LATIN-1 printable, not ASCII. The descriptions carry CP1252 typography - template 3186541 ("Demonic Leech")
-		// has a 0x92 curly apostrophe in "The herald's Body and Spirit Wrack combo ..." - and capping at 0x7E rejected
+		// has a 0x92 curly apostrophe in "The herald's Body and Spirit Wrack combo..." - and capping at 0x7E rejected
 		// the whole record, which is how six of the captured characters' feats stayed missing after the u16 shape was
 		// understood. Wire strings in this client are Latin-1 everywhere else too.
 		// The strings are CP1252, not Latin-1: the descriptions use typographic punctuation, and 0x91-0x94 / 0x96-0x97 /
-		// 0x85 land in Latin-1's C1 CONTROL block rather than on the quotes and dashes they mean. Decoding as Latin-1
+		// 0x85 land in Latin-1's C1 control block rather than on the quotes and dashes they mean. Decoding as Latin-1
 		// silently drops them - "the necromancer's Pestilential Blast" comes out as "the necromancers Pestilential
 		// Blast". Only that 0x80-0x9F window differs between the two encodings, so it is mapped explicitly rather than
 		// by pulling in the CodePages provider for one range.
@@ -670,7 +670,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// The client's FEATCLASS table (RDB 1000043 id 1) - what a class may train, and what the client trains for
-		// itself (#862). Read here rather than in its own importer because it shares this one's RdbReader and is the
+		// itself. Read here rather than in its own importer because it shares this one's RdbReader and is the
 		// same subsystem's data.
 		private static List<FeatClassEntry> ReadClassEntries(RdbReader rdb)
 		{
@@ -741,7 +741,7 @@ namespace Faolan.Importer.Rdb
 			return entries;
 		}
 
-		// The client's feat POINT COST table (RDB 1000099 id 1) - the price of one AA perk rank (#150). Read here
+		// The client's feat point COST table (RDB 1000099 id 1) - the price of one AA perk rank. Read here
 		// beside the featclass table because it is keyed by that table's row ids and comes off the same RdbReader.
 		private static List<FeatPerkCost> ReadPerkCosts(RdbReader rdb)
 		{
@@ -774,7 +774,7 @@ namespace Faolan.Importer.Rdb
 		///         <c>+4</c> and word 2 at <c>+8</c> - see <see cref="FeatPerkCost" /> for what word 1 means.
 		///     </para>
 		///     <para>
-		///         ⚠️ A row whose point type is not one the client switches on is DROPPED rather than stored: the
+		///         A row whose point type is not one the client switches on is dropped rather than stored: the
 		///         column is an enum the client enumerates exhaustively (2 / 3 / 4), so an unknown value is a
 		///         mis-read of the table rather than a pool we have yet to name. The shipped table has none.
 		///     </para>
@@ -809,13 +809,13 @@ namespace Faolan.Importer.Rdb
 
 		/// <summary>
 		///     Fills <see cref="ClassSpell.GrantLevel" /> from the featclass table: the level of the AUTO-TRAINED feat
-		///     that teaches the spell IS the level retail grants it at (#853).
+		///     that teaches the spell is the level retail grants it at.
 		/// </summary>
 		/// <remarks>
-		///     ⭐⭐ <b>14 of 14.</b> Every capture-proven grant level in the database is reproduced exactly by this
+		///     <b>14 of 14.</b> Every capture-proven grant level in the database is reproduced exactly by this
 		///     derivation, across three classes - including all ten where <c>Spells.Level</c> disagrees with the
 		///     capture (<c>Frenzy</c> 5 vs 25, <c>Ice Shackle</c> 5 vs 20, <c>Contract of Protection</c> 5 vs 10,
-		///     <c>Desecrating Essence</c> 3 vs 5, ...). <c>Spells.Level</c> matches only 4 of the 14. So this is the
+		///     <c>Desecrating Essence</c> 3 vs 5,...). <c>Spells.Level</c> matches only 4 of the 14. So this is the
 		///     same fact the captures record, available offline for the whole catalog instead of the 14 rows a
 		///     capture happened to catch.
 		///     <para>
@@ -824,8 +824,7 @@ namespace Faolan.Importer.Rdb
 		///             <item><description>
 		///                 <b>Ladders.</b> Over the 86 families whose every rank resolves, this level is monotonic on
 		///                 <b>all</b> of them; <c>Spells.Level</c> breaks one - <c>Quell the Ether</c>
-		///                 (45/30/45/60/75), the contradiction #853 filed as unrecoverable. It reads 15/30/45/60/75
-		///                 here.
+		///                 (45/30/45/60/75). It reads 15/30/45/60/75 here.
 		///             </description></item>
 		///             <item><description>
 		///                 <b>The captured spellbooks.</b> A level-24 Herald of Xotli holds
@@ -837,18 +836,18 @@ namespace Faolan.Importer.Rdb
 		///         </list>
 		///     </para>
 		///     <para>
-		///         ⚠️ A CAPTURE still wins. It never has to - they agree on all 14 - but the rule that retail leads
+		///         A capture still wins. It never has to - they agree on all 14 - but the rule that retail leads
 		///         should not be quietly inverted by a derivation that merely happens to match it.
 		///     </para>
 		///     <para>
-		///         ⚠️ MIN over the teaching feats, and per CLASS. A spell taught by two auto-trained feats arrives at
+		///         MIN over the teaching feats, and per class. A spell taught by two auto-trained feats arrives at
 		///         the earlier one; and the same spell genuinely unlocks at different levels for different classes,
 		///         which is why this writes <see cref="ClassSpell" /> rather than <c>Spells.Level</c> - a per-class
 		///         fact cannot live on a per-spell column. That is also what the 36 spells with several feat levels
 		///         are: not ambiguity, just more than one class.
 		///     </para>
 		///     <para>
-		///         ⛔ Only the AUTO-TRAINED feats. A tree feat's level is when the feat may be BOUGHT, not when its
+		///         Only the AUTO-TRAINED feats. A tree feat's level is when the feat may be BOUGHT, not when its
 		///         spell is handed over - the player may never buy it - so folding those in would state a grant that
 		///         does not happen.
 		///     </para>
@@ -876,15 +875,15 @@ namespace Faolan.Importer.Rdb
 
 				if (!rows.TryGetValue((derived.Class, derived.SpellId), out var row))
 				{
-					// ⭐ The schedule is also a MEMBERSHIP statement: a feat the client auto-trains FOR THIS CLASS
+					// The schedule is also a membership statement: a feat the client auto-trains FOR this class
 					// teaches this spell, so the class has access to it. That is the client's own word, and it reaches
 					// what `ClassSpells`' usual source cannot - membership is derived from `Spell.GuiStackingLine`'s
-					// `ConanClass * 1000 + index` encoding, and every spell this adds carries a line that is NOT in
+					// `ConanClass * 1000 + index` encoding, and every spell this adds carries a line that is not in
 					// that form (71, 76, 232), so the class map was blind to them by construction.
 					//
-					// ⛔ LEVEL > 0 only, and the exclusion is the whole safety of this. Every class auto-trains the
+					// level > 0 only, and the exclusion is the whole safety of this. Every class auto-trains the
 					// four `Dance:` emotes at level 5, and a Level-0 record belongs to no class - mounts, pets,
-					// emotes and travel unlocks are restored from the character's OWN rows on login
+					// emotes and travel unlocks are restored from the character's own rows on login
 					// (`GrantCharacterSpells`), never from a class query. Writing them here would claim that a
 					// Barbarian's class catalog contains `Dance: Stygian`, which is what the Level-0 rule exists to
 					// prevent. It is the difference between 12 rows and 57.
@@ -948,26 +947,26 @@ namespace Faolan.Importer.Rdb
 			return edges;
 		}
 
-		// The record's TAIL, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
+		// The record's tail, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
 		// last two words are (StatId, Value). The eight leading words of an element are a fixed descriptor.
 		// Returns an empty list when the tail is not this shape - some records carry no effect block at all.
-		// The feat's stat modifiers, via the SHARED template-region parser.
+		// The feat's stat modifiers, via the shared template-region parser.
 		//
-		// Feats, spells and items are the SAME record layout - `[u32 type][u32 id][u32 1000000][...]` - so they share
-		// this region and its parser (#367 already uses it for spells). Hand-rolling a second reader here is what
-		// produced five successive regressions: a fixed stride, then a kind-range delimiter, then a measured
-		// per-kind width table all mis-walked the list, because the records are NOT uniformly strided. Parse anchors
-		// on the 6-word signature `4,0,1,0,2,9` inside the 10-word record instead, which is stride-independent.
+		// Feats, spells and items are the same record layout - `[u32 type][u32 id][u32 1000000][...]` - so they share
+		// this region and its parser, which the spell importer also uses. Hand-rolling a second reader here does not
+		// work: a fixed stride, a kind-range delimiter and a measured per-kind width table all mis-walk the list,
+		// because the records are not uniformly strided. Parse anchors on the 6-word signature `4,0,1,0,2,9` inside
+		// the 10-word record instead, which is stride-independent.
 		//
-		// It also carries the KIND, which the hand-rolled version dropped: a 53067 record is a PERCENT modifier, so
+		// It also carries the kind, which a positional reader cannot: a 53067 record is a percent modifier, so
 		// reading it as flat turns "+2% Critical Rating" into "+200".
 		//
-		// ⚠️ `ParseStatModifiers`, not `Parse` (Gitea #597). `Parse` is the POSITIONAL pair view - payload words 0 and
+		// `ParseStatModifiers`, not `Parse`. `Parse` is the POSITIONAL pair view - payload words 0 and
 		// 1, whatever they mean - and (stat, value) is only where those words sit on `Modify`. Of the 29 kinds the
 		// feat catalog carries, five put a stat in word 0 and a magnitude in word 1; the rest were imported as
 		// nonsense, the worst of them `DisplayLearnAbility` (Line, 187), whose 110 rows read as `Health += 4232751`
 		// because word 0 happened to be 1. `--report feat-effect-kinds` prints the census the gate is built on.
-		// The excluded ones are not lost: the spell- and line-scoped kinds have their own tables (#590/#593), and
+		// The excluded ones are not lost: the spell- and line-scoped kinds have their own tables, and
 		// what remains is undecoded rather than dropped.
 		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseEffects(byte[] body)
 		{
@@ -976,47 +975,46 @@ namespace Faolan.Importer.Rdb
 				: [.. ItemTemplateStatModifiers.ParseStatModifiers(body.AsSpan(12)).Where(m => m.Kind != TagRecordKind)];
 		}
 
-		// The feat's SPELL modifiers (#590): the records the stat parser REJECTS, because their payload's first word
-		// is a spell-LINE id rather than a stat id and so fails its `statId < 0x1000` bound. `Decomposition` rank 5
+		// The feat's spell modifiers: the records the stat parser REJECTS, because their payload's first word
+		// is a spell-line id rather than a stat id and so fails its `statId < 0x1000` bound. `Decomposition` rank 5
 		// carries (41000, 3500) - Necromancer line 0 (Flesh to Worms), +35.00% - which is exactly what the client's
 		// own tooltip draws.
 		//
-		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records, and has
-		// its own parser below), and the
-		// #591 sweep decoded WHAT EACH ONE POINTS AT without decoding what its payload MEANS. That distinction is the
-		// whole reason they stay out: a reference space is checkable (resolve the ref and see whether it hits), a
+		// Kind 53075 only. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records, and has its
+		// own parser below), and for those what the element points at is decoded while what its payload means is not.
+		// That distinction is the whole reason they stay out: a reference space is checkable (resolve the ref and see
+		// whether it hits), a
 		// magnitude is not, and importing a value as a percent because it sits where 53075's percent sits is exactly
 		// the invention this gate exists to prevent - on a third of the feat catalog.
 		//
 		// The ref spaces, each resolved against the shipped catalogs and corroborated by the feat's own LDB tooltip:
 		//
-		//   53209  x3235  a COMBO id (Combos.Id). `Dread Lord` - "Reduces the reuse time of all combos" - carries six,
-		//                 every one a DarkTemplar_NN_lifetapbuff combo. Its payload is DECODED and imported now, as
+		//   53209  x3235  a combo id (Combos.Id). `Dread Lord` - "Reduces the reuse time of all combos" - carries six,
+		//                 every one a DarkTemplar_NN_lifetapbuff combo. Its payload is decoded and imported now, as
 		//                 FeatComboModifier - see ParseComboModifiers. The "value 0 throughout" that made it look like
 		//                 a pure reference was key 66 on a cooldown-only feat; the magnitude was in key 67, which the
 		//                 pair view cannot reach.
-		//   53062   x475  a spell LINE id (Spell.GuiStackingLine), the SAME space 53075 uses. `Brutal Maiming` - "Increases the
+		//   53062   x475  a spell line id (Spell.GuiStackingLine), the same space 53075 uses. `Brutal Maiming` - "Increases the
 		//                 chance of the Disable combo inflicting critical damage" - points at 20410, which is the
-		//                 Guardian's `Disable` line, by name. Its value (147) is NOT a percent and is undecoded.
-		//   53019  x1010  a spell TEMPLATE id (Spell.Id), and a GRANT rather than a modifier: `Spell Unlocking 60-80`
+		//                 Guardian's `Disable` line, by name. Its value (147) is not a percent and is undecoded.
+		//   53019  x1010  a spell template id (Spell.Id), and a grant rather than a modifier: `Spell Unlocking 60-80`
 		//                 points at Drain Essence ranks 1-4, Blood Pact and Covenant of Vengeance. Its `value` repeats
-		//                 its own KIND (53019), i.e. a sentinel, not a magnitude.
+		//                 its own kind (53019), i.e. a sentinel, not a magnitude.
 		//   53212   x421  a PROC: the pair view read its `Spell` slot (key 88) and called it a grant because the feat
 		//                 is named for that spell (`Touch of Death` -> the spell `Touch of Death`). It also carries a
-		//                 COMBO (key 187) to hang the proc off, a second proc spell for the target, a trigger and a
+		//                 combo (key 187) to hang the proc off, a second proc spell for the target, a trigger and a
 		//                 magnitude - decoded and imported now, with 53070, as FeatProc. See ParseProcs.
-		//   53054   x593  a spell TEMPLATE id (`Fiendish Hand` -> `Dark Hand`, `Combo - Skewer` -> `Skewered`), but
-		//                 with a varying value and SEVERAL records per (feat, spell) - three on Fiendish Hand carrying
+		//   53054   x593  a spell template id (`Fiendish Hand` -> `Dark Hand`, `Combo - Skewer` -> `Skewered`), but
+		//                 with a varying value and several records per (feat, spell) - three on Fiendish Hand carrying
 		//                 347/348/349. Undecoded.
-		//   53030   x962  the per-SPELL twin of 53075: key 187 is a `Spell.Id` (238 of 240 distinct refs resolve)
+		//   53030   x962  the per-spell twin of 53075: key 187 is a `Spell.Id` (238 of 240 distinct refs resolve)
 		//                 where 53075 carries a line, and `Value` the same signed percent x100. IMPORTED as a
 		//                 FeatSpellModifier with SpellId set - see ParseSpellModifiers below.
-		//                 ⚠️ This kind used to be written off here as "not a player feat at all - the `Dimach Item`
-		//                 crafting entries, all pointing at one constant ref (43464) with value 100". That was the
-		//                 first SAMPLE, not the census: the Dimach rows sort first by feat id, and behind them are
-		//                 239 other targets and 55 distinct values including a -20/-40/-60% ladder.
+		//                 Not "the `Dimach Item` crafting entries, all pointing at one constant ref (43464) with
+		//                 value 100": those rows merely sort first by feat id, and behind them are 239 other targets
+		//                 and 55 distinct values including a -20/-40/-60% ladder.
 		//
-		// So three of the six are GRANTS, not modifiers, which is a second reason the shape is not enough: importing
+		// So three of the six are grants, not modifiers, which is a second reason the shape is not enough: importing
 		// them here would file a spell the feat gives you as a boost to a spell you already have. Survey them with
 		// `--report feat-spell-modifiers`, which prints each kind with its feat name and the LDB description.
 		public static IReadOnlyList<SpellHitPercentModifier> ParseSpellModifiers(byte[] body)
@@ -1030,7 +1028,7 @@ namespace Faolan.Importer.Rdb
 				if (e.Kind != LineHitPercentKind && e.Kind != SpellHitPercentKind)
 					continue;
 
-				// Read BY KEY, and by the key the KIND says: 53075 carries its target in the line slot (1) and 53030
+				// Read by key, and by the key the kind says: 53075 carries its target in the line slot (1) and 53030
 				// in the spell slot (187). The pair view lands on both by luck of position - the target is payload
 				// word 0 either way - which is exactly the coincidence that makes it unsafe to rely on.
 				var target = e.Value(e.Kind == LineHitPercentKind ? GameActionTypes.KeyLine : GameActionTypes.KeySpellHitPercentTarget);
@@ -1050,12 +1048,12 @@ namespace Faolan.Importer.Rdb
 		/// </summary>
 		public readonly record struct SpellHitPercentModifier(uint Kind, uint TargetId, int PercentHundredths);
 
-		// The (reference, magnitude) pair whose payload is decoded, in its two target spaces: a spell LINE (53075,
-		// #590) and a single SPELL (53030, #593). Same three slots, same signed percent x100.
+		// The (reference, magnitude) pair whose payload is decoded, in its two target spaces: a spell line (53075) and
+		// a single spell (53030). Same three slots, same signed percent x100.
 		private const uint LineHitPercentKind = 53075;
 		private const uint SpellHitPercentKind = 53030;
 
-		// The spells the feat GRANTS (#593): kind 53019 `Spell`, a one-slot element carrying a spell TEMPLATE id.
+		// The spells the feat grants: kind 53019 `Spell`, a one-slot element carrying a spell template id.
 		// A grant, not a modifier - see FeatSpellGrant.
 		public static IReadOnlyList<uint> ParseSpellGrants(byte[] body)
 		{
@@ -1067,18 +1065,17 @@ namespace Faolan.Importer.Rdb
 					.Where(id => id != 0)];
 		}
 
-		// The COMBOS a feat upgrades (#593): kind 53209 `UpgradeCombo`, `[187 combo, 66, 67]` - 3,235 records, the
-		// largest single block in the feat catalog and the last of the "decoded shape, undecoded payload" kinds the
-		// #591 sweep left behind.
+		// The combos a feat upgrades: kind 53209 `UpgradeCombo`, `[187 combo, 66, 67]` - 3,235 records, the largest
+		// single block in the feat catalog.
 		//
-		// Keys 66 and 67 are named out of the CLIENT, not inferred from the feat descriptions: the item-tooltip
+		// Keys 66 and 67 are named out of the client, not inferred from the feat descriptions: the item-tooltip
 		// builder `FUN_0149e450` reads `GameActionStat_e` 0x315 and 0x316 - which the key-index table maps to key 66
 		// and key 67 - and branches on each one's SIGN to pick between the localised `UpgradeCombo_IncreaseDamage` /
 		// `_DecreaseDamage` and `UpgradeCombo_IncreaseCooldown` / `_DecreaseCooldown` strings. So 66 is the combo's
-		// DAMAGE delta and 67 its REUSE-TIME delta, both signed, both rendered as `value × 0.01` with a `%` suffix -
+		// damage delta and 67 its REUSE-time delta, both signed, both rendered as `value × 0.01` with a `%` suffix -
 		// hundredths of a percent, the same scale kind 53075 uses. See docs/re/gameactionlist-grammar.md.
 		//
-		// ⚠️ Read BOTH slots, and do not fall back to the pair view: it returns (combo, 66) and so reports every
+		// Read both slots, and do not fall back to the pair view: it returns (combo, 66) and so reports every
 		// cooldown feat as a no-op with `value = 0`, which is exactly what the catalog looked like before this.
 		public static IReadOnlyList<ComboModifier> ParseComboModifiers(byte[] body)
 		{
@@ -1108,16 +1105,15 @@ namespace Faolan.Importer.Rdb
 		/// <summary>One parsed kind-53209 element: the combo, and its two signed hundredths-of-a-percent deltas.</summary>
 		public readonly record struct ComboModifier(uint Kind, uint ComboId, int DamagePercentHundredths, int CooldownPercentHundredths);
 
-		// One WEAPON ATTACK of a combo (#593): kind 53250 `ChangeInheritedWeaponAttack`,
-		// `[187 combo, 84 attack, 66 dps, 67 crit, 68 hate, 69 damageType]` - 315 records over 12 feats, and the last
-		// of the kinds #593 tabulated.
+		// One weapon attack of a combo: kind 53250 `ChangeInheritedWeaponAttack`,
+		// `[187 combo, 84 attack, 66 dps, 67 crit, 68 hate, 69 damageType]` - 315 records over 12 feats.
 		//
 		// The sibling of ParseComboModifiers, not a variant of it: 53209 moves the combo as a whole and this moves
 		// one of its two ATTACKS, along three axes 53209 has no slot for. Every slot is named out of the client's own
 		// tooltip branch at `014a1dc5` - see GameActionTypes and docs/re/gameactionlist-grammar.md.
 		//
-		// ⚠️ The SCALES differ from 53209's even though keys 66/67 are the same two GameActionStat slots: 53250's key
-		// 66 is a WHOLE percent (raw int + `%`) and its key 67 a crit-chance RATING (`× 0.025`), where 53209 renders
+		// The SCALES differ from 53209's even though keys 66/67 are the same two GameActionStat slots: 53250's key
+		// 66 is a whole percent (raw int + `%`) and its key 67 a crit-chance RATING (`× 0.025`), where 53209 renders
 		// both `× 0.01`. Carrying 53209's units across would report `Fierce Opening`'s +30% as +0.30%.
 		public static IReadOnlyList<ComboAttackModifier> ParseComboAttackModifiers(byte[] body)
 		{
@@ -1159,17 +1155,17 @@ namespace Faolan.Importer.Rdb
 		/// <summary>One parsed kind-53250 element - see <see cref="FeatComboAttackModifier" /> for each field's unit.</summary>
 		public readonly record struct ComboAttackModifier(uint Kind, uint ComboId, ComboAttackSlot Slot, int DpsPercent, int CriticalChanceRating, int HatePercent, uint DamageTypeId);
 
-		// The PROCS a feat attaches (#593): 53212 `AddComboProc` `[88, 236, 187 combo, 117, 237]` and 53070
+		// The PROCS a feat attaches: 53212 `AddComboProc` `[88, 236, 187 combo, 117, 237]` and 53070
 		// `AddSpellLineProc` `[88, 236, 1 line, 117, 237, 73]` - one shape with the target space swapped, the same
 		// pairing 53075/53030 and 53054/53062 have, so they share a table.
 		//
 		// The pair view is what hid these: it returns payload words 0 and 1, i.e. (key 88, key 236), so 53212 read as
-		// "a spell template id, also a grant - the feat is NAMED for the spell, value 0 throughout". The zero was the
-		// SECOND proc spell, empty on all but one record, and the combo it hangs off was three slots further along.
+		// "a spell template id, also a grant - the feat is named for the spell, value 0 throughout". The zero was the
+		// second proc spell, empty on all but one record, and the combo it hangs off was three slots further along.
 		//
 		// The two spell slots are named by the client's own tooltip: it tests key 88 and key 236 for a valid spell
 		// independently and renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` accordingly, so 88
-		// is the CARRIER's proc spell and 236 the TARGET's. See docs/re/gameactionlist-grammar.md.
+		// is the CARRIER's proc spell and 236 the target's. See docs/re/gameactionlist-grammar.md.
 		public static IReadOnlyList<Proc> ParseProcs(byte[] body)
 		{
 			if (body.Length <= 12)
@@ -1220,7 +1216,7 @@ namespace Faolan.Importer.Rdb
 		private const uint ComboAttackKind = 53250;
 
 
-		// Kind 53182 is NOT a stat modifier and must not be imported as one. Its element has the same signature, so
+		// Kind 53182 is not a stat modifier and must not be imported as one. Its element has the same signature, so
 		// the shared parser returns it, but the payload is (index, FOURCC) rather than (statId, amount): the "amount"
 		// decodes to four ASCII characters, identical across a whole feat family - 0x4450434E "DPCN" on every
 		// Perception feat, 0x5633534D "V3SM" on every Hide In Shadows, 0x454F4854 "EOHT" on the crafting ranks - and
@@ -1228,10 +1224,10 @@ namespace Faolan.Importer.Rdb
 		//
 		// It was 1625 of 24946 rows and 480 of the 561 that landed on stats the client cannot name - 86% of all the
 		// noise. The other 1145 looked fine only because a small index happens to be a valid stat id; they are just as
-		// bogus, which is why the whole KIND is dropped rather than the rows that failed a stat lookup.
+		// bogus, which is why the whole kind is dropped rather than the rows that failed a stat lookup.
 		private const uint TagRecordKind = 53182;
 
-		// The effect block's start (past the [2][14][frame] header) and its element COUNT, or (0, 0) when the record
+		// The effect block's start (past the [2][14][frame] header) and its element count, or (0, 0) when the record
 		// carries no effect list. Exposed so `--report feat-effect-widths` measures exactly the bytes the importer
 		// walks, rather than a second opinion about where the list begins.
 		public static (int Start, int Count) EffectTail(byte[] body)

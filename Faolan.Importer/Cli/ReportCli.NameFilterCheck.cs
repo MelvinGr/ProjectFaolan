@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report name-filter-check`: is the character-name rule (#884) too blunt for the world the client ships?
+	// `--report name-filter-check`: is the character-name rule too blunt for the world the client ships?
 	//
 	// `CharacterNameRules` matches a forbidden term as a SUBSTRING once it is long enough, and retail's own matching
 	// rule is unobservable — no capture rejects a name. So the floor is calibrated against an oracle the client
@@ -16,11 +16,11 @@ namespace Faolan.Importer.Cli
 	// that refuses them is refusing names players will reasonably want. This prints the refusal count per candidate
 	// floor, so the constant can be re-derived rather than trusted.
 	//
-	// ⭐ **Why a REPORT and not a test** (Gitea #729): it compares shipped DATA — `NameFilterTerms` and the NPC/item
-	// vocabulary in `faolan.db` — against importer INPUT, the client's own RDB. Those two populations move whenever
+	// Why a report and not a test: it compares shipped data — `NameFilterTerms` and the NPC/item
+	// vocabulary in `faolan.db` — against importer input, the client's own RDB. Those two populations move whenever
 	// the client or the import does, so as a test it would fail on data that is more correct than its baseline.
 	//
-	// It also PRINTS rather than asserts, with one exception: a shipped row whose term the client no longer carries
+	// It also prints rather than asserts, with one exception: a shipped row whose term the client does not carry
 	// means `faolan.db` holds a filter term this client cannot justify, and that can only be a defect.
 	public static partial class ReportCli
 	{

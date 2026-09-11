@@ -16,9 +16,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-character quest JOURNAL (CharacterQuest) recovered from the capture's s2c QuestIIR/QuestGoal packets, so an
-	// imported character carries its active/completed quests + goal progress. Needs characters (attribution) and the
-	// quest definitions (the journal references them).
+	/// <summary>
+	///     Per-character quest journal (CharacterQuest) recovered from the capture's s2c QuestIIR/QuestGoal packets, so an
+	///     imported character carries its active/completed quests and goal progress. Needs characters (attribution) and
+	///     the quest definitions (the journal references them).
+	/// </summary>
 	public sealed class CharacterQuestsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(QuestsModule), nameof(MapsModule)];

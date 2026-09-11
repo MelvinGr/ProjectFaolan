@@ -8,7 +8,7 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// #635: the `{teleportplayer}` travellers, whose destination is inline in their dialogue TEXT rather than in a paid
+	// the `{teleportplayer}` travellers, whose destination is inline in their dialogue text rather than in a paid
 	// destination list. RDB-backed for the reason every module in this file is - the text is in the client's install
 	// and the capture modules run without an RdbDir - and, more sharply, because the directive never reaches the
 	// server at runtime: a conversation screen carries only an LDB reference, and the server ships no LDB.
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Modules
 		{
 			var r = await RdbDialogueTeleportImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 
-			// Every directive it did NOT turn into a trip is accounted for by reason - a silent skip is
+			// Every directive it did not turn into a trip is accounted for by reason - a silent skip is
 			// indistinguishable from a decode regression.
 			return new ImportResult(
 				$"{r.Directives} {{teleportplayer}} directive(s) across {r.Screens} screen(s): {r.Added} trip(s) added, {r.Updated} updated, " +

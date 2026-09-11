@@ -6,7 +6,7 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Tests.Support
 {
-	// Locating the FullPlayerCharacterIIR RECORD inside a captured packet body, for the snapshot tests. Purely
+	// Locating the FullPlayerCharacterIIR record inside a captured packet body, for the snapshot tests. Purely
 	// positional - no wire model lives here; FullPlayerCharacterCodec still owns every byte (see
 	// SnapshotEntryAccessors' header for the line this holds).
 	public static class SnapshotPackets
@@ -48,13 +48,12 @@ namespace Faolan.Tests.Support
 		}
 
 		// Where the sub-class's opaque middle starts: the byte length of the Quest_c journal region that opens it.
-		// Was FullCharSnapshotSubClass.KnownHeaderLength, a parse artifact the value no longer carries.
 		public static int JournalLength(FullCharSnapshotSubClass subClass)
 		{
 			return QuestcRegionCodec.Build(subClass.Quests).Length;
 		}
 
-		// The sub-class bytes AS THEY ARRIVED: step over the record head and the blob-framed root, sequentially.
+		// The sub-class bytes as they arrived: step over the record head and the blob-framed root, sequentially.
 		public static byte[] SubClassBytes(byte[] record)
 		{
 			var r = new SpanReader(record, nameof(SnapshotPackets));

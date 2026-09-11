@@ -10,38 +10,37 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// The server-acted spell effects (SpellEffect): what a spell makes the SERVER do, beyond the generic
+	// The server-acted spell effects (SpellEffect): what a spell makes the server do, beyond the generic
 	// ApplySpell + duration + stat deltas the wire path already covers.
 	//
-	// These are decoded FACTS, not extractable rows - each one is a spell id paired with an observed consequence
-	// (a creature that spawned, a buff that landed), read out of the captures by hand and cited below. They lived as
-	// hardcoded id checks in the server (PetSummonCatalog, FatalityService's Frozen Hatred constants) until #439
-	// moved them into the database, so the cast path can dispatch on DATA and a new summon or proc is a row here.
+	// These are decoded facts, not extractable rows - each one is a spell id paired with an observed consequence
+	// (a creature that spawned, a buff that landed), read out of the captures by hand and cited below. They live in
+	// the database rather than as hardcoded id checks in the server, so the cast path dispatches on data and a new
+	// summon or proc is a row here.
 	//
 	// A seeded effect's spell must already be in the catalog (SpellEffect.SpellId is an FK to Spells) - the module
 	// checks that up front and fails naming the ids, rather than writing rows that point at nothing.
 	public sealed class SpellEffectsModule : IImportModule
 	{
-		// The pet-summon roster is READ FROM THE CATALOG, not listed here (#640). It used to be twelve hand-typed
-		// (spellId, template, combat) triples lifted out of one necro capture, which is the shape that "fails SILENTLY
-		// for any we don't know about" - and it did: the RDB names **319** summon spells, and three of the misses
-		// (`Summon Horde: Corruptor`/`Blighted One`/`Mutilator`) are combat pets of the very class the capture was of.
+		// The pet-summon roster is read from the catalog, not listed here. A hand-typed list of (spellId, template,
+		// combat) triples lifted out of one capture fails silently for every summon it does not know about, and the
+		// RDB names 319 summon spells - including combat pets of the very class such a capture would be of.
 		//
 		// Each of the three facts now comes from the record that states it:
-		//   * WHICH spells summon - `Spell.SummonSpawnHash != null`, off the ScriptParams of the spell's own
+		//   * which spells summon - `Spell.SummonSpawnHash != null`, off the ScriptParams of the spell's own
 		//     server-side-script GameAction element (SummonParams).
-		//   * WHETHER the pet fights - `Spell.SummonIsCompanion`, off which of the two param spellings that string
+		//   * whether the pet fights - `Spell.SummonIsCompanion`, off which of the two param spellings that string
 		//     uses. Every captured summon agrees with the wire's own PetIIR kind triple.
-		//   * WHICH creature - the spell's NAME. Retail names a summon after its pet: `Undead Minion: Corruptor`,
+		//   * which creature - the spell's name. Retail names a summon after its pet: `Undead Minion: Corruptor`,
 		//     `Companion: Pleasurable Company`, `Pet: King Cobra`. Taken as the part after the first ": " (the whole
 		//     name when there is none) and accepted only when it matches an NpcTemplates row, which is also the only
 		//     thing the runtime can actually spawn.
 		//
-		// ⚠️ The spawnHash CORROBORATES the naming rule but cannot replace it: spells sharing a pet share a hash
+		// The spawnHash CORROBORATES the naming rule but cannot replace it: spells sharing a pet share a hash
 		// (`GGDI` on all three Mutilator spells, `NSAO` on both Corruptor ones), so a hash whose spells disagreed on
 		// the creature would be visible. It resolves to nothing in the client - see Spell.SummonSpawnHash.
 
-		// Frozen Hatred's fatality proc (#140/#434). The trigger is the buff 4377209 - the effect record the castable
+		// Frozen Hatred's fatality proc. The trigger is the buff 4377209 - the effect record the castable
 		// 4377207 points at - being live on the killer; retail's own words for it are that spell's description (LDB
 		// 50211): "When you or your group perform a fatality and this buff is active, the Frozen Hatred pet appears
 		// and is under your control for 60 seconds. If you already have a Frozen Hatred pet, the duration of the pet
@@ -74,7 +73,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// #640: the summon roster comes out of the catalog the `spells` module built (Spell.SummonSpawnHash), so
+			// the summon roster comes out of the catalog the `spells` module built (Spell.SummonSpawnHash), so
 			// this module still needs nothing but the database - it reads a column instead of carrying a list.
 			var summonSpells = await ctx.Db.Spells.Where(s => s.SummonSpawnHash != null).ToListAsync();
 			var templateNames = (await ctx.Db.NpcTemplates.Select(t => t.Name).Distinct().ToListAsync())
@@ -135,7 +134,7 @@ namespace Faolan.Importer.Modules
 				$"{summons.Count} of {summonSpells.Count} catalogued summons resolved to a creature we hold ({unresolved} unresolved, #640).");
 		}
 
-		// Every summonable creature TYPE name, lower-cased for matching - what the PETS module lifts onto its types.
+		// Every summonable creature type name, lower-cased for matching - what the PETS module lifts onto its types.
 		// Read from the seeded rows, the one place that knows which creatures a spell can put in play.
 		public static async Task<IReadOnlySet<string>> PetTemplateNames(IDatabaseContext db)
 		{
@@ -143,28 +142,28 @@ namespace Faolan.Importer.Modules
 			return names.Select(n => n.ToLowerInvariant()).ToHashSet();
 		}
 
-		// The narrower roster the NPCS module excludes from world PLACEMENTS: creatures that exist ONLY because a
-		// player summoned them. It is deliberately NOT `PetTemplateNames` (#827).
+		// The narrower roster the NPCS module excludes from world PLACEMENTS: creatures that exist only because a
+		// player summoned them. It is deliberately not `PetTemplateNames`.
 		//
-		// ⚠️ A creature can be BOTH placed in the world and summonable, and retail says which by how it names the
+		// A creature can be both placed in the world and summonable, and retail says which by how it names the
 		// spell. `PetNameOf` already leans on that convention to read the name at all - these are its prefixes:
 		//
 		//   Pet: · Undead Minion: · Summon Horde: · Deathless Acolyte: · Dread Archmage: · (bare `Demon *`)
 		//        combat pets - they exist only while summoned, and must never become scenery
 		//   Companion:
-		//        a VANITY follower modelled on an NPC that stands in the world - `Companion: Courtesan`,
+		//        a vanity follower modelled on an NPC that stands in the world - `Companion: Courtesan`,
 		//        `Companion: Drunk Pirate`, `Companion: Snake Charmer`, `Companion: Wolf Pict Warrior`
 		//
 		// `Companion: Casilda` is the one that cost us: the beach's chained Casilda is the NPC the whole Tortage
-		// rescue chain (#261/#262/#267) hangs off, and the flat roster deleted her placement for 10 days because a
+		// rescue chain hangs off, and the flat roster deleted her placement for 10 days because a
 		// vanity spell shares her name. She is not a pet - freeing her makes her follow.
 		//
-		// A name is exempted only when EVERY summon spell naming it is a `Companion:`. `Chicken` is both
+		// A name is exempted only when every summon spell naming it is a `Companion:`. `Chicken` is both
 		// `Companion: Chicken` and `Pet: Chicken`, so it stays excluded - one vanity spell cannot vouch for a
 		// creature a hunter also summons.
 		//
-		// ⚠️ Residual gap, stated rather than hidden: this still excludes the placed `Pet:` animals (Chicken, Sheep,
-		// Panther, Cobra, Rocknose stand in the world too). Separating those needs PER-SPAWN evidence - the
+		// Residual gap, stated rather than hidden: this still excludes the placed `Pet:` animals (Chicken, Sheep,
+		// Panther, Cobra, Rocknose stand in the world too). Separating those needs per-spawn evidence - the
 		// `SummonedHandles` owner-binding - not a type-level roster, and the corpus has no PetIIR for them.
 		public static async Task<IReadOnlySet<string>> SummonOnlyCreatureNames(IDatabaseContext db)
 		{
@@ -180,7 +179,7 @@ namespace Faolan.Importer.Modules
 				.ToHashSet();
 		}
 
-		// The pet a summon spell is NAMED after: the part of the spell name after the first ": ", or the whole name
+		// The pet a summon spell is named after: the part of the spell name after the first ": ", or the whole name
 		// when it carries none. Retail's own convention across all 319 summon spells - `Undead Minion: Corruptor`,
 		// `Pet: King Cobra`, `Mini-Pet: Vistrix`.
 		public static string PetNameOf(string spellName)
@@ -191,11 +190,11 @@ namespace Faolan.Importer.Modules
 				: spellName[(split + 2)..].Trim();
 		}
 
-		// The summon rows the catalog yields: every spell carrying summon params whose NAME resolves to a creature we
+		// The summon rows the catalog yields: every spell carrying summon params whose name resolves to a creature we
 		// hold a template for. A summon whose pet we have never seen is skipped and COUNTED - the runtime spawns by
 		// template name, so a row naming a creature no NpcTemplate matches could not summon anything anyway, and the
 		// count is the honest coverage number (~30 of 319) rather than a silence.
-		// `templateNames` maps a lower-cased creature name to the TEMPLATE's own spelling, and the row stores the
+		// `templateNames` maps a lower-cased creature name to the template's own spelling, and the row stores the
 		// latter: the runtime spawns by looking the name up, and retail's spell name is not always capitalised the
 		// way its creature is (`Undead Minion: Life-Stealer` summons `Life-stealer`).
 		public static (List<SpellEffect> Rows, int Unresolved) BuildSummonRows(IEnumerable<Spell> summonSpells, IReadOnlyDictionary<string, string> templateNames)
@@ -225,13 +224,13 @@ namespace Faolan.Importer.Modules
 			return (rows, unresolved);
 		}
 
-		// The rows that are NOT read from the catalog. One effect, and it is not a summon spell: the Frozen Hatred
-		// fatality proc, whose trigger is a buff being live rather than a cast (#140/#434).
+		// The rows that are not read from the catalog. One effect, and it is not a summon spell: the Frozen Hatred
+		// fatality proc, whose trigger is a buff being live rather than a cast.
 		//
-		// ⚠️ Its two durations are the only numbers in this module that are not harvested, and they are not
-		// harvestable: they come from retail's own PROSE - the LDB 50211 description quoted above - not from an
+		// Its two durations are the only numbers in this module that are not harvested, and they are not
+		// harvestable: they come from retail's own prose - the LDB 50211 description quoted above - not from an
 		// observed timer. The corpus catches the proc firing but never times it out. Left as literals deliberately,
-		// and said so here rather than sitting silently beside data that is read (#640).
+		// and said so here rather than sitting silently beside data that is read.
 		public static IReadOnlyList<SpellEffect> BuildRows()
 		{
 			var rows = new List<SpellEffect>

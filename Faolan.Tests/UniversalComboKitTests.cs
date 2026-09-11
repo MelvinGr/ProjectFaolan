@@ -8,13 +8,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The UNIVERSAL combo kit in the shipped data (#416): the 4 playable races' dance emotes, granted to every class.
+	// The universal combo kit in the shipped data: the 4 playable races' dance emotes, granted to every class.
 	//
-	// They are named by RACE (Cimmerian_/Khitan_/Stygian_/Aquilonian_Dance), which is exactly why the class-name-prefix
+	// They are named by race (Cimmerian_/Khitan_/Stygian_/Aquilonian_Dance), which is exactly why the class-name-prefix
 	// derivation could never produce them and they reached nobody: `Combos` had all 12 but `ClassCombos` had none, so
 	// `GetClassCombos` returned none and `GrantCharacterCombos` emitted none. The corpus settles the grant rule -
-	// 19 characters spanning every class each receive the SAME 12, i.e. all four races' dances - so this asserts the
-	// shipped ClassCombo rows say the same thing, and that nothing CLASS-specific leaked in with them (which is what
+	// 19 characters spanning every class each receive the same 12, i.e. all four races' dances - so this asserts the
+	// shipped ClassCombo rows say the same thing, and that nothing class-specific leaked in with them (which is what
 	// a union across create dumps instead of an intersection would do: the Ranger's own combos handed to everyone).
 	public class UniversalComboKitTests
 	{

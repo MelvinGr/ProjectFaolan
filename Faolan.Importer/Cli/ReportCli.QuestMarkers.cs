@@ -12,10 +12,10 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report quest-markers` (#848/#559): every `DispatchSetQuestMarker` retail ever sent us, resolved to the NPC it
+	// `--report quest-markers`: every `DispatchSetQuestMarker` retail ever sent us, resolved to the NPC it
 	// was about and cross-tabbed against what the shipped quest data says that NPC is worth.
 	//
-	// ## The enum is the CLIENT's, and it has five values, not four
+	// ## The enum is the client's, and it has five values, not four
 	//
 	// The state byte reaches `n3VisualDynel::SetQuestMarker` (`FUN_005affb0`) unmodified - `GamecodeClient_t::
 	// SetQuestMarker` (`FUN_01395460`) resolves the ID32 and passes the byte straight through - and that function is a
@@ -25,20 +25,20 @@ namespace Faolan.Importer.Cli
 	//                                    3 -> quest_progress_inactive   4 -> quest_progress_active
 	//
 	// So the axes are the client's own: `new`(!) vs `progress`(?), each `active` (bright) or `inactive` (the greyed
-	// form the community documents as the grey `!`). ⭐ That NAMES `0x01` from the client rather than from player
-	// prose, and it turns up a fifth state - **`0x03` quest_progress_inactive** - which this report measures as
-	// **never sent**, in any capture, in any of the marker packets below. Retail's server collapses whatever `3` was
+	// form the community documents as the grey `!`). That names `0x01` from the client rather than from player
+	// prose, and it turns up a fifth state - `0x03` quest_progress_inactive - which this report measures as
+	// never sent, in any capture, in any of the marker packets below. Retail's server collapses whatever `3` was
 	// meant for onto another value.
 	//
-	// ⛔ And the client applies NO level logic of its own: it plays the effect it is told to play. So the wiki's
-	// "grey means come back at a higher level" and "a quest far below you shows nothing" are both SERVER decisions
+	// And the client applies no level logic of its own: it plays the effect it is told to play. So the wiki's
+	// "grey means come back at a higher level" and "a quest far below you shows nothing" are both server decisions
 	// about which byte to send, not client-side rendering rules - neither can be recovered by more RE of the client.
 	//
 	// ## What this report tests
 	//
-	// `QuestMarkerResolver` derives "does this NPC have anything for you" from the dialogue graph's GRANTS alone. The
+	// `QuestMarkerResolver` derives "does this NPC have anything for you" from the dialogue graph's grants alone. The
 	// quest data holds a second relation the resolver never reads: a goal's `TargetTemplateId`, i.e. the NPCs a quest
-	// SENDS you to. Turach grants two quests and is the target of four; Laranga grants two and is the target of six.
+	// sends you to. Turach grants two quests and is the target of four; Laranga grants two and is the target of six.
 	// So the report puts both beside each NPC's observed states, and the population that decides between them is the
 	// NPCs that only ever showed `0x00` - retail saying "this one is scenery, for this player, right now".
 	//
@@ -55,24 +55,25 @@ namespace Faolan.Importer.Cli
 
 			foreach (var c in captures)
 			{
-				// ⚠️ A handle is only unique inside one session AND only until it is recycled (#731), so the NPC a
-				// marker is about is the most recent spawn of that handle BEFORE the marker, never the first or last.
+				// A handle is only unique inside one session and only until it is recycled, so the NPC a
+				// marker is about is the most recent spawn of that handle before the marker, never the first or last.
 				var spawns = NpcSpawnExtractor.Extract(c.Packets);
 				var byHandle = spawns.GroupBy(s => s.Handle).ToDictionary(g => g.Key, g => g.OrderBy(s => s.SourceIndex).ToList());
 
 				// The player's journal, replayed. `QuestIIR` states every transition (2 = active, 4 = completed) and
-				// `QuestFullUpdateIIR` carries the whole entry on grant AND on every re-display - which is what makes
+				// `QuestFullUpdateIIR` carries the whole entry on grant and on every re-display - which is what makes
 				// a capture that opens mid-life readable at all, since the login burst re-displays the journal the
 				// player already had. Both are folded into one "state as of packet i" walk.
 				var journal = QuestJournalWalk(c);
 
-				// The VIEWER's level, off their own spawn body (`player_stats` is what separates a player spawn from
-				// an NPC one). Needed for #848's other thread: the wiki claims a quest far BELOW the player draws no
-				// marker, and the corpus evidence for that has never been separated from the line rule.
-				// ⚠️ TWO clients can share one dump and NOTHING in a marker packet names its recipient, so a capture
+				// The viewer's level, off their own spawn body (`player_stats` is what separates a player spawn from
+				// an NPC one). Needed for the level test below: a quest far below the player is claimed to draw no
+				// marker, and the corpus evidence for that has to be separated from the line rule.
+				//
+				// Two clients can share one dump and nothing in a marker packet names its recipient, so a capture
 				// with more than one player in it cannot attribute a level to the viewer at all. Those are dropped
-				// from the level test rather than guessed at - the ticket's own history has one wrong attribution in
-				// it already (keyed on a capture FILENAME), and this is the same failure wearing a different hat.
+				// from the level test rather than guessed at; a level attributed from the capture's file name is the
+				// same mistake wearing a different hat.
 				var playerLevels = new HashSet<uint>();
 				foreach (var p in c.Packets)
 				{
@@ -144,14 +145,14 @@ namespace Faolan.Importer.Cli
 			ScoreShippingRule(observations);
 		}
 
-		// ⭐ What would WE send? The cross-tab above scores RELATIONS against retail; this scores the rule the server
-		// actually ships (#857), so a change to it is measurable rather than argued.
+		// What would we send? The cross-tab above scores RELATIONS against retail; this scores the rule the server
+		// actually ships, so a change to it is measurable rather than argued.
 		//
 		// It calls `QuestMarkerResolver.LightsSilver` directly rather than restating the rule. A rule measured in one
 		// implementation and shipped in another is a rule with no measurement - that is why the resolver exposes it,
 		// the same reason `LineReached` is public.
 		//
-		// ⚠️ Scoped to the packets the rule actually DECIDES: retail sent 0x00 or 0x01, and the viewer's level is
+		// Scoped to the packets the rule actually DECIDES: retail sent 0x00 or 0x01, and the viewer's level is
 		// known. The gold states come from the giver fold and the talk-goal check, neither of which this rule touches,
 		// and a marker whose viewer level we never captured cannot be scored at all (the level band needs it).
 		private static void ScoreShippingRule(List<MarkerObservation> observations)
@@ -166,7 +167,7 @@ namespace Faolan.Importer.Cli
 				.GroupBy(g => g.NpcTemplateId)
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 
-			// The same exclusion the shipping map applies (`GetQuestGoalTargetMap`): a KILL or LOOT target is not a
+			// The same exclusion the shipping map applies (`GetQuestGoalTargetMap`): a kill or loot target is not a
 			// marker relation. Restated here rather than shared because this report also scores the UNrestricted
 			// relation in its cross-tab above, and the two questions want different sets.
 			var targeted = db.QuestGoalDefinitions.Where(g => g.TargetTemplateId != null && g.TargetTemplateId != 0
@@ -178,7 +179,7 @@ namespace Faolan.Importer.Cli
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().ToArray());
 
 			int hit = 0, miss = 0, over = 0, correctDark = 0;
-			// The LINE clause alone, scored over every 0x00/0x01 packet rather than only the ones whose viewer level
+			// The line clause alone, scored over every 0x00/0x01 packet rather than only the ones whose viewer level
 			// we captured. The two clauses have to be scored apart: the level band needs a viewer level, and only 50
 			// of the 456 silver packets have one, so folding them together scores the line rule on 11% of its evidence
 			// and reads as the rule failing when it is the sample that is missing.
@@ -190,7 +191,7 @@ namespace Faolan.Importer.Cli
 				if (o.State != 0x00 && o.State != 0x01)
 					continue;
 
-				// ⚠️ PRECEDENCE. The silver rule is the LAST thing `MarkerStateFor` consults - a giver with a quest
+				// PRECEDENCE. The silver rule is the last thing `MarkerStateFor` consults - a giver with a quest
 				// still on offer is answered gold by the fold above it, and a talk goal is answered 0x04 before that.
 				// Scoring the silver rule over those packets measures a branch the server never reaches, and it is not
 				// a small effect: it puts Casilda at the top of the over-lit list, when retail's 0x00 there is her
@@ -236,7 +237,7 @@ namespace Faolan.Importer.Cli
 					else
 					{
 						miss++;
-						// ⭐ WHY it was missed, in the order the rule tests. A bare recovery percentage says the rule
+						// why it was missed, in the order the rule tests. A bare recovery percentage says the rule
 						// is wrong; this says which of its clauses is doing the rejecting - and whether the answer is
 						// a rule change at all or a harvest gap wearing one.
 						var unstarted = through.Where(d => d != null && !startedLines.Contains(d.QuestLineId)).ToList();
@@ -309,13 +310,13 @@ namespace Faolan.Importer.Cli
 
 		// One capture's quest-state transitions in packet order: (packet index, quest id, state).
 		//
-		// ⚠️⚠️ The live IIRs are NOT the whole journal, and believing they were made this report lie about exactly the
-		// population #848 cares about. `QuestIIR`/`QuestFullUpdateIIR` carry what happens DURING the session, and the
-		// level-80 captures hold **one** such packet each - so every quest that character ever finished read as
-		// "untouched", and a level-80 standing dark beside a Tortage NPC looked like evidence for a level rule when
-		// it is just a quest they completed years earlier.
+		// The live IIRs are not the whole journal, and taking them for it makes this report lie about exactly the
+		// population it is measuring. `QuestIIR`/`QuestFullUpdateIIR` carry what happens during the session, and the
+		// level-80 captures hold one such packet each - so every quest that character ever finished would read as
+		// "untouched", and a level-80 standing dark beside a Tortage NPC would look like evidence for a level rule
+		// when it is just a quest they completed years earlier.
 		//
-		// The archive arrives instead inside the login SNAPSHOT, as the area-grouped completed-quest region (#390),
+		// The archive arrives instead inside the login SNAPSHOT, as the area-grouped completed-quest region,
 		// which is why it has to be read here too: the necromancer's snapshot alone carries ~1,540 of them.
 		private static List<(int At, uint QuestId, uint State)> QuestJournalWalk(NamedCapture c)
 		{
@@ -356,9 +357,9 @@ namespace Faolan.Importer.Cli
 			[0x04] = "quest_progress_active",
 		};
 
-		// ⭐ The question #848 is open on: what does retail know about an NPC that our GRANT-derived model does not?
-		// Each observed NPC is put beside both relations the shipped quest data holds for it - what it GRANTS (the
-		// dialogue graph, which is all `QuestMarkerResolver` reads) and what SENDS you to it (a goal's target).
+		// The open question: what does retail know about an NPC that our grant-derived model does not?
+		// Each observed NPC is put beside both relations the shipped quest data holds for it - what it grants (the
+		// dialogue graph, which is all `QuestMarkerResolver` reads) and what sends you to it (a goal's target).
 		private static void MarkerCrossTab(List<MarkerObservation> observations)
 		{
 			using var db = OpenDb();
@@ -377,7 +378,7 @@ namespace Faolan.Importer.Cli
 				.GroupBy(g => g.Template)
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().OrderBy(q => q).ToArray());
 
-			// ⭐ The LINE each quest belongs to (#848). The relation that finally separates Casilda from Turach is not
+			// The line each quest belongs to. The relation that finally separates Casilda from Turach is not
 			// about a quest at all - it is about whether the player has touched the CHAIN that quest sits in.
 			var lineOf = db.QuestDefinitions.Where(q => q.QuestLineId > 0)
 				.Select(q => new { q.QuestId, q.QuestLineId })
@@ -405,7 +406,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"=== {perNpc.Count} NPC template(s) ever carried a marker ===");
 			Console.WriteLine();
 
-			// ⭐ THE TEST. If the marker only ever described what an NPC GRANTS, then no NPC that grants nothing could
+			// the test. If the marker only ever described what an NPC grants, then no NPC that grants nothing could
 			// carry a non-zero marker. Every one that does is retail knowing something the resolver does not - and the
 			// second column says whether the quest data already holds it.
 			var lit = perNpc.Where(n => n.NonZero > 0).ToList();
@@ -418,7 +419,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    {litNoRelation.Count,4} have neither - retail lights them off something the shipped data does not hold at all");
 			Console.WriteLine();
 
-			// ⭐⭐ THE FINDING. Split each STATE's own NPC population by which relation the shipped data holds for it.
+			// the FINDING. Split each state's own NPC population by which relation the shipped data holds for it.
 			// The two states are not drawn from the same population at all, and that is what names them.
 			Console.WriteLine("  ⭐ each state's NPCs, by which quest relation they have:");
 			Console.WriteLine();
@@ -453,7 +454,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// The other half of the same test, and the one that decides whether "lit" can be predicted at all: an NPC
-			// the quest data DOES relate to the player, which retail nonetheless never lights.
+			// the quest data does relate to the player, which retail nonetheless never lights.
 			var dark = perNpc.Where(n => n.NonZero == 0 && (n.Grants.Length > 0 || n.Targeted.Length > 0)).ToList();
 			Console.WriteLine();
 			Console.WriteLine($"  {dark.Count} NPC(s) are related to a quest and were NEVER lit - 0x00 every time:");
@@ -469,17 +470,17 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("     What they bound is how much of retail's answer the shipped data could reproduce at all.");
 		}
 
-		// ⭐⭐ THE PREDICTOR TEST (#848). Every observation is scored against the four relations the shipped data can
-		// express, using the player's journal AS OF THAT PACKET rather than at the end of the capture. The point is
+		// the PREDICTOR test. Every observation is scored against the four relations the shipped data can
+		// express, using the player's journal AS of that packet rather than at the end of the capture. The point is
 		// not to declare a rule but to see which relation the observed states actually track - a relation that fires
 		// on 0x00 as often as on 0x02 is not what retail is describing, whatever it sounds like.
 		//
-		// ⚠️ Each row is a PACKET, and retail re-sends the same answer for every NPC on every poll, so a single
+		// Each row is a packet, and retail re-sends the same answer for every NPC on every poll, so a single
 		// long-parked session weights heavily. The per-NPC table above is the counterweight; read them together.
 		private static void RulePredictorTest(List<MarkerObservation> observations,
 			Dictionary<uint, uint[]> grants, Dictionary<uint, uint[]> targeted, Dictionary<uint, uint> lineOf)
 		{
-			// Each observation's LINE view: which chains this NPC appears in at all, and which chains the player has
+			// Each observation's line view: which chains this NPC appears in at all, and which chains the player has
 			// already touched (any quest of that line held or completed as of this packet).
 			foreach (var o in observations)
 			{
@@ -513,9 +514,9 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {name,-42} {byState.GetValueOrDefault((byte)0),7:N0}  {byState.GetValueOrDefault((byte)1),7:N0}  {byState.GetValueOrDefault((byte)2),7:N0}  {byState.GetValueOrDefault((byte)4),7:N0}  {lit * 100.0 / firing.Count,5:0}%");
 			}
 
-			// ⭐ The same numbers read the other way, which is the direction the question is actually asked in: given
+			// The same numbers read the other way, which is the direction the question is actually asked in: given
 			// that retail sent SILVER, what was true of that NPC? A relation holding on 85% of the silvers says what
-			// silver is ABOUT, even where the relation's own lit% is low because it also holds on quiet NPCs.
+			// silver is about, even where the relation's own lit% is low because it also holds on quiet NPCs.
 			Console.WriteLine();
 			Console.WriteLine("  ⭐ read the other way - of the packets carrying each state, how many had each relation:");
 			Console.WriteLine();
@@ -531,7 +532,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {name,-42} {string.Join("  ", cells)}");
 			}
 
-			// ⭐⭐ The one relation that comes out ABSOLUTE, printed as a gate rather than a percentage - and printed
+			// The one relation that comes out ABSOLUTE, printed as a gate rather than a percentage - and printed
 			// with its exceptions named, because a claim of "zero" is only worth having if the next capture that
 			// breaks it says so out loud.
 			var allStarted = observations.Where(o => o.NpcLines.Count > 0 && o.NpcLines.All(o.TouchedLines.Contains)).ToList();
@@ -560,12 +561,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  A relation only tells us something insofar as its lit% beats that.");
 		}
 
-		// ⭐⭐ #848 thread 2, re-examined. The claim on the ticket is that a quest far BELOW the player draws no marker
+		// The level-threshold claim, re-examined: a quest far below the player is said to draw no marker
 		// ("significantly lower-level characters will not have the exclamation mark"), bracketed from the corpus at
 		// `1 < T <= 56` because a level-80 was seen dark beside 15 never-taken quests at delta 56-75.
 		//
-		// ⚠️ That evidence was never separated from the LINE rule, and the two predict the same darkness. This splits
-		// them: every observation on an NPC with an UNTOUCHED quest is bucketed by the level gap to that quest AND by
+		// That evidence was never separated from the line rule, and the two predict the same darkness. This splits
+		// them: every observation on an NPC with an UNTOUCHED quest is bucketed by the level gap to that quest and by
 		// whether the player had already started the NPC's lines. If the high-delta darkness lives entirely in the
 		// `all lines started` column, the level rule is unsupported and the bracket is an artifact of the confound.
 		private static void LevelVersusLineTest(List<MarkerObservation> observations,
@@ -611,9 +612,9 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {bucket.Name,-12} {Cell(untouched),-36} {Cell(started)}");
 			}
 
-			// ⭐ The boundary, at one-level resolution. A bracket is only worth stating if the corpus actually has
+			// The boundary, at one-level resolution. A bracket is only worth stating if the corpus actually has
 			// observations either side of it, so this prints every delta that occurs rather than a chosen bucketing -
-			// and prints how many distinct CAPTURES back each one, because a flip that happens inside one session is
+			// and prints how many distinct captures back each one, because a flip that happens inside one session is
 			// a control and a flip between sessions is a confound waiting to be named.
 			Console.WriteLine();
 			Console.WriteLine("  per-level detail, line-UNstarted only (the column where a level rule could still live):");
@@ -622,7 +623,7 @@ namespace Faolan.Importer.Cli
 			foreach (var g in rows.Where(r => r.LineUntouched).GroupBy(r => r.Delta).OrderBy(g => g.Key))
 				Console.WriteLine($"  {g.Key,+5}   {g.Count(r => r.State != 0),4} / {g.Count(),-6}  {g.Select(r => r.Capture).Distinct().Count()}");
 
-			// ⭐ The brackets, computed rather than eyeballed - and deliberately expressed as brackets, because the
+			// The brackets, computed rather than eyeballed - and deliberately expressed as brackets, because the
 			// corpus is SPARSE in delta (a handful of characters at a handful of levels) and the gap either side of
 			// the lit band is unobserved rather than dark. Picking a number inside an unobserved gap would be
 			// inventing data; naming the gap is the honest result.
@@ -672,7 +673,7 @@ namespace Faolan.Importer.Cli
 
 		// The relations the shipped quest data can express about an NPC, given a player's journal at one moment.
 		// `grants` is the dialogue graph's own grants (what QuestMarkerResolver reads); `targeted` is the quests whose
-		// GOALS send the player to this NPC - the relation it does not read.
+		// goals send the player to this NPC - the relation it does not read.
 		private static readonly (string Name, Func<MarkerObservation, uint[], uint[], bool> Holds)[] Relations =
 		[
 			("grants a quest (any state)", (_, g, _) => g.Length > 0),
@@ -685,10 +686,10 @@ namespace Faolan.Importer.Cli
 			("a goal of a COMPLETED quest targets it", (o, _, t) => t.Any(o.Completed.Contains)),
 			("neither relation at all", (_, g, t) => g.Length == 0 && t.Length == 0),
 
-			// ⭐⭐ THE LINE RELATIONS (#848). "A quest line runs through this NPC that the player has not begun" is the
-			// reading that survives both awkward cases at once: Turach stays silver because lines 222 and 1305 pass
-			// through him and the player never started either, while Casilda goes DARK the moment her quest is taken
-			// because her only line (1054) is now one the player is ON - and a line in progress lights her only when
+			// The line relations. "A quest line runs through this NPC that the player has not begun" is the reading
+			// that survives both awkward cases at once: Turach stays silver because lines 222 and 1305 pass through
+			// him and the player never started either, while Casilda goes dark the moment her quest is taken
+			// because her only line (1054) is now one the player is on - and a line in progress lights her only when
 			// she is actually actionable.
 			("in a line the player has NOT started", (o, _, _) => o.NpcLines.Any(l => !o.TouchedLines.Contains(l))),
 			("in a line the player HAS started", (o, _, _) => o.NpcLines.Any(o.TouchedLines.Contains)),

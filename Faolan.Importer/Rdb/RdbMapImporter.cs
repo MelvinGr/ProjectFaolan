@@ -11,7 +11,7 @@ namespace Faolan.Importer.Rdb
 {
 	// Imports map names + ids from the client RDB PLAYFIELDDESCRIPTIONDATA (type 1070003). Each record is an XML
 	// <playfielddescriptiondata> carrying <playfield Name=".." ID=".."/>; the RDB record id == the playfield id ==
-	// our Map.Id (verified: 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi, ...). Both v5-reachable
+	// our Map.Id (verified: 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi,...). Both v5-reachable
 	// records (file < 0xFF) and the on-demand content-addressed ones (file == 0xFF) are imported: the latter are
 	// pulled through the mirror proxy by RdbReader (cdnBaseUrl), so e.g. playfield 30200 - a real CDN-only playfield
 	// that quest 19522 markers onto - now resolves. Names fill/replace Map.Name; missing maps are created as reference
@@ -23,8 +23,8 @@ namespace Faolan.Importer.Rdb
 
 		// A handful of RDB playfield names carry internal level-tooling suffixes appended to the player-facing name
 		// (e.g. "Khopshef Province Heigh_Tiles_Statels", "Wild Lands of Zelata_statel_height_painting",
-		// "Old Tarantia Statels and Hmap"). Cut the name at the first such marker so .maps/teleport labels show the
-		// clean name (#31). The markers are level-editor artifacts (statel = static element, hmap = height map),
+		// "Old Tarantia Statels and Hmap"). Cut the name at the first such marker so.maps/teleport labels show the
+		// clean name. The markers are level-editor artifacts (statel = static element, hmap = height map),
 		// never part of a real map name, so this can't truncate a legitimate one.
 		private static readonly string[] ToolingMarkers = [" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"];
 

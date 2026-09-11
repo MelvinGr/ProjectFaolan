@@ -3,12 +3,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A spell a character has learned (one row per character+spell). The spell DEFINITION (name/effect/cost) lives in
-	// the Spells catalog + the client RDB (rendered by id); this just records WHICH spells a character knows. Retail
+	// A spell a character has learned (one row per character+spell). The spell definition (name/effect/cost) lives in
+	// the Spells catalog + the client RDB (rendered by id); this just records which spells a character knows. Retail
 	// re-grants the whole learned set on every login via DispatchLearnSpell (s2c 0x200A, body = [u32 spellId]) - so
-	// GrantCharacterSpells replays these rows on world entry, the spell counterpart to GrantCharacterAbilities. The
-	// grant packet was decoded in #73; #74 actually grants the spells. Captured characters are seeded with their
-	// observed learned set (CaptureSpellImporter, attributed via the grant's RpcHeader receiver = the character id).
+	// GrantCharacterSpells replays these rows on world entry, the spell counterpart to GrantCharacterAbilities.
+	// Captured characters are seeded with their observed learned set (CaptureSpellImporter, attributed via the
+	// grant's RpcHeader receiver = the character id).
 	[PrimaryKey(nameof(CharacterId), nameof(SpellId))]
 	public class CharacterSpell
 	{

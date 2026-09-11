@@ -11,10 +11,10 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Extractors
 {
 	// One captured NPC patrol route: its map + anchor position, the flattened waypoints (for the loop-shape filter),
-	// the capture handle, and the columnarized task tree Root (#316).
+	// the capture handle, and the columnarized task tree Root.
 	// Carries the wire task AST, not a columnarized tree: the importer converts it per spawn via PatrolNodeMapper so
 	// there is exactly one wire->row conversion and no hand-maintained copy to fall behind a new column.
-	// ClassId is set only for a route on a class-specific map (Map.ClassSpecific), where (map, position) no longer
+	// ClassId is set only for a route on a class-specific map (Map.ClassSpecific), where (map, position) does not
 	// identifies one spawn - two classes' NPCs can stand on the same spot. Null everywhere else.
 	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, IReadOnlyList<Vector3> Waypoints, uint Handle, MoveTaskNode Task)
 	{
@@ -23,22 +23,22 @@ namespace Faolan.Importer.Extractors
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current map
 	// (MapChange 5D85BFC7), parses every MoveTask via the fully-decoded recursive grammar (MoveTaskCodec,
-	// round-trips all 6225 captured records), and columnarizes the task tree into a PatrolNode tree (#316) so the
+	// round-trips all 6225 captured records), and columnarizes the task tree into a PatrolNode tree so the
 	// runtime CONSTRUCTS the patrol from DB columns rather than replaying a captured blob. Keyed by handle (the
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
 	public static class PatrolPathExtractor
 	{
-		// #703: how close one leg's end must come to the next leg's start for them to be ONE path. Legs that are
+		// how close one leg's end must come to the next leg's start for them to be one path. Legs that are
 		// genuinely one beat join tightly - 313 of the 450 two-leg tasks join within 5u, most of them within 0.5u -
 		// while a leg that belongs elsewhere misses by 6u to 496u. Same tolerance as the runtime's closed-route test.
 		private const float LegJoinTolerance = 5f;
 
-		// One patrol route per NPC in a capture (#266 patrol). The real route is the mode-1 PathMoveTask waypoint list,
+		// One patrol route per NPC in a capture. The real route is the mode-1 PathMoveTask waypoint list,
 		// usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by (map, handle) so
 		// the importer correlates a route to its spawn; keeps the RICHEST route per NPC (the most complete path seen
 		// that session).
 		//
-		// ⚠️ The MAP is half the key, and leaving it out is a real defect, not tidiness (#571): a handle is scoped to
+		// The map is half the key, and leaving it out is a real defect, not tidiness: a handle is scoped to
 		// the PLAYFIELD, so the low pool starts again when the player changes zone and the same number names a
 		// different NPC on the other side of the handoff. Measured over the corpus (`--report handle-recycling`), 46
 		// handles carry a second template and 46 of 46 span more than one map - there is not one same-map reuse. Keyed
@@ -73,14 +73,14 @@ namespace Faolan.Importer.Extractors
 
 				// Reject a task that APPROACHES A CHARACTER (a mode-8 node, MoveTaskNodes.ApproachTarget): walking to a
 				// player is a scripted follow - an escort or a companion - and never an idle patrol. The loop-shape test
-				// below does NOT catch it, because a long meandering escort walks far enough to look loop-shaped: Casilda's
+				// below does not catch it, because a long meandering escort walks far enough to look loop-shaped: Casilda's
 				// rescue walk from her cage to the city gate came in as a 25-waypoint "patrol" on her spawn, so the world
 				// tick wandered her along it from the moment she spawned - before the player had freed her - which both
 				// moved her off the cage and cancelled her captive struggle pose (a walking NPC plays locomotion).
 				if (ApproachesACharacter(task.Task))
 					continue;
 
-				// #703: reduce the task to ONE CONTINUOUS route before anything measures it. A captured task carries
+				// reduce the task to one CONTINUOUS route before anything measures it. A captured task carries
 				// the NPC's CURRENT step as well as the beat it is walking, and the two are separate mode-1 legs of the
 				// same mode-4 list; where they don't join, concatenating them fabricates a straight line between two
 				// unrelated places. See TrimToContinuousRoute.
@@ -91,9 +91,9 @@ namespace Faolan.Importer.Extractors
 				if (waypoints.Count < 2)
 					continue; // no real path (a wait/rotate/approach task, or a single point)
 
-				// Reject a ONE-WAY path: a captured MoveTask is often the mob CHASING the capturing player (a straight
+				// Reject a one-WAY path: a captured MoveTask is often the mob CHASING the capturing player (a straight
 				// line to where the player stood). An idle PATROL loops back toward its start, so its net displacement is
-				// small vs the distance walked; a chase's displacement ~= its length. Keep only loop-shaped paths (#266).
+				// small vs the distance walked; a chase's displacement ~= its length. Keep only loop-shaped paths.
 				var from = new Vector3(Bits(task.FromX), Bits(task.FromY), Bits(task.FromZ));
 				var length = Vector3.Distance(from, waypoints[0]);
 				for (var i = 1; i < waypoints.Count; i++)
@@ -124,7 +124,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Whether a move-task tree contains a mode-8 approach node aimed at a CHARACTER (EntityClass.Character) - i.e.
-		// the NPC walks to a PLAYER. That makes the whole task a scripted follow (escort / companion), never an idle
+		// the NPC walks to a player. That makes the whole task a scripted follow (escort / companion), never an idle
 		// patrol, whatever shape its path happens to have.
 		private static bool ApproachesACharacter(MoveTaskNode node)
 		{
@@ -140,20 +140,20 @@ namespace Faolan.Importer.Extractors
 			return false;
 		}
 
-		// #703: a stored route must be ONE CONTINUOUS POLYLINE - the runtime walks it waypoint by waypoint, so any
+		// a stored route must be one CONTINUOUS POLYLINE - the runtime walks it waypoint by waypoint, so any
 		// break in it is walked as a straight line between the two sides of the break, through whatever stands there.
 		//
-		// A captured mode-4 ListMoveTask routinely holds TWO mode-1 legs: the NPC's current short step, then the roam
+		// A captured mode-4 ListMoveTask routinely holds two mode-1 legs: the NPC's current short step, then the roam
 		// path it is walking. Measured over the 853 harvested routes, every multi-leg task has exactly two legs and
 		// every seam is at that one boundary; the leading leg is 2 waypoints in 450 of 465 cases. Usually the beat
 		// starts where the step ends (median seam 0.7u) and the two are genuinely one path - but in 141 cases the beat
-		// is elsewhere entirely (up to 495.9u away), because a roam path is shared by a GROUP and the NPC joins it
+		// is elsewhere entirely (up to 495.9u away), because a roam path is shared by a group and the NPC joins it
 		// partway rather than at its first waypoint. Two Thunder River spawns of one template carry byte-identical
 		// legs, which is that sharing showing through.
 		//
 		// So: keep the longest run of legs that actually join, and drop the rest. That is the beat - it passes a
 		// median 2.8u from the spawn (max 26.8u, inside the leash) in exactly those 141 cases, so the NPC is standing
-		// on the route it was given; what it is NOT standing on is that route's first waypoint. Dropping the stub
+		// on the route it was given; what it is not standing on is that route's first waypoint. Dropping the stub
 		// costs 294 waypoints across the corpus and removes every fabricated chord at the source.
 		internal static void TrimToContinuousRoute(MoveTaskNode task)
 		{
@@ -199,7 +199,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// The mode-1 legs that carry an explicit waypoint list, in walk order, each with the parent it hangs off (null
-		// for the root). A PathFlags&1 leg names a territory path instead of carrying one (#490) - it holds no geometry,
+		// for the root). A PathFlags&1 leg names a territory path instead of carrying one - it holds no geometry,
 		// so it can neither break continuity nor be measured, and is left alone.
 		private static void CollectPathLegs(MoveTaskNode node, MoveTaskNode parent, List<(MoveTaskNode Parent, MoveTaskNode Leg)> legs)
 		{

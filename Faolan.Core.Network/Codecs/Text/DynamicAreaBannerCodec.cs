@@ -2,28 +2,33 @@ using System.Security;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The top-of-screen FIFO banner (the "toast") carrying ARBITRARY server-authored text - not a pre-defined LDB
-	// string. Reverse-engineered 2026-08-27 (Gitea #664, which had been closed as "not possible"):
-	//
-	//   - The GenericDisplayAreaName FIFO template (LDB category 50018) resolves to the format body `{DisplayedText}`
-	//     - i.e. it renders its `DisplayedText` parameter VERBATIM, the client-side equivalent of a bare `%s`.
-	//   - A remoteformat `<parameter>` of wire-type 7 is a STRING that the client substitutes as-is UNLESS its text
-	//     is itself a nested `<localized>`/`<remoteformat>` tag (which it then resolves recursively). The area-name
-	//     banner nests a `<localized>`; but the corpus also carries type-7 parameters holding plain LITERAL text -
-	//     e.g. `TradePostGUI_MailItemBought` fills its `%s` with `value="7;AssassinL23"` (a real player name, never an
-	//     LDB entry). So a literal string in a type-7 parameter renders exactly as written.
-	//
-	// Put together: the same GenericDisplayAreaName envelope AreaNameBannerCodec builds, but with the nested
-	// `<localized>` replaced by the literal text, makes the top banner show whatever the server says. This is what
-	// AreaNameBannerCodec cannot do - it can only name a client-known area id.
-	//
-	// A rule-1a STRING codec (#530); FormatFeedbackCodec.Build(instance, FifoBannerTypeFlags, 1, text) frames it.
-	// Build-only: the client never sends a banner, so there is no inbound body to gate a Parse against.
+	/// <summary>
+	///     The top-of-screen FIFO banner (the "toast") carrying arbitrary server-authored text rather than a pre-defined
+	///     LDB string.
+	/// </summary>
+	/// <remarks>
+	///     Two client behaviours make it possible. The GenericDisplayAreaName FIFO template (LDB category 50018) resolves
+	///     to the format body <c>{DisplayedText}</c>, i.e. it renders its <c>DisplayedText</c> parameter verbatim, the
+	///     client-side equivalent of a bare <c>%s</c>. And a remoteformat <c>parameter</c> of wire-type 7 is a string the
+	///     client substitutes as-is unless its text is itself a nested <c>localized</c> or <c>remoteformat</c> tag, which
+	///     it then resolves recursively - the area-name banner nests a <c>localized</c>, while the corpus also carries
+	///     type-7 parameters holding plain literal text, such as <c>TradePostGUI_MailItemBought</c> filling its
+	///     <c>%s</c> with a real player name that is never an LDB entry.
+	///     <para>
+	///         Put together: the same GenericDisplayAreaName envelope <see cref="AreaNameBannerCodec" /> builds, with the
+	///         nested <c>localized</c> replaced by the literal text, makes the top banner show whatever the server says.
+	///         That is what <see cref="AreaNameBannerCodec" /> cannot do, since it can only name a client-known area id.
+	///     </para>
+	///     <para>
+	///         A string codec: <c>FormatFeedbackCodec.Build(instance, FifoBannerTypeFlags, 1, text)</c> frames it.
+	///         Build-only, since the client never sends a banner.
+	///     </para>
+	/// </remarks>
 	public static class DynamicAreaBannerCodec
 	{
-		// The outer envelope is the exact area-name FIFO template, key and all - the client resolves the template out
-		// of its own LDB and does not validate the wire key (AreaNameBannerCodec ships the same constant). Only the
-		// parameter differs: a literal type-7 string in place of the nested <localized>.
+		// The outer envelope is the exact area-name FIFO template, key and all - the client resolves the template out of its
+		// own LDB and does not validate the wire key, and AreaNameBannerCodec ships the same constant. Only the parameter
+		// differs: a literal type-7 string in place of the nested <localized>.
 		public static string Build(DynamicAreaBanner value)
 		{
 			var text = SecurityElement.Escape(value.Text) ?? "";
@@ -39,8 +44,10 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// A FIFO-banner payload carrying arbitrary literal text: FormatFeedbackCodec frames it with the banner typeFlags
-	// and footer 1, the same as the area-name banner it is modelled on.
+	/// <summary>
+	///     A FIFO-banner payload carrying arbitrary literal text: <see cref="FormatFeedbackCodec" /> frames it with the
+	///     banner typeFlags and footer 1, the same as the area-name banner it is modelled on.
+	/// </summary>
 	public sealed record DynamicAreaBanner(string Text) : FeedbackPayload
 	{
 		public override uint TypeFlags => FormatFeedbackCodec.FifoBannerTypeFlags;

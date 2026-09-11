@@ -5,17 +5,20 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// KnubotFinishTradeIIR (0x7446F3FA) - the vendor/NPC trade-close. ReadSubClass (FUN_009a7c20) runs the Knubot
-	// base prefix (FUN_009a7e00, a u16 streaming version) then a target entity ref + trailer. Body observed as
-	// [u16 version][u32 targetClass = 0xC350][u32 targetInstance][u64][u32]. Grammar from the client reader
-	// (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     <c>KnubotFinishTradeIIR</c> - the vendor/NPC trade-close.
+	/// </summary>
+	/// <remarks>
+	///     <c>ReadSubClass</c> (FUN_009a7c20) runs the Knubot base prefix (FUN_009a7e00, a u16 streaming version) then a
+	///     target entity ref and trailer. The body is observed as
+	///     <c>[u16 version][u32 targetClass][u32 targetInstance][u64][u32]</c>. Grammar from the client reader
+	///     (docs/re/v1-iir-readers.md), byte-exact. The u32 carrier length belongs to the sender.
+	/// </remarks>
 	public static class KnubotFinishTradeCodec
 	{
 		public const uint Opcode = (uint)IirTypes.KnubotFinishTradeIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(KnubotFinishTradeIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -60,6 +63,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 	}
 
-	// KnubotFinishTradeIIR (0x7446F3FA).
+	/// <summary>The KnubotFinishTradeIIR body.</summary>
 	public sealed record KnubotFinishTradeIIR(uint Handle, byte Env, ushort Version, uint TargetClass, uint TargetInstance, ulong Trailer64, uint Trailer32);
 }

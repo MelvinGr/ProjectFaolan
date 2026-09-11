@@ -8,11 +8,9 @@ namespace Faolan.Tests
 {
 	// Build/Parse golden tests for the small combat result packets (EnergyIIR 0x40749B8A, DamageResultIIR 0xFEC4158A)
 	// and the NPC attack ack. The layouts are capture-derived (strickenbla combat capture; see
-	// protocol_stats_and_combat); #530 wave 4 split the one "CombatPacketCodec" that carried all three unrelated IIRs
-	// into a codec each.
+	// protocol_stats_and_combat), one codec per IIR.
 	//
-	// ⚠️ The carrier handle of a DamageResultIIR is the TARGET and the second endpoint is the ATTACKER - the bytes
-	// below are unchanged, but the names were the other way round while this file owned its own copy of the layout.
+	// The carrier handle of a DamageResultIIR is the target and the second endpoint is the attacker.
 	public class EnergyCodecTests
 	{
 		private const uint Target = 0x021663DD; // the captured character instance
@@ -61,7 +59,7 @@ namespace Faolan.Tests
 
 		// The NPC counter-attack animation ack (BehaviorControlCenterIIR 0x642CD3D6 with actor = NPC handle), byte-exact
 		// against frame 6472 of the strickenbla combat capture (NPC 0x2c56 swings at player 0x01316d8a for 0x53). The
-		// expected hex is the captured 0x2000 body MINUS its 4-byte totalLen prefix (the builder produces the inner
+		// expected hex is the captured 0x2000 body minus its 4-byte totalLen prefix (the builder produces the inner
 		// record that WriteArrayUInt32Length wraps). Decode: tools/capture/decode_combat_npc_ack.py.
 		[Fact]
 		public void NpcAttackAnimationAck_MatchesCapturedFrame6472()

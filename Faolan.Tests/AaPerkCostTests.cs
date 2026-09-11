@@ -9,11 +9,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #150: the ALTERNATE-ADVANCEMENT perk prices - RDB 1000099, imported as `FeatPerkCost`.
+	// The alternate-advancement perk prices - RDB 1000099, imported as `FeatPerkCost`.
 	//
 	// The point of these gates is that the cost table and the feat-tree table have to agree about what an AA perk
-	// IS. A price that lands outside the twelve AA trees, or an AA placement with no price, would each mean the
-	// join key (`FeatClassEntry.Id`, the client's own featclass ROW id) had drifted - and that key is the whole
+	// is. A price that lands outside the twelve AA trees, or an AA placement with no price, would each mean the
+	// join key (`FeatClassEntry.Id`, the client's own featclass row id) had drifted - and that key is the whole
 	// reason the table joins to anything at all, since it is not a feat id.
 	public class AaPerkCostTests
 	{
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 		}
 
 		// The pool column is the client's own `AAFeatPlannerPointType` (e_PvP = 2, e_PvE = 3, e_Generic = 4). The
-		// shipped table uses only the two SPECIFIC pools - if a Generic row ever appeared it would be new data about
+		// shipped table uses only the two specific pools - if a Generic row ever appeared it would be new data about
 		// the economy, not noise, so it is asserted rather than assumed away.
 		[Fact]
 		public async Task PointType_IsOnlyTheTwoSpecificAaPools()
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			Assert.Equal([TokenPool.AltAdvancementPvPToken, TokenPool.AltAdvancementPvEToken], pools);
 		}
 
-		// A perk priced in BOTH pools costs the same either way - so "which currency" is a restriction on who may buy
+		// A perk priced in both pools costs the same either way - so "which currency" is a restriction on who may buy
 		// it, never a discount. 216 of the 2,880 placements are dual-priced.
 		[Fact]
 		public async Task ADualPricedPlacement_CostsTheSameInBothPools()
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 			Assert.Equal(0, mismatched);
 		}
 
-		// The ladder: a later rank of the same perk placement always costs MORE. `Electric Wards` runs 1 / 4 / 8 /
+		// The ladder: a later rank of the same perk placement always costs more. `Electric Wards` runs 1 / 4 / 8 /
 		// 14 / 23 over its five ranks, and nothing in the table goes flat or backwards - which is what makes a rising
 		// per-rank price a rule rather than an observation about one perk.
 		[Fact]
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 
 			foreach (var placement in priced.GroupBy(p => (p.TreeId, p.Tier, p.TreeColumn, p.PointType)))
 			{
-				// The wire feat id's low two digits ARE the rank (FeatIdMap.MaxRank's 0..9 bound).
+				// The wire feat id's low two digits are the rank (FeatIdMap.MaxRank's 0..9 bound).
 				var ladder = placement.OrderBy(p => p.FeatId % 100).ToList();
 				for (var i = 1; i < ladder.Count; i++)
 					Assert.True(ladder[i].Cost > ladder[i - 1].Cost,
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 		}
 
 		// The parser, against bytes rather than the install - the same split ParseClassEntries has. Note the header:
-		// this table's count is the FIFTH word, unlike its two 20-byte-header siblings whose count is the fourth.
+		// this table's count is the fifth word, unlike its two 20-byte-header siblings whose count is the fourth.
 		[Fact]
 		public void ParsePerkCosts_ReadsTheFifthWordAsTheCount()
 		{
@@ -122,7 +122,7 @@ namespace Faolan.Tests
 			Write(body, 0, 1000099);
 			Write(body, 4, 1);
 			Write(body, 8, 1);        // version
-			Write(body, 12, 0xDEAD);  // the word the count is NOT in
+			Write(body, 12, 0xDEAD);  // the word the count is not in
 			Write(body, 16, 3);       // count
 
 			Write(body, 20, 736354); Write(body, 24, 2); Write(body, 28, 1);

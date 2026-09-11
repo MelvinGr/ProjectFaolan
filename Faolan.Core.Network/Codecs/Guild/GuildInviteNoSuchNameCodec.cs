@@ -4,12 +4,14 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildInviteNoSuchName (0x2034) - "there is nobody called that": `[string name]`, the name the inviter
-	// typed, echoed so the client can put it in the message. One string and nothing else -
-	// `CSPlayerInterfaceDispatch_t::DispatchGuildInviteNoSuchName` (FUN_01341490) reads the string primitive once and
-	// dispatches.
-	//
-	// ⚠️ No capture shows a failed guild invite. [V0]
+	/// <summary>
+	///     <c>DispatchGuildInviteNoSuchName</c> - "there is nobody called that": <c>[string name]</c>, the name the
+	///     inviter typed, echoed so the client can put it in the message.
+	/// </summary>
+	/// <remarks>
+	///     One string and nothing else - <c>CSPlayerInterfaceDispatch_t::DispatchGuildInviteNoSuchName</c>
+	///     (FUN_01341490) reads the string primitive once and dispatches. No capture shows a failed guild invite. [V0]
+	/// </remarks>
 	public static class GuildInviteNoSuchNameCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildInviteNoSuchName;

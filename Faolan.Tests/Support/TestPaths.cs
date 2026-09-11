@@ -3,21 +3,21 @@ using System.Runtime.CompilerServices;
 
 namespace Faolan.Tests.Support
 {
-	// Repo-relative fixture paths, resolved from THIS file's compile-time location ([CallerFilePath]) - the same
-	// trick Golden uses. Tests previously hardcoded an absolute checkout path, which pinned the whole suite to one
-	// machine at one path: renaming the checkout (or cloning it anywhere else) silently broke 27 test files. Never
-	// hardcode an absolute path in a test; go through here (or Golden).
+	// Repo-relative fixture paths, resolved from this file's compile-time location ([CallerFilePath]) - the same
+	// trick Golden uses. An absolute checkout path pins the suite to one machine at one path, so renaming the checkout
+	// (or cloning it anywhere else) silently breaks every test that carries one. Never hardcode an absolute path in a
+	// test; go through here (or Golden).
 	public static class TestPaths
 	{
-		// The real-data game database for tests. BUILT from the migrations + faolan.sql rather than read from the
-		// committed faolan.db (#412) - see TestDb.GameDatabase, which is the single place that strategy lives.
+		// The real-data game database for tests. Built from the migrations + faolan.sql rather than read from the
+		// committed faolan.db - see TestDb.GameDatabase, which is the single place that strategy lives.
 		public static string FaolanDb => TestDb.GameDatabase;
 
-		// The named capture blobs + render templates used as test INPUTS. They live in the fixture archive's `assets/`
+		// The named capture blobs + render templates used as test inputs. They live in the fixture archive's `assets/`
 		// keys (Faolan.Tests/Assets/fixtures.bin, the one file that holds every byte the suite reads) - `Golden` reads
-		// the expected OUTPUTS out of the same archive.
+		// the expected outputs out of the same archive.
 		//
-		// Asset() hands back a PATH because ~29 call sites pass one to something that opens it; the bytes are
+		// Asset() hands back a path because ~29 call sites pass one to something that opens it; the bytes are
 		// materialized into the gitignored obj/ cache on first use. Prefer AssetBytes() in new code.
 		public static string Asset(string fileName)
 		{

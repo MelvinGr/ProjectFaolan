@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The live in-memory world model (Gitea #404): per-map zones, an entity registry, and
+	// The live in-memory world model: per-map zones, an entity registry, and
 	// the spatial range queries interest management uses to send moves/spawns to nearby players only.
 	public class WorldStateTests
 	{
@@ -91,8 +91,8 @@ namespace Faolan.Tests
 			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
 		}
 
-		// #309: an EPIC entry never shares a zone with normal players, and the two modes of one map are two copies.
-		// Retail's own captured epic re-entry to the map it had just left as normal minted a FRESH instance
+		// An epic entry never shares a zone with normal players, and the two modes of one map are two copies.
+		// Retail's own captured epic re-entry to the map it had just left as normal minted a fresh instance
 		// (consecutive playfield tokens), which is exactly the stay-in rule refusing a difficulty mismatch.
 		[Fact]
 		public void EpicEntry_GetsItsOwnCopy_AndReentryRespectsTheDifficulty()
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 			var epic = world.ResolveEntryInstance(null, 1004, MapInstanceMode.Shared, epic: true);
 			Assert.NotEqual(WorldState.DefaultInstance, epic);
 
-			// The player stands in their epic copy: an epic re-entry stays, a NORMAL one must not reuse it.
+			// The player stands in their epic copy: an epic re-entry stays, a normal one must not reuse it.
 			var p = Player(1, 0, 0);
 			world.Place(p, 1004, epic, p.Position, Quaternion.Identity);
 			world.ZoneFor(1004, epic).IsEpic = true;
@@ -117,7 +117,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(teamNormal, teamEpic);
 		}
 
-		// #512: a GROUP map is one copy per TEAM. Retail's own group entry names the team in the PlayfieldProxy's
+		// A group map is one copy per team. Retail's own group entry names the team in the PlayfieldProxy's
 		// owner slots, so the routing has to be by team id and not by character.
 		[Fact]
 		public void Group_RoutesTheWholeTeamIntoOneCopy_AndADifferentTeamElsewhere()
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 			var leader = Player(1, 0, 0);
 			world.Place(leader, 1092, first, leader.Position, Quaternion.Identity);
 
-			// A member arriving later JOINS the team's copy rather than minting a second one...
+			// A member arriving later joins the team's copy rather than minting a second one...
 			var member = Player(2, 1, 0);
 			var second = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB);
 			Assert.Equal(first, second);
@@ -194,13 +194,13 @@ namespace Faolan.Tests
 			Assert.NotEqual(i1, i2); // a fresh private copy per entry
 
 			var p1 = Player(1, 0, 0);
-			var p2 = Player(2, 0, 0); // SAME position as p1
+			var p2 = Player(2, 0, 0); // Same position as p1
 			world.Place(p1, 4010, i1, p1.Position, Quaternion.Identity);
 			world.Place(p2, 4010, i2, p2.Position, Quaternion.Identity);
 
 			Assert.NotSame(world.ZoneForEntity(p1), world.ZoneForEntity(p2));
 			Assert.Equal(1, world.ZoneForEntity(p1).Count); // alone in their own copy
-			// p1 does NOT see p2 despite the identical position - different instances.
+			// p1 does not see p2 despite the identical position - different instances.
 			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
 			Assert.DoesNotContain(events, e => e.Subject.Handle == 2);
 		}
@@ -209,7 +209,7 @@ namespace Faolan.Tests
 		public void Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects()
 		{
 			// A hostile NPC with a player in aggro range engages: the tick flips InCombat and emits NpcEnterCombat so the
-			// broadcaster can draw the NPC's weapon (#218). When the player leaves range it disengages: InCombat clears
+			// broadcaster can draw the NPC's weapon. When the player leaves range it disengages: InCombat clears
 			// and NpcExitCombat is emitted (sheathe). The transition fires once, not every tick.
 			var world = new WorldState();
 			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
@@ -222,7 +222,7 @@ namespace Faolan.Tests
 			Assert.Contains(first, e => e.Type == WorldTickEffectType.NpcEnterCombat && e.Entity == npc);
 			Assert.True(npc.InCombat);
 
-			// Already engaged: a second tick must NOT re-emit enter-combat.
+			// Already engaged: a second tick must not re-emit enter-combat.
 			var second = world.Tick(0.1);
 			Assert.DoesNotContain(second, e => e.Type == WorldTickEffectType.NpcEnterCombat);
 
@@ -233,8 +233,8 @@ namespace Faolan.Tests
 			Assert.False(npc.InCombat);
 		}
 
-		// #620: the two sides of the shield rose are owned by different ends. A player enters the world already guarding
-		// the retail default (one shield per arc) and the tick never touches it - it is the CLIENT that moves a player's
+		// The two sides of the shield rose are owned by different ends. A player enters the world already guarding
+		// the retail default (one shield per arc) and the tick never touches it - it is the client that moves a player's
 		// guard, and it uploads each change. An NPC is the mirror: no rose at all until the tick rolls one on engage.
 		[Fact]
 		public void Tick_RollsAnNpcsRose_AndNeverTouchesAPlayers()

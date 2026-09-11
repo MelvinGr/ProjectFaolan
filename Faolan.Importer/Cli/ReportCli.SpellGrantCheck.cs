@@ -17,31 +17,31 @@ namespace Faolan.Importer.Cli
 	// because only one of them can only be a defect:
 	//
 	//   EXTRA   - a spell the path offers that the character does not know. Retail is the leading source, so an extra
-	//             is wrong; but the population moves whenever captures or the catalog grow, so it is PRINTED.
-	//   MISSING - a spell the character demonstrably knows that the path would not restore. Split FIVE ways, because
+	//             is wrong; but the population moves whenever captures or the catalog grow, so it is printed.
+	//   missing - a spell the character demonstrably knows that the path would not restore. Split five ways, because
 	//             four of them are another mechanism and only the last is a defect:
 	//               * never on offer      - not in `ClassSpells` for the class, or `Level 0`, or a combo. Today this
 	//                                       is entirely `Level 0`: mounts, pets, `Dance:`/`Social Ability:` emotes,
 	//                                       `Path:` travel unlocks and veteran rewards - earned or bought, never
-	//                                       leveled into, and replayed on login from the character's OWN rows
+	//                                       leveled into, and replayed on login from the character's own rows
 	//                                       (`GrantCharacterSpells`) rather than re-derived from the class.
 	//               * held below level    - the catalog gates it above the character's own level, so retail granted
 	//                                       it earlier than the client's record says. `ClassSpell.GrantLevel` is
-	//                                       where that gets written, but only a capture of the GRANT states it; a
+	//                                       where that gets written, but only a capture of the grant states it; a
 	//                                       known-spell list merely bounds it, so this is reported, not written.
 	//               * no teaching feat    - zero `FeatSpellGrants` rows, so the feat gate cannot pass it. A gap in
 	//                                       the feat harvest rather than in the gate.
-	//               * bought in the TREE  - taught only by a non-`Feat.AutomaticUnlockCategory` feat, i.e. a
+	//               * bought in the tree  - taught only by a non-`Feat.AutomaticUnlockCategory` feat, i.e. a
 	//                                       `Spell - <name>` the player spent a point on. `FeatService` hands these
 	//                                       over when the feat is trained.
-	//               * DROPPED             - none of the above. Nothing explains it but a bug.
+	//               * dropped             - none of the above. Nothing explains it but a bug.
 	//
-	// ⭐ **Why a report and not a test** (Gitea #729): both sides are shipped DATA - importer OUTPUT (`ClassSpells` +
-	// `Spells.Level` + `FeatSpellGrants`) against importer INPUT (the captured known-spell lists). It also physically
+	// Why a report and not a test: both sides are shipped data - importer output (`ClassSpells` +
+	// `Spells.Level` + `FeatSpellGrants`) against importer input (the captured known-spell lists). It also physically
 	// cannot be a test: `faolan.sql` excludes every `Character*` table as per-developer play state, so the suite's
-	// fixture holds ZERO `CharacterSpells` rows and any such gate there passes vacuously.
+	// fixture holds zero `CharacterSpells` rows and any such gate there passes vacuously.
 	//
-	// It is currently **EXTRA 0 / DROPPED 0** on every captured character, at 97 of the level-80 Necromancer's 109
+	// It is currently EXTRA 0 / dropped 0 on every captured character, at 97 of the level-80 Necromancer's 109
 	// and 96 of the level-80 Demonologist's 127, with every one of the rest attributed to one of the four
 	// mechanisms above.
 	public static partial class ReportCli
@@ -65,9 +65,9 @@ namespace Faolan.Importer.Cli
 			var levels = await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Level);
 			var names = await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name);
 
-			// The feat TREE half of the catalog: a spell no AUTOMATIC feat teaches is not the level path's to grant,
+			// The feat tree half of the catalog: a spell no AUTOMATIC feat teaches is not the level path's to grant,
 			// it is bought with a feat point and handed over by `FeatService` when that feat is trained. Counted
-			// apart for exactly that reason - it is a spell the character has by a DIFFERENT mechanism, not one the
+			// apart for exactly that reason - it is a spell the character has by a different mechanism, not one the
 			// level path lost.
 			var autoTaught = (await db.FeatSpellGrants.AsNoTracking()
 				.Where(g => g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory)
@@ -86,9 +86,9 @@ namespace Faolan.Importer.Cli
 
 				checkedCharacters++;
 
-				// The class's own catalog rows, with the GATE level the two grant paths read - `ClassSpell.GrantLevel`
+				// The class's own catalog rows, with the gate level the two grant paths read - `ClassSpell.GrantLevel`
 				// where a capture caught the grant and `Spells.Level` everywhere else. Absent from this map is a
-				// harvest gap; present in it but above the character's own level is a level-DATA disagreement, which
+				// harvest gap; present in it but above the character's own level is a level-data disagreement, which
 				// is a different thing from the gate dropping it.
 				var catalogGate = await db.ClassSpells.AsNoTracking()
 					.Where(cs => cs.Class == 0 || cs.Class == (ConanClass)character.Class)
@@ -106,7 +106,7 @@ namespace Faolan.Importer.Cli
 				var missing = known.Where(id => !offered.Contains(id)).ToList();
 				var offCatalog = missing.Where(id => !inCatalog.Contains(id) || levels.GetValueOrDefault(id) == 0 || comboActions.Contains(id)).ToList();
 				var rest = missing.Except(offCatalog).ToList();
-				// Held BELOW the level the catalog gates it at - retail granted it earlier than the client's own
+				// Held below the level the catalog gates it at - retail granted it earlier than the client's own
 				// record says. That is what `ClassSpell.GrantLevel` records where a capture catches the grant itself;
 				// a known-spell list only bounds it, so it is reported rather than written.
 				var earlyHeld = rest.Where(id => catalogGate.GetValueOrDefault(id) > character.Level).ToList();
@@ -148,7 +148,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// ⚠️ On characters that CARRY a known-spell list, not on characters at all (#849). A database full of
+			// On characters that carry a known-spell list, not on characters at all. A database full of
 			// freshly-created play characters has plenty of `Characters` rows and no oracle in any of them, which is
 			// the same vacuous pass wearing a different face - the loop above `continue`s straight past every one.
 			if (checkedCharacters == 0)
@@ -161,18 +161,17 @@ namespace Faolan.Importer.Cli
 			return failures == 0 && checkedCharacters > 0 ? 0 : 1;
 		}
 
-		// The three EXCLUSION rules, checked against the records retail actually shipped (Gitea #849). Each says the
-		// same kind of thing - "this is not a book/feat entry, so no captured character may hold one" - and each was
-		// a TEST that could not fail: they intersected against `CharacterSpells` / `CharacterFeats`, and `faolan.sql`
-		// drops every `Character*` table as per-developer play state, so the suite's fixture holds zero rows on the
-		// left-hand side. Three green gates over an empty set.
+		// The three exclusion rules, checked against the records retail actually shipped. Each says the same kind of
+		// thing - "this is not a book/feat entry, so no captured character may hold one" - and each needs a non-empty
+		// left-hand side to mean anything: they intersect against `CharacterSpells` / `CharacterFeats`, which
+		// `faolan.sql` drops as per-developer play state, so in the test suite's fixture they would be three green
+		// gates over an empty set.
 		//
-		// They belong here for the reason #729 gives - both sides are shipped data, importer OUTPUT (`Combos`,
-		// `Spells.EffectSpell`, `FeatIdMap`) against importer INPUT (the harvested known-spell and feat lists) - and
-		// here they run against the real `faolan.db`, where the oracle exists: 249 known-spell entries across four
-		// captured characters, two of them level-80.
+		// They belong here because both sides are shipped data - importer output (`Combos`, `Spells.EffectSpell`,
+		// `FeatIdMap`) against importer input (the harvested known-spell and feat lists) - and here they run against
+		// the real `faolan.db`, where the oracle exists.
 		//
-		// ⚠️ These are ASSERTED rather than printed, unlike the per-character counts below. A count moves whenever
+		// These are ASSERTED rather than printed, unlike the per-character counts below. A count moves whenever
 		// captures grow; a combo appearing in a retail spellbook does not move, it REFUTES the exclusion - retail
 		// would be saying the thing we exclude is a book entry after all. That can only be a defect in the rule.
 		private static async Task<int> CapturedRecordExclusions(Faolan.Core.Database.DatabaseContext db)
@@ -180,8 +179,8 @@ namespace Faolan.Importer.Cli
 			var knownSpells = (await db.CharacterSpells.AsNoTracking().Select(s => s.SpellId).Distinct().ToListAsync()).ToHashSet();
 			var carriedFeats = await db.CharacterFeats.AsNoTracking().Select(f => f.FeatId).Distinct().ToListAsync();
 
-			// ⭐ The guard that makes this impossible to go vacuous again. An empty oracle is a FAILURE, not a pass -
-			// which is the whole lesson of #849, and the reason the emptiness went unnoticed for as long as it did.
+			// The guard against going vacuous: an empty oracle is a failure, not a pass. Without it these checks
+			// stay green while measuring nothing.
 			if (knownSpells.Count == 0 || carriedFeats.Count == 0)
 			{
 				Console.WriteLine($"⚠️ captured-record exclusions are VACUOUS: {knownSpells.Count} known spells, {carriedFeats.Count} carried feats."
@@ -191,13 +190,13 @@ namespace Faolan.Importer.Cli
 
 			var failures = 0;
 
-			// #298: a COMBO is not a spellbook spell. `Combos.GameActionId` IS a `Spells.Id`, and combos are
+			// a combo is not a spellbook spell. `Combos.GameActionId` is a `Spells.Id`, and combos are
 			// attributed to their class exactly like spells because a melee combo's GameAction carries the same
-			// class-encoded stacking line - correct as MEMBERSHIP and wrong as a spellbook.
+			// class-encoded stacking line - correct as membership and wrong as a spellbook.
 			var comboActions = (await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync()).ToHashSet();
 			var comboLeak = knownSpells.Where(comboActions.Contains).ToList();
 
-			// #847: nor is an EFFECT. The DoT a spell applies carries its caster's stacking line, so it lands in
+			// nor is an effect. The DoT a spell applies carries its caster's stacking line, so it lands in
 			// `ClassSpells` by the same route. The referrer must itself be a real leveled entry - `Flesh to Worms`
 			// is named as the effect of a Level-0 `Plague Swarm`, and "anything some spell points at" would delete
 			// the very spell the level-2 ding exists to teach.

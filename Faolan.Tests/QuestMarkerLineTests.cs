@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #559: retail draws FOUR quest-marker states, and the fourth is the greyed/silver '!' - "there is something here
-	// you cannot take yet". That is a quest the player does NOT hold whose line has not reached its giver; without it a
-	// giver deep in a chain drew the GOLD '!' from the moment you logged in, offering a quest you could not take.
+	// Retail draws four quest-marker states, and the fourth is the greyed/silver '!' - "there is something here
+	// you cannot take yet". That is a quest the player does not hold whose line has not reached its giver; without it a
+	// giver deep in a chain drew the gold '!' from the moment you logged in, offering a quest you could not take.
 	//
-	// ⚠️ Silver is ONLY the not-held case. A quest already in the journal clears the marker instead - see
+	// Silver is only the not-held case. A quest already in the journal clears the marker instead - see
 	// QuestMarkerStateTests, which reads that off Casilda's own chain.
 	//
 	// The oracle is `xxx_mage-necromancer_login_play2_tortage_city_first-quests`, where Turach (0x27929) and Laranga
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 				.ToArray();
 			Assert.True(QuestMarkerResolver.LineReached(quarry, line, doneThroughFour));
 
-			// An earlier step merely ACTIVE is not done - the chain has not passed it, so he stays silver.
+			// An earlier step merely active is not done - the chain has not passed it, so he stays silver.
 			var stillOnStepFour = doneThroughFour
 				.Select(q => q.QuestId == line.Single(s => s.JournalSequence == 4).QuestId
 					? new CharacterQuest { QuestId = q.QuestId, State = QuestState.Active }

@@ -6,11 +6,11 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report travel-trips`: every LOCAL TRAVEL trip the captures yield, with the capture that yielded it.
+	// `--report travel-trips`: every local TRAVEL trip the captures yield, with the capture that yielded it.
 	//
-	// The wiring module prints a COUNT, and a count cannot answer the question that matters when the harvest changes:
-	// WHICH trips, and are the ones that disappeared the bogus ones? That question came up the moment a guard was
-	// added for teleports a DOOR had already claimed (The Architect, who was being credited with the Black Castle exit
+	// The wiring module prints a count, and a count cannot answer the question that matters when the harvest changes:
+	// which trips, and are the ones that disappeared the bogus ones? That question came up the moment a guard was
+	// added for teleports a door had already claimed (The Architect, who was being credited with the Black Castle exit
 	// door's changemap), and a count alone could not tell a fixed attribution from a lost trip.
 	public static partial class ReportCli
 	{

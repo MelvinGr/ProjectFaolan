@@ -5,16 +5,15 @@ using Faolan.Core.Extensions;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// DispatchOpenSiteInBrowserOnClient(siteName) - GameCharInterfaceProject 0x0F. Makes the client open a URL in the
-	// player's external browser (#874).
+	// player's external browser.
 	//
 	//   [u16 len][ascii siteName]
 	//
 	// All three captured frames are byte-identical, 54 bytes, and carry Funcom's item-shop deep link
 	// (`http://aocshop.funcom.com/showitem?bundle=quickstart`) - a store promotion, not a game mechanic.
 	//
-	// ⚠️ **Think before sending one.** This message makes a player's machine launch a browser at a server-chosen
-	// address. Retail used it for its own shop; anything we send here is the same capability pointed somewhere else,
-	// so it should carry an address the operator configured, never one derived from player input.
+	// This message makes a player's machine launch a browser at a server-chosen address, so it must only ever carry
+	// an address the operator configured, never one derived from player input.
 	public static class OpenSiteInBrowserCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchOpenSiteInBrowserOnClient;

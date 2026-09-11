@@ -10,10 +10,10 @@ namespace Faolan.Tests.Support
 {
 	// `IQuestOutbound` with every member a no-op, for the service tests that only care about one or two of them - the
 	// quest twin of NoOpEconomyOutbound, and added for the reason that one records: the port is a growing surface, and
-	// each addition breaks every hand-rolled double at once. Adding SendQuestRewardOffer/SendQuestRewardConfirm (#815)
+	// each addition breaks every hand-rolled double at once. Adding SendQuestRewardOffer/SendQuestRewardConfirm
 	// failed three unrelated test classes that have no opinion about quest rewards.
 	//
-	// ⚠️ No-ops rather than throws, same rationale: a test wires this up to exercise a SERVICE, and a service
+	// No-ops rather than throws, same rationale: a test wires this up to exercise a service, and a service
 	// legitimately sends packets the test is not about. Throwing would make every such test assert the whole port.
 	public class NoOpQuestOutbound : IQuestOutbound
 	{

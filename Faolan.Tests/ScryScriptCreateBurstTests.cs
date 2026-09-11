@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #223: the two create-world ScryScriptIIR (0xA36D3B74) records - the "Slave Galley" PreloadAssets step and the
-	// "PlayOrSkip" ScriptMessage - are now CONSTRUCTED via ScryScript.BuildStep from typed protobuf fields instead of
-	// the verbatim hex blobs in RetailCreateEditorCreationScriptBurst. These prove the construction is byte-identical
+	// The two create-world ScryScriptIIR (0xA36D3B74) records - the "Slave Galley" PreloadAssets step and the
+	// "PlayOrSkip" ScriptMessage - are constructed via ScryScript.BuildStep from typed protobuf fields rather than
+	// carried as verbatim hex. These prove the construction is byte-identical
 	// to the captured records (so the create-world cutscene wire is unchanged), for an arbitrary player handle.
 	public class ScryScriptCreateBurstTests
 	{
@@ -32,11 +32,11 @@ namespace Faolan.Tests
 			Assert.Equal(Expected(Rec1Suffix), Convert.ToHexStringLower(body));
 		}
 
-		// The post-morph StartScriptGroupOnClient callback (no token form, #223) from CreateWorldHandshake.
+		// The post-morph StartScriptGroupOnClient callback (the no-token form) from CreateWorldHandshake.
 		[Fact]
 		public void StartScriptGroup_BuildsTheCapturedRecord()
 		{
-			// captured suffix [flag=00][u32 pbLen=0E][08 05 10 00 18 EC 97 02 32 04 08 00 10 00]
+			// captured suffix [flag=00][u32 pbLen=0E][08 05 10 00 18 ec 97 02 32 04 08 00 10 00]
 			var body = ScryScriptCodec.Build(Handle, 35820);
 			Assert.Equal(Expected("000000000e0805100018ec9702320408001000"), Convert.ToHexStringLower(body));
 		}

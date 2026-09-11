@@ -9,8 +9,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// P3 of docs/protocol/methodology.md - the citation linter. It is the whole difference between a doc that CLAIMS to be
-	// verified and one that IS: every verification tag in the protocol reference must name an artifact that exists.
+	// P3 of docs/protocol/methodology.md - the citation linter. It is the whole difference between a doc that claims to be
+	// verified and one that is: every verification tag in the protocol reference must name an artifact that exists.
 	//
 	//   [V3: BurstGoldenTests.CreationScriptBurst_IsByteStable]   -> a real xUnit test method
 	//   [V2: <character>_<scenario>.tshark.json frame 366]        -> a well-formed capture file name (see below)
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 	// examples cited a test method deleted with SendWorldPrepBurst, a capture filename with a literal "...", and a
 	// Ghidra script (DumpRpcMethods.java) that never existed.
 	//
-	// Placeholders (`[V3: …]`) in prose that DESCRIBES the format are skipped, not linted.
+	// Placeholders (`[V3: …]`) in prose that describes the format are skipped, not linted.
 	public class ProtocolCitationTests
 	{
 		private static readonly Regex Citation = new Regex(@"\[V([0-3]):\s*([^\]]+)\]");
@@ -66,12 +66,10 @@ namespace Faolan.Tests
 
 		// V2 = capture-observed: the payload names a capture file (optionally "... frame N").
 		//
-		// This checks the citation's FORM, not that the file exists. It used to resolve the name against a list of all
-		// 227 corpus file names carried in the committed extract's manifest - which meant every checkout shipped an
-		// index of the private capture repo. The names are gone; the corpus lives only in the data repo, and the tests
-		// no longer reach for it. What survives is what this linter actually caught: a payload that is not a capture
-		// filename at all (methodology.md once cited a literal "..."), which is the stale-citation shape that matters.
-		// Whether the named capture exists is verified by whoever has the corpus, not by the suite.
+		// This checks the citation's form, not that the file exists. Resolving the name against a list of corpus file
+		// names would ship an index of the private capture repo in every checkout, and the corpus lives only in the
+		// data repo. The form check catches the shape that matters: a payload that is not a capture filename at all
+		// (a literal "..."). Whether the named capture exists is verified by whoever has the corpus, not by the suite.
 		[Fact]
 		public void V2Citations_AreWellFormed()
 		{
@@ -150,7 +148,7 @@ namespace Faolan.Tests
 			       !name.Contains("...", StringComparison.Ordinal) && !name.Contains('…', StringComparison.Ordinal);
 		}
 
-		// Prose that documents the citation FORM rather than making a claim.
+		// Prose that documents the citation form rather than making a claim.
 		private static bool IsPlaceholder(string payload)
 		{
 			return payload is "…" or "..." || payload.StartsWith("<", StringComparison.Ordinal);

@@ -12,9 +12,8 @@ namespace Faolan.Tests
 	// inserted (a Map carries no position - the coordinate space - so id + name + the per-map rule words are stored);
 	// an already-present map keeps its curated name but has those words refreshed from the capture.
 	//
-	// This fixture is a good one for #451 by luck: 2040 is one of the six maps whose FieldA/FieldC differ from the
-	// values the builder used to hardcode - it carries A=2 (not 0) and C=0 (not 7) - so an import that dropped either
-	// would show up here rather than only in the shipped database.
+	// 2040 is one of the six maps whose FieldA/FieldC are not the common values - it carries A=2 and C=0, against the
+	// usual 0 and 7 - so an import that dropped either shows up here rather than only in the shipped database.
 	public class CaptureMapImporterTests
 	{
 		// The 146-byte MapChange packet from NecroL80_mage-necromancer_login_kingconanscastle (map 2040, PlayfieldFlags 0).
@@ -32,7 +31,7 @@ namespace Faolan.Tests
 				await using (var db = NewContext(dbPath))
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					// A map NOT in the capture is left entirely alone (not in `found`).
+					// A map not in the capture is left entirely alone (not in `found`).
 					db.Maps.Add(new Map
 					{
 						Id = 4010,
@@ -51,8 +50,8 @@ namespace Faolan.Tests
 					Assert.NotNull(map);
 					Assert.Equal(string.Empty, map!.Name); // capture-discovered, no name
 					Assert.Equal(0u, map.PlayfieldFlags); // the captured per-area rule word
-					Assert.Equal(2u, map.PlayfieldFieldA); // #451: 2 on this map, where the builder hardcoded 0
-					Assert.Equal(0u, map.PlayfieldFieldC); // #451: 0 here, where the builder hardcoded 7
+					Assert.Equal(2u, map.PlayfieldFieldA); // 2 on this map, where the builder hardcoded 0
+					Assert.Equal(0u, map.PlayfieldFieldC); // 0 here, where the builder hardcoded 7
 
 					// A map absent from the capture was not overwritten.
 					var beach = await db.Maps.FindAsync([4010u], TestContext.Current.CancellationToken);
@@ -76,8 +75,8 @@ namespace Faolan.Tests
 				await using (var db = NewContext(dbPath))
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					// Curated row with a STALE/wrong flag word - the mount-rule bug this import fixes (#340) - and the
-					// two rule words at the values the builder used to hardcode for every map (#451).
+					// Curated row with a stale flag word - the one that governs the mount rule - and the two rule
+					// words at the values common to most maps, so the import has something to refresh.
 					db.Maps.Add(new Map
 					{
 						Id = 2040,

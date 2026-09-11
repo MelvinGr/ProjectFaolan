@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Foundation for constructing the beach 0x737A6DF9 snapshot's PREFIX and TAILS from the ground up (server-owned
+	// Foundation for constructing the beach 0x737A6DF9 snapshot's prefix and tails from the ground up (server-owned
 	// template + generated fields) instead of patching the captured burst packet. Pins the prefix constants and
 	// proves a from-scratch prefix reproduces the capture; extracts the tails template asset.
 	public class BeachSnapshotConstructionTests
@@ -39,8 +39,8 @@ namespace Faolan.Tests
 		{
 			var (prefix, root, _) = SplitBeach();
 			_o.WriteLine($"prefix = {Convert.ToHexString(prefix)} rootLen={root.Length}");
-			// [u8 flag=0][u32 BE blobLen] and nothing else - blobLen delimits the root exactly. The 3 bytes that
-			// used to be read as a trailing "field5" (28 81 06) are the ROOT's own subscription_flags varint.
+			// [u8 flag=0][u32 BE blobLen] and nothing else - blobLen delimits the root exactly. The 3 bytes 28 81 06
+			// that follow are the root's own subscription_flags varint, not a trailing field after the root.
 			Assert.Equal(5, prefix.Length);
 			Assert.Equal((byte)0x00, prefix[0]); // flag
 			Assert.Equal(root.Length, (int)prefix.ReadU32Be(1));
@@ -77,21 +77,17 @@ namespace Faolan.Tests
 			Assert.True(FullCharSnapshotSubClassCodec.Build(reparsed.SubClass).SequenceEqual(tails));
 		}
 
-		// VERIFIES that the committed beach tails template still matches what the capture yields - it does not rewrite
+		// Verifies that the committed beach tails template still matches what the capture yields - it does not rewrite
 		// it. Set FAOLAN_UPDATE_ASSETS=1 to regenerate, the same convention ProtocolDocsTests uses for the generated
 		// docs.
 		//
-		// ⚠️ It used to call File.WriteAllBytes(TemplatePath, ...) unconditionally, on every run, and that was the
-		// cause of the long-standing "suite flakes once in a while with no diagnosable failure". SIX other test classes
-		// READ this asset (SubClassStatBlockTests, QuestcRegionTests, AccessWindowCatalogTests, KnownSpellListTests,
-		// SnapshotTailsFromScratchTests, SnapshotTailsFromScratchTests) and xUnit runs test CLASSES in parallel - so a
-		// reader landing mid-write saw a truncated file and blew up somewhere deep in a parser, e.g.
-		// "EndOfStreamException at QuestcRegion.Read". It presented as a DIFFERENT test each time, which is exactly why
-		// it never looked like one bug. Caught by re-running the suite in a loop and keeping the failing run's output
-		// (10 iterations).
+		// The write must stay behind that switch. Several other test classes read this asset (SubClassStatBlockTests,
+		// QuestcRegionTests, AccessWindowCatalogTests, KnownSpellListTests, SnapshotTailsFromScratchTests) and xUnit runs
+		// test classes in parallel, so an unconditional rewrite lets a reader land mid-write, see a truncated file and
+		// fail deep in a parser ("EndOfStreamException at QuestcRegion.Read") - in a different test each run.
 		//
 		// Verifying rather than regenerating is also strictly better than just gating the write: if the asset ever
-		// drifts from the capture it now FAILS instead of silently rewriting itself.
+		// drifts from the capture it fails instead of silently rewriting itself.
 		[Fact]
 		public void BeachTailsTemplate_MatchesTheCapture()
 		{

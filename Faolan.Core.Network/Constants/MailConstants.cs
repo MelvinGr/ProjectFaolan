@@ -1,8 +1,10 @@
 namespace Faolan.Core.Network.Constants
 {
-	// Single source of truth for the in-game mail wire/DB constants, shared by the server's mail handler
-	// (GameServerListener / TradepostMailHandler) and the MCP economy tools. Decoded from the NecroL80
-	// buy_from_autionhouse_get_mail capture (docs/subsystems/tradepost-protocol.md).
+	/// <summary>
+	///     The in-game mail wire/DB constants, shared by the tradepost service, the MCP economy tools and the web
+	///     mail view. Decoded from the NecroL80 buy_from_autionhouse_get_mail capture
+	///     (docs/subsystems/tradepost-protocol.md).
+	/// </summary>
 	public static class MailConstants
 	{
 		// The per-attachment trailer's leading word (capture: [0x72][0x08006F31][0]).

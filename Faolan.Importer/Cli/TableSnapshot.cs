@@ -7,10 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// Counts every mapped table so the before/after delta is complete. Derived from the EF model, so new
-	// tables are picked up automatically. Counts are
-	// read on the same connection the runner mutates, so inside the dry-run transaction they reflect the
-	// pending (soon-to-be-rolled-back) changes - exactly the delta we want to show.
+	/// <summary>
+	///     Counts every mapped table so the before/after delta is complete. Derived from the EF model, so new tables
+	///     are picked up automatically.
+	/// </summary>
+	/// <remarks>
+	///     Counts are read on the same connection the runner mutates, so inside the dry-run transaction they reflect
+	///     the pending - soon to be rolled back - changes, which is the delta the run should show.
+	/// </remarks>
 	public static class TableSnapshot
 	{
 		public static async Task<Dictionary<string, int>> CaptureAsync(DatabaseContext db)
@@ -20,11 +24,11 @@ namespace Faolan.Importer.Cli
 			var counts = new Dictionary<string, int>();
 			foreach (var table in tables)
 			{
-				// Table names come from the trusted EF model (not user input) and a table identifier can't be a SQL
-				// parameter anyway, so the interpolation is safe - suppress the raw-SQL injection advisory.
+				// Table names come from the trusted EF model rather than user input, and a table identifier cannot be a
+				// SQL parameter anyway, so the interpolation is safe - suppress the raw-SQL injection advisory.
 #pragma warning disable EF1002
-				// Alias quoted ("Value") so Postgres keeps the case EF's scalar wrapper expects; an unquoted alias
-				// folds to l-case there and the wrapper's "Value" lookup fails. SQLite accepts the quoted alias too.
+				// The alias is quoted ("Value") so Postgres keeps the case EF's scalar wrapper expects; an unquoted
+				// alias folds to lower case there and the wrapper's lookup fails. SQLite accepts the quoted alias too.
 				var count = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS \"Value\" FROM \"{table}\"").SingleAsync();
 #pragma warning restore EF1002
 				counts[table!] = count;
@@ -33,7 +37,9 @@ namespace Faolan.Importer.Cli
 			return counts;
 		}
 
-		// Prints the changed rows (and a total). Unchanged tables are omitted to keep the report readable.
+		/// <summary>
+		///     Prints the changed rows and a total. Unchanged tables are omitted to keep the report readable.
+		/// </summary>
 		public static void PrintDelta(Dictionary<string, int> before, Dictionary<string, int> after, TextWriter @out)
 		{
 			@out.WriteLine("\n  table                          before     after    delta");

@@ -6,16 +6,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// An NPC vendor's shop window, imported from captured DispatchShopData (0x2033) packets
-	// (tools/capture/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC TEMPLATE id (#244) - shop ids
-	// and NPC handles are session-volatile, and the internal NAME is not unique (25 templates share "Halen van Dummy",
+	// (tools/capture/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC template id - shop ids
+	// and NPC handles are session-volatile, and the internal name is not unique (25 templates share "Halen van Dummy",
 	// so keying by name merged distinct vendors and leaked a shop onto non-vendor same-named NPCs like Atraxus).
-	// Keyed BY its vendor TYPE: the relationship is one-to-one (NpcTemplate.Shop), so NpcTemplateId is both the
+	// Keyed by its vendor type: the relationship is one-to-one (NpcTemplate.Shop), so NpcTemplateId is both the
 	// foreign key and the whole identity - a surrogate id alongside it identified nothing and renumbered the shop
 	// set (and its wares) on every re-harvest. It was already the declared unique index.
 	[PrimaryKey(nameof(NpcTemplateId))]
 	public class Shop
 	{
-		// The vendor NPC TYPE this shop belongs to (the stable per-type key).
+		// The vendor NPC type this shop belongs to (the stable per-type key).
 		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))] // Maybe to NpcSpawn?
@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 
 		public virtual ICollection<ShopItem> Items { get; set; } = [];
 
-		// The vendor's internal name at capture time - display/logging only (NOT unique; see the class note).
+		// The vendor's internal name at capture time - display/logging only (not unique; see the class note).
 		[MaxLength(64)]
 		public string VendorName { get; set; } = null!;
 

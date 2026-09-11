@@ -8,16 +8,23 @@ using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.World
 {
-	// Frames the 0x96B8DC59 StatUpdateIIR for a single addressed recipient - the host-side counterpart of
-	// StatUpdateCodec (which owns the pure IIR body). Adds the RPC header on the world conversation (WorldSenderEndpoint)
-	// + length/hash. Used by everything that pushes a stat/vitals change to one client (combat, the regen tick, the
-	// world-entry replay, GM commands); broadcasters that fan a stat out to nearby viewers call StatUpdateCodec.Build
-	// directly and frame it per recipient via WorldIir.Send. Kept here (not in the codec) because it depends on the
-	// host framing types (WorldSenderEndpoint + INetworkClient).
+	/// <summary>
+	///     Frames the 0x96B8DC59 StatUpdateIIR for a single addressed recipient - the host-side counterpart of
+	///     <c>StatUpdateCodec</c>, which owns the pure IIR body - by adding the RPC header on the world conversation
+	///     plus the length and hash.
+	/// </summary>
+	/// <remarks>
+	///     Used by everything that pushes a stat or vitals change to one client: combat, the regen tick, the
+	///     world-entry replay and the GM commands. A broadcaster fanning a stat out to nearby viewers calls the codec
+	///     directly and frames it per recipient through <see cref="WorldIir.Send" />. It lives here rather than in the
+	///     codec because it depends on the host framing types.
+	/// </remarks>
 	public static class VitalsPacket
 	{
-		// The framed 0x96B8DC59 stat-update packet for an entity (defaults to the session's own client instance), as an
-		// Rpc the transport serializes + logs once (no re-parse).
+		/// <summary>
+		///     The framed 0x96B8DC59 stat-update packet for an entity, as an <see cref="Rpc" /> the transport
+		///     serializes and logs once, with no re-parse.
+		/// </summary>
 		public static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

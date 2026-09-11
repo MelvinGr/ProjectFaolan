@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #395: a cast's damage is the SPELL's, not the level's.
+	// A cast's damage is the spell's, not the level's.
 	//
 	// `CombatResolver.ResolveSpellDamage` was `20 + level*5` and ignored its `spellId` outright, so every spell a
 	// character owned hit for the same number and the only thing that could ever separate two of them was the
@@ -17,16 +17,16 @@ namespace Faolan.Tests
 	// *"163-189.5 points of Health"*, and the imported row is `-16300..-18950` on stat 27. 2,149 shipped spells
 	// carry one.
 	//
-	// ⚠️ These read the SHIPPED catalog on purpose. The arithmetic below is trivial and would pass on synthetic
+	// These read the shipped catalog on purpose. The arithmetic below is trivial and would pass on synthetic
 	// rows whether or not a single real spell states a hit — which is the state this ticket was in.
 	public class SpellStatedDamageTests
 	{
 		private const uint InterpolatedHit = 53219;
 
-		// The two ranks the ticket is named against, straight out of `faolan.db`, each read at the LOW end of its own
-		// level ramp: rank 2 states 43-50 and rank 6 states 163-189. Under the old resolver a level-80 caster dealt
-		// 420 with either. The rank-2 row also ramps to 71-82 by level 34, which is what makes the level argument
-		// real rather than decoration.
+		// The two ranks the ticket is named against, straight out of `faolan.db`, each read at the low end of its own
+		// level ramp: rank 2 states 43-50 and rank 6 states 163-189. A resolver that ignores the stated hit deals 420
+		// with either at level 80. The rank-2 row also ramps to 71-82 by level 34, which is what makes the level
+		// argument real rather than decoration.
 		[Theory]
 		[InlineData(144307u, 20u, 43, 50)] // Ice Strike (Rank 2) - ramp 20..34
 		[InlineData(144307u, 34u, 71, 82)] // …the same row at the top of its ramp
@@ -39,8 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(high, -effect.MaxFor(0, level));
 		}
 
-		// ⭐ The point of the whole ticket, stated as the comparison the old code could not make: two ranks of ONE
-		// spell, at ONE caster level, must not deal the same damage.
+		// The comparison that matters: two ranks of one spell, at one caster level, must not deal the same damage.
 		[Fact]
 		public void TwoRanksOfOneSpell_DoNotDealTheSameDamage()
 		{
@@ -49,7 +48,7 @@ namespace Faolan.Tests
 
 			Assert.True(rank6 > rank2 * 2, $"rank 6 ({rank6}) should far outhit rank 2 ({rank2})");
 
-			// …and neither is the placeholder, which is what the old resolver answered for both.
+			// …and neither is the placeholder, which is what a level-only resolver answers for both.
 			var placeholder = CombatResolver.ResolveSpellDamage(0, 80);
 			Assert.NotEqual(placeholder, rank2);
 			Assert.NotEqual(placeholder, rank6);
@@ -66,11 +65,11 @@ namespace Faolan.Tests
 			Assert.Equal(effect.MaxFor(0, 80), effect.Rolled(0, 80, 100));
 
 			var mid = effect.Rolled(0, 80, 50);
-			Assert.InRange(mid, effect.MaxFor(0, 80), effect.For(0, 80)); // negative: max is the LOWER bound
+			Assert.InRange(mid, effect.MaxFor(0, 80), effect.For(0, 80)); // negative: max is the lower bound
 		}
 
-		// ⚠️ The placeholder stays for a spell that states nothing, and that is most CASTS in practice — an ability
-		// with no template row, an NPC cast. A stated hit REPLACES the level curve; it does not add to it.
+		// The placeholder stays for a spell that states nothing, and that is most casts in practice — an ability
+		// with no template row, an NPC cast. A stated hit replaces the level curve; it does not add to it.
 		[Fact]
 		public void ASpellThatStatesNothing_StillFallsToTheLevelPlaceholder()
 		{
@@ -78,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Equal(163, CombatResolver.ResolveSpellDamage(0, 80, 0, 0, 163));
 		}
 
-		// Magic Damage (#399) still adds flat on top of the stated hit, and the spell-line feat boost (#590) still
+		// Magic Damage still adds flat on top of the stated hit, and the spell-line feat boost still
 		// scales the finished number — the stated hit slots into the base term, it does not bypass the rest.
 		[Fact]
 		public void MagicDamageAndTheFeatBoost_StillApplyOverAStatedHit()
@@ -87,7 +86,7 @@ namespace Faolan.Tests
 			Assert.Equal((163 + 40) * 135 / 100, CombatResolver.ResolveSpellDamage(0, 80, 40, 3500, 163));
 		}
 
-		// ⚠️ A PERIODIC row is the DoT engine's, not this one's, and 726 shipped spells state BOTH — every one of
+		// A periodic row is the DoT engine's, not this one's, and 726 shipped spells state both — every one of
 		// them was having its ticks applied as extra instant magnitude the moment it landed. `Flesh to Worms (Rank 2)`
 		// is one: one instant element and two on a 2 s period, all three the same magnitude.
 		[Fact]
@@ -108,7 +107,7 @@ namespace Faolan.Tests
 			]));
 		}
 
-		// The POPULATION, so a regression in the import cannot leave every one of the assertions above passing over
+		// The population, so a regression in the import cannot leave every one of the assertions above passing over
 		// an empty catalog while the live server is back on the flat placeholder for everything.
 		[Fact]
 		public void TheShippedCatalog_StatesADamagingHitForThousandsOfSpells()

@@ -4,13 +4,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The `data/FactionRelations.xml` grammar (RDB 1010701/1, #310). The shipped file is not in this repo - the RDB
-	// lives in the client install - so this gates the READER against the exact shapes the shipped file uses, which is
+	// The `data/FactionRelations.xml` grammar (RDB 1010701/1). The shipped file is not in this repo - the RDB
+	// lives in the client install - so this gates the reader against the exact shapes the shipped file uses, which is
 	// what a regression would break. The whole-file numbers are re-derived on every `--report factions` run.
 	//
 	// The two shapes that matter and are easy to get wrong:
-	//   * a relation id is `factionBase + tier`, so `13` is faction 10 tier 3 - NOT faction 13.
-	//   * the faction's NAME appears only in the XML comment before its standard entry, and an override's comment
+	//   * a relation id is `factionBase + tier`, so `13` is faction 10 tier 3 - not faction 13.
+	//   * the faction's name appears only in the XML comment before its standard entry, and an override's comment
 	//     carries the tier too ("Children of Yag-Kosha group boss"), so an override must never overwrite the name.
 	public class FactionRelationTableTests
 	{

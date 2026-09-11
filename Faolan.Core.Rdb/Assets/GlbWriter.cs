@@ -8,10 +8,15 @@ using System.Text.Json;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Minimal binary-glTF (.glb) writer for decoded RenderMesh sub-meshes (#275 Phase 2). One glTF mesh with one
-	// primitive per sub-mesh; each primitive gets POSITION (+ NORMAL/TEXCOORD_0 when present) and a u32 index buffer.
-	// glb = 12-byte header + JSON chunk + BIN chunk; we pack all accessor data into the single BIN buffer. This is the
-	// format the eventual Blazor three.js/Babylon viewer loads directly.
+	/// <summary>
+	///     A minimal binary-glTF (.glb) writer for decoded RenderMesh sub-meshes, in the format the browser viewer
+	///     loads directly. It emits one glTF mesh with one primitive per sub-mesh, each primitive carrying POSITION,
+	///     NORMAL and TEXCOORD_0 where present, plus a u32 index buffer.
+	/// </summary>
+	/// <remarks>
+	///     A .glb is a 12-byte header followed by a JSON chunk and a BIN chunk; all accessor data is packed into the
+	///     single BIN buffer.
+	/// </remarks>
 	public static class GlbWriter
 	{
 		private const int ArrayBuffer = 34962, ElementArrayBuffer = 34963; // bufferView targets
@@ -21,18 +26,25 @@ namespace Faolan.Core.Rdb.Assets
 		private const uint ChunkJson = 0x4E4F534A; // "JSON"
 		private const uint GlbMagic = 0x46546C67; // "glTF"
 
-		// baseColorPng (optional): a fallback diffuse for sub-meshes that don't carry their own SubMesh.BaseColorPng.
-		// Each distinct PNG becomes its own glTF material/texture, so a body + head (or multi-material prop) texture
-		// independently.
-		//
-		// skeleton (optional): when supplied AND every sub-mesh carries skin influences, the mesh is written as a glTF
-		// skin - a node per bone (TRS = the bone's local rotation+translation, parented per the hierarchy), a skin with
-		// inverseBindMatrices, and JOINTS_0/WEIGHTS_0 on each primitive. The bone bind-pose world and the mesh bind-pose
-		// vertices share one frame, so at rest the SkinnedMesh is pixel-identical to the static mesh - and now posable.
+		/// <summary>
+		///     Writes the sub-meshes as a .glb.
+		/// </summary>
+		/// <param name="baseColorPng">
+		///     A fallback diffuse for sub-meshes that carry no <see cref="RenderMeshReader.SubMesh.BaseColorPng" /> of
+		///     their own. Each distinct PNG becomes its own glTF material and texture, so a body and a head, or a
+		///     multi-material prop, texture independently.
+		/// </param>
+		/// <param name="skeleton">
+		///     When supplied and every sub-mesh carries skin influences, the mesh is written as a glTF skin: a node per
+		///     bone whose TRS is the bone's local rotation and translation, parented per the hierarchy, a skin with
+		///     inverseBindMatrices, and JOINTS_0/WEIGHTS_0 on each primitive. The bone bind-pose world and the mesh
+		///     bind-pose vertices share one frame, so at rest the skinned mesh is pixel-identical to the static mesh
+		///     while being posable.
+		/// </param>
 		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs, byte[]? baseColorPng = null, IReadOnlyList<SkeletonReader.Bone>? skeleton = null)
 		{
 			var skinned = skeleton is { Count: > 0 } && subs.Count > 0 && subs.All(s => s.IsSkinned);
-			// Map a skeleton bone NAME to its index, so a sub-mesh's local bone-palette name resolves to the real joint.
+			// Map a skeleton bone name to its index, so a sub-mesh's local bone-palette name resolves to the real joint.
 			var boneIndexByName = skinned
 				? skeleton!.Select((b, i) => (b.Name, i)).GroupBy(x => x.Name).ToDictionary(g => g.Key, g => g.First().i)
 				: null;
@@ -63,9 +75,10 @@ namespace Faolan.Core.Rdb.Assets
 					}, Bounds(sub.Positions, 3))
 				};
 
-				// Always emit SMOOTH normals welded by position. The RDB's packed UByte4N normals are ambiguous (and the
-				// browser's computeVertexNormals() facets the mesh because skinned bodies split vertices at every UV-island
-				// seam). Welding by position re-fuses those seam-split vertices so curvature shades continuously.
+				// Always emit smooth normals welded by position. The RDB's packed UByte4N normals are ambiguous, and a
+				// browser's computeVertexNormals() facets the mesh because skinned bodies split vertices at every
+				// UV-island seam; welding by position re-fuses those seam-split vertices so curvature shades
+				// continuously.
 				var normals = SmoothNormals(sub.Positions, sub.Indices);
 				attributes["NORMAL"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC3", w =>
 				{
@@ -84,13 +97,14 @@ namespace Faolan.Core.Rdb.Assets
 
 				if (skinned)
 				{
-					// JOINTS_0 is UNSIGNED_BYTE VEC4 (71 bones < 256); WEIGHTS_0 is FLOAT VEC4, renormalised so the four
-					// influences sum to 1 (the /255 weights sum to ~1 already, but a degenerate all-zero vertex would make
-					// a renderer divide by zero, so guard it to a single full weight on joint 0).
+					// JOINTS_0 is UNSIGNED_BYTE VEC4 (71 bones, under 256); WEIGHTS_0 is FLOAT VEC4, renormalised so the
+					// four influences sum to 1. The /255 weights sum to roughly 1 already, but a degenerate all-zero
+					// vertex would make a renderer divide by zero, so it is forced to a single full weight on joint 0.
 					var bones = sub.BlendBones!;
 					var wts = sub.BlendWeights!;
 					var palette = sub.BonePalette!;
-					// Resolve each local palette index to a real skeleton joint via the bone name (unknown -> joint 0).
+					// Resolve each local palette index to a real skeleton joint via the bone name; an unknown name falls
+					// back to joint 0.
 					var local2joint = palette
 						.Select(n => n != null && boneIndexByName!.TryGetValue(n, out var ji)
 							? ji
@@ -151,7 +165,7 @@ namespace Faolan.Core.Rdb.Assets
 				});
 			}
 
-			// Embed each distinct diffuse PNG as an image bufferView and build the material/texture/image arrays.
+			// Embed each distinct diffuse PNG as an image bufferView and build the material, texture and image arrays.
 			var materials = new List<object>
 			{
 				new Dictionary<string, object>
@@ -193,8 +207,8 @@ namespace Faolan.Core.Rdb.Assets
 					{
 						["index"] = EmbedTexture(normalPng),
 						["texCoord"] = 0,
-						// Half strength: the full BC5 relief over-darkens the breast underside/creases under the viewer's
-						// soft lighting; 0.5 keeps the ab/collarbone/muscle detail without the harsh shadows.
+						// Half strength: the full BC5 relief over-darkens undersides and creases under the viewer's soft
+						// lighting, while 0.5 keeps the ab, collarbone and muscle detail without the harsh shadows.
 						["scale"] = 0.5f
 					};
 				}
@@ -210,9 +224,10 @@ namespace Faolan.Core.Rdb.Assets
 				materials.Add(material);
 			}
 
-			// Skin: a node per bone (child of node 0 = the mesh node, so bone node index = 1 + bone index), plus the
-			// inverseBindMatrices accessor. inverseBindMatrices[j] = inverse(bone[j].bindWorld); written in System.Numerics
-			// natural field order, which is exactly glTF's column-major encoding of the equivalent column-vector matrix.
+			// Skin: a node per bone, each a child of node 0, the mesh node, so a bone's node index is 1 + its bone
+			// index, plus the inverseBindMatrices accessor where entry j is inverse(bone[j].bindWorld). The matrices
+			// are written in System.Numerics natural field order, which is exactly glTF's column-major encoding of the
+			// equivalent column-vector matrix.
 			var nodes = new List<object>
 			{
 				skinned
@@ -330,7 +345,10 @@ namespace Faolan.Core.Rdb.Assets
 			var json = JsonSerializer.SerializeToUtf8Bytes(gltf);
 			return Assemble(json, binBytes);
 
-			// Embed a PNG once as an image+texture (deduped by reference) and return its glTF texture index.
+			/// <summary>
+		///     Embeds a PNG once as an image and texture, deduplicated by reference, and returns its glTF texture
+		///     index.
+		/// </summary>
 			int EmbedTexture(byte[] png)
 			{
 				if (textureIndexOf.TryGetValue(png, out var existing))
@@ -378,7 +396,7 @@ namespace Faolan.Core.Rdb.Assets
 				["byteOffset"] = offset,
 				["byteLength"] = len
 			};
-			if (target >= 0) // inverseBindMatrices (target -1) must NOT carry a bufferView target per the glTF spec
+			if (target >= 0) // Per the glTF spec, inverseBindMatrices (target -1) must not carry a bufferView target.
 				bv["target"] = target;
 			bufferViews.Add(bv);
 
@@ -442,9 +460,12 @@ namespace Faolan.Core.Rdb.Assets
 			return (min, max);
 		}
 
-		// System.Numerics.Matrix4x4 in natural (row-major) field order. For a row-vector matrix M this byte layout is
-		// identical to glTF's column-major encoding of M's column-vector equivalent (M^T), so an inverse-bind matrix
-		// computed with System.Numerics serialises straight into a glTF inverseBindMatrices accessor.
+		/// <summary>
+		///     Writes a <see cref="System.Numerics.Matrix4x4" /> in its natural row-major field order. For a row-vector
+		///     matrix M that byte layout is identical to glTF's column-major encoding of M's column-vector equivalent
+		///     (M transposed), so an inverse-bind matrix computed with System.Numerics serialises straight into a glTF
+		///     inverseBindMatrices accessor.
+		/// </summary>
 		private static IEnumerable<float> MatFields(Matrix4x4 m)
 		{
 			return [m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44];
@@ -461,12 +482,15 @@ namespace Faolan.Core.Rdb.Assets
 		private static long Q(float f)
 		{
 			return (long)MathF.Round(f * 1000f);
-			// weld tolerance: 1 unit = 1mm at AoC scale
+			// Weld tolerance: 1 unit is 1 mm at AoC scale.
 		}
 
-		// Per-vertex smooth normals, area-weighted from face normals, with vertices welded by quantized position so the
-		// smoothing crosses UV-island seams (where the mesh duplicates a vertex with the same XYZ but a different UV).
-		// Without the weld, seam-split vertices each keep only their own faces' normals and the surface shades faceted.
+		/// <summary>
+		///     Per-vertex smooth normals, area-weighted from face normals, with vertices welded by quantized position
+		///     so that the smoothing crosses UV-island seams, where the mesh duplicates a vertex with the same XYZ but
+		///     a different UV. Without the weld, seam-split vertices each keep only their own faces' normals and the
+		///     surface shades faceted.
+		/// </summary>
 		private static float[] SmoothNormals(float[] pos, int[] idx)
 		{
 			var vc = pos.Length / 3;
@@ -484,7 +508,8 @@ namespace Faolan.Core.Rdb.Assets
 			for (var t = 0; t + 2 < idx.Length; t += 3)
 			{
 				int a = idx[t], b = idx[t + 1], c = idx[t + 2];
-				// Face normal = (B-A) x (C-A); magnitude is twice the triangle area, so the sum is area-weighted.
+				// The face normal (B-A) x (C-A) has twice the triangle's area as its magnitude, so the sum is
+				// area-weighted.
 				float ex1 = pos[b * 3] - pos[a * 3], ey1 = pos[b * 3 + 1] - pos[a * 3 + 1], ez1 = pos[b * 3 + 2] - pos[a * 3 + 2];
 				float ex2 = pos[c * 3] - pos[a * 3], ey2 = pos[c * 3 + 1] - pos[a * 3 + 1], ez2 = pos[c * 3 + 2] - pos[a * 3 + 2];
 				float nx = ey1 * ez2 - ez1 * ey2, ny = ez1 * ex2 - ex1 * ez2, nz = ex1 * ey2 - ey1 * ex2;

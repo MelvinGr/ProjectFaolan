@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #909: a realm was marked Online in `StartAsync` - i.e. before the host was known to be serving - and only
+	// A realm was marked Online in `StartAsync` - i.e. before the host was known to be serving - and only
 	// `StopAsync` flipped it back, which a crash skips. The two failures compound: a realm process logged "Realm 2
 	// marked Online", then died on a bind with its ports never listening, and the login tier would have advertised it
 	// and handed clients to a host that did not exist. It fails quietly, in the direction of pointing players at a
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 		private const uint RealmId = 2;
 
 		[Fact]
-		// Online now means "serving". Starting the hosted service must NOT claim to be up - that is the whole bug.
+		// Online now means "serving". Starting the hosted service must not claim to be up - that is the whole bug.
 		public async Task StartAsync_DoesNotMarkOnline_AndHoldsTheRealmOffline()
 		{
 			var (service, realms, _) = Harness();
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// The flip happens on ApplicationStarted, which fires only once every hosted service has started AND the web
+		// The flip happens on ApplicationStarted, which fires only once every hosted service has started and the web
 		// host (when there is one) has bound.
 		public async Task TheRealmGoesOnline_OnlyWhenTheHostIsActuallyServing()
 		{
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 
 		[Fact]
 		// A startup that fails after the claim never reaches ApplicationStarted, so the row stays Offline - the exact
-		// sequence #909 reported, with the realm advertising itself and then dying.
+		// sequence in which a realm advertises itself and then dies.
 		public async Task AStartupThatFailsAfterTheClaim_LeavesTheRealmOffline()
 		{
 			var (service, realms, _) = Harness(RealmOnlineStatus.Online);
@@ -119,7 +119,7 @@ namespace Faolan.Tests
 
 			public List<RealmOnlineStatus> Writes { get; } = [];
 
-			// #922: the heartbeat's stamps. Counted rather than timed - the interval is two minutes' worth of ticks
+			// The heartbeat's stamps. Counted rather than timed - the interval is two minutes' worth of ticks
 			// and a test that waited for one would be a two-minute test.
 			public int Touches { get; private set; }
 

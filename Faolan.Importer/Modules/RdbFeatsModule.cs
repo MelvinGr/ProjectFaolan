@@ -8,7 +8,9 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Feat catalog (id / name / tree / group / rank) from the RDB 1000020 PLAINTEXT templates - no TEA key needed.
+	/// <summary>
+	///     Feat catalog (id / name / tree / group / rank) from the plaintext RDB 1000020 templates; no TEA key is needed.
+	/// </summary>
 	public sealed class RdbFeatsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

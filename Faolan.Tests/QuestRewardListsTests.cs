@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #893: the four reward lists of a Quest_c record, built from rows. The rules under test are the two the corpus
+	// The four reward lists of a Quest_c record, built from rows. The rules under test are the two the corpus
 	// and the client's journal renderer (FUN_01617260) agree on:
-	//   * obj3/obj4 are the LINE's catalog reward, carried on every step but the line's last;
-	//   * obj1/obj2 are the quest's OWN set - and on the last step, with nothing of its own, the line's reward FOLDS in.
+	//   * obj3/obj4 are the line's catalog reward, carried on every step but the line's last;
+	//   * obj1/obj2 are the quest's own set - and on the last step, with nothing of its own, the line's reward folds in.
 	// `--report quest-reward-lists` is where those rules are re-measured against the dumps; this gates the builder.
 	public class QuestRewardListsTests
 	{
@@ -98,7 +98,7 @@ namespace Faolan.Tests
 			Assert.Empty(lists.Obj3);
 		}
 
-		// A template we hold no key for is LEFT OUT, never sent with a zero key: the client decrypts each element from
+		// A template we hold no key for is left out, never sent with a zero key: the client decrypts each element from
 		// its own RDB with the key we ship, and a wrong one renders as "No name".
 		[Fact]
 		public void AnElementWithoutAKey_IsLeftOut()

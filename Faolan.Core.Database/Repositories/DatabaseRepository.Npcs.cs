@@ -11,19 +11,19 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 
-		// The ROOTS of the NPC TEMPLATE's dialogue for one trigger (#642/#646), each with its opening screen loaded:
-		// talk roots (`worldObjectId` null), the use-object root of that object, or the approach root. Several can
-		// share a trigger and differ only by quest gate, so the caller picks (ConversationService.PickByLatestQuest).
+		// The roots of the NPC template's dialogue for one trigger, each with its opening screen loaded: talk roots
+		// (`worldObjectId` null), the use-object root of that object, or the approach root. Several can share a trigger
+		// and differ only by quest gate, so the caller picks (ConversationService.PickByLatestQuest).
 		Task<ConversationEntry[]> GetConversationEntries(uint npcTemplateId, ConversationTrigger trigger, uint? worldObjectId);
 
-		// The branches OUT of one screen, each with its destination screen loaded (#642).
+		// The branches out of one screen, each with its destination screen loaded.
 		Task<ConversationEdge[]> GetConversationEdges(uint fromNodeId);
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 
-		// The NPC TEMPLATES whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
+		// The NPC templates whose server-opened conversation is triggered by using world object `worldObjectId`.
 		Task<uint[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
 
-		// The NPC TEMPLATES whose SERVER-OPENED conversation fires on APPROACH rather than on using an object (#523).
+		// The NPC templates whose server-opened conversation fires on approach rather than on using an object.
 		Task<uint[]> GetApproachConversationNpcs();
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
@@ -31,8 +31,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcEncounter?> GetNpcEncounter(uint mapId, uint lureTemplateId);
 		Task<NpcEncounter[]> GetNpcEncounters(uint mapId);
 
-		// #528: the quest-triggered ambushes on `mapId` - the NPCs that appear only when a goal advances. Read once
-		// per zone load, both to arm the trigger and to SKIP the captured placements of those types.
+		// The quest-triggered ambushes on `mapId` - the NPCs that appear only when a goal advances. Read once
+		// per zone load, both to arm the trigger and to skip the captured placements of those types.
 		Task<NpcAmbush[]> GetNpcAmbushes(uint mapId);
 
 		// The ambush a goal springs, or null. Keyed by the goal because that is what the progression engine holds.
@@ -43,17 +43,16 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap();
 		Task<HashSet<uint>> GetStoryKillTargets();
-		// NPC TEMPLATE -> EVERY quest that template's dialogue grants, ascending. A giver is not one quest: Turach hands
+		// NPC template -> every quest that template's dialogue grants, ascending. A giver is not one quest: Turach hands
 		// out both "The Quarry" and "The Guard", Laranga both "The Blacksmith" and "The Barmaid", Cramaleico two more.
-		// This used to return `Min(GrantQuestId)` - one quest per NPC - which silently made the other grants invisible:
-		// a two-quest giver could only ever turn ONE of them in, and the marker over their head could only ever describe
-		// one of them.
+		// Returning one quest per NPC would make the other grants invisible: a two-quest giver could only ever turn one
+		// of them in, and the marker over their head could only ever describe one of them.
 		Task<Dictionary<uint, uint[]>> GetQuestGiverMap();
-		// NPC TEMPLATE -> every quest whose GOAL targets that template - the quests that send a player TO this NPC
+		// NPC template -> every quest whose goal targets that template - the quests that send a player to this NPC
 		// rather than the ones it hands out. The two maps together are "which chains run through this NPC", which is
-		// what the marker rule is actually about (#848/#857).
+		// what the marker rule is actually about.
 		Task<Dictionary<uint, uint[]>> GetQuestGoalTargetMap();
-		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
+		// The NPC templates that play `profession` - the client's own role tag, not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 
@@ -84,13 +83,11 @@ namespace Faolan.Core.Database.Repositories
 			return await query.ExecuteDeleteAsync();
 		}
 
-		// The ROOTS of an NPC's dialogue for one trigger, each with its opening screen fully loaded (#642).
+		// The roots of an NPC's dialogue for one trigger, each with its opening screen fully loaded.
 		//
-		// One lookup replaces the four that used to differ only in which of `ServerInitiated` / `TriggerWorldObjectId` /
-		// `AnswerPath == ""` they filtered on. The trigger is now stated by a column, so "which of Casilda's two
-		// server-opened conversations is this" is answered by the key rather than by whichever row came back first.
-		// #646: keyed by the NPC's TEMPLATE, which is the identity, rather than by its display name with the template as
-		// a nullable side-gate. The gate is gone because the key does its job.
+		// The trigger is stated by a column, so "which of Casilda's two server-opened conversations is this" is
+		// answered by the key rather than by whichever row came back first. Keyed by the NPC's template, which is the
+		// identity, rather than by its display name.
 		public async Task<ConversationEntry[]> GetConversationEntries(uint npcTemplateId, ConversationTrigger trigger, uint? worldObjectId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -103,8 +100,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The branches out of one screen, each with its destination screen fully loaded (#642) - one round-trip per
-		// dialogue pick, the same as the old path lookup cost.
+		// The branches out of one screen, each with its destination screen fully loaded - one round-trip per dialogue
+		// pick.
 		public async Task<ConversationEdge[]> GetConversationEdges(uint fromNodeId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -117,10 +114,10 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The distinct NPCs whose server-opened conversation this world object triggers (#523). Retail's city door is
-		// the worked example: using it opens Casilda's farewell.
+		// The distinct NPCs whose server-opened conversation this world object triggers. Retail's city door is the
+		// worked example: using it opens Casilda's farewell.
 		//
-		// It is also what ENDS her escort, with no extra data: the object that opens the escortee's farewell is the
+		// It is also what ends her escort, with no extra data: the object that opens the escortee's farewell is the
 		// object the escort was leading to. That keeps the escort's completion data-driven off the trigger we already
 		// harvested rather than needing a hard-coded door or a new column on the goal.
 		public async Task<uint[]> GetServerInitiatedConversationNpcs(uint worldObjectId)
@@ -133,9 +130,9 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The NPCs with an APPROACH-triggered server conversation (#523). Saddur's beach confrontation is the worked
-		// example - walking up to him is what opens it. Small and static, so the caller caches it and the per-move
-		// check stays a pure in-memory name test.
+		// The NPCs with an approach-triggered server conversation. Saddur's beach confrontation is the worked example -
+		// walking up to him is what opens it. Small and static, so the caller caches it and the per-move check stays a
+		// pure in-memory name test.
 		public async Task<uint[]> GetApproachConversationNpcs()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -146,8 +143,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// #262: escortee NPCs that DISAPPEAR once their escort quest is COMPLETED (the escort is over - they're not back
-		// at the spawn). Keyed by the escortee's TEMPLATE id (the Escort goal's TrailingRefId) -> the escort quest id.
+		// Escortee NPCs that disappear once their escort quest is completed (the escort is over - they are not back at
+		// the spawn). Keyed by the escortee's template id (the Escort goal's TrailingRefId) -> the escort quest id.
 		// Data-driven from the Escort goals; generalises to any escort (e.g. Casilda 9411 -> 12407).
 		public async Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap()
 		{
@@ -165,8 +162,8 @@ namespace Faolan.Core.Database.Repositories
 			return escorts.GroupBy(x => x.TrailingRefId).ToDictionary(g => g.Key, g => g.First().QuestDefinitionId);
 		}
 
-		// The same include set as GetNpcByName, keyed by the TYPE id - what a runtime spawn from a type needs (#502:
-		// the encounter boss has no NpcSpawn row, so she can only be looked up this way).
+		// The same include set as GetNpcByName, keyed by the type id - what a runtime spawn from a type needs (the
+		// encounter boss has no NpcSpawn row, so she can only be looked up this way).
 		public async Task<NpcTemplate?> GetNpcByTemplateId(uint templateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -254,9 +251,9 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// `forClass` selects the population of a CLASS-SPECIFIC map (Map.ClassSpecific - the city armories): a spawn
+		// `forClass` selects the population of a class-specific map (Map.ClassSpecific - the city armories): a spawn
 		// stamped with another class is not part of that character's copy of the playfield, while class-agnostic spawns
-		// (ClassId null - every ordinary map) always belong. Pass null for NO class filter at all: the whole map, every
+		// (ClassId null - every ordinary map) always belong. Pass null for no class filter at all: the whole map, every
 		// class, which is what an inspection/tooling caller wants and what the world entry must never ask for.
 		// Deliberately not defaulted - a caller populating a live zone has to say whose copy it is building.
 		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass)
@@ -269,34 +266,33 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Spells)
 				.Include(n => n.NpcTemplate)
-				// #766: the creature's ambient idle animations. Lazy loading is off, so without this every NPC reads an
-				// EMPTY set and stands to attention - the exact symptom the ticket reported, one layer down.
+				// The creature's ambient idle animations. Lazy loading is off, so without this every NPC reads an empty set
+				// and stands to attention.
 				.ThenInclude(t => t.AmbientAnimations)
-				// #741: the creature TYPES this one walks with. Same reason as the line above - lazy loading is off, so
-				// without this every follower reads an EMPTY set and keeps its own path.
+				// The creature types this one walks with. Same reason as the line above - lazy loading is off, so without
+				// this every follower reads an empty set and keeps its own path.
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Follows)
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Chatter)
-				// And the bark's PARAMETER slots, or the session slot never reaches the wire (#691). Lazy loading is
-				// off, so without this `NpcChatterColumns.ToBark` reads an EMPTY `row.Parameters` and composes a
-				// remoteformat carrying NO `<parameter>` elements at all - which is a perfectly well-formed bark, so
-				// nothing throws. The client then has nothing to substitute and renders the macro literally: "You
-				// should consider joining a guild, {DetectedChar.name}!". #691 filled that slot per RECIPIENT, which
-				// cannot help while the slot is dropped a layer earlier, here at load.
+				// And the bark's parameter slots, or the session slot never reaches the wire. Lazy loading is off, so
+				// without this `NpcChatterColumns.ToBark` reads an empty `row.Parameters` and composes a remoteformat
+				// carrying no `<parameter>` elements at all - which is a perfectly well-formed bark, so nothing throws. The
+				// client then has nothing to substitute and renders the macro literally: "You should consider joining a
+				// guild, {DetectedChar.name}!".
 				.ThenInclude(c => c.Parameters)
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.StatCore)
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Waypoints)
 				// Words too - lazy loading is off, and PatrolNodeMapper throws on a short word set rather than
-				// rebuilding a wrong record, so a missing Include would break every patrol (#410).
+				// rebuilding a wrong record, so a missing Include would break every patrol.
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Words)
 				.Where(n => n.MapId == mapId && (forClass == null || n.ClassId == null || n.ClassId == forClass))
-				// EIGHT collection navigations off one root. As a single query that is one JOIN whose row count is their
-				// PRODUCT - every morph repeated once per equipment slot per spell per chatter line per patrol word - and
-				// EF then dedups it client-side. It cost 2.3s to return Tortage beach's 95 spawns, which is the bulk of
+				// Eight collection navigations off one root. As a single query that is one JOIN whose row count is their
+				// product - every morph repeated once per equipment slot per spell per chatter line per patrol word - and
+				// EF then dedups it client-side. It costs 2.3s to return Tortage beach's 95 spawns, which is the bulk of
 				// the first-entry stall on a map (the zone load is memoized, so it is paid once per map per process).
 				// Split, each collection is its own flat read.
 				.AsSplitQuery()
@@ -310,35 +306,34 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToArrayAsync();
 		}
 
-		// NPC TEMPLATE id -> the quest ids that reveal it (#261). ⚠️ Membership is the goal's own GatesTargetVisibility
-		// flag, NOT "a Kill goal that happens to carry a target". The gate forces NoRespawn, so implying it from the
-		// target made every mechanically-resolved kill target (#521) hide its whole population and stop respawning -
-		// see QuestGoalDefinition.GatesTargetVisibility for the quest that broke.
-		// ⚠️ The flag decides WHICH NPCs are gated; it does NOT decide which quests REVEAL them. Those are two questions
-		// and answering both with `GatesTargetVisibility` softlocked the Casilda chain (#574). Scavenger Tuut is gated
-		// by 13479 "The Scavenger" (Kill, the flagged goal), but 13563 "The Scavenger's Key" (Loot) targets him too -
-		// and killing him COMPLETES 13479, the only quest that was revealing him. He is also NoRespawn, a story kill
-		// target that stays dead. So the moment his loot bag went (expiry, or a server restart - bags are live world
-		// state and are not persisted), Tuut was invisible for good, the key was unobtainable, and Casilda could never
-		// be freed. Reported in-client 2026-08-02: "killed tuut but did not loot ... she is still locked".
+		// NPC template id -> the quest ids that reveal it. Membership is the goal's own GatesTargetVisibility flag, not
+		// "a Kill goal that happens to carry a target". The gate forces NoRespawn, so implying it from the target makes
+		// every mechanically-resolved kill target hide its whole population and stop respawning - see
+		// QuestGoalDefinition.GatesTargetVisibility.
 		//
-		// So an NPC is gated if ANY goal targeting it is flagged, and once gated it is revealed by EVERY quest that
+		// The flag decides which NPCs are gated; it does not decide which quests reveal them. Those are two questions,
+		// and answering both with `GatesTargetVisibility` softlocks the Casilda chain: Scavenger Tuut is gated by 13479
+		// "The Scavenger" (Kill, the flagged goal), but 13563 "The Scavenger's Key" (Loot) targets him too - and killing
+		// him completes 13479, the only quest that reveals him. He is also NoRespawn, a story kill target that stays
+		// dead. So the moment his loot bag goes (expiry, or a server restart - bags are live world state and are not
+		// persisted), Tuut is invisible for good, the key unobtainable, and Casilda can never be freed.
+		//
+		// So an NPC is gated if any goal targeting it is flagged, and once gated it is revealed by every quest that
 		// targets it - which is what "this NPC still has business with you" actually means. Widening only the reveal
-		// set keeps the flag's original job intact: a mechanically-resolved kill target (#521) that nothing flags
-		// still gates nothing, so it does not hide its population or stop respawning.
+		// set keeps the flag's original job intact: a mechanically-resolved kill target that nothing flags still gates
+		// nothing, so it does not hide its population or stop respawning.
 		//
-		// ⚠️ It USED TO key on the name, which was a live bug (#521). `Saddur` is TWO templates - 2993 on the Stygian
-		// Galley and 9500 on Tortage Island - and goal 3490 flags the Tortage one. Keying the gate on the string
-		// therefore stamped GateQuestIds + NoRespawn onto the GALLEY Saddur as well, hiding an NPC on the intro
-		// playfield from every player who was not carrying a Tortage Island quest they cannot have yet. A template is
-		// exactly one kind of NPC; a display name is ambiguous in the world (`Halen van Dummy` is 27 of them), which is
-		// the same reason ConversationNode re-keyed in #646. Both sides moved together: the giver set reads the node's
+		// Keyed by template, never by name. `Saddur` is two templates - 2993 on the Stygian Galley and 9500 on Tortage
+		// Island - and goal 3490 flags the Tortage one, so keying the gate on the string would stamp GateQuestIds +
+		// NoRespawn onto the galley Saddur as well, hiding an NPC on the intro playfield from every player not carrying
+		// a Tortage Island quest they cannot have yet. A template is exactly one kind of NPC; a display name is
+		// ambiguous in the world (`Halen van Dummy` is 27 of them). Both sides agree: the giver set reads the node's
 		// NpcTemplateId, not its NpcName label.
 		//
-		// A goal whose target has not RESOLVED to a template (TargetTemplateId null - 586 of them, naming NPCs on maps
+		// A goal whose target has not resolved to a template (TargetTemplateId null - 586 of them, naming NPCs on maps
 		// that have not been imported) is simply not in this map. That is correct on both sides: it cannot gate an NPC
 		// that does not exist here, and it cannot reveal one either. `SeedContentTests.EveryGatedGoal_ResolvesToATemplate`
-		// keeps the FLAGGED goals out of that bucket, since a flag on an unresolved goal would be silently inert.
+		// keeps the flagged goals out of that bucket, since a flag on an unresolved goal would be silently inert.
 		public async Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -362,15 +357,14 @@ namespace Faolan.Core.Database.Repositories
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
-		// The NPC TEMPLATES a quest goal kills ONCE (`QuestGoalDefinition.TargetStaysDead` -> WorldEntity.NoRespawn).
-		// A separate question from the visibility gate above and a separate query for that reason (#708): the two used
-		// to be one column, so a quest-only target that must respawn - a repeatable or retryable quest - could not be
-		// expressed at all.
+		// The NPC templates a quest goal kills once (`QuestGoalDefinition.TargetStaysDead` -> WorldEntity.NoRespawn).
+		// A separate question from the visibility gate above, and a separate query for that reason: as one column, a
+		// quest-only target that must respawn - a repeatable or retryable quest - could not be expressed at all.
 		//
-		// ⚠️ NO widening here, unlike the gate. The gate deliberately reveals a gated NPC to every quest that targets
-		// it (#574); staying dead is a property of the TARGET, so it reads the flagged goals and nothing more. A goal
-		// whose target has not resolved to a template is absent from both, which is right: it cannot pin down an NPC
-		// that does not exist here.
+		// No widening here, unlike the gate. The gate deliberately reveals a gated NPC to every quest that targets it;
+		// staying dead is a property of the target, so it reads the flagged goals and nothing more. A goal whose target
+		// has not resolved to a template is absent from both, which is right: it cannot pin down an NPC that does not
+		// exist here.
 		public async Task<HashSet<uint>> GetStoryKillTargets()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -382,8 +376,8 @@ namespace Faolan.Core.Database.Repositories
 				.ToHashSet();
 		}
 
-		// Which quest each NPC TEMPLATE gives, derived from the dialogue graph's own grants (#646: keyed by template,
-		// like everything else that routes off a click - the display name it used to key on is ambiguous in the world).
+		// Which quest each NPC template gives, derived from the dialogue graph's own grants. Keyed by template, like
+		// everything else that routes off a click, because a display name is ambiguous in the world.
 		public async Task<Dictionary<uint, uint[]>> GetQuestGiverMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -400,27 +394,27 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		/// <summary>
-		///     Which quests each NPC TEMPLATE is a GOAL TARGET of - the quests that will send a player to this NPC,
+		///     Which quests each NPC template is a goal target of - the quests that will send a player to this NPC,
 		///     as opposed to the ones it hands out itself (<see cref="GetQuestGiverMap" />).
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The two together are "which quest chains run through this NPC", which is the relation the marker rule
-		///     turns out to be about (#848/#857). The giver map alone is not it: measured over 34,837 marker packets,
-		///     only 31% of the silver retail sent is on an NPC that grants anything at all, while 85% is on one some
-		///     untouched quest's goal will send the player to. 38 of the 62 templates retail ever lit grant nothing.
+		///     The two together are "which quest chains run through this NPC", which is the relation the marker rule is
+		///     about. The giver map alone is not it: measured over 34,837 marker packets, only 31% of the silver retail
+		///     sent is on an NPC that grants anything at all, while 85% is on one some untouched quest's goal will send
+		///     the player to. 38 of the 62 templates retail ever lit grant nothing.
 		///     <para />
-		///     ⚠️ Keyed by TEMPLATE and nothing else, deliberately. A goal also carries a `TargetName`, and matching on
+		///     Keyed by template and nothing else, deliberately. A goal also carries a <c>TargetName</c>, and matching on
 		///     that would attach the relation to every NPC sharing a display name - "Halen van Dummy" is the internal
-		///     name of 27 unrelated templates (#646). A goal that names only a string is skipped here rather than
-		///     resolved by name: an unattributable relation is better than a wrong one on 27 NPCs.
+		///     name of 27 unrelated templates. A goal that names only a string is skipped here rather than resolved by
+		///     name: an unattributable relation is better than a wrong one on 27 NPCs.
 		/// </remarks>
 		public async Task<Dictionary<uint, uint[]>> GetQuestGoalTargetMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// ⛔ KILL and LOOT targets are excluded, and that is measured rather than tidy-minded. A marker says "there
-			// is something here for you"; a mob the quest sends you to kill is not that, and retail agrees without
+			// Kill and loot targets are excluded, and that is measured rather than tidy-minded. A marker says "there is
+			// something here for you"; a mob the quest sends you to kill is not that, and retail agrees without
 			// exception - Saddur is 0x00 in all 76 of his marker packets and Scavenger Tuut in all 13, while both are
-			// goal targets of the live Tortage chain. Including them put 14 spurious silvers on the two of them.
+			// goal targets of the live Tortage chain. Including them puts 14 spurious silvers on the two of them.
 			// The talk/deliver targets beside them (Bronwith "Report to Bronwith", Cavan "Give the Wolf Tails to
 			// Cavan") are the shape this relation is for.
 			var targets = await ctx
@@ -436,9 +430,9 @@ namespace Faolan.Core.Database.Repositories
 			return targets.GroupBy(t => t.Template).ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().OrderBy(q => q).ToArray());
 		}
 
-		// #647: which templates carry a ROLE, straight off the client's own `NpcStats.profession_type`. This is what
-		// makes "is the NPC I clicked an auctioneer" answerable for every auctioneer in the world rather than for the
-		// one template a capture happened to see, and without matching on a display name that is a role rather than an
+		// Which templates carry a role, straight off the client's own `NpcStats.profession_type`. This is what makes
+		// "is the NPC I clicked an auctioneer" answerable for every auctioneer in the world rather than for the one
+		// template a capture happened to see, and without matching on a display name that is a role rather than an
 		// identity ("Trader" is four templates here and would be any NPC that shared the string).
 		public async Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession)
 		{
@@ -449,20 +443,14 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// The ambient spawn-area pools (#363) and the creature TYPE each one spawns. The include set has to match what
-		// the type-built spawn body needs, because lazy loading is off: an APPEARANCE navigation that is not Included
-		// arrives EMPTY and the builder cheerfully emits a creature with no morph table and no worn equipment. That is
-		// #835 - every ambient NPC in the world rendered naked, and it stayed naked after the type rows were filled in,
-		// because the rows were never loaded. `GetNpcByTemplateId` / `GetNpcByName` (the pet and encounter paths) have
-		// always Included both; this one had not.
 		/// <summary>
-		///     The DISTINCT harvested appearances of each given creature type - one placement per outfit, world-wide -
-		///     for a spawner that has to dress an individual it has no placement for (the ambient pools, #836).
+		///     The distinct harvested appearances of each given creature type - one placement per outfit, world-wide -
+		///     for a spawner that has to dress an individual it has no placement for (the ambient pools).
 		/// </summary>
 		/// <remarks>
 		///     Retail dresses the individuals of a type differently: the three captured beach Poachers wear three
 		///     different kits and share only their leather legs. So the type's single default outfit is a uniform retail
-		///     never fields, and a pool of eight needs the SET of outfits to draw from.
+		///     never fields, and a pool of eight needs the set of outfits to draw from.
 		///     <para>
 		///         Deduped by the kit itself (slot=template pairs), so twenty placements wearing the same thing offer
 		///         one variant rather than twenty, and ordered by spawn id so the draw is stable across restarts.
@@ -484,7 +472,7 @@ namespace Faolan.Core.Database.Repositories
 				.GroupBy(s => s.NpcTemplateId)
 				.ToDictionary(g => g.Key, g => g.GroupBy(Individual).Select(v => v.First()).ToArray());
 
-			// What makes two placements the same PERSON to look at and listen to: the worn kit and the voice. Voice is
+			// What makes two placements the same person to look at and listen to: the worn kit and the voice. Voice is
 			// part of the key rather than a detail, because retail rolls it per spawn independently of the gear - two
 			// placements in identical armour with different voices are two variants, and keying on the kit alone would
 			// throw one of them away.
@@ -494,16 +482,25 @@ namespace Faolan.Core.Database.Repositories
 			}
 		}
 
-		// The scripted events this creature's dialogue fires (#839) - retail's `SendScryEvent` strings, e.g. Saddur's
+		// The scripted events this creature's dialogue fires - retail's `SendScryEvent` strings, e.g. Saddur's
 		// `Fight`. Empty for the overwhelming majority of NPCs, which script nothing.
-		// The whole ROW, not just the string: what the server does about an event is its `Action` column, so a caller
-		// that only got the text would be back to matching names in C# (#839).
+		//
+		// The whole row, not just the string: what the server does about an event is its `Action` column, so a caller
+		// that only got the text would be back to matching names in C#.
 		public async Task<NpcScriptEvent[]> GetNpcScriptEvents(uint npcTemplateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.NpcScriptEvents.AsNoTracking().Where(e => e.NpcTemplateId == npcTemplateId).ToArrayAsync();
 		}
 
+		/// <summary>
+		///     The ambient spawn-area pools and the creature type each one spawns.
+		/// </summary>
+		/// <remarks>
+		///     The include set has to match what the type-built spawn body needs, because lazy loading is off: an
+		///     appearance navigation that is not Included arrives empty and the builder emits a creature with no morph
+		///     table and no worn equipment - every ambient NPC in the world rendered naked, whatever the type rows hold.
+		/// </remarks>
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -518,8 +515,8 @@ namespace Faolan.Core.Database.Repositories
 				.Include(a => a.NpcTemplate)
 				.ThenInclude(t => t!.Morphs)
 				.Include(a => a.Points)
-				// Five collection navigations off one root would be returned as their PRODUCT and deduped client-side
-				// (#582). Nothing here depends on the un-ordered read order.
+				// Five collection navigations off one root would be returned as their product and deduped client-side.
+				// Nothing here depends on the un-ordered read order.
 				.AsSplitQuery()
 				.Where(a => a.MapId == mapId && a.NpcTemplateId != null)
 				.ToArrayAsync();

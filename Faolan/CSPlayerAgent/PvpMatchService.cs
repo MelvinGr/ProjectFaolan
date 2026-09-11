@@ -19,12 +19,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// CUSTOM PvP matches (#146): the create/join/side/start lifecycle the client's own match-buildup GUI drives,
-	// on top of the queue (PvpMatchMakingService). The message set is fully recovered from the client
-	// (docs/re/minigame-massivepvp-messages.md); ⚠️ none of it is captured - no captured session ever creates or
-	// fills a match - so every body here is built from the client-recovered layout, and the whole feature carries
-	// #146's needs-testing until a retail client walks it. What the corpus DOES pin is deliberately not repeated
-	// here: the queue half stays in PvpMatchMakingService, byte-matched to its capture.
+	// Custom PvP matches: the create/join/side/start lifecycle the client's own match-buildup GUI drives, on top of the
+	// queue (PvpMatchMakingService). The message set is recovered from the client
+	// (docs/re/minigame-massivepvp-messages.md) and none of it is captured - no captured session ever creates or fills
+	// a match - so every body here is built from the client-recovered layout. The corpus-pinned half stays in
+	// PvpMatchMakingService, byte-matched to its capture.
 	//
 	// The shape mirrors retail's own flow as the client tells it:
 	//   c CreateMatch(rules)  -> s YouJoinedMatch(match) to the creator (their client raises "YouCreatedMatch"
@@ -34,11 +33,11 @@ namespace Faolan.CSPlayerAgent
 	//   c StartMatch()        -> s CantStartMatchNotAllPlayersHaveSide(sideless) to the leader, or
 	//                            StartClicked(teleportInSeconds) to every member
 	//   c TeleportToMinigame() -> the world tier change-maps the member into the match's map, where the entry
-	//                            routes to the MATCH-OWNED instance (WorldState.ResolveEntryInstance, #268/#512)
+	//                            routes to the match-owned instance (WorldState.ResolveEntryInstance)
 	//
 	// Sides are the client's own values, stored and re-broadcast, never interpreted: the GUI produces them and the
-	// GUI consumes them, and nothing server-side needs to know which number is which team yet (scoring is #146's
-	// next slice). "Has a side" means the member has picked one at least once.
+	// GUI consumes them, and nothing server-side needs to know which number is which team. "Has a side" means the
+	// member has picked one at least once.
 	public sealed class PvpMatchService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections, IGameServerDispatcher gameServer,
 		ICharacterRepository database)
 	{
@@ -46,13 +45,13 @@ namespace Faolan.CSPlayerAgent
 		// CantStartMatch refusal exists exactly because of that state); 0 is what PlayerJoined announces for one.
 		private const uint NoSide = 0;
 
-		// StartClicked's countdown. ⚠️ An ASSUMPTION (nothing captured carries the value retail used): long enough
-		// to read the announcement, short enough to not stall the match. Noted on #146.
+		// StartClicked's countdown: long enough to read the announcement, short enough not to stall the match. Nothing
+		// captured carries the value retail used, so this is a choice rather than a recovered constant.
 		private const uint TeleportInSeconds = 10;
 
 		// How long the results page stands before the match is dissolved and any member still on the minigame map is
-		// sent home. ⚠️ An ASSUMPTION, like TeleportInSeconds: the client's results page is dismissed by its own
-		// Quit/Done button and nothing recovered states a server-side deadline. Noted on #146.
+		// sent home. Like TeleportInSeconds this is a choice, not a recovered constant: the client's results page is
+		// dismissed by its own Quit/Done button and nothing recovered states a server-side deadline.
 		private const uint ResultsPageSeconds = 60;
 
 		private readonly ConcurrentDictionary<uint, LiveMatch> _matches = [];
@@ -83,8 +82,8 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		/// <summary>
-		///     The queue's match-formation pass (#146), run after each new signup: a match forms when the resolved
-		///     minigame's queue is FULL - the capacities the client's own window displays (24 for Conquest, 12 for
+		///     The queue's match-formation pass, run after each new signup: a match forms when the resolved
+		///     minigame's queue is full - the capacities the client's own window displays (24 for Conquest, 12 for
 		///     the rest; StartingData.MinigameQueueCapacity) - with sides locked alternating in queue order.
 		///     Under capacity nothing pops; the GM `.matchstart` is the force-with-fewer override.
 		/// </summary>
@@ -95,7 +94,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		/// <summary>
-		///     The GM `.matchstart` override: form a match from whoever is compatibly queued RIGHT NOW, however few -
+		///     The GM `.matchstart` override: form a match from whoever is compatibly queued right now, however few -
 		///     down to a single member, which is what lets one client walk the teleport + match-instance flow alone.
 		///     Returns what happened, for the GM's chat line.
 		/// </summary>
@@ -111,8 +110,8 @@ namespace Faolan.CSPlayerAgent
 			if (eligible.Count < 1)
 				return "nothing formed - the queue holds no eligible signup.";
 
-			// The anchor is the longest-queued signup; everyone compatible with it joins the match. A concrete
-			// signup among them names the minigame; all "join first available" falls back to the pair the captured
+			// The anchor is the longest-queued signup; everyone compatible with it joins the match. A concrete signup
+			// among them names the minigame; an all-"join first available" set falls back to the pair the captured
 			// signups used most - Conquest (type 4) on The Call of Jhebbal Sag (5006).
 			var anchor = eligible[0];
 			var members = eligible.Where(q => Compatible(anchor.Signup, q.Signup)).ToList();
@@ -122,9 +121,9 @@ namespace Faolan.CSPlayerAgent
 				? (5006u, 4u, 0u)
 				: (pick.MapId, pick.MinigameType, pick.QueueType);
 
-			// The match forms when the minigame's queue is FULL - the per-map capacity the client's own window
-			// shows (0/24, 0/12). `.matchstart` overrides with whatever is there; either way no match takes more
-			// than the capacity.
+			// The match forms when the minigame's queue is full - the per-map capacity the client's own window shows
+			// (0/24, 0/12). `.matchstart` overrides with whatever is there; either way no match takes more than the
+			// capacity.
 			var capacity = StartingData.MinigameQueueCapacity.GetValueOrDefault(mapId, StartingData.DefaultMinigameQueueCapacity);
 			if (!force && members.Count < capacity)
 				return $"queue at {members.Count}/{capacity} for map {mapId} - forming at capacity (`.matchstart` forces).";
@@ -132,8 +131,8 @@ namespace Faolan.CSPlayerAgent
 			if (members.Count > capacity)
 				members = members.Take(capacity).ToList();
 
-			// The ruleset states THIS match truthfully: two sides of however many the queue held. Time limit 900 s
-			// is the client's own debug default; the score limit is a placeholder the client only displays.
+			// The ruleset describes this match: two sides of however many the queue held. Time limit 900 s is the
+			// client's own debug default; the score limit is a placeholder the client only displays.
 			// Non-silent, so every client announces the join with its own fifo text.
 			var perSide = (uint)Math.Max(1, (members.Count + 1) / 2);
 			var rules = new PvpMatchRules(matchType, mapId, NumberOfTeams: 2, TeamSizeMin: 1, TeamSizeMax: perSide, Password: "", TimeLimitSeconds: 900, ScoreLimit: 100,
@@ -160,9 +159,9 @@ namespace Faolan.CSPlayerAgent
 				await Push(member.CharacterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouJoinedMatch, payload);
 
 			// Announce every member to every member as a PlayerJoined - [cCharacter record][u32 side], the reader's
-			// own shape. The client DEDUPS against its roster by id (FUN_005471b0 walks the 0x7c-stride vector
-			// before appending), so a member already listed just drives the side/refresh path - and that refresh is
-			// what fills the buildup view, which stayed blank when the roster arrived only inside i_cMatch.
+			// own shape. The client dedups against its roster by id (FUN_005471b0 walks the 0x7c-stride vector before
+			// appending), so a member already listed drives the side/refresh path instead - and that refresh is what
+			// fills the buildup view, which stays blank if the roster arrives only inside i_cMatch.
 			foreach (var member in members)
 				if (PlayerJoinedBody(member.CharacterId, match) is { } joined)
 					await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerJoined, joined);
@@ -339,10 +338,10 @@ namespace Faolan.CSPlayerAgent
 			ScheduleMatchTeleport(match);
 		}
 
-		// ⭐ Verified live (2026-08-26): the client does NOT ask to be moved after StartClicked's countdown - its
-		// own fifo says "Entering minigame in about 10 seconds", passive - so the SERVER initiates the move for
-		// every member when the countdown lapses. The c2s TeleportToMinigame below is the manual path (the PvP
-		// window's own teleport/rejoin button), kept for a member who missed the move or re-enters.
+		// The client does not ask to be moved after StartClicked's countdown - its own fifo says "Entering minigame in
+		// about 10 seconds", passive - so the server initiates the move for every member when the countdown lapses.
+		// The c2s TeleportToMinigame below is the manual path (the PvP window's own teleport/rejoin button), for a
+		// member who missed the move or re-enters.
 		private void ScheduleMatchTeleport(LiveMatch match)
 		{
 			_ = Task.Run(async () =>
@@ -353,9 +352,9 @@ namespace Faolan.CSPlayerAgent
 					foreach (var member in match.Sides.Keys)
 					{
 						// Where to put them back when they leave: their live transform the moment the match takes
-						// them, so LeaveMatch is a round trip and not a one-way move. PERSISTED too (#146): a
-						// mid-match disconnect or server restart loses this dict, and the world entry then reads the
-						// persisted copy to keep a relog off the minigame map.
+						// them, so LeaveMatch is a round trip rather than a one-way move. Persisted as well, because
+						// a mid-match disconnect or server restart loses this dictionary and the world entry then
+						// reads the persisted copy to keep a relog off the minigame map.
 						if (gameServer.GetCharacterLiveState(member) is { } from && from.MapId != match.Rules.MapId)
 						{
 							var back = new System.Numerics.Vector3(from.X, from.Y, from.Z);
@@ -379,7 +378,7 @@ namespace Faolan.CSPlayerAgent
 		// A started match runs until its ruleset's time limit is up, measured from the same StartedAtUtc the client's
 		// own clock is seeded with (DispatchMinigameMatchStarted's i_nSecondsSinceStarted at world entry), so the two
 		// clocks agree and the match ends exactly when the client's counter reaches 00:00. The client computes
-		// GetTimeLeft = matchStart + timeLimit - now and then does NOTHING at zero: retail's server owns the end,
+		// GetTimeLeft = matchStart + timeLimit - now and then does nothing at zero: retail's server owns the end,
 		// which is why a match without this ran for ever with its members stranded on the minigame map.
 		private void ScheduleMatchEnd(LiveMatch match)
 		{
@@ -429,7 +428,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		/// <summary>
-		///     The PvP gate (#146): may <paramref name="attackerId" /> hit <paramref name="victimId" />? Only inside ONE
+		///     The PvP gate: may <paramref name="attackerId" /> hit <paramref name="victimId" />? Only inside one
 		///     started, unfinished match, and only across the side line - two members of the same side cannot damage each
 		///     other, and neither can anyone outside the match. Sideless members (a custom match started before the
 		///     sides were picked cannot happen, but a forced formation can leave one) are never a legal target.
@@ -484,11 +483,11 @@ namespace Faolan.CSPlayerAgent
 			return $"match {match.Id} force-stopped for {match.Sides.Count} member(s).";
 		}
 
-		// Which side took the match. ⚠️ OURS, not retail's: nothing scores yet - a minigame's points come from kills
-		// and capture zones, and neither player-vs-player damage (#503) nor the sensor volumes (#513) is modelled - so
-		// every side sits on zero and the honest answer is a draw. `0` is the value the client's own reset leaves in
-		// the field, i.e. "no side", and it renders as MatchTie for everyone. The moment a score exists this becomes
-		// `the side with the higher total`, which is why it is a method and not a constant.
+		// Which side took the match. This is a local rule rather than retail's: nothing scores yet - a minigame's
+		// points come from kills and capture zones, and neither player-vs-player damage nor the sensor volumes is
+		// modelled - so every side sits on zero and the answer is a draw. `0` is the value the client's own reset
+		// leaves in the field, i.e. "no side", and it renders as MatchTie for everyone. The moment a score exists this
+		// becomes "the side with the higher total", which is why it is a method and not a constant.
 		private static uint WinningSide(LiveMatch match)
 		{
 			var totals = match.Sides
@@ -517,7 +516,7 @@ namespace Faolan.CSPlayerAgent
 		// The results page has no deadline of its own on the wire, so a member who closes the window without pressing
 		// Quit/Done would otherwise stay in a finished match on a minigame map for ever. After a grace period the
 		// match is dissolved and anyone still in it is put back where the countdown found them - the same path the
-		// Done button takes. ⚠️ The grace length is OURS (nothing recovered states retail's).
+		// Done button takes. The grace length is a local choice; nothing recovered states retail's.
 		private void ScheduleMatchDissolve(LiveMatch match)
 		{
 			_ = Task.Run(async () =>
@@ -557,8 +556,8 @@ namespace Faolan.CSPlayerAgent
 
 		/// <summary>
 		///     The started match whose minigame map is <paramref name="mapId" /> and holds <paramref name="characterId" /> -
-		///     what the world entry asks to route the member into the MATCH-OWNED playfield instance (the minigame's twin
-		///     of #512's team instance) and to tell the client the match clock.
+		///     what the world entry asks to route the member into the match-owned playfield instance (the minigame's
+		///     twin of the team instance) and to tell the client the match clock.
 		/// </summary>
 		public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId)
 		{
@@ -584,9 +583,9 @@ namespace Faolan.CSPlayerAgent
 
 			// Everyone already in hears the join first, then the joiner gets the whole match - so the payload the
 			// joiner receives already lists them, and the broadcast does not name them to themselves twice.
-			// ⚠️ PlayerJoined carries the WHOLE cCharacter record plus the side, not a bare ID32 - its dispatch
-			// reader (FUN_01346780) calls the same FUN_005574d0 the roster uses. A 12-byte ID32 form is silently
-			// discarded as stream-bad, which is how the buildup view stayed empty on the first live run.
+			// PlayerJoined carries the whole cCharacter record plus the side, not a bare ID32 - its dispatch reader
+			// (FUN_01346780) calls the same FUN_005574d0 the roster uses. A 12-byte ID32 form is silently discarded as
+			// stream-bad, which leaves the buildup view empty.
 			if (PlayerJoinedBody(characterId, match) is { } joined)
 				foreach (var member in match.Sides.Keys.Where(m => m != characterId))
 					await Push(member, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerJoined, joined);
@@ -605,8 +604,8 @@ namespace Faolan.CSPlayerAgent
 			if (banned)
 				match.Banned.TryAdd(characterId, 0);
 
-			// PlayerLeft/PlayerKicked carry the WHOLE cCharacter record (their readers call the same FUN_005574d0
-			// the roster uses; Kicked appends the message string) - a bare ID32 is discarded as stream-bad.
+			// PlayerLeft/PlayerKicked carry the whole cCharacter record (their readers call the same FUN_005574d0 the
+			// roster uses; Kicked appends the message string) - a bare ID32 is discarded as stream-bad.
 			var record = teams.MemberRecordOf(characterId);
 			if (kickedBy != null)
 			{
@@ -643,7 +642,7 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			// The removed member's own window resets on MatchRemoved (0x207C - the no-arg feedback override the
-			// client's log string names outright); PlayerLeft/PlayerKicked only tell the OTHERS.
+			// client's log string names outright); PlayerLeft/PlayerKicked only tell the others.
 			await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
 
 			if (match.Sides.IsEmpty)
@@ -655,11 +654,11 @@ namespace Faolan.CSPlayerAgent
 
 			if (match.LeaderId == characterId)
 			{
-				// The buildup view's "Cancel Match" IS a leader leave - there is no separate cancel method on the
-				// wire - so a leader leaving a match that has NOT started cancels it for everyone: MatchRemoved to
-				// every remaining member, match gone. A leader leaving a STARTED match instead passes the lead
-				// (NewMatchLeader exists for exactly that). ⚠️ The started/unstarted split is an ASSUMPTION -
-				// nothing recovered states retail's rule - noted on #146.
+				// The buildup view's "Cancel Match" is a leader leave - there is no separate cancel method on the wire
+				// - so a leader leaving a match that has not started cancels it for everyone: MatchRemoved to every
+				// remaining member, match gone. A leader leaving a started match passes the lead instead
+				// (NewMatchLeader exists for exactly that). The started/unstarted split is a local rule; nothing
+				// recovered states retail's.
 				if (!match.Started)
 				{
 					await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
@@ -674,7 +673,7 @@ namespace Faolan.CSPlayerAgent
 					return;
 				}
 
-				// The lead passes to the longest-standing remaining member. ⚠️ An ASSUMPTION too, same note.
+				// The lead passes to the longest-standing remaining member, which is a local rule too.
 				match.LeaderId = match.Sides.Keys.First();
 				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingNewMatchLeader, Id32(match.LeaderId));
 			}
@@ -689,7 +688,7 @@ namespace Faolan.CSPlayerAgent
 
 		private PvpMatch Payload(LiveMatch match)
 		{
-			// The roster is the live members' team-member records - the SAME cCharacter record the team subsystem
+			// The roster is the live members' team-member records - the same cCharacter record the team subsystem
 			// carries (the client's match reader calls the identical FUN_005574d0). A member whose record cannot be
 			// resolved (no live session) is left off rather than sent as an empty shell.
 			var roster = match.Sides.Keys
@@ -756,10 +755,9 @@ namespace Faolan.CSPlayerAgent
 			public bool Started { get; set; }
 			public DateTime StartedAtUtc { get; set; }
 
-			// Set the moment DispatchMinigameMatchEnded goes out. The match stays REGISTERED after that - the
-			// client's results page owns a Quit/Done button whose press is an ordinary LeaveMatch, and that is what
-			// carries the member home - so the flag is what stops a second end (or a late score) landing on a
-			// finished match.
+			// Set the moment DispatchMinigameMatchEnded goes out. The match stays registered after that - the client's
+			// results page owns a Quit/Done button whose press is an ordinary LeaveMatch, and that is what carries the
+			// member home - so the flag is what stops a second end, or a late score, landing on a finished match.
 			public bool Ended { get; set; }
 			public ConcurrentDictionary<uint, uint?> Sides { get; } = [];
 			public ConcurrentDictionary<uint, uint> LockedSides { get; } = [];

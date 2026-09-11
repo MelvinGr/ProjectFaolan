@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The recovered stat-list grammar: the FullChar snapshot's stat block is TWO 0x3F1-framed StatPair_t lists
+	// The recovered stat-list grammar: the FullChar snapshot's stat block is two 0x3F1-framed StatPair_t lists
 	// (docs/re/fullplayer-snapshot-reader.md regions 9-10). StatList#1 = 17 displayed stats (Level/XP/MaxXP/HP...),
-	// StatList#2 = 148 full-sheet stats. The block that COMPOSES them is gated in SubClassPostAccessBlockTests
+	// StatList#2 = 148 full-sheet stats. The block that composes them is gated in SubClassPostAccessBlockTests
 	// (all 151 captures, byte-exact); this file is the list itself.
 	public class StatListCodecTests
 	{

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The NPC post-IIR stream and the PLAYER post-IIR stream are the same grammar (Gitea #475).
+	// The NPC post-IIR stream and the player post-IIR stream are the same grammar.
 	//
 	// They were modelled as two unrelated things: `PlayerSpawnScaffoldCodec` wrote a `[u32 4][u32 2]` pair as bare
 	// constants, and `NpcSpawnPostIir` read the same two words as `[firstRecordLen][recordCount]` and kept
@@ -15,7 +15,7 @@ namespace Faolan.Tests
 	// same stream apart from one slot:
 	//
 	//   [u32 headCount][headCount x u32] [u32 firstRecordLen] [u32 word2]
-	//   [firstRecordLen bytes - the first record, ENDING in the buff list's framing word]
+	//   [firstRecordLen bytes - the first record, ending in the buff list's framing word]
 	//   [buffs] [the entry slot] [pair list][pair list][ListFrame-counted pair list]
 	//
 	// The player's "4" is its first record's length and its "2" is word2; an NPC's are 5 and 1/2/3. So neither is a
@@ -23,13 +23,12 @@ namespace Faolan.Tests
 	public class SpawnPostIirGrammarTests
 	{
 
-		// ⭐ #466, closed: the "flag-1 entry" was never a field. The player entry slot's old carve sat 8 bytes off
-		// the client's reading, and its final 14-byte "entry" was really the SKILL list's ListFrame word plus the
-		// first skill's id (see AppearanceEntry). The "flag" was the frame word's high 16 bits, which go non-zero
-		// once the character has 65+ skills ((n+1) x 0x3F1 > 0xFFFF) - hence "12 spawns, always last, tag matching
-		// nothing". Under the client's carve the parse itself validates the frame word, so what is left to gate is
-		// the SEMANTIC invariant the old "closer value" observation becomes: every captured player skill list opens
-		// with the character's archetype ability - a round hundred in 100..400 - at rank 0.
+		// There is no "flag-1 entry" field. A carve sitting 8 bytes off the client's reading turns the skill list's
+		// ListFrame word plus the first skill's id into a final 14-byte "entry" (see AppearanceEntry), and the "flag"
+		// is that frame word's high 16 bits, which go non-zero once the character has 65+ skills
+		// ((n+1) x 0x3F1 > 0xFFFF) - hence "12 spawns, always last, tag matching nothing". Under the client's carve
+		// the parse itself validates the frame word, so what is left to gate is the semantic invariant: every captured
+		// player skill list opens with the character's archetype ability - a round hundred in 100..400 - at rank 0.
 		// The old flag-1 numbers survive as arithmetic: 12 of 296 tables framed 65+ skills.
 		[Fact]
 		public void EveryPlayerSlot_OpensItsSkillListWithTheArchetypeAbility()
@@ -56,11 +55,11 @@ namespace Faolan.Tests
 			}
 
 			Assert.Equal(296, tables);
-			Assert.Equal(12, over64); // the twelve spawns the old carve reported as "flag-1 carriers"
+			Assert.Equal(12, over64); // the twelve spawns whose frame word has its high 16 bits set
 		}
 
-		// The MINIMAL forms, whose entry slot and pair lists are all empty: what is being pinned here is the header
-		// the two codecs used to disagree about, and the fact that one reader now covers both families.
+		// The minimal forms, whose entry slot and pair lists are all empty: what is being pinned here is the header,
+		// and the fact that one reader covers both families.
 		[Fact]
 		public void TheNpcAndPlayerPostIirStreams_AreTheSameGrammar()
 		{
@@ -77,7 +76,7 @@ namespace Faolan.Tests
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
 			}
 
-			// Pinned to the FULL corpus. The 40-byte form is the create-editor preview PLAYER scaffold, fully empty;
+			// Pinned to the full corpus. The 40-byte form is the create-editor preview player scaffold, fully empty;
 			// the 41-byte one is the NPC minimal form, which differs by exactly one leading byte in its first record.
 			// That one byte, and nothing else, is what made them look like different formats.
 			Assert.Equal(21, shapes["len=40 firstRecordLen=4 word2=2"]);
@@ -86,8 +85,8 @@ namespace Faolan.Tests
 			Assert.Equal(1609 + 3513 + 30, shapes.Where(s => s.Key.StartsWith("len=41 ")).Sum(s => s.Value));
 		}
 
-		// word2 is NOT a record count, which is what it was called until this landed: it takes three different values
-		// across streams of IDENTICAL length, so it cannot be counting anything that occupies bytes. This is the gate
+		// word2 is not a record count, which is what it was called until this landed: it takes three different values
+		// across streams of identical length, so it cannot be counting anything that occupies bytes. This is the gate
 		// behind the SpawnPostIir.MovementMode rename.
 		[Fact]
 		public void Word2_DoesNotAffectTheStreamsLength_SoItIsNotARecordCount()
@@ -107,23 +106,23 @@ namespace Faolan.Tests
 			Assert.Equal([2u], byLength[40].ToArray());
 		}
 
-		// ⭐ #466 item 3: the THIRD closing pair list is a STAT list, and that is why it is framed differently from
-		// the two before it. Lists 1 and 2 are the faction-reputation block (#315) - ids in the decades
-		// 10..120 plus 200/310/320/330, values a signed standing. List 3's ids are wire STAT ids, and every one
+		// The third closing pair list is a stat list, and that is why it is framed differently from
+		// the two before it. Lists 1 and 2 are the faction-reputation block - ids in the decades
+		// 10..120 plus 200/310/320/330, values a signed standing. List 3's ids are wire stat ids, and every one
 		// resolves in the client's own stat-name table (docs/re/aoc-client-stat-names.tsv):
 		//
 		//     20      BCCState                    x8   value 1        NPC spawns
 		//     975     DamageAbsorb                x39  value 0        both families
-		//     1351    NaturalEnergyRegeneration   x9   5625 / 7368    PLAYER spawns only
-		//     1000028 Energy                      x9   3222/9000/14000  PLAYER spawns only
-		//     1000029 MaxEnergy                   x9   9000 / 14000   PLAYER spawns only
+		//     1351    NaturalEnergyRegeneration   x9   5625 / 7368    player spawns only
+		//     1000028 Energy                      x9   3222/9000/14000  player spawns only
+		//     1000029 MaxEnergy                   x9   9000 / 14000   player spawns only
 		//
 		// The three energy stats appear on exactly the same 9 spawns, which is what makes them a deliberate triple
-		// rather than noise: a pool, its denominator and its regen rate, pushed together, with Energy <= MaxEnergy
-		// on every one. #466 recorded this list as "(975, 0) on 10 spawns, always identical" - that is the
-		// player-scaffold subset; over the whole corpus it is 56 carriers and five ids.
+		// rather than noise: a pool, its denominator and its regen rate, pushed together, with Energy <= MaxEnergy on
+		// every one. A player-scaffold-only view of this list reads as "(975, 0) on 10 spawns, always identical"; over
+		// the whole corpus it is 56 carriers and five ids.
 		//
-		// ⚠️ This also corrects a standing claim that `MaxEnergy` (0x000F425D) "appears ZERO times in 120 captures"
+		// This also corrects a standing claim that `MaxEnergy` (0x000F425D) "appears ZERO times in 120 captures"
 		// and that the bytes are a leaked scaffold region rather than a value retail wrote. They are this list -
 		// count-framed, parsed by our own codec, and round-tripped byte-exact.
 		[Fact]
@@ -163,12 +162,12 @@ namespace Faolan.Tests
 			Assert.Equal(56, carriers);
 			Assert.Equal([20u, 975u, 1351u, EnergyStat, MaxEnergyStat], thirdIds.Order().ToArray());
 
-			// The ids are NOT the faction domain: the four above 120 cannot be faction ids, and the one that does
+			// The ids are not the faction domain: the four above 120 cannot be faction ids, and the one that does
 			// collide (20) is `BCCState`, which is a small-number coincidence rather than an overlap of families.
 			Assert.Equal([20u], thirdIds.Intersect(factionIds).ToArray());
 			Assert.All(thirdIds.Where(id => id != 20), id => Assert.True(id > factionIds.Max(), $"{id} sits inside the faction range"));
 
-			// ⭐ The energy triple is pushed TOGETHER, on the same spawns, and it is a real pool.
+			// The energy triple is pushed together, on the same spawns, and it is a real pool.
 			Assert.Equal(energySpawns[EnergyStat], energySpawns[MaxEnergyStat]);
 			Assert.Equal(energySpawns[EnergyStat], energySpawns[EnergyRegenStat]);
 			Assert.NotEmpty(pools);

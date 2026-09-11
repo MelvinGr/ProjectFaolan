@@ -6,15 +6,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #271: `Spell.RecastCentiseconds` is sourced from the spell record's own `SetSpellRecastTime` (53226) /
+	// `Spell.RecastCentiseconds` is sourced from the spell record's own `SetSpellRecastTime` (53226) /
 	// `SetSpellLineRecastTime` (53077) GameAction element - see docs/re/spell-recast-source.md.
 	//
-	// The gate is the RETAIL TOOLTIP, transcribed off screenshots of a level-80 necromancer before any of this was
+	// The gate is the retail tooltip, transcribed off screenshots of a level-80 necromancer before any of this was
 	// decoded (the `spell_cooldowns_observed.tsv` readings). That is what makes it a gate rather than a mirror of the
 	// importer: the expected numbers were written down by a human reading the live client, and the actual ones come
 	// out of a decode that never saw them.
 	//
-	// The ZEROES carry as much weight as the values. `Pestilential Blast` and `Ice Strike` are two of the
+	// The zeroes carry as much weight as the values. `Pestilential Blast` and `Ice Strike` are two of the
 	// necromancer's most-used spells and their tooltips read no recast at all; a decode that put a plausible number
 	// on everything would pass on the four non-zero rows and fail here.
 	public class SpellRecastTests
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		}
 
 		// A rank carrying no element of its own inherits the one its sibling arms on their shared GUI stacking line -
-		// which is what `SetSpellLineRecastTime` MEANS, and the reason the column is filled per target rather than
+		// which is what `SetSpellLineRecastTime` means, and the reason the column is filled per target rather than
 		// per record. Rank 1 of `Unimaginable Terror` carries nothing; rank 2 arms 45 s on line 41023, and casting
 		// either puts both on cooldown.
 		[Fact]

@@ -21,29 +21,33 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// Guild RPC handlers + wire builders + flow state for the CsPlayerAgent connection (create / invite / accept /
-	// decline / leave / MOTD / info). Formats decoded from the hoxxling guild_invite_accepted capture (see
-	// tools/capture/decode_guild.py). Extracted from CsPlayerAgentListener as a composed collaborator: it owns the
-	// pending-invite + per-client reply-endpoint state and routes guild events to other connected members. The
-	// cross-connection client lookup (ClientForCharacter, on the Server base) is injected as a delegate seam; the
-	// in-world guild-tag push rides the existing IGameServerDispatcher.
+	/// <summary>
+	///     Guild RPC handlers, wire builders and flow state for the CsPlayerAgent connection (create / invite / accept
+	///     / decline / leave / MOTD / info). It owns the pending-invite state and routes guild events to other
+	///     connected members. Formats are decoded from the hoxxling guild_invite_accepted capture (see
+	///     tools/capture/decode_guild.py).
+	/// </summary>
+	/// <remarks>
+	///     The cross-connection client lookup (ClientForCharacter, on the Server base) is injected as a delegate seam;
+	///     the in-world guild-tag push rides <see cref="Core.Network.Server.GameServer.IGameServerDispatcher" />.
+	/// </remarks>
 	public sealed class GuildService
 	{
-		// Retail addresses every CsPlayerAgent server->client packet FROM the guild-server object endpoint
+		// Retail addresses every CsPlayerAgent server->client packet from the guild-server object endpoint
 		// {class = the class the client targeted, instance = a fixed server-object handle}. The client targets the
-		// class with NO instance (its Authenticate/requests carry instance 0), and the captures show a nonzero server
-		// instance on every reply (0x04 on the Hoxxling login, 0x52 on the DemoL80 create - so it is an arbitrary server
-		// handle, not session data). We stamp a constant so our s2c headers match retail's shape instead of echoing the
-		// client's instance-0 endpoint back as the sender.
+		// class with no instance (its Authenticate and requests carry instance 0), and the captures show a nonzero
+		// server instance on every reply (0x04 on the Hoxxling login, 0x52 on the DemoL80 create - an arbitrary server
+		// handle, not session data). A constant is stamped so the s2c headers match retail's shape instead of echoing
+		// the client's instance-0 endpoint back as the sender.
 		private const uint GuildServerInstance = 0x04;
 		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, GuildServerInstance);
 		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(RpcInterfaces.CSPlayerInterfaceType, 0);
 
-		// The s2c endpoints for an unsolicited CsPlayerAgent PUSH (a guild event to a player who didn't just send a
+		// The s2c endpoints for an unsolicited CsPlayerAgent push (a guild event to a player who did not just send a
 		// request, so there is no incoming packet to echo). Retail addresses every reply the same way, and every
 		// request carries the same endpoints - target = the guild-server class (CSPlayerAgent), caller =
 		// CSPlayerInterface at instance 0 - so a push reuses the exact endpoints a reply would have echoed
-		// (ReplySender(packet.Receiver) / packet.Sender). This is why we don't need to remember each client's endpoints.
+		// (ReplySender(packet.Receiver) / packet.Sender), and no per-client endpoint state is needed.
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
 		private readonly ConnectionRegistry _connections;
@@ -64,9 +68,9 @@ namespace Faolan.CSPlayerAgent
 			_connections = connections;
 		}
 
-		// 0x201D DeclineGuildInvitation: drop the pending invite and tell the INVITER (0x2031 with joined=0 - the
-		// same message the accept sends with 1). Returns the declined invite's guild name (or null when there was
-		// none) so the listener can log it.
+		// 0x201D DeclineGuildInvitation: drop the pending invite and tell the inviter (0x2031 with joined=0 - the same
+		// message the accept sends with 1). Returns the declined invite's guild name, or null when there was none, so
+		// the listener can log it.
 		public async Task<string?> DeclineGuildInvitation(uint characterId, string? declinerName)
 		{
 			if (!_pendingGuildInvites.TryRemove(characterId, out var declined))
@@ -111,7 +115,7 @@ namespace Faolan.CSPlayerAgent
 				await SendInviteReplyToInviter(inviterClient, character.Name ?? "", true);
 
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
-			await _chatServerDispatcher.RefreshGuildChannel(character.Id, guild.Id); // the guild chat TAB (#663)
+			await _chatServerDispatcher.RefreshGuildChannel(character.Id, guild.Id); // the guild chat tab
 		}
 
 		// 0x201E ClientRequestGuildInfo([ID32 char]): the client resolves guild banners/tooltips of other
@@ -128,8 +132,8 @@ namespace Faolan.CSPlayerAgent
 
 			if (client.Session.Character?.GuildId == targetGuildId)
 			{
-				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
-				// taken verbatim from the capture (Dahviie, same-guild reply).
+				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (they look like
+				// rank/flags); taken verbatim from the capture's same-guild reply.
 				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildUpdateMember,
 					b => b.WriteUInt32(targetId).WriteUInt32(EntityClass.Guild).WriteUInt32(targetGuildId).WriteByte(0x03).WriteByte(0x02).WriteUInt32(targetId).WriteByte(0x01)));
 				return;
@@ -139,9 +143,8 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			// [charId][guild ID32][03][guildId][02][05][name][u32 0x3F1 = an EMPTY list][u32 0][u32 0] - verbatim from
-			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
-			// is a server-wide constant rather than guild data.
+			// [charId][guild ID32][03][guildId][02][05][name][empty list frame][u32 0][u32 0] - verbatim from the
+			// capture's "The Undreamed" reply; the list frame is a count word for an empty list, not guild data.
 			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildUpdateOther,
 				b => b
 					.WriteUInt32(targetId)
@@ -157,11 +160,11 @@ namespace Faolan.CSPlayerAgent
 					.WriteUInt32(0)));
 		}
 
-		// 0x201F ClientRequestGuildName([ID32 guild]): the client resolving a guild id it has seen (a roster entry,
-		// a renown ranking row) to a display name. Body is [u32 EntityClass.Guild][u32 guildId], reply is
-		// DispatchGuildName [u32 guildId][string name] - NOT an ID32 on the way back, matching the field's `n`
-		// prefix (`i_nGuildInstance`). Both directions are capture-verified as a PAIR in xxx_2clients_jumping:
-		// the request at frame 1120 asks for guild 0x00075E9A and frame 1131 answers `00075e9a 000b "the chickas"`.
+		// 0x201F ClientRequestGuildName([ID32 guild]): the client resolving a guild id it has seen (a roster entry, a
+		// renown ranking row) to a display name. Body is [u32 EntityClass.Guild][u32 guildId], reply is
+		// DispatchGuildName [u32 guildId][string name] - not an ID32 on the way back, matching the field's `n` prefix
+		// (`i_nGuildInstance`). Both directions are capture-verified as a pair: the request at frame 1120 asks for
+		// guild 0x00075E9A and frame 1131 answers `00075e9a 000b "the chickas"`.
 		// [V2: xxx_2clients_jumping.tshark.json frame 1131]
 		public async Task HandleClientRequestGuildName(INetworkClient client, Rpc packet, FaolanStream body)
 		{
@@ -181,12 +184,11 @@ namespace Faolan.CSPlayerAgent
 				GuildNameCodec.Build(new GuildName(guildId, guild.Name))));
 		}
 
-		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/subsystems/create-guild-decode.md):
-		//   [name s16][u8 form][u16 0]   e.g. `0006 "faolan" 06 0000`. The `form` is the government/guild-form the
-		// player picked in the registrar window (the blind impl used to drop it). NOTE: retail's IMMEDIATE reply is
-		// DispatchGuildCreated (0x2044) - a [creator member record][guild header][renown/trailer] packet that opens
-		// the window with NO relog - NOT the 0x203F we send here; that 0x2044 tail + its guild-chat 0x003c subs are
-		// the documented follow-up. Today the guild still shows via the login 0x203F push after a relog.
+		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng
+		// (docs/subsystems/create-guild-decode.md): [name s16][u8 form][u16 0], e.g. `0006 "faolan" 06 0000`. The
+		// `form` is the government/guild-form the player picked in the registrar window. Retail's immediate reply is
+		// DispatchGuildCreated (0x2044), a [creator member record][guild header][renown/trailer] packet that opens the
+		// window with no relog; the 0x203F full update sent here is what makes the guild show after a relog.
 		public async Task HandleCreateGuild(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
@@ -204,10 +206,10 @@ namespace Faolan.CSPlayerAgent
 			var guild = await _guilds.CreateGuild(name, character.Id);
 			if (guild == null)
 			{
-				// ⭐ Retail's name-taken refusal, and it is a NO-ARG dispatch - the client already knows which name
-				// it submitted, so the whole message is the method id (#737). Captured in `annotated_6`: a
-				// `CreateGuild "Faolan"` answered in the same second by `0x2047` with an EMPTY body and nothing
-				// else. Without it the registrar window just sits there.
+				// Retail's name-taken refusal is a no-arg dispatch: the client already knows which name it submitted,
+				// so the whole message is the method id. Captured in `annotated_6`, where a `CreateGuild "Faolan"` is
+				// answered in the same second by `0x2047` with an empty body and nothing else. Without it the registrar
+				// window sits there.
 				_logger.LogWarning("CreateGuild failed for {CharacterId:X8}: guild name \"{Name}\" is taken.", character.Id, name);
 				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildTakenName, _ => { }));
 				return;
@@ -215,23 +217,22 @@ namespace Faolan.CSPlayerAgent
 
 			character.GuildId = guild.Id;
 
-			// STORE the form - it was read and dropped, so every guild kept the column's default and its rank ladder
-			// was whatever that happened to be. And the leader's rung is per-form: Stygian tops out at 3, Cimmerian
-			// and Harem at 4, the other four at 5, so a flat GuildRank.Leader was right for two forms of seven (#469).
+			// The governing form has to be stored, because the rank ladder derives from it: the leader's rung is
+			// per-form - Stygian tops out at 3, Cimmerian and Harem at 4, the other four at 5 - so a flat
+			// GuildRank.Leader would be right for only two forms of seven.
 			guild.GovernmentForm = form;
 			character.GuildRank = (GuildRank)GuildRankLadder.LeaderRank(form);
 
 			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} as {Form}; leader rank {Rank} (\"{RankName}\").", guild.Name, guild.Id, character.Name, form,
 				(byte)character.GuildRank, GuildRankLadder.NameOf(form, (byte)character.GuildRank!) ?? "?");
-			// Retail's immediate create response is 0x2044 DispatchGuildCreated (opens the window with NO relog), not
-			// the 0x203F full-update. If the client doesn't accept it the guild still shows on the next login (the
-			// re-auth 0x203F push), so this only ADDS the no-relog path.
+			// Retail's immediate create response is 0x2044 DispatchGuildCreated, which opens the window with no relog.
+			// If the client does not accept it the guild still shows on the next login through the re-auth 0x203F push.
 			await SendGuildCreated(client, ReplySender(packet.Receiver), packet.Sender, guild, character, (byte)form);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 
-			// The guild chat channel, which is what makes the guild chat TAB appear. Retail sends it right after the
-			// 0x2044 (create capture: 0x2044 at frame 366, the `03 <guildId> "~Guild"` subscription at 369) - so this
-			// is the same order, on the chat connection rather than this one (#663).
+			// The guild chat channel, which is what makes the guild chat tab appear. Retail sends it right after the
+			// 0x2044 (create capture: 0x2044 at frame 366, the `03 <guildId> "~Guild"` subscription at 369), so the
+			// order here is the same, on the chat connection rather than this one.
 			await _chatServerDispatcher.RefreshGuildChannel(character.Id, guild.Id);
 		}
 
@@ -261,7 +262,7 @@ namespace Faolan.CSPlayerAgent
 				: Task.CompletedTask;
 		}
 
-		// 0x2027 GuildKick([ID32 target]): an officer takes someone ELSE out. Same removal, different authority check -
+		// 0x2027 GuildKick([ID32 target]): an officer takes someone else out. Same removal, different authority check -
 		// and the kicked member is told by the same DispatchGuildMemberLeft everyone else gets, because it names them.
 		public async Task HandleGuildKick(INetworkClient client, FaolanStream body)
 		{
@@ -276,12 +277,12 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// 0x2025 GuildPromote / 0x2026 GuildDemote ([ID32 target]): move a member one rung up or down their guild's
-		// ladder. Which rungs exist is per governing form (GuildRankLadder), so the bounds are the form's, not a
+		// ladder. Which rungs exist is per governing form (GuildRankLadder), so the bounds are the form's rather than a
 		// constant - a Stygian guild has four rungs and an Aquilonian six.
 		//
-		// ⚠️ The TOP rung is the leader's and is not reachable by promotion: handing it out would create a second
-		// leader, and retail transfers leadership through the governing-form change instead
-		// (DispatchGuildGoverningFormChanged carries a `newLeader`). So promotion stops one below it.
+		// The top rung is the leader's and is not reachable by promotion: handing it out would create a second leader,
+		// and retail transfers leadership through the governing-form change instead (DispatchGuildGoverningFormChanged
+		// carries a `newLeader`). So promotion stops one below it.
 		public async Task HandleGuildRankChange(INetworkClient client, FaolanStream body, bool promote)
 		{
 			var actor = client.Session.Character;
@@ -328,18 +329,18 @@ namespace Faolan.CSPlayerAgent
 			await BroadcastMemberUpdate(guild, target);
 		}
 
-		// The shared authority check for kick / promote / demote: the actor's RUNG must carry the right, and the
+		// The shared authority check for kick / promote / demote: the actor's rung must carry the right, and the
 		// action may not be aimed at themselves or at someone who outranks them. Returns the target when allowed,
 		// else null (and logs why).
 		//
-		// ⭐ The right comes from the client's own per-rung permission bitmask (RDB 1000518, #799), so these are no
-		// longer leader-only: `Officer`-tier rungs and up may invite, kick, promote and demote, which is one to two
-		// rungs below the leader depending on the governing form.
+		// The right comes from the client's own per-rung permission bitmask (RDB 1000518), so these are not
+		// leader-only: `Officer`-tier rungs and up may invite, kick, promote and demote, which is one to two rungs
+		// below the leader depending on the governing form.
 		// [V1: tools/ghidra/DumpGuildRankPermissions.java]
 		//
-		// ⚠️ "may not aim it at an equal or higher rung" is OURS - the table grants a right, it does not say who it
-		// may be used ON, and without that guard an Aquilonian Patrician could demote their own Potentate. It is the
-		// narrow half of the choice: refusing an action retail might allow only inconveniences an officer.
+		// "May not aim it at an equal or higher rung" is this server's rule - the table grants a right, it does not say
+		// who it may be used on, and without that guard an Aquilonian Patrician could demote their own Potentate. It is
+		// the narrow half of the choice: refusing an action retail might allow only inconveniences an officer.
 		private async Task<Character?> AuthorizeRankAction(Character? actor, uint targetId, string verb, GuildPermission permission)
 		{
 			if (actor?.GuildId is not { } guildId)
@@ -393,12 +394,12 @@ namespace Faolan.CSPlayerAgent
 
 			_logger.LogInformation("{Character} {Reason} guild {GuildId:X}.", character.Name, reason, guildId);
 			await _gameServerDispatcher.SendGuildTag(character.Id, "");
-			await _chatServerDispatcher.RefreshGuildChannel(character.Id, null); // drop the ~Guild channel with the tag (#663)
+			await _chatServerDispatcher.RefreshGuildChannel(character.Id, null); // drop the ~Guild channel with the tag
 
 			if (guild == null)
 				return;
 
-			// Guild.Members was loaded BEFORE the removal, so it still contains the departing member - which is what we
+			// Guild.Members was loaded before the removal, so it still contains the departing member - which is what we
 			// want: retail's roster fan-out reaches them too, and their own client is the one that has to close the
 			// guild window.
 			foreach (var member in guild.Members)
@@ -446,11 +447,11 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
-		// The DEPOSIT half of the guild bank (#654): the world tier has already debited the payer's wallet, so this
-		// only has to credit the guild and tell everyone. The exact mirror of the withdrawal below, tier for tier -
-		// there the CS side debits first and the world side credits, here the world side debits first and this
-		// credits, and in both cases WHOEVER HOLDS THE MONEY MOVES IT FIRST. That is the rule that matters in a money
-		// handler: a failure between the two steps must lose the transfer, never duplicate it (#368).
+		// The deposit half of the guild bank: the world tier has already debited the payer's wallet, so this only has
+		// to credit the guild and tell everyone. The exact mirror of the withdrawal below, tier for tier - there the CS
+		// side debits first and the world side credits, here the world side debits first and this credits. In both
+		// cases whoever holds the money moves it first, which is the rule that matters in a money handler: a failure
+		// between the two steps must lose the transfer, never duplicate it.
 		//
 		// Returns false without crediting when the payer is in no guild or the guild is not on this realm's CS tier,
 		// which is the caller's signal to put the money back in the wallet.
@@ -486,19 +487,18 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
-		// 0x2035 GuildWithdrawMoney(uint64 amount): the guild bank pays out to a member's wallet (#132). Its DEPOSIT
+		// 0x2035 GuildWithdrawMoney(uint64 amount): the guild bank pays out to a member's wallet. Its deposit
 		// counterpart is DepositToGuildBank above - the client's `GameCharAgent.GuildTransferMoney`, which arrives on
-		// the world tier because that is where the wallet is. (This used to say there was no deposit at all and that
-		// guild money came only from the guild TAX; the client's own method table says otherwise - #654.)
+		// the world tier because that is where the wallet is.
 		//
-		// The transaction spans both tiers: the CS tier owns Guild.Cash and the rank ladder, the GAME tier owns the
-		// wallet and is the only one whose UpdateCash the client renders. So the guild is debited HERE and the payout
+		// The transaction spans both tiers: the CS tier owns Guild.Cash and the rank ladder, the game tier owns the
+		// wallet and is the only one whose UpdateCash the client renders. So the guild is debited here and the payout
 		// goes through IGameServerDispatcher.CreditCharacterCash.
 		//
-		// ORDER MATTERS, and it is deliberately the pessimistic one: debit + persist the guild FIRST, then credit. If
-		// the credit is refused (the member is not on this realm's game host) the guild is refunded. Done the other way
-		// round, a failure between the two steps would leave money in BOTH places - and a money handler is exactly
-		// where a dupe hides (#368). Losing a withdrawal is recoverable; minting one is not.
+		// The order is deliberately the pessimistic one: debit and persist the guild first, then credit. If the credit
+		// is refused (the member is not on this realm's game host) the guild is refunded. The other way round, a
+		// failure between the two steps would leave money in both places - losing a withdrawal is recoverable, minting
+		// one is not.
 		public async Task HandleGuildWithdrawMoney(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
@@ -511,10 +511,9 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			// WHO may withdraw is the CLIENT'S OWN rule, not a policy of ours: RDB 1000518 ships a permission bitmask
-			// per rung and `GuildPermission.WithdrawMoney` is one of its bits (#799). That works out as the top two
-			// rungs on six governing forms and the leader alone on Stygian - which is why this is not "leader only"
-			// any more, and why it is not a guessed threshold either.
+			// Who may withdraw is the client's own rule rather than a local policy: RDB 1000518 ships a permission
+			// bitmask per rung and `GuildPermission.WithdrawMoney` is one of its bits. That works out as the top two
+			// rungs on six governing forms and the leader alone on Stygian.
 			// [V1: tools/ghidra/DumpGuildRankPermissions.java]
 			var rank = (byte)(character.GuildRank ?? 0);
 			if (!GuildRankLadder.Allows(guild.GovernmentForm, rank, GuildPermission.WithdrawMoney))
@@ -590,7 +589,7 @@ namespace Faolan.CSPlayerAgent
 				_logger.LogWarning("Guild invite to \"{Target}\" by {Inviter}: target {Reason}.", targetLabel, inviter.Name, target == null
 					? "not found"
 					: "is already in a guild");
-				// 0x2034 answers the NO SUCH NAME half only. A target who exists but is already guilded is a different
+				// 0x2034 answers the no-such-name half only. A target who exists but is already guilded is a different
 				// refusal, and the client's catalog has no code for it - so that one stays silent rather than borrowing
 				// this message and telling the inviter a real character does not exist.
 				if (target == null)
@@ -622,14 +621,13 @@ namespace Faolan.CSPlayerAgent
 			return _gameServerDispatcher.GetWorldSessions().Any(s => s.Character?.Id == characterId);
 		}
 
-		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
-		// window, guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and
-		// again on join/member-list requests. The three arguments and their framing live in GuildFullUpdateCodec
-		// (#530 wave 7); the renown block is built per-guild from Guild.Renown (#219), so our created guilds no
-		// longer carry the captured guild's feat/city numbers.
+		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild window,
+		// guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and again on
+		// join/member-list requests. The three arguments and their framing live in GuildFullUpdateCodec; the renown
+		// block is built per-guild from Guild.Renown.
 		private async Task SendGuildFullUpdate(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character self)
 		{
-			// The roster must include EVERY member, the viewing player included - see the codec's header for why an
+			// The roster must include every member, the viewing player included - see the codec's header for why an
 			// empty member map crashes the guild-management panel.
 			var roster = guild.Members.Where(m => m.Name != null).Select(MemberRecord).ToList();
 			var body = GuildFullUpdateCodec.Build(new GuildFullUpdate(GuildHeaders.ForFullUpdate(guild), MemberRecord(self), roster));
@@ -644,20 +642,20 @@ namespace Faolan.CSPlayerAgent
 			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildMemberJoined, GuildMemberJoinedCodec.Build(MemberRecord(member))));
 		}
 
-		// 0x202E member left - the departure twin of the above, carrying only the id and the NAME (the client's reader
+		// 0x202E member left - the departure twin of the above, carrying only the id and the name (the client's reader
 		// says so; see GuildMemberLeftCodec). Sent to every online member, the departing one included.
 		private static Task SendMemberLeft(INetworkClient client, Character member)
 		{
 			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildMemberLeft, GuildMemberLeftCodec.Build(member.Id, member.Name ?? "")));
 		}
 
-		// 0x2030 member update - one roster ROW, for a change that is not a join or a leave (today: a rank move).
+		// 0x2030 member update - one roster row, for a change that is not a join or a leave (today: a rank move).
 		private Task SendMemberUpdate(INetworkClient client, Character member)
 		{
 			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildMemberUpdate, GuildMemberUpdateCodec.Build(MemberRecord(member))));
 		}
 
-		// 0x2032 / 0x2033 - the guild master's own confirmation of a promote/demote. The verb is the OPCODE; the body
+		// 0x2032 / 0x2033 - the guild master's own confirmation of a promote/demote. The verb is the opcode; the body
 		// is identical either way, which is why the codec declares both methods.
 		private static Task SendRankFeedback(INetworkClient client, GuildGoverningForm form, byte oldRank, byte newRank, string name, bool promote)
 		{
@@ -666,13 +664,13 @@ namespace Faolan.CSPlayerAgent
 				: CSPlayerInterfaceMethods.DispatchGuildGMDemoteFeedback, GuildRankFeedbackCodec.Build(form, oldRank, newRank, name)));
 		}
 
-		// 0x2065 - "your rank changed", to the member it happened to. Two BYTES, new before old.
+		// 0x2065 - "your rank changed", to the member it happened to. Two bytes, new before old.
 		private static Task SendRankChanged(INetworkClient client, byte newRank, byte oldRank)
 		{
 			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildRankChanged, GuildRankChangedCodec.Build(newRank, oldRank)));
 		}
 
-		// 0x2031 - what the INVITER hears back once the invitee answers: the invitee's name, and whether they joined.
+		// 0x2031 - what the inviter hears back once the invitee answers: the invitee's name, and whether they joined.
 		private static Task SendInviteReplyToInviter(INetworkClient client, string inviteeName, bool joined)
 		{
 			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildInviteReplyToInviter, GuildInviteReplyCodec.Build(inviteeName, joined)));
@@ -698,7 +696,7 @@ namespace Faolan.CSPlayerAgent
 				: 0, lastSeen);
 		}
 
-		// The reply SENDER endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
+		// The reply sender endpoint for a CsPlayerAgent s2c packet: the class the client addressed, stamped with the
 		// guild-server instance (see GuildServerInstance).
 		public static ProtoEndpoint ReplySender(ProtoEndpoint clientTarget)
 		{
@@ -709,9 +707,9 @@ namespace Faolan.CSPlayerAgent
 			};
 		}
 
-		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO RELOG
-		// (vs the 0x203F GuildUpdate, which only takes effect on the next login). Grammar in GuildCreatedCodec. The
-		// creator is online (they just made it) and their playfield is their current map token.
+		// 0x2044 DispatchGuildCreated - retail's immediate create response, which opens the guild window with no relog
+		// (the 0x203F GuildUpdate only takes effect on the next login). Grammar in GuildCreatedCodec. The creator is
+		// online (they just made it) and their playfield is their current map token.
 		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
 		{
 			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, creator.MapId, 0), GuildHeaders.ForGuildCreate(guild, form)));
@@ -726,18 +724,18 @@ namespace Faolan.CSPlayerAgent
 			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildInvite, body));
 		}
 
-		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
-		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
-		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
-		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
+		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's targeted MOTD-change push - updates
+		// the stored MOTD and pops the "message of the day" toast without re-sending the whole roster, as 0x203F would.
+		// There is no capture for it; the body is the single string argument from the client method signature,
+		// s16-framed like the other guild strings (docs/re/aoc-client-rpc-methods.json).
 		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
 		{
 			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
 		}
 
-		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by
-		// the invitee's character id; entries are dropped on accept/decline (retail also expires them - cooldown
-		// handling can come later).
+		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by the
+		// invitee's character id; entries are dropped on accept or decline. Retail also expires them, which this does
+		// not.
 		private sealed record PendingGuildInvite(uint GuildId, string GuildName, uint InviterId, string InviterName);
 	}
 }

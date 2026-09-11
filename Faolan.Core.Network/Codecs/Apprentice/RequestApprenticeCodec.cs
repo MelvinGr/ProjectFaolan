@@ -5,14 +5,16 @@ using Faolan.Core.Network.Codecs.Team;
 
 namespace Faolan.Core.Network.Codecs.Apprentice
 {
-	// DispatchRequestApprentice(i_cTeacher) - GameCharInterfaceProject 0x03. The invitation: a teacher named a
-	// student with `RequestApprenticeStudent(i_cStudentID)`, and this is what reaches that student. The client
-	// renders the prompt itself off its own string ("%s wants you to become his mentor!", LDB 211711[2491]), so
-	// the body is the teacher's ID32 and nothing else.
-	//
-	// Signature from the client's own method table (docs/re/aoc-client-rpc-methods.md); no capture performs an
-	// apprenticeship, so the METHOD is the grammar (see the `client_method_table_decodes_uncaptured_bodies` note
-	// in docs/subsystems/apprentice.md).
+	/// <summary>
+	///     <c>DispatchRequestApprentice(i_cTeacher)</c> - the invitation. A teacher names a student with
+	///     <c>RequestApprenticeStudent(i_cStudentID)</c>, and this is what reaches that student.
+	/// </summary>
+	/// <remarks>
+	///     The client renders the prompt off its own string ("%s wants you to become his mentor!", LDB 211711[2491]),
+	///     so the body is the teacher's ID32 and nothing else. The signature comes from the client's own method table
+	///     (docs/re/aoc-client-rpc-methods.md); no capture performs an apprenticeship, so the method declaration is the
+	///     grammar. See docs/subsystems/apprentice.md.
+	/// </remarks>
 	public static class RequestApprenticeCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchRequestApprentice;

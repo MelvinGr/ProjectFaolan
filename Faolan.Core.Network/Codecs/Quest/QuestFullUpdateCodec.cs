@@ -5,36 +5,35 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// QuestFullUpdateIIR (0x63268258) - one quest's FULL journal entry, sent live on grant and on every re-display.
-	//
-	// Wire:  [subop][class][playerHandle][u32 0][u8 0x01]  <one QuestcRecord>  [u8 0]
-	//
-	// ⚠️ The payload IS a Quest_c journal record - the same 12 scalars, 5 text slots, 4 object lists and interleaved
-	// @609 objective region the snapshot tails carry (QuestcRecordCodec). It was hand-rolled here under a different
-	// set of names until #530 wave 5, which is why the two never lined up: the "level" is the record's `state` slot,
-	// the "acceptTime" u64 is the goal record's reserved (70099, 4CC-tag) pair and not a time field at all (#537), and
-	// the trailing "stat/objective run" is one QuestObjectiveGoal. Proven by the byte-exact Casilda golden, which the
-	// composed build reproduces unchanged.
-	//
-	// This is also why the snapshot-tails per-quest block equals this body from the record onward, minus the trailing
-	// zero byte: it is literally the same record.
-	//
-	// The u32 length prefix belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     QuestFullUpdateIIR - one quest's full journal entry, sent live on grant and on every re-display. The body is
+	///     <c>[subop][class][playerHandle][u32 0][u8 0x01]</c>, one QuestcRecord, then a zero byte.
+	/// </summary>
+	/// <remarks>
+	///     The payload is a Quest_c journal record: the same 12 scalars, 5 text slots, 4 object lists and interleaved @609
+	///     objective region the snapshot tails carry (see <see cref="QuestcRecordCodec" />), which is why the snapshot
+	///     tails' per-quest block equals this body from the record onward, minus the trailing zero byte. Proven by the
+	///     byte-exact Casilda golden.
+	///     <para>The u32 length prefix belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class QuestFullUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.QuestFullUpdateIIR;
 
-		// The per-quest LEVEL fallback. The level is a quest PROPERTY, CONSTANT per quest across its whole lifecycle
-		// (every captured 13479 full-update uses 3, on grant and on every re-display: frames 687/8876/9947/10129). It
-		// was earlier read as a "state/category" enum, but the harvest across faolan.db tracks LEVEL, not state
-		// (Tortage starter 1/3/4/5, open-world 23/24, endgame 80; two quests in the same zone can be 23 and 80; never
-		// the QuestIIR StateActive value 2). Passing the QuestIIR state (2) here makes the client silently DROP the
-		// full-update (journal stays empty) - the bug that first surfaced this field. Now harvested per quest into
-		// QuestDefinition.Level (#352); this const is the fallback for a quest with no captured full-update
-		// (Level == 0) - 3 is Casilda 13479's level, a sane Tortage default.
+		/// <summary>
+		///     The per-quest level fallback, for a quest with no captured full-update (Level == 0). It is Casilda 13479's
+		///     level, a sane Tortage default; harvested levels live in QuestDefinition.Level.
+		/// </summary>
+		/// <remarks>
+		///     The field is the quest's level and is constant per quest across its whole lifecycle - every captured 13479
+		///     full-update carries 3, on grant and on every re-display (frames 687, 8876, 9947, 10129) - and the harvest
+		///     across the database tracks a level rather than a state: Tortage starters 1/3/4/5, open world 23/24, endgame
+		///     80, with two quests in the same zone able to be 23 and 80. Passing the QuestIIR state here instead makes the
+		///     client silently drop the full-update and leave the journal empty.
+		/// </remarks>
 		public const uint DefaultQuestLevel = 3;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestFullUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -72,6 +71,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// QuestFullUpdateIIR (0x63268258) - a player handle and the quest's journal record.
+	/// <summary>The QuestFullUpdateIIR body: a player handle and the quest's journal record.</summary>
 	public sealed record QuestFullUpdateIIR(uint PlayerHandle, QuestcRecord Record);
 }

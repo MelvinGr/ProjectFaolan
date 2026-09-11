@@ -7,7 +7,7 @@ namespace Faolan.Tests
 {
 	// Golden-byte tests for DispatchUpdateTokenAmount (s2c 0x204D) against every frame the corpus carries - 10
 	// frames over 10 captures, all 18 bytes, listed by `--report method-bodies --report-arg UpdateTokenAmount`.
-	// The four distinct bodies below ARE that set: five character-creation captures send the first one verbatim.
+	// The four distinct bodies below are that set: five character-creation captures send the first one verbatim.
 	public class UpdateTokenAmountTests
 	{
 		// (hex, decoded) - the four distinct captured bodies and the event each was sent on.
@@ -18,7 +18,7 @@ namespace Faolan.Tests
 			// xxx_mage-necromancer_login_play3 - in the turn-in burst of quest 10915 "Nadini"
 			{ "040000000000000001000000000000000000", TokenPool.AltAdvancementGeneralToken, 1 },
 			// xxx_mage-necromancer_login_play4 - same character, in the burst of quest 10830 "Rescue Arias".
-			// ⛔ "a Destiny quest completion credits this" is NOT the rule these two frames establish - 32
+			// "a Destiny quest completion credits this" is not the rule these two frames establish - 32
 			// completions in the corpus, 2 paid, and nothing separates them (docs/re/alternate-advancement-perks.md).
 			{ "040000000000000002000000000000000000", TokenPool.AltAdvancementGeneralToken, 2 },
 			// NecroL80_..._group-finder-dungeon - a login-reward claim (CoreClaimIIR "login counter 120"), like Hoxxling's
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(tokenId, parsed.TokenId);
 			Assert.Equal(gained, parsed.Gained);
-			// `spent` and `includeBonus` are 0 in every captured frame - the corpus pins their POSITION, not a value.
+			// `spent` and `includeBonus` are 0 in every captured frame - the corpus pins their position, not a value.
 			Assert.Equal(0UL, parsed.Spent);
 			Assert.False(parsed.IncludeBonus);
 

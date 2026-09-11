@@ -5,33 +5,34 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// OverrideGameTweaks (PlayerInterface 0x1A07) - the server's "dynamic game tweaks", which the client applies on
-	// login ("ApplyDynamicGameTweaks: Applying 19 gametweaks"). Reverse-engineered from the retail capture
-	// (logs-test/retail pkt#3); see docs/protocol/02-rpc.md.
-	//
-	// Wire format of the `overrides` collection (raw stream, NOT protobuf; every field big-endian):
-	//   [u32 tableId][ per tweak: [u16 nameLen][name ASCII][f64 value] ] *
-	//
-	// The tweak NAMES are plaintext on the wire, length-prefixed - not name hashes - and map 1:1 onto the client's
-	// RDBGameTweaks DataTable keys. Every value is an 8-byte double regardless of the tweak's logical type
-	// (bool/int/float). The collection carries NO count: the client reads to end-of-stream, which is why the record
-	// has to be exact - a single stray byte makes the client log "stream bad after 'overrides'" and drop the whole
-	// PlayerInterface route (it applied 0 of 19 tweaks; fixed in 40d4bc0). Byte-exact in GameTweaksTests.
-	//
-	// Moved in from `PlayerAgentListener`'s inline stream build in #530 wave 7 - the listener keeps the send and the
-	// 13-byte session header-extra this method rides with.
+	/// <summary>
+	///     <c>OverrideGameTweaks</c> - the server's dynamic game tweaks, which the client applies on login
+	///     ("ApplyDynamicGameTweaks: Applying 19 gametweaks"). See docs/protocol/02-rpc.md.
+	/// </summary>
+	/// <remarks>
+	///     The <c>overrides</c> collection is a raw stream rather than protobuf, every field big-endian:
+	///     <code>
+	///     [u32 tableId][ per tweak: [u16 nameLen][name ASCII][f64 value] ] *
+	///     </code>
+	///     <para>
+	///         The tweak names are plaintext on the wire, length-prefixed rather than hashed, and map 1:1 onto the
+	///         client's RDBGameTweaks DataTable keys. Every value is an 8-byte double regardless of the tweak's logical
+	///         type. The collection carries no count: the client reads to end-of-stream, so the record has to be exact -
+	///         a single stray byte makes the client log "stream bad after 'overrides'" and drop the whole PlayerInterface
+	///         route. Byte-exact in <c>GameTweaksTests</c>.
+	///     </para>
+	/// </remarks>
 	public static class GameTweaksCodec
 	{
-		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
-		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
-		// against (#613).
+		// The message identity. On PlayerAgent/PlayerInterface that is the method constant rather than an opcode: the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare against.
 		public const uint Method = (uint)PlayerInterfaceMethods.OverrideGameTweaks;
 
-		// The 4-byte prefix retail sends, replayed verbatim: a tweak-table id/version. NOT the entry count - the
+		// The 4-byte prefix retail sends, replayed verbatim: a tweak-table id or version. It is not the entry count - the
 		// client infers that by reading to the end of the stream.
 		public const uint RetailTableId = 0x00004ED4;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GameTweaks value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -69,14 +70,16 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// The OverrideGameTweaks payload.
+	/// <summary>The OverrideGameTweaks payload.</summary>
 	public sealed record GameTweaks(uint TableId, IReadOnlyList<GameTweak> Tweaks);
 
-	// One tweak: an RDBGameTweaks key and its value, always encoded as a double.
+	/// <summary>One tweak: an RDBGameTweaks key and its value, always encoded as a double.</summary>
 	public readonly record struct GameTweak(string Name, double Value);
 
-	// The tweak SETS we serve, as VALUE factories - content, not encoding. The list below is byte-for-byte what retail
-	// sends, in wire order (the client sorts nothing; it applies them as they arrive).
+	/// <summary>
+	///     The tweak sets the server serves, as value factories - content rather than encoding. The list below is
+	///     byte-for-byte what retail sends, in wire order; the client applies them as they arrive.
+	/// </summary>
 	public static class GameTweakSets
 	{
 		public static GameTweaks Defaults()

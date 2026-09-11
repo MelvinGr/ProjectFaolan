@@ -4,27 +4,31 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// GameCharInterface.DispatchLockTemplate (0x204E) - the SPELL COOLDOWN. This is what greys a spell's action-bar
-	// button and runs its sweep; there is no recast GameAction on the wire at all (#767).
-	//
-	// Body, 8 bytes: [u32 spellId][f32 secondsRemaining] - the float BIG-endian, like every other raw-body float.
-	//
-	// Decoded over the corpus: 992 bodies, every one 8 bytes. Of the 741 whose spell id resolves against `Spells`,
-	// **580 (78.3%) carry exactly `RecastCentiseconds / 100`** - the spell's own recast, in seconds. The rest are
-	// partials against the same spell (15.143 / 15.254 / 15.76 where the recast is 20.0), i.e. the time LEFT rather
-	// than the base, which is the same restore shape a long buff's duration takes (#601).
-	//
-	// ⚠️ Retail sends one per spell in the LINE, not one for the cast: a `Contract of Protection` cast emits five
-	// bodies in a row - 195173 / 195178 / 195179 / 195180 / 1151248, every rank on the line - each carrying the same
-	// 20.0. That is the wire form of `SetSpellLineRecastTime`, and it is why all five ranks of a spell grey together.
-	//
-	// The 251 bodies whose id is absent from `Spells` are ABILITIES and combos, which lock through the same message -
-	// "template" is the client's word for the thing on the bar, not specifically a spell.
+	/// <summary>
+	///     GameCharInterface.DispatchLockTemplate - the spell cooldown. It greys a spell's action-bar button and runs its
+	///     sweep; there is no recast GameAction on the wire at all. The body is 8 bytes,
+	///     <c>[u32 templateId][f32 secondsRemaining]</c>, the float big-endian like every other raw-body float.
+	/// </summary>
+	/// <remarks>
+	///     Decoded over the corpus: 992 bodies, every one 8 bytes. Of the 741 whose id resolves against Spells, 580 (78.3%)
+	///     carry exactly RecastCentiseconds / 100 - the spell's own recast in seconds. The rest are partials against the same
+	///     spell (15.143 / 15.254 / 15.76 where the recast is 20.0), i.e. the time left rather than the base, the same
+	///     restore shape a long buff's duration takes.
+	///     <para>
+	///         Retail sends one body per spell in the line rather than one for the cast: a Contract of Protection cast emits
+	///         five bodies in a row - 195173 / 195178 / 195179 / 195180 / 1151248, every rank on the line - each carrying the
+	///         same 20.0. That is the wire form of SetSpellLineRecastTime, and why all five ranks grey together.
+	///     </para>
+	///     <para>
+	///         The 251 bodies whose id is absent from Spells are abilities and combos, which lock through the same message:
+	///         "template" is the client's word for the thing on the bar, not specifically a spell.
+	///     </para>
+	/// </remarks>
 	public static class LockTemplateCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchLockTemplate;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(LockTemplate value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -57,6 +61,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// The DispatchLockTemplate body: lock `TemplateId` (a spell, ability or combo) for `SecondsRemaining`.
+	/// <summary>
+	///     The DispatchLockTemplate body: lock <c>TemplateId</c> - a spell, ability or combo - for
+	///     <c>SecondsRemaining</c>.
+	/// </summary>
 	public sealed record LockTemplate(uint TemplateId, float SecondsRemaining);
 }

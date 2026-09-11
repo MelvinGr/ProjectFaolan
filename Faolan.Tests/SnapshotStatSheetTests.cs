@@ -8,10 +8,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #447's acceptance test: the snapshot stat sheet has ONE author, so a modelled stat's value reaches the wire
-	// whatever the character's provenance. The bug this exists to prevent is not hypothetical - setting the GM Level
-	// stat on the static fresh list did nothing for a single real login, because imported characters never touched
-	// that list, and nothing anywhere said so.
+	// The snapshot stat sheet has one author, so a modelled stat's value reaches the wire whatever the character's
+	// provenance. The failure this prevents is not hypothetical: setting the GM Level stat on a static fresh list does
+	// nothing for a real login, because imported characters never touch that list, and nothing anywhere says so.
 	public class SnapshotStatSheetTests
 	{
 		// A captured sheet, of the exact size the snapshot requires, with a recognisable value in every slot so an
@@ -33,7 +32,7 @@ namespace Faolan.Tests
 
 		public static TheoryData<bool> Provenance => [true, false];
 
-		// The whole point: every override lands, for an imported character AND a freshly-created one.
+		// The whole point: every override lands, for an imported character and a freshly-created one.
 		[Theory]
 		[MemberData(nameof(Provenance))]
 		public void EveryOverride_Lands_WhateverTheProvenance(bool imported)
@@ -41,18 +40,18 @@ namespace Faolan.Tests
 			var sheet = SnapshotStatSheet.For(Char80(GmRoles.All), 0x0802ABCD, imported ? Captured() : null);
 
 			Assert.Equal(0x0802ABCDu, Value(sheet, CharacterStatId.PlayfieldToken));
-			// The account's stored mask, verbatim - `Account.GmLevel` IS the wire value now, with nothing derived
+			// The account's stored mask, verbatim - `Account.GmLevel` is the wire value now, with nothing derived
 			// from the web account type and no separate god-mode flag to reconcile. See AccountGmPrivilegeMaskTests.
 			Assert.Equal(GmRoles.All, Value(sheet, CharacterStatId.GmLevel));
 			Assert.Equal(80u, Value(sheet, CharacterStatId.Level));
-			// The XP triple is retail's CUMULATIVE form (#297): the row's 4242 is within-level progress and rides on
+			// The XP triple is retail's cumulative form: the row's 4242 is within-level progress and rides on
 			// level 80's own threshold, which is also the base the client subtracts to fill the bar.
 			Assert.Equal(LevelingResolver.CumulativeXpForLevel(80) + 4242u, Value(sheet, CharacterStatId.Exp));
 			Assert.Equal(LevelingResolver.CumulativeXpForLevel(81), Value(sheet, CharacterStatId.MaxExp));
 			Assert.Equal(LevelingResolver.CumulativeXpForLevel(80), Value(sheet, CharacterStatId.ExpCurrentLevelBase));
 		}
 
-		// An override writes EVERY occurrence, not just the first. Level and the XP stats appear in both StatList#1
+		// An override writes every occurrence, not just the first. Level and the XP stats appear in both StatList#1
 		// and StatList#2, and half-writing one is exactly what leaves a sheet internally inconsistent.
 		[Theory]
 		[MemberData(nameof(Provenance))]
@@ -65,15 +64,15 @@ namespace Faolan.Tests
 			Assert.All(levels, p => Assert.Equal(80u, p.Value));
 		}
 
-		// A slot the snapshot does NOT derive keeps whatever the baseline gave it. Without this the previous test
+		// A slot the snapshot does not derive keeps whatever the baseline gave it. Without this the previous test
 		// would also pass on a builder that simply overwrote the whole sheet.
 		[Fact]
 		public void ANonDerivedSlot_KeepsTheCapturedValue()
 		{
 			var sheet = SnapshotStatSheet.For(Char80(), null, Captured());
 
-			// (AttackRating used to be the example here. It is derived from level now - `400 x level - 300`, #685 -
-			// so the pair below are two skills that genuinely still are not.)
+			// (AttackRating is derived from level - `400 x level - 300` - so the pair below are two skills that
+			// genuinely are not.)
 			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Climbing));
 			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Perception));
 		}

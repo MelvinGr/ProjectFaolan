@@ -241,7 +241,7 @@
 	        Style="max-height: 84vh; right: 1.25rem; top: 4.75rem; width: 16.5rem;">
 		<div class="edit-scroll">
 			<div class="edit-head">Body</div>
-			@* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
+			@* Morph sliders are editable only for a character the signed-in account owns; a disabled fieldset greys out all 7. *@
 			<fieldset class="morph-set" disabled="@(!_ownsSelected)">
 				<label class="pose">
 					<span>Arm</span>
@@ -395,7 +395,7 @@
 		</div>
 
 		<div class="edit-actions">
-			@* Save only appears for a character you own; others get a preview-only editor. *@
+			@* Save only appears for a character the signed-in account owns; every other character gets a preview-only editor. *@
 			@if (_ownsSelected)
 			{
 				<button class="pose-reset" @onclick="SaveEdit">Save</button>
@@ -425,8 +425,8 @@
 
 @code {
 
-	// Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
-	// placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
+	// Renders one item slot, equipment or bag: a 3D thumbnail filled in by JS, the item name as the fallback label or
+	// the placeholder label when empty, a stack-count badge, and the data-* attributes the JS tooltip reads on hover.
 	private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "", string? equipSlot = null) =>
 		@<div
 			 class="slot @extra @(info != null

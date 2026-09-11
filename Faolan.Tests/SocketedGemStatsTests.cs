@@ -11,12 +11,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #311: a gem socketed into a WORN item grants its stats, and it grants them through the ordinary item-stat path.
+	// A gem socketed into a worn item grants its stats, and it grants them through the ordinary item-stat path.
 	//
 	// A socket carries no stat value in either wire form - the persistent `slot_map` and the live
-	// `DispatchAddToItemSlot` both name the gem by TEMPLATE and nothing else - so the gem's effect is its own
+	// `DispatchAddToItemSlot` both name the gem by template and nothing else - so the gem's effect is its own
 	// template's modifier list, and folding it in is a matter of returning the gem alongside the item it sits in.
-	// Storage and display shipped with #750; until this, every gem in the game was inert.
 	public class SocketedGemStatsTests
 	{
 		private const uint CharacterId = 311;
@@ -53,8 +52,8 @@ namespace Faolan.Tests
 					ctx.ItemStatModifiers.Add(new ItemStatModifier { ItemId = GemTemplate, StatId = Stat, Amount = 1500 });
 					ctx.ItemStatModifiers.Add(new ItemStatModifier { ItemId = OtherGemTemplate, StatId = Stat, Amount = 9900 });
 
-					// Worn gloves with TWO of the same gem in two sockets, a worn ring with none, and - the control -
-					// an unworn BAG item carrying a gem that must not count.
+					// Worn gloves with two of the same gem in two sockets, a worn ring with none, and - the control -
+					// an unworn bag item carrying a gem that must not count.
 					var gloves = new ItemInstance { Id = 90001, OwnerCharacterId = CharacterId, Container = ContainerKind.Equipped, Slot = (int)CharacterEquipmentSlot.Hands, TemplateId = GlovesTemplate };
 					var ring = new ItemInstance { Id = 90002, OwnerCharacterId = CharacterId, Container = ContainerKind.Equipped, Slot = (int)CharacterEquipmentSlot.LeftRing, TemplateId = RingTemplate };
 					var inBag = new ItemInstance { Id = 90003, OwnerCharacterId = CharacterId, Container = ContainerKind.Bag, Slot = 4, TemplateId = GlovesTemplate };
@@ -75,8 +74,8 @@ namespace Faolan.Tests
 				Assert.Equal(2, worn.Count(i => i.Id == GemTemplate));
 				Assert.DoesNotContain(worn, i => i.Id == OtherGemTemplate);
 
-				// ONCE PER SOCKET, not once per distinct gem: two of the same gem is that bonus twice. De-duplicating
-				// here is exactly the halving #585 fixed for the worn items themselves.
+				// Once per socket, not once per distinct gem: two of the same gem is that bonus twice. De-duplicating
+				// here would halve the bonus, exactly as it does for the worn items themselves.
 				var total = worn.SelectMany(i => i.StatModifiers).Where(m => m.StatId == Stat).Sum(m => m.Amount);
 				Assert.Equal(3000, total);
 			}

@@ -34,9 +34,9 @@ namespace Faolan.Core.Database.Tables
 		public string Name { get; set; } = null!;
 
 		// The u32 form the ChatServer / CsPlayerAgent handoffs carry (a fixed 4-byte field + u16 port, byte-exact
-		// against retail's ChatServerConnectReady / CSServerConnectReady). The client is IPv4-only (#845: both of
-		// its connect helpers are hard-wired AF_INET + gethostbyname), and that field has no room for anything
-		// else - so a realm row holding a v6 literal is a configuration error, and this THROWS rather than
+		// against retail's ChatServerConnectReady / CSServerConnectReady). The client is IPv4-only (both of its
+		// connect helpers are hard-wired AF_INET + gethostbyname), and that field has no room for anything
+		// else - so a realm row holding a v6 literal is a configuration error, and this throws rather than
 		// silently sending the first four bytes of the v6 address as if they were an IPv4 one (which is what
 		// GetAddressBytes() would hand back).
 		public uint IpAddressLong
@@ -52,9 +52,9 @@ namespace Faolan.Core.Database.Tables
 			}
 		}
 
-		// Multi-realm (process-per-realm, #324): chat + guild/team run IN the realm process, so their ports are
-		// per-realm too. The login/router tier advertises these (with IpAddress) in the ChatServer/CsPlayerAgent
-		// handoffs. Seeded to the historical single-process config ports so a one-realm deploy is byte-identical.
+		// Multi-realm is process-per-realm: chat + guild/team run in the realm process, so their ports are per-realm
+		// too. The login/router tier advertises these (with IpAddress) in the ChatServer/CsPlayerAgent handoffs.
+		// Defaulted to the single-process config ports so a one-realm deploy is byte-identical.
 		public ushort ChatServerPort { get; set; }
 
 		public ushort CsPlayerAgentPort { get; set; }
@@ -63,20 +63,19 @@ namespace Faolan.Core.Database.Tables
 		public ushort Port { get; set; }
 
 		/// <summary>
-		///     When this realm's host last said it was still serving - the LIVENESS half of <see cref="OnlineStatus" />
-		///     (#922). NULL means it has never heartbeated.
+		///     When this realm's host last said it was still serving - the liveness half of
+		///     <see cref="OnlineStatus" />. Null means it has never heartbeated.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ <c>OnlineStatus</c> on its own cannot express "this host died and nobody restarted it". #909 made
-		///     the flag mean SERVING and made a realm's own restart clear its stale Online, but a crash with no
-		///     restart leaves the row Online for ever - the login tier keeps advertising a host that is not there,
-		///     which is the same quiet, wrong-direction failure on a longer timescale.
+		///     <c>OnlineStatus</c> on its own cannot express "this host died and nobody restarted it": the flag means
+		///     serving and a realm's own restart clears its stale Online, but a crash with no restart leaves the row
+		///     Online for ever, so the login tier keeps advertising a host that is not there.
 		///     <para />
-		///     A two-value flag cannot decay on its own; somebody has to observe the ABSENCE. This column is that
+		///     A two-value flag cannot decay on its own; somebody has to observe the absence. This column is that
 		///     observation: the realm host stamps it on a timer, and a reader treats Online-but-stale as Offline
-		///     (<c>RealmLiveness.IsServing</c>). ⭐ Deliberately a stamp rather than a lease or a reaper, because it
-		///     preserves #909's invariant unchanged - <b>a realm process only ever writes its own row</b>, and no
-		///     process writes another's. The login tier only READS.
+		///     (<c>RealmLiveness.IsServing</c>). Deliberately a stamp rather than a lease or a reaper, because it
+		///     preserves the invariant that a realm process only ever writes its own row, and no process writes
+		///     another's. The login tier only reads.
 		/// </remarks>
 		public DateTimeOffset? LastSeenUtc { get; set; }
 	}

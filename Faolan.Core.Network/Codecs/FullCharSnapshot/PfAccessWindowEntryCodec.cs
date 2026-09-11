@@ -4,26 +4,29 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The `PFAccessWindow_` playfield catalog of the FullChar snapshot tails - the game-static region emitted from
-	// the typed AccessWindowCatalog rather than a captured blob (#258), re-carved to the CLIENT's own grammar (#464):
-	//
-	//   table = [u32 (count + 1) * 0x3F1]  count × entry            (a plain ListFrame list - see PfAccessWindowEntry
-	//   entry = [u32 playfieldId][u8 flag][u32 accessType][u32 unknown]    for what the old lookahead carve got wrong)
-	//           [u16 len][name][u32 childCount]  childCount × child
-	//   child = [u8 flag][u32 id][u16 len][displayName][u16 len][parentName]
-	//
-	// The client reader is `PlayfieldAccessHolder`'s `FUN_0077d220`/`FUN_0077db70` (the snapshot-tails list the old
-	// notes called "list D"); its sibling list ("E", `FUN_0077d5b0`, per record `[u32 key][str][u32 x3][u8][str]`)
-	// follows the table and is EMPTY on every captured snapshot, so it rides the post-access block's leading empty
-	// frame. The old carve's "no count and no terminator" was this table's own ListFrame word being misread as the
-	// quest index's terminal (QuestIndexRegionCodec).
+	/// <summary>
+	///     The <c>PFAccessWindow_</c> playfield catalog of the FullChar snapshot tails - the game-static region emitted
+	///     from the typed <see cref="Constants.AccessWindowCatalog" /> rather than a captured blob, carved to the client's
+	///     own grammar:
+	///     <code>
+	///     table = [list frame]  count x entry
+	///     entry = [u32 playfieldId][u8 flag][u32 accessType][u32 unknown]
+	///             [u16 len][name][u32 childCount]  childCount x child
+	///     child = [u8 flag][u32 id][u16 len][displayName][u16 len][parentName]
+	///     </code>
+	/// </summary>
+	/// <remarks>
+	///     The client reader is <c>PlayfieldAccessHolder</c>'s <c>FUN_0077d220</c>/<c>FUN_0077db70</c>. Its sibling list
+	///     (<c>FUN_0077d5b0</c>, per record <c>[u32 key][str][u32 x3][u8][str]</c>) follows the table and is empty on
+	///     every captured snapshot, so it rides the post-access block's leading empty frame.
+	/// </remarks>
 	public static class PfAccessWindowEntryCodec
 	{
-		// Every name in the shipped catalog carries this prefix - a property of the DATA the catalog tests assert,
-		// not of the grammar (the client does not validate names).
+		// Every name in the shipped catalog carries this prefix - a property of the data the catalog tests assert, not of
+		// the grammar; the client does not validate names.
 		public const string NamePrefix = "PFAccessWindow_";
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(PfAccessWindowEntry value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -32,7 +35,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return s.ToArray();
 		}
 
-		// The whole table, ListFrame word included.
+		// The whole table, list frame word included.
 		public static byte[] Build(IReadOnlyList<PfAccessWindowEntry> entries)
 		{
 			ArgumentNullException.ThrowIfNull(entries);
@@ -41,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return s.ToArray();
 		}
 
-		// One entry (no frame word - an entry is only ever part of the table).
+		// One entry; no frame word, since an entry is only ever part of the table.
 		public static PfAccessWindowEntry Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(PfAccessWindowEntryCodec));
@@ -76,8 +79,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var internalName = r.ReadStringU16Length();
 
 			var childCount = r.ReadU32Be();
-			// A count is bounded by the bytes a child needs (9 minimum), so a shifted read fails HERE rather than
-			// producing a phantom model - the failure mode the old carve fell into.
+			// A count is bounded by the bytes a child needs (9 minimum), so a shifted read fails here rather than producing a
+			// phantom model.
 			if (childCount > r.Remaining / 9)
 				throw CodecParseException.Unexpected(nameof(PfAccessWindowEntryCodec), r.Position - 4, "a plausible child count", childCount.ToString());
 

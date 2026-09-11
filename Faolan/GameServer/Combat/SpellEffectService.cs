@@ -12,26 +12,32 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// The spell-effect dispatcher: given a spell, what does the SERVER have to do about it - beyond sending the
-	// ApplySpell carrier and folding in its stat deltas?
-	//
-	// This replaces dispatching on hardcoded spell ids. A pet summon used to be a catalog lookup branch in the cast
-	// resolve and the fatality proc a pair of constants FatalityService compared against; both
-	// are now SpellEffect rows the importer seeds, so adding the next summon or proc is a row rather than a branch.
-	//
-	// What is deliberately NOT here, because it is not keyed by spell id and folding it in would be a fake
-	// unification:
-	//   - MOUNTS (the Mounts table, #627) are keyed by the client's MOUNT id - the SummonMount behavior's `from` word,
-	//     which is the SUMMON spell's id, not the ridden spell's - and carry the mount creature the client animates
-	//     from. A different axis; the wire constants around it stay in MountCatalog (docs/subsystems/mounts.md).
-	//   - SPELLWEAVES (SpellweaveCatalog) are keyed by CLASS - the weave elements and the energy pool are per-class
-	//     profiles, not per-spell effects.
-	//   - Shield of the Risen and Exhausted are single named spell ids each used at ONE call site (world entry, energy
-	//     depletion). Those are spell REFERENCES, not a dispatch table; a row would only add a lookup.
+	/// <summary>
+	///     The spell-effect dispatcher: given a spell, what the server has to do about it beyond sending the ApplySpell
+	///     carrier and folding in its stat deltas.
+	/// </summary>
+	/// <remarks>
+	///     <para>
+	///         Effects are <c>SpellEffect</c> rows the importer seeds rather than branches on hardcoded spell ids, so
+	///         the next summon or proc is a row.
+	///     </para>
+	///     <para>
+	///         Three neighbouring mechanics are deliberately not here, because they are not keyed by spell id and
+	///         folding them in would be a fake unification. Mounts (the <c>Mounts</c> table) are keyed by the client's
+	///         mount id - the SummonMount behavior's <c>from</c> word, which is the summon spell's id, not the ridden
+	///         spell's - and carry the mount creature the client animates from; the wire constants around them stay in
+	///         <c>MountCatalog</c> (docs/subsystems/mounts.md). Spellweaves (<c>SpellweaveCatalog</c>) are keyed by
+	///         class, the weave elements and energy pool being per-class profiles. Shield of the Risen and Exhausted
+	///         are single named spell ids used at one call site each - world entry and energy depletion - which makes
+	///         them spell references rather than a dispatch table.
+	///     </para>
+	/// </remarks>
 	public sealed class SpellEffectService
 	{
-		// See BuffStatEffects.WarmAsync (#938): build the triggered-effect table at startup rather than on the first
-		// pet summon / proc.
+		/// <summary>
+		///     Builds the triggered-effect table at startup rather than on the first pet summon or proc - see
+		///     <see cref="BuffStatEffects.WarmAsync" />.
+		/// </summary>
 		public async Task WarmAsync() => await EnsureLoaded();
 
 		private readonly ICatalogRepository _database;
@@ -49,14 +55,22 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
-		// The effects a CAST carries. `spellBase` is the bare id from the cast trailer (not the wire (base << 8) form).
+		/// <summary>
+		///     The effects a cast carries. <paramref name="spellBase" /> is the bare id from the cast trailer, not the
+		///     wire (base &lt;&lt; 8) form.
+		/// </summary>
 		public async Task<IReadOnlyList<SpellEffect>> ForCast(uint spellBase)
 		{
 			return await For(spellBase, SpellEffectTrigger.OnCast);
 		}
 
-		// The fatality-triggered effects armed by the buffs currently live on `entity` (#140). ActiveBuffs is keyed by
-		// the WIRE id, so each is shifted back to its base to match a row. Returns them in (buff, sequence) order.
+		/// <summary>
+		///     The fatality-triggered effects armed by the buffs currently live on <paramref name="entity" />, in
+		///     (buff, sequence) order.
+		/// </summary>
+		/// <remarks>
+		///     <c>ActiveBuffs</c> is keyed by the wire id, so each is shifted back to its base to match a row.
+		/// </remarks>
 		public async Task<IReadOnlyList<SpellEffect>> ForFatality(WorldEntity entity)
 		{
 			var effects = await EnsureLoaded();
@@ -73,9 +87,14 @@ namespace Faolan.GameServer.Combat
 			return armed;
 		}
 
-		// Runs one effect for the player. Returns whether it was actually carried out - a summon whose creature type is
-		// missing reports false rather than pretending, so the caller can log the content gap (the buff that asked for
-		// the pet is already on the player either way).
+		/// <summary>
+		///     Runs one effect for the player.
+		/// </summary>
+		/// <returns>
+		///     Whether it was actually carried out: a summon whose creature type is missing reports false rather than
+		///     pretending, so the caller can log the content gap - the buff that asked for the pet is already on the
+		///     player either way.
+		/// </returns>
 		public async Task<bool> Run(INetworkClient client, SpellEffect effect)
 		{
 			switch (effect.Kind)
@@ -88,10 +107,10 @@ namespace Faolan.GameServer.Combat
 						return false;
 					}
 
-					// ⭐ The pet's POINT COST comes from the spell that summoned it (#823) and goes on the wire in the
-					// PetIIR assign, because the client counts its pet-point bar from there and the server states it
-					// nowhere else. Read from the SPELL rather than joined by creature name: several spells can name
-					// one creature, and the name join is what makes `Demon Avenger` read 1 where retail assigns 4.
+					// The pet's point cost comes from the spell that summoned it and goes on the wire in the PetIIR
+					// assign, because the client counts its pet-point bar from there and the server states it nowhere
+					// else. Read from the spell rather than joined by creature name: several spells can name one
+					// creature, and a name join makes `Demon Avenger` read 1 where retail assigns 4.
 					var pointCost = (await _database.GetSpell(effect.SpellId))?.SummonPointCost ?? 0;
 
 					if (effect.DurationMs is not { } durationMs)
@@ -99,14 +118,14 @@ namespace Faolan.GameServer.Combat
 						if (await _outbound.SummonPet(client, effect.Template, effect.Combat, pointCost))
 							return true;
 
-						// The cast HAPPENED - the player paid for it and the client is waiting for a pet. Say which
+						// The cast happened - the player paid for it and the client is waiting for a pet. Say which
 						// creature type is missing rather than resolving the cast as if it did nothing.
 						_logger.LogWarning("Spell {Spell} summons '{Template}', but no creature type by that name is spawnable (pet-creature import needed).", effect.SpellId, effect.Template);
 						return false;
 					}
 
-					// A TIMED pet extends the one already out rather than stacking a second (the summon path owns that
-					// rule); it has no "nothing spawned" answer to give back, so a missing type is reported there.
+					// A timed pet extends the one already out rather than stacking a second - the summon path owns that
+					// rule - and has no "nothing spawned" answer to give back, so a missing type is reported there.
 					await _outbound.SummonTimedPet(client, effect.Template, TimeSpan.FromMilliseconds(durationMs), effect.MaxDurationMs is { } cap
 						? TimeSpan.FromMilliseconds(cap)
 						: null, pointCost);
@@ -132,8 +151,13 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
-		// Runs every effect of `effects` in order, and says whether there was anything to run - the cast resolve uses
-		// that to decide between "this spell's effect IS the summon" and the generic buff-apply resolution.
+		/// <summary>
+		///     Runs every effect in order.
+		/// </summary>
+		/// <returns>
+		///     Whether there was anything to run. The cast resolve uses that to decide between "this spell's effect is
+		///     the summon" and the generic buff-apply resolution.
+		/// </returns>
 		public async Task<bool> RunAll(INetworkClient client, IReadOnlyList<SpellEffect> effects)
 		{
 			foreach (var effect in effects)
@@ -165,7 +189,7 @@ namespace Faolan.GameServer.Combat
 				var rows = await _database.GetSpellEffects();
 				_effects = rows.GroupBy(r => (r.SpellId, r.Trigger)).ToDictionary(g => g.Key, g => g.OrderBy(r => r.Sequence).ToArray());
 
-				// An EMPTY table is not a valid state - the seed carries these rows, so nothing to dispatch means a
+				// An empty table is not a valid state - the seed carries these rows, so nothing to dispatch means a
 				// database that predates the spell-effects module. Say so once at load rather than letting every pet
 				// summon quietly resolve as a plain buff.
 				if (rows.Length == 0)

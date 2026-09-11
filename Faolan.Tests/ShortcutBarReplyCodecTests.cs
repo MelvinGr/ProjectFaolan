@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact golden for the ShortcutBarReply (0x2076) body decoded in #71: the action bar restored at login.
+	// Byte-exact golden for the ShortcutBarReply (0x2076) body: the action bar restored at login.
 	// Reproduces Strie's captured login reply from her stored shortcuts (slot/type/id), proving the builder matches
 	// retail - header = (N+1)*0x3F1, records = [slot][type][id][0][0][0].
 	public class ShortcutBarReplyCodecTests
@@ -16,9 +16,9 @@ namespace Faolan.Tests
 
 		private const uint StrieId = 0x02165EFF;
 
-		// A type-1 record points into the owner's OWN inventory, and its tail says so: [0][0x68 = container 104][owner].
-		// It is not padding. Reading it as padding is what made the strict codec throw on DemoL80's and NecroL80's bars and
-		// abort the whole capture import (#530 wave 6 swapped a tolerant reader that discarded these three words).
+		// A type-1 record points into the owner's own inventory, and its tail says so: [0][0x68 = container 104][owner].
+		// It is not padding: read as padding it makes the strict codec throw on DemoL80's and NecroL80's bars and abort
+		// the whole capture import.
 		// Bytes from DemoL80_mage-demonologist_login_randomActions frame 98, record 40.
 		private const uint DemoL80Id = 0x110099BD;
 

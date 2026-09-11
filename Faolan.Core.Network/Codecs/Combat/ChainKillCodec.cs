@@ -5,15 +5,16 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// ChainKillIIR (0x0EED7068) - a kill-chain/streak count (30 captured). ReadSubClass (FUN_0079c0b0) reads one u32
-	// (observed a small count). Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     ChainKillIIR - a kill-chain/streak count, 30 records captured. The client reader (FUN_0079c0b0) reads one u32,
+	///     observed as a small count. Grammar from that reader; see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class ChainKillCodec
 	{
 		public const uint Opcode = (uint)IirTypes.ChainKillIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(ChainKillIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -50,6 +51,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// ChainKillIIR (0x0EED7068).
+	/// <summary>The ChainKillIIR body.</summary>
 	public sealed record ChainKillIIR(uint Handle, byte Env, uint Count);
 }

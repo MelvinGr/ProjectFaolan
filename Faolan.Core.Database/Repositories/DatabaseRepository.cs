@@ -4,10 +4,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// The aggregate database port: composes the cohesive per-domain repository interfaces (each defined next to its
-	// implementation in DatabaseRepository.<Domain>.cs) so a consumer that genuinely needs everything can keep taking
-	// IDatabaseRepository unchanged, while a consumer that only touches one domain can depend on the narrow interface
-	// (interface segregation - Gitea #353). IDatabaseRepository itself carries only the cross-cutting unit-of-work seam.
+	/// <summary>
+	///     The aggregate database port: composes the per-domain repository interfaces, each declared next to its
+	///     implementation in DatabaseRepository.&lt;Domain&gt;.cs. This interface itself carries only the cross-cutting
+	///     unit-of-work seam.
+	/// </summary>
+	/// <remarks>
+	///     A consumer takes the narrow slices it actually calls; only one that genuinely needs most of the surface, or
+	///     that hands the repository on to a helper needing the composite, takes <see cref="IDatabaseRepository" />.
+	/// </remarks>
 	public interface IDatabaseRepository : IAccountRepository, ICharacterRepository, ICharacterInventoryRepository, ICharacterQuestRepository, ICharacterStatRepository, ICharacterProgressionRepository, ICatalogRepository, IEconomyRepository, IFactionRepository, IGuildRepository, INpcRepository, IRealmRepository, IWorldRepository
 	{
 		Task Execute(Func<IDatabaseContext, Task> work);

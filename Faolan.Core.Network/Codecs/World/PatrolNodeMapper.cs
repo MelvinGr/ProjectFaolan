@@ -4,15 +4,23 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Reversible mapping between the wire MoveTaskNode AST (MoveTaskCodec) and the columnarized PatrolNode tree
-	// (#316). ToNode decodes a captured task tree into DB rows; ToTask rebuilds the wire node from them. The pair
-	// round-trips byte-exact for every committed patrol (PatrolNodeRoundTripTests). Confirmed-float slots
-	// (duration/remaining/speed/anchor/waypoints) become float columns; the rest stay raw u32 bits (PathFloat10/20,
-	// packed) or ride in WordsData (the fixed numeric arrays that don't columnize).
+	/// <summary>
+	///     Reversible mapping between the wire <see cref="MoveTaskNode" /> AST and the columnarized
+	///     <see cref="PatrolNode" /> tree.
+	/// </summary>
+	/// <remarks>
+	///     The pair round-trips byte-exact for every committed patrol (PatrolNodeRoundTripTests). Confirmed float slots
+	///     (duration/remaining/speed/anchor/waypoints) become float columns; the rest stay raw u32 bits
+	///     (PathFloat10/20, packed) or ride as <see cref="PatrolNodeWord" /> rows - the fixed numeric arrays that do
+	///     not columnize.
+	/// </remarks>
 	public static class PatrolNodeMapper
 	{
-		// Decodes a wire task node into a PatrolNode row (with Children/Waypoints nav populated recursively). The
-		// caller sets PatrolPathId + persists; EF cascades the tree.
+		/// <summary>
+		///     Decodes a wire task node into a <see cref="PatrolNode" /> row, populating the Children/Waypoints
+		///     navigations recursively.
+		/// </summary>
+		/// <remarks>The caller sets PatrolPathId and persists; EF cascades the tree.</remarks>
 		public static PatrolNode ToNode(MoveTaskNode m)
 		{
 			var n = new PatrolNode
@@ -117,7 +125,7 @@ namespace Faolan.Core.Network.Codecs.World
 				{
 					n.ApproachType = m.ApproachType;
 					n.ApproachTarget = m.ApproachTarget;
-					// The tail is [u8 flag][9 zero bytes]; only the flag is data (#410).
+					// The tail is [u8 flag][9 zero bytes]; only the flag is data.
 					n.ApproachFlag = m.ApproachTail[0];
 					break;
 				}
@@ -137,7 +145,10 @@ namespace Faolan.Core.Network.Codecs.World
 			return n;
 		}
 
-		// Rebuilds the wire task node from a PatrolNode row (recursing into Children ordered by Ordinal).
+		/// <summary>
+		///     Rebuilds the wire task node from a <see cref="PatrolNode" /> row, recursing into Children ordered by
+		///     Ordinal.
+		/// </summary>
 		public static MoveTaskNode ToTask(PatrolNode n)
 		{
 			var m = new MoveTaskNode
@@ -273,7 +284,7 @@ namespace Faolan.Core.Network.Codecs.World
 			}
 		}
 
-		// The Vec7 transform of a Rotate/SetPos node: a position and a unit quaternion (#410).
+		// The Vec7 transform of a Rotate/SetPos node: a position and a unit quaternion.
 		private static void SetTransform(PatrolNode n, uint[] vec7)
 		{
 			n.TargetX = ToFloat(vec7[0]);
@@ -294,7 +305,7 @@ namespace Faolan.Core.Network.Codecs.World
 			];
 		}
 
-		// The remaining un-named numeric arrays, one PatrolNodeWord row per 32-bit word in wire order (#410).
+		// The remaining un-named numeric arrays, one PatrolNodeWord row per 32-bit word in wire order.
 		private static void SetWords(PatrolNode n, params uint[] words)
 		{
 			n.Words.Clear();
@@ -308,7 +319,7 @@ namespace Faolan.Core.Network.Codecs.World
 			}
 		}
 
-		// Reads them back in order. The count is the MODE's (3 for Path's middle trailer, 7 for Vec7/Ballistic, 6 for
+		// Reads them back in order. The count is the mode's (3 for Path's middle trailer, 7 for Vec7/Ballistic, 6 for
 		// Formation), so a row set of the wrong size cannot rebuild the record - fail loudly rather than emit short.
 		private static uint[] Words(PatrolNode n, int count)
 		{

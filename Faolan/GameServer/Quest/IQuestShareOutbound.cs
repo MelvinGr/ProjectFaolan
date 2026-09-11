@@ -5,12 +5,15 @@ using Faolan.Core.Network.Server.GameServer;
 
 namespace Faolan.GameServer.Quest
 {
-	// The wire + world side of a quest SHARE, as a narrow port the listener implements - the same shape ITradeOutbound
-	// takes for the other two-player interaction. QuestSharingService owns the rules and reaches everything else
-	// through this, so it never holds the listener.
-	//
-	// Everything is addressed by CHARACTER ID: a share always spans two connections, and the service has no business
-	// resolving either.
+	/// <summary>
+	///     The wire and world side of a quest share, as a narrow port - the same shape <c>ITradeOutbound</c> takes for
+	///     the other two-player interaction.
+	/// </summary>
+	/// <remarks>
+	///     <see cref="QuestSharingService" /> owns the rules and reaches everything else through this port, so it never
+	///     holds the listener. Every member is addressed by character id, because a share always spans two connections
+	///     and the service has no business resolving either.
+	/// </remarks>
 	public interface IQuestShareOutbound
 	{
 		/// <summary>

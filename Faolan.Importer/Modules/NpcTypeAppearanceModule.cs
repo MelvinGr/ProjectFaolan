@@ -7,18 +7,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Lift a creature's APPEARANCE from its placements onto its TYPE (#835): the morph table (hair, texscripts, facial
+	// Lift a creature's APPEARANCE from its placements onto its type: the morph table (hair, texscripts, facial
 	// values) and the worn equipment, copied from a representative NpcSpawn of that template.
 	//
-	// A spawn built from the TYPE rather than from a placement row - the ambient spawn-area pools (#363), a summoned
+	// A spawn built from the type rather than from a placement row - the ambient spawn-area pools, a summoned
 	// pet, an encounter boss, `.spawnnpc` - reads `NpcTemplate.Morphs` / `.Equipment`. Only the pet and mount
-	// importers ever wrote those, because a summon-only creature has no placement to carry them, so **8 of 1,213
-	// types had any**: every ambient NPC in the world rendered with no hair and no clothes. Map 4010's `Poacher1`
+	// importers ever wrote those, because a summon-only creature has no placement to carry them, so 8 of 1,213
+	// types had any: every ambient NPC in the world rendered with no hair and no clothes. Map 4010's `Poacher1`
 	// pool puts eight of them on the beach next to three placed Poachers that look right, which is what it was
 	// reported as - "a lot of the poachers look the same (naked/bald)".
 	//
-	// ⭐ **Appearance is TYPE identity, and that is measured rather than assumed**: of the 442 templates with more
-	// than one placement, **442 have exactly one HeadMesh and one MonsterData across all of them**. So there is no
+	// Appearance is type identity, and that is measured rather than assumed: of the 442 templates with more
+	// than one placement, 442 have exactly one HeadMesh and one MonsterData across all of them. So there is no
 	// per-placement variation to lose by lifting one spawn's table onto the type - the creature genuinely looks the
 	// same everywhere, and a crowd of identical Poachers is retail's own data. (The head itself already reaches the
 	// wire: `NpcStatCore.HeadMesh` is type-level and always was. It is the hair and the clothes that were missing.)
@@ -56,7 +56,7 @@ namespace Faolan.Importer.Modules
 			var haveMorphs = await ctx.Db.NpcMorphs.Select(m => m.NpcTemplateId).Distinct().ToHashSetAsync();
 			var haveEquipment = await ctx.Db.NpcEquipment.Select(e => e.NpcTemplateId).Distinct().ToHashSetAsync();
 
-			// One representative placement per type: the LOWEST spawn id that carries anything. Deterministic, so a
+			// One representative placement per type: the lowest spawn id that carries anything. Deterministic, so a
 			// re-run against the same database produces the same rows and faolan.sql does not churn.
 			var donors = await ctx.Db.NpcSpawns.Where(s => s.Morphs.Count > 0 || s.Equipment.Count > 0)
 				.Select(s => new

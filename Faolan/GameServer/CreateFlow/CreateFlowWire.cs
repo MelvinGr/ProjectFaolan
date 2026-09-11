@@ -27,9 +27,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow
 {
-	// The create flow's SENDERS: the A36D script callbacks, the create-editor 0x2000 records, the scry scripts and the
+	// The create flow's senders: the A36D script callbacks, the create-editor 0x2000 records, the scry scripts and the
 	// two endpoint constants they frame against. Shared by the editor bursts, the name commit, the morph ack and the
-	// cutscene, which is why they are one static class rather than private members of any of them (#928 item 8).
+	// cutscene, which is why they are one static class rather than private members of any of them.
 	internal static class CreateFlowWire
 	{
 		internal static readonly ProtoEndpoint MorphAckSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x0C);
@@ -38,8 +38,8 @@ namespace Faolan.GameServer.CreateFlow
 		internal static readonly ProtoEndpoint CreateGrantSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x0C);
 
 		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
-		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
-		// receiver baked in 0x021662C8; see Endpoints / ProtoEndpointGoldenTests).
+		// client instance. Built as a typed ProtoEndpoint so the type and instance cannot drift - a hardcoded
+		// receiver would bake in one session's instance. See Endpoints and ProtoEndpointGoldenTests.
 		internal static ProtoEndpoint Receiver(INetworkClient client)
 		{
 			return client.Endpoint(RpcInterfaces.GameInterfaceType, client.Session.Account.ClientInstance);
@@ -53,20 +53,19 @@ namespace Faolan.GameServer.CreateFlow
 			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
-		// Sends a fully-built create-editor IIR RECORD - one that already begins with its sub-opcode, i.e. whatever
+		// Sends a fully-built create-editor IIR record - one that already begins with its sub-opcode, i.e. whatever
 		// `XCodec.Build(...)` returned - on the creator connection.
 		//
-		// ⚠️ There is deliberately no `(subOpcode, tail)` twin any more (#542). That shape made every burst step name
-		// an IIR in the SERVICE, which is #530 rule 7's definition of a file that encodes, and it forced a helper
-		// (`CreateEditorRecordBuilder`) whose whole job was slicing the sub-opcode back off a record so this could
-		// re-prepend it.
+		// There is deliberately no `(subOpcode, tail)` twin: that shape makes every burst step name an IIR in the
+		// service, which is what the codec conventions forbid, and it forces a helper whose whole job is slicing the
+		// sub-opcode back off a record so this can re-prepend it.
 		internal static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
 			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
-		// header (subop/type/Head/four/one, decoded 570/570) is CONSTRUCTED via GameActionListCodec.Build and
+		// header (subop/type/Head/four/one, decoded 570/570) is constructed via GameActionListCodec.Build and
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
 		internal static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
@@ -75,8 +74,8 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance + reserved(0) +
-		// pbLength + a ProtoScryScriptIIR - the same wire shape (and the same message) the INBOUND
-		// HandleCommandPacket already reads typed. It used to be written as raw tag bytes.
+		// pbLength + a ProtoScryScriptIIR - the same wire shape (and the same message) the inbound
+		// HandleCommandPacket already reads typed. Written as raw tag bytes.
 		internal static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
 			return SendCreateEditor2000Record(client,

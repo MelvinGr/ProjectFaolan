@@ -41,13 +41,12 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ #485: `widthWords = 8 + keyCount`, on all 260 rows with no exception - so the descriptor's own WIDTH
-		// states how many keys the type has, and it is readable statically even where the key ARRAY is not.
+		// `widthWords = 8 + keyCount`, on all 260 rows with no exception - so the descriptor's own width
+		// states how many keys the type has, and it is readable statically even where the key array is not.
 		//
-		// That settles the ticket's open question the other way round. The artifact's header used to warn that the
-		// 57 blank `keys` cells were blank "because the descriptor table is BSS - filled at runtime, so a static read
-		// sees zeros" and that they "need a live dump". They do not: every blank row reads width EXACTLY 8, the
-		// header-only size, and the blank set is EXACTLY the width-8 set. A row whose key array was hidden but
+		// That also settles the 57 blank `keys` cells, which a static read might be thought to miss because the
+		// descriptor table is bss and filled at runtime: they need no live dump. Every blank row reads width exactly 8,
+		// the header-only size, and the blank set is exactly the width-8 set. A row whose key array was hidden but
 		// non-empty would show width > 8 with no keys beside it, and there is not one. So those 57 types genuinely
 		// carry no fields - `StartFlymode` (53138) among them, which is what makes the empty key list `.fly` sends
 		// correct rather than an assumption.
@@ -70,9 +69,9 @@ namespace Faolan.Tests
 			Assert.Empty(GameActionTypes.Get(53138)!.Keys); // StartFlymode - the .fly element
 		}
 
-		// A descriptor's key list holds an INDEX; the element reader resolves it through the client's key table
-		// (`DAT_025073c0`, built by `FUN_00897bd0`) to the real property key, which is an ordinary STAT id. The
-		// `statKeys` column carries that resolution, and the mapping is a property of the INDEX - so the same index
+		// A descriptor's key list holds an index; the element reader resolves it through the client's key table
+		// (`DAT_025073c0`, built by `FUN_00897bd0`) to the real property key, which is an ordinary stat id. The
+		// `statKeys` column carries that resolution, and the mapping is a property of the index - so the same index
 		// must resolve the same way on every one of the 260 types. A re-dump that mis-read the table would show up
 		// here as one index with two keys, rather than as silently renamed properties.
 		[Fact]
@@ -99,7 +98,7 @@ namespace Faolan.Tests
 				}
 			}
 
-			// The two the mounted-combat question turns on (#142): the lance charge is the only action that asks
+			// The two the mounted-combat question turns on: the lance charge is the only action that asks
 			// whether it may be used from the saddle, and it asks through stat 0x4FD `GameAction_CanUseIfMounted`.
 			Assert.Equal("0x4FD", byIndex[245]);
 
@@ -118,9 +117,9 @@ namespace Faolan.Tests
 				Assert.InRange(type.Id, GameActionTypes.FirstId, GameActionTypes.LastId);
 		}
 
-		// The catalog is COMPLETE, and this is what says so (#596). The descriptor table is a flat array indexed by
+		// The catalog is complete, and this is what says so. The descriptor table is a flat array indexed by
 		// the id, so every id in the range is either registered or a hole - there is no third state. Asserting that
-		// the two sets PARTITION the range is what turns "the dump found 260" into "the client has 260": if a later
+		// the two sets partition the range is what turns "the dump found 260" into "the client has 260": if a later
 		// re-dump recovers one of the 26, the tsv gains a row and this fails until `UnregisteredIds` gives it up, and
 		// an id that fell out of the tsv fails the same way rather than quietly becoming "retired".
 		//
@@ -143,9 +142,9 @@ namespace Faolan.Tests
 		// so the width is knowable rather than assumed. Measured against the RDB (`--report feat-effect-widths`),
 		// which is an independent source - the client's initialiser on one side, shipped template bytes on the other.
 		//
-		// These widths are the TILING measurement (#595): the distance from an element's opening type word to the
-		// NEXT element's, inside a record whose own 0x3F1 frame count agrees with the elements found. That is an
-		// EXACT width, where the earlier single-element measurement could only give a ceiling (an element at the end
+		// These widths are the tiling measurement: the distance from an element's opening type word to the
+		// next element's, inside a record whose own 0x3F1 frame count agrees with the elements found. That is an
+		// exact width, where the earlier single-element measurement could only give a ceiling (an element at the end
 		// of a record is bounded by the record, so it swallows any trailing record content). It reaches 27 kinds
 		// against that pass's 17, and it resolves the two the ceiling left in doubt: `AddSkinnedMesh` tiles at exactly
 		// 9 words, so its 12-word "measurement" was trailing record content and not the string-valued key it looked
@@ -188,9 +187,9 @@ namespace Faolan.Tests
 			Assert.Equal(measuredWords, type.WidthWords);
 		}
 
-		// The slot constants the modifier readers address by. Naming a slot by KEY rather than by position is the
-		// whole reason a `SpellStatModifier` can be read at all: it puts the spell first and the stat SECOND, so a
-		// positional read takes the spell for a stat id and the stat id for a magnitude (#591).
+		// The slot constants the modifier readers address by. Naming a slot by key rather than by position is the
+		// whole reason a `SpellStatModifier` can be read at all: it puts the spell first and the stat second, so a
+		// positional read takes the spell for a stat id and the stat id for a magnitude.
 		[Fact]
 		public void TheModifierSlotKeysSitWhereTheKindSaysTheyDo()
 		{
@@ -200,20 +199,20 @@ namespace Faolan.Tests
 			Assert.Equal(2, spellMod.SlotOf(GameActionTypes.KeyValue));
 			Assert.Equal(3, spellMod.SlotOf(GameActionTypes.KeyAmount));
 
-			// Its per-LINE twin is the same record with the spell slot replaced by a line slot - which is what makes
+			// Its per-line twin is the same record with the spell slot replaced by a line slot - which is what makes
 			// key 1 the line, on this type and on every other `...Line...` one.
 			var lineMod = GameActionTypes.Get(53062u)!;
 			Assert.Equal(0, lineMod.SlotOf(GameActionTypes.KeyLine));
 			Assert.Equal(-1, lineMod.SlotOf(GameActionTypes.KeySpell));
 			Assert.Equal(spellMod.Keys.Skip(1), lineMod.Keys.Skip(1));
 
-			// A plain stat modifier is (Stat, Value) and nothing else - the shape the old fixed-10-word reader
-			// assumed for every kind.
+			// A plain stat modifier is (Stat, Value) and nothing else - not the fixed ten words a width-blind reader
+			// assumes for every kind.
 			Assert.Equal([GameActionTypes.KeyStat, GameActionTypes.KeyValue], GameActionTypes.Get(53045u)!.Keys);
 		}
 
-		// A one-key element has no second payload word. The old reader took one anyway and got the NEXT element's
-		// type id, which is why a `Spell` grant looked like it "repeats its own kind" (#591).
+		// A one-key element has no second payload word. Taking one anyway reads the next element's type id, which
+		// makes a `Spell` grant look as if it "repeats its own kind".
 		[Fact]
 		public void AOneKeyElementDoesNotReadIntoTheNextElement()
 		{
@@ -241,9 +240,9 @@ namespace Faolan.Tests
 			Assert.Null(element.Value(GameActionTypes.KeyStat));
 		}
 
-		// `8 + len(keyList)` describes an element whose every slot is a u32, and keys 209/210 are TEXT - `[u16
-		// byteLength][bytes]` (#596). A text slot shifts every slot after it by an odd number of bytes, which is both
-		// why such an element has no fixed width and why it has to be WALKED rather than indexed: a positional read
+		// `8 + len(keyList)` describes an element whose every slot is a u32, and keys 209/210 are text - `[u16
+		// byteLength][bytes]`. A text slot shifts every slot after it by an odd number of bytes, which is both
+		// why such an element has no fixed width and why it has to be walked rather than indexed: a positional read
 		// past the string takes its length for the next slot's value. Shape taken from spell 4609400 "Path of the
 		// Enlightened", whose `SetMorphValue` element reads `[u16 3]["arm"][u32 -10]` and tiles at 41 bytes.
 		[Fact]
@@ -276,11 +275,11 @@ namespace Faolan.Tests
 			Assert.Equal(2, elements.Count);
 			Assert.Equal(53010u, elements[0].Kind);
 
-			// The string itself, and - the point of walking - the u32 AFTER it, read at its real offset.
+			// The string itself, and - the point of walking - the u32 after it, read at its real offset.
 			Assert.Equal("arm", elements[0].Text(GameActionTypes.KeyEventString));
 			Assert.Equal(unchecked((uint)-10), elements[0].Value(GameActionTypes.KeyValue));
 
-			// A text slot's Value is its BYTE LENGTH - what the u16 actually holds - not the string.
+			// A text slot's Value is its byte length - what the u16 actually holds - not the string.
 			Assert.Equal(3u, elements[0].Value(GameActionTypes.KeyEventString));
 			Assert.Null(elements[0].Text(GameActionTypes.KeyValue));
 
@@ -293,13 +292,13 @@ namespace Faolan.Tests
 			Assert.Equal(12u, elements[1].Value(GameActionTypes.KeyValue));
 		}
 
-		// The shipped-data anomaly behind #595, in the shape feat `Swift Pathing` (5031395..5031401) carries it: two
-		// elements wearing the `SpellStatModifier` type word but only TEN words wide, tiling the record end to end.
+		// The shipped-data anomaly, in the shape the feat `Swift Pathing` (5031395..5031401) carries it: two
+		// elements wearing the `SpellStatModifier` type word but only ten words wide, tiling the record end to end.
 		// The payload is a plain `(Stat, Value)` pair - Ride Skill and Player Flags, byte-identical to what the
-		// `Basic Riding` family (115944..115953) carries under the CORRECT `Modify` (53045) and `SetFlag` (53139)
+		// `Basic Riding` family (115944..115953) carries under the correct `Modify` (53045) and `SetFlag` (53139)
 		// type words - so the type word is stale, not the width model.
 		//
-		// What this locks is the READER's behaviour on it: both elements are found (the second one has fewer bytes
+		// What this locks is the reader's behaviour on it: both elements are found (the second one has fewer bytes
 		// after it than its key list wants, and dropping it would hide the anomaly), and the first one's `Value` slot
 		// lands on the next element's type id - which is exactly what `ItemTemplateStatModifiers.ParseSpellStatModifiers`
 		// rejects on, rather than importing a GameAction type id as a magnitude.
@@ -330,7 +329,7 @@ namespace Faolan.Tests
 			Assert.Equal(2, elements.Count);
 			Assert.Equal(40, elements[1].Offset - elements[0].Offset);
 
-			// Read by key, the first element's Value slot is the SECOND element's opening word.
+			// Read by key, the first element's Value slot is the second element's opening word.
 			Assert.Equal(238u, elements[0].Value(GameActionTypes.KeySpell));
 			Assert.Equal(5u, elements[0].Value(GameActionTypes.KeyStat));
 			Assert.Equal(53054u, elements[0].Value(GameActionTypes.KeyValue));
@@ -341,8 +340,8 @@ namespace Faolan.Tests
 			Assert.Null(elements[1].Value(GameActionTypes.KeyValue));
 		}
 
-		// The tsv carries a `#` PROVENANCE header - where the dump's window comes from and why 58 rows have no keys
-		// (#485). Skipping comments as well as the column line keeps that documentable without the gate seeing it.
+		// The tsv carries a `#` provenance header - where the dump's window comes from and why 58 rows have no keys
+		//. Skipping comments as well as the column line keeps that documentable without the gate seeing it.
 		private static IEnumerable<string> Rows(string path)
 		{
 			return File.ReadAllLines(path).Where(l => !l.StartsWith('#')).Skip(1);

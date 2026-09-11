@@ -7,10 +7,14 @@ namespace Faolan.Core.Extensions
 {
 	public static class StringHexExtensions
 	{
-		// https://stackoverflow.com/questions/321370/how-can-i-convert-a-hex-string-to-a-byte-array
-		//
-		// Throws on malformed input rather than returning null: a silent null here surfaces later as an NRE or an
-		// empty payload with nothing pointing back at the bad hex.
+		/// <summary>
+		///     Parses a hex string into its bytes.
+		/// </summary>
+		/// <remarks>
+		///     Throws on malformed input rather than returning null: a silent null here surfaces later as an NRE or an
+		///     empty payload with nothing pointing back at the bad hex.
+		/// </remarks>
+		/// <exception cref="FormatException">The string is not valid hex.</exception>
 		public static byte[] HexToByteArray(this string hex)
 		{
 			ArgumentNullException.ThrowIfNull(hex);
@@ -26,9 +30,11 @@ namespace Faolan.Core.Extensions
 				: " }");
 		}
 
-		// The same rendering for a byte WINDOW (ReadOnlyMemory<byte> doesn't implement IEnumerable<byte>, so it would
-		// otherwise need a .ToArray() copy first). The packet trace holds its headerData/body as memory over the frame,
-		// so this keeps the hex dump copy-free - and it is only ever reached when byte dumping is actually enabled.
+		/// <summary>
+		///     The same rendering for a byte window. <see cref="ReadOnlyMemory{T}" /> does not implement
+		///     <see cref="IEnumerable{T}" />, so it would otherwise need a <c>ToArray()</c> copy first; the packet
+		///     trace holds its header data and body as memory over the frame, so this keeps the hex dump copy-free.
+		/// </summary>
 		public static string ToHex(this ReadOnlyMemory<byte> value, bool asArray = false)
 		{
 			var builder = new StringBuilder(asArray

@@ -8,13 +8,13 @@ using Faolan.GameServer.Wire;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the FormatFeedbackIIR (0x8D5A8B6B) body - AoC's on-screen feedback /
-	// FIFO-message overlay (NOT chat). Oracles: the GenericDisplayAreaName zone-name banner (NecroL80 Has-inventory
-	// #1753) and the LostGraceEffect feedback line (NecroL80 changemap #1262). Proves the codec reconstructs the
+	// FIFO-message overlay (not chat). Oracles: the GenericDisplayAreaName zone-name banner (NecroL80 Has-inventory
+	// frame 1753) and the LostGraceEffect feedback line (NecroL80 changemap frame 1262). Proves the codec reconstructs the
 	// captured bytes from the parsed fields (construct-don't-replay) and that Parse is its faithful inverse.
 	//
-	// ⚠️ Every captured oracle below is the whole carrier payload, which BEGINS with the [u32 len]. That word is the
-	// SENDER's (#530 rule 2), so the assertions are against `CapturedRecord.Bytes(...)` - the capture minus its first four bytes.
-	// No wire byte moved: GameWire.SendFeedback writes the same length back on via WorldIir.Send.
+	// Every captured oracle below is the whole carrier payload, which begins with the [u32 len]. That word is the
+	// sender's, so the assertions are against `CapturedRecord.Bytes(...)` - the capture minus its first four bytes.
+	// GameWire.SendFeedback writes that length back on via WorldIir.Send.
 	public class FormatFeedbackCodecTests
 	{
 		private const string AreaNameBody = "000001508d5a8b6b0000c3500802e5d40100000000000000000000000001313c72656d6f7465666f726d617420746f6b656e3d" +
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildAreaNameXml_MatchesCapturedBanner()
 		{
-			// The area-name banner is fully reconstructable from just its localized-text id (#348): rebuild the whole
+			// The area-name banner is fully reconstructable from just its localized-text id: rebuild the whole
 			// captured AreaNameBody from BuildAreaNameXml(3474586) + the captured instance/typeFlags/footer.
 			var captured = CapturedRecord.Bytes(AreaNameBody);
 			var p = FormatFeedbackCodec.Parse(captured);
@@ -70,9 +70,9 @@ namespace Faolan.Tests
 			Assert.Equal(FormatFeedbackCodec.EffectLineTypeFlags, p.TypeFlags);
 		}
 
-		// #372: the "resurrection point discovered" banner - the toast that actually fires when a player walks near an
-		// undiscovered point, sent in the SAME frame as the spots re-send that adds it to their list. Two captured
-		// occurrences, different points: the OUTER key is identical in both (fixed per message id) while the inner
+		// The "resurrection point discovered" banner - the toast that actually fires when a player walks near an
+		// undiscovered point, sent in the same frame as the spots re-send that adds it to their list. Two captured
+		// occurrences, different points: the outer key is identical in both (fixed per message id) while the inner
 		// per-point name key differs, which is what identifies the latter as a property of the point's category-270
 		// string rather than of the message. Rebuilt whole from the captured instance/typeFlags/footer.
 		[Theory, InlineData(784237u, "Vt!]0&amp;amp;S#3cT3v&amp;quot;)&amp;#39;HJeU", DiscoveredPoint784237Body),

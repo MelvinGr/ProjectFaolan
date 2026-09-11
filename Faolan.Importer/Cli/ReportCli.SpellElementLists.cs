@@ -8,11 +8,11 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spell-element-lists`: scores the ELEMENT-LIST grammar over the whole spell catalog (#785).
+	// `--report spell-element-lists`: scores the element-list grammar over the whole spell catalog.
 	//
 	// A spell record's element region is not one stream. Each group of elements is introduced by a 12-byte header
-	// `[2][listId][(count + 1) * 0x3F1]` - the client's ordinary list count word, the same one the wire uses. #785 was
-	// filed on "a spell record states the same GameAction element TWICE, verbatim"; the twins are in different LISTS,
+	// `[2][listId][(count + 1) * 0x3F1]` - the client's ordinary list count word, the same one the wire uses. A spell
+	// record that appears to state the same GameAction element twice, verbatim, is stating twins in different lists,
 	// which is a fact a reader that streams the region cannot see.
 	//
 	// This report is the gate on that claim, and it is the only kind that can be: `Faolan.Tests` runs from a plain
@@ -22,12 +22,12 @@ namespace Faolan.Importer.Cli
 	//   * TILING - does every element of every record fall inside exactly one framed list? A record whose lists do
 	//     not account for all its elements is the grammar failing, and it is printed with its id;
 	//   * the list ID distribution, by position and by the KINDS each id carries - which is what any future reading
-	//     of what the id MEANS has to start from;
+	//     of what the id means has to start from;
 	//   * the DUPLICATE elements the ticket is about, split by whether the twins share a list;
-	//   * ⭐ head word `a` (#632) cross-tabbed against those lists. `a` had been read as a CATEGORY - "a=2 is an
+	//   * head word `a` cross-tabbed against those lists. `a` had been read as a CATEGORY - "a=2 is an
 	//     internal effect record, a=4/5 are castables" - and it is not: it is `2 + element lists + 1 if the record
-	//     carries a [22][36] block`, i.e. a count of the record's VALUE BLOCKS, at 97.10%. The category reading was
-	//     that count seen through what the records happen to hold. ⚠️ The residual is printed row by row rather
+	//     carries a [22][36] block`, i.e. a count of the record's value blocks, at 97.10%. The category reading was
+	//     that count seen through what the records happen to hold. The residual is printed row by row rather
 	//     than summarised, because 97% is a reading and a bare percentage would read as a definition.
 	public static partial class ReportCli
 	{
@@ -72,7 +72,7 @@ namespace Faolan.Importer.Cli
 				var body = record.AsSpan(12);
 				var all = ItemTemplateStatModifiers.ParseElements(body);
 
-				// ⭐ Head word `a` against the record's LIST-valued content (#632). Counted over EVERY record,
+				// Head word `a` against the record's list-valued content. Counted over every record,
 				// including the 2,066 that carry no element at all - those are the ones that pin the formula's
 				// constant, and skipping them would leave `a`'s floor unmeasured.
 				var headA = body.ReadU32Le(HeadWordAOffset);
@@ -200,9 +200,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			Console.WriteLine($"  elements whose DECODED SLOTS repeat another of the same record: {sameList + crossList:N0}"
 			                  + $"   ({crossList:N0} across two lists, {sameList:N0} inside one)");
-			// ⭐ The number #785 is really about. An element carries a sub-record run the decoded slots do not show,
-			// and most of the apparent duplicates differ THERE - so they are not repeated data, they are elements
-			// this reader cannot yet tell apart.
+			// The number that matters. An element carries a sub-record run the decoded slots do not show, and most of
+			// the apparent duplicates differ there - so they are not repeated data, they are elements this reader
+			// cannot yet tell apart.
 			Console.WriteLine($"    ...of which byte-identical incl. their CRITERIA: {identical:N0}"
 			                  + $"   ({sameList + crossList - identical:N0} are the same effect under different conditions)");
 
@@ -211,15 +211,15 @@ namespace Faolan.Importer.Cli
 			                  + $"{criterionIds.Values.Sum():N0} over {criterionIds.Count} ids and {criterionOps.Count} operators");
 			Console.WriteLine("    top ids:       " + string.Join(", ", criterionIds.OrderByDescending(k => k.Value).Take(10).Select(k => $"{k.Key}x{k.Value:N0}")));
 			Console.WriteLine("    top operators: " + string.Join(", ", criterionOps.OrderByDescending(k => k.Value).Take(10).Select(k => $"{k.Key}x{k.Value:N0}")));
-			// ⭐ A criterion with BOTH id and value zero cannot be a comparison, so its operator is a logical combiner
+			// A criterion with both id and value zero cannot be a comparison, so its operator is a logical combiner
 			// - which is what a postfix (RPN) requirement expression looks like. Reported separately because the
 			// split is the evidence for that reading rather than an assertion of it.
 			Console.WriteLine($"    of those, [0][0][op] (no operand - a logical combiner?): {zeroIdOps.Values.Sum():N0}"
 			                  + "   ops: " + string.Join(", ", zeroIdOps.OrderByDescending(k => k.Value).Take(8).Select(k => $"{k.Key}x{k.Value:N0}")));
 
-			// ⭐ #790's first question, asked of the data rather than argued: is a criterion id a STAT id? Every id is
+			// Is a criterion id a stat id? Asked of the data rather than argued: every id is
 			// printed against the client's own stat-name table (`CharacterStatId`, `docs/re/aoc-client-stat-names.tsv`).
-			// ⚠️ The hit RATE is not the evidence - the OPERATORS are printed through the same table as the CONTROL
+			// The hit rate is not the evidence - the OPERATORS are printed through the same table as the control
 			// and all 50 of those "resolve" too, because the table is dense at low ids. What separates them is
 			// COHERENCE: the ids read as a condition vocabulary end to end (`Level`, `Race`, `CombatMode`,
 			// `CurrentPlayfield`, `Rnd`) while the control comes back `RespecPoints` / `VolumeMass` / `CATMesh`.
@@ -228,8 +228,8 @@ namespace Faolan.Importer.Cli
 			foreach (var (id, n) in criterionIds.OrderByDescending(k => k.Value))
 				Console.WriteLine($"      {id,6} x{n,-7:N0} {ClientStatName(id)}");
 
-			// The OPERATOR read through its own vocabulary - `CriteriaItem_t::CheckCriteria`'s switch (#790,
-			// `docs/re/criteria-grammar.md`) - beside the stat-table reading it is NOT.
+			// The operator read through its own vocabulary - `CriteriaItem_t::CheckCriteria`'s switch,
+			// `docs/re/criteria-grammar.md` - beside the stat-table reading it is not.
 			Console.WriteLine();
 			Console.WriteLine($"    every OPERATOR ({criterionOps.Count} distinct):  value, its name, then the CONTROL - what the stat table would have called it");
 			foreach (var (op, n) in criterionOps.OrderByDescending(k => k.Value))
@@ -256,9 +256,9 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// ⭐ How many `[22][36]` LIST-valued field blocks does the record carry? Usually the block sits immediately
-		// after the string block, but not always - on some records it turns up BETWEEN two element lists, and a
-		// couple carry it twice - so this SCANS from the end of the text rather than reading one fixed spot (#632).
+		// How many `[22][36]` list-valued field blocks does the record carry? Usually the block sits immediately
+		// after the string block, but not always - on some records it turns up between two element lists, and a
+		// couple carry it twice - so this SCANS from the end of the text rather than reading one fixed spot.
 		// `RdbSpellImporter` owns the shape.
 		private static int CountListFieldBlocks(ReadOnlySpan<byte> body)
 		{
@@ -287,7 +287,7 @@ namespace Faolan.Importer.Cli
 			return blocks;
 		}
 
-		// The client's own name for a stat id, or "" when the table does not name it (#790).
+		// The client's own name for a stat id, or "" when the table does not name it.
 		private static string ClientStatName(uint id)
 		{
 			return Enum.IsDefined(typeof(CharacterStatId), id) ? ((CharacterStatId)id).ToString() : "";

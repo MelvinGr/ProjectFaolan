@@ -36,18 +36,26 @@ namespace Faolan.Web.Components.Pages
 			await Reload();
 		}
 
-		// The client's own 25 named bits, in bit order. `None` is not a flag.
+		/// <summary>
+		///     The client's own 25 named bits, in bit order. <c>None</c> is not a flag.
+		/// </summary>
 		private static readonly GmPrivileges[] NamedBits =
 		[
 			.. Enum.GetValues<GmPrivileges>().Where(p => p != GmPrivileges.None).OrderBy(p => (uint)p)
 		];
 
-		// Used by the shipped roles, never named by the client, and never tested anywhere in it (docs/subsystems/
-		// gm-commands.md). Editable so a role can be reproduced exactly rather than approximately.
+		/// <summary>
+		///     Bits the shipped roles use that the client never names and never tests; see
+		///     docs/subsystems/gm-commands.md. They stay editable so a role can be reproduced exactly rather than
+		///     approximately.
+		/// </summary>
 		private static readonly uint[] UnnamedBits =
 			[0x00040000, 0x00200000, 0x00800000, 0x08000000, 0x20000000, 0x40000000, 0x80000000];
 
-		// Funcom's own role masks, verbatim - the point of offering them is that they are policy, not a flag recipe.
+		/// <summary>
+		///     Funcom's own role masks, verbatim. The point of offering them is that they are policy rather than a
+		///     flag recipe.
+		/// </summary>
 		private static readonly (string Name, uint Mask)[] Roles =
 		[
 			("all", GmRoles.All), ("support2", GmRoles.Support2), ("support1", GmRoles.Support1),
@@ -78,7 +86,10 @@ namespace Faolan.Web.Components.Pages
 			return SetMask(mask);
 		}
 
-		// Clearing every bit and "not a GM" are the same state - see AccountAdminService.SetGmLevelAsync.
+		/// <summary>
+		///     Revokes GM access. Clearing every bit and "not a GM" are the same state; see
+		///     <see cref="Services.AccountAdminService.SetGmLevelAsync" />.
+		/// </summary>
 		private Task RevokeGm()
 		{
 			return SetMask(null);

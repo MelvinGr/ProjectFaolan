@@ -6,19 +6,18 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report morph-stats`: does retail ever push a SHAPESHIFT stat on the wire, and if so how? (Gitea #709.)
+	// `--report morph-stats`: does retail ever push a shapeshift stat on the wire, and if so how?
 	//
-	// The POLYMORPH family is 296 `SpellStatEffects` rows over 231 spells whose stats are appearance fields -
-	// `Monster Data` (359), `Head Mesh` (64), `Scale` (360), `Hair Render Type` (47), `Super Family` (121),
-	// `BCC` (21), `Char Radius` (421), `Race` (89), `Side` (33). #709 asks what the server SENDS when a player
-	// morphs, and notes that no capture is known to contain one - so the answer has to come from the corpus or
-	// not at all.
+	// The polymorph family is the `SpellStatEffects` rows whose stats are appearance fields - `Monster Data` (359),
+	// `Head Mesh` (64), `Scale` (360), `Hair Render Type` (47), `Super Family` (121), `BCC` (21), `Char Radius` (421),
+	// `Race` (89), `Side` (33). What the server sends when a player morphs is not otherwise recorded, so the answer
+	// has to come from the corpus or not at all.
 	//
-	// ⭐ The candidate needs no new packet: every one of those is an ordinary wire STAT id, and `StatIIR`
+	// The candidate needs no new packet: every one of those is an ordinary wire stat id, and `StatIIR`
 	// (0xF98E10B3) sets one stat to one value on one entity. So the question is answerable by census: over every
 	// captured `StatIIR`, does the morph set ever appear, on what entity class, and with what values.
 	//
-	// ⚠️ A NEGATIVE is the useful answer here too, and it has to be stated as one: "retail never pushes these"
+	// A NEGATIVE is the useful answer here too, and it has to be stated as one: "retail never pushes these"
 	// closes off inventing a StatIIR morph, which is exactly what the project's rule forbids. So the report prints
 	// the whole stat census beside it - without that, "the morph stats are absent" is indistinguishable from "the
 	// scan is broken".

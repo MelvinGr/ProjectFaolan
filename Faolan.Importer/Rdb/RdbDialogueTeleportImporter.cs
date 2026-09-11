@@ -12,12 +12,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// Harvests the SECOND local-travel mechanism (#635): the travellers who carry their destination inline in their
-	// dialogue TEXT, as a `{teleportplayer}` directive the server acts on, instead of offering a paid destination list.
+	// Harvests the second local-travel mechanism: the travellers who carry their destination inline in their
+	// dialogue text, as a `{teleportplayer}` directive the server acts on, instead of offering a paid destination list.
 	//
-	// ⚠️ THE DIRECTIVE IS NOT ON THE WIRE AND NEVER REACHES THE SERVER AT RUNTIME. A conversation screen carries only
+	// the DIRECTIVE is not on the wire and never REACHES the server at RUNTIME. A conversation screen carries only
 	// an LDB reference (category + string id + the per-string key); the text itself lives in the client's install, and
-	// the server ships no LDB. So the only way to act on a directive is to read it HERE, at import, and store what it
+	// the server ships no LDB. So the only way to act on a directive is to read it here, at import, and store what it
 	// says - which is why this is an RDB module and not a dialogue-VM feature.
 	//
 	// The three travellers the client ships, all found by sweeping every conversation screen we hold:
@@ -26,22 +26,21 @@ namespace Faolan.Importer.Rdb
 	//   Wagoner Polus     "Climb aboard, then. […]{delay 3}{teleportplayer 349 564 1000}{hidegoodbye}{quit}"
 	//   Sigurd            "Then I wish you luck.{gameactiononnpc …}{teleportplayer 55.7 113.9 y 158.1 4020}{showgoodbye}"
 	//
-	// ⚠️ Sigurd was NOT in #635's write-up, which named only the first two. He is the same mechanism with no `{delay}`
-	// (retail teleports as the line lands) and an extra `{gameactiononnpc StartClientSideScryScript}` that plays a
-	// cutscene - unwired, and independent of the trip.
+	// Sigurd is the same mechanism with no `{delay}` (retail teleports as the line lands) and an extra
+	// `{gameactiononnpc StartClientSideScryScript}` that plays a cutscene - unwired, and independent of the trip.
 	//
-	// **Grammar**, from the three of them plus the capture that confirms one:
+	// Grammar, from the three of them plus the capture that confirms one:
 	//
 	//     {teleportplayer <x> <z> [y <y>] <mapId>}
 	//
-	// The LAST token is the destination playfield and the leading ones are the arrival position, X then Z, with the
+	// The last token is the destination playfield and the leading ones are the arrival position, X then Z, with the
 	// height carried optionally behind a literal `y`. [V2: NecroL80_..._disconnect-after-wayfarer t=105.8 -> 111.7 ->
 	// 112.3 - the Smuggler's line, then IntendedTeleport naming 4579, and the player arrives at (210.0, 10.5, 205.0),
 	// matching `210 205 y 11` read as x=210 z=205 y=11.] Polus omits the height entirely, which is why the runtime
 	// ground-snaps a directive arrival that states none rather than throwing the X/Z away.
 	//
 	// Stored as ordinary `TravelDestination` rows, keyed by the dialogue EDGE whose pick leads to the directive
-	// screen - which is exactly what that table already is ("the row IS the conversation wiring"), so the trip runs
+	// screen - which is exactly what that table already is ("the row is the conversation wiring"), so the trip runs
 	// through the same capture-verified runtime the wagoners use rather than through a second one.
 	public static class RdbDialogueTeleportImporter
 	{
@@ -103,7 +102,7 @@ namespace Faolan.Importer.Rdb
 				if (!knownMaps.Contains(mapId))
 				{
 					// Loudly by count, not silently: a directive naming a playfield we have never imported is a trip
-					// that would land the player in an empty world, and it is content we are MISSING rather than a
+					// that would land the player in an empty world, and it is content we are missing rather than a
 					// directive we misread.
 					result.UnknownMap++;
 					continue;
@@ -132,7 +131,7 @@ namespace Faolan.Importer.Rdb
 				{
 					if (existing.TryGetValue((edge.FromNodeId, edge.OptionId), out var row))
 					{
-						// A CAPTURED trip already keyed here wins: it is the wire's own statement of where the player
+						// A captured trip already keyed here wins: it is the wire's own statement of where the player
 						// landed, where this is the client's script for it. They should agree, and if they ever do not,
 						// the capture is the truth source this project runs on.
 						if (!row.FromDialogueDirective)

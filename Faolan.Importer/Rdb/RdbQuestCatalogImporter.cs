@@ -9,13 +9,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// The client's own quest catalog, RDB type 1000104 (#569) - see docs/rdb/quest-catalog-1000104.md.
+	// The client's own quest catalog, RDB type 1000104 - see docs/rdb/quest-catalog-1000104.md.
 	//
-	// This is the DEFINITION side of the quest system. Everything the DB held before came from CAPTURES, so it covered
+	// This is the DEFINITION side of the quest system. Everything the DB held before came from captures, so it covered
 	// exactly the quests some captured character happened to hold or complete; the catalog covers the whole game and
-	// carries the designers' names in PLAINTEXT, needing neither an LDB page nor a captured decryption key.
+	// carries the designers' names in plaintext, needing neither an LDB page nor a captured decryption key.
 	//
-	// ⚠️ It ADDS and NAMES; it never overwrites captured wire data. A quest that already has a row keeps every
+	// It ADDS and names; it never overwrites captured wire data. A quest that already has a row keeps every
 	// harvested scalar - only Name, the line membership and the line's own catalog columns are written. That matters
 	// because the two sources disagree in kind: the wire is what the server actually sent, the catalog is what the
 	// client ships, and where we have the former it is the better evidence.
@@ -38,7 +38,7 @@ namespace Faolan.Importer.Rdb
 			              ?? throw new InvalidOperationException(
 				              "RDB type 1000104 (RDBQUESTGIVERS) not found - is RdbDir pointing at the client's RDB folder?");
 
-			// Distinct by id, LAST wins. A handful of ids repeat and some of those rows differ (2 lines, 15 goals);
+			// Distinct by id, last wins. A handful of ids repeat and some of those rows differ (2 lines, 15 goals);
 			// there is no key that separates them, so one has to be chosen. This is the one place the report's
 			// "do not silently dedup" warning is unavoidable - it is recorded in the result and in the docs rather
 			// than hidden, and it affects 17 of 14560 rows.
@@ -68,13 +68,13 @@ namespace Faolan.Importer.Rdb
 				row.Tier = m.Tier;
 
 				// 0 means "no prerequisite"; a dangling target (798, 806 are not lines in the table) is still recorded,
-				// because dropping it would hide a gap in the client's own data behind a NULL that means something else.
+				// because dropping it would hide a gap in the client's own data behind a null that means something else.
 				row.PrevQuestLineId = m.PrevTemplateId == 0
 					? null
 					: m.PrevTemplateId;
 			}
 
-			// 63 of the catalog's quests point at a line id that its OWN `main_quest` list does not contain, across 20
+			// 63 of the catalog's quests point at a line id that its own `main_quest` list does not contain, across 20
 			// distinct ids - the same flavour of gap as the two dangling `prev` targets. A placeholder line carries the
 			// id and nothing else, which keeps those 63 quests rather than dropping them to satisfy an FK. Same pattern
 			// ImportOps uses for a quest whose Map is not in the catalog.
@@ -118,7 +118,7 @@ namespace Faolan.Importer.Rdb
 
 				row.Name = q.Name;
 
-				// Only fill the line when the row has none. A captured quest already carries the line the WIRE put it
+				// Only fill the line when the row has none. A captured quest already carries the line the wire put it
 				// in, and that is the better evidence; the catalog fills the ones no capture ever placed.
 				if (row.QuestLineId == 0 && q.MainQuestTemplateId != 0 && existingLines.ContainsKey(q.MainQuestTemplateId))
 					row.QuestLineId = q.MainQuestTemplateId;
@@ -141,8 +141,8 @@ namespace Faolan.Importer.Rdb
 
 				if (!existingGoals.TryGetValue(id, out var row))
 				{
-					// Separator stays NULL: the catalog has no kind tag, and this goal has never been on the wire.
-					// 0 would be a lie - there is no kind 0 (see QuestGoalKind) - and it is the value #548 removed.
+					// Separator stays null: the catalog has no kind tag, and this goal has never been on the wire.
+					// 0 would be a lie - there is no kind 0 (see QuestGoalKind).
 					row = new QuestGoalDefinition { GoalId = id, QuestDefinitionId = g.QuestTemplateId, Separator = null };
 					db.QuestGoalDefinitions.Add(row);
 					existingGoals[id] = row;
@@ -160,7 +160,7 @@ namespace Faolan.Importer.Rdb
 
 			// ---- line item rewards: a clean rebuild, the set is fully derived from the fixed client RDB ----
 			//
-			// ...except for two things the WIRE states and the catalog does not (#893), which a rebuild must carry
+			// ...except for two things the wire states and the catalog does not, which a rebuild must carry
 			// across or a catalog re-import silently undoes the capture harvest: the per-reward Quantity/WirePos words,
 			// and the rows of a line the catalog does not hold at all (3780 in the corpus). Same shape as the spawn
 			// importer carrying Manual resolutions across its own clean rebuild.

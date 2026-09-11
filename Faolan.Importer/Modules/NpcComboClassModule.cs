@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// #675: the NPC COMBAT ARCHETYPE (`NpcStatCore.ComboClass`) - which `combo_npc_<class>_*` family a template may
+	// the NPC combat ARCHETYPE (`NpcStatCore.ComboClass`) - which `combo_npc_<class>_*` family a template may
 	// swing beside its generic row. Harvested, because the archetype is in no column we hold and in no client table:
 	// the captured swing carries the combo id, and the client's own `Combos.NpcClass` states the class.
 	//
@@ -56,7 +56,7 @@ namespace Faolan.Importer.Modules
 				byClass[npcClass] = byClass.GetValueOrDefault(npcClass) + 1;
 			}
 
-			// ⚠️ A tally rather than a single value, so a CONFLICT is visible instead of being silently resolved by
+			// A tally rather than a single value, so a CONFLICT is visible instead of being silently resolved by
 			// whichever swing was walked last. The corpus has none - all 30 harvested templates vote unanimously -
 			// and that is the measurement this module reports, not an assumption it makes.
 			var conflicted = votes.Where(v => v.Value.Count > 1).ToList();

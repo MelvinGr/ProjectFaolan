@@ -9,14 +9,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The area-banner harvest (#348/#377). The banner is s2c; the position it fired at comes from the client's own c2s
+	// The area-banner harvest. The banner is s2c; the position it fired at comes from the client's own c2s
 	// CharDCMove, so a sighting is only placeable if a move brackets it.
 	//
-	// The regression guarded here: the pairing used to take the last move BEFORE the banner and drop the sighting when
-	// there wasn't one - which is exactly the ENTRY banner, since it fires right after the MapChange, before the client
-	// has moved. That silently discarded 17 of the corpus's 48 sightings and one whole area (1010/3709829, which had
-	// nothing but entry banners). The next move on the same playfield places it just as well: the player is standing in
-	// the area while the banner is on screen.
+	// The pairing takes the next move on the same playfield, not the last move before the banner: the entry banner
+	// fires right after the MapChange, before the client has moved, so requiring a preceding move drops 17 of the
+	// corpus's 48 sightings and one whole area (1010/3709829, which has nothing but entry banners). The next move
+	// places the sighting just as well - the player is standing in the area while the banner is on screen.
 	public class AreaNameExtractorTests
 	{
 		[Fact]
@@ -34,7 +33,7 @@ namespace Faolan.Tests
 		public void BannerWithAPrecedingMove_StillUsesThatMove()
 		{
 			// The crossing case: the move that crossed the boundary is the first position inside the new area, so a
-			// LATER move must not override it.
+			// later move must not override it.
 			var sightings = AreaNameExtractor.Extract([MapChange(2000), Move(1, 2, 3), Banner(3373519), Move(9, 9, 9)]);
 
 			var s = Assert.Single(sightings);
@@ -62,7 +61,7 @@ namespace Faolan.Tests
 
 		private static CapturedPacket Banner(uint areaNameId)
 		{
-			// A REAL FormatFeedbackIIR, built by the codec - same reasoning as MapChange below. Only the
+			// A real FormatFeedbackIIR, built by the codec - same reasoning as MapChange below. Only the
 			// GenericDisplayAreaName|<id> token is read out of the XML; the real frames wrap it in a
 			// <remoteformat>/<parameter> pair whose surroundings this harvest ignores.
 			var xml = $"<localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|{areaNameId}'>";
@@ -78,10 +77,9 @@ namespace Faolan.Tests
 
 		private static CapturedPacket MapChange(uint mapId)
 		{
-			// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte
-			// (#530 rule 3), so a synthetic body with the map id at the right offset and zeros everywhere else is
-			// not a MapChange any more - and a fixture shaped like the parser proves only that the file agrees
-			// with itself.
+			// A real PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte, so a
+			// synthetic body with the map id at the right offset and zeros everywhere else is not a MapChange - and a
+			// fixture shaped like the parser proves only that the file agrees with itself.
 			return Carrier(true, PlayfieldFCodec.Opcode, PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0));
 		}
 

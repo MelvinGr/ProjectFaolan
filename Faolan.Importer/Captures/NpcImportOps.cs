@@ -21,56 +21,69 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Shared capture-import orchestration the modules (Faolan.Importer.Modules) drive - the upsert/wipe-rebuild
-	// helpers that sit above the per-subsystem CaptureX importers/extractors.
-	// NPC types, spawns, spells, patrol routes and stationary placements from the captures - the three-tier Npc / NpcSpawn model (docs/subsystems/npc-three-tier-architecture.md). One of the five domain halves of what was one 2,064-line ImportOps (#928 item 7).
+	/// <summary>
+	///     Capture-import orchestration for NPC types, spawns, spells, patrol routes and stationary placements - the
+	///     upsert helpers the modules in Faolan.Importer.Modules drive above the per-subsystem capture importers and
+	///     extractors.
+	/// </summary>
+	/// <remarks>
+	///     The model is the three-tier Npc type / NpcSpawn placement / live entity split described in
+	///     docs/subsystems/npc-three-tier-architecture.md.
+	/// </remarks>
 	public static class NpcImportOps
 	{
-		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
-		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
-		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
+		/// <remarks>
+		///     Home facing for unique quest NPCs that turn during their quest: the burst-truth dedup can pick a session
+		///     in which one had already turned, so the facing drifts from its home pose. Casilda's rotation is pinned
+		///     to her create-dump FA015807 transform, the byte-exact facing she has while chained at the post.
+		/// </remarks>
 		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new Dictionary<string, Quaternion>
 		{
 			["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f)
 		};
 
-		// Unique quest-NPC home positions (they move during their quest, so dedup must not strand them). #266
+		/// <remarks>
+		///     Home positions for unique quest NPCs: they move during their quest, so the dedup must not strand them
+		///     wherever a capture happened to see them.
+		/// </remarks>
 		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new Dictionary<string, Vector3>
 		{
 			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f)
 		};
 
-		// The clean burst-truth NPC spawn set (#266): per capture one entry per distinct mob (dedup by handle),
-		// each type taken from its single authoritative session. SUMMONED creatures are excluded two ways - by the
-		// wire's own owner-binding (`SummonedHandles`, the general rule) and by `petNames`, the seeded summon-template
-		// names (the fallback for summons whose binding was never captured). See both call sites below.
-		// How near a spawn must stand to a candidate patrol route's nearest waypoint to be counted as walking it (#425).
-		// Measured, not chosen: over the 139 spawns that carry their own route by handle, spawn-to-nearest-waypoint is
-		// 0.0 at the median, 4.4 at p90 and 7.8 at p95.
+		/// <remarks>
+		///     How near a spawn must stand to a candidate patrol route's nearest waypoint to be counted as walking it.
+		///     Measured, not chosen: over the spawns that carry their own route by handle, spawn-to-nearest-waypoint is
+		///     0.0 at the median, 4.4 at p90 and 7.8 at p95.
+		/// </remarks>
 		private const float RouteMatchRadius = 10f;
 
-		// #565: the widest spawn-to-route gap a HANDLE-joined route may have before it is read as a mis-join rather than
-		// a route. The handle join is identity evidence and is deliberately far looser than RouteMatchRadius above - an
-		// NPC may well have drifted from its recorded spawn point by the time its MoveTask was issued, and that is a
-		// route, not an error. What it is guarding against is handle RECYCLING: a handle freed by a despawn is reissued
-		// inside the same capture, so a route observed for the first NPC can land on the second one's spawn. That failure
-		// is gross, never marginal - the audit found 30 of 900 routes whose NEAREST waypoint is already beyond this, six
-		// of them compact 16-109u loops sitting 480-640u from the spawn they were joined to (Ymirish Frostshield,
-		// Vanir Champion Elite x2, ...), which no NPC could be walking. Against genuine matches there is a wide margin:
-		// spawn-to-nearest-waypoint is 7.8u at p95 and 23.1u at p95 over ALL routes, so 40 sits ~5x the genuine spread.
-		// A route rejected here still gets the positional backfill below, which is the correct owner-finding path.
+		/// <remarks>
+		///     The widest spawn-to-route gap a handle-joined route may have before it is read as a mis-join rather than
+		///     a route. The handle join is identity evidence and is deliberately far looser than
+		///     <see cref="RouteMatchRadius" />: an NPC may have drifted from its recorded spawn point by the time its
+		///     MoveTask was issued, and that is a route, not an error.
+		///     What it guards against is handle recycling - a handle freed by a despawn is reissued inside the same
+		///     capture, so a route observed for the first NPC can land on the second one's spawn. That failure is
+		///     gross rather than marginal: the rejected routes are compact loops hundreds of units from the spawn they
+		///     were joined to, which no NPC could be walking. Genuine matches leave a wide margin, spawn-to-nearest
+		///     waypoint being 23.1u at p95 over all routes. A route rejected here still gets the positional backfill
+		///     below, which is the correct owner-finding path.
+		/// </remarks>
 		private const float MaxHandleRouteGap = 40f;
 
-		// `classSpecificMaps` = the maps whose population is per class (Map.ClassSpecific - the city armories). A spawn
-		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
-		// the capture was played on and elected only against captures of that same class.
+		/// <param name="classSpecificMaps">
+		///     The maps whose population is per class (Map.ClassSpecific - the city armories). A spawn harvested on one
+		///     of them is evidence about one class's copy of the playfield, so it is stamped with the class the capture
+		///     was played on and elected only against captures of that same class.
+		/// </param>
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols, List<NpcSpawnEntry> ObservedTypes) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
 			IReadOnlySet<uint> classSpecificMaps, IReadOnlySet<uint> triggerSpawnedTypes)
 		{
-			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
-			// exclusion has to be, too - and doing it here rather than at the placement step keeps a summon out of the
-			// morph/equipment/route backfills and out of the richest-capture election as well, not just out of the
-			// final placement list.
+			// Summons are dropped per capture, before anything else sees them: a pet handle is session-scoped, so the
+			// exclusion has to be too. Doing it here rather than at the placement step keeps a summon out of the
+			// morph, equipment and route backfills and out of the richest-capture election, not just out of the final
+			// placement list.
 			var perCap = captures
 				.Select(c =>
 				{
@@ -85,12 +98,10 @@ namespace Faolan.Importer.Captures
 				.ToList();
 			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
-			// Keyed by TEMPLATE ID, not name (#244): many NPCs share a placeholder INTERNAL name - e.g. "Halen van
-			// Dummy" is the internal name of ~16 unrelated templates (the level-10 castle Child 14543, a dummy 14535,
-			// a quest-giver, ...). Keying the richest-set backfill by name leaked a geared level-80 same-named NPC's
-			// gear + morphs onto the level-10 child, which its own captured spawn doesn't carry (floating gear). The
-			// template id is the stable per-type key: distinct templates stay separate, while genuinely-same NPCs
-			// (same template across captures) still merge.
+			// Keyed by template id, not name: many NPCs share a placeholder internal name - "Halen van Dummy" is the
+			// internal name of some sixteen unrelated templates - so keying the richest-set backfill by name leaks a
+			// geared level-80 NPC's gear and morphs onto a same-named level-10 child. The template id is the stable
+			// per-type key: distinct templates stay separate, while the same NPC across captures still merges.
 			var morphsByTemplate = new Dictionary<uint, IReadOnlyList<AppearanceEntry>>();
 			foreach (var e in perCap.SelectMany(p => p.All))
 			{
@@ -98,11 +109,11 @@ namespace Faolan.Importer.Captures
 					morphsByTemplate[e.TemplateId] = e.Morphs;
 			}
 
-			// Richest worn-equipment set per TEMPLATE (#267): the burst-truth dedup can pick a session where an NPC wears
-			// FEWER pieces than another capture of the same NPC - e.g. Casilda at the post wears 4 (incl. slot-18
-			// tpl402981, the CHAINS that make her look chained), but while FOLLOWING the player she wears only 3. Keep
-			// the fullest loadout so the chosen spawn isn't stripped of state-specific gear it has in another capture.
-			// (Per template, so it never leaks across the shared-placeholder-name templates above.)
+			// Richest worn-equipment set per template: the burst-truth dedup can pick a session in which an NPC wears
+			// fewer pieces than another capture of the same NPC - Casilda at the post wears four, including the
+			// slot-18 chains (template 402981), but only three while following the player. Keeping the fullest loadout
+			// stops the chosen spawn being stripped of state-specific gear it has in another capture. Per template, so
+			// it never leaks across the shared-placeholder-name templates above.
 			var equipByTemplate = new Dictionary<uint, IReadOnlyList<NpcSpawnEquipment>>();
 			foreach (var e in perCap.SelectMany(p => p.All))
 			{
@@ -110,13 +121,11 @@ namespace Faolan.Importer.Captures
 					equipByTemplate[e.TemplateId] = e.Equipment;
 			}
 
-			// ⚠️ ...and how many DISTINCT NPCs each template stands for, because the merge above is only identity-
-			// preserving when the answer is one (#836). Casilda is a unique creature, so "the richest kit seen on
-			// template 9411" IS her own richest kit. A Poacher is not: template 8848 stands for many individuals, and
-			// retail dresses them INDIVIDUALLY - the three captured beach Poachers wear three different kits (7, 6 and
-			// 6 pieces, differing in chest, weapon, boots and whether they carry a slot-2 piece at all), sharing only
-			// their leather legs. Applying the richest kit to all of them handed every Poacher in the world the same
-			// loadout and erased that, which is what "they all look the same" turned out to be.
+			// How many distinct NPCs each template stands for, because the merge above is only identity-preserving
+			// when the answer is one. Casilda is a unique creature, so the richest kit seen on her template is her own
+			// richest kit. A Poacher is not: one template stands for many individuals, and retail dresses them
+			// individually - the captured beach Poachers wear three different kits, sharing only their leather legs -
+			// so applying the richest kit to all of them would hand every Poacher in the world the same loadout.
 			//
 			// A placement is (map, position): a handle is session-volatile, and the same NPC seen in two captures is
 			// the one standing in the same spot.
@@ -124,35 +133,27 @@ namespace Faolan.Importer.Captures
 				.GroupBy(e => e.TemplateId)
 				.ToDictionary(g => g.Key, g => g.Select(e => (e.MapId, X: MathF.Round(e.X), Z: MathF.Round(e.Z))).Distinct().Count());
 
-			// Richest PATROL ROUTE per (map, template) - the third backfill of the same shape as the two above, and the
-			// one that was missing (#425).
+			// Richest patrol route per (map, template) - the third backfill of the same shape as the two above.
 			//
-			// A route rides the burst-truth capture's own observation (`best.Routes`, keyed by that session's handle),
-			// so a capture that wins on spawn COUNT while happening to observe fewer NPCs mid-patrol takes the map's
-			// patrols down with it: importing the two beach->city captures moved PatrolNodes 632 -> 596 for zero new
-			// information, six spawns on map 4020 losing their route entirely. But a route is per-NPC CONTENT - the
-			// path is a stable asset of that spawn - so it can be backfilled from ANY capture that saw the NPC, exactly
-			// as morphs and equipment already are.
+			// A route observed only through the burst-truth capture's own handles means a capture that wins on spawn
+			// count while happening to observe fewer NPCs mid-patrol takes the map's patrols down with it. But a route
+			// is per-NPC content - the path is a stable asset of that spawn - so it can be backfilled from any capture
+			// that saw the NPC, exactly as morphs and equipment are.
 			//
-			// Keyed by (map, template) for the reason spelled out above: NAME is not a key, because ~16 unrelated
-			// templates share the internal name "Halen van Dummy" and keying by it would hand one NPC another's path.
+			// Keyed by (map, template) for the reason above: a name is not a key, because unrelated templates share
+			// internal names and keying by one would hand an NPC another's path.
 			//
-			// ⚠️ Template alone is NOT enough to pick the route, and measuring said so. Handing every same-template
-			// spawn the one route observed for that template recovered 207 PatrolNodes where the regression lost 36 -
-			// the extra 171 being ten guards of one template, one of them ever seen walking, all ten then walking the
-			// same path and converging on one spot. That is a worse artefact than the missing route, and in the row
-			// counts it would have looked like a big win.
-			//
-			// So the route is tied to the spawn POSITIONALLY: a spawn inherits a candidate route only if it is standing
-			// ON it. The threshold is measured, not invented - across the 139 spawns that DO carry their own route by
-			// handle, the distance from the spawn to the nearest waypoint of its own path is 0.0 at the median, 4.4 at
-			// p90 and 7.8 at p95. RouteMatchRadius is 10, which accepts ~95% of genuine matches while being far tighter
-			// than the spacing between distinct patrol routes on a map. An AMBIGUOUS spawn - two candidate routes in
-			// range - is left alone rather than guessed at.
+			// Template alone is not enough to pick the route either. Handing every same-template spawn the one route
+			// observed for that template makes ten guards of one template - one of them ever seen walking - all walk
+			// the same path and converge on one spot, a worse artefact than the missing route and one that looks like
+			// a win in the row counts. So the route is tied to the spawn positionally: a spawn inherits a candidate
+			// route only if it is standing on it, within the measured RouteMatchRadius, which accepts ~95% of genuine
+			// matches while staying far tighter than the spacing between distinct routes on a map. An ambiguous spawn,
+			// with two candidate routes in range, is left alone rather than guessed at.
 			var routeCandidates = new Dictionary<(uint Map, uint Template), List<PatrolPathEntry>>();
 			foreach (var cap in perCap)
 			{
-				// (map, handle), matching DistinctByHandle - a handle alone is not an identity across a zone change (#571).
+				// (map, handle), matching DistinctByHandle - a handle alone is not an identity across a zone change.
 				var byHandle = cap.All.ToDictionary(e => (e.MapId, e.Handle), e => e);
 				foreach (var (key, route) in cap.Routes)
 				{
@@ -173,26 +174,22 @@ namespace Faolan.Importer.Captures
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
 
-			// PER (map, TYPE), not per map (#486). The login burst is an INSTANT - one snapshot of what is standing
+			// Elected per (map, type), not per map. The login burst is an instant - one snapshot of what is standing
 			// there - so it gives true density without counting a respawn twice, and it stays the preferred source.
-			// But electing ONE capture for a whole map and then locking every type it saw to that capture does not
-			// survive a large, interest-streamed zone.
-			//
-			// Poitain is the case: `..._combat` entered it by a mid-session MAP CHANGE and the client polled almost
-			// immediately, so its burst window holds 5 spawns while 875 more arrive after the poll; `..._combat2` is a
-			// fresh LOGIN into the same zone and its burst holds 59. The 59 legitimately won the map, which then
-			// locked all 59 type names - and that excluded the first capture's 875 later observations from the
-			// non-burst pass entirely. Poitain Guard 13 -> 2, Zingaran Alchemist 12 -> 3.
+			// But electing one capture for a whole map and locking every type it saw to that capture does not survive
+			// a large, interest-streamed zone: a capture that entered by a mid-session map change and polled almost
+			// immediately has a burst window holding a handful of spawns while hundreds more arrive after the poll,
+			// and if that capture's burst wins the map it excludes every other capture's later observations.
 			//
 			// So each type takes whichever single capture saw the most of it, preferring a burst when the burst is at
-			// least as complete. One capture per type is still the rule (#266) - this only stops a type being pinned
-			// to a capture that barely saw it. `Merge` dedups the result by position, so a respawn on the same anchor
+			// least as complete. One capture per type is still the rule - this only stops a type being pinned to a
+			// capture that barely saw it. `Merge` dedups the result by position, so a respawn on the same anchor
 			// inside the chosen capture still collapses.
 			//
-			// On a class-specific map the key also carries the CLASS, so each class's copy of the armory elects its own
-			// truth capture independently and the two sets never compete (a necromancer capture and a herald capture see
-			// disjoint quartermasters on map 5007 - without the class in the key they would simply be unioned onto one
-			// map and every class served all of them).
+			// On a class-specific map the key also carries the class, so each class's copy of the armory elects its
+			// own truth capture independently and the two sets never compete: captures of two classes see disjoint
+			// quartermasters on the same map, and without the class in the key they would be unioned onto one map with
+			// every class served all of them.
 			foreach (var (map, cls, name) in perCap.SelectMany(p => p.All).Select(e => (e.MapId, e.ClassId, Name: e.Name ?? "")).Distinct())
 			{
 				var bestBurst = perCap.OrderByDescending(p => p.Burst.Count(Matches)).First();
@@ -214,43 +211,33 @@ namespace Faolan.Importer.Captures
 				}
 			}
 
-			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
-			// at summon time - #307/#244), NEVER world placements. A captured session's SUMMONED pets otherwise leak in
-			// here as permanent NpcSpawns and stand around forever where the player summoned them (the necro pet cluster
-			// on Old Tarantia).
+			// Pets are content of the creature type (lifted onto the type columns by CapturePetImporter and spawned
+			// from the type at summon time), never world placements. A captured session's summoned pets otherwise leak
+			// in here as permanent NpcSpawns and stand around forever where the player summoned them.
 			//
-			// This is the SECOND of two nets, and it is the weaker one. `SummonedHandles` above is the general rule -
-			// it asks the wire who owns the creature - and this one only knows the names we happened to seed. Both are
-			// kept because each catches what the other misses, MEASURED on the corpus:
-			//   * owner-binding only:  Parasitic Soul x2, Demon Avenger, Tamed Puma  (none of them in the name roster)
-			//   * name roster only:    Mutilator x10                                 (no PetIIR ever captured for it)
-			// So dropping either one regresses. If a capture ever observes the Mutilator's owner-binding, this net
-			// becomes redundant and can go.
+			// This is the second of two nets and the weaker one. `SummonedHandles` above is the general rule - it asks
+			// the wire who owns the creature - while this one only knows the names that have been seeded. Both are
+			// kept because each catches what the other misses on the corpus: creatures whose owner-binding was
+			// captured but which are in no name roster, and creatures in the roster for which no PetIIR was ever
+			// captured. Dropping either one regresses.
 			//
-			// TRIGGER-SPAWNED types go the same way, for the same reason one level over (#528). `triggerSpawnedTypes`
-			// is every creature the world puts in play through a SCRIPT rather than a placement:
-			//   * a `NpcAmbush` ambusher  - a quest goal advancing spawns it (the Quarry Bat Demon)
-			//   * a `NpcEncounter` BOSS   - a proximity lure swaps into it (Eerika of the Maidens / Boros)
-			// A capture that caught one caught the trigger FIRING, so harvesting it as a placement is the summoned-pet
-			// failure exactly: it left a Bat Demon standing in the Tortage quarry permanently, for every player,
-			// regardless of quest state. By TEMPLATE rather than by name, because unlike the pet roster these are real
-			// tables with real ids.
-			//
-			// ⚠️ The encounter boss half is a RULE now, where it used to be an accident. She got no placement only
-			// because she spawns on the exact spot her lure vacated and the position dedup below dropped her (#501) -
-			// which would have stopped protecting her the moment a capture caught the swap a few units off.
+			// Trigger-spawned types go the same way, one level over. `triggerSpawnedTypes` is every creature the world
+			// puts in play through a script rather than a placement - an NpcAmbush ambusher that a quest goal
+			// advancing spawns, or an NpcEncounter boss that a proximity lure swaps into. A capture that caught one
+			// caught the trigger firing, so harvesting it as a placement is the summoned-pet failure exactly: it
+			// leaves the ambusher standing there permanently, for every player, regardless of quest state. Keyed by
+			// template rather than by name, because unlike the pet roster these are real tables with real ids.
 			var placements = spawns
 				.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant()))
 				.Where(e => !triggerSpawnedTypes.Contains(e.TemplateId))
 				.ToList();
 
-			// The placements are position-deduped; the TYPES are not. A creature that loses the position dedup is
-			// still a creature we observed, and its type must survive even though its placement does not - the
-			// encounter boss `Eerika of the Maidens` spawns on the exact spot her lure vacated, so `Merge` (which keys
-			// on position and keeps the first) dropped her, and with her every trace: no NpcTemplate, no NpcStatCore,
-			// level 80 and 8519 HP thrown away (#501). Harvesting the type off the UNMERGED list keeps her, while she
-			// correctly gets no placement - a trigger spawn is not a world placement, and a type with no NpcSpawn row
-			// is an established shape (pets and mounts, 18 templates today).
+			// The placements are position-deduped; the types are not. A creature that loses the position dedup was
+			// still observed, and its type must survive even though its placement does not: an encounter boss spawns
+			// on the exact spot her lure vacated, so `Merge` - which keys on position and keeps the first - drops her,
+			// and with her the whole type. Harvesting the type off the unmerged list keeps it while she correctly gets
+			// no placement; a trigger spawn is not a world placement, and a type with no NpcSpawn row is an
+			// established shape that pets and mounts already have.
 			return (NpcSpawnExtractor.Merge(placements), patrols, placements);
 
 			// The one unambiguous candidate route this spawn is standing on, or null.
@@ -266,13 +253,13 @@ namespace Faolan.Importer.Captures
 					: null;
 			}
 
-			// Tags the spawns this capture saw on a CLASS-SPECIFIC map with the class it was played on, and leaves every
-			// other spawn class-agnostic (null).
+			// Tags the spawns this capture saw on a class-specific map with the class it was played on, and leaves
+			// every other spawn class-agnostic (null).
 			//
-			// A spawn on a class-specific map from a capture whose class could not be determined is DROPPED, not kept as
-			// null: null means "every class sees this", so keeping it would put one class's quartermasters in front of
-			// all twelve - precisely the bug the column exists to fix. Losing a few rows from an unattributable trace is
-			// the cheap side of that trade, and it is reported rather than silent.
+			// A spawn on a class-specific map from a capture whose class could not be determined is dropped, not kept
+			// as null: null means every class sees this, so keeping it would put one class's quartermasters in front
+			// of all twelve - precisely what the column exists to prevent. Losing a few rows from an unattributable
+			// trace is the cheap side of that trade, and it is reported rather than silent.
 			List<NpcSpawnEntry> StampClass(IEnumerable<NpcSpawnEntry> entries, ConanClass? playedClass, string captureName)
 			{
 				var result = new List<NpcSpawnEntry>();
@@ -341,9 +328,9 @@ namespace Faolan.Importer.Captures
 						};
 					}
 
-					// The richest-kit merge only where the template IS one NPC (#836); everywhere else a placement keeps
-					// what IT was seen wearing, and the template set is a fallback for an observation that carried no
-					// equipment at all - the same rule the morph backfill above uses, and for the same reason.
+					// The richest-kit merge applies only where the template is one NPC; everywhere else a placement
+					// keeps what it was seen wearing, and the template set is a fallback for an observation that
+					// carried no equipment at all - the same rule the morph backfill above uses.
 					var oneNpcOfThisType = placementsPerTemplate.GetValueOrDefault(e.TemplateId) <= 1;
 					if (equipByTemplate.TryGetValue(e.TemplateId, out var fullEquip) && (oneNpcOfThisType
 						    ? fullEquip.Count > e.Equipment.Count
@@ -359,9 +346,9 @@ namespace Faolan.Importer.Captures
 					spawns.Add(e);
 
 					// This capture's own observation first; otherwise the unambiguous cross-capture route for the
-					// template, so a session that simply did not catch this NPC walking no longer costs it its path.
-					// The handle join is sanity-checked positionally (MaxHandleRouteGap) so a RECYCLED handle cannot hand
-					// this spawn a route belonging to a different NPC on the far side of the zone; a rejected route falls
+					// template, so a session that did not catch this NPC walking does not cost it its path. The handle
+					// join is sanity-checked positionally (MaxHandleRouteGap) so a recycled handle cannot hand this
+					// spawn a route belonging to a different NPC on the far side of the zone; a rejected route falls
 					// through to the positional backfill, which finds the spawn actually standing on it.
 					if (routes.TryGetValue((e.MapId, e.Handle), out var r) && r.Waypoints.Count > 0
 					    && r.Waypoints.Min(w => Vector3.Distance(w, new Vector3(e.X, e.Y, e.Z))) <= MaxHandleRouteGap)
@@ -382,10 +369,14 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Upsert by (map, spawn point); never wipe. Ensures NpcTemplate TYPE rows exist first (#244).
-		// `observedTypes` is the UNMERGED observation list - every creature seen, including ones whose placement lost
-		// the position dedup. Types come from it, placements from `spawns` (#501). Passing null falls back to the
-		// placements, which is what a caller with no wider view should do.
+		/// <summary>
+		///     Upserts spawns by (map, spawn point); never wipes. Ensures the NpcTemplate type rows exist first.
+		/// </summary>
+		/// <param name="observedTypes">
+		///     The unmerged observation list - every creature seen, including ones whose placement lost the position
+		///     dedup. Types come from it, placements from <paramref name="spawns" />. Passing null falls back to the
+		///     placements, which is what a caller with no wider view should do.
+		/// </param>
 		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns, List<NpcSpawnEntry>? observedTypes = null)
 		{
 			var typeByTemplate = await UpsertNpcTypes(db, observedTypes ?? spawns);
@@ -393,20 +384,21 @@ namespace Faolan.Importer.Captures
 			foreach (var e in spawns)
 			{
 				// The lookup key is the placement's full identity, class included: on a class-specific map two classes'
-				// NPCs share a spot, and matching on position alone would have each class's import overwrite the other's row.
+				// NPCs share a spot, and matching on position alone would have each class's import overwrite the
+				// other's row.
 				var existing = await db
 					.NpcSpawns.Include(n => n.Morphs)
 					.Include(n => n.Equipment)
 					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z && n.ClassId == e.ClassId);
 
-				// NpcTemplateId is required now (no phantom rows), so a spawn whose type doesn't resolve is dropped - the same
-				// rule ImportNpcSpells applies to typeless casters, and consistent with the phantom-scrub invariant.
+				// NpcTemplateId is required, so a spawn whose type does not resolve is dropped - the same rule
+				// ImportNpcSpells applies to typeless casters.
 				if (e.TemplateId == 0 || !typeByTemplate.TryGetValue(e.TemplateId, out var npc))
 					continue;
 
-				// The id is DERIVED from the placement (see NpcSpawn/DerivedKey), so a re-harvest reproduces it rather
-				// than renumbering the spawn set and every equipment/morph/patrol row hanging off it. An `existing`
-				// row already carries it.
+				// The id is derived from the placement (see NpcSpawn/DerivedKey), so a re-harvest reproduces it rather
+				// than renumbering the spawn set and every equipment, morph and patrol row hanging off it. An
+				// `existing` row already carries it.
 				var row = existing ?? new NpcSpawn
 				{
 					Id = NpcSpawn.ComputeId(e.MapId, e.X, e.Y, e.Z, e.ClassId),
@@ -425,6 +417,19 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
+		/// <summary>
+		///     Caster NPCs' spells, upserted by (NpcTemplate type, spell id). The caster name is resolved to its
+		///     NpcTemplate id - the types were upserted by <see cref="ImportNpcSpawns" /> just before - and stored only
+		///     as that foreign key, so a cast whose caster has no captured type is dropped; the loader reads spells
+		///     through the same navigation.
+		/// </summary>
+		/// <remarks>
+		///     The player-name check is a belt, not the braces: it only knows characters in this database, so it never
+		///     sees a stranger who stood near the capturing client on the retail server. What keeps those out is
+		///     structural and upstream - their spawns carry player_stats, so NpcSpawnExtractor never gives them a
+		///     handle-to-name entry for NpcSpellExtractor to join on. Both are kept because this one also catches the
+		///     capture's own player once imported, whose spawn is dropped by handle rather than by message.
+		/// </remarks>
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n!.ToLowerInvariant()).ToHashSet();
@@ -457,7 +462,9 @@ namespace Faolan.Importer.Captures
 			return inserted;
 		}
 
-		// Decodes the captured 54-byte MagicBuffIIR data region into the NpcSpell columns (#304).
+		/// <summary>
+		///     Decodes the captured 54-byte MagicBuffIIR data region into the NpcSpell columns.
+		/// </summary>
 		private static void ApplyEffect(NpcSpell s, byte[] payload)
 		{
 			if (payload is not { Length: MagicBuffDataCodec.Length })
@@ -472,26 +479,27 @@ namespace Faolan.Importer.Captures
 			s.DescriptorSlot8 = NpcSpellEffectColumns.DescriptorSlot8(fx);
 		}
 
-		// NPC patrol routes, one per NpcSpawn (#316). The route is correlated to its NPC by the shared spawn position
-		// (the spawns were imported + saved just before), then FK'd; the columnarized task tree is replaced wholesale
-		// on re-import.
+		/// <summary>
+		///     NPC patrol routes, one per NpcSpawn. The route is correlated to its NPC by the shared spawn position
+		///     (the spawns are imported and saved just before), then keyed to it; the columnarized task tree is
+		///     replaced wholesale on re-import.
+		/// </summary>
 		public static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
 		{
-			// Resolve every route to its spawn FIRST, keyed by spawn. Two captured routes can correlate to the same
+			// Resolve every route to its spawn first, keyed by spawn. Two captured routes can correlate to the same
 			// spawn (they share a transform), and a per-entry loop cannot see what an earlier iteration already
-			// queued - so the second route's nodes would collide with the first's on the primary key.
+			// queued, so the second route's nodes would collide with the first's on the primary key.
 			//
-			// The RICHEST route wins, not the last one. Last-wins made the shipped path depend on which capture the
-			// corpus happened to iterate last: adding one gameplay capture of a map already covered replaced 36 nodes
-			// worth of patrol with what that run happened to observe (-36 PatrolNodes / -29 waypoints for zero new
-			// information). Two captures of one spawn are two observations of the same asset, so the one carrying more
-			// of the route is the better record of it - the same rule ImportConversations applies when a later capture
-			// is shorter ("replaced by a richer capture").
+			// The richest route wins, not the last one: last-wins makes the shipped path depend on which capture the
+			// corpus happened to iterate last, so adding a capture of an already-covered map can replace a full patrol
+			// with whatever that run observed. Two captures of one spawn are two observations of the same asset, so
+			// the one carrying more of the route is the better record of it - the same rule ImportConversations
+			// applies when a later capture is shorter.
 			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, MoveTaskNode Task)>();
 			foreach (var e in paths)
 			{
-				// Class included: on a class-specific map (map, position) matches two rows, and a route would otherwise
-				// be handed to whichever class the query happened to return first.
+				// Class included: on a class-specific map (map, position) matches two rows, and a route would
+				// otherwise be handed to whichever class the query happened to return first.
 				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n =>
 					n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z && n.ClassId == e.ClassId);
 				if (spawn == null)
@@ -509,32 +517,31 @@ namespace Faolan.Importer.Captures
 				bySpawn[spawn.Id] = (spawn, e.Task);
 			}
 
-			// Drop the persisted routes for those spawns BEFORE staging the replacements. The node key is derived
-			// from the tree position now, so a re-import reuses the very same keys - queueing the deletes and the
-			// inserts into one SaveChanges races them (`UNIQUE constraint failed: PatrolNodeWaypoints...`), the same
-			// way it does for the conversation tree. ExecuteDelete runs immediately, inside the import transaction,
-			// and cascades to the waypoints and words.
+			// Drop the persisted routes for those spawns before staging the replacements. The node key is derived from
+			// the tree position, so a re-import reuses the very same keys, and queueing the deletes and the inserts
+			// into one SaveChanges races them (unique constraint failed on PatrolNodeWaypoints) the same way it does
+			// for the conversation tree. ExecuteDelete runs immediately, inside the import transaction, and cascades
+			// to the waypoints and words.
 			var spawnIds = bySpawn.Keys.ToList();
 			if (spawnIds.Count > 0)
 				await db.PatrolNodes.Where(n => spawnIds.Contains(n.NpcSpawnId)).ExecuteDeleteAsync();
 
-			// Build each spawn's tree from the WIRE AST here rather than reusing the extractor's instance: one entry's
-			// task can be shared across spawns, and EF cannot track the same node object twice. Converting per spawn via
-			// PatrolNodeMapper - the single wire->row authority - is what keeps this complete. The hand-written deep copy
-			// this replaces silently dropped every column #410 added (PathTrailerWord, PathDirection1/2 and the seven
-			// Target*/TargetRotation* slots), because a field-by-field clone has to be updated for each new column and
-			// nothing forced it: the round-trip gate converts in memory and never reads a row back.
+			// Build each spawn's tree from the wire AST rather than reusing the extractor's instance: one entry's task
+			// can be shared across spawns, and EF cannot track the same node object twice. Converting per spawn
+			// through PatrolNodeMapper - the single wire-to-row authority - is what keeps every column populated; a
+			// hand-written field-by-field clone has to be updated for each new column, and nothing forces that,
+			// because the round-trip gate converts in memory and never reads a row back.
 			foreach (var (spawn, task) in bySpawn.Values)
 				AddNodeTree(spawn, PatrolNodeMapper.ToNode(task));
 
-			// #713: the beat identifies the PLACEMENT, so stamp it now that every route is attached. Rows that come out
-			// with the same key are sightings of ONE patroller in different capture sessions - this extraction keys
-			// spawns on MapId + exact XYZ, and a patroller stands somewhere different every time it is seen, so each
-			// sighting minted a placement (231 of 857 route-carrying spawns repo-wide are redundant that way).
+			// The beat identifies the placement, so stamp it now that every route is attached. Rows that come out with
+			// the same key are sightings of one patroller in different capture sessions: spawns are keyed on MapId and
+			// exact XYZ, and a patroller stands somewhere different every time it is seen, so each sighting mints a
+			// placement row.
 			//
-			// Nothing is deleted: the redundant rows are the placement's VARIANT POOL. What differs between them is
-			// exactly what retail re-rolls per spawn - level, morphs and all 7 equipment slots - so the world draws one
-			// at spawn rather than standing them all up at once.
+			// Nothing is deleted - the redundant rows are the placement's variant pool. What differs between them is
+			// exactly what retail re-rolls per spawn (level, morphs and the seven equipment slots), so the world draws
+			// one at spawn rather than standing them all up at once.
 			foreach (var (spawn, _) in bySpawn.Values)
 				spawn.PlacementId = PatrolRoute.PlacementKey(spawn.PatrolNodes, spawn.NpcTemplateId);
 
@@ -544,12 +551,14 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Patrol placements: {bySpawn.Count} route-carrying spawn(s) -> {pools} placement(s) (#713).");
 		}
 
-		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
-		// sets ParentId).
-		// Flattens the task tree onto the spawn, stamping each node's POSITION as it goes: OrdinalPath is the chain
-		// of sibling ordinals from the root ("" at the root, then "1", "1>0", ...) and ParentPath is its parent's.
-		// That pair IS the node's key now (PatrolNode) - EF used to assign a surrogate and derive ParentId from the
-		// Children nav, so nothing had to be computed here.
+		/// <summary>
+		///     Flattens the task tree onto the spawn, stamping each node's position as it goes.
+		/// </summary>
+		/// <remarks>
+		///     OrdinalPath is the chain of sibling ordinals from the root ("" at the root, then "1", "1&gt;0",...) and
+		///     ParentPath is its parent's. That pair is the node's key (see PatrolNode), so it must be computed here
+		///     rather than left to EF.
+		/// </remarks>
 		private static void AddNodeTree(NpcSpawn spawn, PatrolNode node, string? parentPath = null)
 		{
 			node.ParentPath = parentPath;
@@ -565,8 +574,10 @@ namespace Faolan.Importer.Captures
 				AddNodeTree(spawn, child, node.OrdinalPath);
 		}
 
-		// How much of a route an observation carries: total nodes, then total waypoints as the tiebreak. Used only to
-		// pick between two captures of the SAME spawn - see ImportPatrolPaths.
+		/// <summary>
+		///     How much of a route an observation carries: total nodes, then total waypoints as the tiebreak. Used only
+		///     to pick between two captures of the same spawn - see <see cref="ImportPatrolPaths" />.
+		/// </summary>
 		private static (int Nodes, int Waypoints) RouteWeight(MoveTaskNode task)
 		{
 			var nodes = 1;
@@ -581,18 +592,19 @@ namespace Faolan.Importer.Captures
 			return (nodes, waypoints);
 		}
 
-		// #718/#765: stamps `PlacementId` on the STATIONARY spawn clusters the corpus proves are one placement seen
-		// twice - the case #713's route key cannot reach, because these NPCs have no beat.
-		//
-		// The decision is `StationaryPlacementResolver`'s and the reasoning lives there; the short version is that the
-		// test is a HANDLE, not a distance. Retail genuinely places same-name NPCs a metre apart (181 of 191 candidate
-		// clusters are two real placements), so a tolerance would collapse the world's guard pairs; but one handle
-		// sighted at two of a cluster's positions WALKED between them, and that is one entity.
-		//
-		// Nothing is deleted, exactly as on the patrol side: the redundant rows are the placement's VARIANT POOL, and
-		// the world stands one entity up drawing its level/morphs/equipment from the group.
-		//
-		// Returns how many rows were pooled (cluster size minus one, summed).
+		/// <summary>
+		///     Stamps <c>PlacementId</c> on the stationary spawn clusters the corpus proves are one placement seen
+		///     twice - the case the route key cannot reach, because these NPCs have no beat.
+		/// </summary>
+		/// <returns>How many rows were pooled: cluster size minus one, summed.</returns>
+		/// <remarks>
+		///     The decision is <see cref="StationaryPlacementResolver" />'s and the reasoning lives there; in short the
+		///     test is a handle, not a distance. Retail genuinely places same-name NPCs a metre apart, so a tolerance
+		///     would collapse the world's guard pairs, but one handle sighted at two of a cluster's positions walked
+		///     between them, and that is one entity.
+		///     Nothing is deleted, exactly as on the patrol side: the redundant rows are the placement's variant pool,
+		///     and the world stands one entity up drawing its level, morphs and equipment from the group.
+		/// </remarks>
 		public static async Task<int> ImportStationaryPlacements(DatabaseContext db, IReadOnlyList<NamedCapture> captures)
 		{
 			var routed = await db.PatrolNodes.Select(p => p.NpcSpawnId).Distinct().ToHashSetAsync();
@@ -622,7 +634,7 @@ namespace Faolan.Importer.Captures
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
-			// Race/Sex are type-level now (#287) - set on the NpcTemplate type in UpsertNpcTypes, not on the spawn row.
+			// Race and Sex are type-level: set on the NpcTemplate in UpsertNpcTypes, not on the spawn row.
 			row.Level = e.Level;
 			row.MonsterScale = e.MonsterScale;
 			row.MonsterData = e.MonsterData;
@@ -630,8 +642,8 @@ namespace Faolan.Importer.Captures
 			row.HasEquipment = e.HasEquipment;
 			row.Health = e.Health;
 
-			// Per-placement stat pools (#244): lift the remaining level-scaled/per-placement values from this spawn's
-			// capture (via the same codec the type core uses), overriding the type StatCore when the body is built.
+			// Per-placement stat pools: lift the level-scaled, per-placement values from this spawn's capture through
+			// the same codec the type core uses, overriding the type StatCore when the body is built.
 			var placeBody = WorldObjectColumns.ExtractBody(e.Data);
 			if (placeBody != null && SpawnBodyReader.TryReadCharacterMessage(placeBody, out var placeRead))
 			{
@@ -660,7 +672,7 @@ namespace Faolan.Importer.Captures
 					Ordinal = i,
 					MorphId = e.Morphs[i].MorphId,
 					Value = e.Morphs[i].Value,
-					Word2 = e.Morphs[i].Word2, // #672: two captured tables carry it; dropping it re-declines them
+					Word2 = e.Morphs[i].Word2, // captured tables carry it; dropping it declines them on the wire
 					Text = e.Morphs[i].Text ?? ""
 				});
 			}
@@ -679,16 +691,17 @@ namespace Faolan.Importer.Captures
 			return row;
 		}
 
-		// Every entity handle this session's server bound to an OWNER, i.e. every summoned creature - read off the
-		// wire's own owner-binding (`PetIIR` mode 0 assign / mode 1 dismiss, #307) instead of a roster of pet names.
-		//
-		// Why not names: the name roster is the seeded `SpellEffect` SummonPet templates, so it only ever excludes
-		// summons we already knew about, and it fails SILENTLY for any we don't. It did: the necromancer's
-		// `Parasitic Soul` (Parasitic Soul Swarm) is not in the seed, so two captured sessions that had one out
-		// planted it as permanent scenery on maps 2010 and 2070. Owner-binding is the general fact - a creature is a
-		// pet exactly when the server said it belongs to somebody - and it covers summons of any class, named or not.
-		//
-		// Handles are per-session, so this set is only valid for the capture it came from.
+		/// <summary>
+		///     Every entity handle this session's server bound to an owner, i.e. every summoned creature, read off the
+		///     wire's own owner-binding (PetIIR mode 0 assign / mode 1 dismiss) rather than a roster of pet names.
+		/// </summary>
+		/// <remarks>
+		///     The name roster is the seeded SpellEffect SummonPet templates, so it only ever excludes summons that are
+		///     already known and fails silently for any that are not - a summon missing from the seed gets planted as
+		///     permanent scenery wherever a capture had one out. Owner-binding is the general fact: a creature is a pet
+		///     exactly when the server said it belongs to somebody, whatever its class or name.
+		///     Handles are per-session, so this set is only valid for the capture it came from.
+		/// </remarks>
 		private static HashSet<uint> SummonedHandles(IReadOnlyList<CapturedPacket> packets)
 		{
 			var summoned = new HashSet<uint>();
@@ -713,11 +726,15 @@ namespace Faolan.Importer.Captures
 			return summoned;
 		}
 
-		// One entry per distinct mob in a capture. The identity is (MAP, handle), not the bare handle (#571): a handle
-		// is scoped to the PLAYFIELD and the pool starts again on a zone change, so the same number names a different
-		// NPC on the other side of a handoff. Keyed on the handle alone this kept the FIRST sighting and silently
-		// dropped the second map's spawn - measured at 46 collisions across the corpus, every one of them cross-map
-		// (`--report handle-recycling`), with not a single same-map reuse in 11,442 handles.
+		/// <summary>
+		///     One entry per distinct mob in a capture, keyed on (map, handle).
+		/// </summary>
+		/// <remarks>
+		///     A handle is scoped to the playfield and the pool starts again on a zone change, so the same number names
+		///     a different NPC on the other side of a handoff. Keyed on the handle alone this keeps the first sighting
+		///     and silently drops the second map's spawn; every collision measured over the corpus is cross-map, with
+		///     no same-map reuse at all (`--report handle-recycling`).
+		/// </remarks>
 		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)
 		{
 			var seen = new HashSet<(uint MapId, uint Handle)>();
@@ -731,50 +748,33 @@ namespace Faolan.Importer.Captures
 			return result;
 		}
 
-		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.
+		/// <summary>
+		///     Upserts the NpcTemplate type rows, keyed by TemplateId so the id stays stable across re-imports.
+		/// </summary>
 		private static async Task<Dictionary<uint, NpcTemplate>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
 		{
 			var byTemplate = await db.NpcTemplates.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 
-			// The type's MOVEMENT MODE, taken as the MODAL value over every captured sighting of the type (#605).
+			// Four fields are rolled per spawn event rather than being properties of the type, so the modal value over
+			// every captured sighting decides them instead of whatever the representative spawn was doing:
+			// `movement_mode`, `npc_stats.spawn_animation`, `bcc_state` and its `anim_idle_id`.
 			//
-			// This replaces a scan that read a "minimal post-IIR recordCount" off the FIRST sighting of each type and
-			// stored it in a second column. Two things were wrong with that, and the second is why the first was never
-			// caught. (1) It is the same value as the character message's own `movement_mode`, so the type carried one
-			// number twice, lifted from two different representative spawns - 45 of 368 types ended up disagreeing with
-			// themselves, and a spawn built from such a row went out in a shape retail never sends. (2) The scan
-			// stopped at the first sighting, which is what let it be documented as "type-stable - no type is ever seen
-			// with two". A first-record-wins scan cannot observe a second value, so that claim was unfalsifiable rather
-			// than measured ([[first_record_wins_silently_truncates_repeated_wire_records]]); the field is really
-			// ~62% type-stable.
+			// `movement_mode` is only ~62% type-stable and `spawn_animation` ~78%, and nothing in the spawn body
+			// predicts either (`--report field-predictors`), so neither has a derivation or a resting value.
 			//
-			// The mode is a measurement of the type's OWN sightings, not a corpus-wide guess - which is the line #602
-			// drew. It also covers strictly more types than the old scan: that one needed a minimal-form capture, while
-			// `movement_mode` is present on every captured NPC spawn.
-			//
-			// `npc_stats.spawn_animation` gets the same treatment for the same reason. It is the other field #605
-			// named, `--report field-predictors` finds NOTHING in the spawn body that predicts it (no coarse candidate
-			// beats the 91.7% a constant scores), and it is 77.9% type-stable over fresh sightings - so it has no
-			// derivation and no resting value, and the only honest improvement left is to stop letting the FIRST
-			// sighting speak for the type.
-			// ⚠️ **`bcc_state` and its `anim_idle_id` need it MORE than either of those, and not having it is what put
-			// half of Old Tarantia on the floor.** They are the state-controller's state and the animation that goes
-			// with it, and they are per-spawn-EVENT: over the corpus 102 of 1024 types are caught in more than one
-			// `bcc_state`, and the split is lopsided every time - a Citizen (12460) is captured standing (state 1,
-			// `anim_idle_id` 42024) 286 times and SITTING (state 9, idle 42176) 5 times. The representative that
-			// reached the lift was one of the 5, so the type's definition of a Citizen became "sitting", and every
-			// Citizen in the world sat down - while still walking around, because a MoveTask moves an NPC whatever
+			// `bcc_state` and `anim_idle_id` need it most: they are the state controller's state and the animation
+			// that goes with it, and a type caught in a rare pose defines itself by it. A Citizen captured standing
+			// hundreds of times and sitting a handful became "sitting" when the representative was one of the few -
+			// and then sat down all over the city while still walking around, because a MoveTask moves an NPC whatever
 			// pose it is holding.
 			//
-			// The two are tallied SEPARATELY but move together, because they describe one thing: the majority of a
-			// type's sightings carry both the resting state and its resting idle, so both modes come off the same
-			// spawns. Tallying them independently is still the right shape - it is what keeps a type whose idle
-			// varies for another reason from being dragged by its state.
+			// The two are tallied separately but move together, because the majority of a type's sightings carry both
+			// the resting state and its resting idle. Tallying them independently is still the right shape: it keeps a
+			// type whose idle varies for another reason from being dragged by its state.
 			//
-			// ⚠️ Not a blanket reset to 1. 14 types are NEVER captured in state 1 - the Door Warden (19619) is state
-			// 11 in all 15 of its sightings - so a type CAN rest somewhere other than 1, and flattening the column
-			// would trade one wrong pose for another. The mode is a measurement of that type's own sightings and
-			// keeps the Door Warden exactly where retail puts it.
+			// This is not a blanket reset to a resting value. Some types are never captured in the common state - the
+			// Door Warden (19619) is bcc_state 11 in every sighting - so flattening the column would trade one wrong
+			// pose for another. The mode is a measurement of that type's own sightings.
 			var modes = new PerSpawnEventModes();
 			foreach (var e in entries)
 			{
@@ -795,7 +795,7 @@ namespace Faolan.Importer.Captures
 				{
 					if (!string.IsNullOrEmpty(e.Name))
 						npc.Name = e.Name;
-					// Community/Race/Sex now live on StatCore (set below via Lift), not the retired NpcTemplate columns.
+					// Community, Race and Sex live on StatCore, set below via Lift.
 				}
 				else
 				{
@@ -808,16 +808,16 @@ namespace Faolan.Importer.Captures
 					byTemplate[e.TemplateId] = npc;
 				}
 
-				// #244: lift the type-level CharacterIIR stat core from a representative capture (the first spawn of the
-				// type that decodes), so a spawn body can be constructed from typed columns instead of the Data blob.
+				// Lift the type-level CharacterIIR stat core from a representative capture (the first spawn of the type
+				// that decodes), so a spawn body can be constructed from typed columns rather than a captured blob.
 				if (npc.StatCore == null || npc.StatCore.IirHeader == null)
 				{
 					var body = WorldObjectColumns.ExtractBody(e.Data);
 					if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					{
-						// ⚠️ The core is lifted from ONE representative spawn, so anything that NPC happened to be doing
+						// The core is lifted from one representative spawn, so anything that NPC happened to be doing
 						// at capture time would become the type's definition of itself and be inherited by every other
-						// placement (#602). ClearPerSpawnEventState resets the measured per-event fields first.
+						// placement. ClearPerSpawnEventState resets the per-event fields first.
 						if (npc.StatCore == null)
 						{
 							npc.StatCore = NpcStatCoreColumns.Lift(read.Message);
@@ -828,9 +828,9 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// #605/#688: the fields the representative spawn must NOT decide on its own - all four are rolled per
-				// spawn event, so the mode over ALL of this type's sightings replaces whatever Lift took from the
-				// representative. See PerSpawnEventModes, which is shared with the pet/mount importers (#689).
+				// The four fields the representative spawn must not decide on its own: they are rolled per spawn
+				// event, so the mode over all of this type's sightings replaces whatever Lift took from the
+				// representative. See PerSpawnEventModes, which the pet and mount importers share.
 				modes.Apply(e.TemplateId, npc.StatCore);
 			}
 

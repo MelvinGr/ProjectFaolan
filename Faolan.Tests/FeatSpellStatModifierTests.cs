@@ -9,12 +9,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #593: the feat kinds that were readable only once the modifier record was understood as a GameAction ELEMENT
-	// read BY KEY (#591) - 53054 `SpellStatModifier`, 53062 `SpellLineStatModifier` and 53019 `Spell`.
+	// The feat kinds that were readable only once the modifier record was understood as a GameAction element
+	// read by key - 53054 `SpellStatModifier`, 53062 `SpellLineStatModifier` and 53019 `Spell`.
 	//
-	// Positional reading is what hid all three, and each hid differently: 53054 puts the SPELL first and the STAT
-	// second, so its stat id read as "a magnitude that varies for no reason"; 53019 carries ONE payload word, so its
-	// "magnitude" was the next element's type id. These gates are therefore about the KEY, not about offsets - a test
+	// Positional reading is what hid all three, and each hid differently: 53054 puts the spell first and the stat
+	// second, so its stat id read as "a magnitude that varies for no reason"; 53019 carries one payload word, so its
+	// "magnitude" was the next element's type id. These gates are therefore about the key, not about offsets - a test
 	// that asserted word positions would pass just as happily on the misread.
 	//
 	// Pure by design: synthetic template bodies, no RDB, so they run from a plain clone.
@@ -24,7 +24,7 @@ namespace Faolan.Tests
 		private const uint SpellLineStatModifier = 53062;
 		private const uint SpellGrant = 53019;
 
-		// The per-SPELL form, on the shape `Bombardment` carries: (spell, stat, absolute value, no percent).
+		// The per-spell form, on the shape `Bombardment` carries: (spell, stat, absolute value, no percent).
 		[Fact]
 		public void SpellStatModifier_ReadsTargetStatAndAbsoluteValue()
 		{
@@ -35,10 +35,10 @@ namespace Faolan.Tests
 			Assert.Equal(144677u, mod.TargetId);
 			Assert.Equal(CharacterStatId.AttackRange, mod.Stat);
 			Assert.Equal(150, mod.Value);
-			Assert.Null(mod.PercentHundredths); // the slot the record left at 0 is ABSENT, not a zero magnitude
+			Assert.Null(mod.PercentHundredths); // the slot the record left at 0 is absent, not a zero magnitude
 		}
 
-		// The per-LINE form is the same payload with the target space swapped, which is exactly why the two share a
+		// The per-line form is the same payload with the target space swapped, which is exactly why the two share a
 		// table - and why the kind, not the slot position, has to be what picks the space.
 		[Fact]
 		public void SpellLineStatModifier_ReadsTheLineTarget()
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			Assert.Equal(41000u, mod.TargetId);
 			Assert.Equal(CharacterStatId.ManaCost, mod.Stat);
 			Assert.Null(mod.Value);
-			Assert.Equal(-5000, mod.PercentHundredths); // -50.00%, and SIGNED - most of these are reductions
+			Assert.Equal(-5000, mod.PercentHundredths); // -50.00%, and signed - most of these are reductions
 		}
 
 		// `Value` and `Amount` are alternatives, never a pair: the client's tooltip renders the first with the stat's
@@ -66,9 +66,9 @@ namespace Faolan.Tests
 			Assert.Empty(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 		}
 
-		// The `Swift Pathing` case (Gitea #595): an element narrower than its key list says, so a magnitude slot lands
-		// on the FOLLOWING element's opening type word. The guard is the type-id range, not the feat - a spell id, a
-		// stat id and a magnitude all live nowhere near 0xCF09..0xD026 - and it is COUNTED, because seven rows quietly
+		// The `Swift Pathing` case: an element narrower than its key list says, so a magnitude slot lands
+		// on the following element's opening type word. The guard is the type-id range, not the feat - a spell id, a
+		// stat id and a magnitude all live nowhere near 0xCF09..0xD026 - and it is counted, because seven rows quietly
 		// vanishing is the failure this whole ticket exists to avoid.
 		[Fact]
 		public void SpellStatModifier_RejectsAndCounts_AMagnitudeThatIsAGameActionTypeId()
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			Assert.Equal(1, misSliced);
 		}
 
-		// A well-formed record must NOT be counted as mis-sliced - otherwise the counter would report a problem on
+		// A well-formed record must not be counted as mis-sliced - otherwise the counter would report a problem on
 		// every import and stop meaning anything.
 		[Fact]
 		public void SpellStatModifier_CountsNoMisSlice_OnAWellFormedRecord()
@@ -90,8 +90,8 @@ namespace Faolan.Tests
 			Assert.Equal(0, misSliced);
 		}
 
-		// A GRANT is one payload word, and it must not reach the modifier reader: filing it there would record a spell
-		// the feat GIVES you as a boost to one you already have.
+		// A grant is one payload word, and it must not reach the modifier reader: filing it there would record a spell
+		// the feat gives you as a boost to one you already have.
 		[Fact]
 		public void SpellGrant_ReadsTheSpellTemplateId_AndIsNotAModifier()
 		{
@@ -112,7 +112,7 @@ namespace Faolan.Tests
 		}
 
 		// The element list is not 4-byte aligned to the body in most templates - a feat's name and description are
-		// variable-length - so a word-aligned reader simply cannot see these records (#441).
+		// variable-length - so a word-aligned reader simply cannot see these records.
 		[Theory]
 		[InlineData(0)]
 		[InlineData(1)]
@@ -126,7 +126,7 @@ namespace Faolan.Tests
 			Assert.Equal(-3300, mod.PercentHundredths);
 		}
 
-		// Several elements of MIXED kinds in one record, which is the ordinary case: a feat that grants a spell and
+		// Several elements of mixed kinds in one record, which is the ordinary case: a feat that grants a spell and
 		// also boosts one. Each reader must take its own and leave the rest, and the sequence must survive - the DB
 		// key is (FeatId, Sequence), so a reader that reordered them would renumber the table on every import.
 		[Fact]
@@ -148,7 +148,7 @@ namespace Faolan.Tests
 			Assert.Equal(CharacterStatId.SplashRadius, mods[1].Stat);
 		}
 
-		// The twelve spell properties the shipped catalog targets must all be NAMED. They are the client's own LDB 615
+		// The twelve spell properties the shipped catalog targets must all be named. They are the client's own LDB 615
 		// names, and an unnamed one would leave a bare number in a table whose whole point is to be readable - and
 		// would silently widen the ConstrainToEnumValues check the two stat tables carry.
 		[Fact]
@@ -162,7 +162,7 @@ namespace Faolan.Tests
 		}
 
 		// One element: `[kind][0][4][0][1][0][2][9]` then one word per key of that kind's key list. The parser needs a
-		// zero word BEFORE the signature, which the element's own second word supplies for every element but the
+		// zero word before the signature, which the element's own second word supplies for every element but the
 		// first - hence the leading pad word.
 		private static byte[] Template(uint kind, uint[] payload, int pad = 0)
 		{

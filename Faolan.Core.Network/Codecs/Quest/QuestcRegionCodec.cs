@@ -4,24 +4,27 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL. Grammar
-	// recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210 -> base FUN_00797440 ->
-	// List A driver FUN_0091f5c0 -> per-record FUN_0091df50) and validated byte-exact against BeachTailsTemplate.bin
-	// (docs/re/fullplayer-snapshot-reader.md, tools/capture/decode_questc.py).
-	//
-	// Wire:  [u32 version = 0x18][u32 (records + 1) * 0x3F1]  then one QuestcRecord per held quest, each of which
-	// carries its own interleaved @609 objective region (#384).
-	//
-	// #304 RE 2026-07-05: the FULL structure is decoded from the client readers and validated byte-exact on
-	// NecroL80's lvl80 login - see docs/re/questc-region-decode.md. Each record also ends with a NESTED 0x3F1-framed
-	// per-goal PROGRESS sub-list (empty on the beach template, so unmodeled) whose entries carry a `"WTHD"` block that
-	// is opaque server data with no client reader (FindConst = 0 hits) - the hard limit of client-only RE. Production
-	// is unaffected: fresh chars (the only journals we generate) have empty objlists + empty progress.
+	/// <summary>
+	///     The Quest_c (List A) region at the start of the FullChar snapshot tails - the quest journal. The body is
+	///     <c>[u32 version][ListFrame(records)]</c> then one <see cref="QuestcRecord" /> per held quest, each carrying its
+	///     own interleaved @609 objective region.
+	/// </summary>
+	/// <remarks>
+	///     Grammar recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210, base FUN_00797440,
+	///     List A driver FUN_0091f5c0, per-record FUN_0091df50) and validated byte-exact against BeachTailsTemplate.bin and
+	///     against a level-80 login; see docs/re/fullplayer-snapshot-reader.md, docs/re/questc-region-decode.md and
+	///     tools/capture/decode_questc.py.
+	///     <para>
+	///         Each record also ends with a nested count-framed per-goal progress sub-list, empty on the beach template and
+	///         therefore unmodelled, whose entries carry a "WTHD" block that is opaque server data with no client reader.
+	///         The journals we generate are for fresh characters, whose reward lists and progress are both empty.
+	///     </para>
+	/// </remarks>
 	public static class QuestcRegionCodec
 	{
 		public const uint Version = 0x18;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestcRegion value)
 		{
 			using var s = new FaolanStream();
@@ -59,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// The quest journal: the held quests, in wire order (primary first).
+	/// <summary>The quest journal: the held quests, in wire order, primary first.</summary>
 	public sealed record QuestcRegion
 	{
 		public List<QuestcRecord> Records { get; init; } = [];

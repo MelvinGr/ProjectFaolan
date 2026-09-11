@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #718/#765: which near-identical STATIONARY spawns the shipped data says are one NPC harvested twice.
+	// Which near-identical stationary spawns the shipped data says are one NPC harvested twice.
 	//
-	// The decision is made at import time from the corpus (`StationaryPlacementResolver` - the test is a HANDLE sighted
-	// at two of a cluster's positions, not a distance), so what a test without the corpus can gate is the RESULT: that
+	// The decision is made at import time from the corpus (`StationaryPlacementResolver` - the test is a handle sighted
+	// at two of a cluster's positions, not a distance), so what a test without the corpus can gate is the result: that
 	// the pooling happened, that it stayed narrow, and that it did not touch the tight placements retail really has.
 	// That last one is the assertion with teeth. 181 of the 191 candidate clusters are genuinely concurrent, so a
 	// regression to any distance-based rule would collapse the world's guard pairs and animal packs, and would show up
@@ -20,8 +20,8 @@ namespace Faolan.Tests
 		public async Task TheThreeScruffys_AreOnePlacement()
 		{
 			// The reported case: at least three "Scruffy" dogs stood on one spot on map 2000, and there should be one.
-			// He MOVES (per #741 he chases Giner the cat), so each capture caught him somewhere slightly different and
-			// the (map, XYZ) spawn key minted a placement per sighting. Two captures show one handle standing at two of
+			// He moves (he chases Giner the cat), so each capture caught him somewhere slightly different and
+			// the (map, xyz) spawn key minted a placement per sighting. Two captures show one handle standing at two of
 			// the three positions, which is what proves it rather than the 0.2u gap between two of them.
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 			Assert.InRange(pools.Count, 1, 20);
 			Assert.InRange(pooled.Count, 2, 60);
 
-			// Every pooled group is ONE creature on ONE map: the resolver groups by (map, template, class), so a pool
+			// Every pooled group is one creature on one map: the resolver groups by (map, template, class), so a pool
 			// spanning two templates would mean the key collided.
 			Assert.All(pools, pool =>
 			{
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 				Assert.Single(pool.Select(s => s.ClassId).Distinct());
 			});
 
-			// The creatures retail really places in tight groups must NOT be pooled - these are the ones a distance rule
+			// The creatures retail really places in tight groups must not be pooled - these are the ones a distance rule
 			// eats first. Black Dragon Guards flank Tarantia doorways 1.3u apart; Enraged Boars come in packs; the
 			// class-specific armory rows sit at literally the same point, one per class.
 			foreach (var name in new[] { "Black Dragon Guard", "Enraged Boar", "Quartermaster Haji", "Wolf Pict Envoy" })

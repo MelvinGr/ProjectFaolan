@@ -5,20 +5,22 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// QuestGoalIIR (0x0774C8C1, 33 B) - one objective's progress.
-	//   [subop][class][playerHandle][u8 0x01][u32 questId][u32 goalId][u32 w1][u32 w2][u32 w3]
-	//
-	// The three trailing words are ONE value - the update KIND - not a count plus padding. They were modelled as
-	// [count][0][0] because every single-count goal sends (1,0,0), which is 52 of the 66 QuestGoalIIR packets in the
-	// corpus; the multi-count collect goal is what shows the other two spellings. A triple retail never sends is
-	// REJECTED rather than read as a count.
-	//
-	// The u32 length prefix belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     QuestGoalIIR - one objective's progress, 33 bytes:
+	///     <c>[subop][class][playerHandle][u8 0x01][u32 questId][u32 goalId][u32 w1][u32 w2][u32 w3]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The three trailing words are one value, the update kind, not a count plus padding. A single-count goal sends
+	///     (1, 0, 0), which is 52 of the 66 QuestGoalIIR packets in the corpus, so the triple reads as a count until the
+	///     multi-count collect goal shows the other two spellings. A triple retail never sends is rejected rather than read
+	///     as a count.
+	///     <para>The u32 length prefix belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class QuestGoalCodec
 	{
 		public const uint Opcode = (uint)IirTypes.QuestGoalIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestGoalIIR value)
 		{
 			using var s = new FaolanStream();
@@ -66,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				.WriteUInt32(w3);
 		}
 
-		// The only three word-triples retail sends. One table, so the build and parse sides cannot drift.
+		/// <summary>The only three word-triples retail sends. One table, so the build and parse sides cannot drift.</summary>
 		private static (uint W1, uint W2, uint W3) UpdateWords(QuestGoalUpdate update)
 		{
 			return update switch
@@ -79,6 +81,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// QuestGoalIIR (0x0774C8C1).
+	/// <summary>The QuestGoalIIR body.</summary>
 	public sealed record QuestGoalIIR(uint PlayerHandle, uint QuestId, uint GoalId, QuestGoalUpdate Update);
 }

@@ -5,34 +5,37 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// Byte-exact codec for the 0x200F DispatchTeamSearchResult body - the LFG "search for team" result list, the answer
-	// to 0x200B SearchForTeam.
-	//
-	//   [u32 (count+1)*0x3F1]  { count x row }  [u8 i_bMoreHits]
-	//   row = [ cTeam (TeamRosterCodec) ][ u16 len + LATIN1 message ]
-	//
-	// ⚠️ The corpus cannot decode this on its own: all SIX captured replies are the EMPTY body `000003f1 00`
-	// (Hoxxling_mage-heraldofxotli_login, addfriends x2, login-with-friends, login_2-clients_group-trade-friend and
-	// the group-finder/pvp capture), because nobody in any traced session had flagged a team as looking for members.
-	// The grammar above is the CLIENT'S OWN READER (#889):
-	//
-	//   `CSPlayerInterfaceDispatch_t::DispatchTeamSearchResult()` is `FUN_0133de00` (found by its two "stream bad
-	//   after 'i_cResult'/'i_bMoreHits'" assert strings). It reads the vector through `FUN_0134e9c0` and then ONE
-	//   byte through the 1-byte primitive - so the trailing byte every captured body carries is `i_bMoreHits`, the
-	//   paging flag, and not a "list trailer".
-	//   `FUN_0134e9c0` is the ordinary count-framed list reader (`word / 0x3F1`, capped at 0x7531 = 30000 elements),
-	//   and per element it calls `FUN_00557960` then `FUN_0048f840`. Those two are already known: `FUN_00557960` is
-	//   the `cTeam` reader TeamRosterCodec was decoded from (#669), and `FUN_0048f840` is the std::string read - the
-	//   same call `FUN_005574d0` makes for a member's NAME.
-	//
-	// The row's class name is the client's own: `TeamSearchResultRow_c`, from the RTTI of the GUI slot that consumes
-	// the vector (`Slot2<…, const vector<TeamSearchResultRow_c>&, bool>` bound to `TeamAndGuildSearchView_c` - the
-	// window that hosts both the team and the guild search tab).
-	//
-	// The MESSAGE is the team's looking-for-members advert: it is the only per-team string in the LFG feature set,
-	// and it is what c2s `SetLookingForMemberStatus(bool i_bLookingForMember, const std::string& i_cMessage)` /
-	// s2c `DispatchTeamLookingForMemberStatus(i_bLookingForMember, i_cMessage)` carry for the same team. Structural,
-	// not observed - no captured row exists to read it off. [V0]
+	/// <summary>
+	///     The <c>DispatchTeamSearchResult</c> body - the LFG "search for team" result list, the answer to
+	///     <c>SearchForTeam</c>.
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     [list frame]  { count x row }  [u8 i_bMoreHits]
+	///     row = [ cTeam (TeamRosterCodec) ][ u16 len + Latin1 message ]
+	///     </code>
+	///     <para>
+	///         The corpus cannot decode this on its own: all six captured replies are the empty body, because nobody in
+	///         any traced session had flagged a team as looking for members. The grammar comes from the client's own
+	///         reader. <c>CSPlayerInterfaceDispatch_t::DispatchTeamSearchResult()</c> is <c>FUN_0133de00</c> (found by its
+	///         two "stream bad after 'i_cResult'/'i_bMoreHits'" assert strings); it reads the vector through
+	///         <c>FUN_0134e9c0</c> and then one byte through the 1-byte primitive, so the trailing byte every captured
+	///         body carries is <c>i_bMoreHits</c>, the paging flag, rather than a list trailer. <c>FUN_0134e9c0</c> is the
+	///         ordinary count-framed list reader (capped at 30000 elements), and per element it calls <c>FUN_00557960</c>
+	///         then <c>FUN_0048f840</c> - respectively the <c>cTeam</c> reader <see cref="TeamRosterCodec" /> was decoded
+	///         from and the std::string read.
+	///     </para>
+	///     <para>
+	///         The row's class name is the client's own, <c>TeamSearchResultRow_c</c>, from the RTTI of the GUI slot that
+	///         consumes the vector (bound to <c>TeamAndGuildSearchView_c</c>, the window hosting both the team and the
+	///         guild search tab).
+	///     </para>
+	///     <para>
+	///         The message is the team's looking-for-members advert: the only per-team string in the LFG feature set, and
+	///         what c2s <c>SetLookingForMemberStatus</c> / s2c <c>DispatchTeamLookingForMemberStatus</c> carry for the
+	///         same team. Structural rather than observed - no captured row exists to read it off. [V0]
+	///     </para>
+	/// </remarks>
 	public static class TeamSearchResultCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchTeamSearchResult;
@@ -65,15 +68,20 @@ namespace Faolan.Core.Network.Codecs.Team
 		}
 	}
 
-	// One row of the result list - the client's `TeamSearchResultRow_c`: a whole team, plus the advert its leader set.
+	/// <summary>
+	///     One row of the result list - the client's <c>TeamSearchResultRow_c</c>: a whole team, plus the advert its
+	///     leader set.
+	/// </summary>
 	public sealed record TeamSearchResultRow(TeamRoster Team, string Message);
 
-	// `MoreHits` is the client's `i_bMoreHits`: the request pages (`SearchForTeam` carries `i_nSkipResults`), so this
-	// says whether anything was left behind after the page that was sent. Every captured reply is the empty result
-	// with the flag clear.
+	/// <remarks>
+	///     <c>MoreHits</c> is the client's <c>i_bMoreHits</c>: the request pages (<c>SearchForTeam</c> carries
+	///     <c>i_nSkipResults</c>), so this says whether anything was left behind after the page that was sent. Every
+	///     captured reply is the empty result with the flag clear.
+	/// </remarks>
 	public sealed record TeamSearchResult(IReadOnlyList<TeamSearchResultRow> Rows, bool MoreHits)
 	{
-		// What retail answers a search that matched nothing: `000003f1 00`, byte-exact from all six captured replies.
+		// What retail answers a search that matched nothing, byte-exact from all six captured replies.
 		public static TeamSearchResult Empty { get; } = new TeamSearchResult([], false);
 	}
 }

@@ -7,20 +7,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The buff stat engine (#367): which imported [2][9] records it honors, at what scale, and that a buff's stats go
-	// back DOWN when it ends. The DATA (kinds, stats, amounts) is the decoded spell region
+	// The buff stat engine: which imported [2][9] records it honors, at what scale, and that a buff's stats go back
+	// down when it ends. The data (kinds, stats, amounts) is the decoded spell region
 	// (docs/rdb/spell-stat-effects.md); this pins the policy and the arithmetic.
 	public class BuffStatEffectsTests
 	{
 		private const uint FlatKind = 53220; // Battle Cry / Fend / Shielding Litany
-		// ⚠️ The potions carry 53045, NOT 53189. 53189 `AddPercentSkillModifier` has no stat key at all, so its rows
-		// were a positional misread and no longer reach the table (`SpellPoolEffectTests
-		// .EveryStoredRowsKind_ActuallyCarriesAStat`); naming it "AttributeKind" here outlived that.
+		// The potions carry 53045, not 53189. 53189 `AddPercentSkillModifier` has no stat key at all, so rows read as
+		// that kind are a positional misread and do not reach the table (`SpellPoolEffectTests
+		// .EveryStoredRowsKind_ActuallyCarriesAStat`).
 		private const uint AttributeKind = 53045;
 		private const uint HealthKind = 53219; // Lifestrike's heal - not a buff stat
 		private const uint TempChangeSkill = 53110; // Skin of Iron / Soul of Mitra - `Modify` with a duration in its name
 
-		// A rating's amount is stored at the same wire scale item modifiers use, because it IS the same field: +62 Hit
+		// A rating's amount is stored at the same wire scale item modifiers use, because it is the same field: +62 Hit
 		// Rating on a buff and on a ring are the same number in the same units.
 		[Fact]
 		public void FlatRating_KeepsItsWireScale()
@@ -36,8 +36,8 @@ namespace Faolan.Tests
 			Assert.Equal([Delta(CharacterStatId.NaturalManaRegen, 5)], catalog.BySpellBase[145240]);
 		}
 
-		// Attributes are the one place the spell region and the item region disagree: a spell stores DISPLAY units.
-		// Reading "Potion of Strength" 0x324 = 2 at the item scale (×10) would grant +0.2 Strength.
+		// Attributes are the one place the spell region and the item region disagree: a spell stores display units.
+		// Reading "Potion of Strength" 0x324 = 2 at the item scale (x10) would grant +0.2 Strength.
 		[Fact]
 		public void FlatAttribute_IsDisplayUnitsNotTheItemScale()
 		{
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal([Delta(CharacterStatId.Strength, 2)], catalog.BySpellBase[5070357]);
 			Assert.Equal([Delta(CharacterStatId.Dexterity, 2)], catalog.BySpellBase[3200]);
 			Assert.Equal(1u, BuffStatEffects.SpellScale(CharacterStatId.Strength));
-			Assert.Equal(10u, CharacterStatId.Strength.GetScale()); // …while an ITEM's Strength really is ×10
+			Assert.Equal(10u, CharacterStatId.Strength.GetScale()); // ...while an item's Strength really is x10
 		}
 
 		// A percent record must never be read as a flat one: Philtre of Guile's 200 is "+2% Critical Rating", not +200.
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 			Assert.Equal(1, catalog.KindSkipped);
 		}
 
-		// A percent on a stat whose scale we have NOT verified is counted, not applied - the same gate the flat kinds
+		// A percent on a stat whose scale we have not verified is counted, not applied - the same gate the flat kinds
 		// pass through, because a percentage of an unknown quantity is no more usable than a flat amount of it.
 		[Fact]
 		public void PercentOnAnUnmodelledStat_IsCountedNotApplied()
@@ -82,12 +82,12 @@ namespace Faolan.Tests
 			Assert.Equal(2, catalog.PercentSkipped);
 		}
 
-		// ⭐ #807: `AddPercentSkillModifier` (53189) with a source stat DIFFERENT from its target - "raise stat B by
-		// N% of stat A". `Will of the Sublime` is the shipped case: +3..15% of Intelligence AND of Strength onto
-		// Critical Damage Rating, two terms per rank.
+		// `AddPercentSkillModifier` (53189) with a source stat different from its target - "raise stat B by N% of stat
+		// A". `Will of the Sublime` is the shipped case: +3..15% of Intelligence and of Strength onto Critical Damage
+		// Rating, two terms per rank.
 		//
 		// Both terms have to land. They share a target, so banding them together would pick one band across the pair
-		// and silently drop a source - which is what grouping `Applicable` by stat alone did.
+		// and silently drop a source.
 		[Fact]
 		public void DerivedStat_AddsAPercentageOfEachSourceStat()
 		{
@@ -116,8 +116,8 @@ namespace Faolan.Tests
 			Assert.Equal(100u, entity.CriticalDamageRating); // and it comes back off
 		}
 
-		// The other end of the same rule: a derived row whose SOURCE we cannot resolve is dropped, and says so
-		// separately from an unmodelled TARGET - the two are different gaps.
+		// The other end of the same rule: a derived row whose source we cannot resolve is dropped, and says so
+		// separately from an unmodelled target - the two are different gaps.
 		[Fact]
 		public void DerivedStat_FromAnUnresolvedSource_IsCountedNotGuessed()
 		{
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 			Assert.Equal(1, catalog.DerivedSkipped);
 		}
 
-		// An unmodelled TARGET falls at the target gate, ahead of the source question - `Arcane Plunder` derives onto
+		// An unmodelled target falls at the target gate, ahead of the source question - `Arcane Plunder` derives onto
 		// 490 `ImmunityRating`, which nothing in the combat model consumes.
 		[Fact]
 		public void DerivedStat_OntoAnUnmodelledTarget_FallsAtTheTargetGate()
@@ -143,8 +143,8 @@ namespace Faolan.Tests
 			Assert.Equal(0, catalog.DerivedSkipped);
 		}
 
-		// #436: a percentage SCALES the flat total rather than adding to it - "+2% Critical Rating" is worth more on a
-		// well-geared character, which is the whole reason it needed a model of its own.
+		// A percentage scales the flat total rather than adding to it - "+2% Critical Rating" is worth more on a
+		// well-geared character, which is why it needs a model of its own.
 		[Fact]
 		public void PercentBuff_ScalesTheFlatTotal()
 		{
@@ -163,7 +163,7 @@ namespace Faolan.Tests
 			Assert.Equal(250u, entity.CriticalRating); // and it comes back off
 		}
 
-		// A percentage applies AFTER the flat deltas, on their total - so a flat +50 and a +2% are 306, not 305.
+		// A percentage applies after the flat deltas, on their total - so a flat +50 and a +2% are 306, not 305.
 		[Fact]
 		public void PercentBuff_AppliesToTheFlatTotalNotToGearAlone()
 		{
@@ -181,7 +181,7 @@ namespace Faolan.Tests
 			Assert.Equal(306u, entity.CriticalRating); // (250 + 50) x 1.02
 		}
 
-		// Two percentages ADD rather than compounding: +2% and +5% is +7%, not 1.02 x 1.05.
+		// Two percentages add rather than compounding: +2% and +5% is +7%, not 1.02 x 1.05.
 		[Fact]
 		public void TwoPercentBuffs_AddRatherThanCompound()
 		{
@@ -199,9 +199,9 @@ namespace Faolan.Tests
 			Assert.Equal(1070u, entity.CriticalRating); // 1000 x 1.07, not 1071
 		}
 
-		// #599: the interpolated kinds are a LEVEL RAMP, so the same buff is worth different amounts to a level-20 and
-		// a level-80 carrier. The gate is on the RECOMPUTE rather than the catalog, because the catalog cannot resolve
-		// one - it has no carrier - which is the whole reason the ramp is carried into it rather than collapsed there.
+		// The interpolated kinds are a level ramp, so the same buff is worth different amounts to a level-20 and a
+		// level-80 carrier. The gate is on the recompute rather than the catalog, because the catalog cannot resolve
+		// one - it has no carrier - which is why the ramp is carried into it rather than collapsed there.
 		[Theory]
 		[InlineData(5u, 1000u)]  // below the ramp: clamped to the low endpoint
 		[InlineData(10u, 1000u)] // at the low level
@@ -211,7 +211,7 @@ namespace Faolan.Tests
 		public void RampedBuff_IsWorthTheValueAtTheCarriersLevel(uint level, uint expected)
 		{
 			// A ramp shaped like the shipped ones: 1000 armor at level 10 rising to 5000 at 50. Armor's wire scale is
-			// 1, so the display value IS the raw one and this test is purely about the interpolation.
+			// 1, so the display value is the raw one and this test is purely about the interpolation.
 			var catalog = BuffStatEffects.BuildCatalog([RampRow(4239529, CharacterStatId.Armor, FlatKind, 1000, 5000, 10, 50)]);
 			var entity = Player();
 			entity.Level = level;
@@ -222,10 +222,10 @@ namespace Faolan.Tests
 			Assert.Equal(expected, entity.ArmorRating);
 		}
 
-		// The ramp interpolates in the RAW units it was decoded in and divides by the stat's scale AFTERWARDS. Dividing
+		// The ramp interpolates in the raw units it was decoded in and divides by the stat's scale afterwards. Dividing
 		// the endpoints first truncates twice, and the two readings really do part company: a 550 -> 950 regen ramp
-		// (×100, so +5.5/s to +9.5/s) is +9/s nine tenths of the way up, while pre-divided endpoints of 5 and 9 give
-		// 5 + 0.9 x 4 = 8.6 -> +8/s. This is the reason a ramped row is the one shape BuildCatalog cannot pre-convert.
+		// (x100, so +5.5/s to +9.5/s) is +9/s nine tenths of the way up, while pre-divided endpoints of 5 and 9 give
+		// 5 + 0.9 x 4 = 8.6 -> +8/s. This is why a ramped row is the one shape BuildCatalog cannot pre-convert.
 		[Fact]
 		public void RampedBuff_ScalesAfterInterpolatingNotBefore()
 		{
@@ -252,10 +252,9 @@ namespace Faolan.Tests
 			Assert.Equal(2, catalog.StatSkipped);
 		}
 
-		// The three RESISTANCE stats used to fall through that same gate, for no reason: all three are x1, so there
-		// was no scale to verify. Between them they were dropping 370 imported rows - including the `-20 Chance of
-		// Being Staggered` every horse's `Mounted` buff carries, which is visible in the client's own buff tooltip
-		// while the number went nowhere.
+		// The three resistance stats must not fall through that same gate: all three are x1, so there is no scale to
+		// verify, and between them they carry 370 imported rows - including the `-20 Chance of Being Staggered` every
+		// horse's `Mounted` buff carries, which is visible in the client's own buff tooltip.
 		[Fact]
 		public void TheResistanceStats_AreHonoredRatherThanSkipped()
 		{
@@ -270,8 +269,8 @@ namespace Faolan.Tests
 			Assert.Equal(-20, catalog.BySpellBase[3271454][0].Amount);
 		}
 
-		// KnockbackResistance is the one of the three with a LIVE consumer - `WorldBroadcaster.Knock` reads it off
-		// `BuffedStats` before falling back to the gear bonus - so honoring it is what makes a resisting BUFF resist a
+		// KnockbackResistance is the one of the three with a live consumer - the knockback path reads it off
+		// `BuffedStats` before falling back to the gear bonus - so honoring it is what makes a resisting buff resist a
 		// knockback rather than only a resisting item.
 		[Fact]
 		public void KnockbackResistanceFromABuff_ReachesTheLiveStats()
@@ -285,14 +284,13 @@ namespace Faolan.Tests
 			Assert.Equal(100u, entity.BuffedStats[CharacterStatId.KnockbackResistance]);
 		}
 
-		// ⚠️ The admission test for `HonoredStats`. A stat belongs there when its records ADD to a ZERO baseline,
-		// whatever their scale - which is why the whole invulnerability family and the out-of-combat regens went in,
-		// and why the MULTIPLIER stats did not: `Recompute` computes `gear + sum(buffs)`, and `Turtle Formation`'s
-		// -50 `MovementMultiplier` summed from zero says "movement 50%" for a buff that means "-50%".
+		// The admission test for `HonoredStats`. A stat belongs there when its records add to a zero baseline, whatever
+		// their scale - which is why the whole invulnerability family and the out-of-combat regens are in, and why the
+		// multiplier stats are not: `Recompute` computes `gear + sum(buffs)`, and `Turtle Formation`'s -50
+		// `MovementMultiplier` summed from zero says "movement 50%" for a buff that means "-50%".
 		//
-		// The gate's ORIGINAL test - "is the wire scale verified" - no longer excludes anything, because
-		// `StatDisplayScale` transcribes the client's own divisor rule and covers every id. Reading it as the live
-		// test is how entries rot on the wrong side of the list.
+		// "Is the wire scale verified" is not the test: `StatDisplayScale` transcribes the client's own divisor rule
+		// and covers every id, so reading it as the live test is how entries rot on the wrong side of the list.
 		[Fact]
 		public void AdditiveFamilies_AreHonoredWhileMultiplierStatsStayOut()
 		{
@@ -308,16 +306,13 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(4292427u, catalog.BySpellBase.Keys);
 		}
 
-		// ⚠️ The admission test for the KIND half of the gate, which is a different question and used to be answered
-		// less carefully. 53110 `TempChangeSkill` sat outside `FlatKinds` as "unclassified" while its own RAMPED twin
-		// 53221 `InterpolatedTempChangeSkill` sat inside it - the list disagreeing with itself, since 53221 is to
-		// 53110 exactly what the already-honored 53220 is to 53045.
-		//
-		// What settles it is the UNIT, not the name: on stats whose scale is already proven, `TempChangeSkill`'s
+		// The admission test for the kind half of the gate, which is a different question from the stat half. What
+		// settles a kind is the unit, not the name: on stats whose scale is already proven, `TempChangeSkill` (53110)
 		// amounts land in that same unit rather than a rescaled one. `Skin of Iron` carries the same +10000 = +100%
 		// step on four schools that `Magic Shield` carries with 53045 on cold, and `Soul of Mitra` - whose client
 		// description is "shielding the priest from almost all damage" - carries 90 deflection beside `Phoenix
-		// Cloak`'s 53045 +40. Both were landing nowhere.
+		// Cloak`'s 53045 +40. 53110 and its ramped twin 53221 must therefore sit on the same side of the list: 53221 is
+		// to 53110 exactly what the honored 53220 is to 53045.
 		[Fact]
 		public void TempChangeSkill_IsHonored_LikeItsAlreadyHonoredInterpolatedTwin()
 		{
@@ -328,18 +323,18 @@ namespace Faolan.Tests
 
 			Assert.Equal(0, catalog.KindSkipped);
 
-			// In DISPLAY units, like every other honored delta: the invulnerabilities are ×100, so the 10000 the record
+			// In display units, like every other honored delta: the invulnerabilities are x100, so the 10000 the record
 			// carries is the +100% the client draws - the same number `Magic Shield` produces through 53045. Damage
-			// deflection is ×1, so 90 stays 90. What differs is how it COMBINES - see the override tests below.
+			// deflection is x1, so 90 stays 90. What differs is how it combines - see the override tests below.
 			Assert.Equal([Delta(CharacterStatId.SlashingInvulnerability, 100, true)], catalog.BySpellBase[166828]);
 			Assert.Equal([Delta(CharacterStatId.DamageDeflection, 90, true)], catalog.BySpellBase[197061]);
 		}
 
-		// #805: 53110 / 53221 REPLACE the stat, they do not add to it - and that is forced, not chosen. The client
-		// runs the spell's own GameAction elements off its RDB copy when OUR buff packet lands
-		// (`MagicBuffIIR_c::Activate` -> `CoreMagicHolder::UpdateBuff` -> `RunGameActions` -> the executor's vtable
-		// slot 9), and 53110's executor is `SetStatOverride(statTable, Stat, Value)`. Summing would tell the client
-		// `gear + 90` for a number its own executor had already set to 90.
+		// 53110 / 53221 replace the stat, they do not add to it - and that is forced, not chosen. The client runs the
+		// spell's own GameAction elements off its RDB copy when our buff packet lands (`MagicBuffIIR_c::Activate` ->
+		// `CoreMagicHolder::UpdateBuff` -> `RunGameActions` -> the executor's vtable slot 9), and 53110's executor is
+		// `SetStatOverride(statTable, Stat, Value)`. Summing would tell the client `gear + 90` for a number its own
+		// executor had already set to 90.
 		[Fact]
 		public void OverrideKind_ReplacesTheGearContributionRatherThanAddingToIt()
 		{
@@ -353,7 +348,7 @@ namespace Faolan.Tests
 			Assert.Contains((CharacterStatId.DamageDeflection, 90u), changed); // not 115
 		}
 
-		// …and it goes back to the gear value when the buff ends, which is what `ClearStatOverride` does client-side.
+		// ...and it goes back to the gear value when the buff ends, which is what `ClearStatOverride` does client-side.
 		[Fact]
 		public void OverrideKind_FallsBackToGearWhenTheBuffEnds()
 		{
@@ -368,7 +363,7 @@ namespace Faolan.Tests
 			Assert.Contains((CharacterStatId.DamageDeflection, 25u), BuffStatEffects.Recompute(entity, catalog));
 		}
 
-		// An ADDITIVE delta on the same stat is not folded into an override - the override is the whole answer, which
+		// An additive delta on the same stat is not folded into an override - the override is the whole answer, which
 		// is the one place the two rules visibly disagree. (The client keeps one override slot per stat and applies it
 		// over whatever the stat otherwise holds.)
 		[Fact]
@@ -405,10 +400,10 @@ namespace Faolan.Tests
 			Assert.Equal(100u, entity.BuffedStats[CharacterStatId.SlashingInvulnerability]); // 10000 / ×100, not 120
 		}
 
-		// ...and admitting the kind does NOT admit what else it carries. 53110's bulk is a POLYMORPH tail - a
+		// ...and admitting the kind does not admit what else it carries. 53110's bulk is a polymorph tail - a
 		// shapeshift buff assigning a head mesh or a creature scale - which is not `gear + sum(buffs)` in any units,
-		// and which the STAT half of the gate goes on holding. The two halves are independent, which is the reason
-		// widening one was safe.
+		// and which the stat half of the gate goes on holding. The two halves are independent, which is why widening
+		// one is safe.
 		[Fact]
 		public void TempChangeSkill_DoesNotSmuggleInThePolymorphTail()
 		{
@@ -421,10 +416,8 @@ namespace Faolan.Tests
 			Assert.Equal(2, catalog.StatSkipped);
 		}
 
-		// The gate answers for a row from ONE place, because the imported-vs-applied census is taken from outside the
-		// server (`--report spell-effect-gap`) and a census that re-derives the rule drifts from it. #701 is the
-		// cautionary case: it was filed off a hand-count that had gone four times stale and named the wrong gate as
-		// the problem.
+		// The gate answers for a row from one place, because the imported-vs-applied census is taken from outside the
+		// server (`--report spell-effect-gap`) and a census that re-derives the rule drifts from it.
 		[Fact]
 		public void ClassifyAndBuildCatalog_AreTheSamePolicy()
 		{
@@ -487,7 +480,7 @@ namespace Faolan.Tests
 			Assert.Equal(1000u, entity.ArmorRating);
 		}
 
-		// Two buffs granting the same stat DO stack with each other.
+		// Two buffs granting the same stat do stack with each other.
 		[Fact]
 		public void SeparateBuffsOnTheSameStat_Sum()
 		{
@@ -523,9 +516,8 @@ namespace Faolan.Tests
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.Armor] = 100 };
 
-			// ⚠️ The debuff has to be ACTIVE. Without this line the catalog row never applies and the assertion below
-			// passed on an ArmorRating that had simply never been written - which is what it did until #473 made the
-			// recompute apply gear-only values too. 100 + (-500) = -400, clamped to 0.
+			// The debuff has to be active, or the catalog row never applies and the assertion below passes on an
+			// ArmorRating that was simply never written. 100 + (-500) = -400, clamped to 0.
 			entity.ActiveBuffs[999 << 8] = new ActiveBuff(999 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 60f);
 
 			BuffStatEffects.Recompute(entity, catalog);
@@ -533,7 +525,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, entity.ArmorRating);
 		}
 
-		// #450: a buff that raises a max pool has to move the POOL, and the client has to be told the whole pool rather
+		// A buff that raises a max pool has to move the pool, and the client has to be told the whole pool rather
 		// than the bonus - otherwise the bar stops at the unbuffed max and out-of-combat regen visibly stalls there.
 		[Fact]
 		public void MaxPoolBuff_RaisesThePoolAndPushesTheWholePool()
@@ -541,8 +533,8 @@ namespace Faolan.Tests
 			// Sustaining Wrath (Rank 9): stat 1 = 180000 at the ×100 vitals scale -> +1800 health.
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
-			// The base is DERIVED from (Class, Level) (#578), so take it from the character rather than restating a
-			// number - what this test is about is the +1800 landing ON it, not what it happens to be.
+			// The base is derived from (Class, Level), so take it from the character rather than restating a number - what
+			// this test is about is the +1800 landing on it, not what it happens to be.
 			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
 			entity.Vitals = EntityVitals.FromCharacter(character);
 			var baseHp = entity.Vitals.BaseMaxHealth;
@@ -554,7 +546,7 @@ namespace Faolan.Tests
 			Assert.Equal(baseHp + 1800, entity.Vitals.MaxHealth);
 		}
 
-		// …and when it ends the pool comes back down, taking CURRENT with it: a player left above their own bar would
+		// ...and when it ends the pool comes back down, taking current with it: a player left above their own bar would
 		// never regen and would read as permanently full.
 		[Fact]
 		public void MaxPoolBuffEnding_LowersThePoolAndClampsCurrent()
@@ -586,7 +578,7 @@ namespace Faolan.Tests
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
 			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
 			entity.Vitals = EntityVitals.FromCharacter(character, entity.GearBonuses);
-			// The pool BEFORE gear and buffs - taken off the same object the test then buffs, so the two cannot
+			// The pool before gear and buffs - taken off the same object the test then buffs, so the two cannot
 			// disagree about how it was derived.
 			var baseHp = entity.Vitals.BaseMaxHealth;
 
@@ -598,23 +590,23 @@ namespace Faolan.Tests
 			Assert.Equal(baseHp + 584 + 1800, entity.Vitals.MaxHealth); // base + 584 gear + 1800 buff
 		}
 
-		// #473: a GEAR-ONLY change to a max pool must APPLY, with no buff involved. The recompute used to `continue`
-		// before calling SetMaxFromBonus whenever a stat was unseeded with no flat/percent delta - safe while
-		// GearBonuses was fixed at world entry, and wrong the moment equipping refreshes it mid-session. The entry was
-		// never seeded either, so the skip was permanent: a +25 HP item moved the server's max by nothing at all.
+		// A gear-only change to a max pool must apply, with no buff involved. Skipping SetMaxFromBonus whenever a stat
+		// is unseeded with no flat/percent delta is safe only while GearBonuses is fixed at world entry, and wrong the
+		// moment equipping refreshes it mid-session: the entry is never seeded either, so the skip is permanent and a
+		// +25 HP item moves the server's max by nothing at all.
 		[Fact]
 		public void GearOnlyChangeToAMaxPool_IsApplied()
 		{
 			var catalog = BuffStatEffects.BuildCatalog([]); // no buffs anywhere - gear is the only source
 			var entity = Player();
 			// FromCharacter, not FromMax: only it seeds BaseMaxHealth, which is what SetMaxFromBonus adds the bonus
-			// ONTO. (Production always comes through FromCharacter - GetOrAddPlayerVitals and RegisterPlayerInWorld.)
+			// onto. (Production always comes through FromCharacter - GetOrAddPlayerVitals and RegisterPlayerInWorld.)
 			var character = new Character { Class = ConanClass.Guardian, Level = 1 };
 			entity.Vitals = EntityVitals.FromCharacter(character);
 			var baseHp = entity.Vitals.BaseMaxHealth;
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
 
-			// First sync seeds off gear alone: it APPLIES but reports nothing (that is not news).
+			// First sync seeds off gear alone: it applies but reports nothing (that is not news).
 			Assert.Empty(BuffStatEffects.Recompute(entity, catalog));
 			Assert.Equal(baseHp, entity.Vitals.MaxHealth);
 
@@ -632,13 +624,13 @@ namespace Faolan.Tests
 			Assert.Equal(baseHp, entity.Vitals.Health); // current clamped down, not left above the bar
 		}
 
-		// #584: a buff that raises an ATTRIBUTE has to move the pool that attribute scales. Each pool is
-		// `class base + Σ weight × attribute + class row + flat bonuses`, and only the flat half was tracked live, so
-		// a +10 Constitution buff on an Assassin (health weight 8) was worth 0 instead of +80.
+		// A buff that raises an attribute has to move the pool that attribute scales. Each pool is
+		// `class base + sum(weight x attribute) + class row + flat bonuses`, so tracking only the flat half makes a
+		// +10 Constitution buff on an Assassin (health weight 8) worth 0 instead of +80.
 		[Fact]
 		public void AttributeBuff_MovesThePoolItScales()
 		{
-			// Constitution is stored in DISPLAY units on a spell record (see BuffStatEffects.SpellScale), so 10 = +10.
+			// Constitution is stored in display units on a spell record (see BuffStatEffects.SpellScale), so 10 = +10.
 			var catalog = BuffStatEffects.BuildCatalog([Row(3197, CharacterStatId.Constitution, FlatKind, 10)]);
 			var entity = Player();
 			entity.CharacterClass = ConanClass.Assassin;
@@ -647,7 +639,7 @@ namespace Faolan.Tests
 				ClassAttributeBase());
 			entity.ClassBase = ClassAttributeBase();
 
-			// Seed the unbuffed state the way world entry does, so the assertion is about the CHANGE.
+			// Seed the unbuffed state the way world entry does, so the assertion is about the change.
 			BuffStatEffects.Recompute(entity, catalog);
 			var before = entity.Vitals.MaxHealth;
 			Assert.Equal(1u, entity.Attributes.Constitution); // the level-1 class row: a flat 10 wire = 1 display
@@ -658,7 +650,7 @@ namespace Faolan.Tests
 			Assert.Equal(11u, entity.Attributes.Constitution);
 			// The Assassin's health weight is 8000 thousandths, i.e. 8 display health per point of Constitution.
 			Assert.Equal(before + 80, entity.Vitals.MaxHealth);
-			// ...and the client is TOLD, or its bar stops at the old ceiling.
+			// ...and the client is told, or its bar stops at the old ceiling.
 			Assert.Contains(applied, a => a.Stat == CharacterStatId.HealthMax && a.Value == entity.Vitals.MaxHealth);
 
 			// And it comes back off when the buff ends.
@@ -667,7 +659,7 @@ namespace Faolan.Tests
 			Assert.Equal(before, entity.Vitals.MaxHealth);
 		}
 
-		// The attribute term must not EAT the flat one: a pool carrying both a +Constitution buff and a flat +HealthMax
+		// The attribute term must not eat the flat one: a pool carrying both a +Constitution buff and a flat +HealthMax
 		// bonus has to end up with the sum, which is what SetMaxFromBonus-on-top-of-the-rebase means.
 		[Fact]
 		public void AttributeBuff_AddsToTheFlatPoolBonusRatherThanReplacingIt()
@@ -709,7 +701,7 @@ namespace Faolan.Tests
 			return new WorldEntity(0x1000, 2040, true, "Tester", null!);
 		}
 
-		// A 53189 row: the kind that names a TARGET and a SOURCE stat plus a plain percentage.
+		// A 53189 row: the kind that names a target and a source stat plus a plain percentage.
 		private static SpellStatEffect Derived(uint spellId, CharacterStatId target, CharacterStatId source, int percent)
 		{
 			return new SpellStatEffect
@@ -733,7 +725,7 @@ namespace Faolan.Tests
 			};
 		}
 
-		// A ramped row (#599): `Amount` is the ramp's LOW endpoint and the other three columns carry the rest.
+		// A ramped row: `Amount` is the ramp's low endpoint and the other three columns carry the rest.
 		private static SpellStatEffect RampRow(uint spellId, CharacterStatId stat, uint kind, int low, int high, uint lowLevel, uint highLevel)
 		{
 			var row = Row(spellId, stat, kind, low);
@@ -743,7 +735,7 @@ namespace Faolan.Tests
 			return row;
 		}
 
-		// The catalog entry a flat row builds - spelled out so the assertions above stay about the AMOUNT rather than
+		// The catalog entry a flat row builds - spelled out so the assertions above stay about the amount rather than
 		// about the shape the catalog happens to hold it in.
 		private static BuffStatEffects.Delta Delta(CharacterStatId stat, int amount, bool @override = false)
 		{

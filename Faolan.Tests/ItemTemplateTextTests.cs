@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The item template's own TEXT - its display name and tooltip description (#891).
+	// The item template's own text - its display name and tooltip description.
 	//
-	// The templates themselves are client data and are not in this repo, so the fixtures here are BUILT to the two
+	// The templates themselves are client data and are not in this repo, so the fixtures here are built to the two
 	// layouts rather than lifted: what the gate is about is that one reader handles both framings and refuses
 	// anything that does not frame exactly. The shapes come from real records -
 	//   1000020 `Animated Dagger` : tag, lengths 0x0F and 0x20, then the two strings back to back;
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Equal("Deals piercing damage over time.", description);
 		}
 
-		// The description length is a real field: zero means the item HAS none, which is the common case (a plain
+		// The description length is a real field: zero means the item has none, which is the common case (a plain
 		// armour piece carries its name and stops). It must read as "no description", never as a mis-framed read.
 		[Fact]
 		public void TaggedTemplate_WithNoDescription_YieldsOnlyTheName()
@@ -97,7 +97,7 @@ namespace Faolan.Tests
 		}
 
 		// The untagged form has nothing to anchor on but its own framing, so it only accepts a chain that lands
-		// EXACTLY on the last byte. A property value that happens to look like a length must not become a name.
+		// exactly on the last byte. A property value that happens to look like a length must not become a name.
 		[Fact]
 		public void UnheaderedTemplate_RejectsAChainThatDoesNotEndTheRecord()
 		{

@@ -17,17 +17,16 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).
-		// THE COMBAT-BALANCE MEASUREMENT TOOL. CombatResolver's MEASURED constants come from this report, and its
+		// The combat-balance measurement tool. CombatResolver's measured constants come from this report, and its
 		// class header explains how to read the output; docs/subsystems/combat.md carries the same summary.
 		//
-		// What retail's combat actually DEALT, by NPC level (#401/#20). The captures carry every floating number as a
+		// What retail's combat dealt, by NPC level. The captures carry every floating number as a
 		// DamageResultIIR [target][attacker][damage][school], and the spawn extractor gives each NPC handle its level
 		// - so joining them measures both directions instead of guessing:
-		//   NPC -> player  : the curve ResolveNpcAttackDamage approximates (level * 100, plus the #488 level-gap scale)
-		//   player -> NPC  : what a player's hit lands for on a level-N NPC, i.e. the shape any NPC-armour model has
+		//   NPC -> player: the curve ResolveNpcAttackDamage approximates (level * 100, plus the level-gap scale)
+		//   player -> NPC: what a player's hit lands for on a level-N NPC, i.e. the shape any NPC-armour model has
 		//                    to reproduce
-		// ⚠️ Both sides are POST-mitigation - they are what the client was told to draw - so they are the target
+		// Both sides are post-mitigation - they are what the client was told to draw - so they are the target
 		// numbers, not raw weapon rolls.
 		private static void NpcDamageCensus(IReadOnlyList<NamedCapture> captures)
 		{
@@ -39,17 +38,17 @@ namespace Faolan.Importer.Cli
 			var toNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 			var toNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 
-			// Per-ATTACKER melee, the same hits as `fromNpc` but not collapsed into a level bucket (#479). A level
+			// Per-attacker melee, the same hits as `fromNpc` but not collapsed into a level bucket. A level
 			// bucket mixes archetypes - Poitain carries a 304,944-HP `Poitain Guard` and a 4,605-HP
-			// `Zingaran Alchemist` BOTH at level 80 - and the combat log proves how far apart they hit: a
+			// `Zingaran Alchemist` both at level 80 - and the combat log proves how far apart they hit: a
 			// `Zingaran Stockpiler` at level 70/72 swings for 7-14 displayed while a `Hired Bodyguard` at 75 swings
 			// for 67-92, ~8x at +3 levels. Collapsed by level that reads as a sudden cliff at 74/75 and invites a
 			// curve to be fitted through it. `hitsToKill` below already makes this caveat; the melee table did not.
 			var fromNpcByAttacker = new Dictionary<(uint Template, uint Level), List<uint>>();
-			// NPC->player SPELL, keyed by the CASTER (template, level, school). The (level, school) table alone
-			// cannot show that a high-level "NPC" caster is really the necro's own PET nuking an uncaptured mob -
-			// Unholy/Cold ARE the necro's schools - so this names the caster and its per-level sample the way the
-			// melee BY-ATTACKER table does (#479 request 2).
+			// NPC->player spell, keyed by the caster (template, level, school). The (level, school) table alone
+			// cannot show that a high-level "NPC" caster is really the necro's own pet nuking an uncaptured mob -
+			// Unholy/Cold are the necro's schools - so this names the caster and its per-level sample the way the
+			// melee by-attacker table does.
 			var fromNpcSpellByCaster = new Dictionary<(uint Template, uint Level, DamageSchool School), List<uint>>();
 			var attackerHealth = new Dictionary<(uint Template, uint Level), uint>();
 			// level -> every captured spawn health at that level (the `hp/curve` denominator, see below).
@@ -62,7 +61,7 @@ namespace Faolan.Importer.Cli
 				// handle -> level, for every NPC this capture spawned.
 				var levels = new Dictionary<uint, uint>();
 				// Handles that received a FullPlayerCharacter snapshot - i.e. genuine players. Used to gate the
-				// SPELL table's NPC->player direction on the target actually BEING the player, rather than on
+				// spell table's NPC->player direction on the target actually BEING the player, rather than on
 				// "not a known NPC" (which an uncaptured mob also satisfies, letting the necro's own AoE leak in).
 				var playerHandles = new HashSet<uint>();
 				foreach (var q in c.Packets)
@@ -89,28 +88,26 @@ namespace Faolan.Importer.Cli
 							// The level's health CURVE, from every captured spawn rather than only the ones that hit
 							// the player. Built off the attackers alone it was a median of one to three values, so
 							// nearly every row read exactly 1.0 - a column that cannot separate an elite from a
-							// critter is worse than no column, because it looks like it did (#671).
+							// critter is worse than no column, because it looks like it did.
 							(healthByLevel.TryGetValue(st.Level, out var hl) ? hl : healthByLevel[st.Level] = []).Add(st.Health);
 						}
 					}
 				}
 
-				// PLAYER levels, PER HANDLE. NpcSpawnExtractor drops the player's spawn (handle >= the character
+				// player levels, per handle. NpcSpawnExtractor drops the player's spawn (handle >= the character
 				// instance base), which is exactly the record that carries it, so read it straight off the raw spawns.
-				// Needed because the interesting variable is not the mob's level but the GAP to whoever it HIT - see
+				// Needed because the interesting variable is not the mob's level but the gap to whoever it HIT - see
 				// the `lvl gap` column below.
 				//
-				// ⚠️ Kept per handle rather than collapsed to the capture's MAXIMUM, which is what it used to be.
-				// A capture is not one player: any level-80 stranger who walks past is spawned into it, and the max
-				// then stamped `pc lvl 80` onto every mob in the file. Every one of #671's "elite" outliers is a
-				// low-level mob scored against a gap it never fought, so the whole elite question was an artifact of
-				// this line (#671).
+				// Kept per handle rather than collapsed to the capture's maximum. A capture is not one player: any
+				// level-80 stranger who walks past is spawned into it, and a maximum would stamp `pc lvl 80` onto
+				// every mob in the file, scoring low-level mobs against a gap they never fought.
 				foreach (var p in c.Packets)
 				{
-					// The session's OWN character: its level is in the login snapshot's stat sheet, and on the beach
+					// The session's own character: its level is in the login snapshot's stat sheet, and on the beach
 					// that is the only place it is - no StatIIR/StatUpdateIIR carries `Level` for the player there, and
 					// the player's own spawn is this record, not a SimpleCharFullUpdate. Without it every beach row
-					// read `pc lvl -` and sat outside the gap-keyed measurements (#479).
+					// read `pc lvl -` and sat outside the gap-keyed measurements.
 					if (p is { IsIirCarrier: true, SubOpcode: FullPlayerCharacterCodec.Opcode } && p.Record.Length >= 12)
 					{
 						var sheet = SubClassStatBlock.ExtractFromSnapshot(p.Record);
@@ -127,7 +124,7 @@ namespace Faolan.Importer.Cli
 					if (sb.Length < 20 || sb.ReadU32Be(12) < EntityHandles.CharacterInstanceBase)
 						continue;
 
-					// `Body` is already past the packet prologue+header, so it IS the IIR body the reader wants -
+					// `Body` is already past the packet prologue+header, so it is the IIR body the reader wants -
 					// unlike NpcSpawnEntry.Data above, which is the whole packet and has to be sliced.
 					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { Level: > 0 } pst)
 						playerLevels[sb.ReadU32Be(12)] = pst.Level;
@@ -145,12 +142,12 @@ namespace Faolan.Importer.Cli
 					if (!p.IsIirCarrier || p.Body is not { Length: >= 8 })
 						continue;
 
-					// The player's LEVEL rides the single-pair StatIIR stream (the login push's `54=<level>` beside
+					// The player's level rides the single-pair StatIIR stream (the login push's `54=<level>` beside
 					// health and XP, and every ding), and the player's own spawn is a FullPlayerCharacter rather than
 					// the SimpleCharFullUpdate the pass above reads - so without this most beach rows had no victim
 					// level at all (`pc lvl -`) and dropped out of every gap-keyed measurement.
-					// ⚠️ "Is a player" = not a spawned NPC, the same rule the hit loop uses: retail character handles
-					// sit BELOW `CharacterInstanceBase` as often as above it (0x01317CF8 in the beach captures), so
+					// "Is a player" = not a spawned NPC, the same rule the hit loop uses: retail character handles
+					// sit below `CharacterInstanceBase` as often as above it (0x01317CF8 in the beach captures), so
 					// the base is not a player test on retail traffic.
 					if (p.Body.ReadU32Be(4) == StatCodec.Opcode)
 					{
@@ -200,8 +197,8 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⚠️ SPELL damage is NOT a DamageResult - it rides StatDamageIIR (see StatDamageCodec / #349),
-					// so a census of DamageResult alone reports "no magical schools" and means only "I looked in the
+					// Spell damage is not a DamageResult - it rides StatDamageIIR (see StatDamageCodec), so a census
+					// of DamageResult alone reports "no magical schools" and means only "I looked in the
 					// melee packet". A caster NPC's hit is a negative HealthCurrent delta with the caster's handle.
 					if (p.Body.ReadU32Be(4) == StatDamageCodec.Opcode)
 					{
@@ -215,14 +212,12 @@ namespace Faolan.Importer.Cli
 							continue;
 						}
 
-						// ⚠️ The record's "StatId" slot is the damage SCHOOL for a damage record, not a stat id - treating
-						// it as one makes Rend reduce stat 1 rather than deal Slashing. So the magical branch IS
+						// The record's "StatId" slot is the damage school for a damage record, not a stat id - treating
+						// it as one makes Rend reduce stat 1 rather than deal Slashing. So the magical branch is
 						// represented here.
 						//
-						// The old justification for that ("every observed value is 0..10, i.e. exactly the DamageSchool
-						// range") was WRONG on both halves and is what #487 unpicked: the corpus also carries 12
-						// (Environmental - fall damage) and 23 (Heal), and the 0..10 numbering itself had Cold in the
-						// wrong slot. Fitting inside a range never identified the mapping.
+						// The school is identified by the mapping, never by fitting inside a range: the corpus carries
+						// 12 (Environmental - fall damage) and 23 (Heal) as well as the melee schools.
 						//
 						// Non-damage rows drop out here rather than needing their own filter: Heal is excluded because
 						// all 110 of its occurrences carry a non-negative delta, and Environmental because a fall has no
@@ -231,17 +226,17 @@ namespace Faolan.Importer.Cli
 							continue;
 
 						// Same both-ends rule as the melee tables below: a pet is a spawned entity too, so checking only
-						// one end files the PET's own nukes as NPC casts, and a mob's DoT on the pet as damage to the player.
+						// one end files the pet's own nukes as NPC casts, and a mob's DoT on the pet as damage to the player.
 						var magnitude = (uint)(-cast.Delta);
 						var casterIsNpc = levels.TryGetValue(cast.Caster, out var casterLevel);
 						var spellTargetIsNpc = levels.TryGetValue(cast.Handle, out var spellTargetLevel);
 
-						// ⚠️ TARGET MUST BE A KNOWN PLAYER, not merely "not a known NPC". A necromancer AoEs mobs
+						// target must be A known player, not merely "not a known NPC". A necromancer AoEs mobs
 						// that stream in and out of the capture, so many of its Unholy/Cold casts land on a target
 						// whose spawn was never captured - which `!spellTargetIsNpc` waves through as an "NPC->player"
 						// cast by the necro's own pet. Gating on the FullPlayerCharacter handle removes that whole
 						// contaminant, which is what made the level-80 Unholy/Cold rows (the necro's own schools) read
-						// as enemy casters (#479).
+						// as enemy casters.
 						if (casterIsNpc && playerHandles.Contains(cast.Handle))
 						{
 							fromNpcSpell.TryAdd((casterLevel, cast.School), []);
@@ -284,15 +279,15 @@ namespace Faolan.Importer.Cli
 
 					pendingHits[hit.Target] = hit;
 
-					// ⚠️ BOTH directions need BOTH ends checked, not just one. `levels` holds every entity the capture
+					// both directions need both ends checked, not just one. `levels` holds every entity the capture
 					// spawned - which includes the player's own PETS - so testing only the attacker counted a mob
-					// hitting the necro's pet as "NPC -> PLAYER", and testing only the target counted the PET's hits
-					// as "PLAYER -> NPC". It showed: `Parasitic Soul` (a necro summon) sat in the NPC->player table
+					// hitting the necro's pet as "NPC -> player", and testing only the target counted the pet's hits
+					// as "player -> NPC". It showed: `Parasitic Soul` (a necro summon) sat in the NPC->player table
 					// as a level-80 attacker dealing 8556.
 					//
-					// ⛔ **And "not a known spawn" is NOT "the player"** - the same defect the SPELL table carried
+					// And "not a known spawn" is not "the player" - the same defect the spell table carried
 					// until b1b6b6be. An UNCAPTURED entity satisfies it too: a mob that streamed in without its spawn
-					// packet, another player's pet, a passing guard. So both directions are gated on the PLAYER end
+					// packet, another player's pet, a passing guard. So both directions are gated on the player end
 					// being a real player - a handle that received a `FullPlayerCharacter` snapshot - exactly as the
 					// spell table is. Without it the high-level rows mixed mob-on-mob damage into "NPC -> player" and
 					// produced medians two orders of magnitude apart inside one level band.
@@ -307,8 +302,8 @@ namespace Faolan.Importer.Cli
 						fromNpc[(attackerLevel, hit.School)].Add(hit.Damage);
 
 						// ...and the same hit kept ATTRIBUTED, so the archetype spread stays visible.
-						// Keyed by TEMPLATE, never by NAME (#244): ~16 unrelated templates share the internal name
-						// "Halen van Dummy", and an elite variant routinely carries the SAME display name as its
+						// Keyed by template, never by name: ~16 unrelated templates share the internal name
+						// "Halen van Dummy", and an elite variant routinely carries the same display name as its
 						// ordinary cousin - so a name key silently averages two different creatures together.
 						if (templates.TryGetValue(hit.Attacker, out var attackerTemplate))
 						{
@@ -319,14 +314,14 @@ namespace Faolan.Importer.Cli
 								attackerHealth[key] = attackerHp;
 							if (names.TryGetValue(hit.Attacker, out var attackerName))
 								attackerNames[attackerTemplate] = attackerName;
-							// The level of the player this hit actually LANDED ON, by victim handle.
+							// The level of the player this hit actually LANDED on, by victim handle.
 							if (playerLevels.TryGetValue(hit.Target, out var victimLevel))
 								attackerPlayerLevel[key] = victimLevel;
 						}
 					}
 
 					// The kill-scale check asks "did this NPC take its own health in damage before it died", so it
-					// accumulates damage from ANY source - the player, their pet, a passing guard. Filtering it to
+					// accumulates damage from any source - the player, their pet, a passing guard. Filtering it to
 					// player-only hits would undercount every mob a pet helped kill and drag the ratio down.
 					if (targetIsNpc)
 						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
@@ -372,13 +367,12 @@ namespace Faolan.Importer.Cli
 			foreach (var (ratio, n) in scaleRatios.OrderByDescending(k => k.Value).Take(6))
 				Console.WriteLine($"{ratio,8:F2} {n,6}");
 
-			// The model is the SERVER's, called - not a copy of it. This column used to hardcode `5 + level * 3`, a
-			// formula the server had already replaced with `level * 100`, so it spent that time reporting our fit
-			// against a curve nothing ran (#479).
+			// The model is the server's, called - never a copy of it, or this column reports our fit against a curve
+			// nothing runs.
 			// `level, level` = a player at the mob's own level, i.e. the un-penalised case - the level-gap penalty
-			// (#488) is a separate factor and the column below is the one that shows it.
-			// ⚠️ WIRE units, not the resolver's display return. Captured damage is a wire number, and comparing it
-			// to the display value multiplied every `x model` in this report by 100 from #572 until #671 caught it.
+			//  is a separate factor and the column below is the one that shows it.
+			// Wire units, not the resolver's display return: captured damage is a wire number, and comparing it to
+			// the display value multiplies every `x model` in this report by 100.
 			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => CombatResolver.NpcAttackDamageWire(level, level));
 
 			// Per attacker, so the archetype spread is visible instead of averaged away. `x model` is the measured
@@ -393,8 +387,8 @@ namespace Faolan.Importer.Cli
 				var sorted = hits.Order().ToList();
 				var median = sorted[sorted.Count / 2];
 				var pcLvl = attackerPlayerLevel.GetValueOrDefault((template, level));
-				// Scored against what the server would ACTUALLY deal to that player - the level-gap penalty included
-				// (#488) - so `x model` reads 1.0 when we reproduce the fight rather than only when the gap is 0. Rows
+				// Scored against what the server would actually deal to that player - the level-gap penalty included
+				//  - so `x model` reads 1.0 when we reproduce the fight rather than only when the gap is 0. Rows
 				// with no resolvable player level fall back to the un-penalised curve.
 				var ours = CombatResolver.NpcAttackDamageWire(level, pcLvl > 0 ? pcLvl : level);
 
@@ -405,8 +399,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 24),-24} {sorted.Count,5} {sorted[0],7} {median,7} {sorted[^1],7} {ours,7} {(ours > 0 ? (double)median / ours : 0),8:F2} {(pcLvl > 0 ? pcLvl.ToString() : "-"),7} {(pcLvl > 0 ? ((int)pcLvl - (int)level).ToString() : "-"),8} {(hpRatio > 0 ? hpRatio.ToString("F1") : "-"),9} {(hp > 0 ? (100.0 * median / hp).ToString("F2") : "-"),7}  {Modes(sorted, ours)}");
 			}
 
-			// ⭐ THE HEAD-TO-HEAD (#671). The ticket asked for an ELITE multiplier on top of the level curve. The
-			// better question is whether LEVEL is the right base at all: we also hold the attacker's own maximum
+			// the head-TO-head. The ticket asked for an ELITE multiplier on top of the level curve. The
+			// better question is whether level is the right base at all: we also hold the attacker's own maximum
 			// health (`NpcSpawn.Health`), and a swing that is a fixed share of the swinger's pool would explain the
 			// "elites hit harder" observation without an archetype column, because an elite's pool is what makes it
 			// an elite.
@@ -450,7 +444,7 @@ namespace Faolan.Importer.Cli
 
 			// Splits an attacker's hits at the largest RATIO gap between consecutive sorted values, when that gap is
 			// wide enough and both sides are populated. A per-archetype damage multiplier cannot express two
-			// mechanics in one number, so before fitting one the question is whether there IS one number: `Vanir
+			// mechanics in one number, so before fitting one the question is whether there is one number: `Vanir
 			// Sentinel` L26's 25 hits run 127 / 4191 / 5217, where 127 is what the level-gap model predicts and 5217
 			// is 40x that. One template, one level, one player, one fight - and two mechanics.
 			static string Modes(List<uint> sorted, uint model)
@@ -500,10 +494,9 @@ namespace Faolan.Importer.Cli
 
 			Report("NPC -> PLAYER, SPELL/DoT damage (StatDamageIIR)", fromNpcSpell, null);
 
-			// By CASTER, so a genuine enemy caster is separable from the necro's own pet leaking through an
-			// uncaptured target (#479 request 2). With the player-target gate above, a pet cannot appear here at all
-			// (it never damages the player), so every row IS an enemy caster - the point is to NAME it and show its
-			// per-level sample, which is what the ticket asks for: "a mob that actually casts, at any level above ~10".
+			// By caster, so a genuine enemy caster is separable from the necro's own pet leaking through an
+			// uncaptured target. With the player-target gate above, a pet cannot appear here at all (it never damages
+			// the player), so every row is an enemy caster - the point is to name it and show its per-level sample.
 			Console.WriteLine("\n=== NPC -> PLAYER, SPELL/DoT BY CASTER (target gated to a real player - no pet leakage) ===");
 			Console.WriteLine($"{"level",5} {"tpl",8} {"caster",-26} {"school",-12} {"hits",5} {"min",8} {"median",8} {"max",8}");
 			foreach (var ((template, level, school), mags) in fromNpcSpellByCaster.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.Template).ThenBy(k => (int)k.Key.School))
@@ -536,17 +529,17 @@ namespace Faolan.Importer.Cli
 
 		// --report dot-trains [--report-arg <spell name substring or base id>]
 		//
-		// The EVIDENCE behind every measured DoT tick interval: each `(spell, target, caster)` tick train the corpus
+		// The evidence behind every measured DoT tick interval: each `(spell, target, caster)` tick train the corpus
 		// contains, how long it is, and the gaps it contributes - the exact input `DotIntervalEstimator` is handed.
 		//
-		// It exists because #524's open item is a spell whose gaps cluster on a LATTICE (Aura: Fire Weave, 17 gaps at
-		// 0.92 / 1.23 / 1.53 / 1.84, spaced ~0.3s), and there are two very different explanations that the pooled gap
-		// list cannot tell apart:
-		//   * a HARMONIC - one long train of a ~0.3s pulse whose ticks are mostly unobserved, so every surviving gap
+		// It exists because some spells' gaps cluster on a lattice (Aura: Fire Weave, gaps at 0.92 / 1.23 / 1.53 /
+		// 1.84, spaced ~0.3s), and there are two very different explanations that the pooled gap list cannot tell
+		// apart:
+		//   * a harmonic - one long train of a ~0.3s pulse whose ticks are mostly unobserved, so every surviving gap
 		//     is a multiple of the fundamental (the estimator's documented blind spot);
 		//   * RE-APPLICATION phase - many SHORT trains, each contributing one arbitrary first-gap, in which case the
 		//     lattice is an artefact of when the aura was recast and the spell simply has no measurable interval.
-		// Train LENGTH separates them, and only this report shows it.
+		// Train length separates them, and only this report shows it.
 		private static void DotTrains(IReadOnlyList<NamedCapture> captures, string? filter, string? outPath)
 		{
 			var wanted = (filter ?? "").Trim();
@@ -557,7 +550,7 @@ namespace Faolan.Importer.Cli
 			foreach (var capture in captures)
 			{
 				// Same key as CaptureStatDamageImporter: a train is one spell on one target from one caster, within
-				// ONE capture (handles are session-volatile).
+				// one capture (handles are session-volatile).
 				var trains = new Dictionary<(uint Spell, uint Target, uint Caster), List<long>>();
 				foreach (var p in capture.Packets)
 				{
@@ -604,7 +597,7 @@ namespace Faolan.Importer.Cli
 				                  + $"{lengths.Count(l => l == 1),5} {lengths.Count(l => l == 2),5} {lengths.Count(l => l >= 3),5} {gaps.Count,5}"
 				                  + $"  {(estimate is { } ms ? $"{ms} ms" : "(none)")}");
 
-				// The whole point when drilling one spell: the gaps WITH the train that produced each.
+				// The whole point when drilling one spell: the gaps with the train that produced each.
 				if (wanted.Length == 0)
 					continue;
 
@@ -620,9 +613,9 @@ namespace Faolan.Importer.Cli
 			if (outPath == null)
 				return;
 
-			// `--out <file>` writes the SAME input at full precision, one (spell, gap) row per line. The console view
+			// `--out <file>` writes the same input at full precision, one (spell, gap) row per line. The console view
 			// rounds to 2 dp, which is enough to read a cluster and not enough to re-run a candidate acceptance rule
-			// against - and re-running one over every spell at once is the gate #657 asks any new rule to pass.
+			// against - and re-running one over every spell at once is the gate any new rule has to pass.
 			var rows = new List<string> { "spellId\tname\tgapSeconds" };
 			foreach (var (spellId, gaps) in gapsBySpell.OrderBy(kv => kv.Key))
 			foreach (var gap in gaps.OrderBy(g => g))
@@ -635,15 +628,14 @@ namespace Faolan.Importer.Cli
 		// --report chain-kill
 		//
 		// Every `ChainKillIIR` in the corpus in its own timeline, against the kill counters that move with it: stat
-		// `0x6A` (106) and `0xF4256` (1000070), which #446 read as "remaining of 20" and "achieved". Prints each
-		// counter move and each ChainKill, with the seconds since the previous one of each.
+		// `0x6A` (106), read as "remaining of 20", and `0xF4256` (1000070), read as "achieved". Prints each counter
+		// move and each ChainKill, with the seconds since the previous one of each.
 		//
-		// #446's open questions are all TIMING questions - "what exactly triggers the IIR: N kills within a time
-		// window? Both arrivals are ~9-17s apart, so a window is plausible but unmeasured" - and it proposed a fresh
-		// retail session to settle them. The corpus already carries the records; this reads them.
+		// The open questions about the family are all timing questions - what exactly triggers the IIR, and whether
+		// the ~9-17s spacing between arrivals is a window. The corpus already carries the records; this reads them.
 		//
-		// ⚠️ It does NOT need the IIR body decoded, and the body is not the gap: `ChainKillCodec` already reads it
-		// byte-exact off the client's own reader (handle, env, count). What is missing is when to SEND one.
+		// It does not need the IIR body decoded, and the body is not the gap: `ChainKillCodec` already reads it
+		// byte-exact off the client's own reader (handle, env, count). What is missing is when to send one.
 		private static void ChainKill(IReadOnlyList<NamedCapture> captures)
 		{
 			const uint chainCounterA = 0x6A; // 106 - "remaining of 20" in #446's reading

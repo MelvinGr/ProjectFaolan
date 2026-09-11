@@ -15,17 +15,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Progression
 {
-	// ALTERNATE ADVANCEMENT: the xp pools, the give-away that turns a full pool into perk tokens, and the wallet those
-	// tokens live in (#150). AA adds no messages of its own - it rides the feedback, stat and token-amount channels
-	// that already exist - so this service is rules plus three sends, and the rules themselves are
-	// `AlternateAdvancementRules` (pure, and tested without a world).
+	// Alternate advancement: the xp pools, the give-away that turns a full pool into perk tokens, and the wallet those
+	// tokens live in. AA adds no messages of its own - it rides the feedback, stat and token-amount channels that
+	// already exist - so this service is rules plus three sends, and the rules themselves are
+	// `AlternateAdvancementRules`, which is pure and tested without a world.
 	//
-	// It sits beside LevelUpService for the reason that service's own header gives: a kill is one SOURCE of
-	// advancement, not the definition of it. Ordinary experience and AA experience are two pools fed by the same
-	// event, and the AA one is the pool that keeps filling once the level bar cannot.
+	// It sits beside LevelUpService for the reason that service's header gives: a kill is one source of advancement,
+	// not the definition of it. Ordinary experience and AA experience are two pools fed by the same event, and the AA
+	// one keeps filling once the level bar cannot.
 	//
-	// ⚠️ Retail states ONE token pool per message and only when it moves - ten pushes across the whole corpus, each a
-	// single pool. So there is deliberately NO wallet burst at world entry: the client keeps its own totals and asking
+	// Retail states one token pool per message and only when it moves - ten pushes across the whole corpus, each a
+	// single pool. So there is deliberately no wallet burst at world entry: the client keeps its own totals and asking
 	// it to re-read them would be traffic retail never sends.
 	public sealed class AlternateAdvancementService
 	{
@@ -39,14 +39,14 @@ namespace Faolan.GameServer.Progression
 		}
 
 		/// <summary>
-		///     A kill's share of the killer's ALTERNATE ADVANCEMENT: the xp the creature is worth into the PvE pool,
+		///     A kill's share of the killer's alternate advancement: the xp the creature is worth into the PvE pool,
 		///     the announcement retail makes for it, and the token give-away if the pool fills.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ <b>The KILLING BLOW attributes the grant, not the damage majority.</b> A level-75 kill whose last hit
-		///     came from the necromancer's PET paid nothing although the player had damaged it moments before, while a
-		///     level-78 kill where the pets dealt the clear majority but the player landed the last hit paid in full.
-		///     This is called from the killing-blow path for exactly that reason.
+		///     The killing blow attributes the grant, not the damage majority: a level-75 kill whose last hit came from
+		///     the necromancer's pet paid nothing although the player had damaged it moments before, while a level-78
+		///     kill where the pets dealt the clear majority but the player landed the last hit paid in full. This is
+		///     called from the killing-blow path for exactly that reason.
 		/// </remarks>
 		public async Task AwardKillXp(INetworkClient client, uint creatureLevel, uint? npcType, uint? npcFlags)
 		{
@@ -59,15 +59,14 @@ namespace Faolan.GameServer.Progression
 
 			var amount = AlternateAdvancementRules.KillXp(character.Level, LevelingResolver.MaxLevel, creatureLevel, npcType, npcFlags);
 			if (amount > 0)
-				await AwardXp(client, amount); // announces, drains, and restates the pool ONCE
+				await AwardXp(client, amount); // announces, drains, and restates the pool once
 
-			// ⭐ #935: retail restates the pool TWICE per kill, whether or not the kill pays. Measured by pairing each
-			// push with the event nearest to it rather than by counting both per capture and dividing: of the 142
-			// `AAPvEXP` pushes in the corpus, 128 sit within 30 packets of a death the PLAYER caused, at a median
-			// distance of -2 - and 52 deaths carry exactly two. The 23 that carry none are the deaths the player only
-			// witnessed, which is the count of `deaths - playerKills`.
+			// Retail restates the pool twice per kill, whether or not the kill pays. Measured by pairing each push with
+			// the event nearest to it: of the 142 `AAPvEXP` pushes in the corpus, 128 sit within 30 packets of a death
+			// the player caused, at a median distance of -2, and 52 deaths carry exactly two. The 23 that carry none
+			// are the deaths the player only witnessed, which is the count of `deaths - playerKills`.
 			//
-			// ⚠️ The value is whatever the pool now reads, unchanged on a kill that pays nothing: the captures with no
+			// The value is whatever the pool now reads, unchanged on a kill that pays nothing: the captures with no
 			// grant at all still push, and their pool never moves (10 pushes, 0 moves in one).
 			await SendPool(client, CharacterStatId.AAPvEXP, character.AaPvEXp);
 			if (amount == 0)
@@ -111,7 +110,7 @@ namespace Faolan.GameServer.Progression
 		///     Credits one token wallet and tells the client its new totals.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The UNSPENT ceiling is applied to the credit, not to the stored total: the wire carries lifetime
+		///     The unspent ceiling is applied to the credit, not to the stored total: the wire carries lifetime
 		///     `gained`/`spent` and the client subtracts, so clamping the stored total would make an already-spent
 		///     token reappear. Nothing in the client reads the cap - the three `*UnusedTokensCap` keys are absent from
 		///     the exe - so it is the server's to enforce, and enforcing it means declining the credit that would
@@ -157,17 +156,17 @@ namespace Faolan.GameServer.Progression
 		}
 
 		/// <summary>
-		///     Restates one wallet's current totals to the client, without changing them (#936).
+		///     Restates one wallet's current totals to the client, without changing them.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ Retail opens a NEW character with exactly this, and only this: a
-		///     <c>DispatchUpdateTokenAmount</c> saying <see cref="TokenPool.VeteranPoints" /> <b>0 gained / 0 spent</b>.
-		///     It is in five of the six character-CREATE captures and in NO login capture, at the same place in the
-		///     burst every time - between the entry teleport and the map change. So it is a statement that the wallet
-		///     is empty rather than a credit, and it is sent ONCE, at creation.
+		///     Retail opens a new character with exactly this, and only this: a <c>DispatchUpdateTokenAmount</c> saying
+		///     <see cref="TokenPool.VeteranPoints" /> 0 gained / 0 spent. It is in five of the six character-create
+		///     captures and in no login capture, at the same place in the burst every time - between the entry teleport
+		///     and the map change. So it is a statement that the wallet is empty rather than a credit, and it is sent
+		///     once, at creation.
 		///     <para />
-		///     ⚠️ That is also why this does not belong on the ordinary world entry: restating a wallet on every login
-		///     and every teleport is traffic retail does not send.
+		///     That is also why it does not belong on the ordinary world entry: restating a wallet on every login and
+		///     every teleport is traffic retail does not send.
 		/// </remarks>
 		public async Task StateWallet(INetworkClient client, TokenPool pool)
 		{
@@ -194,7 +193,7 @@ namespace Faolan.GameServer.Progression
 		}
 
 		// The pool itself, as the standalone player-addressed StatIIR retail pushes in the same frame as the
-		// announcement. Its value IS the running total toward the cap - the client does the division.
+		// announcement. Its value is the running total toward the cap - the client does the division.
 		private static Task SendPool(INetworkClient client, CharacterStatId stat, uint value)
 		{
 			return WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(client.Session.Character.Id, (uint)stat, value)));

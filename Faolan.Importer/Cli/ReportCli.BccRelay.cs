@@ -8,24 +8,23 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Cli
 {
 	// `--report bcc-relay`: for each `BehaviorId`, does retail send a client a record for SOMEBODY ELSE'S actor
-	// handle? (#912)
+	// handle?
 	//
-	// The question behind it is a design one. Our BCC relay is an explicit ALLOWLIST that has been extended once per
-	// discovery - #48 the combat behaviours, #428 the mounted jump, #403 `Equip` - each time with the same symptom
-	// (an action visible only to the actor) and each time by adding one more id. Before adding a sixth entry it is
-	// worth asking what retail relays, and the corpus answers it directly.
+	// The question behind it is a design one: the BCC relay is an explicit allowlist, extended one id at a time as
+	// each missing behaviour turns up with the same symptom - an action visible only to the actor. What retail relays
+	// is answerable from the corpus directly, which is a better basis for the list than another discovery.
 	//
-	// ⭐ The discriminator does NOT need a multi-client capture, which is what the ticket assumed and what the corpus
-	// does not have. It needs only the recipient's OWN handle, and every capture states that: the client sends its
-	// own actions, so the modal `actor` over the c2s records IS the player. An s2c record whose actor is that handle
+	// The discriminator does not need a multi-client capture, which is what the ticket assumed and what the corpus
+	// does not have. It needs only the recipient's own handle, and every capture states that: the client sends its
+	// own actions, so the modal `actor` over the c2s records is the player. An s2c record whose actor is that handle
 	// is the echo-ACK coming back; one whose actor is anything else is retail rendering another entity's behaviour on
 	// this client's screen - which is a relay whether the other entity is a player or an NPC. The client cannot tell
 	// the difference either: a handle is a handle.
 	//
-	// ⚠️ So "relayed" here means "the client is asked to render this behaviour for a handle that is not its own".
-	// It does NOT establish that retail relays a PLAYER's instance of that behaviour to another player - the corpus
+	// So "relayed" here means "the client is asked to render this behaviour for a handle that is not its own".
+	// It does not establish that retail relays a player's instance of that behaviour to another player - the corpus
 	// is single-client, so no capture can. What it does establish is the client-side half: a command the client
-	// already renders for a foreign handle cannot be one it refuses to render for a foreign PLAYER handle, because
+	// already renders for a foreign handle cannot be one it refuses to render for a foreign player handle, because
 	// nothing downstream of the record knows which it is.
 	public static partial class ReportCli
 	{
@@ -53,7 +52,7 @@ namespace Faolan.Importer.Cli
 					directions.Add(p.IsDownload);
 				}
 
-				// The player: the actor the CLIENT names most often. A capture with no c2s BCC at all cannot say who
+				// The player: the actor the client names most often. A capture with no c2s BCC at all cannot say who
 				// its player is, so it contributes nothing rather than guessing.
 				var self = records.Where((_, i) => !directions[i])
 					.GroupBy(r => r.Actor)
@@ -102,9 +101,9 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  0x{id:X2}   {name,-30}  {r.ToSelf,8}  {r.ToOthers,8}   {r.OtherActors.Count,15}   {r.Captures.Count}");
 			}
 
-			// ⚠️ A MISS needs a control. An id with zero foreign-actor records may mean "retail does not relay it" or
-			// merely "nobody else ever did it near the recorded player" - and the second is the default expectation
-			// for an action only a PLAYER performs, in a corpus of single-client sessions. So for every id the player
+			// A miss needs a control. An id with zero foreign-actor records may mean retail does not relay it, or
+			// merely that nobody else ever did it near the recorded player - and the second is the default expectation
+			// for an action only a player performs, in a corpus of single-client sessions. So for every id the player
 			// itself performed, print how many of those same captures carried foreign BCC actors at all: that is the
 			// opportunity count, and a zero-relay id with a healthy opportunity count is the only one saying anything.
 			Console.WriteLine();

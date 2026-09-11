@@ -9,11 +9,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #193: a loot bag built ENTIRELY FROM SCRATCH - identity columns + the DECODED kd-tree bounds (typed,
+	// A loot bag built entirely from scratch - identity columns + the decoded kd-tree bounds (typed,
 	// LootContainerTemplate.BuildBounds) + a clean codec-built ProtoLootBagIIR scaffold - reproduces a captured "Bag of loot"
 	// body's identity + geometry byte-for-byte, with no embedded asset and no baked capture state (the former
 	// LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a captured item). The live items + cash are
-	// spliced per drop (WithLootContents), so the at-rest template carries an EMPTY scaffold.
+	// spliced per drop (WithLootContents), so the at-rest template carries an empty scaffold.
 	public class LootBagTemplateTests
 	{
 		[Fact]
@@ -45,11 +45,11 @@ namespace Faolan.Tests
 			var body = WorldObjectCodec.Build(LootContainerTemplate.Create(LootContainerTemplateId.Bag), handle, pos, rot, typeTag, playfieldToken);
 
 			// Identity message + kd-tree geometry (everything up to the content blob) are byte-identical to the capture.
-			// (The content blob differs: the from-scratch bag carries a clean EMPTY scaffold, not the captured bag's
+			// (The content blob differs: the from-scratch bag carries a clean empty scaffold, not the captured bag's
 			// stale owner + item.)
 			Assert.Equal(WorldObjectCodec.Parse(record).Tail.AsSpan(0, contentsStart).ToArray(), WorldObjectCodec.Parse(body).Tail.AsSpan(0, contentsStart).ToArray());
 
-			// The scaffold is a well-formed, EMPTY loot bag with no baked owner.
+			// The scaffold is a well-formed, empty loot bag with no baked owner.
 			Assert.True(WorldObjectColumns.TryLocateContents(body, out var contents, out _));
 			Assert.Empty(contents.Inventory.Items);
 			Assert.Equal(0u, contents.OwnerId.Instance);

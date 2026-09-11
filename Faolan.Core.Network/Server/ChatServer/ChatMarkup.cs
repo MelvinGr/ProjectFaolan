@@ -6,24 +6,23 @@ namespace Faolan.Core.Network.Server.ChatServer
 	///     One line of chat/system text, already in the form the client will render.
 	/// </summary>
 	/// <remarks>
-	///     The AoC client renders chat and system lines as MARKUP, so a bare <c>&lt;</c> in the text is swallowed as a
-	///     tag: <c>"Usage: .kill [&lt;handle&gt; | self]"</c> used to have to be hand-escaped at every call site, and
-	///     forgetting it silently ate the placeholder. Worse, any text that came from a PLAYER (a say, a whisper, a
-	///     channel post) went to other clients verbatim, so one player could inject markup into another's chat window.
+	///     The AoC client renders chat and system lines as markup, so a bare <c>&lt;</c> in the text is swallowed as a
+	///     tag, and any text that came from a player - a say, a whisper, a channel post - would otherwise reach other
+	///     clients verbatim and let one player inject markup into another's chat window.
 	///     <para>
-	///         So the chat ops take this type rather than <see cref="string" />, and the implicit conversion from string
-	///         ESCAPES. That makes the safe thing the default and the unsafe thing impossible to do by accident:
-	///         <c>SendSystemMessage(id, $"target {name}")</c> is escaped (including the interpolated value), while markup
-	///         is opted into explicitly with <see cref="Raw" /> - which is then easy to grep for and review.
+	///         The chat operations therefore take this type rather than <see cref="string" />, and the implicit
+	///         conversion from string escapes. That makes the safe thing the default:
+	///         <c>SendSystemMessage(id, $"target {name}")</c> is escaped, including the interpolated value, while markup
+	///         is opted into explicitly with <see cref="Raw" />, which is easy to grep for and review.
 	///     </para>
-	///     Only the three entities the client actually decodes are replaced, in an order that cannot double-escape
-	///     (ampersand first) - see <see cref="Escape" />, which explains why quotes and apostrophes are left alone.
-	///     Nothing else is touched: the payload is a length-prefixed LATIN-1 string on the wire, not a URL or a JS
-	///     context, so ampersand/angle escaping is the whole job.
+	///     Only the three entities the client decodes are replaced, in an order that cannot double-escape (ampersand
+	///     first) - see <see cref="Escape" />, which explains why quotes and apostrophes are left alone. Nothing else is
+	///     touched: the payload is a length-prefixed Latin-1 string on the wire, not a URL or a JS context, so
+	///     ampersand and angle escaping is the whole job.
 	/// </remarks>
 	public readonly record struct ChatMarkup(string Value)
 	{
-		/// <summary>Markup that is ALREADY rendered - passed through verbatim. The deliberate opt-out of escaping.</summary>
+		/// <summary>Markup that is already rendered, passed through verbatim: the deliberate opt-out of escaping.</summary>
 		public static ChatMarkup Raw(string markup)
 		{
 			return new ChatMarkup(markup ?? "");
@@ -36,8 +35,8 @@ namespace Faolan.Core.Network.Server.ChatServer
 		}
 
 		/// <summary>
-		///     <paramref name="plain" /> in a CSS colour, escaped inside the span. The common case by far - most markup in
-		///     the codebase is a coloured word in an otherwise plain sentence (<c>ON</c> green, an error red).
+		///     <paramref name="plain" /> in a CSS colour, escaped inside the span. The common case by far, since most
+		///     markup here is a coloured word in an otherwise plain sentence.
 		/// </summary>
 		public static ChatMarkup Color(string cssColor, string? plain)
 		{
@@ -64,11 +63,11 @@ namespace Faolan.Core.Network.Server.ChatServer
 		///     The three entities the client actually decodes, ampersand first so an escape can never be escaped twice.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ <b>Quotes and apostrophes are deliberately NOT escaped</b> - escaping them is visible corruption. The
-		///     client's renderer does not decode <c>&amp;apos;</c>, so <c>'x'</c> reached the chat window as the literal
-		///     text <c>&amp;apos;x&amp;apos;</c> (seen 2026-07-29 on the #448 GM-command reply).
+		///     Quotes and apostrophes are deliberately not escaped: escaping them is visible corruption, because the
+		///     client's renderer does not decode <c>&amp;apos;</c> and <c>'x'</c> would reach the chat window as the
+		///     literal text <c>&amp;apos;x&amp;apos;</c>.
 		///     <para>
-		///         Settled against the client's own content rather than by taste - across all 2,164,982 LDB strings:
+		///         Settled against the client's own content: across all 2,164,982 LDB strings,
 		///         <c>&amp;apos;</c> appears <b>0</b> times while 228,544 strings carry a literal <c>'</c>, and
 		///         <c>&amp;quot;</c> appears 7 times against 183,200 carrying a literal <c>"</c> (the client writes
 		///         <c>You can "auto-complete" the group name</c> with markup in the same line). Angle brackets are the

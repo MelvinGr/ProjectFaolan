@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Best-effort text scan of Opcodes.cs for the trailing `// ...` comment on each enum member. ENRICHMENT ONLY:
+	// Best-effort text scan of Opcodes.cs for the trailing `// ...` comment on each enum member. Enrichment only:
 	// reflection already gives the authoritative name + value on every page, so a missing or stale comment never
 	// affects a generated page's correctness (the regeneration test still pins the whole page against reflection).
 	public static class OpcodesSource

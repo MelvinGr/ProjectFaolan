@@ -7,27 +7,23 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #719/#723: an item in a character's inventory must be one the world-entry snapshot can RENDER.
+	// An item in a character's inventory must be one the world-entry snapshot can render.
 	//
 	// The failure this guards is real and was shipped: a claim redeem persisted an item whose hash had never been
-	// harvested, the world-entry snapshot then DROPPED the row (it rendered Hash != 0 only), and a per-world-entry
-	// live re-add papered over the resulting invisible item - re-announcing "You received [X]" on every MAP CHANGE.
+	// harvested, the world-entry snapshot then dropped the row (it rendered Hash != 0 only), and a per-world-entry
+	// live re-add papered over the resulting invisible item - re-announcing "You received [X]" on every map change.
 	//
-	// ⚠️ What changed with #723: the gate used to be "no inventory row may reference a hash-0 item", because a
-	// token could only be HARVESTED and an item without one was undeliverable. That is no longer true - the token
-	// carries no information and the client validates nothing, so AcgHash.ForWire mints one for the 232 templates
-	// no capture ever showed entering an inventory, and those items are now perfectly holdable. Keeping the old
-	// assertion would fail the moment a claim or an AH purchase legitimately delivers one.
+	// The invariant is about what reaches the wire, not about Items.Hash: the token carries no information and the
+	// client validates nothing, so AcgHash.ForWire mints one for the 232 templates no capture ever showed entering an
+	// inventory, and those items are perfectly holdable. Items.Hash is a provenance record where 0 is a normal value,
+	// so "no inventory row may reference a hash-0 item" would fail the moment a claim or an AH purchase legitimately
+	// delivers one. Every item must resolve to a well-formed token instead.
 	//
-	// So the invariant moved down a level: it is no longer about Items.Hash (a provenance record, 0 is a normal
-	// value there) but about what reaches the WIRE. Every item must resolve to a well-formed token.
-	//
-	// ⚠️ And it is asked of the TEMPLATE population, not of held instances (#849). Both gates here used to read
-	// `db.ItemInstances` out of `TestDb.GameDatabase`, and the seed excludes that table with the rest of the player
-	// state: 404 rows in `faolan.db`, zero in `faolan.sql`. They were asserting "no offender among no rows". Asking
-	// `Items` instead is not a weaker question but a strictly stronger one - it covers every template that COULD be
-	// held rather than the handful some captured character happened to be carrying, and `Items` is seeded, so the
-	// gate can actually fail. The held-instance form, which needs the real database, is
+	// And it is asked of the template population, not of held instances. `db.ItemInstances` is excluded from the seed
+	// with the rest of the player state - 404 rows in `faolan.db`, zero in `faolan.sql` - so a gate reading it would
+	// assert "no offender among no rows". Asking `Items` is not a weaker question but a strictly stronger one: it
+	// covers every template that could be held rather than the handful some captured character happened to be
+	// carrying, and `Items` is seeded, so the gate can actually fail. The held-instance form, which needs the real database, is
 	// `--report inventory-token-check`.
 	public class InventoryItemHashTests
 	{

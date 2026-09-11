@@ -6,19 +6,19 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gates for the typed 277-byte guild renown block codec (Gitea #219). The grammar was recovered
+	// Byte-exact gates for the typed 277-byte guild renown block codec. The grammar was recovered
 	// from Ghidra (CoreGuild_c::Read, govForm 1) and validated against both 0x203F snapshots in the guild_invite
-	// capture; Golden/GuildRenownBlock.bin is the captured "Sepulchra Invictus" block. The round-trip + the
-	// structured CapturedPlaceholder both reproduce it, which is how the from-DB path replaces the old verbatim
-	// blob (which had been hand-transcribed 3 bytes short -> 274 not 277, misaligning the roster after it).
+	// capture; Golden/GuildRenownBlock.bin is the captured "Sepulchra Invictus" block. The round-trip and the
+	// structured CapturedPlaceholder both reproduce it, which is what lets the from-DB path emit a constructed block.
+	// The length is load-bearing: 274 bytes instead of 277 misaligns the roster that follows.
 	public class GuildRenownBlockCodecTests
 	{
-		// The create-guild capture's 225-byte 0x2044 tail, byte-for-byte. Verified against
-		// Golden/GuildCreateRenownBlock.bin (since deleted) before removal.
+		// The create-guild capture's 225-byte 0x2044 tail, byte-for-byte, as a SHA-256 pin: the retail blob itself is
+		// not carried in the repo.
 		private const string CapturedCreateTailSha256 = "890040917505eaf6418b843043290c06ac29e3ec794ffcb3ec9ced43377f4669";
 
 		// The structured factory (no captured blob) reproduces the capture byte-for-byte - so GuildService can
-		// emit a constructed block instead of carrying the verbatim (and previously malformed) template.
+		// emit a constructed block instead of carrying a verbatim template.
 		[Fact]
 		public void CapturedPlaceholder_EncodesToTheCapturedBlock()
 		{
@@ -51,23 +51,23 @@ namespace Faolan.Tests
 			var fresh = GuildRenownBlock.ForFreshGuild();
 			var create = GuildRenownBlock.ForGuildCreate();
 
-			// #335: a fresh guild's full-update IS its create block re-expressed in full-update FORM - same guild
-			// STATE, so every guild-state field matches ForGuildCreate (byte-exact vs the real fresh-guild create
-			// capture), including the two the old code wrongly carried as "hard caps".
+			// A fresh guild's full-update is its create block re-expressed in full-update form - same guild
+			// state, so every guild-state field matches ForGuildCreate (byte-exact vs the real fresh-guild create
+			// capture), including the two that are easily mistaken for hard caps.
 			Assert.Equal(create.List2, fresh.List2);
-			Assert.Equal(create.Group4, fresh.Group4); // [0, 0] - NOT the Sepulchra placeholder's [0, 30,000,000]
-			Assert.Equal(create.Counters64D, fresh.Counters64D); // 0x01A93458 - NOT Sepulchra's 975,000,000
+			Assert.Equal(create.Group4, fresh.Group4); // [0, 0] - not the Sepulchra placeholder's [0, 30,000,000]
+			Assert.Equal(create.Counters64D, fresh.Counters64D); // 0x01A93458 - not Sepulchra's 975,000,000
 			Assert.Equal(create.Counters64C, fresh.Counters64C);
 			Assert.All(fresh.RenownCounters, c => Assert.Equal(0ul, c));
 			Assert.All(fresh.Group1, v => Assert.Equal(0u, v));
 			Assert.All(fresh.Group3, v => Assert.Equal(0u, v));
 			Assert.All(fresh.Counters64B, v => Assert.Equal(0ul, v));
 
-			// ...and NONE of the Sepulchra placeholder's accumulated per-guild values leak in.
+			// ...and none of the Sepulchra placeholder's accumulated per-guild values leak in.
 			Assert.NotEqual(30000000u, fresh.Group4[1]);
 			Assert.NotEqual(975000000ul, fresh.Counters64D);
 
-			// ...while the two FORM fields switch to the full-update shape (create writes Flag 0 + an empty stat list).
+			// ...while the two form fields switch to the full-update shape (create writes Flag 0 + an empty stat list).
 			Assert.Equal((byte)0x01, fresh.Flag);
 			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds);
 			Assert.Equal(GuildRenownBlockCodec.Length, GuildRenownBlockCodec.Build(fresh).Length); // still 277 bytes -> roster stays aligned
@@ -75,13 +75,13 @@ namespace Faolan.Tests
 
 		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
 		// the create-guild capture's tail byte-for-byte, so GuildService.WriteGuildCreatedBody constructs it via the
-		// typed codec instead of the old verbatim hex blob (#306).
+		// typed codec rather than a verbatim hex blob.
 		[Fact]
 		public void ForGuildCreate_EncodesToTheCapturedCreateTail()
 		{
 			var block = GuildRenownBlock.ForGuildCreate();
 
-			// The retail tail's SHA-256 rather than the tail: the blob is gone from the repo (#555). This gate only
+			// The retail tail's SHA-256 rather than the tail: the blob is gone from the repo. This gate only
 			// ever compared against those bytes - it never read them - so the digest is the same assertion.
 			Assert.Equal(225, GuildRenownBlockCodec.Build(block).Length);
 			Assert.Equal(CapturedCreateTailSha256, Convert.ToHexStringLower(SHA256.HashData(GuildRenownBlockCodec.Build(block))));

@@ -11,27 +11,26 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The fatality burst (#140), locked against the captured bytes. Long believed un-pinnable - the RE notes concluded
-	// no capture showed a fatality - which held only for MELEE finishers; the corpus carries the SERVER side of a
-	// caster's fatality in seven captures. Worked example: xxx_mage-necromancer beach->city fr1267, where the killing
+	// The fatality burst, locked against the captured bytes. No capture carries a melee finisher, but the corpus
+	// carries the server side of a caster's fatality in seven captures. Worked example: xxx_mage-necromancer beach->city fr1267, where the killing
 	// cast's completion is followed, in one frame, by both Fatality self-buffs and (because that character had Frozen
 	// Hatred up) its proc.
 	public class FatalityBurstTests
 	{
-		// The three captured ApplySpell payloads of that burst, verbatim (the bytes AFTER the ApplySpell header).
+		// The three captured ApplySpell payloads of that burst, verbatim (the bytes after the ApplySpell header).
 		private const string FatalityAPayload = "00000000000000000000000a00010000000100000000004d5fcd0000000100000000000000000000000000000001000000001436da64";
 		private const string FatalityBPayload = "0000000000000000000003e800010000000100000000000c12b500000001000000000000000000000000000000010000000014370110";
 		private const string FrozenHatredProcPayload = "000000000000000000000258000100000001000000000037f0b30000000100000000000000000000000000000001000000001436f170";
 
-		// The third buff of the burst is not a fatality CONSTANT any more - it is what Frozen Hatred arms on a fatality,
-		// a SpellEffect row (#439). Named here only so the captured payload above can be checked against it;
+		// The third buff of the burst is not a fatality constant any more - it is what Frozen Hatred arms on a fatality,
+		// a SpellEffect row. Named here only so the captured payload above can be checked against it;
 		// SpellEffectSeedTests owns the assertion that this is what the seed ships.
 		private const uint FrozenHatredProc = 3666099;
 
 		// Every captured fatality payload is the ordinary 54-byte self-buff form: its own duration, a per-application
-		// nonce, and the caster's LEVEL in the @26/@42 words - 1 here, because this burst is the first fatality of a
+		// nonce, and the caster's level in the @26/@42 words - 1 here, because this burst is the first fatality of a
 		// fresh character's beach run (the same words walk 1->2->3->4->5 as it levels, and read 80 in the L80 sessions;
-		// see SelfBuffCodec, #438). Nothing about a fatality needs a new wire shape - which is why the burst is three
+		// see SelfBuffCodec). Nothing about a fatality needs a new wire shape - which is why the burst is three
 		// ApplySpell sends and not a bespoke record.
 		[Theory]
 		[InlineData(FatalityService.FatalityBuffA, 10u, 0x1436DA64u, FatalityAPayload)] // 0.1s
@@ -52,7 +51,7 @@ namespace Faolan.Tests
 			Assert.Equal(791221u, FatalityService.FatalityBuffB);
 		}
 
-		// The roll, from the client's own fatality groups (RDB 1010219): fatalitychance is a PERCENT and its tiers map
+		// The roll, from the client's own fatality groups (RDB 1010219): fatalitychance is a percent and its tiers map
 		// 1:1 onto minlevel - 1 -> 5%, 5 -> 10%, 30 -> 15%, 40/60 -> 20%, 80 -> 30% across the 58 groups / 205 real
 		// entries. A character rolls the best tier its level qualifies for.
 		[Theory]
@@ -70,17 +69,17 @@ namespace Faolan.Tests
 			Assert.Equal(expected, FatalityService.FatalityChancePercent(level));
 		}
 
-		// ⛔ A Fatality row's 53051 elements are a candidate REGISTRY, not #784's "when this lands, also run X", so the
-		// burst applies the two ids ALONE. `791221`'s five edges are `Frozen Hatred`, `Companion Spirit`,
+		// A Fatality row's 53051 elements are a candidate registry, not a "when this lands, also run X" list, so the
+		// burst applies the two ids alone. `791221`'s five edges are `Frozen Hatred`, `Companion Spirit`,
 		// `Furious Inspiration`, `XX Daily Fatality Counter` and a second `Fatality` row - three different classes'
 		// procs, a dev counter and a sibling carrier.
 		//
 		// The capture is what settles it: all 36 of its fatality bursts carry the two Fatality ids and only 21 carry
 		// the Frozen Hatred proc, so the edges cannot be applied wholesale - the other four would be in all 36 and are
-		// in none. Which one rides is the KILLER's state, which `ForFatality` resolves (#439).
+		// in none. Which one rides is the killer's state, which `ForFatality` resolves.
 		//
-		// Walking them handed a level-80 NECROMANCER `Companion Spirit`, an ungated `Frozen Hatred` she had not armed,
-		// and all TEN ranks of the class-44 `Furious Inspiration` at once - eleven icons expiring together 15 s later.
+		// Walking them handed a level-80 necromancer `Companion Spirit`, an ungated `Frozen Hatred` she had not armed,
+		// and all ten ranks of the class-44 `Furious Inspiration` at once - eleven icons expiring together 15 s later.
 		[Fact]
 		public async Task FatalityBurst_AppliesTheTwoIdsAloneAndNeverWalksTheirChain()
 		{

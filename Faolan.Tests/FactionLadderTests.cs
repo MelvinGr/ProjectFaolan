@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The Khitai reputation ladder and its two wire messages (#310).
+	// The Khitai reputation ladder and its two wire messages.
 	//
-	// ⚠️ There is NO capture oracle for any of this - the corpus carries zero faction packets in either direction.
-	// So these gates assert two things that do not need one: that the ladder reproduces the CLIENT's own tuning-sheet
-	// numbers, and that the codecs round-trip. What they deliberately do NOT assert is a golden byte string, because
+	// There is no capture oracle for any of this - the corpus carries zero faction packets in either direction.
+	// So these gates assert two things that do not need one: that the ladder reproduces the client's own tuning-sheet
+	// numbers, and that the codecs round-trip. What they deliberately do not assert is a golden byte string, because
 	// there is no retail body to compare one against and a self-authored golden would only be testing our encoder
 	// against itself.
 	public class FactionLadderTests
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, FactionLadder.RankFor(points));
 		}
 
-		// ⭐ The whole negative half is rank 0 - a hostile standing has no rank, it has a hostile standing. This is the
+		// The whole negative half is rank 0 - a hostile standing has no rank, it has a hostile standing. This is the
 		// half nothing but the tuning sheet stated, and the half the rival-pair rule needs.
 		[Theory]
 		[InlineData(-1)]
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			Assert.Equal(-120, FactionLadder.Apply(0, -120));
 		}
 
-		// ⭐ The corroboration the decode rests on: the payout matrix and the thresholds belong to the same system.
+		// The corroboration the decode rests on: the payout matrix and the thresholds belong to the same system.
 		// At the shipped 120 points for a solo normal kill, rank 1 is ~417 kills and rank 4 ~8,333 - the order of
 		// magnitude Khitai reputation is remembered for. A threshold set belonging to something else would have no
 		// reason to land there.
@@ -85,7 +85,7 @@ namespace Faolan.Tests
 		[Theory]
 		[InlineData(10u, 0)]
 		[InlineData(90u, 1_100_000)]
-		[InlineData(330u, -1_100_000)] // the SIGNED half, which a uint wire slot has to carry as two's complement
+		[InlineData(330u, -1_100_000)] // the signed half, which a uint wire slot has to carry as two's complement
 		public void ApplyFactionPoints_RoundTrips(uint factionId, int points)
 		{
 			var built = ApplyFactionPointsCodec.Build(factionId, points);
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 
 		// The shipped catalog, against the client's own file. Not a restatement of the importer: these are the
 		// structural facts docs/subsystems/factions.md records, and each one would break differently if the ordered
-		// LDB runs were joined to the XML by POSITION instead of by name.
+		// LDB runs were joined to the XML by position instead of by name.
 		[Fact]
 		public void TheShippedCatalogMatchesTheClientsFile()
 		{
@@ -133,7 +133,7 @@ namespace Faolan.Tests
 			var ranked = factions.Where(f => f.HasPlayerRanks).Select(f => f.Id).ToList();
 			Assert.Equal<uint[]>([10, 20, 30, 40, 50, 60, 70, 80, 90], [.. ranked]);
 
-			// The six rival PAIRS are symmetric in the file...
+			// The six rival pairs are symmetric in the file...
 			foreach (var f in factions.Where(f => f.RivalFactionId is not null && f.Id <= 90))
 			{
 				var rival = factions.Single(r => r.Id == f.RivalFactionId);
@@ -141,7 +141,7 @@ namespace Faolan.Tests
 			}
 
 			// ...and 100 is the documented asymmetry: it names 90 as its rival yet has no ladder of its own, so the
-			// Wolves' rivalry is one-sided from the PLAYER's side. Pinned because it reads like a bug and is not.
+			// Wolves' rivalry is one-sided from the player's side. Pinned because it reads like a bug and is not.
 			var hyrkanians = factions.Single(f => f.Id == 100);
 			Assert.Equal(90u, hyrkanians.RivalFactionId);
 			Assert.False(hyrkanians.HasPlayerRanks);
@@ -160,7 +160,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(awards);
 			Assert.Equal<int[]>([0, 1, 2, 3, 4, 5], [.. awards.Select(a => a.Tier).Distinct().Order()]);
 
-			// ⭐ Killing one of a faction's own NPCs COSTS standing with them: every tier-0 self-award is negative.
+			// Killing one of a faction's own NPCs costs standing with them: every tier-0 self-award is negative.
 			foreach (var self in awards.Where(a => a.Tier == 0 && a.FactionId == a.VictimFactionId))
 				Assert.True(self.Points < 0, $"faction {self.VictimFactionId} pays {self.Points} to itself for a kill");
 

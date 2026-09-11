@@ -6,22 +6,22 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The importer's DB config comes from env > command line > faolan.json, and the command-line key IS the config
-	// path - one NAME per setting whatever the input method.
+	// The importer's DB config comes from env > command line > faolan.json, and the command-line key is the config
+	// path - one name per setting whatever the input method.
 	//
-	// The bug these pin: the command-line CONFIG PROVIDER pairs SEQUENTIAL tokens, so a valueless flag swallowed
+	// The bug these pin: the command-line config provider pairs sequential tokens, so a valueless flag swallowed
 	// whatever followed it. `--dry-run --Database:ConnectionString "X"` parsed as dry-run="--Database:...", the
-	// connection string never reached the config, and the command silently ran against the CONFIGURED database
+	// connection string never reached the config, and the command silently ran against the configured database
 	// instead of the one named. A --dry-run reporting on the wrong database is worse than one that fails outright.
 	//
-	// They pin the BEHAVIOUR, not the mechanism: the resolved connection must not depend on where the flags sit,
+	// They pin the behaviour, not the mechanism: the resolved connection must not depend on where the flags sit,
 	// and it must beat the config file.
 	public class CliConfigTests : IDisposable
 	{
 		private const string Connection = "Data Source=/tmp/faolan-cliconfig-test.db";
 		private const string Decoy = "Data Source=the-json-should-not-win.db";
 
-		// Hermetic: a config file of its own rather than the developer's, and its connection string is a DECOY that
+		// Hermetic: a config file of its own rather than the developer's, and its connection string is a decoy that
 		// only shows up if the command line was dropped - which is exactly the bug.
 		private readonly string _configPath = Path.Combine(Path.GetTempPath(), $"faolan-cliconfig-{Guid.NewGuid():N}.json");
 
@@ -39,9 +39,9 @@ namespace Faolan.Tests
 
 		public static IEnumerable<object[]> Orderings()
 		{
-			// the flag before the option - the ordering that used to lose the value
+			// the flag before the option
 			yield return [new[] { "--report", "apply-seed", "--dry-run", "--Database:ConnectionString", Connection }];
-			// and after it, which happened to work
+			// and after it
 			yield return [new[] { "--report", "apply-seed", "--Database:ConnectionString", Connection, "--dry-run" }];
 			// several valueless flags either side
 			yield return [new[] { "--dry-run", "--force", "--Database:ConnectionString", Connection, "--list" }];
@@ -70,8 +70,8 @@ namespace Faolan.Tests
 			Assert.Equal(Decoy, CliConfig.ResolveDatabase(options.Configuration).Connection);
 		}
 
-		// What the declared command line buys over the old argv scans: a misspelling is an ERROR, not a silent
-		// default. `--dryrun` used to parse as "not a dry run" and the import would write for real.
+		// A misspelling is an error, not a silent default: `--dryrun` must not parse as "not a dry run" and let the
+		// import write for real.
 		[Theory]
 		[InlineData("--dryrun")]
 		[InlineData("--Database:Connection")]
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(0, exitCode);
 		}
 
-		// ...and the flags it DOES understand come back typed, wherever they sit.
+		// ...and the flags it does understand come back typed, wherever they sit.
 		[Fact]
 		public void Parse_ReadsTheCommandFlags()
 		{

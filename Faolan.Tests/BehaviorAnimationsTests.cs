@@ -14,12 +14,12 @@ namespace Faolan.Tests
 	// caster = 0x0802E5D4; the golden hex is the frame body with the 0x2000 carrier's u32 length prefix stripped.
 	public class BehaviorAnimationsTests
 	{
-		// #676: a ranged NPC's swing, byte-exact against the pair retail sent for ONE shot -
+		// A ranged NPC's swing, byte-exact against the pair retail sent for one shot -
 		// Hoxxling_mage-heraldofxotli_login_gameplay frames 9017 (begin) and 9038 (complete). The two differ in the
 		// sequence word and in nothing else: same swing counter, same args, byte-identical 82-byte tail.
 		//
-		// It is a whole SHOT rather than one record on purpose. Our archers used to send a single `Combat:Melee`
-		// (0x0F) ack - a sword swing for a bow, and only the opening half of the action - which is what this issue is.
+		// It is a whole shot rather than one record on purpose: a single `Combat:Melee` (0x0F) ack is a sword swing for
+		// a bow, and only the opening half of the action.
 		[Theory]
 		[InlineData(BehaviorAnimations.RangedBeginSeq,
 			"642cd3d60000c35000017e160004000000100000001908f8df04180328183000520908d0860310f1dcc50958536051" +
@@ -34,15 +34,15 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 
-		// #827: FREEING Casilda takes TWO records, and we shipped one - so she followed the player still playing the
-		// chained struggle. A registration is per SLOT and the struggle lives in slot 5, so writing her locomotion
-		// into slot 9 ADDS a behaviour rather than replacing the looping one.
+		// Freeing Casilda takes two records, and we shipped one - so she followed the player still playing the
+		// chained struggle. A registration is per slot and the struggle lives in slot 5, so writing her locomotion
+		// into slot 9 adds a behaviour rather than replacing the looping one.
 		//
 		// Retail's rescue is three consecutive records on her handle 0x00017ED0 in
 		// Hoxxling_mage-heraldofxotli_login_gameplay - idx 2104 (slot 7, an end stamp), 2106 (slot 9, locomotion) and
 		// 2110 (slot 5, 142007). This pins the one that was missing, byte-exact against frame 1847.
 		//
-		// ⚠️ Its sibling 2106 is deliberately NOT pinned here: the captured record carries a full behaviour-state tail
+		// Its sibling 2106 is deliberately not pinned here: the captured record carries a full behaviour-state tail
 		// (six NullIdentity pairs + three trailing ones, 124 bytes) where we send the short 20-byte bound form. That
 		// difference predates this fix and she does walk on it, so it is recorded rather than quietly "corrected" -
 		// widening it is a byte-exact job of its own.
@@ -75,17 +75,17 @@ namespace Faolan.Tests
 
 		[Theory, InlineData((ushort)0x0004, "642cd3d60000c3500802e5d40004000000120000001708c5c80210071809280a3000520908d0860310d4cb8b400000c8780001217400000006"),
 		 InlineData((ushort)0x000f, "642cd3d60000c3500802e5d4000f000000120000001708c5c80210071809280a3000520908d0860310d4cb8b400000c8780001217400000006")]
-		// F2793 (hold-echo, seq 0x0004) / F2801 (hold-assert, seq 0x000f): the object-action STATE that holds the seated pose.
+		// F2793 (hold-echo, seq 0x0004) / F2801 (hold-assert, seq 0x000f): the object-action state that holds the seated pose.
 		public void BenchSitState_MatchesCapture(ushort seq, string expected)
 		{
 			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.BenchSitState(0x0802E5D4, seq, 0x12174));
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 
-		// #428 the PlayAnimation (behaviour 0x07) relay - a jump the movement record cannot carry (mounted, or off a
-		// bridge: a standing jump translates nowhere, so there is no CharDCMove to forward). Retail answers the client's
-		// request with the SAME record at the ack seq, with the phase spliced in as f3 - which is precisely what the
-		// generic relay builder produces, so the fix for the missing mounted jump was the relay GATE, not a new codec.
+		// The PlayAnimation (behaviour 0x07) relay - a jump the movement record cannot carry (mounted, or off a bridge:
+		// a standing jump translates nowhere, so there is no CharDCMove to forward). Retail answers the client's request
+		// with the same record at the ack seq, with the phase spliced in as f3 - which is precisely what the generic
+		// relay builder produces, so a mounted jump needs the relay gate rather than a codec of its own.
 		//
 		// Ground truth: NecroL80_mage-necromancer_login_falldamage_bridge-toast, c2s fr1318 -> s2c fr1321 (bodies below
 		// with the 0x2000 carrier's u32 length prefix stripped). The args are f1=249527 (the animation-action id),
@@ -128,11 +128,11 @@ namespace Faolan.Tests
 				Convert.ToHexStringLower(bytes));
 		}
 
-		// The remoteformat's length prefix must describe the string ACTUALLY written, for any string - not just the one
+		// The remoteformat's length prefix must describe the string actually written, for any string - not just the one
 		// the capture happened to contain.
 		//
 		// This is the gate the two capture goldens above could not be: they feed the captured literal, so a hardcoded
-		// prefix matches it by construction. In production the string is GENERATED (SitRemoteformat emits key="" until the
+		// prefix matches it by construction. In production the string is generated (SitRemoteformat emits key="" until the
 		// object's localized action key is imported), so it is a different length - and the baked 0xAA/0x84 prefixes then
 		// overstated it by 33 and 25 bytes. The client read past the end of the record and discarded it whole
 		// ("too short IIR UNKNOWN Key"), so sitting on a bench played nothing and the character stood straight back up.
@@ -172,8 +172,7 @@ namespace Faolan.Tests
 
 		[Theory, InlineData(false, "642cd3d60000c3500802e5d40004000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000000"),
 		 InlineData(true, "642cd3d60000c3500802e5d4000a000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000001")]
-		// frame#1657 begin
-		// frame#1658 complete
+		// frame 1657 (begin) and frame 1658 (complete).
 		public void SpellweaveComponentAdd_MatchesCapture(bool complete, string expected)
 		{
 			// the add gesture for element[0] = Arcane Renewal 0x396AE9.
@@ -192,14 +191,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void SpellweaveTrance_MatchesCapture()
 		{
-			// frame#1645: the caster's trance-pose animation on activate.
+			// frame 1645: the caster's trance-pose animation on activate.
 			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveTrance(0x0802E5D4));
 			Assert.Equal("642cd3d60000c3500802e5d40004000000010000000d08b9c80218042808300058af090000002700000001000000000000000000000000", Convert.ToHexStringLower(bytes));
 		}
-		// #827: the one-stat update retail sends at Casilda's rescue, immediately before the three BCC records
+		// The one-stat update retail sends at Casilda's rescue, immediately before the three BCC records
 		// (Hoxxling_mage-heraldofxotli_login_gameplay frame 1834, 25 bytes past the carrier length).
 		//
-		// ⭐ This is the record that actually lets her WALK. `CharacterStatId.CombatMode` (0x14) is "BCC State" to the
+		// This is the record that actually lets her walk. `CharacterStatId.CombatMode` (0x14) is "BCC State" to the
 		// client and selects the behaviour tree; her type ships 80 - her captive tree - where 1,186 templates carry the
 		// ordinary 1. Until it flips, her locomotion tree never runs, so the server moved her while she played a
 		// standing animation. That is what "she slides / teleports" was, and no amount of getting the MoveTask right
@@ -212,10 +211,10 @@ namespace Faolan.Tests
 			Assert.Equal("96b8dc590000c35000017ed000000000010000001400000001", Convert.ToHexString(bytes).ToLowerInvariant());
 		}
 
-		// #827: the slot-9 LOCOMOTION registration retail installs at the rescue - byte-exact against
+		// The slot-9 locomotion registration retail installs at the rescue - byte-exact against
 		// Hoxxling_mage-heraldofxotli_login_gameplay idx 2106 (frame 1840), past the carrier's u32 length.
 		//
-		// ⚠️ We sent the SHORT bound form here for three rounds of fixes while she slid through a standing animation.
+		// We sent the short bound form here for three rounds of fixes while she slid through a standing animation.
 		// The movement packets were retail-exact and arriving the whole time; this is the behaviour that animates
 		// them, and it was being registered with a tail truncated to its first 20 of 88 bytes.
 		[Fact]

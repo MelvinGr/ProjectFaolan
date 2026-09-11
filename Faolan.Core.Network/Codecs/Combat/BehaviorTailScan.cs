@@ -4,20 +4,22 @@ using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// Named reads out of a `BehaviorControlCenterIIR.Tail`.
-	//
-	// NOT a codec, and deliberately not a decode: the tail is genuinely four different shapes discriminated by
-	// `behaviorId` (an echoed client tail, an equip identity block, the 81-byte hit-result block, or a per-behaviour
-	// literal) and stays an opaque region until #536 settles it. What the server needs from it today is two single
-	// words, and this is where they are NAMED - the shape `PlayfieldTokenScan` and `CastGroundTargetScan` set for
-	// reading a field out of a region the codec carries verbatim.
-	//
-	// Both used to be fixed offsets in `Faolan/` (`actionTrailer.ReadU32Be(0)` and a slice at `26 + <u32 at 22>`),
-	// which is what #530 rule 7 evicts: an offset into a message body belongs beside the codec that owns the body.
+	/// <summary>
+	///     Named reads out of a <see cref="BehaviorControlCenterIIR" /> tail.
+	/// </summary>
+	/// <remarks>
+	///     Not a codec, and deliberately not a decode: the tail is four different shapes discriminated by the behaviour id
+	///     (an echoed client tail, an equip identity block, the 81-byte hit-result block, or a per-behaviour literal), so the
+	///     codec carries it verbatim. The handful of words the server needs out of it are named here - an offset into a
+	///     message body belongs beside the codec that owns the body, never at the call site. Compare
+	///     <see cref="World.PlayfieldTokenScan" /> and <see cref="CastGroundTargetScan" />.
+	/// </remarks>
 	public static class BehaviorTailScan
 	{
-		// The ABILITY id of an unarmed swing: the last word of the request's tail. 0 when the tail is too short to
-		// carry one (the air-swing forms).
+		/// <summary>
+		///     The ability id of an unarmed swing: the last word of the request's tail. Zero when the tail is too short to
+		///     carry one (the air-swing forms).
+		/// </summary>
 		public static uint AbilityId(ReadOnlySpan<byte> tail)
 		{
 			return tail.Length >= sizeof(uint)
@@ -25,17 +27,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 				: 0;
 		}
 
-		// The TRADESKILL request in a `0x27` tail (#754). Unlike everything else here this is a real DECODE rather
-		// than a named read - the tail's leading byte discriminates a craft from a socketing and each has its own
-		// payload - so the grammar lives in `TradeskillCommandCodec` and this is the entry point, keeping the
-		// listener's tail reads going through one seam instead of two.
+		/// <summary>
+		///     The tradeskill request carried by a 0x27 tail.
+		/// </summary>
+		/// <remarks>
+		///     Unlike everything else here this is a real decode rather than a named read - the tail's leading byte
+		///     discriminates a craft from a socketing and each has its own payload - so the grammar lives in
+		///     <see cref="TradeskillCommandCodec" /> and this is only the entry point, keeping every tail read on one seam.
+		/// </remarks>
 		public static TradeskillCommand Tradeskill(ReadOnlySpan<byte> tail)
 		{
 			return TradeskillCommandCodec.Parse(tail);
 		}
 
-		// The moved item's TEMPLATE handle on an equip/unequip interact: the first word of the trailing struct that
-		// follows the action's from/target pair. 0 when the tail carries none (an unequip to an empty slot).
+		/// <summary>
+		///     The moved item's template handle on an equip/unequip interact: the first word of the trailing struct that
+		///     follows the action's from/target pair. Zero when the tail carries none (an unequip to an empty slot).
+		/// </summary>
 		public static uint MovedItemHandle(ReadOnlySpan<byte> tail)
 		{
 			return tail.Length >= sizeof(uint)
@@ -43,12 +51,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 				: 0;
 		}
 
-		// The entity a UseDynel (BehaviorId 0x12) acted on: the SECOND word of the tail's leading `[from][target]`
-		// pair, `from` being the object's typetag. 0 when the tail is too short.
-		//
-		// ⚠️ NOT `args.Target` - on a UseObject that holds the PLAYER's own instance, and the object is only in the
-		// tail. A TalkToNpc is the other way round (its NPC handle IS `args.Target.Instance`), so the two interacts
-		// cannot share a read. Both importer readers of this word had the offset spelled out by hand.
+		/// <summary>
+		///     The entity a UseDynel (behaviour id 0x12) acted on: the second word of the tail's leading [from][target] pair,
+		///     <c>from</c> being the object's typetag. Zero when the tail is too short.
+		/// </summary>
+		/// <remarks>
+		///     This is not the action's own target: on a UseObject that field holds the player's own instance and the object
+		///     appears only in the tail. A TalkToNpc is the other way round - its NPC handle is the action target - so the two
+		///     interacts cannot share a read.
+		/// </remarks>
 		public static uint InteractTargetHandle(ReadOnlySpan<byte> tail)
 		{
 			return tail.Length >= 2 * sizeof(uint)

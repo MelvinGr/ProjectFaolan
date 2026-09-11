@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		public void Build_EmptyCatalog_IsAValidEmptyList()
 		{
 			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1 - after
-			// the [subop][0xC350][handle] carrier prefix the codec now owns (#530 wave 7).
+			// the [subop][0xC350][handle] carrier prefix the codec owns.
 			var body = TradeskillReplyCodec.Build(0x0802E5D4, []);
 			Assert.Equal("9062d5590000c3500802e5d4" + "00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
 		}
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			Assert.True(sub >= 0);
-			var capturedRecord = reply.Bytes.AsSpan(sub).ToArray(); // the WHOLE record, carrier prefix included
+			var capturedRecord = reply.Bytes.AsSpan(sub).ToArray(); // the whole record, carrier prefix included
 
 			var parsed = TradeskillReplyCodec.Parse(capturedRecord);
 			Assert.Equal(603, parsed.Recipes.Count);
@@ -107,7 +107,7 @@ namespace Faolan.Tests
 			return -1;
 		}
 
-		// The one captured recipe catalog, committed as its own fixture. There is exactly ONE TradeskillReplyIIR in
+		// The one captured recipe catalog, committed as its own fixture. There is exactly one TradeskillReplyIIR in
 		// the whole corpus, so this never wanted the corpus - it wanted that packet.
 		private static CapturedPacket Reply()
 		{

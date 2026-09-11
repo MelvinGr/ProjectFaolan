@@ -7,24 +7,24 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #349: the two numbers a ground-targeted AoE needs - how wide it blasts and how often it ticks - read off the
+	// The two numbers a ground-targeted AoE needs - how wide it blasts and how often it ticks - read off the
 	// client instead of guessed. Both are shipped data, so this gates the committed faolan.db.
 	//
-	// The radius is NOT a property field, which is why three sweeps of the field run found none: it is the `Radius`
-	// key (11) of the spell's area-TARGETING GameAction element, one region over. The interval IS a property field
+	// The radius is not a property field, which is why three sweeps of the field run found none: it is the `Radius`
+	// key (11) of the spell's area-targeting GameAction element, one region over. The interval is a property field
 	// (447 `ChannelingInterval`).
 	public class SpellAreaAndChannelTests
 	{
 		// The single strongest check available on the channel interval, and it is an independent one: DotIntervalMs
-		// was MEASURED from the gaps between captured StatDamageIIR ticks, months before field 447 was read. Where a
-		// spell has both, they agree exactly - and one of the three is Deathly Blizzard, the spell #349 is about.
+		// was measured from the gaps between captured StatDamageIIR ticks, months before field 447 was read. Where a
+		// spell has both, they agree exactly - and one of the three is Deathly Blizzard.
 		[Fact]
 		public void ChannelingInterval_AgreesWithEveryIntervalMeasuredOffTheWire()
 		{
 			var rows = Query("SELECT m.Name, m.DotIntervalMs, c.ChannelingIntervalMs FROM Spells m " +
 				"JOIN Spells c ON lower(c.Name) = lower(m.Name) AND c.ChannelingIntervalMs > 0 WHERE m.DotIntervalMs > 0");
 
-			// Three overlaps today. Assert the count so a widened corpus that ADDS one cannot quietly stop being
+			// Three overlaps today. Assert the count so a widened corpus that adds one cannot quietly stop being
 			// checked, and assert the values so a disagreement fails rather than averages.
 			Assert.Equal(3, rows.Count);
 			foreach (var (name, measured, stated) in rows)
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void DeathlyBlizzard_TicksAtTheClientsTwoAndAHalfSeconds()
 		{
-			// 144526 is the CAST record (the one carrying range + cast time); 144432 is its effect twin, which is
+			// 144526 is the cast record (the one carrying range + cast time); 144432 is its effect twin, which is
 			// where the measured DoT interval landed. The channel interval rides the cast record.
 			Assert.Equal(2500u, Scalar("SELECT ChannelingIntervalMs FROM Spells WHERE Id = 144526"));
 		}
@@ -45,9 +45,8 @@ namespace Faolan.Tests
 		public void AreaRadius_IsLiftedFromTheAreaTargetingElement(uint spellId, float expected)
 			=> Assert.Equal(expected, (float)Scalar($"SELECT CAST(AreaRadius * 100 AS INTEGER) FROM Spells WHERE Id = {spellId}") / 100f);
 
-		// ⚠️ This used to assert Deathly Blizzard has NO area, and reasoned from that absence that "its blast is
-		// server-side". The absence was the element scan's, not the record's: it carries an area element that the
-		// leaf-only anchor could not see (#772), and the radius is 5 m like its siblings. A conclusion drawn from a
+		// Deathly Blizzard does carry an area element, one a leaf-only anchor cannot see, and its radius is 5 m like
+		// its siblings. An absence reported by a scan is the scan's, not the record's: a conclusion drawn from a
 		// parser's silence is only as good as the parser.
 		[Fact]
 		public void AreaRadius_IsLiftedForASpellWhoseElementWasPreviouslyInvisible()
@@ -56,12 +55,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void AreaRadius_IsCarriedByOverAThousandSpells_AndNoneAtAnAbsurdWidth()
 		{
-			// A sanity bound rather than an exact count (the catalog grows): the radius is METRES, so a four-digit
+			// A sanity bound rather than an exact count (the catalog grows): the radius is metres, so a four-digit
 			// one would mean the unit was misread - the splash triple's radius, by contrast, is metres x100.
 			Assert.True(Scalar("SELECT COUNT(*) FROM Spells WHERE AreaRadius > 0") > 1000);
 
-			// ⚠️ The bound was `> 500 == 0` and it was calibrated on a partial parse (#772). Five spells legitimately
-			// exceed it: `Earthling` and `Apocalypse` at 100,000 m - a radius that IS the world, which is what an
+			// The bound was `> 500 == 0` and it was calibrated on a partial parse. Five spells legitimately
+			// exceed it: `Earthling` and `Apocalypse` at 100,000 m - a radius that is the world, which is what an
 			// apocalypse should be - `Anoki` at 800, and two `XX Unstable Energy Knockback`, whose `XX` prefix is the
 			// catalog's own dev marker. So the sanity bound moves to where a real misread would still be caught (the
 			// splash triple's radius is metres x100, so a unit slip lands in the thousands on ordinary spells) while
@@ -71,8 +70,8 @@ namespace Faolan.Tests
 				"AND Name NOT IN ('Earthling', 'Apocalypse', 'Anoki')"));
 		}
 
-		// The set is a deliberate SUBSET of the 17 types carrying a Radius key - a radius is only a blast radius
-		// when the element is selecting targets. Locks that intent so an audio falloff or a radius MODIFIER cannot
+		// The set is a deliberate subset of the 17 types carrying a Radius key - a radius is only a blast radius
+		// when the element is selecting targets. Locks that intent so an audio falloff or a radius modifier cannot
 		// be folded in later without the choice being made again.
 		[Fact]
 		public void AreaTargetKinds_AreTheTargetSelectorsOnly()
@@ -88,7 +87,7 @@ namespace Faolan.Tests
 				Assert.Contains(GameActionTypes.KeyRadius, GameActionTypes.Get(kind)!.Keys);
 		}
 
-		// #633: the per-spell CRIT columns, against the shipped catalog. The point of gating them is that the data
+		// The per-spell crit columns, against the shipped catalog. The point of gating them is that the data
 		// makes a claim the code had been making on its own authority - see the modal-value assertion below.
 		[Fact]
 		public void SpellCritFields_AreImportedForTheSpellsThatCarryThem()
@@ -101,7 +100,7 @@ namespace Faolan.Tests
 			Assert.Equal(5000u, Scalar("SELECT CriticalDamageHundredths FROM Spells WHERE Name = 'Shockstrike (Rank 3)'"));
 		}
 
-		// ⭐ The independent corroboration. `CombatResolver.BaseCritDamagePercent` is 150 - a crit hits for 1.5x -
+		// The independent corroboration. `CombatResolver.BaseCritDamagePercent` is 150 - a crit hits for 1.5x -
 		// and that file says outright that the constant is provisional and "waiting on an in-client combat log".
 		// The client's own spell table states +50.00% on 607 of the 1,228 records that state anything, which is the
 		// same number arrived at from a different direction entirely.

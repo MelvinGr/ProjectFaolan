@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #3: EntityVitals.FromCharacter folds the equipped-gear vital bonuses (MaxStatAggregator display totals) onto the
-	// class/level base max, and seeds current == max, so a +HP piece lifts the ceiling AND the bar starts full (the
+	// EntityVitals.FromCharacter folds the equipped-gear vital bonuses (MaxStatAggregator display totals) onto the
+	// class/level base max, and seeds current == max, so a +HP piece lifts the ceiling and the bar starts full (the
 	// health-bar-fill fix). Pure over a Character + a gear-bonus dict - no DB/session.
 	public class EntityVitalsGearTests
 	{
@@ -53,10 +53,10 @@ namespace Faolan.Tests
 			Assert.Equal(BaseStamina(), vitals.MaxStamina);
 		}
 
-		// #450: a vitals push has to carry the MAX ids, not just the current ones. The bug this pins was a
-		// currents-only sender used by every path that CHANGES a max: the client only ever learns a max when one is
+		// A vitals push has to carry the MAX ids, not just the current ones. The bug this pins was a
+		// currents-only sender used by every path that changes a max: the client only ever learns a max when one is
 		// sent, so it kept the value it was seeded with at world entry and a `.level 80` rendered `4285 / 1270` -
-		// current at 3.4x the max. Asserting all SIX ids is what a currents-only block fails.
+		// current at 3.4x the max. Asserting all six ids is what a currents-only block fails.
 		[Fact]
 		public void VitalsBlock_CarriesTheMaxIdsAndNotJustTheCurrentOnes()
 		{
@@ -67,35 +67,35 @@ namespace Faolan.Tests
 			var ids = vitals.ToVitalsBlock().Records;
 
 			Assert.Equal(100u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthCurrent).RawValue);
-			// ALL THREE max ids carry the class BASE, not our ceiling: the client tops each up with its own
+			// All three max ids carry the class base, not our ceiling: the client tops each up with its own
 			// attribute/gear/feat terms, so sending the ceiling made it top up an already-topped-up number and draw
-			// 1754 where retail drew 1270 (#580). Retail's AssassinL23 push proves the split in one packet - HpBase 77200
+			// 1754 where retail drew 1270. Retail's AssassinL23 push proves the split in one packet - HpBase 77200
 			// beside HpCur 127000, and ManaBase 0 beside ManaCur 7400.
 			var classCurve = CharacterMaxStats.ClassBaseHundredths(ConanClass.Guardian, 4);
 			Assert.Equal(classCurve.Health, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
 			Assert.True(classCurve.Health / 100 < vitals.MaxHealth, "the wire base must sit below the server ceiling");
 			Assert.Equal(50u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaCurrent).RawValue);
 			Assert.Equal(classCurve.Stamina, ids.Single(r => r.StatId == CharacterStatId.StaminaMax).RawValue);
-			// A Guardian has NO mana pool, and the max id says so with a 0 - which is what keeps the client from
+			// A Guardian has no mana pool, and the max id says so with a 0 - which is what keeps the client from
 			// drawing a mana bar for a class that has none, even when a worn item grants mana.
 			Assert.Equal(0u, ids.Single(r => r.StatId == CharacterStatId.ManaMax).RawValue);
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaCurrent);
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaMax);
 		}
 
-		// The WHOLE sum, end to end, against the one character we have a retail capture AND a screenshot of: AssassinL23,
+		// The whole sum, end to end, against the one character we have a retail capture and a screenshot of: AssassinL23,
 		// a level-23 Assassin. Their world-entry 0x96B8DC59 carries HpCur 127000 / StamCur 114800 / ManaCur 7400, and
 		// the client's sheet draws those as the maxima - so this is what the server's ceiling has to be, or the sheet
-		// reads a current that is not its max (health 1314 against a 1270 max, #580).
+		// reads a current that is not its max (health 1314 against a 1270 max).
 		//
 		// The inputs are the character's own rows, stated here rather than read from the DB because faolan.sql
 		// excludes characters (they are per-developer play state) - the ClassAttributeBases row for Assassin level 23
-		// and the ItemStatModifiers of their ACTIVE weapon set's worn items.
+		// and the ItemStatModifiers of their active weapon set's worn items.
 		[Fact]
 		public void AssassinL23_AtLevel23_MatchesTheCapturedRetailPools()
 		{
 			var character = new Character { Class = ConanClass.Assassin, Level = 23 };
-			// ClassAttributeBases (34, 23) - the RAW WIRE amounts: Str 20, Con 17, Int 26, Wis 20, Dex 65.
+			// ClassAttributeBases (34, 23) - the raw wire amounts: Str 20, Con 17, Int 26, Wis 20, Dex 65.
 			var classBase = new Dictionary<CharacterStatId, int>
 			{
 				[CharacterStatId.Strength] = 200,
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 				[CharacterStatId.Wisdom] = 200,
 				[CharacterStatId.Dexterity] = 650
 			};
-			// The worn gear, in the DISPLAY units MaxStatAggregator returns.
+			// The worn gear, in the display units MaxStatAggregator returns.
 			var gear = new Dictionary<CharacterStatId, int>
 			{
 				[CharacterStatId.HealthMax] = 50,
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(1270u, vitals.MaxHealth);
 			Assert.Equal(1148u, vitals.MaxStamina);
-			// An Assassin has no mana POOL, but a worn item still grants mana and retail still carries it as a
+			// An Assassin has no mana pool, but a worn item still grants mana and retail still carries it as a
 			// current - so the pool is 74, and it is the max ID that says the class has no bar (asserted below).
 			Assert.Equal(74u, vitals.MaxMana);
 
@@ -136,10 +136,10 @@ namespace Faolan.Tests
 			Assert.Equal(0u, records.Single(r => r.StatId == CharacterStatId.ManaMax).RawValue);
 		}
 
-		// The GetScale entries that were established from a RENDERED client value, pinned so a future edit cannot
+		// The GetScale entries that were established from a rendered client value, pinned so a future edit cannot
 		// quietly drop one. Each number here was read off the client, not inferred: wire 428500 drew as 4285 health,
 		// a 10-wire class base drew as 1 Strength, and the feat `Lotus Blades` holds 3800 on WeaponDamageMelee where
-		// the tooltip reads "+38%". The ×1 default is deliberately NOT asserted - an id missing from the table is
+		// the tooltip reads "+38%". The ×1 default is deliberately not asserted - an id missing from the table is
 		// unmeasured, not known-unscaled (see the remarks on CharacterStatIdExtensions).
 		[Theory]
 		[InlineData(CharacterStatId.HealthMax, 100u)]
@@ -162,11 +162,11 @@ namespace Faolan.Tests
 			Assert.Equal(expected, stat.GetScale());
 		}
 
-		// The create-world burst's RegenIIR is a DELTA the client ADDS to its own current vitals, so it may only ever
-		// carry this character's own shortfall. It used to replay the captured `0 / 0x8F2 / 0` verbatim, which handed
-		// every freshly created character +22.90 mana on top of a pool the same world entry had just announced as
-		// full: the level-1 Necromancer below stood up reading 269 against a 246 max, and only a relog (which
-		// recomputes from the class curve) cleared it.
+		// The create-world burst's RegenIIR is a delta the client adds to its own current vitals, so it may only ever
+		// carry this character's own shortfall. Replaying a captured `0 / 0x8F2 / 0` verbatim instead hands every
+		// freshly created character +22.90 mana on top of a pool the same world entry has just announced as full: the
+		// level-1 Necromancer below would stand up reading 269 against a 246 max, and only a relog (which recomputes
+		// from the class curve) would clear it.
 		[Fact]
 		public void AFreshlyCreatedCharacter_HasNothingToRefill()
 		{
@@ -176,7 +176,7 @@ namespace Faolan.Tests
 			Assert.Equal((0, 0, 0), vitals.ToRefillDeltas());
 		}
 
-		// ...and a pool that IS short states exactly how short, in the wire's ×100 scale.
+		// ...and a pool that is short states exactly how short, in the wire's ×100 scale.
 		[Fact]
 		public void RefillDeltas_CarryTheShortfallInWireUnits()
 		{
@@ -191,14 +191,14 @@ namespace Faolan.Tests
 			Assert.Equal(0, stamina);
 		}
 
-		// The base is DERIVED from (Class, Level) (#578), so a fixture picks a level rather than injecting numbers.
-		// Level 4 keeps the old shape of these cases - a few hundred HP, a stamina pool, no mana.
+		// The base is derived from (Class, Level), so a fixture picks a level rather than injecting numbers.
+		// Level 4 gives these cases the shape they need - a few hundred HP, a stamina pool, no mana.
 		private static Character Guardian()
 		{
 			return new Character { Class = ConanClass.Guardian, Level = 4 };
 		}
 
-		// The class/level attribute base (#444) a real character carries into the world. Every class's level-1 row is
+		// The class/level attribute base a real character carries into the world. Every class's level-1 row is
 		// a flat 10 wire (= 1 display) for all five, which is what the pools' attribute term scales off.
 		private static Dictionary<CharacterStatId, int> ClassBase()
 		{

@@ -7,27 +7,21 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.ClientLauncher
 {
-	// The launcher's command line, declared once (System.CommandLine) rather than scanned by hand.
-	//
-	// What the declaration buys over the old switch over argv: `--help` is GENERATED from the option descriptions
-	// rather than hand-maintained beside them (the old block never mentioned `--debug-channels` at all), a missing
-	// value is an error the parser words rather than three copies of the same `i + 1 >= args.Length` guard - and one
-	// the parser applies to EVERY option, not just the three that happened to carry a guard - and `--exe`,
-	// `--username`, ... no longer read a value past the end of argv and crash with an IndexOutOfRangeException.
+	// The launcher's command line, declared once with System.CommandLine rather than scanned by hand, so `--help` is
+	// generated from the option descriptions and a missing value is a parse error on every option.
 	//
 	// Two kinds of option live here, as everywhere else in the repo:
-	//   - CONFIG KEYS (Server:PrivateKey, Server:PublicKey, Server:PublicAddress, Server:UniverseAgentPort,
-	//     Cdn:PublicAddress) name a setting that also lives in
-	//     faolan.json and the environment, so the option's NAME is the configuration path and its value is resolved
-	//     through the shared builder (FaolanCommandLine) - the launcher patches the key the server is holding
-	//     without a second setting to keep in step.
-	//   - COMMAND options (--exe, --console, --restore, ...) belong to this invocation alone. Their short aliases
-	//     (-u/-p/-c/-n) stay: unlike a config key, these have no second spelling in a file or the environment to
-	//     drift against, and they are what the documented test launches type.
-	// The two kinds MEET in --patch-universeaddr/--patch-cdn: each is a bare flag that says WHETHER to redirect the client, while
-	// the address it redirects to is the setting (Server:PublicAddress + Server:UniverseAgentPort, Cdn:PublicAddress). They
-	// used to carry the address themselves, which is the same endpoint spelled twice - the launch line and the
-	// faolan.json/faolan.user.json the server and the mirror read - and only the launcher's copy reaches the client.
+	//   - Config keys (Server:PrivateKey, Server:PublicKey, Server:PublicAddress, Server:UniverseAgentPort,
+	//     Cdn:PublicAddress) name a setting that also lives in faolan.json and the environment, so the option's name is
+	//     the configuration path and its value is resolved through the shared builder (FaolanCommandLine) - the
+	//     launcher patches the key the server is holding, with no second setting to keep in step.
+	//   - Command options (--exe, --console, --restore, ...) belong to this invocation alone. Their short aliases
+	//     (-u/-p/-c/-n) stay: unlike a config key, these have no second spelling in a file or the environment to drift
+	//     against, and they are what the documented test launches type.
+	// The two kinds meet in --patch-universeaddr and --patch-cdn: each is a bare flag saying whether to redirect the
+	// client, while the address it redirects to is the setting (Server:PublicAddress + Server:UniverseAgentPort,
+	// Cdn:PublicAddress). Carrying the address on the flag would spell the same endpoint twice - on the launch line and
+	// in the faolan.json the server and the mirror read - with only the launcher's copy reaching the client.
 	public static class LauncherCommand
 	{
 		private static readonly Option<string> Charname = new Option<string>("--charname", "-c") { Description = "Auto-enter this character." };
@@ -38,8 +32,8 @@ namespace Faolan.ClientLauncher
 		};
 
 		// Optional value: `--debug-channels a,b` takes that list, a bare `--debug-channels` takes the default set.
-		// Zero-or-one arity is what tells the two apart - a bare flag is PRESENT with no value, which is why the
-		// reader below asks whether the option was GIVEN rather than whether its value is null.
+		// Zero-or-one arity is what tells the two apart - a bare flag is present with no value, which is why the reader
+		// below asks whether the option was given rather than whether its value is null.
 		private static readonly Option<string> DebugChannels = new Option<string>("--debug-channels")
 		{
 			Description = "Enable the client's OWN debug channels by writing its logger config file dbDebug.conf (no exe change, no process memory): a comma-separated list, or the default low-noise set if given bare. Implies --console. Full list: strings AgeOfConan.exe | grep '^GameCode/'",
@@ -83,7 +77,7 @@ namespace Faolan.ClientLauncher
 			Description = "Restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr redirects and the debug channels) and exit."
 		};
 
-		// The settings the launcher reads, named EXACTLY as they are in faolan.json and the environment (the
+		// The settings the launcher reads, named exactly as they are in faolan.json and the environment (the
 		// one-name-per-setting rule - see Faolan.Core/Cli/FaolanCommandLine.cs). Passing one here is only for a one-off
 		// run; the normal path is that the launcher reads the same faolan.json the server and the content mirror do, so
 		// a configured Server:PrivateKey automatically patches its own matching public key, and --patch-universeaddr/--patch-cdn

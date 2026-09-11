@@ -8,23 +8,23 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// Byte-exact parse/build of a `remoteformat` dialogue screen (#188) so a Knubot screen can be GENERATED from
-	// structured fields instead of replaying captured XML. A screen is:
+	// Byte-exact parse/build of a `remoteformat` dialogue screen, so a Knubot screen can be generated from structured
+	// fields instead of replaying captured XML. A screen is:
 	//   <remoteformat id="I" category="C" key="K" knubot="N" {antitag="A"} >( <parameter> )*</remoteformat>
 	// each parameter:
 	//   <parameter value="7;{xml-escaped inner element}" name="P" />
 	// The inner element (a <localized .../> or <stringentry .../>) is carried as its once-escaped raw string; the
 	// builder re-escapes it for the parameter value, so the model stays agnostic of the inner element shape. The
-	// `key` is the client-validated content hash (harvested, not computable) and is carried verbatim as-escaped.
+	// `key` is the client-validated content hash - harvested, not computable - and is carried verbatim as-escaped.
 	//
-	// A rule-1a STRING codec (#530). The session-slot substitution that runs over a parsed screen before it is sent
-	// is RemoteFormatSession next door - that is live-value policy, not encoding.
+	// A string codec. The session-slot substitution that runs over a parsed screen before it is sent is
+	// RemoteFormatSession next door: that is live-value policy, not encoding.
 	public static class RemoteFormatScreenCodec
 	{
 		private static readonly Regex ParamRx = new Regex("<parameter value=\"7;(?<inner>.*?)\" name=\"(?<name>.*?)\" />", RegexOptions.Compiled);
 
 		// Root attrs, then the `knubot="X" {antitag} >` slot - antitag sits between two spaces (empty when absent,
-		// giving the double space `knubot="0"  >`), so the optional group must NOT eat the trailing space.
+		// giving the double space `knubot="0"  >`), so the optional group must not eat the trailing space.
 		private static readonly Regex RootRx = new Regex("^<remoteformat id=\"(?<id>.*?)\" category=\"(?<cat>.*?)\" key=\"(?<key>.*?)\" knubot=\"(?<knubot>.*?)\" (?:antitag=\"(?<antitag>.*?)\")? >",
 			RegexOptions.Compiled);
 
@@ -61,14 +61,15 @@ namespace Faolan.Core.Network.Codecs.Text
 
 	public sealed record RemoteFormatParameter(string Name, string InnerRaw);
 
-	// The screen forms our own senders build, as VALUE factories - row -> value mapping, not encoding (#533).
+	// The screen forms our own senders build, as value factories - row-to-value mapping, not encoding.
 	public static class RemoteFormatScreens
 	{
-		// The cutscene stock-phrase payload (#410): every captured phrase is a PARAMETER-LESS root, so a StockPhrase
-		// row's four attribute columns rebuild the exact text the 0x205D reply carries - the blob column they replaced
-		// is gone. It used to be a `byte[] Build(StockPhrase)` overload on the codec, which rule 1a allows only while
-		// the text IS the whole wire payload; since #530 wave 7 it is composed INTO ReceivedStockPhraseTextCodec, so
-		// the string is what the caller wants and the Latin1 encoding belongs to that codec's `WriteString`.
+		/// <summary>The cutscene stock-phrase payload.</summary>
+		/// <remarks>
+		///     Every captured phrase is a parameter-less root, so a <see cref="StockPhrase" /> row's four attribute
+		///     columns rebuild the exact text the 0x205D reply carries. The result is a string because it is composed
+		///     into ReceivedStockPhraseTextCodec, which owns the Latin1 encoding through its own `WriteString`.
+		/// </remarks>
 		public static RemoteFormatScreen ForStockPhrase(StockPhrase row)
 		{
 			ArgumentNullException.ThrowIfNull(row);

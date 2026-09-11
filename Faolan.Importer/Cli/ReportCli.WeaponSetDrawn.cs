@@ -7,7 +7,7 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report weapon-set-drawn`: does a captured SPAWN say which of the two weapon sets is drawn? (#588/#400.)
+	// `--report weapon-set-drawn`: does a captured spawn say which of the two weapon sets is drawn?
 	//
 	// `Character.ActiveWeaponSet` is never set by the character importer, so every imported character gets the CLR
 	// default (Primary) - and it is load-bearing, because it decides which weapons `CharacterEquipment` counts toward
@@ -16,7 +16,7 @@ namespace Faolan.Importer.Cli
 	// container"*.
 	//
 	// That is a claim about EVENTS, and there is a second place to look: the spawn record's own worn list. A spawn is
-	// what every OTHER client renders the character from, and only the drawn set renders - so if the f23 list carried
+	// what every other client renders the character from, and only the drawn set renders - so if the f23 list carried
 	// one set at a time it would state the answer without any event at all.
 	//
 	// The test needs no player identification and no per-capture reasoning: across every captured spawn, does any
@@ -30,8 +30,9 @@ namespace Faolan.Importer.Cli
 
 		private static void WeaponSetDrawn(IReadOnlyList<NamedCapture> captures, string? nameFilter = null)
 		{
-			// Per-NAME breakdown when asked: the whole-corpus answer says what the LIST is, but #588 is about one
-			// character, and a character whose spawn carries only one set is a character the list does answer for.
+			// Per-name breakdown when asked: the whole-corpus answer says what the list is, but the question is
+			// usually about one character, and a character whose spawn carries only one set is one the list answers
+			// for.
 			var perName = new SortedDictionary<string, SortedSet<uint>>(StringComparer.OrdinalIgnoreCase);
 			int spawns = 0, armed = 0, primaryOnly = 0, secondaryOnly = 0, both = 0;
 			var bothExamples = new List<string>();

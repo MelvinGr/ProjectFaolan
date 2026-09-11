@@ -9,22 +9,26 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// Parses/builds the DispatchShopData (DL 0x2033) vendor-window body. Wire grammar (decoded 2026-06-12,
-	// validated on all 11 captured vendor windows; dissector tools/capture/decode_shopdata.py):
-	//   [shop ID32 (type 0xC75B)][vendor NPC ID32 (type 0xC350)][u32 contentLength][ProtoInventoryGame]
-	// The content is the SAME ProtoInventoryGame the FullChar snapshot uses for the player's bag, with
-	// inventory_id.type = 111 (the shop container; bag = 104) and per-slot InventoryListEntry items whose
-	// ProtoAcgItem tail carries the item's full identity (Data1..4 quad + template id + hash). Shop
-	// entries differ from bag entries only in their stat list: (0, 0x200000), (26, count), (356, perSlot)
-	// instead of (0, flags), (23, recordId), (26, count) - and item_id = 0 (wares have no instance GUID).
-	// The value used to be a self-serializing `ICodec<ShopContent>` (#530 wave 7 retired the interface here).
+	/// <summary>
+	///     The <c>DispatchShopData</c> vendor-window body:
+	///     <c>[shop ID32][vendor NPC ID32][u32 contentLength][ProtoInventoryGame]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Decoded and validated on all 11 captured vendor windows (dissector tools/capture/decode_shopdata.py). The
+	///     content is the same <c>ProtoInventoryGame</c> the FullChar snapshot uses for the player's bag, with
+	///     <c>inventory_id.type</c> = 111 (the shop container; the bag is 104) and per-slot <c>InventoryListEntry</c>
+	///     items whose <c>ProtoAcgItem</c> tail carries the item's full identity (the Data1..4 quad plus template id and
+	///     hash). Shop entries differ from bag entries only in their stat list - (0, 0x200000), (26, count),
+	///     (356, perSlot) instead of (0, flags), (23, recordId), (26, count) - and <c>item_id</c> = 0, wares having no
+	///     instance GUID.
+	/// </remarks>
 	public static class ShopContentCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchShopData;
 
 		public const uint ShopEntryFlags = 0x200000;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ShopContent value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -34,9 +38,9 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return s.ToArray();
 		}
 
-		// From rows. `resolveItem` maps a template id to its Items row (for the quad + hash); unresolvable slots are
-		// skipped (the importer harvests the wares into Items from the same packets, so resolution only fails on a
-		// hand-made shop with a bogus template).
+		// From rows. `resolveItem` maps a template id to its Items row (for the quad and hash); unresolvable slots are
+		// skipped, since the importer harvests the wares into Items from the same packets and resolution only fails on a
+		// hand-made shop with a bogus template.
 		public static byte[] Build(uint shopInstance, uint npcHandle, uint maxSize, IEnumerable<ShopItem> items, Func<uint, Item> resolveItem)
 		{
 			return Build(ShopContents.FromRows(shopInstance, npcHandle, maxSize, items, resolveItem));
@@ -145,20 +149,25 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// One vendor slot: the ware's position, template and the identity its ProtoAcgItem tail carries.
+	/// <summary>
+	///     One vendor slot: the ware's position, template and the identity its <c>ProtoAcgItem</c> tail carries.
+	/// </summary>
 	public sealed record ShopEntry(uint Pos, uint Template, uint Count, uint Stat356, uint TailLevel, uint Hash, uint Data1, uint Data2, uint Data3, uint Data4);
 
-	// The decoded DispatchShopData body.
+	/// <summary>The decoded DispatchShopData body.</summary>
 	public sealed record ShopContent(uint ShopInstance, uint NpcHandle, uint MaxSize, IReadOnlyList<ShopEntry> Entries);
 
-	// Whether a body IS a shop window at all.
-	//
-	// NOT a codec: method index 0x2033 is class-MULTIPLEXED, so a caller sweeping a mixed stream cannot dispatch on the
-	// opcode word the way #530 §4 assumes - it has to look at the body. That is the `PlayfieldTokenScan` shape, and it
-	// is why this is a neighbour rather than a third public method on the codec.
+	/// <summary>
+	///     Whether a body is a shop window at all.
+	/// </summary>
+	/// <remarks>
+	///     Not a codec: this method index is class-multiplexed, so a caller sweeping a mixed stream cannot dispatch on the
+	///     opcode word and has to look at the body. That is why this is a neighbour rather than a third public method on
+	///     the codec.
+	/// </remarks>
 	public static class ShopDataScan
 	{
-		// A shop-data body: shop ID32 type + char ID32 type + a content length that lands exactly on the body end.
+		// A shop-data body: shop ID32 type, char ID32 type, and a content length that lands exactly on the body end.
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
 			return body.Length > 20 && body.ReadU32Be(0) == EntityClass.Shop && body.ReadU32Be(8) == EntityClass.Character &&
@@ -166,7 +175,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// The shop-window forms, as VALUE factories - row -> value mapping (#533).
+	/// <summary>The shop-window forms, as value factories: a row-to-value mapping.</summary>
 	public static class ShopContents
 	{
 		public static ShopContent FromRows(uint shopInstance, uint npcHandle, uint maxSize, IEnumerable<ShopItem> items, Func<uint, Item> resolveItem)

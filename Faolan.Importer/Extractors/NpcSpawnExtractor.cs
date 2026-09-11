@@ -14,22 +14,22 @@ namespace Faolan.Importer.Extractors
 	{
 		public uint TemplateId { get; init; }
 
-		// Where in the capture this spawn arrived (the index into the packet list `Extract` was given). ⚠️ Needed
-		// because HANDLES ARE RECYCLED: 91 handles in the corpus carry two different templates over one capture, so
-		// "what was spawned on handle H" is only answerable AT A POINT IN TIME. A consumer correlating a later packet
-		// to an NPC must take the most recent spawn BEFORE it, not the first or the last one overall (#731).
+		// Where in the capture this spawn arrived (the index into the packet list `Extract` was given). Needed
+		// because HANDLES are RECYCLED: 91 handles in the corpus carry two different templates over one capture, so
+		// "what was spawned on handle H" is only answerable at A point in time. A consumer correlating a later packet
+		// to an NPC must take the most recent spawn before it, not the first or the last one overall.
 		// Left 0 by the extractors that do not walk the whole packet list.
 		public int SourceIndex { get; init; }
 
-		// The CLASS this placement belongs to, on a class-specific map (Map.ClassSpecific - the city armories).
+		// The class this placement belongs to, on a class-specific map (Map.ClassSpecific - the city armories).
 		// Stamped by BuildBurstTruthSpawns from the class of the capture's own played character; null everywhere else.
 		public ConanClass? ClassId { get; init; }
 
-		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
+		// The humanoid appearance/morph table lifted from the post-IIR, empty for animals. Lets the spawn's
 		// post-IIR generate from rows instead of the Data blob.
 		public IReadOnlyList<AppearanceEntry> Morphs { get; init; } = [];
 
-		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
+		// The worn equipment lifted from the CharacterIIR f23, empty for unarmed NPCs and for any NPC whose
 		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).
 		public IReadOnlyList<NpcSpawnEquipment> Equipment { get; init; } = [];
 		public bool HasEquipment { get; init; }
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Extractors
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		// What ends the pre-poll login burst window (#619). Named at last: on the 26,011 captured c2s frames carrying
+		// What ends the pre-poll login burst window. Named at last: on the 26,011 captured c2s frames carrying
 		// this the RECEIVER class is `GameCharAgent` (0xA9ECB95D), so index 0x20 indexes GameCharAgent - and the
 		// client's own method table calls that `UpdateQuestMarkerNPC`. The body agrees: it is two ID32s, the second
 		// constant per capture (the player's own instance) and the first a handle that matches an FA015807 spawn from
@@ -66,13 +66,13 @@ namespace Faolan.Importer.Extractors
 		// client asking "what quest marker do I draw over this NPC, for me" once per NPC it has taken delivery of -
 		// which is why it reads like a spawn poll and why the first one marks the end of the burst.
 		//
-		// ⚠️ The DIRECTION filter is load-bearing, not decoration. 0x2020 is the wire rendering of index 0x20 on
+		// The direction filter is load-bearing, not decoration. 0x2020 is the wire rendering of index 0x20 on
 		// whichever interface the frame is addressed to, and s2c that is `GameCharInterface.DispatchAddItem` - 165 of
 		// them in the corpus. Without the c2s test an item delivery during world entry would close the burst window
 		// early and truncate the map's spawn set.
 		internal static readonly uint QuestMarkerQueryWireOpcode = CapturedPacket.Wire(GameCharAgentMethods.UpdateQuestMarkerNPC);
 
-		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
+		// Every FA015807 spawn in the capture (login burst and mid-session interest/respawn spawns), all maps. This
 		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so
 		// the live world over-populates (~4x retail). Use ExtractLoginBurst for the clean retail-shaped set.
 		public static List<NpcSpawnEntry> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -88,13 +88,13 @@ namespace Faolan.Importer.Extractors
 
 				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					// ⚠️ A MapChange we cannot READ must clear the map, never leave the previous one standing (#818).
+					// A MapChange we cannot read must clear the map, never leave the previous one standing.
 					// Keeping it silently re-attributes everything that follows to the playfield the player just LEFT:
 					// when PlayfieldFCodec refused the zero-scene-entry body, White Sands Night's NPCs were imported
 					// as City of Tortage Night spawns, and the row counts looked like a healthy +50.
 					//
-					// ⚠️ And an EPIC-mode window must be skipped outright (#309): the proxy's class word says which
-					// difficulty this copy is, and epic re-tunes the SAME templates - measured on chat-annotated-3's
+					// And an EPIC-mode window must be skipped outright: the proxy's class word says which
+					// difficulty this copy is, and epic re-tunes the same templates - measured on chat-annotated-3's
 					// back-to-back Spider Caverns entries, Cavecrawler/Cavehunter carry ~8x the health at the same
 					// name, template and level (147,600 -> 1,186,900 at L27), minion-type Spiderlings ~+6%. Harvesting
 					// an epic window would write those into the NORMAL stat columns; only first-record-wins ordering
@@ -113,10 +113,10 @@ namespace Faolan.Importer.Extractors
 			return entries;
 		}
 
-		// Only the NPCs of a map's LOGIN WORLD BUILD: the FA015807 spawns in the pre-poll burst window (a MapChange
+		// Only the NPCs of a map's LOGIN WORLD build: the FA015807 spawns in the pre-poll burst window (a MapChange
 		// up to the client's first UpdateQuestMarkerNPC query - the same window MapWorldBurstExtractor delimits). This is the
 		// retail-shaped set as it arrives on world entry; it EXCLUDES the mid-session interest/respawn spawns that
-		// otherwise accrete duplicates (Gitea #185 / #244). `allowedMaps` (null = all) restricts which maps to lift.
+		// otherwise accrete duplicates. `allowedMaps` (null = all) restricts which maps to lift.
 		public static List<NpcSpawnEntry> ExtractLoginBurst(IReadOnlyList<CapturedPacket> packets, ISet<uint>? allowedMaps = null)
 		{
 			var entries = new List<NpcSpawnEntry>();
@@ -127,8 +127,8 @@ namespace Faolan.Importer.Extractors
 			{
 				if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
 				{
-					// Clear rather than keep the previous map on an unreadable MapChange - see Extract (#818), and
-					// skip an EPIC-mode window outright - epic re-tunes the same templates (~8x health), see Extract (#309).
+					// Clear rather than keep the previous map on an unreadable MapChange - see Extract, and
+					// skip an EPIC-mode window outright - epic re-tunes the same templates (~8x health), see Extract.
 					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) && !change.Proxy.IsEpic ? change.MapId : 0;
 					sawPoll = false;
 					continue;
@@ -158,7 +158,7 @@ namespace Faolan.Importer.Extractors
 		// Dedup by (map, spawn point); keep the first seen.
 		public static List<NpcSpawnEntry> Merge(IEnumerable<NpcSpawnEntry> all)
 		{
-			// Keyed by (map, position, CLASS): on a class-specific map two classes' quartermasters legitimately stand
+			// Keyed by (map, position, class): on a class-specific map two classes' quartermasters legitimately stand
 			// on the same spot, and collapsing them would silently drop one class's set. Null class (every ordinary
 			// map) keeps the historical (map, position) behaviour.
 			var seen = new Dictionary<(uint, float, float, float, ConanClass?), NpcSpawnEntry>();
@@ -189,7 +189,7 @@ namespace Faolan.Importer.Extractors
 					? stats.Health
 					: stats.Life;
 
-			// Lift worn equipment (#185) - but only when EVERY item matches the reproducible ProtoAcgItem shape, so
+			// Lift worn equipment - but only when every item matches the reproducible ProtoAcgItem shape, so
 			// the builder reproduces the f23 list byte-for-byte; otherwise leave equipment to the Data blob (no rows).
 			var equipment = new List<NpcSpawnEquipment>();
 			foreach (var entry in msg.InventoryEntries)
@@ -224,11 +224,11 @@ namespace Faolan.Importer.Extractors
 			};
 		}
 
-		// The transform floats, at the offsets `SpawnPacketBuilder` publishes. Those offsets are CODEC-owned and
-		// deferred by #530 §7 along with the captured template they patch - this reads them rather than declaring its
-		// own. The whole-record route (`SpawnBodyReader.TryParse`) is deliberately not taken here: it is strict, and
-		// the rest of TryBuildEntry is built to lift identity/appearance out of bodies the strict codec rejects
-		// (#243's mid-session humanoids), so gating the entry on it would drop spawns rather than decode them.
+		// The transform floats, at the offsets `SpawnPacketBuilder` publishes. Those offsets are codec-owned, so this
+		// reads them rather than declaring its own. The whole-record route (`SpawnBodyReader.TryParse`) is
+		// deliberately not taken here: it is strict, and the rest of TryBuildEntry is built to lift
+		// identity/appearance out of bodies the strict codec rejects - the mid-session humanoids - so gating the
+		// entry on it would drop spawns rather than decode them.
 		private static float ReadLE(byte[] body, int offset)
 		{
 			return body.ReadF32Le(offset);
@@ -246,22 +246,21 @@ namespace Faolan.Importer.Extractors
 			if (handle >= EntityHandles.CharacterInstanceBase)
 				return false; // the player's own spawn
 
-			// Another visible PLAYER's spawn (not the own player - a different account in view): it carries
-			// player_stats + no npc_stats, so it isn't an NPC. These were previously imported as phantom NpcSpawn
-			// rows with TemplateId 0 / no type (found via the CoreChar-header X RE, #244) - drop them here.
+			// Another visible player's spawn (not the own player - a different account in view): it carries
+			// player_stats and no npc_stats, so it is not an NPC. Without this it becomes a phantom NpcSpawn row with
+			// TemplateId 0 and no type.
 			if (SpawnBodyReader.TryReadCharacterMessage(body, out var pr) && pr.Message.player_stats != null)
 				return false;
 
-			// The name comes off the CoreCharacter message and nowhere else (#541). This used to fall back to a
-			// lenient byte scan for the name field; measured over the whole corpus, that fallback NEVER fires - of
-			// 11632 captured char spawns the scan and the message reader name the same 11631, and the one they
-			// disagree on is the scan getting it wrong (a 1-character "\" where the message says "Crocodile").
+			// The name comes off the CoreCharacter message and nowhere else. A lenient byte scan for the name field
+			// adds nothing: over the whole corpus the scan and the message reader name the same spawns bar one, and
+			// on that one the scan is wrong (a 1-character "\" where the message says "Crocodile").
 			var identity = LiftIdentity(body);
 			var name = identity.Name;
 
-			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals. The clean shape
-			// decodes directly; a mid-session humanoid capture carries the SAME table behind a runtime record1, lifted
-			// by the lenient decode (#243) so those spawns get morph rows too (and build from scratch, not Data).
+			// Humanoid appearance/morph table - decoded from the post-IIR; empty for animals. The clean shape
+			// decodes directly; a mid-session humanoid capture carries the same table behind a runtime record1, lifted
+			// by the lenient decode so those spawns get morph rows too (and build from scratch, not Data).
 			var morphs = NpcSpawnAppearance.TryLift(body, out var decoded)
 				? decoded
 				: NpcSpawnAppearance.TryLiftLenient(body, out var lenient)

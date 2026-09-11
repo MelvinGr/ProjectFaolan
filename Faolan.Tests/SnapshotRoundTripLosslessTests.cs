@@ -12,10 +12,10 @@ namespace Faolan.Tests
 {
 	// Regression guard for the DB-container world-entry path (RetailLoginReplay.BuildBeachInventoryPacket): the typed
 	// protobuf round-trip it relies on (FromProtobuf<ProtoFullCharacterIIR> -> Inventories.Clear()/Add() ->
-	// ToProtobufBytes) MUST be byte-lossless for everything we do NOT change. A plain round-trip with NO inventory
+	// ToProtobufBytes) must be byte-lossless for everything we do not change. A plain round-trip with no inventory
 	// edit must reproduce the captured root exactly; otherwise the rebuilt root would differ from a valid one before
 	// we even touch the containers, and the client rejects it ("ReadSubClass for IIR 1937403385
-	// (FullPlayerCharacterIIR) failed"). This proves the round-trip is NOT the source of the 2026-06-13 regression -
+	// (FullPlayerCharacterIIR) failed"). This proves the round-trip is not the source of the 2026-06-13 regression -
 	// it does not drop the per-container 0x18 subclass version byte (the suspect).
 	public class SnapshotRoundTripLosslessTests
 	{

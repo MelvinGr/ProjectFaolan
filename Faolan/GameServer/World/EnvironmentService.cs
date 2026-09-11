@@ -13,19 +13,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// "The world damaged you" - the non-combat damage sources (#495/#504). Before this there were none at all: every
-	// health loss came from a creature through CombatResolver, which is why fall damage and lava both had to wait on
-	// the same missing plumbing rather than being two small features.
-	//
-	// Composed collaborator (CLAUDE.md): owns the DECISION (did this move end a fall? did it cross into a hazard?) and
-	// reaches the wire only through IEnvironmentOutbound. Driven from the CharDCMove handler rather than from the
-	// world tick, deliberately - both triggers are edges on the player's own position stream:
-	//
-	//   * a fall ENDS on the move whose flag1 shows the character back on the ground, and the drop is only known then;
-	//   * a hazard's own client-named trigger is `playerenter(3)`, i.e. the crossing, not "being inside".
-	//
-	// Polling either at the 10 Hz tick would sample the position AFTER the fact and, for a fall, miss the landing
-	// record that carries the impact entirely.
+	/// <summary>
+	///     The non-combat damage sources: the world damaging the player, as against a creature doing so.
+	/// </summary>
+	/// <remarks>
+	///     It owns the decision - did this move end a fall, did it cross into a hazard - and reaches the wire only
+	///     through <see cref="IEnvironmentOutbound" />.
+	///     <para>
+	///         It is driven from the move handler rather than from the world tick, because both triggers are edges on
+	///         the player's own position stream: a fall ends on the move whose flag1 shows the character back on the
+	///         ground, and the drop is only known then; a hazard's own client-named trigger is <c>playerenter(3)</c>,
+	///         the crossing rather than being inside. Polling either at the tick would sample the position after the
+	///         fact and, for a fall, miss the landing record that carries the impact entirely.
+	///     </para>
+	/// </remarks>
 	public sealed class EnvironmentService
 	{
 		private readonly IWorldRepository _database;
@@ -41,8 +42,11 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// Every accepted player move runs through here. `position` is the ACCEPTED position (the spellweave trance pins
-		// it), so a rooted caster cannot be pushed into a hazard by a move the server rejected.
+		/// <summary>Every accepted player move runs through here.</summary>
+		/// <param name="position">
+		///     The accepted position, which the spellweave trance pins, so a rooted caster cannot be pushed into a
+		///     hazard by a move the server rejected.
+		/// </param>
 		public async Task OnPlayerMoved(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags, float? verticalSpeed = null)
 		{
 			await TrackFall(client, entity, position, flags, verticalSpeed);
@@ -50,13 +54,18 @@ namespace Faolan.GameServer.World
 			await CheckNoMount(client, entity, position);
 		}
 
-		// No-mount volumes (#681): riding into a settlement unseats you. Same shape as a hazard - an edge on the
-		// player's own position stream - and it reaches the wire through the SAME dismount the button press uses,
-		// because retail ends every dismount with one record pair whatever caused it.
-		//
-		// No latch, unlike CurrentHazardId: there is nothing to re-fire. Once unseated the player is not mounted, so
-		// the test costs a bool until they mount again - and a player who mounts up INSIDE the volume is unseated on
-		// their next move, which is the behaviour we want anyway and is why this is not gated on the crossing.
+		/// <summary>No-mount volumes: riding into a settlement unseats the rider.</summary>
+		/// <remarks>
+		///     The same shape as a hazard, an edge on the player's own position stream, and it reaches the wire through
+		///     the same dismount the button press uses, because retail ends every dismount with one record pair
+		///     whatever caused it.
+		///     <para>
+		///         Unlike <c>CurrentHazardId</c> there is no latch, because there is nothing to re-fire: once unseated
+		///         the player is not mounted, so the test costs a bool until they mount again, and a player who mounts
+		///         up inside the volume is unseated on their next move - which is the wanted behaviour, and why this is
+		///         not gated on the crossing.
+		///     </para>
+		/// </remarks>
 		private async Task CheckNoMount(INetworkClient client, WorldEntity entity, Vector3 position)
 		{
 			if (!entity.IsMounted)
@@ -81,13 +90,18 @@ namespace Faolan.GameServer.World
 			return regions;
 		}
 
-		// Fall detection. The client already tells us whether it is off the ground: flag1 CLEARS NoAccelerationVector
-		// while airborne, because it starts sending an acceleration vector the moment the character leaves the ground
-		// (MoveFlag's own note, pinned by xxx_2clients_jumping). So this is an edge detector over that bit, not physics.
-		//
-		// ⚠️ The Airborne bit (0x40) is NOT the test, even though its name invites it: measured across the fall
-		// captures it is set only while the character is RISING (flag1 0x42) and clears for the descent (0x02), so
-		// keying on it would miss every fall that starts from a ledge rather than a jump - which is most of them.
+		/// <summary>Fall detection: an edge detector over the client's own airborne bit, not physics.</summary>
+		/// <remarks>
+		///     The client states whether it is off the ground: flag1 clears <c>NoAccelerationVector</c> while airborne,
+		///     because it starts sending an acceleration vector the moment the character leaves the ground - see
+		///     <see cref="MoveFlag" />, pinned by xxx_2clients_jumping.
+		///     <para>
+		///         The <c>Airborne</c> bit (0x40) is deliberately not the test, despite its name: across the fall
+		///         captures it is set only while the character is rising (flag1 0x42) and clears for the descent
+		///         (0x02), so keying on it would miss every fall that starts from a ledge rather than a jump, which is
+		///         most of them.
+		///     </para>
+		/// </remarks>
 		private async Task TrackFall(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags, float? verticalSpeed)
 		{
 			var airborne = !flags.HasFlag(MoveFlag.NoAccelerationVector);
@@ -96,8 +110,8 @@ namespace Faolan.GameServer.World
 				if (!entity.Airborne)
 				{
 					entity.Airborne = true;
-					// Seed the apex with the last GROUNDED height, so a fall straight off a ledge - which has no rising
-					// samples at all - still measures from the top rather than from its first mid-air sample.
+					// Seed the apex with the last grounded height, so a fall straight off a ledge - which has no
+					// rising samples at all - still measures from the top rather than from its first mid-air sample.
 					entity.AirborneApexY = MathF.Max(entity.LastGroundedY, position.Y);
 					entity.AirborneFallSpeed = 0f;
 				}
@@ -105,9 +119,9 @@ namespace Faolan.GameServer.World
 				if (position.Y > entity.AirborneApexY)
 					entity.AirborneApexY = position.Y;
 
-				// #515: the client's own downward speed, which is what the damage is resolved from. Only the DOWNWARD
-				// half is kept - a jump's rise reports a positive Y and says nothing about how hard the landing will
-				// be - and the maximum, since a fall accelerates.
+				// The client's own downward speed, which is what the damage is resolved from. Only the downward half
+				// is kept, because a jump's rise reports a positive Y and says nothing about how hard the landing
+				// will be, and only the maximum, because a fall accelerates.
 				if (verticalSpeed is { } vy && -vy > entity.AirborneFallSpeed)
 					entity.AirborneFallSpeed = -vy;
 
@@ -123,10 +137,9 @@ namespace Faolan.GameServer.World
 			entity.AirborneFallSpeed = 0f;
 			var fall = entity.AirborneApexY - position.Y;
 
-			// #515: the SPEED law where the client reported one, the height law where it did not. Both are the same
-			// fit over the same 34 corpus falls; the speed is simply the more accurate input (r = 0.96 against 0.63),
-			// and it is not a new trust assumption - the height above is reconstructed from the same client's
-			// position stream, so the velocity is the same source one field over.
+			// The speed law where the client reported a speed, the height law where it did not. Both are the same fit
+			// over the same 34 corpus falls; the speed is simply the more accurate input (r = 0.96 against 0.63), and
+			// it is no extra trust in the client, because the height is reconstructed from that same position stream.
 			var useSpeed = speed > 0f;
 			if (useSpeed ? speed <= FallDamage.FreeFallSpeed : fall <= FallDamage.FreeFallDistance)
 				return;
@@ -135,9 +148,9 @@ namespace Faolan.GameServer.World
 			if (vitals == null || vitals.IsDead)
 				return;
 
-			// /falldamage off (#914). Deliberately AFTER the free-fall test and before the damage is resolved, so a
-			// disabled fall is still a detected fall - the airborne state is cleared either way and the toggle only
-			// suppresses the consequence.
+			// The /falldamage toggle, deliberately after the free-fall test and before the damage is resolved: a
+			// disabled fall is still a detected fall, the airborne state is cleared either way, and the toggle
+			// suppresses only the consequence.
 			if (!entity.FallDamageEnabled)
 				return;
 
@@ -147,15 +160,15 @@ namespace Faolan.GameServer.World
 			if (damage == 0)
 				return;
 
-			// .godmode spares the player the damage, but the DEBUFF still lands - it is the landing animation's marker
-			// and suppressing it would make a godmode test look like the fall was not detected at all.
+			// Godmode spares the player the damage, but the debuff still lands: it is the landing animation's marker,
+			// and suppressing it would make a godmode test look like the fall was never detected.
 			var debuff = FallDamage.ResolveDebuff(damage, vitals.MaxHealth);
 
 			if (!entity.GodMode)
 			{
 				vitals.ApplyHealthDelta(-(int)damage);
-				// The environmental StatDamage form: no caster, no spell, school 12, and NO DamageResult - retail
-				// renders no floating combat number for a fall (CombatEffectBuilder.EnvironmentalDamage).
+				// The environmental damage form: no caster, no spell, school 12, and no damage result, because retail
+				// renders no floating combat number for a fall.
 				await _output.SendEnvironmentalDamage(client, entity.Handle, damage, (uint)CharacterStatId.HealthCurrent, FallDamage.EnvironmentalSchool);
 				await _output.PushVitals(client, vitals);
 			}
@@ -163,10 +176,10 @@ namespace Faolan.GameServer.World
 			if (debuff != 0)
 				await _output.ApplySelfBuff(client, debuff << 8);
 
-			// A fall CAN kill (the corpus tops out at 64.9% of max health, so two in a row will). The death itself is
-			// TickPlayerDeaths' job - it notices IsDead, strips buffs and sends the release screen - so nothing here
-			// duplicates that. LastAttackerHandle stays 0: there is no killer, and attributing the death to the last
-			// mob that hit you would give a wrong instant-respawn (#214).
+			// A fall can kill: the corpus tops out at 64.9% of max health, so two in a row will. The death itself is
+			// the death tick's job - it notices IsDead, strips buffs and sends the release screen - so nothing here
+			// duplicates it. LastAttackerHandle stays 0, because there is no killer, and attributing the death to the
+			// last mob that hit the player would give a wrong instant respawn.
 			_logger.LogInformation("Environment: {Player} fell {Fall:F1} units at {Speed:F1} u/s for {Damage} damage ({Percent:P0} of {Max}){Source}{Debuff}.",
 				client.Session.Character?.Name, fall, speed, damage, (float)damage / vitals.MaxHealth, vitals.MaxHealth,
 				useSpeed ? "" : " [no reported speed - resolved from the sampled drop]",
@@ -176,9 +189,13 @@ namespace Faolan.GameServer.World
 				_logger.LogInformation("Environment: the fall killed {Player}.", client.Session.Character?.Name);
 		}
 
-		// Hazard areas (#504). Fires on the ENTRY edge - the client's own feedback token for the lava names the trigger
-		// `playerenter(3)` - so standing in one does not re-apply every move. CurrentHazardId is the "am I already
-		// inside" latch, exactly like CurrentAreaNameId is for banners.
+		/// <summary>
+		///     Hazard areas. Fires on the entry edge - the client's own feedback token for the lava names the trigger
+		///     <c>playerenter(3)</c> - so standing in one does not re-apply on every move.
+		/// </summary>
+		/// <remarks>
+		///     <c>CurrentHazardId</c> is the already-inside latch, as <c>CurrentAreaNameId</c> is for banners.
+		/// </remarks>
 		private async Task CheckHazards(INetworkClient client, WorldEntity entity, Vector3 position)
 		{
 			var hazards = await GetMapHazardsCached(entity.MapId);
@@ -197,7 +214,7 @@ namespace Faolan.GameServer.World
 
 			if (inside == null)
 			{
-				entity.CurrentHazardId = null; // left it - the next entry fires again
+				entity.CurrentHazardId = null; // left the hazard, so the next entry fires again
 				return;
 			}
 
@@ -210,8 +227,8 @@ namespace Faolan.GameServer.World
 			if (vitals == null || vitals.IsDead)
 				return;
 
-			// The effect spell first, then the damage - retail's order, and the one that reads right: the lava's
-			// Incineration lands at 20:25:58 and the death follows at 20:26:01, i.e. the player burns and THEN dies.
+			// The effect spell first, then the damage - retail's order: the lava's Incineration lands at 20:25:58 and
+			// the death follows at 20:26:01, so the player burns and then dies.
 			if (inside.EffectSpellId != 0)
 				await _output.ApplySelfBuff(client, inside.EffectSpellId << 8);
 
@@ -223,9 +240,9 @@ namespace Faolan.GameServer.World
 
 			if (inside.Lethal)
 			{
-				// Lethal is its own outcome, not "damage >= health": retail sends NO StatDamage at all for the lava
-				// death (checked across the whole window), so the health simply goes to zero and TickPlayerDeaths
-				// picks it up on the next tick - which is also where the death penalty is applied.
+				// Lethal is its own outcome rather than damage exceeding health: retail sends no damage record at all
+				// for the lava death, checked across the whole window, so the health simply goes to zero and the
+				// death tick picks it up, which is also where the death penalty is applied.
 				vitals.Health = 0;
 				await _output.PushVitals(client, vitals);
 				_logger.LogInformation("Environment: {Player} was killed by hazard {Hazard} on map {Map}.", client.Session.Character?.Name, inside.Region.Name, entity.MapId);
@@ -251,28 +268,32 @@ namespace Faolan.GameServer.World
 			return hazards;
 		}
 
-		// Containment against the client's own polygon - no slack anywhere, because unlike a MapArea banner hull this
-		// geometry is EXACT (it is the volume the client draws the lava with, and the volume a quest goal or a
-		// resurrection pad was drawn as). Adding tolerance to a volume that kills would kill players on the walkable
-		// ledge beside it.
-		//
-		// Three tests, cheapest first: the Y range, then the AABB, then the polygon walk. The AABB is only a reject
-		// filter - a lava volume is a concave ribbon tracing the flow (up to 583 vertices) whose bounding box covers a
-		// lot of safe ground, so an AABB hit means "worth walking", never "inside".
-		//
-		// ONE routine for every consumer (#679): hazards used to carry their own copy of the geometry and so had a
-		// near-identical second overload. The ordering trap below is exactly the kind of thing that must not be
-		// rediscovered twice.
+		/// <summary>Containment against the client's own polygon, with no tolerance anywhere.</summary>
+		/// <remarks>
+		///     Unlike a <c>MapArea</c> banner hull this geometry is exact - it is the volume the client draws the lava
+		///     with, and the volume a quest goal or a resurrection pad was drawn as - and adding slack to a volume that
+		///     kills would kill players on the walkable ledge beside it.
+		///     <para>
+		///         Three tests, cheapest first: the Y range, the bounding box, then the polygon walk. The bounding box
+		///         is only a reject filter, because a lava volume is a concave ribbon tracing the flow, up to 583
+		///         vertices, whose box covers a lot of safe ground: a box hit means the polygon is worth walking, never
+		///         that the point is inside.
+		///     </para>
+		///     <para>This is the one containment routine; every consumer of region geometry goes through it.</para>
+		/// </remarks>
 		public static bool Contains(MapRegion region, Vector3 p)
 		{
 			// Ordered by Sequence: a polygon is only meaningful in ring order, and EF gives no ordering guarantee on a
-			// navigation collection. Reading them as loaded produced a self-intersecting ring on some volumes.
+			// navigation collection. Reading the vertices as loaded yields a self-intersecting ring on some volumes.
 			return InPrism(p, region.MinY, region.MaxY, region.MinX, region.MaxX, region.MinZ, region.MaxZ,
 				region.Vertices.OrderBy(v => v.Sequence).Select(v => (v.X, v.Z)));
 		}
 
-		// Y range -> AABB reject -> even-odd ray cast over the ring, wrapping the closing edge back to vertex 0 (the
-		// RDB does not repeat the first point). `ring` must already be in Sequence order.
+		/// <summary>
+		///     Y range, then bounding-box reject, then an even-odd ray cast over the ring, wrapping the closing edge
+		///     back to vertex 0 because the RDB does not repeat the first point.
+		/// </summary>
+		/// <param name="ring">The polygon's vertices, which must already be in <c>Sequence</c> order.</param>
 		private static bool InPrism(Vector3 p, float minY, float maxY, float minX, float maxX, float minZ, float maxZ,
 			IEnumerable<(float X, float Z)> ring)
 		{

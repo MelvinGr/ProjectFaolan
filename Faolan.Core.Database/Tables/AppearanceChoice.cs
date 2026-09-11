@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One selectable character-appearance choice for a given sex+race, imported from the client's CHARACTERCREATOR
+	// One selectable character-appearance choice for a given sex+race, imported from the client's charactercreator
 	// (RDB 1010700 - the per-sex/race legal option lists) with the resource's friendly Name resolved from the
 	// referenced RDB object's own name= (texscript for tattoos, monsterdata for heads) and the swatch Color from the
 	// creator XML. The morph slider bounds and the height range ride as special Category rows (Min/Max set). This is
 	// what the Faolan.Web appearance editor reads for its race/sex-gated pickers (replacing a runtime XML parse).
-	// Keyed by (Race, Sex, Category, Sequence) - a choice IS its slot in one race/sex/category list, so there was
+	// Keyed by (Race, Sex, Category, Sequence) - a choice is its slot in one race/sex/category list, so there was
 	// never anything for a surrogate id to identify. Verified unique across all 634 rows.
 	[PrimaryKey(nameof(Race), nameof(Sex), nameof(Category), nameof(Sequence))]
 	public class AppearanceChoice

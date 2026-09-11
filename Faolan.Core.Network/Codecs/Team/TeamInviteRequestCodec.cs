@@ -4,14 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// c2s TeamInvite (CSPlayerAgent 0x2003) - the leader (or a solo player) invites someone into a team:
-	//   TeamInvite(const ID32& i_cTargetID, const std::string& i_cMessage, bool i_bCheckCriminalStatus)
-	// The body is 11 bytes in all four captures - the ID32, an EMPTY message and the flag - which is why only the
-	// first 8 were read for so long (#459).
-	//
-	// i_bCheckCriminalStatus asks the server to refuse the invite if the target is flagged CRIMINAL, a PvP rule we
-	// model nothing of. It is set in every captured invite, so it is not a rare path - just a no-op until PvP
-	// flagging exists.
+	/// <summary>
+	///     c2s <c>TeamInvite(const ID32&amp; i_cTargetID, const std::string&amp; i_cMessage, bool
+	///     i_bCheckCriminalStatus)</c> - the leader, or a solo player, invites someone into a team. The body is 11 bytes
+	///     in all four captures: the ID32, an empty message and the flag.
+	/// </summary>
+	/// <remarks>
+	///     <c>i_bCheckCriminalStatus</c> asks the server to refuse the invite if the target is flagged criminal, a PvP
+	///     rule nothing here models. It is set in every captured invite, so it is not a rare path - just a no-op until PvP
+	///     flagging exists.
+	/// </remarks>
 	public static class TeamInviteRequestCodec
 	{
 		public const uint Method = (uint)CSPlayerAgentMethods.TeamInvite;

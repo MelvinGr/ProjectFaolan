@@ -5,7 +5,7 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Core.Crypt
 {
 	// The per-string LDB decryption key: the `key="..."` attribute the server sends on every `<remoteformat>` /
-	// `<localized>` reference into an ENCRYPTED LDB category (the quest text 50300-50306 and the NPC dialogue
+	// `<localized>` reference into an encrypted LDB category (the quest text 50300-50306 and the NPC dialogue
 	// 50000-50003). Eleven of the client's 158 categories are encrypted, and this is what unlocks them - see
 	// docs/rdb/ldb-string-index.md.
 	//
@@ -16,22 +16,22 @@ namespace Faolan.Core.Crypt
 	// exactly like an item template; only the key's delivery differs (per string on the wire, rather than per
 	// template in the RDB).
 	//
-	// ⚠️ The 85-character alphabet SKIPS 0x3a..0x3e (`:;<=>`) and uses `vwxyz` for digits 25..29 instead. That is
+	// The 85-character alphabet skips 0x3a..0x3e (`:;<=>`) and uses `vwxyz` for digits 25..29 instead. That is
 	// not decoration: `<`, `>` and `=` cannot sit unescaped in an XML attribute, and the key travels inside one.
-	// The client's decoder expresses the same thing as a fold (`c -= 0x3c` for `v`..`z`), which READS like a
+	// The client's decoder expresses the same thing as a fold (`c -= 0x3c` for `v`..`z`), which reads like a
 	// many-to-one aliasing - it is not, because the characters it folds from are the only ones ever emitted.
 	// Assuming otherwise produces an encoder that emits `:;<=>` and a round-trip that fails on 72% of real keys.
-	// Verified: all 168 shipped keys round-trip string -> key -> string EXACTLY (LdbKeyTests).
+	// All 168 shipped keys round-trip string -> key -> string exactly (LdbKeyTests).
 	public static class LdbKey
 	{
-		// Digit value -> character. Index IS the digit, so this table is the whole encoding.
+		// Digit value -> character. Index is the digit, so this table is the whole encoding.
 		public const string Alphabet = "!\"#$%&'()*+,-./0123456789vwxyz?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstu";
 
 		public const int KeyLength = 20; // 4 words x 5 base-85 digits
 		private const int Radix = 85;
 		private const int WordDigits = 5;
 
-		// Decodes the 20-character key into the 128-bit TEA key. Accepts the RAW form or the XML-ESCAPED wire form
+		// Decodes the 20-character key into the 128-bit TEA key. Accepts the raw form or the XML-escaped wire form
 		// (the attribute is escaped in transit), since callers hold one or the other depending on where they sit.
 		// Returns null when the input is not a well-formed key rather than throwing: a capture can carry a truncated
 		// or absent attribute, and a missing key means "this string stays encrypted", not "the packet is corrupt".
@@ -66,7 +66,7 @@ namespace Faolan.Core.Crypt
 			};
 		}
 
-		// The exact inverse: the 20-character RAW key. Escape() puts it on the wire.
+		// The exact inverse: the 20-character raw key. Escape() puts it on the wire.
 		public static string Encode(ProtoDecryptionKey? key)
 		{
 			if (key == null)
@@ -90,7 +90,7 @@ namespace Faolan.Core.Crypt
 		}
 
 		// The five characters retail escapes in the attribute, and the entity it uses for each. Measured across the
-		// corpus, where the split is CLEAN - a character is either always raw or always escaped, never both - so this
+		// corpus, where the split is clean - a character is either always raw or always escaped, never both - so this
 		// map reproduces the captured bytes rather than approximating them. Note `$` and `\` use numeric entities
 		// even though XML does not require escaping either; that is retail's spelling and we match it.
 		public static string Escape(string raw)
@@ -125,7 +125,7 @@ namespace Faolan.Core.Crypt
 				.Replace("&#39;", "'")
 				.Replace("&#36;", "$")
 				.Replace("&#92;", "\\")
-				.Replace("&amp;", "&"); // LAST: an escaped '&' would otherwise re-introduce the other entities
+				.Replace("&amp;", "&"); // last: an escaped '&' would otherwise re-introduce the other entities
 		}
 
 		// The wire form of a stored key: encode, then escape. This is what goes into `key="..."`.
@@ -139,8 +139,8 @@ namespace Faolan.Core.Crypt
 		// The other half of the recipe: an encrypted LDB string's blob bytes + the key that addresses it -> the
 		// plaintext. TEA-ECB with the key's four words, then strip the NUL padding, then UTF-8.
 		//
-		// The padding is part of the PLAINTEXT (the ciphertext length is always a whole number of 8-byte blocks), so it
-		// can only be stripped AFTER decrypting - which is why the ciphertext has to be read as raw bytes
+		// The padding is part of the plaintext (the ciphertext length is always a whole number of 8-byte blocks), so it
+		// can only be stripped after decrypting - which is why the ciphertext has to be read as raw bytes
 		// (LdbStringIndex.ParseRaw) rather than as a string.
 		//
 		// Returns null for an absent/empty key or a blob that is not a whole number of blocks, and for a plaintext that

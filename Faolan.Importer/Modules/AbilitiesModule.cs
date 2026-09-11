@@ -18,10 +18,9 @@ namespace Faolan.Importer.Modules
 {
 	// Ability grants (0x2052) -> Abilities.
 	//
-	// ⚠️ This used to carry six (abilityId -> slot) constants rehomed from the retired archive sqlite, and apply them
-	// AFTER the harvest - so for those six the constant beat the wire. It is gone (#638): the 0x2052 grant's own
-	// leading word is the slot (CaptureAbilityImporter), and blanking all six and re-harvesting restores every one of
-	// them to the identical value, so the table was pure duplication with the wrong precedence.
+	// The slot comes off the wire and nowhere else: the 0x2052 grant's own leading word is the slot
+	// (CaptureAbilityImporter). A hand-kept (abilityId -> slot) table applied after the harvest would let a constant
+	// beat the wire, and the wire reproduces every value such a table could hold.
 	public sealed class AbilitiesModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

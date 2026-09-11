@@ -9,37 +9,37 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report fall-speed`: pair every captured FALL with the impact SPEED the client reported for it (#515).
+	// `--report fall-speed`: pair every captured fall with the impact speed the client reported for it.
 	//
-	// #504 shipped `damage = maxHealth * 0.038 * (fallDistance - 3.08)`, and #515 says the limit is the
-	// MEASUREMENT rather than the model: the drop is reconstructed from position samples ~200 ms apart, so it
+	// The shipped law is `damage = maxHealth * 0.038 * (fallDistance - 3.08)`, and its limit is the measurement
+	// rather than the model: the drop is reconstructed from position samples ~200 ms apart, so it
 	// misses a fraction of a unit at each end - which dominates a 4-unit fall whose free distance is 3.08.
 	//
-	// ⭐ The client already reports the impact speed and it needs no reconstruction at all. During flight the
-	// vector `CharDCMoveCodec` calls `Velocity` carries the live velocity, and the LANDING record's `Velocity.Y`
+	// The client already reports the impact speed and it needs no reconstruction at all. During flight the
+	// vector `CharDCMoveCodec` calls `Velocity` carries the live velocity, and the landing record's `Velocity.Y`
 	// is the impact speed - one number, sampled by the client at the moment of impact rather than interpolated
 	// between two of our samples.
 	//
-	// ⭐⭐ And this dissolves the trade-off #515 calls "the actual decision on this ticket". The worry is that
-	// driving damage off a client-reported speed means TRUSTING it for a server-side number. It does not, because
+	// And it dissolves the apparent trade-off. Driving damage off a client-reported speed looks like trusting the
+	// client for a server-side number. It is not, because
 	// impact speed and fall height are the same quantity under `v^2 = 2*g*h`: a law in `v` is the same law in `h`
-	// through a fixed transform the server can apply to its OWN tracked height. So the client's speed is the
-	// CALIBRATION ORACLE - the precise measurement we fit the constants against - and never a runtime input. The
+	// through a fixed transform the server can apply to its own tracked height. So the client's speed is the
+	// calibration oracle - the precise measurement the constants are fitted against - and never a runtime input. The
 	// server keeps computing from state it already holds, and gains only the accuracy.
 	//
-	// ⚠️ The health POOL is the third column, and it is the one two earlier passes died on. It comes from the
-	// separate `StatUpdateIIR` (0x96B8DC59) stream, as the HIGH-WATER MARK of `HealthCurrent` for that handle up to
-	// the fall - and from nowhere else. Two things it is NOT:
+	// The health pool is the third column, and the easiest one to get wrong. It comes from the
+	// separate `StatUpdateIIR` (0x96B8DC59) stream, as the high-water mark of `HealthCurrent` for that handle up to
+	// the fall - and from nowhere else. Two things it is not:
 	//   * `StatDamageIIR.StatValue` - the damage again on the environmental form, so a pool read off it makes every
-	//     fall cost exactly 50% BY CONSTRUCTION, which is what the second attempt produced and refused to ship;
-	//   * the `HealthMax` the same stat block states - the wire max is a BASE the client tops up (#450), and it
+	//     fall cost exactly 50% by construction;
+	//   * the `HealthMax` the same stat block states - the wire max is a base the client tops up, and it
 	//     reads 2,371 for every fall in the corpus, the same value for two different characters, against which the
 	//     deepest falls come out at 225% of the pool.
 	//
-	// ⚠️ Two more traps, both of which produce a plausible wrong number rather than an obvious failure:
-	//   * BOTH streams carry every visible entity, not just the player - so the pool must be keyed by the damage's
+	// Two more traps, both of which produce a plausible wrong number rather than an obvious failure:
+	//   * both streams carry every visible entity, not just the player - so the pool must be keyed by the damage's
 	//     own target handle, or a fall gets paired with some NPC's health;
-	//   * the two sides are on DIFFERENT SCALES. `CharacterStatBlock`'s indexer already returns the player-facing
+	//   * the two sides are on different scales. `CharacterStatBlock`'s indexer already returns the player-facing
 	//     value, while `StatDamageIIR.Delta` is the x100 wire number. Mixed, a fall costs 4,000% of the pool.
 	public static partial class ReportCli
 	{
@@ -56,25 +56,25 @@ namespace Faolan.Importer.Cli
 		// unrelated movement does not raise the maximum.
 		private static readonly TimeSpan DropWindow = TimeSpan.FromSeconds(3);
 
-		// ⚠️ How long after the landing record the damage may arrive and still be THAT landing's. The environmental
-		// school is not fall-only - lava is in it too (#504) - and an environmental hit with no landing near it is
+		// How long after the landing record the damage may arrive and still be that landing's. The environmental
+		// school is not fall-only - lava is in it too - and an environmental hit with no landing near it is
 		// something else entirely. Without this bound the pairing walks back to whatever the last downward movement
-		// was: the corpus contains a hit 94 SECONDS after one, which would otherwise be fitted as a fall. The good
+		// was: the corpus contains a hit 94 seconds after one, which would otherwise be fitted as a fall. The good
 		// pairings sit at 86..855 ms, so the bound is comfortably outside the real population rather than tuned to it.
 		private static readonly TimeSpan LandingLag = TimeSpan.FromSeconds(1);
 
-		// Gravity is measured as `v^2 / 2h` against the SAMPLED drop, which is the noisy quantity this whole ticket
-		// exists to stop using - so it is measured only on the falls where that noise is smallest. A drop of 10+
+		// Gravity is measured as `v^2 / 2h` against the sampled drop, which is the noisy quantity this report
+		// exists to stop relying on - so it is measured only on the falls where that noise is smallest. A drop of 10+
 		// units is many times the ~0.5 unit the 200 ms sampling can lose at each end.
 		private const float GravitySampleDepth = 10f;
 
-		// How long after the damage the fall DEBUFF may arrive. Wider than LandingLag because the two are different
+		// How long after the damage the fall debuff may arrive. Wider than LandingLag because the two are different
 		// events: the damage is the landing, the debuff is retail deciding what the landing did.
 		//
-		// ⚠️ The column is REPORTED and deliberately NOT aggregated into bands, because attribution is not sound at
+		// The column is reported and deliberately not aggregated into bands, because attribution is not sound at
 		// this corpus's fall spacing and the failure is silent: at 5 s the corpus yields 10 Bruised Body falls and
-		// ZERO Broken Bones (though #504 observed Broken Bones), and at 15 s it yields 5 Broken Bones spanning
-		// 0.47%..84.28% of the pool - i.e. the wider window simply captures the NEXT fall's debuff. Both look like
+		// zero Broken Bones, and at 15 s it yields 5 Broken Bones spanning
+		// 0.47%..84.28% of the pool - i.e. the wider window simply captures the next fall's debuff. Both look like
 		// measurements. Bounding it properly needs "the first fall-debuff before the same handle's next fall", which
 		// is a change to how falls are collected rather than a wider constant.
 		private static readonly TimeSpan DebuffLag = TimeSpan.FromSeconds(5);
@@ -89,15 +89,15 @@ namespace Faolan.Importer.Cli
 
 			foreach (var capture in captures)
 			{
-				// The pool track, per handle, in packet order - read from the StatUpdate stream and NOT from the
+				// The pool track, per handle, in packet order - read from the StatUpdate stream and not from the
 				// damage record (see the class remarks).
 				//
-				// ⚠️ The pool is the HIGH-WATER MARK of `HealthCurrent`, NOT the `HealthMax` the same stream states.
-				// The wire max is a BASE the client tops up (#450), so it is not the number a fall is a fraction of:
+				// The pool is the high-water mark of `HealthCurrent`, not the `HealthMax` the same stream states.
+				// The wire max is a base the client tops up, so it is not the number a fall is a fraction of:
 				// reading it gives 2,371 for every fall in the corpus - the same value for two different characters -
 				// against which the deepest falls come out at 225% and 161% of the pool, i.e. more damage than the
 				// character could possibly have. A player is at full health at some point in a session, so the
-				// highest current the stream ever states for them IS the pool, measured rather than derived.
+				// highest current the stream ever states for them is the pool, measured rather than derived.
 				var pools = new Dictionary<uint, List<(int Index, uint Current, uint WireMax)>>();
 				for (var i = 0; i < capture.Packets.Count; i++)
 				{
@@ -117,7 +117,7 @@ namespace Faolan.Importer.Cli
 					list.Add((i, current, update.Stats[CharacterStatId.HealthMax]));
 				}
 
-				// The two fall DEBUFFS as they land, per handle. A fall's tier is not derivable from the damage - it
+				// The two fall debuffs as they land, per handle. A fall's tier is not derivable from the damage - it
 				// is what retail actually applied - so it is read off the wire like everything else here.
 				var debuffs = new Dictionary<uint, List<(int Index, uint SpellBase)>>();
 				for (var i = 0; i < capture.Packets.Count; i++)
@@ -164,7 +164,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// The LANDING record: the last move before the damage whose vertical velocity is downward. A
+					// The landing record: the last move before the damage whose vertical velocity is downward. A
 					// record at rest carries ~0 there, so the test is the sign rather than "the nearest record".
 					var before = track.Where(m => m.Index < i).ToList();
 					var landing = before.LastOrDefault(m => m.Vel.Y < -0.01f);
@@ -174,7 +174,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⚠️ ...and it has to be THIS damage's landing. See LandingLag: the environmental school carries
+					// ...and it has to be this damage's landing. See LandingLag: the environmental school carries
 					// lava as well as falls, so an environmental hit with no landing within the bound is not a fall
 					// and must not be fitted as one.
 					if (capture.Packets[i].Ticks - capture.Packets[landing.Index].Ticks > LandingLag.Ticks)
@@ -183,20 +183,20 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// The DROP, reconstructed the way #504 did it - from POSITION samples, not from the velocity sign.
-					// ⚠️ A velocity-sign run does not work: the client sends exactly ONE record with a downward
+					// The drop, reconstructed from position samples rather than from the velocity sign.
+					// A velocity-sign run does not work: the client sends exactly one record with a downward
 					// Velocity.Y per fall (measured - `airborne` was 1 on all 39), so a run bounded by the sign is a
 					// single sample and its drop is 0 by construction. The window is the same one a fall occupies.
 					var windowStart = capture.Packets[landing.Index].Ticks - DropWindow.Ticks;
 					var window = before.Where(m => capture.Packets[m.Index].Ticks >= windowStart).ToList();
 					var drop = window.Count > 0 ? window.Max(m => m.Pos.Y) - landing.Pos.Y : 0f;
 
-					// ⚠️ `Delta` is in HUNDREDTHS of a health point - the ×100 wire scale #515's history already names
-					// as one of its three traps. Divided here so the column is health, and so a reader does not take a
+					// `Delta` is in hundredths of a health point - the x100 wire scale. Divided here so the column is
+					// health, and so a reader does not take a
 					// 534,437 against a 6,341 pool as a decode failure.
-					// The pool AT THE MOMENT OF THE FALL: the highest health this handle has been seen at, up to and
+					// The pool at the moment of the fall: the highest health this handle has been seen at, up to and
 					// including the fall itself. Bounded at the fall rather than taken over the whole capture because
-					// a character LEVELS during a session and the pool grows - taking a later, bigger pool would
+					// a character levels during a session and the pool grows - taking a later, bigger pool would
 					// understate every earlier fall. (That growth is also the likeliest reason the 25-fall handle's
 					// rank correlation is 0.87 rather than 1.00.)
 					//
@@ -241,8 +241,8 @@ namespace Faolan.Importer.Cli
 					$" {f.Gap / TimeSpan.TicksPerMillisecond,7:F0}  {Trim(f.Capture, 40)}");
 			}
 
-			// The claim to test: does the client's speed order the events BETTER than our reconstructed drop? Damage
-			// is pool-relative, so raw damage cannot be compared across characters - but the RANK correlation can,
+			// The claim to test: does the client's speed order the events better than our reconstructed drop? Damage
+			// is pool-relative, so raw damage cannot be compared across characters - but the rank correlation can,
 			// within the events of one handle, where the pool is fixed.
 			Console.WriteLine();
 			Console.WriteLine("⭐ per-entity rank agreement (the pool is fixed within one handle, so damage is comparable there):");
@@ -272,17 +272,17 @@ namespace Faolan.Importer.Cli
 			};
 		}
 
-		// The refit, in the only two steps that are separable: measure GRAVITY from the falls, then fit the damage
-		// law in HEIGHT - because height is what the server computes from its own tracked state, and what
+		// The refit, in the only two steps that are separable: measure gravity from the falls, then fit the damage
+		// law in height - because height is what the server computes from its own tracked state, and what
 		// `FallDamage`'s constants are expressed in.
 		//
-		// ⭐ Height is not taken from the position samples here. The whole point of #515 is that those are ~200 ms
-		// apart and lose a fraction of a unit at each end; the client's impact SPEED does not, and `v^2 = 2gh`
+		// Height is not taken from the position samples here: those are ~200 ms apart and lose a fraction of a unit
+		// at each end, while the client's impact speed does not, and `v^2 = 2gh`
 		// converts one into the other exactly. So each fall's height is `v^2 / 2g` - the client's own precision,
 		// expressed in the server's own units.
 		private static void Fit(IReadOnlyList<(string Capture, uint Handle, double Damage, float ImpactY, float DropY, int Samples, double Gap, uint Pool, uint Debuff)> falls)
 		{
-			// GRAVITY, from the deep falls only. A sampled drop of 7+ units carries ~13% error (#504); a 4-unit one
+			// Gravity, from the deep falls only. A sampled drop of 7+ units carries ~13% error; a 4-unit one
 			// is dominated by the sampling gap, and including those biases g by more than the deep falls can fix.
 			var deep = falls.Where(f => f.DropY >= GravitySampleDepth).Select(f => (double)(f.ImpactY * f.ImpactY) / (2 * f.DropY)).Order().ToList();
 			Console.WriteLine();
@@ -297,7 +297,7 @@ namespace Faolan.Importer.Cli
 				$"[p10 {deep[deep.Count / 10]:F2}, p90 {deep[deep.Count * 9 / 10]:F2}]");
 
 			// The damage law, fitted in height. `frac = slope * (h - intercept)`, by ordinary least squares on
-			// (h, frac) - the same shape #504 fitted, on a height that no longer has the sampling error in it.
+			// (h, frac), over the impact-derived height rather than the sampled drop.
 			var points = falls.Select(f => (H: f.ImpactY * f.ImpactY / (2 * gravity), Frac: f.Damage / f.Pool)).ToList();
 			var n = points.Count;
 			var meanH = points.Average(p => p.H);
@@ -315,7 +315,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"⭐ damage law over {n} falls: frac = {slope:F5} * (h - {free:F2})" +
 				$"    [shipped: {0.038:F5} * (h - {3.08:F2})]");
 
-			// How well it reproduces each fall, which is the number #504 reports as "median 13% over the deep ones".
+			// How well it reproduces each fall.
 			var errors = points.Select(p => (Predicted: Math.Max(0, slope * (p.H - free)), p.Frac))
 				.Where(e => e.Frac > 0)
 				.Select(e => Math.Abs(e.Predicted - e.Frac) / e.Frac)
@@ -324,8 +324,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"   |error| over all {errors.Count}: p50 {errors[errors.Count / 2]:P0}, " +
 				$"p90 {errors[errors.Count * 9 / 10]:P0}, max {errors[^1]:P0}");
 
-			// ⚠️ The intercept is what the shipped constant is PINNED by rather than fitted to: #504 sets it from the
-			// smallest DAMAGING fall observed, because a least-squares intercept predicts zero for that fall. Print
+			// The intercept is what the shipped constant is pinned by rather than fitted to: it comes from the
+			// smallest damaging fall observed, because a least-squares intercept predicts zero for that fall. Print
 			// both so the choice stays visible instead of being silently overwritten by the regression.
 			var smallest = points.Where(p => p.Frac > 0).MinBy(p => p.H);
 			Console.WriteLine($"   smallest damaging fall: h {smallest.H:F2} for {smallest.Frac:P1} of pool " +
@@ -334,17 +334,17 @@ namespace Faolan.Importer.Cli
 			FitInSpeed(falls);
 		}
 
-		// ⭐ The SAME law, fitted in v^2 - and this is the one that ships (#515).
+		// The same law, fitted in v^2 - and this is the one that ships.
 		//
 		// The height fit above has to divide by a measured gravity, and gravity can only be measured as `v^2 / 2h`
-		// against the SAMPLED drop - the very quantity this ticket exists to stop using. Over the deep falls it runs
-		// p10 7.6 / median 19.3 / p90 36.2, so the conversion was the loosest link in the chain and refitting through
-		// it would have traded a known error for an unknown one. That is why the constants sat unchanged.
+		// against the sampled drop - the very quantity this report exists to stop relying on. Over the deep falls it
+		// runs p10 7.6 / median 19.3 / p90 36.2, so the conversion is the loosest link in the chain and refitting
+		// through it would trade a known error for an unknown one.
 		//
-		// The blocker dissolves by never converting. `frac = a * (h - h0)` and `frac = A * (v^2 - V0)` are the SAME
+		// The blocker dissolves by never converting. `frac = a * (h - h0)` and `frac = A * (v^2 - V0)` are the same
 		// model under `v^2 = 2gh` - gravity is absorbed into the fitted slope (`A = a / 2g`, `V0 = 2g * h0`) - so
 		// fitting in v^2 needs no gravity at all, and the server applies it to the impact speed the client reports on
-		// the landing move rather than to a height it reconstructed. ⚠️ That is not a new trust assumption: the
+		// the landing move rather than to a height it reconstructed. That is not a new trust assumption: the
 		// server's sampled drop already comes from the client's own position stream, so the velocity in the same
 		// packet is the same source, one field over and without the 200 ms sampling loss.
 		private static void FitInSpeed(IReadOnlyList<(string Capture, uint Handle, double Damage, float ImpactY, float DropY, int Samples, double Gap, uint Pool, uint Debuff)> falls)
@@ -364,7 +364,7 @@ namespace Faolan.Importer.Cli
 
 			// The three candidate predictors, scored the same way, so "the speed is better" is a measurement rather
 			// than a preference. Pearson rather than Spearman here: the fit is linear in each x, and what is being
-			// compared is how much of the VARIANCE each one explains, not merely the ordering.
+			// compared is how much of the variance each one explains, not merely the ordering.
 			Console.WriteLine($"   correlation with the damage fraction:  v^2 {Pearson([.. points.Select(p => p.V2)], [.. points.Select(p => p.Frac)]):F3}" +
 				$"   v {Pearson([.. falls.Select(f => (double)-f.ImpactY)], [.. points.Select(p => p.Frac)]):F3}" +
 				$"   sampled drop {Pearson([.. falls.Select(f => (double)f.DropY)], [.. points.Select(p => p.Frac)]):F3}");
@@ -375,7 +375,7 @@ namespace Faolan.Importer.Cli
 			Errors("   |error| on the sampled drop, best case (refit)", RefitOnDrop(falls));
 		}
 
-		// The sampled-drop law refitted on this same corpus, so the comparison is against its BEST case rather than
+		// The sampled-drop law refitted on this same corpus, so the comparison is against its best case rather than
 		// against constants fitted on an older pass. Anything worse than this is the measurement, not the model.
 		private static IEnumerable<(double Predicted, double Actual)> RefitOnDrop(
 			IReadOnlyList<(string Capture, uint Handle, double Damage, float ImpactY, float DropY, int Samples, double Gap, uint Pool, uint Debuff)> falls)

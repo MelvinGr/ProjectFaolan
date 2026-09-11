@@ -8,7 +8,9 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Combo catalog (name / unlock level / featid / actions / ...) from the RDB 1010206 plaintext-XML combo defs.
+	/// <summary>
+	///     Combo catalog (name / unlock level / feat id / actions /...) from the RDB 1010206 plaintext-XML combo definitions.
+	/// </summary>
 	public sealed class RdbCombosModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

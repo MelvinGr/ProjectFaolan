@@ -6,36 +6,42 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchAddToItemSlot (s2c GameCharInterface 0x1D) - a gem went into one socket of one item (#754). 84 bytes,
-	// and NOT protobuf: the cell it happened in, the socket index, then the gem's whole ACG identity flattened.
-	//
-	//   [u32 container][u32 charInstance][u32 slot]   the item RECEIVING the gem
-	//   [u32 socketIndex]                             0-based
-	//   [u32 template1][u32 template2][u32 template3] the gem's templates - the level PAIR (#752), template3 always 0
-	//   [u32 level][u32 hash]                         the gem's own level; hash is 0 on a socketed gem
-	//   [16B key1][16B key2][16B key3]                the three decryption keys, in ProtoAcgItem order
-	//
-	// So the trailing 68 bytes are exactly a `ProtoAcgItem`'s fields with the protobuf framing taken off, in the
-	// schema's own field order - which is what identifies the layout rather than a byte-count coincidence: the
-	// captured reply's `template1`/`template2` are `0x3CC6F0`/`0x3CC6F1` = 3983088/3983089, a real #752 pair, and its
-	// `key2` is byte-identical to the `PairKey` harvested for that gem from a DIFFERENT packet in a DIFFERENT
-	// capture.
-	//
-	// ⚠️ `key3` is NOT always `key1` here. It is on all 344 captured snapshot pairs, but this reply carries
-	// `b290805c 29e627ca b290805c 29e627ca` - an 8-byte value repeated - which is the same third key the crafted
-	// item's own `itemref` chat link shows in another capture. So it is a real third key on crafted/generated items;
-	// what fills it is undecoded, and `Build(ItemInstanceSocket)` sends `key1` because that is what our catalog can
-	// justify.
-	//
-	// The socketed item's own container entry is NOT re-sent; the gem leaving the bag is an ordinary
-	// `DispatchRemoveItem`.
-	//
-	// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8248]
+	/// <summary>
+	///     <c>DispatchAddToItemSlot</c> - a gem went into one socket of one item. 84 bytes, and not protobuf: the cell it
+	///     happened in, the socket index, then the gem's whole ACG identity flattened.
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     [u32 container][u32 charInstance][u32 slot]   the item receiving the gem
+	///     [u32 socketIndex]                             0-based
+	///     [u32 template1][u32 template2][u32 template3] the gem's templates - the level pair, template3 always 0
+	///     [u32 level][u32 hash]                         the gem's own level; hash is 0 on a socketed gem
+	///     [16B key1][16B key2][16B key3]                the three decryption keys, in ProtoAcgItem order
+	///     </code>
+	///     <para>
+	///         The trailing 68 bytes are exactly a <c>ProtoAcgItem</c>'s fields with the protobuf framing taken off, in
+	///         the schema's own field order - which is what identifies the layout rather than a byte-count coincidence:
+	///         the captured reply's <c>template1</c>/<c>template2</c> are 3983088/3983089, a real pair, and its
+	///         <c>key2</c> is byte-identical to the <c>PairKey</c> harvested for that gem from a different packet in a
+	///         different capture.
+	///     </para>
+	///     <para>
+	///         <c>key3</c> is not always <c>key1</c> here. It is on all 344 captured snapshot pairs, but this reply
+	///         carries an 8-byte value repeated, the same third key the crafted item's own <c>itemref</c> chat link shows
+	///         in another capture. It is therefore a real third key on crafted and generated items; what fills it is
+	///         undecoded, and <c>Build(ItemInstanceSocket)</c> sends <c>key1</c>, which is what the catalog can justify.
+	///     </para>
+	///     <para>
+	///         The socketed item's own container entry is not re-sent; the gem leaving the bag is an ordinary
+	///         <c>DispatchRemoveItem</c>.
+	///         [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8248]
+	///     </para>
+	/// </remarks>
 	public static class AddToItemSlotCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchAddToItemSlot;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(AddToItemSlot value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -89,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// DispatchAddToItemSlot (0x1D).
+	/// <summary>The DispatchAddToItemSlot body.</summary>
 	public sealed record AddToItemSlot(
 		ContainerKind Container, uint CharInstance, uint Slot, uint SocketIndex,
 		uint Template1, uint Template2, uint Template3, uint Level, uint Hash,

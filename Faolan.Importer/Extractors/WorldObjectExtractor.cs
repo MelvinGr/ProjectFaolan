@@ -15,12 +15,12 @@ namespace Faolan.Importer.Extractors
 		public float RotY { get; init; }
 		public float RotZ { get; init; }
 
-		// The display_name identity (localized id) that disambiguates two props sharing an exact position (#222).
+		// The display_name identity (localized id) that disambiguates two props sharing an exact position.
 		public string DisplayName { get; init; } = string.Empty;
 		public string Name { get; init; } = string.Empty;
 
-		// proto field 12, as this capture saw it - null when ABSENT. The ONE identity field observed to change
-		// during play, so it is the one Merge cannot resolve by taking whichever capture sorted first (#554). Carried
+		// proto field 12, as this capture saw it - null when absent. The one identity field observed to change
+		// during play, so it is the one Merge cannot resolve by taking whichever capture sorted first. Carried
 		// here rather than re-read from `Data` at merge time so there is a single place the field is parsed.
 		public bool? IsClosed { get; init; }
 	}
@@ -55,9 +55,8 @@ namespace Faolan.Importer.Extractors
 				if (!p.TryParse(WorldObjectCodec.Parse, out var obj))
 					continue; // a capture truncated mid-record
 
-				// EVERY class in the family carries the same identity message in the same place - kdtree in field 1,
-				// name in field 2 - so one codec read replaces both the hand-rolled protobuf walker this file used to
-				// carry and the separate DisplayName read next to it.
+				// Every class in the family carries the same identity message in the same place - kdtree in field 1,
+				// name in field 2 - so one codec read supplies both the kdtree id and the display name.
 				if (!WorldObjectColumns.TryReadIdentity(p.Record, out var identity))
 					continue;
 
@@ -69,13 +68,13 @@ namespace Faolan.Importer.Extractors
 				var position = transform.Position;
 				var rotation = transform.Rotation;
 
-				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
-				// world-builder-PLACED containers. A drop - a plain "Bag of loot" OR a boss/raid CHEST ("Large Chest",
-				// "Chest") - spawns dynamically on a kill and fades after 300s (WorldBroadcaster.LootBagExpirySeconds);
-				// it must NOT be baked as a permanent WorldObject (that was how a stray "Large Chest" ended up standing
-				// on the Tortage beach - #363). Placed containers are constructed the SAME way (bigger container is just
-				// a bigger LootBagTemplate.Variant), so the NAME can't tell a drop from a placement; the signal is the
-				// world-builder [script-tag] in the name ([N7FU]/[QRON]/...), which only a PLACED object carries.
+				// LootBagFullUpdateIIR (F096251E) is shared by two things: transient loot-container drops and static
+				// world-builder-placed containers. A drop - a plain "Bag of loot" or a boss/raid chest ("Large Chest",
+				// "Chest") - spawns dynamically on a kill and fades after 300s (WorldBroadcaster.LootBagExpirySeconds),
+				// so baking it as a permanent WorldObject leaves a stray chest standing in the world. Placed
+				// containers are constructed the same way (a bigger container is just a bigger LootBagTemplate.
+				// Variant), so the name cannot tell a drop from a placement; the signal is the world-builder
+				// [script-tag] in the name ([N7FU]/[QRON]/...), which only a placed object carries.
 				if (p.SubOpcode == LootContainerTemplate.ContainerClass && IsTransientLootContainer(name))
 					continue;
 
@@ -98,23 +97,21 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Dedup by (map, spawn point, identity). Identity (the display_name) is part of the key because two distinct
-		// props can occupy the EXACT same coordinates (#222) - position alone would drop one.
+		// props can occupy the exact same coordinates - position alone would drop one.
 		//
-		// The structural fields agree across captures, so for those any candidate would do. `IsClosed` does NOT
-		// (#554): the map 4020 "Wharf Door" is captured closed in one session and open in another, and taking the
-		// first-seen entry made ordinal CAPTURE FILENAME order the thing that decided a door's state. Adding a
-		// capture that happened to sort earlier and caught that door open would have flipped the shipped row, and no
-		// test would have noticed - both are legitimate wire shapes, so the whole-corpus lift gate passes either way.
+		// The structural fields agree across captures, so for those any candidate would do. `IsClosed` does not: the
+		// map 4020 "Wharf Door" is captured closed in one session and open in another, so a first-seen rule would let
+		// capture file-name order decide a door's state, and no test would catch it - both are legitimate wire
+		// shapes, so the whole-corpus lift gate passes either way.
 		//
-		// `IsClosed` is SESSION state, not a placement fact: a door captured open was opened by the capturing player,
-		// so no capture is evidence of anything but that moment. Since #598 the row does NOT store it - the live world
-		// owns it (LiveWorldObject.IsClosed) and the lift feeds the captured reading into its byte comparison - so
-		// which candidate wins no longer decides anything that ships.
+		// `IsClosed` is session state, not a placement fact: a door captured open was opened by the capturing player,
+		// so no capture is evidence of anything but that moment. The row does not store it - the live world owns it
+		// (LiveWorldObject.IsClosed) and the lift feeds the captured reading into its byte comparison.
 		//
-		// The ranking stays anyway, and is not dead weight: it is what keeps the dedup a function of what the entries
-		// SAY rather than of the order the capture files happened to sort in. Candidates are ranked closed-present >
-		// present > absent, a property of the ENTRY. Falling back to first-seen here would put filename order back in
-		// charge of which capture's bytes every other field is lifted from - the #554 bug, one field over.
+		// The ranking still matters: it is what keeps the dedup a function of what the entries say rather than of the
+		// order the capture files happened to sort in. Candidates are ranked closed-present > present > absent, a
+		// property of the entry. Falling back to first-seen would put file-name order in charge of which capture's
+		// bytes every other field is lifted from.
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
 		{
 			return Merge(all, out _);
@@ -149,8 +146,8 @@ namespace Faolan.Importer.Extractors
 			return seen.Values.ToList();
 		}
 
-		// Closed-and-explicit beats explicit beats absent. Deliberately NOT a tie-break that falls through to
-		// "whichever came first": every candidate is ranked by what it SAYS, so the winner is the same whatever
+		// Closed-and-explicit beats explicit beats absent. Deliberately not a tie-break that falls through to
+		// "whichever came first": every candidate is ranked by what it says, so the winner is the same whatever
 		// order the captures are read in.
 		private static int Rank(WorldObjectEntry e)
 		{
@@ -162,10 +159,10 @@ namespace Faolan.Importer.Extractors
 			};
 		}
 
-		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
+		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container drop (skip it) unless it was PLACED by the world
 		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its
-		// NAME ([N7FU], [QRON], ...). The container NAME alone is NOT the signal: a boss-drop chest is named exactly
-		// like a placed one ("Chest", "Large Chest"), so keying on "chest" wrongly baked the Large Chest drops (#363);
+		// name ([N7FU], [QRON],...). The container name alone is not the signal: a boss-drop chest is named exactly
+		// like a placed one ("Chest", "Large Chest"), so keying on "chest" wrongly baked the Large Chest drops;
 		// only the [script-tag] distinguishes a placement from a drop.
 		internal static bool IsTransientLootContainer(string name)
 		{

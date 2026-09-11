@@ -15,18 +15,16 @@ namespace Faolan.Tests
 	// The reader/writer pair for the 0x737A6DF9 body must agree on the prefix model. This is the test that makes
 	// that structural rather than hopeful.
 	//
-	// The model used to be stated TWICE - FullPlayerCharacterCodec parsed the prefix, and the server host emitted it
-	// from a separate builder in another project. They disagreed: the reader skipped a 3-byte "field5" that the
-	// writer appended verbatim. Both were self-consistent on the level-1 beach capture, so every existing golden
-	// passed while the reader failed on EVERY level-80 snapshot. Now one type owns the writing
-	// (FullPlayerCharacterCodec) and these assert the round trip closes.
+	// One type owns both halves of the model - FullPlayerCharacterCodec parses the prefix and writes it - and these
+	// assert the round trip closes. Stating it twice lets the two drift apart: a reader that skips a 3-byte "field5"
+	// a writer appends verbatim is self-consistent on the level-1 beach capture, so every golden passes while the
+	// reader fails on every level-80 snapshot.
 	public class FullPlayerCharacterCodecTests
 	{
 		private const uint Instance = 0x02165EFF;
 
-		// The prefix the writer emits is exactly the prefix the reader consumes - the specific invariant that was
-		// broken. Asserted for a spread of root lengths, not just the captured one, because the old bug was a
-		// FIXED-SIZE assumption that only held for one capture.
+		// The prefix the writer emits is exactly the prefix the reader consumes. Asserted for a spread of root lengths,
+		// not just the captured one, because a fixed-size assumption holds for one capture and nothing else.
 		[Theory, InlineData(0), InlineData(1), InlineData(686), InlineData(11003), InlineData(1 << 20)]
 		// the beach capture's own root length
 		// NecroL80's L80 root

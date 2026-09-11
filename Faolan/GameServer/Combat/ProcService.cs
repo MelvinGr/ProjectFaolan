@@ -9,16 +9,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// The feat PROC engine (#697): a trained feat hangs an extra spell off a combo or a spell line, to fire on a
-	// trigger - "Touch of Death: empowers their next combo with additional unholy damage", "Holy Vengeance: after
-	// casting the Wave of Life the priest is infused…". The 876 `FeatProc` rows were imported in #593 and read by
-	// nothing until this.
-	//
-	// A character's procs are resolved ONCE at world entry into WorldEntity.Procs (the same shape as ComboBonuses and
-	// SpellBoosts, for the same reason: a swing must not turn into a query), so an untrain that reloads the entity
-	// drops them with the feat (#920). The two hooks are the two places the trigger events happen: ComboFinisher when a
-	// combo lands, CastService when a cast completes. What fires is an ordinary ApplySpell - the proc spell on the
-	// carrier (key 88) and/or on the target (key 236), at rank 0 like a cast.
+	/// <summary>
+	///     The feat proc engine: a trained feat hangs an extra spell off a combo or a spell line, to fire on a trigger -
+	///     "Touch of Death: empowers their next combo with additional unholy damage", "Holy Vengeance: after casting
+	///     the Wave of Life the priest is infused...".
+	/// </summary>
+	/// <remarks>
+	///     A character's procs are resolved once at world entry into <c>WorldEntity.Procs</c> - the same shape as
+	///     <c>ComboBonuses</c> and <c>SpellBoosts</c>, and for the same reason, that a swing must not turn into a query
+	///     - so an untrain that reloads the entity drops them with the feat. The two hooks are the two places the
+	///     trigger events happen: <see cref="ComboFinisher" /> when a combo lands, <see cref="CastService" /> when a
+	///     cast completes. What fires is an ordinary ApplySpell: the proc spell on the carrier (key 88) and/or on the
+	///     target (key 236), at rank 0 like a cast.
+	/// </remarks>
 	public sealed class ProcService
 	{
 		private readonly BuffService _buffs;
@@ -41,7 +44,10 @@ namespace Faolan.GameServer.Combat
 			_roll = roll;
 		}
 
-		// A combo LANDED on `targetHandle` (0 for an air swing). The event's length is the combo's own animation time.
+		/// <summary>
+		///     A combo landed on <paramref name="targetHandle" />, which is 0 for an air swing. The event's length is
+		///     the combo's own animation time.
+		/// </summary>
 		public async Task OnComboLanded(INetworkClient client, ComboSwing swing, uint targetHandle)
 		{
 			ArgumentNullException.ThrowIfNull(swing);
@@ -53,8 +59,10 @@ namespace Faolan.GameServer.Combat
 				await Fire(client, proc, client.Session.Character.Id, targetHandle, swing.AnimationSeconds, $"combo '{swing.Combo.Name}'");
 		}
 
-		// A cast of `spellId` completed; `offensive` when it landed on a hostile target. The event's length is the
-		// spell's cast time.
+		/// <summary>
+		///     A cast of <paramref name="spellId" /> completed, <paramref name="offensive" /> when it landed on a
+		///     hostile target. The event's length is the spell's cast time.
+		/// </summary>
 		public async Task OnSpellCast(INetworkClient client, uint spellId, uint targetHandle, bool offensive)
 		{
 			var caster = _sim.PlayerWorldEntity(client);
@@ -75,7 +83,7 @@ namespace Faolan.GameServer.Combat
 			if (_roll() >= chance)
 				return;
 
-			// ApplySpell takes the WIRE id ((base << 8) | rank); the table carries the bare base, as the cast path does.
+			// ApplySpell takes the wire id ((base << 8) | rank); the table carries the bare base, as the cast path does.
 			if (proc.SelfSpellId is { } self)
 				await _buffs.ApplySpell(client, casterHandle, casterHandle, self << 8);
 

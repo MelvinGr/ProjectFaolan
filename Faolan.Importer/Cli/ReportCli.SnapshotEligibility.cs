@@ -8,22 +8,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report snapshot-eligibility` (#389): which quests can ride the LOGIN SNAPSHOT, and WHICH ARM stops the rest.
+	// `--report snapshot-eligibility`: which quests can ride the login snapshot, and which arm stops the rest.
 	//
-	// A held quest that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live
-	// restore path any more - so this number is a gameplay bound, not a curiosity. #389 has been carried for months as
-	// "the @609 objective region needs harvesting", and this report exists because that is NOT where the ceiling is:
-	// the region gate and the record scalars both sit downstream of the quest's five HEADER TEXT REFS, and the
-	// scarcest of those is the SUMMARY (slot 1, LDB category 50302).
+	// A held quest that fails `SnapshotTails.IsSnapshotEligible` is simply absent from the journal - there is no live
+	// restore path, so this number is a gameplay bound rather than a curiosity. The ceiling is not the @609 objective
+	// region: the region gate and the record scalars both sit downstream of the quest's five header text refs, and the
+	// scarcest of those is the summary (slot 1, LDB category 50302).
 	//
-	// ⭐ **Why that is a hard bound and not a backlog item.** A text ref is `(Category, RefId, key)` and the first two
-	// ARE derivable - the summary's category is always 50302 and its `RefId` is the quest's own id on all of them. The
+	// Why that is a hard bound and not a backlog item. A text ref is `(Category, RefId, key)` and the first two
+	// are derivable - the summary's category is always 50302 and its `RefId` is the quest's own id on all of them. The
 	// `key` is not: it is a per-string 128-bit TEA key that retail's own database holds and the server sends on the
 	// wire, it is uniformly random (7.998 bits/byte), it is absent from the client, and ten candidate derivations from
-	// `(RefId, Category)` score zero. So a quest whose summary key no capture carried CANNOT have its text rendered by
+	// `(RefId, Category)` score zero. So a quest whose summary key no capture carried cannot have its text rendered by
 	// the client, and that is what caps this report's bottom line. See `Faolan.Core/Crypt/LdbKey.cs`.
 	//
-	// ⛔ It is a REPORT rather than a test for the standing reason (#729): it measures SHIPPED DATA against what the
+	// It is a report rather than a test for the standing reason: it measures shipped data against what the
 	// corpus happens to carry, and both move as captures land. A test would pin a number that is supposed to climb.
 	//
 	// Exit code is 0 always - a measurement.
@@ -57,7 +56,7 @@ namespace Faolan.Importer.Cli
 				("has a Level", q => q.Level != 0),
 				("@609 region verified or buildable", q => q.ObjectiveRegionVerified || SnapshotTails.IsObjectiveRegionBuildable(q)),
 				("Quest_c record scalars", q => q.HasSnapshotRecord),
-				// The index block states the held quest's step number (#926); a multi-step line with no captured order
+				// The index block states the held quest's step number; a multi-step line with no captured order
 				// cannot state one, so its quests wait for a capture that orders the line.
 				("line ordered (sequence, or 1 step)", q => StepsOf(q) <= 1 || q.JournalSequence != 0)
 			};
@@ -67,7 +66,7 @@ namespace Faolan.Importer.Cli
 			foreach (var (name, holds) in arms)
 				Console.WriteLine($"  {name,-38} {quests.Count(holds),8}");
 
-			// The header slots broken out one by one: this is the finding, and it only shows up per SLOT.
+			// The header slots broken out one by one: this is the finding, and it only shows up per slot.
 			foreach (var slot in EligibilityHeaderSlots)
 			{
 				var n = quests.Count(q => q.TextRefs.Any(t => t.Slot == slot));
@@ -78,7 +77,7 @@ namespace Faolan.Importer.Cli
 			var eligible = quests.Count(q => SnapshotTails.IsSnapshotEligible(q, lines.GetValueOrDefault(q.QuestLineId), StepsOf(q)));
 			Console.WriteLine($"\n  ELIGIBLE (every arm)                   {eligible,8}");
 
-			// ⭐ The diagnostic that actually names a culprit: for each arm, how many quests fail THAT ARM AND NOTHING
+			// The diagnostic that actually names a culprit: for each arm, how many quests fail that ARM and nothing
 			// ELSE. A count of "quests failing arm X" blames every arm equally when the arms all fail together, which
 			// is exactly what happens here - every capture-only input is known for the same 114 quests.
 			var all = new List<(string Name, Func<QuestDefinition, bool> Holds)>(arms);

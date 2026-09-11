@@ -4,12 +4,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Phase 0x0E of the BehaviorControlCenterIIR carries an EXTRA u32 in front of the behaviorId - the delay word
+	// Phase 0x0E of the BehaviorControlCenterIIR carries an extra u32 in front of the behaviorId - the delay word
 	// `ReadSubClass` (FUN_005e24e0) reads into `this+0x24` and the record's consumer scales by 0.01 before adding it
-	// to the running Command's timeline (#549). Ten of the 67 299 captured BCC records are that shape, and reading
+	// to the running Command's timeline. Ten of the 67 299 captured BCC records are that shape, and reading
 	// them without it made the delay look like the behaviorId: they showed up as commands 0x32/0x35/0x39/0x3A/0x47,
-	// none of which the client's classmap registers, which is what #549 was opened to explain. Re-split, all ten are
-	// Magic:Attack (0x04) or ObjectInteraction (0x2A) with a tail their already-decoded grammars fit exactly.
+	// none of which the client's classmap registers. Read with the delay word split off, all ten are Magic:Attack
+	// (0x04) or ObjectInteraction (0x2A) with a tail their already-decoded grammars fit exactly.
 	//
 	// The two records here are the shortest of each kind, from `loot-drag-1538` (frame 920) and
 	// `Hoxxling_mage-heraldofxotli_login_gameplay` (frame 2412); `--report bcc-census --report-arg 0E` prints all ten.
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			"2063617465676f72793d22353030323622206b65793d226c5a37402c355e44692347262339323b3975546039536a43222" +
 			"06b6e75626f743d22302220203e3c2f72656d6f7465666f726d61743e00000001";
 
-		// The ordinary phase, for contrast: another Magic:Attack, phase 0x0A, with NO delay word - the behaviorId sits
+		// The ordinary phase, for contrast: another Magic:Attack, phase 0x0A, with no delay word - the behaviorId sits
 		// one word earlier. `NecroL80_mage-necromancer_login_gameplay_chat-annotated` frame 13771.
 		private const string PlainPhaseRecord =
 			"642cd3d60000c3500002de7c000a000000040000001408db8904180128183000520808d0860310fcbc0b" +

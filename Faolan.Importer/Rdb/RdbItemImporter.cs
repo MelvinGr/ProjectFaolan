@@ -23,7 +23,7 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint BagPropertyField = 104; // = ContainerKind.Bag (0x68)
 
-		// Property field 0 is the client's `Flags` word - the item's birth stat-0 value (#756). Bit 26 is BOUND, so a
+		// Property field 0 is the client's `Flags` word - the item's birth stat-0 value. Bit 26 is BOUND, so a
 		// template carrying it mints items that are already bound: the client's "Binds when Picked Up".
 		private const uint FlagsPropertyField = 0;
 
@@ -32,10 +32,10 @@ namespace Faolan.Importer.Rdb
 		private const uint MoreFlagsPropertyField = 177;
 		private const uint CanPropertyField = 30;
 
-		// `NumGemSlots` - how many gems the item can take (#754).
+		// `NumGemSlots` - how many gems the item can take.
 		private const uint GemSlotsPropertyField = 114;
 
-		// Where the item may be WORN (#916). All three are the client's own stat ids (aoc-client-stat-names.tsv) and
+		// Where the item may be WORN. All three are the client's own stat ids (aoc-client-stat-names.tsv) and
 		// all three are present on every decrypted template: `Placement` is the slot BITMASK (0 = not equippable),
 		// `DefaultPos` the preferred slot when the mask offers several, `OccupySlots` everything the item consumes
 		// once worn (bits beyond the chosen slot = the two-hander rule). See `Item.Placement`.
@@ -57,85 +57,86 @@ namespace Faolan.Importer.Rdb
 		private const uint ResourceBagPropertyField = 1331; // the resource-bag capacity field (no ContainerKind analogue)
 
 		// String fields inside a template are encoded `tag 0x21 (u32) + length (u16) + flags (u16) + <length> ASCII
-		// bytes`. The length is a u16, NOT a u32 - the next u16 is a flags word that is nonzero whenever the string
+		// bytes`. The length is a u16, not a u32 - the next u16 is a flags word that is nonzero whenever the string
 		// carries backslash-escaped chars (e.g. an apostrophe `\'`). Reading the length as a u32 folds that flags word
-		// into the high bytes, so names like "Aspirant's Cap" came out as a bogus 1.5M length and got skipped (#202) -
+		// into the high bytes, so names like "Aspirant's Cap" came out as a bogus 1.5M length and got skipped -
 		// the ~900 names that worked all happened to have flags == 0. The first such string is the display name;
 		// internal asset names (mesh refs like `NPC_..._(W0129)`) contain underscores, so we skip those and take the
-		// first underscore-free string. NPC/TEST/internal items carry only an asset name and have no display name - we
+		// first underscore-free string. NPC/test/internal items carry only an asset name and have no display name - we
 		// leave their captured (empty) name untouched.
 		private const uint StringTag = 0x21;
 
-		// The [2][9]-region stats we import + apply today: vitals (the #3 health-bar-fill headline), the five
-		// attributes, and the combat ratings that now HAVE a consumer (Armor/Protection mitigation #401, Hit/Crit/
-		// CombatRating + Magic Damage + regen #399, all read off gearBonuses in WorldSimulation.RegisterPlayerInWorld).
+		// The [2][9]-region stats imported and applied today: vitals, the five attributes, and the combat ratings that
+		// have a consumer (Armor/Protection mitigation, Hit/Crit/CombatRating, Magic Damage and regen, all read off
+		// gearBonuses in WorldSimulation.RegisterPlayerInWorld).
 		// The region's other ~30 unnamed rating ids stay unimported until a consumer lands. NB the five attributes are
-		// imported for server-side derived-stat use, NOT to patch the sent stat block: retail sends BASELINE attributes
-		// (Str=Int=10) in the snapshot for every char L1-L80 and NEVER updates them live (verified across every login
+		// imported for server-side derived-stat use, not to patch the sent stat block: retail sends BASELINE attributes
+		// (Str=Int=10) in the snapshot for every char L1-L80 and never updates them live (verified across every login
 		// capture + a level-up) - the client derives displayed attributes itself from class/level/feats + worn gear, so
-		// patching gear totals onto the wire would diverge from retail and double-count (#399 item 1, won't-do).
+		// patching gear totals onto the wire would diverge from retail and double-count.
+
 		// The GameAction element that carries an item's on-use spell: `e_Type_GC_GameAction_CastNano` (key list [39]).
-		// "Nano" is Funcom's Anarchy Online word for a spell. See ItemTemplateStatModifiers and Gitea #762.
+		// "Nano" is Funcom's Anarchy Online word for a spell. See ItemTemplateStatModifiers.
 		private const uint CastNanoKind = 53051;
 		private const int CastNanoSpellKey = 39;
 
-		// The element that gives a consumable its SHARED cooldown (#764): `CoreLockSpellLineTemplate`, key 39 = the
-		// spell LINE to lock and key 66 = for how long. The line groups by the resource restored - health 80000,
+		// The element that gives a consumable its shared cooldown: `CoreLockSpellLineTemplate`, key 39 = the
+		// spell line to lock and key 66 = for how long. The line groups by the resource restored - health 80000,
 		// stamina 80100, mana 80200 - so the three lock independently.
 		//
-		// ⚠️ Not to be confused with kind 53116 `LockSpellLine`, which ships with an EMPTY key list. Whatever that
+		// Not to be confused with kind 53116 `LockSpellLine`, which ships with an empty key list. Whatever that
 		// variant is, it is not this one read differently.
 		private const uint LockSpellLineKind = 53124;
 		private const int LockSpellLineKey = 39;
 		private const int LockSpellLineDurationKey = 66;
 
-		// Internal rather than private so `--report item-effect-kinds` can measure the import against the SAME
+		// Internal rather than private so `--report item-effect-kinds` can measure the import against the same
 		// whitelist the import applies - a census run against a different set would answer a different question.
 		internal static readonly HashSet<uint> ApplicableStatIds =
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax, (uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution,
 			(uint)CharacterStatId.Intelligence, (uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
-			(uint)CharacterStatId.Armor, // #401: physical armor rating, applied as incoming-damage mitigation
-			(uint)CharacterStatId.HitRating, // #399: drives the provisional critical-hit chance
-			(uint)CharacterStatId.MagicDamage, // #399: added flat to the caster's spell damage
+			(uint)CharacterStatId.Armor, // physical armor rating, applied as incoming-damage mitigation
+			(uint)CharacterStatId.HitRating, // drives the provisional critical-hit chance
+			(uint)CharacterStatId.MagicDamage, // added flat to the caster's spell damage
 			(uint)CharacterStatId.NaturalManaRegen, // gear mana regen (added to the regen tick)
 			(uint)CharacterStatId.NaturalStaminaRegen, // gear stamina regen (added to the regen tick)
-			(uint)CharacterStatId.CriticalRating, // #399: melee crit chance
-			(uint)CharacterStatId.CriticalDamageRating, // #399: melee crit magnitude
-			(uint)CharacterStatId.Protection, // #401: magical mitigation of incoming NPC-cast damage
-			(uint)CharacterStatId.CombatRating // #399: provisional flat melee damage bonus
+			(uint)CharacterStatId.CriticalRating, // melee crit chance
+			(uint)CharacterStatId.CriticalDamageRating, // melee crit magnitude
+			(uint)CharacterStatId.Protection, // magical mitigation of incoming NPC-cast damage
+			(uint)CharacterStatId.CombatRating // provisional flat melee damage bonus
 		];
 
-		// The ONE effect kind whose payload is a flat additive stat delta, and so the only one `ItemStatModifier` can
+		// The one effect kind whose payload is a flat additive stat delta, and so the only one `ItemStatModifier` can
 		// hold: `MaxStatAggregator.AggregateGearBonuses` sums the column straight into the gear total, and the table
-		// carries neither a kind nor the ramp columns `FeatEffect` grew for #599. Measured, not assumed - see the
-		// import loop's remarks and `--report item-effect-kinds` (#806).
+		// carries neither a kind nor the ramp columns `FeatEffect` carries. Measured, not assumed - see the
+		// import loop's remarks and `--report item-effect-kinds`.
 		private const uint FlatModifierKind = 53045; // `Modify` [Stat, Value]
 
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
-		// The item-template type that carries NO 12-byte RDB-Id header, and whose body therefore starts at 0.
+		// The item-template type that carries no 12-byte RDB-Id header, and whose body therefore starts at 0.
 		private const uint UnheaderedTemplateType = 1000620;
 
-		// An item template's own TEXT: its display name and, when it has one, its tooltip description (#891).
+		// An item template's own text: its display name and, when it has one, its tooltip description.
 		//
 		// The two template types frame it DIFFERENTLY, which is why one reader could never see both:
 		//
 		//   1000020  `[u32 0x21][u16 nameLen][u16 descLen][name][description]` - both lengths up front, the strings
 		//            back to back. `Animated Dagger` carries 0x0F and 0x20 there, then its 15- and 32-byte strings.
 		//            An item with no description carries descLen 0 (`Dusklight Tunic`, `Combatant's Hauberk`).
-		//   1000620  `[u16 nameLen][name][u16 descLen][description]` - NO tag at all, each length in front of its own
+		//   1000620  `[u16 nameLen][name][u16 descLen][description]` - no tag at all, each length in front of its own
 		//            string, and the block ENDS the record. The Self-Resurrection Potion's 24-byte name is followed by
 		//            a 337-byte description that runs to the last byte of the body.
 		//
-		// ⚠️ The `[u16 descLen]` of the tagged form was read as "a flags word (escaping marker) we don't need" for as
-		// long as only the NAME was wanted. It is a length, and reading it is the whole of this decode.
+		// The `[u16 descLen]` of the tagged form was read as "a flags word (escaping marker) we don't need" for as
+		// long as only the name was wanted. It is a length, and reading it is the whole of this decode.
 		//
 		// Asset paths share the record (`armor_..._body`, `*bodymesh_NNN`), so an entry containing `_` is rejected:
 		// no captured item name or description carries one.
 		public static (string? Name, string? Description) ExtractText(ReadOnlySpan<byte> template, bool headered = true)
 		{
-			// A 1000620 record has no RDB-Id header, so its body IS the blob; a 1000020 one starts after the 12 bytes.
+			// A 1000620 record has no RDB-Id header, so its body is the blob; a 1000020 one starts after the 12 bytes.
 			var body = !headered
 				? template
 				: template.Length > 12
@@ -154,7 +155,7 @@ namespace Faolan.Importer.Rdb
 
 		// `[u32 0x21][u16 nameLen][u16 descLen]` then the two strings, back to back.
 		//
-		// ⚠️ A rejected field is stepped OVER, not scanned through. Fields are not 4-byte aligned - an asset name of
+		// A rejected field is stepped over, not scanned through. Fields are not 4-byte aligned - an asset name of
 		// 31 bytes puts the next tag at offset 39 - so a plain `i += 4` sweep walks straight past every field that
 		// follows one, which is exactly how an item whose asset path precedes its name loses its name.
 		private static bool TryTagged(ReadOnlySpan<byte> body, out string? name, out string? description)
@@ -260,7 +261,7 @@ namespace Faolan.Importer.Rdb
 			var items = await db.Items.Include(i => i.StatModifiers).Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).ToListAsync();
 
 			// The on-use spell (below) is an FK to Spells, so a template naming a spell our catalog lacks must be
-			// SKIPPED rather than stored - an unresolvable id would fail the constraint, and silently pointing at
+			// skipped rather than stored - an unresolvable id would fail the constraint, and silently pointing at
 			// nothing would be worse than leaving the item inert.
 			var knownSpells = (await db.Spells.Select(sp => sp.Id).ToListAsync()).ToHashSet();
 
@@ -289,8 +290,8 @@ namespace Faolan.Importer.Rdb
 				onUseUnknownSpell = 0;
 			var firstSampleShown = false;
 
-			// Every effect kind that landed on a whitelisted stat but is NOT a flat additive delta, by kind. Empty on
-			// the shipped catalog (#806) - it exists to stay empty loudly.
+			// Every effect kind that landed on a whitelisted stat but is not a flat additive delta, by kind. Empty on
+			// the shipped catalog - it exists to stay empty loudly.
 			var nonFlatKinds = new Dictionary<uint, int>();
 
 			foreach (var item in items)
@@ -325,14 +326,14 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				// ⚠️ Only the 1000020 records carry the 12-byte RDB-Id header - and this used to validate it on BOTH
-				// types, so every 1000620 template was thrown away as a header mismatch (#891). Their first three
-				// words are data (the Self-Resurrection Potion's read 5 / 30029 / 1), the strings sit at a different
-				// offset, and the property table this loop reads at +12 is not there at all. There are 271 of them
-				// against 98,048 of the other, which is why the loss stayed invisible: it costs a handful of items
-				// their whole row, not a field on many.
+				// Only the 1000020 records carry the 12-byte RDB-Id header, so the header check must not run on a
+				// 1000620 template or every one of them is thrown away as a mismatch. Their first three words are
+				// data (the Self-Resurrection Potion's read 5 / 30029 / 1), the strings sit at a different offset,
+				// and the property table this loop reads at +12 is not there at all. There are only 271 of them
+				// against 98,048 of the other, so such a loss costs a handful of items their whole row and is easy
+				// to miss.
 				//
-				// So they take a TEXT-ONLY path: their name and description are recoverable (the string block
+				// So they take a text-only path: their name and description are recoverable (the string block
 				// self-anchors on the end of the record), and nothing else in this loop applies to their layout.
 				if (matchedType == UnheaderedTemplateType)
 				{
@@ -364,8 +365,8 @@ namespace Faolan.Importer.Rdb
 				decrypted++;
 
 				// The AH search CATEGORY is the first u32 of the template body (right after the 12-byte RDB-Id header).
-				// Validated byte-for-byte against 170 captured AH listings (#181). Lets a player's listing be filed
-				// under the item-type search node the client queries by, for EVERY item - not just captured ones.
+				// Validated byte-for-byte against 170 captured AH listings. Lets a player's listing be filed
+				// under the item-type search node the client queries by, for every item - not just captured ones.
 				var category = template.ReadU32Le(12);
 				if (category != item.SearchCategory)
 				{
@@ -374,9 +375,9 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// The template's `Flags` word - property field 0, the item's BIRTH stat-0 value, whose bit 26 is the
-				// BOUND flag (#756). Read through ItemTemplateProperties, which walks the WHOLE property table:
+				// BOUND flag. Read through ItemTemplateProperties, which walks the whole property table:
 				// TryReadPropertyField below cannot reach field 0 at all (it takes the longest strictly-decreasing run
-				// and rejects fieldId 0, and field 0 lives at the end of the FIRST run). Measured against the dumps,
+				// and rejects fieldId 0, and field 0 lives at the end of the first run). Measured against the dumps,
 				// 174 of 179 captured DispatchAddItem arrivals carry exactly this value.
 				var properties = ItemTemplateProperties.Parse(template.AsSpan(12));
 				if (properties.Fields.TryGetValue(FlagsPropertyField, out var flags) && flags != item.Flags)
@@ -397,7 +398,7 @@ namespace Faolan.Importer.Rdb
 					bindFieldsAdded++;
 				}
 
-				// How many gem sockets the item has - `NumGemSlots`, what bounds a socketing request (#754).
+				// How many gem sockets the item has - `NumGemSlots`, what bounds a socketing request.
 				var gemSlots = properties.Fields.GetValueOrDefault(GemSlotsPropertyField);
 				if (gemSlots != item.GemSlots)
 				{
@@ -405,7 +406,7 @@ namespace Faolan.Importer.Rdb
 					gemSlotsAdded++;
 				}
 
-				// Where the item can be worn (#916). Absent reads as 0, which for `Placement` IS the answer for the
+				// Where the item can be worn. Absent reads as 0, which for `Placement` is the answer for the
 				// 1,049 templates that are not equippable at all.
 				var placement = properties.Fields.GetValueOrDefault(PlacementPropertyField);
 				var defaultPos = properties.Fields.GetValueOrDefault(DefaultPosPropertyField);
@@ -418,8 +419,8 @@ namespace Faolan.Importer.Rdb
 					placementAdded++;
 				}
 
-				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
-				// against the captured sell anchors, #137). The property table is the run of [fieldId][value] u32 pairs
+				// The item base value = property-table field 74 (validated: vendor sell = round(value/10) per unit
+				// against the captured sell anchors). The property table is the run of [fieldId][value] u32 pairs
 				// with strictly-decreasing fieldId after the body header (same parse as tools/capture/decode_item_template.py).
 				// Some templates' tables don't carry field 74 (left at 0 -> the shop falls back to the level price).
 				if (TryReadPropertyField(template.AsSpan(12), 74, out var value) && value != item.Value)
@@ -428,11 +429,11 @@ namespace Faolan.Importer.Rdb
 					valuesAdded++;
 				}
 
-				// The item QUALITY/rarity tier = property field 499 - the client's 0-indexed tooltip tier (0=Mundane ..
-				// 5=Legendary), stored directly as ItemQuality (whose values ARE those ids). The strict-decreasing
-				// property parse reaches 499 for most gear, but on some templates it sits OUTSIDE the main decreasing
+				// The item QUALITY/rarity tier = property field 499 - the client's 0-indexed tooltip tier (0=Mundane..
+				// 5=Legendary), stored directly as ItemQuality (whose values are those ids). The strict-decreasing
+				// property parse reaches 499 for most gear, but on some templates it sits outside the main decreasing
 				// run (e.g. the max-capacity bags carry 499=5 at a position the strict parser can't reach - the same
-				// blind spot bag slots hit, #397), so fall back to a direct field scan.
+				// blind spot bag slots hit), so fall back to a direct field scan.
 				var found = TryReadPropertyField(template.AsSpan(12), 499, out var qualityRaw) && qualityRaw <= MaxQualityFieldValue;
 				if (!found)
 					found = TryReadQualityAnywhere(template.AsSpan(12), out qualityRaw);
@@ -443,34 +444,34 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// The item's equipped stat bonuses (docs/rdb/item-template-stats.md, #3), as ItemStatModifier rows keyed
-				// (ItemId, StatId). ONE decoded source: the [2][9] stat-modifier region
+				// (ItemId, StatId). one decoded source: the [2][9] stat-modifier region
 				// (ItemTemplateStatModifiers.Parse) - the whole tooltip stat list (attributes, vitals, ratings) at wire
 				// scale, whitelisted to the stats we can name (ApplicableStatIds).
 				//
-				// ⚠️ There used to be a second source here: field 972 (`Weapon Attribute`, a stat id as its VALUE) with
-				// field 971 read as its amount, applied when the region parsed to nothing. **971 is not 972's amount**
-				// (#631). 971/972/973 are the client's own coherent TRIPLE - `Weapon Critical Chance` /
-				// `Weapon Attribute` / `Weapon Critical Damage` - and the client PROVES 971 is a percent: its
-				// unit-suffix helper (FUN_01119f20) appends "%" for exactly the stat ids listed in it, and 971 and 973
-				// are both in that list while 972 is not. A crit chance is not a "+1 Strength", so the fallback was
-				// emitting a bonus the client never applies, on templates whose region is empty.
+				// There is no second source. Field 972 (`Weapon Attribute`, a stat id as its value) with field 971 as
+				// its amount is not a fallback: 971 is not 972's amount. 971/972/973 are the client's own coherent
+				// triple - `Weapon Critical Chance` / `Weapon Attribute` / `Weapon Critical Damage` - and the client
+				// states that 971 is a percent: its unit-suffix helper (FUN_01119f20) appends "%" for exactly the
+				// stat ids listed in it, and 971 and 973 are both in that list while 972 is not. A crit chance is not
+				// a "+1 Strength", so reading the pair that way emits a bonus the client never applies.
 				//
 				// Nothing replaces it. 972 names an attribute but states no amount (it reads like the spell record's
-				// ScalingAttribute - what the weapon scales OFF, not a bonus it grants), and 971/973 are crit stats
-				// whose wire scale is unmeasured, so emitting them would be inventing a number. Tracked in #631.
+				// ScalingAttribute - what the weapon scales off, not a bonus it grants), and 971/973 are crit stats
+				// whose wire scale is unmeasured, so emitting them would be inventing a number. Open work tracked in
+				// Gitea #631.
 				//
-				// ⭐ Read BY KEY (`ParseSpellStatEffects`), not by POSITION, and branch on the element's KIND (#806).
+				// Read by key (`ParseSpellStatEffects`), not by position, and branch on the element's kind.
 				// Both were assumptions inherited rather than measured, and `--report item-effect-kinds` measured
-				// them: of the 24 kinds the 4,753 decryptable item templates carry, exactly ONE reaches this table -
+				// them: of the 24 kinds the 4,753 decryptable item templates carry, exactly one reaches this table -
 				// 53045 `Modify`, flat - and the positional and key-addressed readers agree on all 6,167 rows, 0
 				// differences. So neither change moves a value today. They are here because the SAFETY was three
 				// accidents deep and none of them is a rule:
 				//   - `AddLayeredSkinnedMesh` (5,632 elements, the second-commonest kind) has no stat slot at all,
 				//     and the positional reader was filing its key-194 MESH id as a stat id - harmless only because
 				//     no mesh id survives `ApplicableStatIds`;
-				//   - `SpellLineStatModifier` puts the LINE first and the stat second, and was rejected only because
+				//   - `SpellLineStatModifier` puts the line first and the stat second, and was rejected only because
 				//     a line id (44221) is above the parser's stat-id bound;
-				//   - `InterpolatedModify` is a level RAMP whose stored value is the ramp's LOW endpoint, and this
+				//   - `InterpolatedModify` is a level RAMP whose stored value is the ramp's low endpoint, and this
 				//     table has no ramp columns - the one item carrying it (Ring of Acheron) touches a stat the
 				//     whitelist drops.
 				// Widening `ApplicableStatIds` by one id is all it takes to turn any of those into a wrong stat, so
@@ -497,11 +498,11 @@ namespace Faolan.Importer.Rdb
 				if (SyncStatModifiers(item, mods))
 					statsAdded++;
 
-				// The item's ON-USE SPELL (#762): a `CastNano` GameAction element - kind 53051, key 39 - whose payload
+				// The item's on-USE spell: a `CastNano` GameAction element - kind 53051, key 39 - whose payload
 				// is a Spells.Id. This is the scalable twin of CaptureItemUseImporter, which can only learn an on-use
 				// spell from a capture where somebody actually right-clicked the item.
 				//
-				// ⚠️ Only fills a GAP; a captured value always wins. The capture observed the spell the server really
+				// Only fills a gap; a captured value always wins. The capture observed the spell the server really
 				// applied, while the template states what the item declares - and those disagree at least once
 				// (Totem of Origins: template 3763119 "Totem of Origins" vs captured 3981764 "Degeneration"), which is
 				// unresolved. Overwriting a captured value with the template's would silently rewrite ground truth.
@@ -523,7 +524,7 @@ namespace Faolan.Importer.Rdb
 					onUseAdded++;
 				}
 
-				// The consumable's SHARED COOLDOWN (#764), from the same element pass. Both keys or neither: a line with
+				// The consumable's shared cooldown, from the same element pass. Both keys or neither: a line with
 				// no duration cannot lock anything, and a duration with no line has nothing to lock.
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(template.AsSpan(12)))
 				{
@@ -543,10 +544,10 @@ namespace Faolan.Importer.Rdb
 					lockLinesAdded++;
 				}
 
-				// Weapon MIN/MAX damage (docs/rdb/item-template-stats.md, #395): property fields 286 (0x11E) = min and
+				// Weapon MIN/MAX damage (docs/rdb/item-template-stats.md): property fields 286 (0x11E) = min and
 				// 285 (0x11D) = max, decoded from the client's GUIGetMinDamage()/GUIGetMaxDamage(). Same strict property
 				// run as value/quality. Stored only when both are present and sane (min <= max, non-zero) - non-weapons
-				// (and weapons whose fields sit in the non-monotonic tail) leave them NULL.
+				// (and weapons whose fields sit in the non-monotonic tail) leave them null.
 				var hasMin = TryReadPropertyField(template.AsSpan(12), 286, out var minDmg);
 				var hasMax = TryReadPropertyField(template.AsSpan(12), 285, out var maxDmg);
 				if (hasMin && hasMax && minDmg > 0 && minDmg <= maxDmg)
@@ -559,17 +560,17 @@ namespace Faolan.Importer.Rdb
 					}
 				}
 
-				// ATTACK RANGE (#838): property field 287, the client's own `Attack Range` stat, in world units x100.
+				// attack RANGE: property field 287, the client's own `Attack Range` stat, in world units x100.
 				// It is what tells an NPC whether to close or to hold: every captured NPC melee weapon reads 200 and
 				// every bow 1750. The client tuning table has no AI stand-off constant and a mob's swing names no
-				// target to measure a distance from, so the weapon IS the source for it.
+				// target to measure a distance from, so the weapon is the source for it.
 				if (TryReadPropertyField(template.AsSpan(12), 287, out var attackRange) && attackRange > 0 && item.AttackRange != (int)attackRange)
 				{
 					item.AttackRange = (int)attackRange;
 					attackRangeAdded++;
 				}
 
-				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
+				// bag capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
 				// adds when equipped (the "+N slots" tooltip) - Burlap 24 / Bag of Holding 20 / Veteran's Bag 35. It sits
 				// in the table's non-monotonic tail (after the strictly-decreasing run), so it needs the dedicated scan.
 				// Only real bags carry it; used server-side only for the item equipped in the bag slot (equip slot 3).
@@ -589,7 +590,7 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// Fill the display name only when we don't already have one (captured names are authoritative). The two
-				// strings are read together because they are ONE decode - the description is simply the entry after
+				// strings are read together because they are one decode - the description is simply the entry after
 				// the name - but they are stored independently, since an item can arrive from a capture with a name
 				// and no text.
 				var (templateName, templateDescription) = ExtractText(template);
@@ -599,8 +600,8 @@ namespace Faolan.Importer.Rdb
 					namesAdded++;
 				}
 
-				// #891: the tooltip text. Most items have none - a plain armour piece carries its name and stops -
-				// so this fills the ones that DO and leaves the rest null rather than inventing prose. Captured text
+				// the tooltip text. Most items have none - a plain armour piece carries its name and stops -
+				// so this fills the ones that do and leaves the rest null rather than inventing prose. Captured text
 				// wins for the same reason the name does.
 				if (string.IsNullOrWhiteSpace(item.Description) && !string.IsNullOrEmpty(templateDescription))
 				{
@@ -622,9 +623,9 @@ namespace Faolan.Importer.Rdb
 			// The *Bonus columns were set on tracked Item entities above, so they save with everything else. (The old
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
-			// ⚠️ Ask the CHANGE TRACKER, not a hand-maintained list of counters. This was an OR over every counter the
-			// importer happened to keep, so a field added later saved only when some OTHER field also changed on the
-			// same run: `AttackRange` (#838) set 632 items, reported 632, and wrote nothing, because on a re-run of an
+			// Ask the change TRACKER, not a hand-maintained list of counters. This was an or over every counter the
+			// importer happened to keep, so a field added later saved only when some other field also changed on the
+			// same run: `AttackRange` set 632 items, reported 632, and wrote nothing, because on a re-run of an
 			// already-imported catalog every other counter is 0. The count is not the fact - the save is.
 			if (db.ChangeTracker.HasChanges())
 				await db.SaveChangesAsync();
@@ -640,8 +641,8 @@ namespace Faolan.Importer.Rdb
 
 			if (flagsAdded > 0 || bindFieldsAdded > 0)
 			{
-				// ⚠️ `BindsOnPickup` derives through `Flags is { } f && ...`, NOT `(i.Flags & Bit) != 0`: `Flags` is
-				// `uint?` and a LIFTED `!= 0` is TRUE for null, which counted all 61 items with no readable template
+				// `BindsOnPickup` derives through `Flags is { } f &&...`, not `(i.Flags & Bit) != 0`: `Flags` is
+				// `uint?` and a LIFTED `!= 0` is true for null, which counted all 61 items with no readable template
 				// as bound the first time this was written.
 				Console.WriteLine($"  Flags (field 0) set on {flagsAdded} item(s), MoreFlags/Can (177/30) on {bindFieldsAdded}; " +
 					$"{items.Count(i => i.BindsOnPickup)} bind on PICKUP, {items.Count(i => i.BindsOnEquip)} on EQUIP (#756).");
@@ -738,15 +739,13 @@ namespace Faolan.Importer.Rdb
 			return false;
 		}
 
-		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
+		// Reads the value of property-table field `fieldId` from a decrypted template body (the span after the
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
 		// strictly-decreasing fieldId in (0, 2000] - the same grammar tools/capture/decode_item_template.py validated.
 		// Returns false when no such run contains the field (some template kinds don't carry it).
 		//
-		// `internal` because the item-stat-scaling report needs the SAME parse. ReportCli used to carry a
-		// byte-identical private copy called TryReadTemplateField, justified as "kept local so the report stays
-		// read-only and independent of the importer's internals" - but this is a pure parse over a span, so sharing
-		// it neither writes anything nor exposes importer state. Two copies of a grammar this fiddly (a
+		// `internal` because the item-stat-scaling report needs the same parse. It is a pure parse over a span, so
+		// sharing it neither writes anything nor exposes importer state, and two copies of a grammar this fiddly (a
 		// strictly-decreasing run, not a fixed offset) is how a report quietly stops agreeing with the importer.
 		internal static bool TryReadPropertyField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
 		{
@@ -796,7 +795,7 @@ namespace Faolan.Importer.Rdb
 
 		// Direct scan for field 499 (item quality, 0-indexed) at any 4-byte-aligned position, taking the following word
 		// as the value and accepting only the 0..5 field range. Mirrors TryReadBagSlots: the fallback for templates
-		// whose 499 is outside the strict-decreasing property run (#397).
+		// whose 499 is outside the strict-decreasing property run.
 		private static bool TryReadQualityAnywhere(ReadOnlySpan<byte> body, out uint value)
 		{
 			value = 0;

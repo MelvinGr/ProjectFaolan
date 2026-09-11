@@ -7,24 +7,24 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report broadcast-check`: which server records does retail send to EVERY player who can see the subject, and
-	// which only to the one client concerned? (#272.)
+	// `--report broadcast-check`: which server records does retail send to every player who can see the subject, and
+	// which only to the one client concerned?
 	//
 	// The question has one honest oracle in the whole corpus - `login_2-clients_group-trade-friend`, the only capture
-	// with TWO game connections. With one client on the wire a broadcast and a private reply look identical; with two,
-	// a record that reaches both streams IS a broadcast and one that reaches only one is not. Everything this report
+	// with two game connections. With one client on the wire a broadcast and a private reply look identical; with two,
+	// a record that reaches both streams is a broadcast and one that reaches only one is not. Everything this report
 	// says comes from that single distinction.
 	//
-	// ⭐ What it is FOR. A record addressed to a SUBJECT and describing world-visible state has to go to everyone who
+	// What it is for: a record addressed to a subject and describing world-visible state has to go to everyone who
 	// can see that subject, or the world desynchronises per player: an NPC killed by someone else stays standing for
 	// you, an animation plays for one witness, a corpse never freezes. That class of bug is invisible in single-client
 	// testing and invisible in a single-client capture, which is exactly why it needs a standing measurement rather
 	// than a convention someone remembers.
 	//
-	// ⚠️ READ THE MIXED COLUMN, do not automate off the type alone. An IIR type is not one message: a
-	// `BehaviorControlCenterIIR` carries an entity's animation (broadcast) AND the ack of a client's own request
-	// (not), so its 11/11 here says only that this capture's eleven were all the first kind - the two players never
-	// fought. The type-level verdict is a starting point; the record's ROLE decides.
+	// Read the mixed column; do not automate off the type alone. An IIR type is not one message: a
+	// `BehaviorControlCenterIIR` carries an entity's animation (broadcast) and the ack of a client's own request
+	// (not), so a clean per-type verdict here can simply mean this capture's records were all of one kind. The
+	// type-level verdict is a starting point; the record's role decides.
 	public static partial class ReportCli
 	{
 		// The one capture with two game connections. Named rather than searched for: no other capture can answer this,
@@ -42,7 +42,7 @@ namespace Faolan.Importer.Cli
 
 			// The GAME connections are the TCP STREAMS that carry IIRs at all; a client also holds login/chat/agent
 			// connections which carry none, so counting every stream would split one client into several. It cannot be
-			// `Port` - that is the SERVER port and is identical for every client on a tier.
+			// `Port` - that is the server port and is identical for every client on a tier.
 			var gameStreams = capture.Packets.Where(p => p is { IsDownload: true, IsIirCarrier: true }).Select(p => p.Stream).Distinct().OrderBy(s => s).ToArray();
 			Console.WriteLine($"broadcast-check over {capture.Name}: {gameStreams.Length} game connection(s) - streams {string.Join(", ", gameStreams)}.");
 			if (gameStreams.Length < 2)
@@ -60,7 +60,7 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				// The subject is the handle the record is ADDRESSED to. `Record` starts at the type word, so the
-				// layout is [u32 type][u32 entityClass][u32 handle] - reading the CLASS instead collapses every
+				// layout is [u32 type][u32 entityClass][u32 handle] - reading the class instead collapses every
 				// record onto one subject, because it is the constant 0xC350 on all of them.
 				var key = (p.SubOpcode, p.Record.ReadU32Be(8));
 				if (!reached.TryGetValue(key, out var streams))

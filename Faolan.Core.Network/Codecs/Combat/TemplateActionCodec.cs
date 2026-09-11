@@ -5,18 +5,19 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// TemplateActionIIR (0x6C300937). ReadSubClass (FUN_007a0b00) reads an item-template struct (FUN_005d5150,
-	// 68 bytes on the wire) then six u32. The struct is item-identity data - a name/length region + item keys (the
-	// B2 90 80 5C 29 E6 27 CA equip-identity pattern + TEA-key-like blocks), so it is carried verbatim; the six
-	// trailing u32 are constructed. Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     TemplateActionIIR - the client reader (FUN_007a0b00) reads an item-template struct (FUN_005d5150, 68 bytes on
+	///     the wire) then six u32. The struct is item-identity data - a name and length region plus item keys, the
+	///     B2 90 80 5C 29 E6 27 CA equip-identity pattern and TEA-key-like blocks - so it is carried verbatim, while the six
+	///     trailing u32 are constructed. Grammar from the client reader; see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class TemplateActionCodec
 	{
 		public const int TemplateBytes = 68;
 		public const uint Opcode = (uint)IirTypes.TemplateActionIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(TemplateActionIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -60,6 +61,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// TemplateActionIIR (0x6C300937).
+	/// <summary>The TemplateActionIIR body.</summary>
 	public sealed record TemplateActionIIR(uint Handle, byte Env, byte[] Template, uint F1, uint F2, uint F3, uint F4, uint F5, uint F6);
 }

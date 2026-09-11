@@ -12,27 +12,27 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report feat-autotrain-check`: does the client's own auto-train flag agree with what retail actually puts in
-	// a character's feat list, and does one point per rank reproduce the point budget those lists spend? (#862)
+	// a character's feat list, and does one point per rank reproduce the point budget those lists spend?
 	//
 	// Two populations, and neither is ours:
-	//   * `FeatClassEntry` - the client's FEATCLASS table (RDB 1000043), which marks 3,839 of its 9,916 rows
+	//   * `FeatClassEntry` - the client's FEATCLASS table (RDB 1000043), which marks a third of its rows
 	//     `Autotrain`, i.e. trained by the client itself from the character's class and level.
 	//   * `CharacterFeats` - the feat lists harvested off the captured player spawns' pre-IIR frame. Retail's answer.
 	//
-	// The claim under test is that they are complementary: every id retail sends is one the client does NOT
-	// auto-train, so nothing our server grants needs to be in that list, and putting one there is a wire divergence
+	// The claim under test is that they are complementary: every id retail sends is one the client does not
+	// auto-train, so nothing the server grants needs to be in that list, and putting one there is a wire divergence
 	// (`FeatHolder::TrainFeat` refuses one outright - "will break feats!").
 	//
-	// It also prints the COST arithmetic, which is the other half of #862: summing `rank + 1` over each captured
-	// list reproduces `FeatRules.PointBudget` for that character's level exactly.
+	// It also prints the cost arithmetic: summing `rank + 1` over each captured list reproduces
+	// `FeatRules.PointBudget` for that character's level exactly.
 	//
-	// ⭐ **Why a report and not a test** (Gitea #729/#849): the captured half lives in `CharacterFeats`, and
+	// Why a report and not a test: the captured half lives in `CharacterFeats`, and
 	// `faolan.sql` excludes every `Character*` table as per-developer play state - so the suite's fixture holds none
-	// and the assertion would pass on an empty left side. The properties of the CODE and of the client table are
+	// and the assertion would pass on an empty left side. The properties of the code and of the client table are
 	// gated in `FeatSpellGrantTests` / `FeatRulesTests`; this is the one comparison that needs the real database.
 	//
 	// Returns non-zero when a captured character holds a feat the client auto-trains - the only direction that can
-	// only be a defect. A budget that does not land exactly is PRINTED, not asserted: a character may simply not have
+	// only be a defect. A budget that does not land exactly is printed, not asserted: a character may simply not have
 	// spent everything, and it is the captures that would have to move for that to become news.
 	public static partial class ReportCli
 	{
@@ -91,25 +91,25 @@ namespace Faolan.Importer.Cli
 				? $"OK: {checkedChars} character(s), no auto-trained feat in any feat list."
 				: $"FAIL: {offenders} auto-trained feat(s) across {checkedChars} character(s).");
 
-			// ⛔ The effects half gates too, and on its own direction: a derived row that touches a pool or an
-			// attribute would move a captured stat sheet, which is the one thing #863 promised could not happen.
+			// The effects half gates too, and on its own direction: a derived row that touches a pool or an attribute
+			// would move a captured stat sheet, which is what folding the effects in must not do.
 			var leaked = await AutoTrainedEffects(db);
 
 			return offenders == 0 && leaked == 0 ? 0 : 1;
 		}
 
 		/// <summary>
-		///     The other half of the same population (Gitea #863): what the auto-trained feats DO, now that #862 has
-		///     settled that they are never in a feat list.
+		///     The other half of the same population: what the auto-trained feats do, given that they are never in a
+		///     feat list.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The ticket asked for one check before shipping this - that folding the effects in must not move a
-		///     captured character's stat sheet, because the class PROGRESSION tracks carry 70-80 effect rows each. The
-		///     check passes STRUCTURALLY rather than numerically, which is stronger: the derived set touches no pool
-		///     and no attribute at all, so there is nothing for it to move. Both halves print below.
+		///     Folding the effects in must not move a captured character's stat sheet, because the class progression
+		///     tracks carry 70-80 effect rows each. The check passes structurally rather than numerically, which is
+		///     stronger: the derived set touches no pool and no attribute at all, so there is nothing for it to move.
+		///     Both halves print below.
 		///     <list type="number">
 		///         <item>
-		///             the progression track is EXCLUDED, because <c>ClassAttributeBases</c> already applies it - the
+		///             the progression track is excluded, because <c>ClassAttributeBases</c> already applies it - the
 		///             same client templates, read through the RDB item parser instead of the feat catalog;
 		///         </item>
 		///         <item>
@@ -158,7 +158,7 @@ namespace Faolan.Importer.Cli
 				? "  ✅ the derived set touches NO pool or attribute stat, so no captured stat sheet can move."
 				: $"  ⛔ {leaked.Count} derived row(s) carry a sheet stat - the captured sheets must be re-checked before this ships.");
 
-			// The LADDER, per class at the level cap - the pick the shipping rule makes, beside the sum it refuses.
+			// The ladder, per class at the level cap - the pick the shipping rule makes, beside the sum it refuses.
 			// A sum is printed because it is the rival implementation, and the gap is the whole argument.
 			Console.WriteLine();
 			Console.WriteLine($"  {"class",-16} {"stats",5} {"picked",8} {"summed",8}  (the sum is what stacking every rung would give)");
@@ -175,7 +175,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐ The corroboration the derivation was NOT fitted to: the out-of-combat mana-regen base.
+		///     The corroboration the derivation was not fitted to: the out-of-combat mana-regen base.
 		/// </summary>
 		/// <remarks>
 		///     <c>RegenRates</c> recorded three retail observations of stat 280 with no source for them - 0 for a

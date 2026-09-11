@@ -6,12 +6,12 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact snapshot for GameTimeIIR (0x4F57DC08) - the world clock. The record's resync timestamp is generated
-	// from the wall clock rather than replayed (#351), so the gate is: feed the instant the capture was taken and the
+	// from the wall clock rather than replayed, so the gate is: feed the instant the capture was taken and the
 	// codec must reproduce the captured bytes exactly. That keeps this a real oracle - the expected bytes come from the
 	// capture, and the generated timestamp has to land on the captured u64 on its own.
 	//
 	// WorldEntryGeneratedRecordsTests.BuildGameTime_ReproducesCapturedRecord asserts the same bytes through the
-	// listener; this pins the CODEC boundary so a GameTimeCodec refactor is guarded on its own.
+	// listener; this pins the codec boundary so a GameTimeCodec refactor is guarded on its own.
 	public class GameTimeCodecTests
 	{
 		// [subop 4F57DC08][TypeTag 0][Handle 0][bool 01][f32 dayTime 472BDD00 = 43997s = 12:13][u32 word 1][u32 gameDay 0001920C][u32 unix 6A024E93][f32 rate 1.0].
@@ -66,8 +66,8 @@ namespace Faolan.Tests
 			Assert.Equal(before + 1, GameClock.ResyncTimestamp(atMidnight) >> 32);
 		}
 
-		// dayTime is an IEEE FLOAT of game seconds, and it starts one byte later than the record's old reading claimed
-		// (#351). This is the assertion that would have caught the mistake: the captured word decodes to a sane time of
+		// dayTime is an IEEE float of game seconds, and it starts one byte later than a naive carve puts it. This is
+		// the assertion that catches that: the captured word decodes to a sane time of
 		// day as a float and to nonsense as an integer, and the bool in front of it is what the client validates - a
 		// dayTime written where that bool belongs is rejected outright ("isToBePassed on bool has value G").
 		[Fact]

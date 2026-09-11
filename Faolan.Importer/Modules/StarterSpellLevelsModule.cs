@@ -16,9 +16,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Corrects starter-spell unlock levels from the create grants (the level-1 truth), overriding the ellatha/wiki
-	// level scrape so a level-1 create yields EXACTLY that class's f239 grant. Runs after class-spells (which harvests
-	// the per-class grants); registration order (after the tsv level modules) places it after the ellatha/wiki levels.
+	/// <summary>
+	///     Corrects starter-spell unlock levels from the create grants (the level-1 truth), overriding the ellatha/wiki
+	///     level scrape so a level-1 create yields exactly that class's f239 grant.
+	/// </summary>
+	/// <remarks>
+	///     Runs after class-spells (which harvests the per-class grants); registration order places it after the
+	///     ellatha/wiki levels.
+	/// </remarks>
 	public sealed class StarterSpellLevelsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(StartingSpellsModule)];
@@ -38,7 +43,7 @@ namespace Faolan.Importer.Modules
 		{
 			var (starters, cleared) = await CaptureSpellImporter.MarkStarterSpellsAsync(ctx.Db, ctx.CreateCaptures);
 
-			// #376: the same table's other half - what a ding actually grants, from every capture (not just creates).
+			// The same table's other half: what a ding actually grants, from every capture (not just creates).
 			var (access, levels) = await CaptureSpellImporter.MarkLevelGrantsAsync(ctx.Db, ctx.Captures);
 			return new ImportResult($"{starters} create-granted starters marked, {cleared} stale flags cleared; {levels} capture-proven grant levels ({access} new access rows).");
 		}

@@ -9,15 +9,15 @@ namespace Faolan.Tests
 {
 	// DoS-hardening of the untrusted inbound path (security review 2026-07-02):
 	//   1. FaolanStream.ReadArray rejects a length-prefix larger than the bytes remaining (no multi-GB alloc).
-	//   2. ConanMessageFramer never inflates inbound: the 0x80000005 compression marker is SKIPPED as a fixed 9-byte
+	//   2. ConanMessageFramer never inflates inbound: the 0x80000005 compression marker is skipped as a fixed 9-byte
 	//      control frame, so a compressed payload behind it is never materialised (no zlib decompression bomb).
 	public class NetworkHardeningTests
 	{
 		[Fact]
 		public void Framer_CompressionMarkerCoalescedWithPacket_KeepsThePacket()
 		{
-			// The regression: a recv that TCP-coalesced the client's 9-byte compression marker with the packet behind
-			// it (e.g. the post-ready 0x205f) must still frame that packet - the old path dropped the whole buffer.
+			// A recv that TCP-coalesced the client's 9-byte compression marker with the packet behind it (e.g. the
+			// post-ready 0x205f) must still frame that packet rather than drop the whole buffer.
 			byte[] marker = [0x80, 0x00, 0x00, 0x05, 0xA5, 0x05, 0xDF, 0x1B, 0x01];
 			byte[] packet = [0x00, 0x00, 0x00, 0x04, 0xAA, 0xBB, 0xCC, 0xDD]; // [len=4][4-byte body]
 
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ReadArrayUInt32Length_ValidLength_StillReads()
 		{
-			// len=3, exactly 3 payload bytes → the guard must not break the happy path.
+			// len=3, exactly 3 payload bytes the guard must not break the happy path.
 			var s = new FaolanStream([0, 0, 0, 3, 0xAA, 0xBB, 0xCC]);
 			Assert.Equal([0xAA, 0xBB, 0xCC], s.ReadArrayUInt32Length());
 		}

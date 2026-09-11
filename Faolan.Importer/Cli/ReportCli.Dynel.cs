@@ -33,18 +33,17 @@ namespace Faolan.Importer.Cli
 				}
 		}
 
-		// #571: how often a single capture reuses one entity handle for MORE THAN ONE NPC, and what the spawn import
-		// loses to it. Handles are recycled - a handle freed by a despawn is reissued later in the same session - but
-		// the import treats a handle as a capture-scoped mob identity: `DistinctByHandle` keeps the FIRST spawn per
-		// handle and silently drops every later one, and the patrol join used to hand the survivor the other NPC's
-		// route (fixed in #565 by a positional sanity check, which is where this was found).
+		// How often a single capture reuses one entity handle for more than one NPC, and what the spawn import loses
+		// to it. Handles are recycled - a handle freed by a despawn is reissued later in the same session - but the
+		// import treats a handle as a capture-scoped mob identity: `DistinctByHandle` keeps the first spawn per handle
+		// and silently drops every later one, and the patrol join guards against inheriting the other NPC's route only
+		// through a positional sanity check.
 		//
-		// ⚠️ Only a change of TEMPLATE proves it. The obvious-looking test - the same handle seen at two distant
-		// positions - does NOT: an NPC that WANDERS or patrols streams in again wherever it has walked to, and over a
-		// long session a cow covers a couple of hundred units. Counting distance-apart-only reuses reported 229 handles
-		// where the provable figure is far smaller, and every inflated one was a Wild Cow / Conarch Guard seen at three
-		// points of its own route. So distance is reported SEPARATELY as ambiguous and is never added to the total: a
-		// different template on one handle is the only thing that cannot be one mob moving.
+		// Only a change of template proves a reuse. The obvious-looking test - the same handle seen at two distant
+		// positions - does not: an NPC that wanders or patrols streams in again wherever it has walked to, and over a
+		// long session a cow covers a couple of hundred units, so a distance-only count is dominated by one mob seen
+		// at three points of its own route. Distance is therefore reported separately as ambiguous and never added to
+		// the total: a different template on one handle is the only thing that cannot be one mob moving.
 		private static void HandleRecycling(IReadOnlyList<NamedCapture> captures)
 		{
 			var provenHandles = 0;
@@ -89,30 +88,31 @@ namespace Faolan.Importer.Cli
 
 		// --report dynel-cycle [--report-arg <minimum burst size, default 4>]
 		//
-		// Retail's world-object interest, measured: every BURST of `SimpleDynelFullUpdateIIR` spawns or
+		// Retail's world-object interest, measured: every burst of `SimpleDynelFullUpdateIIR` spawns or
 		// `n3ToClientQuitIIR` despawns that arrives in one second, with the burst's centroid, the player's own
 		// position at that moment (from their last uploaded `CharDCMove`) and the distance between the two.
 		//
-		// #529 is the question it answers. Twelve Stone Bricks were seen despawning at 83u, respawning at 144u and
-		// despawning again at 149u - an ordering no radius test can produce, so whatever drives retail's streaming is
-		// not the distance our `InterestManager` uses. One capture cannot say what it IS; a census of every bulk
-		// event in the corpus can, because a RADIUS leaves a tight band of distances and a grid/cell scheme does not.
+		// The question it answers: twelve Stone Bricks were seen despawning at 83u, respawning at 144u and despawning
+		// again at 149u - an ordering no radius test can produce, so whatever drives retail's streaming is not the
+		// distance `InterestManager` uses. One capture cannot say what it is; a census of every bulk event in the
+		// corpus can, because a radius leaves a tight band of distances and a grid or cell scheme does not.
 		//
 		// Bursts, not individual events, because that is the unit of the phenomenon: an interest pass moves a whole
 		// group at once, and a single spawn is just a mob walking into view.
+
 		// --report dynel-effects
 		//
-		// Every `SimpleDynelVisualChangeIIR` PARTICLE record in the corpus, attributed to the object it played on and
-		// crossed against the effect that object's own geometry declares (#698/#687). Written because the two
-		// questions this family raises cannot be answered from a count: whether a record is a standing decoration or
-		// a one-off puff (the ATTRACTOR says), and whether we already hold its effect (the geometry node says).
+		// Every `SimpleDynelVisualChangeIIR` particle record in the corpus, attributed to the object it played on and
+		// crossed against the effect that object's own geometry declares. The two questions this family raises cannot
+		// be answered from a count: whether a record is a standing decoration or a one-off puff (the attractor says),
+		// and whether the effect is already held (the geometry node says).
 		//
-		// ⚠️ Handles are RECYCLED - the same handle is a `Location Object - Walls` early in a capture and an Oak Tree
-		// later - so a record is attributed through the SPAWN that most recently minted its handle, within one
-		// capture. Keying on the handle alone merges unrelated objects and was worth an hour on #494.
+		// Handles are recycled - the same handle is a `Location Object - Walls` early in a capture and an Oak Tree
+		// later - so a record is attributed through the spawn that most recently minted its handle, within one
+		// capture. Keying on the handle alone merges unrelated objects.
 		private static void DynelEffects(IReadOnlyList<NamedCapture> captures, DatabaseContext db)
 		{
-			// What the objects' own geometry declares: effect id -> how many nodes carry it (#687).
+			// What the objects' own geometry declares: effect id -> how many nodes carry it.
 			var declared = db.WorldObjectWords
 				.Where(w => w.Kind == WorldObjectWordKind.GeometryNode && w.Ordinal % 6 == 0)
 				.AsEnumerable()
@@ -130,7 +130,7 @@ namespace Faolan.Importer.Cli
 					if (!p.IsIirCarrier)
 						continue;
 
-					// The spawn that minted the handle - and it re-mints, so the LAST one before a record wins. Every
+					// The spawn that minted the handle - and it re-mints, so the last one before a record wins. Every
 					// class of the dynel family carries the same identity message in the same place, which is why one
 					// codec read plus WorldObjectColumns covers all of them.
 					if (WorldObjectClasses.Placed.Contains(p.SubOpcode) && p.TryParse(WorldObjectCodec.Parse, out var obj))
@@ -172,14 +172,14 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {g.Key,-10} {g.Count(),8}  {string.Join("/", g.Select(s => s.Attractor).Distinct()),9}  {held,-19}  {on}");
 			}
 
-			// The STOPs, with what they played on. A Stop that never had a Start in the same capture is retail
+			// The stops, with what they played on. A stop that never had a start in the same capture is retail
 			// clearing an effect the object brought with it - which is the shape a loot bag's sparkle would have.
 			Console.WriteLine();
 			Console.WriteLine("  StopParticleEffect, by the object it was sent to:");
 			foreach (var g in stopped.GroupBy(x => (x.TypeTag, x.Name)).OrderByDescending(g => g.Count()))
 				Console.WriteLine($"    class 0x{g.Key.TypeTag:X4}  {g.Key.Name,-40} {g.Count(),3} record(s), {g.Count(x => x.HadStart)} of them after a Start in the same capture");
 
-			// ⭐ The cross-tab that says what an effect IS. A decoration is started and left running; a STATE marker
+			// The cross-tab that says what an effect is. A decoration is started and left running; a state marker
 			// is started and later stopped on the same handle. Crossed against whether the object's own geometry
 			// declares the effect, the two populations separate.
 			Console.WriteLine();
@@ -202,7 +202,7 @@ namespace Faolan.Importer.Cli
 			var minimumBurst = int.TryParse(arg, out var m) && m > 0 ? m : 4;
 			var spawnDistances = new List<double>();
 			var despawnDistances = new List<double>();
-			// The WORLD-ENTRY burst is a world BUILD, not an interest pass - it states the playfield the player just
+			// The world-entry burst is a world build, not an interest pass - it states the playfield the player just
 			// loaded into, so it reaches as far as the playfield does. Scored separately, because leaving it in is
 			// what makes the radius verdict read as "something spawned 1834u away" when nothing was streaming at all.
 			var midSessionSpawnDistances = new List<double>();
@@ -225,7 +225,7 @@ namespace Faolan.Importer.Cli
 					if (!p.IsIirCarrier)
 						continue;
 
-					// The player's own position: their UPLOADED moves, which is the one CharDCMove stream that is
+					// The player's own position: their uploaded moves, which is the one CharDCMove stream that is
 					// certainly the capturing character (the downloads are every visible mover).
 					if (p is { IsDownload: false, SubOpcode: CharDCMoveCodec.Opcode })
 					{
@@ -277,9 +277,9 @@ namespace Faolan.Importer.Cli
 				if (interesting.Count == 0)
 					continue;
 
-				// A despawn burst is a REFRESH when most of what it dropped comes straight back. #529 read the Stone
-				// Bricks' "removed and restored together" as an interest cycle; if the same handles return within
-				// seconds, it is not interest at all - it is the cell being re-sent, and the distances at each end are
+				// A despawn burst is a refresh when most of what it dropped comes straight back. A set of handles
+				// removed and restored together reads as an interest cycle, but if the same handles return within
+				// seconds it is not interest at all - it is the cell being re-sent, and the distances at each end are
 				// just wherever the player had walked to by then.
 				var refreshWindow = TimeSpan.FromSeconds(30).Ticks;
 				foreach (var burst in interesting.Where(b => !b.Spawn))
@@ -303,10 +303,10 @@ namespace Faolan.Importer.Cli
 					if (known.Count == 0)
 						continue;
 
-					// The RADIUS test is one-sided per kind, and that is the whole trick. A radius R bounds a SPAWN
-					// burst from above (nothing past R may appear) and a DESPAWN burst from below (nothing inside R
-					// may vanish). So the numbers that matter are the FARTHEST thing that spawned and the NEAREST
-					// thing that despawned - if those two ranges overlap, no single R can produce the corpus.
+					// The radius test is one-sided per kind, and that is the whole trick. A radius R bounds a spawn
+					// burst from above (nothing past R may appear) and a despawn burst from below (nothing inside R
+					// may vanish). So the numbers that matter are the farthest thing that spawned and the nearest
+					// thing that despawned: if those two ranges overlap, no single R can produce the corpus.
 					var extreme = burst.Spawn ? known.Max() : known.Min();
 					(burst.Spawn ? spawnDistances : despawnDistances).Add(extreme);
 					if (burst.Ticks != start)
@@ -346,10 +346,10 @@ namespace Faolan.Importer.Cli
 					  + $"{spawnDistances.Count(d => d > floor)} spawn burst(s) reach past the nearest despawn.");
 			}
 
-			// The grid hypothesis #529 proposes. If interest is per CELL, a burst fires when the player CROSSES a cell
-			// boundary, so the player's position at a burst should sit near a multiple of the cell size on one axis.
+			// The grid hypothesis. If interest is per cell, a burst fires when the player crosses a cell boundary, so
+			// the player's position at a burst should sit near a multiple of the cell size on one axis.
 			//
-			// ⚠️ The null model is NOT `cell/6` (the value a uniformly placed player would give). It is the SAME
+			// The null model is not `cell/6` (the value a uniformly placed player would give). It is the same
 			// statistic over every position the player was ever at, because a player does not walk uniformly: they
 			// stand on designer-placed round coordinates, and a burst-only score has no meaning without that control.
 			// A real cell size beats the walk; a spurious one matches it.
@@ -368,7 +368,7 @@ namespace Faolan.Importer.Cli
 
 			return;
 
-			// DISTINCT positions on both sides: bursts arrive in clumps at one standing position (a map change fires
+			// Distinct positions on both sides: bursts arrive in clumps at one standing position (a map change fires
 			// several at the same coordinates), and counting that position once per burst would let a single spot
 			// carry the whole statistic.
 			static double Median(List<Vector3> points, float cell)
@@ -405,17 +405,17 @@ namespace Faolan.Importer.Cli
 		// --report shield-rose
 		//
 		// Every `CombatShieldIIR` in the corpus as a per-defender timeline: when each rose arrived, what it said, how
-		// long since that handle's previous rose, and how long since that handle's SPAWN (`SimpleCharFullUpdateIIR`)
+		// long since that handle's previous rose, and how long since that handle's spawn (`SimpleCharFullUpdateIIR`)
 		// in the same capture.
 		//
-		// The last column is the whole point (#622). Retail leaves the spawn scaffold's shield word at 0, so a viewer
-		// that arrives after a defender's rose was set has nothing to draw - unless retail sends a CATCH-UP rose when
-		// the entity comes into view. If it does, this report shows it as a rose arriving within a second or two of
-		// that handle's spawn; if the only roses are ones that follow a previous rose by the measured 5-12s shift
-		// cadence, retail has the same hole and inventing a catch-up send would be inventing a message.
+		// The last column is the whole point. Retail leaves the spawn scaffold's shield word at 0, so a viewer that
+		// arrives after a defender's rose was set has nothing to draw - unless retail sends a catch-up rose when the
+		// entity comes into view. If it does, this report shows it as a rose arriving within a second or two of that
+		// handle's spawn; if the only roses are ones that follow a previous rose by the measured 5-12 s shift cadence,
+		// retail has the same hole and inventing a catch-up send would be inventing a message.
 		//
-		// A rose that repeats the PREVIOUS VALUE is called out for the same reason: a shift moves exactly one shield
-		// (34 of 39 captured transitions), so an unchanged re-send is not a shift and wants explaining.
+		// A rose that repeats the previous value is called out for the same reason: a shift moves exactly one shield
+		// in almost every captured transition, so an unchanged re-send is not a shift and wants explaining.
 		private static void ShieldRose(IReadOnlyList<NamedCapture> captures)
 		{
 			var total = 0;
@@ -433,7 +433,7 @@ namespace Faolan.Importer.Cli
 					if (p is not { IsIirCarrier: true, IsDownload: true })
 						continue;
 
-					// Both records put the subject handle at the same place - body is [u32 recordLen][u32 type][u32 ...]
+					// Both records put the subject handle at the same place - body is [u32 recordLen][u32 type][u32...]
 					// [u32 handle] - so the spawn side needs no full parse (most spawn bodies would not survive one).
 					if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode)
 					{

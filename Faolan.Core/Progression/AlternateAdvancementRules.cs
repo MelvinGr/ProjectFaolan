@@ -4,18 +4,17 @@ using System.Collections.Generic;
 namespace Faolan.Core.Progression
 {
 	/// <summary>
-	///     The ALTERNATE-ADVANCEMENT economy's rules (Gitea #150): what a kill pays into the AA xp pool, and what a
-	///     full pool pays out in tokens. Pure arithmetic, so the whole thing is testable without a world.
+	///     The alternate-advancement economy's rules: what a kill pays into the AA xp pool, and what a full pool pays
+	///     out in tokens. Pure arithmetic, so the whole thing is testable without a world.
 	/// </summary>
 	/// <remarks>
-	///     ⭐ <b>Every number here is measured or read off the client, none is invented</b> - see
-	///     <c>--report aa-xp</c> and <c>docs/re/alternate-advancement-perks.md</c>. Retail ANNOUNCES each grant in an
-	///     on-screen feedback message that states the amount verbatim, and the <c>AAPvEXP</c> stat push in the same
-	///     frame moves by exactly that much, so the pay-out table below is transcribed from the wire rather than
-	///     fitted.
+	///     Every number here is measured or read off the client, none is invented - see <c>--report aa-xp</c> and
+	///     <c>docs/re/alternate-advancement-perks.md</c>. Retail announces each grant in an on-screen feedback message
+	///     that states the amount verbatim, and the <c>AAPvEXP</c> stat push in the same frame moves by exactly that
+	///     much, so the pay-out table below is transcribed from the wire rather than fitted.
 	///     <para />
-	///     ⚠️ Two rows of that table are the exception and are marked at their line: creature levels 76 and 77 are
-	///     UNOBSERVED, so they are linearly interpolated between the neighbours the corpus does carry. That is a
+	///     Two rows of that table are the exception and are marked at their line: creature levels 76 and 77 are
+	///     unobserved, so they are linearly interpolated between the neighbours the corpus does carry. That is a
 	///     placeholder, not a finding - the corpus does not license a formula, which is why this is a table.
 	/// </remarks>
 	public static class AlternateAdvancementRules
@@ -27,17 +26,22 @@ namespace Faolan.Core.Progression
 		/// </summary>
 		public const uint XpCap = 1_000_000;
 
-		// What a full pool pays. `AlternateAdvancement_{Specific,Generic}TokensAwarded` in the tuning sheet, which the
-		// client never reads (0 reads against the cap's 6) - so this half of the economy is the SERVER's.
+		/// <summary>
+		///     What a full pool pays. <c>AlternateAdvancement_{Specific,Generic}TokensAwarded</c> in the tuning sheet,
+		///     which the client never reads (0 reads against the cap's 6) - so this half of the economy is the
+		///     server's.
+		/// </summary>
 		public const int SpecificTokensAwarded = 3;
 		public const int GenericTokensAwarded = 1;
 
-		// The ceiling on UNSPENT tokens in one pool (the three `*UnusedTokensCap` tuning keys). Names absent from the
-		// exe, so this is ours as well.
+		/// <summary>
+		///     The ceiling on unspent tokens in one pool (the three <c>*UnusedTokensCap</c> tuning keys). The names are
+		///     absent from the exe, so this is ours as well.
+		/// </summary>
 		public const int UnspentTokenCap = 100;
 
 		/// <summary>
-		///     How far below the player a creature may be and still pay: the GREY rule, applied to AA accrual. A
+		///     How far below the player a creature may be and still pay: the grey rule, applied to AA accrual. A
 		///     creature at <c>playerLevel - 8</c> or below pays nothing.
 		/// </summary>
 		/// <remarks>
@@ -47,9 +51,9 @@ namespace Faolan.Core.Progression
 		public const uint GreyLevelGap = 8;
 
 		/// <summary>
-		///     What a sub-cutoff BOSS pays where an ordinary grey pays nothing. Three captured bosses below the
-		///     cutoff each paid exactly this - Battlemaster Torgvall at level 26 and the epic-instance Lurking Horror
-		///     at 28, against a level-80 player.
+		///     What a sub-cutoff boss pays where an ordinary grey pays nothing. Three captured bosses below the cutoff
+		///     each paid exactly this - Battlemaster Torgvall at level 26 and the epic-instance Lurking Horror at 28,
+		///     against a level-80 player.
 		/// </summary>
 		public const uint GreyEliteFloor = 2;
 
@@ -58,10 +62,10 @@ namespace Faolan.Core.Progression
 		///     (so 0 is an even-level kill and -7 is the last paying rung above the grey cutoff).
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Repeats in the corpus are BYTE-IDENTICAL (27/27, 91/91, 211/211), so the amount is deterministic per
+		///     Repeats in the corpus are byte-identical (27/27, 91/91, 211/211), so the amount is deterministic per
 		///     level - there is no roll to model.
 		///     <para />
-		///     ⛔ -4 and -3 are INTERPOLATED and are the only two entries that are not retail's own numbers: no capture
+		///     -4 and -3 are interpolated and are the only two entries that are not retail's own numbers: no capture
 		///     holds a level-76 or level-77 kill. They are marked so that a future capture replaces them rather than
 		///     confirming them by accident.
 		/// </remarks>
@@ -70,8 +74,8 @@ namespace Faolan.Core.Progression
 			[-7] = 27,
 			[-6] = 57,
 			[-5] = 91,
-			[-4] = 131, // INTERPOLATED - no captured level-76 kill
-			[-3] = 171, // INTERPOLATED - no captured level-77 kill
+			[-4] = 131, // interpolated - no captured level-76 kill
+			[-3] = 171, // interpolated - no captured level-77 kill
 			[-2] = 211,
 			[-1] = 234,
 			[0] = 258
@@ -81,10 +85,10 @@ namespace Faolan.Core.Progression
 		///     The AA xp a kill pays the killer, or 0 for a kill that pays nothing.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ <b><paramref name="playerLevel" /> is a GATE, not just a scale.</b> Every one of the corpus's kill
-		///     grants was made by a character at the level cap, and no kill in any levelling capture pays at all -
-		///     while a flat item redemption pays a Tortage lowbie 15,000. So kills feed the pool only at the cap;
-		///     below it the pool moves by rewards alone.
+		///     <paramref name="playerLevel" /> is a gate, not just a scale. Every one of the corpus's kill grants was
+		///     made by a character at the level cap, and no kill in any levelling capture pays at all - while a flat
+		///     item redemption pays a Tortage lowbie 15,000. So kills feed the pool only at the cap; below it the pool
+		///     moves by rewards alone.
 		/// </remarks>
 		/// <param name="playerLevel">the killer's level.</param>
 		/// <param name="maxLevel">the level cap this server runs (the gate above).</param>
@@ -112,14 +116,14 @@ namespace Faolan.Core.Progression
 		///     differ on rather than off their reputation.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ <b>The two factors are approximations, and the corpus says so itself.</b> Argus the Thief (level 79,
+		///     The two factors are approximations, and the corpus says so itself. Argus the Thief (level 79,
 		///     <c>NpcType</c> 2) paid 461 where the ordinary level-79 kill paid 234, and Eerika of the Maidens (level
-		///     80, type 2) paid 510 against 258 - ratios of 1.970 and 1.977, not 2. <b>461 is ODD</b>, which rules out
-		///     an integer x2 over an integer base outright, so the real mechanism scales something other than the
+		///     80, type 2) paid 510 against 258 - ratios of 1.970 and 1.977, not 2. 461 is odd, which rules out an
+		///     integer x2 over an integer base outright, so the real mechanism scales something other than the
 		///     ordinary amount and cannot be recovered from one sample per case. 2.0 reproduces both within 1.5%.
 		///     <para />
 		///     Boros (level 80, type 4, <c>NpcFlags</c> 0x1C0000) paid 297 against the same 258 - a ratio of 1.151 -
-		///     and the flag does NOT compound on a type-2: Eerika carries it too and still pays the type-2 rate.
+		///     and the flag does not compound on a type-2: Eerika carries it too and still pays the type-2 rate.
 		/// </remarks>
 		private static double Multiplier(uint? npcType, uint? npcFlags)
 		{
@@ -142,7 +146,7 @@ namespace Faolan.Core.Progression
 
 		/// <summary>
 		///     Drains a pool of every whole <see cref="XpCap" /> it holds, and says what those give-aways pay: one
-		///     award of <see cref="SpecificTokensAwarded" /> into the pool's OWN token wallet plus
+		///     award of <see cref="SpecificTokensAwarded" /> into the pool's own token wallet plus
 		///     <see cref="GenericTokensAwarded" /> generic ones, per full pool.
 		/// </summary>
 		/// <remarks>

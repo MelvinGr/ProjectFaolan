@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The character-name rules (#884) and the framing of the client list that feeds them.
+	// The character-name rules and the framing of the client list that feeds them.
 	//
-	// ⚠️ There is deliberately NO test that asserts a specific rude word is refused. The whole point of storing the
+	// There is deliberately no test that asserts a specific rude word is refused. The whole point of storing the
 	// list hashed is that the words are not in this repo, and a test naming one would put it back. What is testable
-	// without them is the mechanism: a term hashes to a stored row, a name CONTAINING that term is refused, and one
+	// without them is the mechanism: a term hashes to a stored row, a name containing that term is refused, and one
 	// that does not is allowed. The tests below build their own synthetic list for exactly that reason.
 	public class CharacterNameRulesTests
 	{
@@ -125,7 +125,7 @@ namespace Faolan.Tests
 		public void NameFilterList_ParsesTheCountThenLengthPrefixedUtf8()
 		{
 			// The real record is 1,819 entries of exactly this shape - see RdbNameFilterList for where the framing
-			// came from. Multi-byte UTF-8 is the case that matters: the length is in BYTES, not characters.
+			// came from. Multi-byte UTF-8 is the case that matters: the length is in bytes, not characters.
 			Assert.Equal(["alpha", "팍", "beta"], RdbNameFilterList.Parse(SynthesizedList("alpha", "팍", "beta")));
 		}
 

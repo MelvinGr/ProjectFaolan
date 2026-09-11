@@ -14,9 +14,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Rdb
 {
 	// Imports the authoritative open-world ambient spawn GROUPS from the client RDB "NPC roam/movement" layout (type
-	// 1010506 = NpcSpawnLayout, #332/#363) into NpcSpawnArea (+ child NpcSpawnAreaPoint anchors). Each group becomes one
+	// 1010506 = NpcSpawnLayout) into NpcSpawnArea (+ child NpcSpawnAreaPoint anchors). Each group becomes one
 	// area carrying its roam AABB + population count; the resolver then pre-fills the creature (NpcTemplateId) where it
-	// can. Records are LOCAL and their id == the playfield id; only maps in the DB Maps catalog are imported. Empty
+	// can. Records are local and their id == the playfield id; only maps in the DB Maps catalog are imported. Empty
 	// records (scripted/instanced playfields, groupCount == 0) contribute nothing. Clean rebuild each run (the set is
 	// fully derived from the fixed client RDB).
 	public static class RdbNpcSpawnImporter
@@ -28,7 +28,7 @@ namespace Faolan.Importer.Rdb
 
 			// A hand-verified assignment is a human's answer and must survive a re-harvest. The resolver already
 			// refuses to overwrite Manual; the clean rebuild below would delete it instead, which contradicts that,
-			// so carry it across by the STABLE (map, group ordinal) key and re-apply after the rows are rebuilt.
+			// so carry it across by the stable (map, group ordinal) key and re-apply after the rows are rebuilt.
 			var manual = await db
 				.NpcSpawnAreas.Where(a => a.ResolvedBy == SpawnResolutionSource.Manual && a.NpcTemplateId != null)
 				.Select(a => new { a.MapId, a.GroupOrdinal, a.NpcTemplateId })
@@ -38,19 +38,18 @@ namespace Faolan.Importer.Rdb
 			db.NpcSpawnAreas.RemoveRange(db.NpcSpawnAreas);
 			await db.SaveChangesAsync();
 
-			// The group's wander polylines, kept by area id for the resolver's containment test (#491). Not persisted -
+			// The group's wander polylines, kept by area id for the resolver's containment test. Not persisted -
 			// corpus-wide they are ~740k points, which would dwarf the seed for data only the resolver reads.
 			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
 
 			int maps = 0, areas = 0, points = 0, emptyMaps = 0, unreadable = 0;
 
-			// ⚠️ COUNTED, not silent (#886). A layout whose playfield is not in `Maps` is skipped - the areas carry an
-			// FK to it - and that skip used to happen inside the `Where` where nothing could see it. #886 asked
-			// whether 47 playfields with territories and no spawn areas were a MISSING RECORD or a DROPPED one; the
-			// only way that question ever gets a straight answer is if the drop has a number beside it.
+			// Counted, not silent. A layout whose playfield is not in `Maps` is skipped - the areas carry an FK to it
+			// - and a skip hidden inside the `Where` makes "a playfield with territories and no spawn areas" an
+			// unanswerable question. The drop needs a number beside it.
 			var layouts = rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(rdb.CanRead).ToList();
 			//
-			// ⭐ And the count SPLITS, which is the whole answer: the great majority of the skipped entries carry an
+			// And the count splits, which is the whole answer: the great majority of the skipped entries carry an
 			// id with bit 30 set (>= 0x4000_0000), which is not a playfield id in any other resource - a separate id
 			// space inside the same RDB type, not a playfield we are missing. What is genuinely absent from `Maps` is
 			// the small remainder, and those are the ones a coverage question is about.
@@ -154,7 +153,7 @@ namespace Faolan.Importer.Rdb
 				await db.SaveChangesAsync();
 
 			// Infer the creature (NpcTemplateId) per area where we can - name / gated containment / guarded id-prop /
-			// the group's own declared race where that race has exactly one candidate template (#518).
+			// the group's own declared race where that race has exactly one candidate template.
 			var resolved = await SpawnAreaResolver.ResolveAsync(db, roamPaths, SpawnAreaResolver.LoadRaceNames(rdb));
 
 			return new Result(maps, areas, points, emptyMaps, unreadable, unknownMap, highIdSpace, resolved);

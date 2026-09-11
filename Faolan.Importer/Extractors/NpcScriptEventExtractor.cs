@@ -7,7 +7,7 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// The SCRIPTED EVENTS an NPC's dialogue fires (#839). Retail sends a `GameActionListIIR` whose action type is
+	// The SCRIPTED EVENTS an NPC's dialogue fires. Retail sends a `GameActionListIIR` whose action type is
 	// 53241 `SendScryEvent`, carrying a bare string the playfield's script listens for - `Fight` on Saddur (what turns
 	// him on the player), `SpawnScavenger` and `RunToTortage` on Casilda.
 	//
@@ -18,9 +18,9 @@ namespace Faolan.Importer.Extractors
 		// GameAction 53241 - `SendScryEvent`, whose first parameter is the EventString (GameActionTypes).
 		private const uint SendScryEventType = 53241;
 
-		// [u16 length][latin1 bytes] inside the action tail. The tail is otherwise the opaque property-map shape #190
-		// describes, so the string is located by its own length prefix rather than by a fixed offset - which is what
-		// keeps this working across the 36- and 82-byte tails the corpus carries.
+		// [u16 length][latin1 bytes] inside the action tail. The tail is otherwise an opaque property map, so the
+		// string is located by its own length prefix rather than by a fixed offset - which is what keeps this working
+		// across the 36- and 82-byte tails the corpus carries.
 		private const int MinEventLength = 3;
 		private const int MaxEventLength = 64;
 
@@ -35,8 +35,8 @@ namespace Faolan.Importer.Extractors
 				if (p is not { IsIirCarrier: true, IsDownload: true })
 					continue;
 
-				// Who each handle IS. The action names only a handle, and a handle is session-volatile, so the spawn
-				// record is the only thing that can turn it into a creature TYPE (#835's lesson in the other direction).
+				// Who each handle is. The action names only a handle, and a handle is session-volatile, so the spawn
+				// record is the only thing that can turn it into a creature type.
 				if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode)
 				{
 					if (p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn) && spawn.Character?.npc_stats?.TemplateId is { } template and > 0)
@@ -60,7 +60,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// The event string out of the action tail. Scans for a `[u16 len][len printable bytes]` pair rather than
-		// trusting an offset: the tail's surrounding property map is undecoded (#190) and its length varies with the
+		// trusting an offset: the tail's surrounding property map is undecoded and its length varies with the
 		// action, so the self-describing part is the only reliable anchor.
 		private static bool TryReadEventString(byte[] tail, out string value)
 		{

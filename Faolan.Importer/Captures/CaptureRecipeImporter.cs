@@ -11,11 +11,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Imports the crafting recipe-book catalog from a captured TradeskillReplyIIR_c (0x9062D559) - the list the
-	// server sends when the client opens the Crafting -> Recipes window. Decoded + validated byte-exact in
-	// TradeskillRecipeCodec (see docs/subsystems/tradeskill-recipes.md). Each record becomes a fully-columnized Recipe
-	// row (header/mid/tail columns + ingredient/result RecipeItem child rows); the wire record rebuilds from those
-	// columns, so no verbatim blob is stored.
+	/// <summary>
+	///     Imports the crafting recipe-book catalog from a captured TradeskillReplyIIR_c - the list the server sends
+	///     when the client opens the Crafting -> Recipes window (see docs/subsystems/tradeskill-recipes.md).
+	/// </summary>
+	/// <remarks>
+	///     Each record becomes a fully-columnized Recipe row (header/mid/tail columns plus ingredient/result RecipeItem
+	///     child rows); the wire record rebuilds from those columns, so no verbatim blob is stored.
+	/// </remarks>
 	public static class CaptureRecipeImporter
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59]; // TradeskillReplyIIR_c
@@ -29,8 +32,7 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				// Locate the sub-opcode inside the raw packet; the record runs from there to the packet end, which is
-				// what the codec's strict Parse asserts (#530 wave 7 - the reader used to be told where the BODY
-				// started and stopped after `count` records, so trailing bytes went unnoticed).
+				// what the codec's strict Parse asserts.
 				var sub = IndexOf(p.Bytes, ReplySubOpBe);
 				if (sub < 0)
 					continue;
@@ -44,8 +46,8 @@ namespace Faolan.Importer.Captures
 
 		public static async Task<(int Seen, int Added, int Updated, int HarvestedItems)> ImportAsync(IDatabaseContext db, IReadOnlyCollection<RecipeRecord> records)
 		{
-			// Seed a bare Items TEMPLATE for every item a recipe references so the RecipeItem.ItemId -> Items FK
-			// (Restrict) resolves. Must run BEFORE the recipe rows are saved (same ordering as the shop/AH harvesters).
+			// Seed a bare Items template for every item a recipe references so the RecipeItem.ItemId -> Items FK
+			// (Restrict) resolves. Must run before the recipe rows are saved (same ordering as the shop/AH harvesters).
 			var harvestedItems = await HarvestItems(db, records);
 
 			var added = 0;
@@ -122,14 +124,13 @@ namespace Faolan.Importer.Captures
 			return recipe;
 		}
 
-		// Ensures each item a recipe references (ingredient or result) exists as an Items TEMPLATE so the
+		// Ensures each item a recipe references (ingredient or result) exists as an Items template so the
 		// RecipeItem.ItemId -> Items FK resolves. The recipe element carries the full identity (id + 128-bit TEA key
-		// quad + hash) - the same source the wire record rebuilds from - so we read it straight off the elements
-		// (RecipeItem stores neither key nor hash; both live once in Items). Name="" keeps these bare templates out of
-		// random loot (GetRandomBuildableItems filters Name != ""). A missing item is seeded; an item we already have
-		// keeps its (richer) row but has its Hash BACKFILLED from the recipe when it was 0 - the recipe carries the
-		// real per-template hash that AH-listing-harvested items lack (Hash=0). Verified: no recipe/item hash ever
-		// DIFFERS non-zero, so the backfill only ever fills a 0, never overwrites a real hash.
+		// quad + hash), so it is read straight off the elements (RecipeItem stores neither key nor hash; both live once
+		// in Items). Name="" keeps these bare templates out of random loot (GetRandomBuildableItems filters
+		// Name != ""). A missing item is seeded; an existing item keeps its (richer) row but has its Hash backfilled
+		// from the recipe when it was 0 - the recipe carries the real per-template hash that AH-listing-harvested
+		// items lack. The backfill only ever fills a 0, never overwrites a real hash.
 		private static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<RecipeRecord> records)
 		{
 			var harvested = 0;

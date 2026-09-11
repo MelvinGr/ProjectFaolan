@@ -21,7 +21,7 @@ namespace Faolan.Tests
 	// Crafting, against the one captured craft: NecroL80_mage-necromancer_login_gameplay_annotated_5, 18:45:25-18:45:30.
 	//
 	// The capture is unusually complete because the player narrated it and linked the item in /say before and after.
-	// Its s2c completion names the RECIPE ID (DispatchTradeskillComplete 0x0000000F = recipe 15) and its removals name
+	// Its s2c completion names the recipe ID (DispatchTradeskillComplete 0x0000000F = recipe 15) and its removals name
 	// the quantities, so the whole transaction is checkable against our own shipped rows rather than against a
 	// re-implementation of it:
 	//
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 				TestDb.Delete(path);
 		}
 
-		// The SHIPPED catalog has to still be the capture's recipe. This is the gate that would catch a re-harvest
+		// The shipped catalog has to still be the capture's recipe. This is the gate that would catch a re-harvest
 		// renumbering the recipes or dropping a quantity - everything else here is only meaningful if this holds.
 		[Fact]
 		public async Task Recipe15_IsTheCapturedBloodsilverKhopeshCraft()
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 			Assert.Empty(h.Outbound.Taken);
 		}
 
-		// Quantities scale with the requested count, and they are summed per TEMPLATE before the check - so asking for
+		// Quantities scale with the requested count, and they are summed per template before the check - so asking for
 		// two of a recipe needs two lots of every material, not one.
 		[Fact]
 		public async Task Craft_OfTwo_NeedsTwiceTheMaterials()
@@ -125,7 +125,7 @@ namespace Faolan.Tests
 			Assert.Empty(h.Outbound.Granted);
 		}
 
-		// #793: retail PACES the transaction. The client's own duration getter (`FUN_0114bf50`) reads the recipe
+		// Retail paces the transaction. The client's own duration getter (`FUN_0114bf50`) reads the recipe
 		// record's `+0x24` for a craft - the mid-header word the codec validates - and hardcodes 500 for a gem. Both
 		// are 5.00 s, and both are confirmed server-side on the wire (5.07 s craft, 4.98 s socket).
 		[Fact]
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 			Assert.Equal([RecipeId], h.Outbound.Completed);
 		}
 
-		// The completion runs ONCE. The tick calls CompleteDue ten times a second, so an entry that survived its own
+		// The completion runs once. The tick calls CompleteDue ten times a second, so an entry that survived its own
 		// completion would re-craft for as long as the player stayed logged in.
 		[Fact]
 		public async Task CompletedCraft_DoesNotRunAgainOnTheNextTick()
@@ -170,7 +170,7 @@ namespace Faolan.Tests
 			Assert.Single(h.Outbound.Completed);
 		}
 
-		// A refusal stays SILENT, five seconds late as it is now: retail has no failure form here, and a completion
+		// A refusal stays silent, five seconds late as it is now: retail has no failure form here, and a completion
 		// over a craft that did not happen tells the client to close its window on an item it never received.
 		[Fact]
 		public async Task StagedCraft_ThatCannotBeAfforded_CompletesSilently()
@@ -242,7 +242,7 @@ namespace Faolan.Tests
 
 		private sealed record Harnessed(TradeskillService Service, RecordingNetworkClient Client, RecordingEconomyOutbound Outbound);
 
-		// Records what the craft asked the wire/inventory side to do, so the test asserts on the TRANSACTION rather
+		// Records what the craft asked the wire/inventory side to do, so the test asserts on the transaction rather
 		// than on bytes: which template was granted to whom, and what was taken.
 		private sealed class RecordingEconomyOutbound : NoOpEconomyOutbound
 		{

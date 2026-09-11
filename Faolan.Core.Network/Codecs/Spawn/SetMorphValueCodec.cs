@@ -6,26 +6,27 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// SetMorphValueIIR (0xBADF5A4B) - sets one morph/resource value on an entity. Variable length:
-	//
-	//   [u32 subop][u32 class][u32 handle][u16 0][u8 len][value][f32 weight BE][u8 p][u32 q]
-	//
-	// The editor streams the chosen hair/texture resource refs this way; `weight` is 1.0 in every capture and the
-	// small p/q trailing pair carries morph flags/index. Raw-body floats are big-endian.
-	//
-	// ⚠️ `Value` is the WHOLE length-prefixed string, leading '*' included. This codec used to model that byte as a
-	// separate `NameTag = 0x2A` constant with the name after it - but 0x2A IS '*', and the client's own morph values
-	// are '*'-prefixed resource refs ("*hairmesh_207920"): `SendMorphValueAck` echoes the client's string with no tag
-	// of its own and switches its default weight on `StartsWith("*")`, which the tag reading cannot express. Two
-	// emitters, one message, and the field boundary was in the wrong place in one of them (#530 §3's pattern, #542).
-	// No byte moved - the tag form wrote exactly the same [len][*][name].
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     SetMorphValueIIR - sets one morph or resource value on an entity. Variable length:
+	///     <c>[u32 subop][u32 class][u32 handle][u16 0][u8 len][value][f32 weight][u8 p][u32 q]</c>, the float
+	///     big-endian like every raw-body float.
+	/// </summary>
+	/// <remarks>
+	///     The editor streams the chosen hair and texture resource refs this way. <c>weight</c> is 1.0 in every capture and
+	///     the small p/q trailing pair carries morph flags and index.
+	///     <para>
+	///         <c>Value</c> is the whole length-prefixed string, leading '*' included. The '*' is not a separate tag byte:
+	///         the client's own morph values are '*'-prefixed resource refs such as "*hairmesh_207920", and
+	///         SendMorphValueAck echoes the client's string with no tag of its own, switching its default weight on whether
+	///         the string starts with one.
+	///     </para>
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class SetMorphValueCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SetMorphValueIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SetMorphValueIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -57,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		internal static void Write(FaolanStream s, SetMorphValueIIR v)
 		{
-			// Wire strings are raw Latin1 bytes - see FaolanStream.ReadString.
+			// Wire strings are raw Latin1 bytes; see FaolanStream.ReadString.
 			s
 				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
@@ -70,6 +71,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 	}
 
-	// SetMorphValueIIR (0xBADF5A4B). `Value` is the morph/resource ref verbatim, '*' prefix included.
+	/// <summary>
+	///     The SetMorphValueIIR body. <c>Value</c> is the morph or resource ref verbatim, '*' prefix included.
+	/// </summary>
 	public sealed record SetMorphValueIIR(uint Handle, string Value, float Weight, byte P, uint Q);
 }

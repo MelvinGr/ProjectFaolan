@@ -8,8 +8,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #702: the INSTANT half of what a spell does - the pools it moves the moment it lands, as opposed to the lasting
-	// stat deltas `BuffStatEffects` owns. Nothing applied these, which meant HEALING did not exist: the Necromancer's
+	// The instant half of what a spell does - the pools it moves the moment it lands, as opposed to the lasting
+	// stat deltas `BuffStatEffects` owns. Nothing applied these, which meant healing did not exist: the Necromancer's
 	// whole `Lifestrike` line, `Aura of Infusion`, every health potion in the catalog - all of them showed an icon and
 	// moved no bar.
 	//
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 			return new SpellStatEffect { SpellId = spell, StatId = stat, EffectKind = kind, Amount = amount };
 		}
 
-		// The three CURRENT pools are stored at the ×100 wire scale - which the client's own divisor table confirms
+		// The three current pools are stored at the ×100 wire scale - which the client's own divisor table confirms
 		// for all three ids - so `Health Potion Effect 10`'s +40500 is 405 HP, not 40,500.
 		[Fact]
 		public void AFlatEffect_IsTheWireValueAtTheVitalsScale()
@@ -35,8 +35,8 @@ namespace Faolan.Tests
 			Assert.Equal(405, effect.For(2000, 1));
 		}
 
-		// ⭐ `HitPercentage` states its own unit through a carrier's NAME: the dev spell
-		// `System Spell: Fire AOE damage 25% of Life` carries -25. So its Amount is a plain percent OF THE POOL, not
+		// `HitPercentage` states its own unit through a carrier's name: the dev spell
+		// `System Spell: Fire AOE damage 25% of Life` carries -25. So its Amount is a plain percent of the pool, not
 		// a value at the stat's display scale - which is what tells the two kinds apart without a fit.
 		[Fact]
 		public void APercentEffect_IsAPlainPercentOfThePool()
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			Assert.Equal(-500, effect.For(2000, 1)); // 25% of a 2000 pool
 		}
 
-		// ⚠️ The drain SENTINEL is a marker, not a number - `Demonic Puppet` carries -100000000 on health, which
+		// The drain sentinel is a marker, not a number - `Demonic Puppet` carries -100000000 on health, which
 		// applied literally would kill anything it touched.
 		[Fact]
 		public void TheDrainSentinel_IsNotAnAmount()
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			Assert.Empty(SpellPoolEffects.BuildCatalog([Row(3, CharacterStatId.HealthCurrent, Hit, -100_000_000)]));
 		}
 
-		// The MAX pools are a different mechanic and stay out - a `HealthMax` row is a max-health change, not a heal.
+		// The max pools are a different mechanic and stay out - a `HealthMax` row is a max-health change, not a heal.
 		[Fact]
 		public void MaxPoolRows_AreNotInstantEffects()
 		{
@@ -66,10 +66,10 @@ namespace Faolan.Tests
 			]));
 		}
 
-		// ⚠️ `MagicHit` carries NO stat key (`[39 Value, 71]`), so it can never name a pool - and it is out of the
-		// kind set for that reason rather than by judgement. It used to reach this table under stat 1 `HealthMax`
-		// with the `Venomstrike`/`Banestrike` ladders, which read as a max-health drain; that "stat" was key 39's own
-		// value, read positionally (#701). Nothing carries it now, and nothing should.
+		// `MagicHit` carries no stat key (`[39 Value, 71]`), so it can never name a pool - and it is out of the
+		// kind set for that reason rather than by judgement. Read positionally, key 39's own value passes for stat 1
+		// `HealthMax` and the `Venomstrike`/`Banestrike` ladders read as a max-health drain. Nothing carries it, and
+		// nothing should.
 		[Fact]
 		public void MagicHit_CarriesNoStatAndIsNotAPoolEffect()
 		{
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53256"));
 		}
 
-		// A LASTING stat delta is the buff engine's, not this one's - the two families live in the same table and are
+		// A lasting stat delta is the buff engine's, not this one's - the two families live in the same table and are
 		// told apart only by the kind, so a parser that keyed off the stat would apply an armour buff as a heal.
 		[Fact]
 		public void LastingStatDeltas_AreNotInstantEffects()
@@ -107,9 +107,9 @@ namespace Faolan.Tests
 		// The shipped catalog: the population this is for. A heal that stops being imported would otherwise fail
 		// nothing, because the classification above is happy with zero rows.
 		//
-		// ⚠️ Lifestrike is a LIFE STEAL, and the row set says so - two health elements per rank, one negative and one
-		// positive. Until #783 only one of the two survived the import: keyed on (stat, period), the damage and the
-		// heal collapsed onto the same key and the last write won. The line is named for the mechanic this asserts.
+		// Lifestrike is a life steal, and the row set says so - two health elements per rank, one negative and one
+		// positive. Keyed on the stat alone the damage and the heal collapse onto one key and the last write wins, so
+		// only one of the two survives the import.
 		[Fact]
 		public void TheShippedCatalog_CarriesTheHealsThisIsFor()
 		{
@@ -121,8 +121,8 @@ namespace Faolan.Tests
 			Assert.Equal(3400, heals[0].Amount);
 			Assert.Equal(33700, heals[4].Amount);
 
-			// …and the damage half, which the old key was discarding. It is a RANGE (`Hit`'s min and max endpoints,
-			// #783), so rank 1 strikes for 4.10-5.00 rather than for one number, and it RAMPS over levels 15..29.
+			// …and the damage half. It is a range (`Hit`'s min and max endpoints), so rank 1 strikes for 4.10-5.00
+			// rather than for one number, and it ramps over levels 15..29.
 			var damage = Query("SELECT s.Name, e.Amount FROM SpellStatEffects e JOIN Spells s ON s.Id = e.SpellId " +
 				"WHERE s.Name LIKE 'Lifestrike (Rank%' AND e.EffectKind = 53219 AND e.StatId = 27 AND e.Amount < 0 ORDER BY e.Amount DESC");
 
@@ -137,16 +137,16 @@ namespace Faolan.Tests
 			Assert.Equal(29u, Scalar(string.Format(rank1Damage, "e.HighLevel")));
 		}
 
-		// ⭐ A potion heals TWICE - instantly, and then over time - and the record says so in two `Hit` elements on the
-		// SAME stat, told apart by the element's 0x2d6 period (the maintainer's reading, confirmed 2026-08-10):
+		// A potion heals twice - instantly, and then over time - and the record says so in two `Hit` elements on the
+		// same stat, told apart by the element's 0x2d6 period (the maintainer's reading, confirmed 2026-08-10):
 		//     0x2d5=1,  0x2d6=0    27 = 40500     405 HP, at once
 		//     0x2d5=-1, 0x2d6=100  27 = 6750      67.5 HP every second, for the row's 60 s duration
 		// The spell row corroborates independently: DurationMs 60000, DotIntervalMs 1000, DotDelta 6750.
 		//
-		// ⚠️ This used to assert a SINGLE row at 40500, and that held only by accident: the element scan could see one
-		// of the two (#772) and the importer keyed repeats on the stat id alone, so one silently overwrote the other.
-		// When the scan was fixed the surviving value flipped to 6750 - the potion's heal changing by 6x for no reason
-		// a player could observe. Both rows are kept now (the key carries the period), so this asserts the MECHANIC.
+		// Asserting a single row at 40500 holds only by accident: with an element scan that sees one of the two and a
+		// repeat key of the stat id alone, one silently overwrites the other, and which value survives can flip to 6750
+		// - the potion's heal changing by 6x for no reason a player could observe. Both rows are kept (the key carries
+		// the period), so this asserts the mechanic.
 		[Fact]
 		public void TheShippedCatalog_CarriesAHealthPotionThatHealsAtOnceAndOverTime()
 		{
@@ -159,13 +159,13 @@ namespace Faolan.Tests
 			Assert.Equal(6750, Assert.Single(overTime).Amount); // 67.5 HP a second thereafter
 		}
 
-		// ⭐ The invariant the key-addressed read establishes (#701): every stored row's KIND carries a stat key, so
+		// The invariant the key-addressed read establishes: every stored row's kind carries a stat key, so
 		// its `StatId` column is a stat rather than whatever field happened to sit in payload word 0. 1,191 rows
-		// failed this before - `StartParticleEffect` filing a string's BYTE LENGTH as a stat id, `NanoResistance`
-		// filing key 152, `SetSpellLineRecastTime` filing a spell LINE.
+		// failed this before - `StartParticleEffect` filing a string's byte length as a stat id, `NanoResistance`
+		// filing key 152, `SetSpellLineRecastTime` filing a spell line.
 		//
-		// ⚠️ **53189 `AddPercentSkillModifier` came OFF this list** (#807), and it is the one member that ever will:
-		// the list means "this kind has no stat to file", and 53189 turned out to have TWO. Its stat is not at key 0 -
+		// **53189 `AddPercentSkillModifier` came off this list**, and it is the one member that ever will:
+		// the list means "this kind has no stat to file", and 53189 turned out to have two. Its stat is not at key 0 -
 		// which is why the key-addressed read could not find one and dropping the kind was right at the time - but the
 		// client's own tooltip branch reads it as `key 67 += key 39 % of key 66`, naming both. The row now carries the
 		// target in `StatId` and the source in `SourceStatId`, and `SourceStatIdIsSetExactlyOnTheDerivedKind` below is
@@ -179,10 +179,10 @@ namespace Faolan.Tests
 			Assert.Equal(0u, offenders);
 		}
 
-		// ⭐ #807: `SourceStatId` is set on exactly the kind whose magnitude is a percentage OF ANOTHER STAT, and on
+		// `SourceStatId` is set on exactly the kind whose magnitude is a percentage of another stat, and on
 		// nothing else. Both directions matter and they fail differently:
-		//   * a 53189 row WITHOUT it is a row whose Amount cannot be read at all - the percentage has no referent;
-		//   * any OTHER kind WITH it would mean the column had leaked into the general path, where `Amount` is already
+		//   * a 53189 row without it is a row whose Amount cannot be read at all - the percentage has no referent;
+		//   * any other kind with it would mean the column had leaked into the general path, where `Amount` is already
 		//     in `StatId`'s own units and a consumer reading a percentage there would be off by the stat's scale.
 		[Fact]
 		public void SourceStatIdIsSetExactlyOnTheDerivedKind()
@@ -190,7 +190,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53189 AND SourceStatId IS NULL"));
 			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind <> 53189 AND SourceStatId IS NOT NULL"));
 
-			// And the kind is actually PRESENT - the two assertions above pass vacuously on an empty population, which
+			// And the kind is actually present - the two assertions above pass vacuously on an empty population, which
 			// is exactly the state this ticket found (the rows were being deleted at import).
 			Assert.True(Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53189") > 90,
 				"the 53189 rows are missing again - they were 105 when #807 restored them");

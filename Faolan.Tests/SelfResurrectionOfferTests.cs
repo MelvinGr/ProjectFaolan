@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The self-resurrection OFFER's lifecycle (#890): armed while alive by the consumable, answered when dead.
+	// The self-resurrection offer's lifecycle: armed while alive by the consumable, answered when dead.
 	//
 	// The wire half is gated in ResurrectRequestCodecTests against the one captured request. This is the half no
 	// capture covers at all - the traced session used its potion and never died - so what is asserted here is the
@@ -65,10 +65,10 @@ namespace Faolan.Tests
 			Assert.False(entity.Vitals!.IsDead);
 			Assert.Equal(1000u, entity.Vitals.Health);
 			Assert.Equal(400u, entity.Vitals.Stamina);
-			Assert.Equal(600u, entity.Vitals.Mana); // all THREE pools, which is what the tooltip promises
+			Assert.Equal(600u, entity.Vitals.Mana); // all three pools, which is what the tooltip promises
 		}
 
-		// A Minor Elixir of Resurgence restores 25, an Exceptional 75 - the percentage is the SPELL's, so the tiers
+		// A Minor Elixir of Resurgence restores 25, an Exceptional 75 - the percentage is the spell's, so the tiers
 		// differ by nothing but this number.
 		[Theory]
 		[InlineData(25u, 250u)]
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			Assert.Equal(expectedHealth, entity.Vitals!.Health);
 		}
 
-		// It revives IN PLACE. Resurrecting where you fell is the whole point of the item, and it is the one revive
+		// It revives in place. Resurrecting where you fell is the whole point of the item, and it is the one revive
 		// that needs no destination - so the entity must not have moved.
 		[Fact]
 		public async Task ItRevivesWhereThePlayerFell()
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell)); // a second death is not covered
 		}
 
-		// The spell id is the TOKEN we sent, echoed back: an answer naming a different one is not an answer to this
+		// The spell id is the token we sent, echoed back: an answer naming a different one is not an answer to this
 		// offer, and must not spend it.
 		[Fact]
 		public async Task AnAnswerNamingAnotherSpell_IsNotThisOffer()
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 			Assert.True(deaths.HasSelfResurrection(Player, PotionSpell)); // still armed
 		}
 
-		// The offer only answers a DEATH. Taking it while alive would consume the item's whole point for nothing.
+		// The offer only answers a death. Taking it while alive would consume the item's whole point for nothing.
 		[Fact]
 		public async Task ALivePlayerCannotTakeTheOffer()
 		{

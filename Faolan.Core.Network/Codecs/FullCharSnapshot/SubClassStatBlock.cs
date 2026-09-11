@@ -7,42 +7,45 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The fresh-character STAT-block skeleton (the FullCharSnapshotSubClass PostAccessBlock), relocated out of
-	// BeachTailsTemplate.bin so the stat region can be authored without the .bin (#186). Decoded by
-	// tools/capture/decode_statblock.py: of the 338 values, only ~14 distinct slots are character/map-derived (class
-	// HP/Mana/Stamina + hash, XP, the playfield token + position, one session slot) - the other 313 are this
-	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
-	// the skeleton; SnapshotStatSheet authors the character-derived slots by stat id before the block is built, and
-	// the per-class vitals ride the id-addressed setters after it - so generating == relocating
-	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
+	/// <summary>
+	///     The fresh-character stat-block skeleton - the <see cref="FullCharSnapshotSubClass" />'s post-access block -
+	///     authored from typed data rather than from a captured template.
+	/// </summary>
+	/// <remarks>
+	///     Of the 338 values, only ~14 distinct slots are character- or map-derived (class HP/Mana/Stamina plus hash, XP,
+	///     the playfield token and position, one session slot); the other 313 are this fixed baseline, identical for every
+	///     fresh character. <see cref="CreateFreshBlock" /> returns a post-access block seeded with the skeleton,
+	///     <see cref="SnapshotStatSheet" /> authors the character-derived slots by stat id before the block is built, and
+	///     the per-class vitals ride the id-addressed setters after it.
+	/// </remarks>
 	public static class SubClassStatBlock
 	{
-		// StatList#1's count word - and the landmark ExtractFromSnapshot scans for. It is NOT a type tag: it is
-		// `(displayedStats + 1) * 0x3F1` (0x46F2 for 17), the ordinary ListFrame count. Written as the arithmetic so
-		// resizing StatList1 moves the scan target with it instead of silently looking for the old list's length.
+		// StatList#1's count word, and the landmark ExtractFromSnapshot scans for. It is not a type tag: it is
+		// `(displayedStats + 1)` frame units, the ordinary ListFrame count. Written as the arithmetic so resizing StatList1
+		// moves the scan target with it instead of silently looking for the old list's length.
 		public static uint BlockType => ListFrame.ForCount(StatList1.Length);
 
-		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
-		// 0xBF..0x40B (see N3ToClientQuitCodec). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
-		// live zone's minted token (FullCharSnapshotSubClass passes it in), never a captured one. Replaying a stale token
-		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
-		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
+		// The stat slot whose value is the playfield-instance token: in the snapshot the token is framed by the stat ids
+		// 0xBF..0x40B (see N3ToClientQuitCodec). This is session and map state rather than a character stat - the snapshot is
+		// built with the live zone's minted token, which FullCharSnapshotSubClass passes in, never a captured one. Replaying
+		// a stale token hides the entire in-client abilities tab and mis-scopes despawns. SkeletonValueOf is the fresh or
+		// fallback value when no live token is given.
 		public const uint PlayfieldTokenStatId = (uint)CharacterStatId.PlayfieldToken;
 
-		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
+		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) plus StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
 
-		// The two lists' sizes, exposed so a size mismatch can say WHICH half is short.
+		// The two lists' sizes, exposed so a size mismatch can say which half is short.
 		public static int StatList1Size => StatList1.Length;
 		public static int StatList2Size => StatList2Half.Length;
 
 
-		// The block is TWO 0x3F1-framed StatList_t (StatPair_t = [statId, value]; docs/re/fullplayer-snapshot-reader.md
-		// regions 9-10). StatList#1 = the 17 DISPLAYED stats (its count word IS the BlockType field, (17+1)*0x3F1 =
-		// 0x46F2). StatList#2 = the full sheet: 74 UNIQUE pairs written TWICE (base + current copy = 148 pairs, the old
-		// "repeated run"). Every value is a named (statId, value) - the character-derived stats (Level 0x36, XP 0x34,
-		// MaxXP 0x15E, HP 0x1B, mana, stamina) are overwritten from the character by the caller; the rest are the fresh
-		// baseline (armour/resists/... we do not model yet, so carried as their fixed defaults). No opaque blob.
+		// The block is two count-framed StatList_t (StatPair_t = [statId, value];
+		// docs/re/fullplayer-snapshot-reader.md regions 9-10). StatList#1 is the 17 displayed stats, and its count word is
+		// the BlockType field. StatList#2 is the full sheet: 74 unique pairs written twice (base plus current copy = 148
+		// pairs). Every value is a named (statId, value): the character-derived stats (Level 0x36, XP 0x34, MaxXP 0x15E, HP
+		// 0x1B, mana, stamina) are overwritten from the character by the caller, and the rest are the fresh baseline
+		// (armour, resists and the like that are not modelled yet, carried as their fixed defaults).
 		private static readonly (CharacterStatId Id, uint Value)[] StatList1 =
 		[
 			(CharacterStatId.TempSaveTeamId, 0x0), (CharacterStatId.TempSavePlayfield, 0x0), (CharacterStatId.TempSaveX, 0x0), (CharacterStatId.TempSaveY, 0x0), (CharacterStatId.Flags, 0x1),
@@ -51,7 +54,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.HeroicMode, 0x0)
 		];
 
-		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then
+		// One half of StatList#2; the client carries it twice (base plus current). Its last two slots (Unknown63 then
 		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
 		private static readonly (CharacterStatId Id, uint Value)[] StatList2Half =
 		[
@@ -72,25 +75,24 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.PvPTotalDeathsSeasonal, 0x0), (CharacterStatId.PvPTotalDeaths, 0x0), (CharacterStatId.PvPTotalKillsSeasonal, 0x0), (CharacterStatId.PvPTotalKills, 0x0)
 		];
 
-		// The SHEET's own stat ids - what a login snapshot carries and nothing else. CharacterStats can legitimately
-		// hold MORE than the sheet (the daily-challenge counters land there, ids 1000066+, and retail pushes those on
-		// the live StatUpdate channel rather than in the snapshot - every captured sheet is exactly these 91), so a
-		// sheet loader filters the table to this set rather than assuming the table IS the sheet.
-		// ⚠️ Declared AFTER the two arrays it reads: static fields initialize in declaration order, and above them
-		// this ran on nulls (TypeInitializationException across the whole suite).
+		// The sheet's own stat ids - what a login snapshot carries and nothing else. CharacterStats can legitimately hold
+		// more than the sheet (the daily-challenge counters land there, ids 1000066 and up, and retail pushes those on the
+		// live StatUpdate channel rather than in the snapshot - every captured sheet is exactly these 91), so a sheet loader
+		// filters the table to this set rather than assuming the table is the sheet.
+		//
+		// Declared after the two arrays it reads: static fields initialize in declaration order, and above them this would
+		// run on nulls.
 		public static readonly IReadOnlySet<uint> SheetStatIds =
 			StatList1.Concat(StatList2Half).Select(p => (uint)p.Id).ToHashSet();
 
-		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes
-		// used to be carried here as six opaque words plus a spare byte - which is what a 17-byte record looks like
-		// through a u32 view. The PAIR tail is empty for a fresh character.
+		// The block's wide tail: one entry, all-zero but for its flag byte. The pair tail is empty for a fresh character.
 		private static readonly SnapshotTailWideEntry FreshWideTail = new SnapshotTailWideEntry(0x01, 0, 0);
 
-		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
-		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the
-		// wire (base + current), so the block is [17 displayed pairs][74 sheet pairs x2][known-spell list][tails].
-		// A null known-list becomes an EMPTY one rather than an absent one: a login snapshot always carries the list
-		// (its 0x3F1 frame), and the empty form is byte-identical to the captured beach skeleton.
+		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs, the displayed
+		// stats) followed by StatList#2 (the remaining pairs, one copy). StatList#2 is emitted twice on the wire (base plus
+		// current), so the block is [17 displayed pairs][74 sheet pairs x2][known-spell list][tails]. A null known list
+		// becomes an empty one rather than an absent one: a login snapshot always carries the list, and the empty form is
+		// byte-identical to the captured beach skeleton.
 		public static SubClassPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList? known = null)
 		{
 			var displayedCount = StatList1.Length;
@@ -99,7 +101,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			for (var i = 0; i < displayedCount; i++)
 				displayed.Pairs.Add(sheet[i]);
 
-			// BOTH copies, because both are on the wire and a stat is only consistent when both carry the same value.
+			// Both copies, because both are on the wire and a stat is only consistent when both carry the same value.
 			var full = new StatList();
 			for (var copy = 0; copy < 2; copy++)
 			for (var i = displayedCount; i < sheet.Count; i++)
@@ -117,15 +119,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public static SubClassPostAccessBlock CreateFreshBlock(KnownSpellList? known = null)
 		{
-			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
-			// captured beach block (proven by BeachTailsFromScratchTests).
+			// The fresh skeleton is the baseline sheet run through the generic builder - byte-identical to the captured beach
+			// block (proven by BeachTailsFromScratchTests).
 			return CreateBlock(FreshSheet(), known);
 		}
 
-		// Scans a raw 0x737A6DF9 snapshot body for the stat block and returns its (statId, value) pairs in order:
-		// StatList#1 (the 17 displayed stats, count word 0x46F2) then StatList#2's first copy (the 74 sheet stats - the
-		// sheet is written TWICE on the wire, base + current; we keep one). Null when not found. This is the inverse of
-		// the generated block - the importer uses it to store a character's REAL stat sheet from its login snapshot.
+		// Scans a raw snapshot body for the stat block and returns its (statId, value) pairs in order: StatList#1 (the 17
+		// displayed stats) then StatList#2's first copy (the 74 sheet stats; the sheet is written twice on the wire, base
+		// plus current, and one copy is kept). Null when not found. This is the inverse of the generated block - the importer
+		// uses it to store a character's real stat sheet from its login snapshot.
 		public static List<(uint Id, uint Value)>? ExtractFromSnapshot(ReadOnlySpan<byte> body)
 		{
 			for (var i = 0; i + 8 <= body.Length; i++)
@@ -136,7 +138,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				if (!TryReadStatList(body, i, out var displayed, out var afterDisplayed) || displayed.Pairs.Count != StatList1.Length)
 					continue;
 
-				// Reject a spurious 0x46F2 that is really a stat VALUE: the displayed stat ids are all small.
+				// Reject a spurious match that is really a stat value: the displayed stat ids are all small.
 				if (displayed.Pairs.Exists(p => p.Id >= 0x700))
 					continue;
 
@@ -152,9 +154,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return null;
 		}
 
-		// The fresh-character baseline stat sheet (StatList#1's 17 displayed pairs + StatList#2's 74 sheet pairs, ONE
-		// copy), as a fresh mutable list - the caller patches the character-derived slots (level/...) on IT before
-		// building, so nothing has to SetStat the finished block (which would also scan the inline known-list).
+		// The fresh-character baseline stat sheet (StatList#1's 17 displayed pairs plus StatList#2's 74 sheet pairs, one
+		// copy), as a fresh mutable list - the caller patches the character-derived slots on it before building, so nothing
+		// has to SetStat the finished block, which would also scan the inline known list.
 		public static List<(uint Id, uint Value)> FreshSheet()
 		{
 			var sheet = new List<(uint, uint)>(SheetSize);
@@ -165,8 +167,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return sheet;
 		}
 
-		// (The known-spell list is no longer spliced in after the fact - CreateBlock builds it inline at the block tail,
-		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
+		// CreateBlock builds the known-spell list inline at the block tail.
 
 		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
 		public static uint SkeletonValueOf(uint statId)
@@ -186,8 +187,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return 0;
 		}
 
-		// Reads one StatList_t at `off` THROUGH ITS CODEC - the scan only decides WHERE a list starts, never how one is
-		// laid out. The codec is strict, so a frame word that is not really a list throws and the scan moves on.
+		// Reads one StatList_t at `off` through its codec: the scan only decides where a list starts, never how one is laid
+		// out. The codec is strict, so a frame word that is not really a list throws and the scan moves on.
 		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, [NotNullWhen(true)] out StatList? list, out int end)
 		{
 			list = null;

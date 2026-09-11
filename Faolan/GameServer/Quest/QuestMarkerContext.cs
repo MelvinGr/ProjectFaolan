@@ -7,15 +7,14 @@ using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Quest
 {
-	// One character's quest state, read ONCE and asked about many NPCs (#939). `QuestMarkerResolver.MarkerStateFor`
-	// used to reload all of it per NPC - the character's rows, the active definitions, and one full-graph
-	// definition load per quest the character had EVER held - so an entry burst of seven NPCs on a level-80 with
-	// 1,565 completions ran ~11,000 queries: 1.7-2.5 s of the login, every login.
+	// One character's quest state, read once and asked about many NPCs. Reloading it per NPC - the character's rows,
+	// the active definitions and one full-graph definition load per quest the character has ever held - costs ~11,000
+	// queries for an entry burst of seven NPCs on a level-80 with 1,565 completions, i.e. 1.7-2.5 s of every login.
 	//
-	// The batch callers (the entry followups, the interest stream, a spawn poll) build one of these per character
-	// per batch and hand it to every marker resolution in it. What a marker needs from a definition is three words -
-	// line, level, step - so those come through a projection (`GetQuestLineMembership`), memoised here as the NPCs
-	// name new quests; the full definitions are loaded only for the ACTIVE set, whose goals the turn-in check reads.
+	// The batch callers (the entry followups, the interest stream, a spawn poll) build one of these per character per
+	// batch and hand it to every marker resolution in it. What a marker needs from a definition is three words - line,
+	// level, step - so those come through a projection (`GetQuestLineMembership`), memoised here as the NPCs name new
+	// quests; the full definitions are loaded only for the active set, whose goals the turn-in check reads.
 	public sealed class QuestMarkerContext
 	{
 		private readonly IWorldRepository _world;
@@ -35,7 +34,7 @@ namespace Faolan.GameServer.Quest
 		// Every row the character holds, in every state - the giver fold and the line-reached gate read both.
 		public CharacterQuest[] Quests { get; }
 
-		// The ACTIVE quests with their definitions (goals included): the turn-in check walks each one's current goal.
+		// The active quests with their definitions, goals included: the turn-in check walks each one's current goal.
 		public (CharacterQuest Quest, QuestDefinition Definition)[] Active { get; }
 
 		public static async Task<QuestMarkerContext> Load(ICharacterQuestRepository quests, IWorldRepository world, Character character)
@@ -59,7 +58,7 @@ namespace Faolan.GameServer.Quest
 			return (await Memberships([questId])).GetValueOrDefault(questId);
 		}
 
-		// Batched: whatever is not memoised yet is fetched in ONE projection query.
+		// Batched: whatever is not memoised yet is fetched in one projection query.
 		public async Task<IReadOnlyDictionary<uint, QuestLineMembership?>> Memberships(IEnumerable<uint> questIds)
 		{
 			var wanted = questIds.Distinct().ToArray();

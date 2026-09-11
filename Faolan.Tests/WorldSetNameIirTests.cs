@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the in-WORLD SetNameIIR (0xADCE0CDA) record grammar recovered byte-exact from the client (#363):
+	// Locks the in-world SetNameIIR (0xADCE0CDA) record grammar recovered byte-exact from the client:
 	// n3InfoItemRemote::Construct (FUN_005b9d30) reads [u32 type][u32 handle][u8 isToBePassed], then
 	// SetNameIIR_t::ReadSubClass (FUN_007ae1d0) reads [u32 nameType][u8][u8][u32 nameLen][name], and Activate
 	// (FUN_007ae3e0 -> FUN_006ed100) applies it only when nameType is 1..4 (3 also refreshes the OverheadText).

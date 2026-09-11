@@ -23,8 +23,11 @@ namespace Faolan.Mcp.Tools
 			WriteIndented = true
 		};
 
-		// The full-session dump (list_world_sessions) walks the live INetworkClientSession, whose Account/Character are
-		// EF entities with navigation cycles - IgnoreCycles keeps the serializer from throwing on those back-references.
+		/// <summary>
+		///     Serializer options for the full-session dump, which walks the live INetworkClientSession. Its Account and
+		///     Character are EF entities with navigation cycles, so IgnoreCycles is what keeps the serializer from
+		///     throwing on those back-references.
+		/// </summary>
 		private static readonly JsonSerializerOptions SessionJsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true,

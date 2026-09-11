@@ -12,9 +12,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Corpus gate for the COMPLETED-quest journal region (Gitea #390). The region is absent from the beach template,
+	// Corpus gate for the completed-quest journal region. The region is absent from the beach template,
 	// so a golden asset would prove nothing - the gate is the whole tshark corpus (see the self-referential-golden
-	// -tests lesson). Every snapshot whose tails carry the region must parse by the decoded grammar AND re-emit
+	// -tests lesson). Every snapshot whose tails carry the region must parse by the decoded grammar and re-emit
 	// byte-for-byte.
 	public class CompletedQuestJournalTests(ITestOutputHelper o)
 	{
@@ -113,7 +113,7 @@ namespace Faolan.Tests
 
 		// The word after a completed line group's 4CC is the line's flag - the same per-line flag the quest index
 		// block carries as TrailerC (MainQuest_c +0x50), which is why one QuestLine.TrailerFlag column now feeds both
-		// producers (#926). The gate is the agreement on every line a snapshot carries in BOTH records, and it only
+		// producers. The gate is the agreement on every line a snapshot carries in both records, and it only
 		// binds if at least one such line is flagged - all-zero agreement would not distinguish one field from two.
 		[Fact]
 		public void TheLineFlag_AgreesWithTheIndexBlocksTrailerC_OnEveryLineSeenInBoth()
@@ -143,7 +143,7 @@ namespace Faolan.Tests
 			Assert.True(flagged.Count > 0, "no flagged line is captured in both records, so the gate cannot tell one field from two");
 		}
 
-		// The THIRD producer of the same flag (#929): the QuestJournalIIR's area block is the completed journal's line
+		// The third producer of the same flag: the QuestJournalIIR's area block is the completed journal's line
 		// record through the same client reader (`FUN_00922c90`), so its word after the ACGHash must carry what the
 		// snapshot's index block carries as TrailerC for that line. Every captured journal area is on a flag-0 line, so
 		// this gate cannot tell "one field" from "always 0" by variance - the identification is the reader, one
@@ -274,7 +274,7 @@ namespace Faolan.Tests
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()
 		{
-			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
+			// Reads the committed corpus extract rather than the capture repo, so the suite runs from a plain clone.
 			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.FullPlayerCharacterIIR))
 			{
 				var declared = body.ReadU32Be(0);

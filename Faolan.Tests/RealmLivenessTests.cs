@@ -4,20 +4,19 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #922: a realm that crashes and is never restarted must stop being advertised.
+	// A realm that crashes and is never restarted must stop being advertised.
 	//
-	// #909 made `OnlineStatus` mean SERVING and made a realm's own restart clear the stale Online its previous life
-	// left behind. What it could not fix is the case with no restart: nothing re-reconciles the row, so the login
-	// tier keeps handing clients to a host that is not there — the same quiet, wrong-direction failure on a longer
-	// timescale, and one that survives a reboot.
+	// `OnlineStatus` means serving, and a realm's own restart clears the stale Online its previous life left behind.
+	// That leaves the case with no restart: nothing re-reconciles the row, so the login tier keeps handing clients to
+	// a host that is not there - a quiet failure in the wrong direction, and one that survives a reboot.
 	//
-	// ⚠️ A two-value column cannot decay on its own; the ABSENCE has to be observed. `Realm.LastSeenUtc` is that
+	// A two-value column cannot decay on its own; the absence has to be observed. `Realm.LastSeenUtc` is that
 	// observation and `RealmLiveness` is the rule read over the pair.
 	public class RealmLivenessTests
 	{
 		private static readonly DateTimeOffset Now = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
 
-		// The whole point: Online plus a stale stamp is DOWN. This is the crashed realm.
+		// The whole point: Online plus a stale stamp is down. This is the crashed realm.
 		[Fact]
 		public void OnlineButStale_IsNotServing()
 		{
@@ -36,7 +35,7 @@ namespace Faolan.Tests
 			Assert.Equal(RealmOnlineStatus.Online, RealmLiveness.Effective(RealmOnlineStatus.Online, fresh, Now));
 		}
 
-		// ⚠️ A NULL stamp is NOT serving even with the flag set — a row whose host predates the heartbeat, or whose
+		// A null stamp is not serving even with the flag set — a row whose host predates the heartbeat, or whose
 		// flag was set by hand. Neither is evidence that anything is listening, and reading "no news" as good news is
 		// the exact failure this exists to remove.
 		[Fact]
@@ -45,7 +44,7 @@ namespace Faolan.Tests
 			Assert.False(RealmLiveness.IsServing(RealmOnlineStatus.Online, null, Now));
 		}
 
-		// The flag still has the final say in the DOWN direction: a fresh stamp on an Offline row is a realm that
+		// The flag still has the final say in the down direction: a fresh stamp on an Offline row is a realm that
 		// shut down cleanly seconds ago, and it must not be advertised.
 		[Fact]
 		public void OfflineIsOffline_HoweverFreshTheStamp()
@@ -53,7 +52,7 @@ namespace Faolan.Tests
 			Assert.False(RealmLiveness.IsServing(RealmOnlineStatus.Offline, Now, Now));
 		}
 
-		// ⭐ Exactly at the TTL is still up. The boundary matters because the margin is the whole design: three
+		// Exactly at the ttl is still up. The boundary matters because the margin is the whole design: three
 		// consecutive missed stamps must not take a healthy realm out of the list.
 		[Fact]
 		public void TheBoundaryIsInclusive()
@@ -62,7 +61,7 @@ namespace Faolan.Tests
 			Assert.False(RealmLiveness.IsServing(RealmOnlineStatus.Online, Now - RealmLiveness.StaleAfter - TimeSpan.FromTicks(1), Now));
 		}
 
-		// ⚠️ A stamp in the FUTURE is accepted rather than rejected. The two processes may be on different machines
+		// A stamp in the future is accepted rather than rejected. The two processes may be on different machines
 		// and a little clock skew must not take a live realm down; only the past is measured.
 		[Fact]
 		public void AClockSkewedStampIsNotTreatedAsStale()
@@ -70,7 +69,7 @@ namespace Faolan.Tests
 			Assert.True(RealmLiveness.IsServing(RealmOnlineStatus.Online, Now + TimeSpan.FromMinutes(5), Now));
 		}
 
-		// ⭐ The TTL must leave room for missed stamps, or a GC pause takes a healthy realm off the list. Asserted
+		// The ttl must leave room for missed stamps, or a GC pause takes a healthy realm off the list. Asserted
 		// rather than left to the two constants happening to be right: they are what the whole rule is calibrated on.
 		[Fact]
 		public void TheTtlAllowsSeveralMissedHeartbeats()

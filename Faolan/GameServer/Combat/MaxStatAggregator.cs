@@ -5,18 +5,23 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.GameServer.Combat
 {
-	// Server-side gear-stat aggregation (#3): sums the stat bonuses a character's EQUIPPED items grant, by stat, so
-	// worn gear raises the character's derived stats (the health-bar-fill case: a +HP ring lifts MaxHealth above the
-	// class base). Pure over the item rows - the caller supplies the equipped Items (with their StatModifiers loaded),
-	// keeping this unit-testable and free of DB/session deps.
-	//
-	// Each ItemStatModifier.Amount is the RAW WIRE value; this divides by the stat's CharacterStatId.GetScale() to
-	// return the DISPLAYED bonus (÷100 vitals + Magic Damage, ÷10 attributes, ÷1 ratings) - the unit a caller adds onto
-	// a display MaxHealth / attribute before the wire re-applies the scale.
+	/// <summary>
+	///     Server-side gear-stat aggregation: sums the stat bonuses a character's equipped items grant, by stat, so
+	///     worn gear raises the character's derived stats - a +HP ring lifts MaxHealth above the class base.
+	/// </summary>
+	/// <remarks>
+	///     Pure over the item rows: the caller supplies the equipped items with their StatModifiers loaded, which keeps
+	///     this free of database and session dependencies. Each <c>ItemStatModifier.Amount</c> is the raw wire value,
+	///     so this divides by the stat's <see cref="CharacterStatId" /> scale to return the displayed bonus (/100 for
+	///     vitals and Magic Damage, /10 for attributes, /1 for ratings) - the unit a caller adds onto a display
+	///     MaxHealth or attribute before the wire re-applies the scale.
+	/// </remarks>
 	public static class MaxStatAggregator
 	{
-		// Total DISPLAY-unit gear bonus per stat across the given equipped items' StatModifiers. Absent stats = no
-		// entry (a caller reads it as 0).
+		/// <summary>
+		///     Total display-unit gear bonus per stat across the given equipped items' StatModifiers. An absent stat
+		///     has no entry, which a caller reads as 0.
+		/// </summary>
 		public static IReadOnlyDictionary<CharacterStatId, int> AggregateGearBonuses(IEnumerable<Item> equippedItems)
 		{
 			var totals = new Dictionary<CharacterStatId, int>();
@@ -30,51 +35,52 @@ namespace Faolan.GameServer.Combat
 			return totals;
 		}
 
-		// The feat effect kinds whose Value adds to the stat, and so the only ones this sums (#597). The feat region
-		// is as heterogeneous as the spell one BuffStatEffects reads, and for the same reason - both are GameAction
-		// elements, and the KIND is what says how to read the payload:
+		// The feat effect kinds whose Value adds to the stat, and so the only ones this sums. The feat region is as
+		// heterogeneous as the spell one BuffStatEffects reads, and for the same reason - both are GameAction elements,
+		// and the kind is what says how to read the payload:
 		//   53045  `Modify`             a flat delta. The bulk of the table.
-		//   53220  `InterpolatedModify` an additive delta too, but a LEVEL RAMP: the row's Value is only the low
+		//   53220  `InterpolatedModify` an additive delta too, but a level ramp: the row's Value is only the low
 		//          53221                endpoint and the whole bonus is `lerp(Value@LowLevel, HighValue@HighLevel)`
-		//                               over the carrier's level (#599). Summed through that ramp, so `Battle Roar`
-		//                               is the +17500 health it is at 80 rather than the +887 it is at 20.
-		// Deliberately NOT summed, each for a different reason:
-		//   53067  `ModifyAsRating`     a PERCENT stored x100, so "+2% Critical Rating" would add +200. It scales a
+		//                               over the carrier's level. Summed through that ramp, so `Battle Roar` is the
+		//                               +17500 health it is at 80 rather than the +887 it is at 20.
+		// Deliberately not summed, each for a different reason:
+		//   53067  `ModifyAsRating`     a percent stored x100, so "+2% Critical Rating" would add +200. It scales a
 		//          53068                computed total; BuffStatEffects has the model, this aggregate does not.
 		//                               53068 `InterpolatedModifyAsRating` is that same percent as a level ramp -
 		//                               its ramp endpoints are percentages, so it is no more summable than 53067,
 		//                               which is why it is here and not above. (Zero feat rows carry it today; the
 		//                               one shipped row is on a spell.)
-		//   53139  `SetFlag`            a flag WRITE, not a bonus - `Basic Riding` and every class feat carry
+		//   53139  `SetFlag`            a flag write, not a bonus - `Basic Riding` and every class feat carry
 		//                               (864 Player Flags, 5). Summing two of them invents flag 10.
 		//   53026  `Set`                an assignment, not an addition (`Ring of the Griffin` sets 149 Available
 		//                               Slots to 65535). Adding it to a base is meaningless.
 		private static readonly HashSet<uint> FlatFeatKinds = [53045, 53220, 53221];
 
-		// Total stat bonus per stat across a character's trained FEATS (#251), counting only the additive kinds above
-		// and interpolating the ramped ones at <paramref name="level" /> - the carrier's level, which is what the
-		// client ramps over (LevelRamp).
-		//
-		// ⛔ THE SCALE DIVISION IS REQUIRED, and this used to omit it (#865). The old comment claimed
-		// `FeatEffect.Value` is already a DISPLAY value - "Strength carries 1..9, HealthMax carries 100..700" - and
-		// that was measured on a subset. Over the whole table HealthMax runs to 99,000 and Strength to 2,300, and
-		// three independent things say those are RAW WIRE:
-		//
-		//   1. ⭐⭐ The same bytes are read TWICE. `ClassAttributeBase.Amount` and `FeatEffect.Value` are both
-		//      `ItemTemplateStatModifiers.Modifier.WireAmount`, off the same `<Class> Class Feat NNN` templates -
-		//      `Necromancer Class Feat 071` carries HealthMax 38,600 and the `ClassAttributeBases` row for
-		//      (Necromancer, 80) is 38,600. `CharacterMaxStats.Pool` adds that in HUNDREDTHS and divides by 100 for
-		//      +386 health, which is the value verified against every captured pool. One convention, two tables.
-		//   2. The magnitudes are impossible read as display: `Barbarian: HP (1) 10` carries 26,800, and a level-80's
-		//      WHOLE pool is ~6,300. As raw wire it is +268 health, which is a feat.
-		//   3. The flat health term #588 is hunting for is 73 - tens, not thousands.
-		//
-		// So feats follow the ITEM convention, which is what the parser they share implies. ⚠️ NOT the SPELL one:
-		// `BuffStatEffects.SpellScale` keeps attributes at scale 1 because spell records really do store those in
-		// display units. Three sources, three conventions, and the parser is what says which.
+		/// <summary>
+		///     Total stat bonus per stat across a character's trained feats, counting only the additive kinds above and
+		///     interpolating the ramped ones at <paramref name="level" /> - the carrier's level, which is what the
+		///     client ramps over (see <see cref="LevelRamp" />).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         <c>FeatEffect.Value</c> is a raw wire value, so the scale division is required. Three things say so:
+		///         the same bytes are read twice - <c>ClassAttributeBase.Amount</c> and <c>FeatEffect.Value</c> are
+		///         both <c>ItemTemplateStatModifiers.Modifier.WireAmount</c> off the same <c>&lt;Class&gt; Class Feat
+		///         NNN</c> templates, and <c>Necromancer Class Feat 071</c> carries HealthMax 38,600 exactly as the
+		///         <c>ClassAttributeBases</c> row for (Necromancer, 80) does, which <c>CharacterMaxStats.Pool</c> adds
+		///         in hundredths for the +386 health verified against every captured pool; the magnitudes are
+		///         impossible read as display, since <c>Barbarian: HP (1) 10</c> carries 26,800 against a level-80's
+		///         whole pool of about 6,300; and the flat health term the class curves want is in the tens.
+		///     </para>
+		///     <para>
+		///         So feats follow the item convention, which is what the parser they share implies - not the spell
+		///         one, where <see cref="BuffStatEffects.SpellScale" /> keeps attributes at scale 1 because spell
+		///         records store those in display units. Three sources, three conventions, and the parser says which.
+		///     </para>
+		/// </remarks>
 		public static IReadOnlyDictionary<CharacterStatId, int> AggregateFeatBonuses(IEnumerable<FeatEffect> effects, uint level)
 		{
-			// ⭐ Accumulated in WIRE units and divided ONCE per stat, which is how `CharacterMaxStats.Pool` handles the
+			// Accumulated in wire units and divided once per stat, which is how `CharacterMaxStats.Pool` handles the
 			// same numbers: dividing each row first throws away the remainder of every one of them, and a stat built
 			// from several feats then reads low by up to one display point per row.
 			var wire = new Dictionary<CharacterStatId, int>();
@@ -83,9 +89,8 @@ namespace Faolan.GameServer.Combat
 				if (!FlatFeatKinds.Contains(effect.EffectKind))
 					continue;
 
-				// A ramped kind whose three ramp columns are null is a row imported before they existed (or one the
-				// parse could not complete): fall back to the low endpoint, which is exactly what shipped before -
-				// an under-grant, never a wrong stat.
+				// A ramped kind whose three ramp columns are null is a row whose parse could not complete: fall back
+				// to the low endpoint, which under-grants rather than reporting a wrong stat.
 				var bonus = effect is { HighValue: { } high, LowLevel: { } low, HighLevel: { } top }
 					? new LevelRamp(effect.Value, high, low, top).ValueAt(level)
 					: effect.Value;
@@ -100,8 +105,10 @@ namespace Faolan.GameServer.Combat
 			return totals;
 		}
 
-		// Sums several bonus sources into one table. The simulation takes a single additive bonus set, and gear and
-		// feats are just two contributors to it.
+		/// <summary>
+		///     Sums several bonus sources into one table. The simulation takes a single additive bonus set, of which
+		///     gear and feats are two contributors.
+		/// </summary>
 		public static IReadOnlyDictionary<CharacterStatId, int> Combine(params IReadOnlyDictionary<CharacterStatId, int>[] sources)
 		{
 			var totals = new Dictionary<CharacterStatId, int>();

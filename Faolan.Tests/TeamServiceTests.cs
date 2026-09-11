@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The team ROSTER transitions - invite, accept, leave, kick, promote, dissolve. The wire bytes are gated separately
+	// The team roster transitions - invite, accept, leave, kick, promote, dissolve. The wire bytes are gated separately
 	// (TeamTradeFriendCodecTests, byte-exact against the capture); this is the state machine those bytes describe, and
 	// the reason it is worth its own gate is that a team spans two listener tiers, so nothing else would notice a
 	// roster that goes stale on one of them.
@@ -61,8 +61,8 @@ namespace Faolan.Tests
 			Assert.Contains(dispatcher.Membership, m => m is { Recipient: 1, Joined: true });
 			Assert.Contains(dispatcher.Membership, m => m is { Recipient: 2, Joined: true });
 
-			// ...and so does the CHAT tier: retail subscribes EVERY member to the ~Team channel when the team forms,
-			// not just the joiner (both clients get it, frames 701/702) - #668.
+			// ...and so does the chat tier: retail subscribes every member to the ~Team channel when the team forms,
+			// not just the joiner (both clients get it, frames 701/702).
 			Assert.Contains(chat.TeamChannel, c => c == (1u, teamId));
 			Assert.Contains(chat.TeamChannel, c => c == (2u, teamId));
 		}
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AcceptWithoutAnInvite_DoesNothing()
 		{
-			// The inviter comes from OUR pending-invite table, not the client's body, so an unsolicited accept cannot
+			// The inviter comes from our pending-invite table, not the client's body, so an unsolicited accept cannot
 			// pull someone into a team.
 			var (teams, _, _, _) = Harness(1, 2);
 
@@ -122,7 +122,7 @@ namespace Faolan.Tests
 			Assert.Contains(dispatcher.Membership, m => m is { Member: 2, Joined: false });
 			Assert.Contains(dispatcher.Membership, m => m is { Member: 1, Joined: false });
 
-			// The dissolve takes BOTH off the ~Team channel - the leaver on their way out and the survivor with the
+			// The dissolve takes both off the ~Team channel - the leaver on their way out and the survivor with the
 			// team itself (capture: the two 0x003D at frames 923/926 name the same channel).
 			Assert.Contains(chat.TeamChannel, c => c == (2u, (uint?)null));
 			Assert.Contains(chat.TeamChannel, c => c == (1u, (uint?)null));

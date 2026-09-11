@@ -12,17 +12,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Rdb
 {
-	// The Khitai faction catalog and its kill-payout matrix, straight out of the client (Gitea #310).
+	// The Khitai faction catalog and its kill-payout matrix, straight out of the client.
 	//
-	// TWO sources, and neither is a capture - which is the whole point, since #310 was filed as blocked on captures
-	// that do not exist and the corpus carries zero faction packets in either direction:
+	// Two sources, and neither is a capture - which is the whole point, since the corpus carries zero faction packets
+	// in either direction:
 	//
 	//   the RULESET   `data/FactionRelations.xml` (RDB 1010701/1) - 16 factions with their ids, icons, rivals and
 	//                 the per-encounter-tier payout matrix. Plaintext XML; FactionRelationTable owns the grammar.
-	//   the NAMES     LDB[254] - the display name and the four rank titles per faction.
+	//   the names     LDB[254] - the display name and the four rank titles per faction.
 	//
-	// ⚠️ The LDB blocks are ORDERED RUNS, not keyed by faction id, so they cannot be indexed by id. They are read as
-	// runs and joined to the XML by NAME, and the join is REPORTED rather than assumed: the XML's authoring comment
+	// The LDB blocks are ORDERED runs, not keyed by faction id, so they cannot be indexed by id. They are read as
+	// runs and joined to the XML by name, and the join is reported rather than assumed: the XML's authoring comment
 	// and the LDB's display name are two independent spellings of one faction, so a name that fails to join is a
 	// finding rather than something to absorb. (The LDB lists them in the reverse of the XML's order - 90, 80, … 10 -
 	// which is exactly the kind of thing a positional join would get silently wrong.)
@@ -42,7 +42,7 @@ namespace Faolan.Importer.Rdb
 		private const uint FactionNameBare = 61205296;
 		private const uint FactionNameStep = 16;
 
-		// The rank-title blocks: runs of four, stepping by 0x1000 between factions. A faction WITH a run is one a
+		// The rank-title blocks: runs of four, stepping by 0x1000 between factions. A faction with a run is one a
 		// player can hold standing with; the seven without are NPC-only reputations.
 		private const uint FactionRankBase = 59456385;
 		private const uint FactionRankStep = 0x1000;
@@ -67,7 +67,7 @@ namespace Faolan.Importer.Rdb
 
 			var (names, ladders) = ReadLdb(rdb);
 
-			// The join, by simplified NAME in both directions. `byName` maps the LDB's spelling onto its run index so
+			// The join, by simplified name in both directions. `byName` maps the LDB's spelling onto its run index so
 			// a faction can find its own ladder; the XML's authoring comment is the other spelling.
 			var ldbIndexByName = names
 				.Select((name, index) => (name, index))
@@ -122,10 +122,10 @@ namespace Faolan.Importer.Rdb
 			// Delete-then-insert, scoped to the whole catalog: the client's file is authoritative for it, so a faction
 			// that disappears from the file is gone rather than stale. The awards go first - they point at the rows.
 			//
-			// ⚠️ EXPLICITLY, not by relying on the awards' FK cascade. A cascade does not fire when the principal is
+			// EXPLICITLY, not by relying on the awards' FK cascade. A cascade does not fire when the principal is
 			// removed and re-added with the same key in one unit of work: EF collapses that pair into an UPDATE, so no
 			// DELETE reaches the database - which is exactly the bug that made the spell importer non-idempotent
-			// (#807). CharacterFactionStandings is NOT cleared, for the obvious reason: it is play state.
+			// . CharacterFactionStandings is not cleared, for the obvious reason: it is play state.
 			db.FactionKillAwards.RemoveRange(await db.FactionKillAwards.ToListAsync());
 			db.Factions.RemoveRange(await db.Factions.ToListAsync());
 			await db.SaveChangesAsync();

@@ -8,10 +8,10 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// The ACHIEVEMENT catalog (#748) - LDB 55701 names + 55700 descriptions, keyed by the id the wire calls a TAG.
-	// Without it a granted achievement is a bare number: `DispatchAddTag` sends one u32 and nothing else.
-	// #310: the Khitai faction catalog + its kill-payout matrix. Opt-in like every RDB module, and dependency-free -
-	// it is keyed by the client's own faction ids and joins to nothing we import.
+	/// <summary>
+	///     The Khitai faction catalog and its kill-payout matrix. Opt-in like every RDB module, and dependency-free: it
+	///     is keyed by the client's own faction ids and joins to nothing we import.
+	/// </summary>
 	public sealed class RdbFactionsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

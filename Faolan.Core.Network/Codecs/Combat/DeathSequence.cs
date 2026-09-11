@@ -6,63 +6,72 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// The records retail sends around a death, as VALUE factories.
-	//
-	// Not a codec, and that is the point of the file: a death is FIVE different messages
-	// (SimpleCharKilledByUpdateIIR + BehaviorControlCenterIIR + MagicBuffIIR + LookAtIIR + MoveTaskIIR), and the
-	// builder this replaced declared all five as its own `HandledTypes` - re-implementing four records that already had
-	// codecs, under four more names. Wave 4 of #530 kept `SimpleCharKilledByUpdateCodec` (the one IIR that is genuinely
-	// this file's) and turned the rest into values the existing codecs encode. Same treatment `ConversationScreenDecoder`
-	// got in wave 2, for the same reason: orchestrating a sequence is not encoding a message.
-	//
-	// The sequence retail sends for a dying entity, in order: drop the target (`LookAts.DropTarget`), the death pose
-	// (`Pose`), the death behaviour (`Bcc`), and - for a player - the kill record
-	// (`SimpleCharKilledByUpdateCodec.Build`) then the 0x2024 release screen.
+	/// <summary>
+	///     The records retail sends around a death, as value factories.
+	/// </summary>
+	/// <remarks>
+	///     Not a codec: a death is five different messages (SimpleCharKilledByUpdateIIR, BehaviorControlCenterIIR,
+	///     MagicBuffIIR, LookAtIIR and MoveTaskIIR), each of which has its own codec. Orchestrating a sequence is not
+	///     encoding a message, so what lives here are the values those codecs encode.
+	///     <para>
+	///         The order retail sends them in for a dying entity: drop the target (LookAts.DropTarget), the death pose
+	///         (<see cref="Pose" />), the death behaviour (<see cref="Bcc" />), and for a player the kill record
+	///         (<see cref="SimpleCharKilledByUpdateCodec" />) followed by the release screen.
+	///     </para>
+	/// </remarks>
 	public static class DeathSequence
 	{
-		// ⚠️ field3 IS NOT A "DEATH VARIANT" (#742). It is the dying entity's own BEHAVIOUR COUNTER - the protobuf
-		// schema has said so all along (`CommandqueueServerId`) and the corpus now proves it: across all 272 captured
-		// death records it takes 40 distinct values from 2 to 373, and against the SAME actor's previous BCC record of
-		// any kind it is **+1 on 265 of 267**. The progression is visible inside one kill: an NPC's two swings carry
-		// 5 and 6, the abort of the second carries 6 again, and its death carries 7.
-		//
-		// The two constants that used to live here (5 for an NPC, 3 for a player) were simply the value the two
-		// golden captures happened to be at - 5 occurs on 11 of the 272, and 3 on 6. Same class of trap as
-		// `decoded_defaults_masquerade_as_facts`. `CombatService` now passes the NPC's real counter
-		// (`WorldEntity.AttackSwingCounter`, the same one its swing acks already use); the values below are kept
-		// ONLY so the byte-exact goldens can still name what the captured records carried.
+		/// <summary>
+		///     The counter values the two golden captures happen to carry. They exist only so the byte-exact goldens can name
+		///     them; a live death passes the dying entity's real counter.
+		/// </summary>
+		/// <remarks>
+		///     Field 3 of the death record is the dying entity's own behaviour counter (CommandqueueServerId), not a death
+		///     variant: across all 272 captured death records it takes 40 distinct values from 2 to 373, and against the same
+		///     actor's previous BCC record of any kind it is +1 on 265 of 267. The progression is visible inside one kill - an
+		///     NPC's two swings carry 5 and 6, the abort of the second carries 6 again, and its death carries 7. CombatService
+		///     passes WorldEntity.AttackSwingCounter, the same counter the swing acks use.
+		/// </remarks>
 		public const byte CapturedNpcDeathCounter = 0x05;
 		public const byte CapturedPlayerDeathCounter = 0x03;
 
-		// The **behaviorId IS the creature's death animation** and is CREATURE-TYPE specific - decoded across the corpus
-		// (Faolan.Importer NpcDeathBehaviorExtractor, #362): 41877 = humanoid biped, 17036 = demon/large caster,
-		// 215333 = quadruped/beast. It is harvested per NpcTemplate (DeathBehaviorId) and passed in; un-harvested types
-		// default to the humanoid one.
+		/// <summary>
+		///     The behaviourId is the creature's death animation and is creature-type specific - decoded across the corpus by
+		///     the importer's NpcDeathBehaviorExtractor: 41877 humanoid biped, 17036 demon or large caster, 215333 quadruped
+		///     or beast. It is harvested per NpcTemplate (DeathBehaviorId) and passed in; un-harvested types default to the
+		///     humanoid one.
+		/// </summary>
 		public const uint HumanoidDeathBehaviorId = 41877;
 
-		// ⭐ A FOURTH one, and it is a PLAYER's (#742): 128031, on two records, both on the same character, both with
-		// field12 300. One of the two lands 8 s before that session's own annotation *"got incinerated by lava"* -
-		// inside the normal annotation lag - while the plain *"died"* annotation 2 minutes earlier maps to an
-		// ordinary 41877 death. So an environmental death appears to play its own animation. Two records is not
-		// enough to wire a rule on, and nothing selects it here. [V0: what selects the 128031 death animation]
+		/// <summary>
+		///     A fourth death animation, and a player's: 128031, on two records, both on the same character and both with
+		///     field 12 at 300. One of the two lands 8 s before that session's own "got incinerated by lava" annotation -
+		///     inside the normal annotation lag - while the plain "died" annotation two minutes earlier maps to an ordinary
+		///     41877 death, so an environmental death appears to play its own animation. Two records is not enough to wire a
+		///     rule on, and nothing selects this one. [V0: what selects the 128031 death animation]
+		/// </summary>
 		public const uint EnvironmentalDeathBehaviorId = 128031;
 
-		// field12 (`ActivationTime`) is per-ANIMATION, not per-kill, and reads as the animation's own length in
-		// centiseconds: humanoid 2.40 s, quadruped/beast 1.00 s, the environmental one 3.00 s. Each of those three is
-		// INVARIANT across every captured record of that animation (166 / 32 / 2), which is why they are here rather
-		// than left at one global constant - a beast used to be given 2.4x its own timing.
-		//
-		// ⭐ **The demon/large-caster animation's spread is the CREATURE's** (#781, `--report death-timing`). It takes
-		// eight values over 52 records; resolving every actor against its own capture's spawns gives **22 creatures,
-		// 22 of which carry ONE value and none of which carries two** - Valley Yeti 816, Enslaved Demon 592, Bat Demon
-		// 360, Harvester 240, Necrotic Bomb 220, Striped Boar and Wild Boar both 176, Wild Cow and Wild Pig both 160,
-		// Moose 120, and a 280 cluster of ten casters and crawlers. Two families landing on one number each is not
-		// what noise looks like.
-		//
-		// So this lookup is the FALLBACK now, not the answer: a creature the corpus measured carries its own length in
-		// `NpcTemplate.DeathActivationTime`, and only an un-harvested one falls through to the animation's modal
-		// value. Which is still the right default - the humanoid and quadruped animations are invariant across all
-		// 166 and 32 of their records, so a creature of that family is served correctly by it either way.
+		/// <summary>
+		///     The fallback animation length in centiseconds for a creature whose own length has not been harvested.
+		/// </summary>
+		/// <remarks>
+		///     Field 12 (ActivationTime) is per-animation rather than per-kill and reads as the animation's own length:
+		///     humanoid 2.40 s, quadruped/beast 1.00 s, the environmental one 3.00 s. Each of those is invariant across every
+		///     captured record of that animation (166 / 32 / 2 records).
+		///     <para>
+		///         The demon/large-caster animation is the exception, and its spread belongs to the creature (--report
+		///         death-timing): it takes eight values over 52 records, and resolving every actor against its own capture's
+		///         spawns gives 22 creatures, each carrying exactly one value - Valley Yeti 816, Enslaved Demon 592, Bat Demon
+		///         360, Harvester 240, Necrotic Bomb 220, Striped Boar and Wild Boar 176, Wild Cow and Wild Pig 160, Moose 120,
+		///         and a 280 cluster of ten casters and crawlers.
+		///     </para>
+		///     <para>
+		///         A creature the corpus measured therefore carries its own length in NpcTemplate.DeathActivationTime and only
+		///         an un-harvested one falls through to the modal value here, which remains correct for the humanoid and
+		///         quadruped families since both are invariant.
+		///     </para>
+		/// </remarks>
 		public static uint ActivationTimeFor(uint deathBehaviorId)
 		{
 			return deathBehaviorId switch
@@ -74,16 +83,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 			};
 		}
 
-		// The self-applied "you are dead" effect's spell id.
+		/// <summary>The self-applied "you are dead" effect's spell id.</summary>
 		public const uint DeathEffectSpellId = 0x0009F000;
 
-		// The BCC seq (form) both carry.
+		/// <summary>The BCC seq both records carry.</summary>
 		private const ushort DeathSeq = 0x0004;
 
-		// The dead-state movement type: normal movement is a mode-07 path, 0x06 is the "stopped/incapacitated" pose.
+		/// <summary>The revive tail's leading word.</summary>
 		private const byte ReviveTailPrefix = 0x03;
 
-		// The revive's args (was the literal [0x08,0x98,0xC3,0x02, 0x18,0x04, 0x28,0x08, 0x30,0x00, 0x60,0x64]).
+		/// <summary>The revive's args.</summary>
 		private static readonly byte[] ReviveArgs = new CommandMessage
 		{
 			BccActionId = 41368, // 0x98 0xC3 0x02
@@ -93,20 +102,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 			ActivationTime = 100
 		}.ToProtobuf();
 
-		// The death-behavior record that transitions a dying SimpleChar - PLAYER or NPC - into the dead state and plays
-		// its death animation. Retail sends it to:
-		//   * the dying PLAYER (Stihetfv beach #1292, right after the death-effect ApplySpell) - drives the dead state
-		//     (bcc_state 29). A login-while-dead char gets bcc_state=29 from its spawn, but an IN-SESSION death has no
-		//     spawn re-send, so this is how the live SimpleChar transitions.
-		//   * every dying NPC (NecroL80_..._casting-combat: EVERY kill = death-pose MoveTask + this record, and NO
-		//     SimpleCharKilledBy).
-		// `commandQueueId` is the dying entity's own behaviour counter - see the note on
-		// <see cref="CapturedNpcDeathCounter" />; field12 comes from the animation
-		// (<see cref="ActivationTimeFor" />). field5=8 and field6=0 are the only two that really are constants: 272
-		// of 272 captured records carry them.
-		//
-		// `activationTime` is the creature's own measured animation length (#781); null falls back to the animation's
-		// modal value, which is what every creature used before the per-creature harvest.
+		/// <summary>
+		///     The death-behaviour record that transitions a dying SimpleChar - player or NPC - into the dead state and plays
+		///     its death animation.
+		/// </summary>
+		/// <remarks>
+		///     Retail sends it to the dying player right after the death-effect ApplySpell (Stihetfv beach capture packet
+		///     1292), which is what drives bcc_state 29. A character logging in dead gets bcc_state 29 from its spawn, but an
+		///     in-session death has no spawn re-send, so this record is how the live SimpleChar transitions. It also sends it
+		///     for every dying NPC: in NecroL80_..._casting-combat every kill is a death-pose MoveTask plus this record, with
+		///     no SimpleCharKilledBy at all.
+		///     <para>
+		///         <paramref name="commandQueueId" /> is the dying entity's own behaviour counter - see
+		///         <see cref="CapturedNpcDeathCounter" />. <paramref name="activationTime" /> is the creature's own measured
+		///         animation length; null falls back to the animation's modal value (<see cref="ActivationTimeFor" />). Field
+		///         5 at 8 and field 6 at 0 are the only genuine constants: all 272 captured records carry them.
+		///     </para>
+		/// </remarks>
 		public static BehaviorControlCenterIIR Bcc(uint handle, uint deathBehaviorId = HumanoidDeathBehaviorId, uint commandQueueId = CapturedPlayerDeathCounter,
 			uint? activationTime = null)
 		{
@@ -122,36 +134,47 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(handle, DeathSeq, (uint)BehaviorId.LimboDeath, args, []);
 		}
 
-		// ⚠️ DECODED BUT DELIBERATELY NOT SENT. Retail's AssassinL23 (map 2010) death carries this self-applied
-		// death-state effect, but the retail BEACH death does NOT (proven by live gdb 2026-06-20), and the spell's
-		// client RDB effect sets stat 0x546 - the WAVE-RESPAWN timer - to 15. Sending it puts the client into the
-		// dreaded wave countdown, which is exactly the #214 bug the death sequence was fixed to avoid. The factory and
-		// its golden test stay because the bytes are proven and the record is part of the decoded death grammar; the
-		// IWorldOutbound seam that used to expose it was removed, so there is no longer a one-call path to the
-		// regression. If a capture ever justifies sending it, gate it on the map/death kind, not on "retail has it".
-		//
-		// applyTo == applyFrom == the dying player. Decoded from AssassinL23_..._resurect pkt#4051: the handles are
-		// rewritten to the live one and the data region kept verbatim (capture-derived interim - the effect's
-		// magnitude/duration fields are not decoded).
+		/// <summary>
+		///     The self-applied death-state effect. Decoded, and deliberately not sent.
+		/// </summary>
+		/// <remarks>
+		///     Retail's AssassinL23 death on map 2010 carries it, but the retail beach death does not, and the spell's client
+		///     RDB effect sets stat 0x546 - the wave-respawn timer - to 15, which puts the client into the wave countdown.
+		///     The factory and its golden test stay because the bytes are proven and the record is part of the decoded death
+		///     grammar, but nothing exposes a one-call path to sending it. If a capture ever justifies sending it, gate it on
+		///     the map or the kind of death, not on retail having it somewhere.
+		///     <para>
+		///         applyTo and applyFrom are both the dying player. Decoded from AssassinL23_..._resurect packet 4051: the
+		///         handles are rewritten to the live one and the data region kept verbatim, since the effect's magnitude and
+		///         duration fields are not decoded.
+		///     </para>
+		/// </remarks>
 		public static MagicBuffIIR Effect(uint dyingHandle)
 		{
 			return new MagicBuffIIR(dyingHandle, 0x00, MagicBuffIds.BaseOf(DeathEffectSpellId), MagicBuffIds.FormOf(DeathEffectSpellId), dyingHandle, EffectData);
 		}
 
-		// The death-pose MoveTask retail forces onto the dying entity's own handle right before the kill record
-		// (AssassinL23_..._resurect pkt#4048): a minimal stationary MoveTask at the death position, with no
-		// waypoint/speed payload. The SimpleCharKilledBy + 0x2024 + death effect alone left the avatar standing and the
-		// release UI closed (#214).
+		/// <summary>
+		///     The death-pose MoveTask retail forces onto the dying entity's own handle right before the kill record
+		///     (AssassinL23_..._resurect packet 4048): a minimal stationary MoveTask at the death position, with no waypoint
+		///     or speed payload. It is required - the kill record, the release screen and the death effect on their own leave
+		///     the avatar standing and the release UI closed.
+		/// </summary>
 		public static MoveTaskIIR Pose(uint dyingHandle, Vector3 position)
 		{
 			return new MoveTaskIIR(dyingHandle, position, MoveTaskNodes.Stationary());
 		}
 
-		// The revive action retail sends on RespawnMe - a behaviour record on the player that transitions bcc_state
-		// 29->1 (alive), which CLOSES the release window and revives in place. Decoded from the retail beach
-		// death+resurrect (Stihetfv #1382, identical form in AssassinL23 #4840). Capture-derived verbatim except the
-		// player handle + the chosen resurrection-point id. Retail follows it with a vitals restore (we ride
-		// PushVitals) and an IntendedTeleport to the point (deferred - the beach point is adjacent so we revive in place).
+		/// <summary>
+		///     The revive action retail sends on RespawnMe: a behaviour record on the player that transitions bcc_state from
+		///     29 back to 1, closing the release window and reviving in place.
+		/// </summary>
+		/// <remarks>
+		///     Decoded from the retail beach death and resurrect (Stihetfv packet 1382, identical in AssassinL23 packet 4840)
+		///     and carried verbatim apart from the player handle and the chosen resurrection-point id. Retail follows it with
+		///     a vitals restore, which we send as PushVitals, and an IntendedTeleport to the point; the beach point is
+		///     adjacent, so we revive in place instead.
+		/// </remarks>
 		public static BehaviorControlCenterIIR Revive(uint handle, uint respawnPointId)
 		{
 			using var tail = new FaolanStream();

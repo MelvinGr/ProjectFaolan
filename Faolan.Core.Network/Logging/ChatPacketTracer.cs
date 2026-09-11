@@ -6,10 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network.Logging
 {
-	// The chat-tier packet tracer. Both directions render from the structured ChatServerMessage, the same way the Conan
-	// tiers render from an Rpc, and through the same line shaper (PacketLogFormatter) - one trace format across
-	// protocols. The chat wire has a single opcode space per direction (no receiver class to disambiguate), so naming is
-	// just which enum the direction implies.
+	/// <summary>
+	///     The chat-tier packet tracer. Both directions render from the structured <see cref="ChatServerMessage" />, as
+	///     the Conan tiers do from an <c>Rpc</c>, and through the same line shaper
+	///     (<see cref="PacketLogFormatter" />), giving one trace format across protocols.
+	/// </summary>
+	/// <remarks>
+	///     The chat wire has a single opcode space per direction (no receiver class to disambiguate), so naming is
+	///     simply whichever enum the direction implies.
+	/// </remarks>
 	public sealed class ChatPacketTracer : PacketTracer
 	{
 		public ChatPacketTracer(ILogger logger) : base(logger, "ChatServer")
@@ -17,7 +22,7 @@ namespace Faolan.Core.Network.Logging
 		}
 
 		// The chat transport writes bytes (its frame is 4 bytes plus the body, so a send serializes straight through),
-		// which are decoded back to the message here - the same render either way.
+		// which are decoded back to the message here, giving the same render either way.
 		protected override void RenderTransmitted(byte[] frame)
 		{
 			var packet = ChatServerMessage.Parse(frame);
@@ -39,7 +44,7 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		// Inbound (RX) with no handler: the same line, at Warning, marked UNHANDLED.
+		// Inbound with no handler: the same line, at Warning, marked unhandled.
 		public void Unhandled(in ChatServerMessage packet)
 		{
 			try

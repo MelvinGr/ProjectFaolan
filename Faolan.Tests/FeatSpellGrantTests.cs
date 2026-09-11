@@ -9,16 +9,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #862: which feats may be put in a character's list at all. The list rides the player spawn's pre-IIR frame, so
-	// an extra id is a wire divergence rather than a harmless surplus - and the client's own FEATCLASS table
+	// Which feats may be put in a character's list at all. The list rides the player spawn's pre-IIR frame, so
+	// an extra id is a wire divergence rather than a harmless surplus - and the client's own featclass table
 	// (`FeatClassEntry`, RDB 1000043) says which side of the line each feat is on.
 	//
-	// ⚠️ The gate that proves this from the CAPTURED feat lists is `--report feat-autotrain-check`, not a test
-	// (#849/#729): `faolan.sql` excludes every `Character*` table as per-developer play state, so the suite's
+	// The gate that proves this from the captured feat lists is `--report feat-autotrain-check`, not a test
+	//: `faolan.sql` excludes every `Character*` table as per-developer play state, so the suite's
 	// fixture holds no `CharacterFeats` at all and an assertion over them would pass on an empty left side.
 	public class FeatSpellGrantTests
 	{
-		// The claim `FeatClassEntry.Autotrain`'s remark rests on: auto-training is a property of the FEAT, not of one
+		// The claim `FeatClassEntry.Autotrain`'s remark rests on: auto-training is a property of the feat, not of one
 		// (class, level) row. If a feat were auto-trained for one class and trainable for another, "may this id be in
 		// a feat list" would stop being answerable from the id alone - which is exactly how the level path asks it.
 		[Fact]
@@ -37,11 +37,10 @@ namespace Faolan.Tests
 			Assert.True(split.Count == 0, "feats with both an auto-trained and a trainable row: " + string.Join(", ", split));
 		}
 
-		// The removal is TARGETED, not a blanket stop: everything the old level-up grant handed out - the
-		// `Spell Unlocking <lo>-<hi>` bands, the `<Class> Class Feat NNN` tracks and `Pet Mastery` - is auto-trained
-		// in the client's own table, so the client hands it over itself. Asserted by NAME because the names are what
-		// #847 measured the old (category-based) split on; this is the same population, re-checked against the
-		// client's flag.
+		// Everything a server-side level-up grant would hand out - the `Spell Unlocking <lo>-<hi>` bands, the
+		// `<Class> Class Feat NNN` tracks and `Pet Mastery` - is auto-trained in the client's own table, so the client
+		// hands it over itself. Asserted by name, because the names are how that population is identified without the
+		// flag.
 		[Fact]
 		public async Task EveryFeatTheLevelPathUsedToTrain_IsAutotrainedByTheClient()
 		{
@@ -59,9 +58,8 @@ namespace Faolan.Tests
 			Assert.True(trainable.Count == 0, "expected auto-trained, but the client marks them trainable: " + string.Join(", ", trainable));
 		}
 
-		// The free set the budget check uses is the client's flag now, not the 7063 category. It must still resolve to
-		// something - an empty set would silently restore the #850 overspend for any character whose rows predate the
-		// grant's removal.
+		// The free set the budget check uses is the client's flag, not the 7063 category. It must still resolve to
+		// something - an empty set would silently let a character overspend its budget.
 		[Fact]
 		public async Task TheAutotrainedSet_IsNotEmpty()
 		{
@@ -76,10 +74,10 @@ namespace Faolan.Tests
 			Assert.True(autotrained.Count < all, $"every feat is auto-trained ({autotrained.Count} of {all}) - the flag cannot be selecting anything");
 		}
 
-		// The class PROGRESSION tracks - bases whose low digits run past the client's own rank ceiling
+		// The class progression tracks - bases whose low digits run past the client's own rank ceiling
 		// (FeatIdMap.MaxRank, from FUN_007850c0's `base*100 + 10`), so the digits index a family instead of naming a
-		// rank. They were excluded by name from the old grant; the client's flag reaches them too, which is what says
-		// the flag SUPERSEDES that exclusion rather than merely agreeing with it on the easy cases.
+		// rank. The client's flag reaches them too, which is what makes an exclusion by name unnecessary rather than
+		// merely agreed with on the easy cases.
 		[Fact]
 		public async Task EveryProgressionTrack_IsAutotrained()
 		{
@@ -88,7 +86,7 @@ namespace Faolan.Tests
 
 			var tracks = await TrackBases(db, ct);
 			Assert.NotEmpty(tracks);
-			Assert.NotEqual(0, await db.FeatClassEntries.AsNoTracking().CountAsync(ct)); // ...and the side being SCANNED
+			Assert.NotEqual(0, await db.FeatClassEntries.AsNoTracking().CountAsync(ct)); // ...and the side being scanned
 
 			var trainable = await (from entry in db.FeatClassEntries.AsNoTracking()
 				join map in db.FeatIdMaps.AsNoTracking() on entry.FeatId equals map.WireFeatId

@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gitea #674/#518: an RDB record that lives on the CDN (`le.idx file == 0xFF`) is still readable - `RdbReader`
-	// fetches it through the Faolan.Web.Content mirror - but only if the caller ASKS for it. Two mistakes made that
+	// An RDB record that lives on the CDN (`le.idx file == 0xFF`) is still readable - `RdbReader`
+	// fetches it through the Faolan.Web.Content mirror - but only if the caller asks for it. Two mistakes made that
 	// silently not happen, both of which read as harmless:
 	//
 	//   * gating on `Entry.IsLocal`, which looks like "skip the unreadable ones" and means "skip everything that is
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 	// 276 of 520 tilemaps (1070003), 274 of 478 bounded-area records (1000053) and 44,106 of 95,289 render meshes
 	// (1010001) are CDN-only. `rdb-npc-spawns` was importing 2,669 spawn areas where the client ships 3,970.
 	//
-	// So both are gated here, over the source itself. `IsLocal` has exactly one legitimate use left - REPORTING where
+	// So both are gated here, over the source itself. `IsLocal` has exactly one legitimate use left - reporting where
 	// a resource physically lives - and that is what the allowlist is.
 	public class RdbCdnGateTests
 	{
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			"RdbAssetExtractor.cs", // DescribeMesh / DescribeResource: the "local" | "cdn" strings in the diagnostics
 			"ReportCli.cs", // the rdb-assets corpus summary's geomLocal/geomCdn + texLocal/texCdn tallies
 
-			// rdb-word-scan sweeps the WHOLE RDB, so the CDN half is a quarter of a million HTTP fetches. It still
+			// rdb-word-scan sweeps the whole RDB, so the CDN half is a quarter of a million HTTP fetches. It still
 			// defaults to fetching them - a miss has to mean "absent from the game", not "absent from the local
 			// packs" - and `IsLocal` is only consulted to honour an explicit `:local` opt-out, which the report
 			// prints in its own header. A coverage choice the caller made and can see, not a readability test.
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			"RdbCollisionMeshTests.cs",
 			"RdbCdnGateTests.cs",
 
-			// #834's last-wins rule is checked against a SYNTHETIC `le.idx` the test writes itself - three entries,
+			// The last-wins rule is checked against a synthetic `le.idx` the test writes itself - three entries,
 			// all `file == 0`, no CDN record in it at all. A mirror base would have nothing to reach and would only
 			// make the construction look like it depended on one.
 			"RdbDuplicateKeyTests.cs"

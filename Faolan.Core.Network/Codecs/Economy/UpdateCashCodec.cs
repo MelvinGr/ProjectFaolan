@@ -4,15 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchUpdateCash (s2c 0x2005) - the player's ABSOLUTE wallet balance, not a delta:
-	//   [u64 balanceTin][u32 reason]
-	// The unit is TIN, the game's smallest coin (100 tin = 1 copper, ...). Byte-exact in UpdateCashTests; was
-	// `UpdateCashBody.WriteUpdateCashBody(FaolanStream, …)` (#530 wave 7).
+	/// <summary>
+	///     <c>DispatchUpdateCash</c> - the player's absolute wallet balance, not a delta:
+	///     <c>[u64 balanceTin][u32 reason]</c>. The unit is tin, the game's smallest coin. Byte-exact in
+	///     <c>UpdateCashTests</c>.
+	/// </summary>
 	public static class UpdateCashCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchUpdateCash;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(UpdateCash value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -42,10 +43,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// DispatchUpdateCash (0x2005).
+	/// <summary>The DispatchUpdateCash body.</summary>
 	public sealed record UpdateCash(ulong BalanceTin, UpdateCashReason Reason);
 
-	// Why the wallet changed - the client celebrates a Gain and stays quiet for a Spend/sync.
+	/// <summary>Why the wallet changed - the client celebrates a gain and stays quiet for a spend or sync.</summary>
 	public enum UpdateCashReason : uint
 	{
 		Spend = 0, // also used for syncs that don't celebrate a gain

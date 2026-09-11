@@ -4,16 +4,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #272: the movement a creature walked but never had broadcast, taken when its move ends outside the tick.
+	// The movement a creature walked but never had broadcast, taken when its move ends outside the tick.
 	//
 	// The bug this exists for: the world tick only emits a MoveTask once the entity has covered `MoveBroadcastSegment`
-	// (6u) since the last one, and flushes the remainder in its own `EndMove` on arrival. DEATH ends a move without
-	// going through that - so a creature killed MID-CHASE carried up to 6u the client had never been told about, and
-	// the death POSE states the true position. On screen the corpse jumped that far onto its killer and only then
+	// (6u) since the last one, and flushes the remainder in its own `EndMove` on arrival. Death ends a move without
+	// going through that - so a creature killed mid-chase carried up to 6u the client had never been told about, and
+	// the death pose states the true position. On screen the corpse jumped that far onto its killer and only then
 	// played its death animation. Killing one in melee never showed it, because the chase had already ended and
 	// flushed - which is exactly why it reads as "only when I kill them from a distance".
 	//
-	// ⭐ Retail keeps the two in agreement rather than posing elsewhere: over the whole corpus **250 of 267** death
+	// Retail keeps the two in agreement rather than posing elsewhere: over the whole corpus **250 of 267** death
 	// poses sit at distance 0.00 from the end of that handle's preceding MoveTask (median 0.00). So the pose is right
 	// and the client was simply behind - flush, don't move the pose.
 	public class PendingMoveFlushTests

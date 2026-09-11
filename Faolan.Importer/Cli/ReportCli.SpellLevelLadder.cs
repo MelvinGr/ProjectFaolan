@@ -15,43 +15,42 @@ namespace Faolan.Importer.Cli
 	// the same spell at once.
 	//
 	// A family's ranks unlock at spaced levels (`Ice Strike` 7/20/35/50/65/80). `Spells.Level` comes from RDB field
-	// 125, which states that ladder for most families and states NO ladder for a handful: every rank of `Chill` reads
+	// 125, which states that ladder for most families and states no ladder for a handful: every rank of `Chill` reads
 	// 7, every rank of `Infestation` reads 2, `Lifestrike`'s five ranks read 2/3/4/4/4. The symptom is in-game and
-	// loud - a level-4 Necromancer dinging once was handed Lifestrike ranks 3, 4 AND 5, the last of which states its
+	// loud - a level-4 Necromancer dinging once was handed Lifestrike ranks 3, 4 and 5, the last of which states its
 	// damage for levels 75-80.
 	//
 	// `RdbSpellImporter.RankLadderFromEffectBands` repairs the families where the record answers a second time (the
 	// `InterpolatedHit` ramp's level band) completely and monotonically. It cannot repair the rest, and this is where
 	// that residue is counted rather than left invisible.
 	//
-	// ⭐ **The residue is not one gap but two, and the TEACHING FEAT tells them apart.** Every rank of a normal
+	// The residue is not one gap but two, and the TEACHING feat tells them apart. Every rank of a normal
 	// family is granted by a feat - a `<Class> Class Feat NNN` for rank 1 and a `Spell Unlocking <lo>-<hi>` for ranks
-	// 2 and up, whose NAME carries the level band it covers. Read against `FeatSpellGrants` the collapsed families
+	// 2 and up, whose name carries the level band it covers. Read against `FeatSpellGrants` the collapsed families
 	// split cleanly:
 	//
-	//   * **UNTAUGHT TOP RANK** - the family's highest rank is granted by NO feat while every rank below it is, and it
+	//   * UNTAUGHT TOP rank - the family's highest rank is granted by no feat while every rank below it is, and it
 	//     duplicates the level of the rank below. Nine families, and the predicate is exact: all nine top ranks sit in
 	//     one late id block (>= 4487431) that nothing else in the catalog occupies, which is a second and completely
 	//     independent characterisation of the same set. The captures agree where they can speak - the level-80
 	//     Necromancer knows `Chill` ranks 1-5 and `Pestilential Blast` 1-6 but neither top rank, the level-80
 	//     Demonologist `Hellfire Stream` 1-5 and `Shock` 1-4 but neither - four controlled misses, i.e. a miss with
-	//     the rank BELOW present as the control. These are not level-granted at all.
-	//   * **RANK 1 FROM A CLASS FEAT** - rank 1 shares rank 2's level, and rank 1's only grant is a `<Class> Class
-	//     Feat`, never a `Spell Unlocking` band. Field 125 copied the band-granted rank 2's level onto it.
-	//     ⭐⭐ **This IS recoverable, and #853 is answered** - the band was never the only thing the client states.
+	//     the rank below present as the control. These are not level-granted at all.
+	//   * rank 1 from A class feat - rank 1 shares rank 2's level, and rank 1's only grant is a `<Class> Class
+	//     Feat`, never a `Spell Unlocking` band. Field 125 copies the band-granted rank 2's level onto it, but the
+	//     band is not the only thing the client states, so rank 1's own level is recoverable.
 	//     A `<Class> Class Feat NNN` is a family of ten wire ids, and the client's featclass table (RDB 1000043)
-	//     gives each one its own LEVEL. `RdbFeatImporter.DeriveClassSpellGrantLevels` writes it to
+	//     gives each one its own level. `RdbFeatImporter.DeriveClassSpellGrantLevels` writes it to
 	//     `ClassSpell.GrantLevel`; this report prints it beside the extrapolation it replaced.
 	//
-	// The `Spell Unlocking` band is also a CHECK on the level itself, and it is what independently confirmed the
+	// The `Spell Unlocking` band is also a check on the level itself, and it is what independently confirmed the
 	// effect-band repair: `Lifestrike` ranks 2/3/4/5 are granted by the 20-40, 40-60, 60-80 and 60-80 feats, which
-	// fits the repaired 30/45/60/75 exactly and fits the old 3/4/4/4 not at all. `Necromancer Class Feat 011` grants
-	// rank 1 of BOTH `Chill` and `Lifestrike`, so those two cannot unlock at different levels - and after the repair
-	// they do not (15 and 15, against 7 and 2 before).
+	// fits the repaired 30/45/60/75 exactly. `Necromancer Class Feat 011` grants rank 1 of both `Chill` and
+	// `Lifestrike`, so those two cannot unlock at different levels, and under the repaired bands they do not.
 	//
-	// ⭐ **Why a report and not a test** (Gitea #729): both sides are shipped DATA. The count of collapsed families
+	// Why a report and not a test: both sides are shipped data. The count of collapsed families
 	// moves whenever the RDB import is re-run or the catalog grows, so pinning it would rebaseline on every data
-	// change. What is asserted is the one direction that can only be a defect - a family the importer's rule WOULD
+	// change. What is asserted is the one direction that can only be a defect - a family the importer's rule would
 	// separate but whose shipped rows are still collapsed, i.e. `faolan.db` predates the rule and the module needs
 	// re-running.
 	public static partial class ReportCli
@@ -69,11 +68,11 @@ namespace Faolan.Importer.Cli
 			var classSpells = (await db.ClassSpells.AsNoTracking().Select(cs => cs.SpellId).Distinct().ToListAsync()).ToHashSet();
 			var comboActions = (await db.Combos.AsNoTracking().Select(c => c.GameActionId).ToListAsync()).ToHashSet();
 
-			// ⚠️ The family is grouped over the WHOLE catalog, not over the class spells, because that is what the
+			// The family is grouped over the whole catalog, not over the class spells, because that is what the
 			// importer's rule groups over - and the difference decides cases. `Covenant of Pestilence` has three
 			// records per rank (the cast plus its companion effects) whose bands disagree, so the rule declines it;
 			// scoped to the one class-spell record per rank it would look repairable and this report would promise a
-			// re-import that changes nothing. Only the DISPLAY is narrowed, to the families a character can learn.
+			// re-import that changes nothing. Only the display is narrowed, to the families a character can learn.
 			var spells = await db.Spells.AsNoTracking()
 				.Where(s => s.Level > 0)
 				.Select(s => new
@@ -85,7 +84,7 @@ namespace Faolan.Importer.Cli
 				.ToListAsync();
 
 			// The level a record's numbers OPEN at, read exactly as `RdbSpellImporter.BandOpensAt` reads it: the
-			// LOWEST band above 1, falling back to the lowest of all. A stepped ramp states `{1, 30, 35, 40, 45}` for
+			// lowest band above 1, falling back to the lowest of all. A stepped ramp states `{1, 30, 35, 40, 45}` for
 			// a rank rated 30, so the highest is its CEILING and only the lowest-above-floor is its own level - and
 			// this column has to agree with the importer or it promises repairs that will not happen.
 			var bands = (await db.SpellStatEffects.AsNoTracking()
@@ -99,7 +98,7 @@ namespace Faolan.Importer.Cli
 				.GroupBy(e => e.SpellId)
 				.ToDictionary(g => g.Key, g => (uint?)(g.Where(e => e.Low > 1).Select(e => e.Low).DefaultIfEmpty(g.Min(e => e.Low)).Min()));
 
-			// (spell -> the names of the feats that teach it). The NAME is the payload here, not the id: it is what
+			// (spell -> the names of the feats that teach it). The name is the payload here, not the id: it is what
 			// carries the level band and what separates a class feat from a band feat.
 			var teachers = (await db.FeatSpellGrants.AsNoTracking()
 					.Join(db.Feats.AsNoTracking(), g => g.FeatId, f => f.Id, (g, f) => new
@@ -198,19 +197,18 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     Rank 1's real level, from the client's featclass SCHEDULE - printed beside what the old ladder
-		///     extrapolation would have guessed, so the two can be compared per family.
+		///     Rank 1's real level, from the client's featclass schedule - printed beside what a ladder extrapolation
+		///     would guess, so the two can be compared per family.
 		/// </summary>
 		/// <remarks>
-		///     ⭐⭐ <b>#853 is answered, and this block is what shows it.</b> The ticket's premise was that rank 1's
-		///     level "is not recoverable from the client", because rank 1 is granted by a
-		///     <c>&lt;Class&gt; Class Feat NNN</c> whose NAME carries no level band. That reasoning treated the class
-		///     feat as ONE feat. It is a family of ten wire ids, and the client's featclass table (RDB 1000043,
-		///     <c>FeatClassEntry</c>) gives each of them its own LEVEL - so the teaching feat states rank 1's level
+		///     Rank 1's level is recoverable from the client, even though rank 1 is granted by a
+		///     <c>&lt;Class&gt; Class Feat NNN</c> whose name carries no level band: the class feat is not one feat.
+		///     It is a family of ten wire ids, and the client's featclass table (RDB 1000043,
+		///     <c>FeatClassEntry</c>) gives each of them its own level - so the teaching feat states rank 1's level
 		///     after all, just not in its name. <c>RdbFeatImporter.DeriveClassSpellGrantLevels</c> writes it to
 		///     <see cref="Faolan.Core.Database.Tables.ClassSpell.GrantLevel" />, which is where the report reads it.
 		///     <para />
-		///     ⚠️ The extrapolation column stays, and stays REFUTED - it is the rival explanation, and printing it
+		///     The extrapolation column stays, and stays REFUTED - it is the rival explanation, and printing it
 		///     next to the answer is what shows the answer was needed. It was right on only ~60% of the families
 		///     where the ladder was already known, and on `Spark of Life` it produces level 0, which is not a level a
 		///     spell is granted at. The schedule gives that family 15.
@@ -235,10 +233,10 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				// The step is taken from ranks 2->3, which are both real: rank 1 is the corrupted one and rank 2's
-				// value is what it was copied FROM, so a step measured across 1->2 would be zero by construction.
+				// value is what it was copied from, so a step measured across 1->2 would be zero by construction.
 				var step = levels[2] - levels[1];
 				var candidate = levels[1] - step;
-				// ⚠️ Over EVERY rank-1 row, not the first. Several of these families ship the same rank twice on two
+				// Over every rank-1 row, not the first. Several of these families ship the same rank twice on two
 				// different `GuiStackingLine`s (two classes offering it), and only the row an auto-trained feat
 				// actually teaches carries a grant level - so taking the first row reported "-" for three families
 				// whose answer was sitting on the sibling id.
@@ -253,7 +251,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"     {c.Family,-28}  {c.Field,-22}  {step,4}  {(candidate > 0 ? candidate.ToString() : $"{candidate} ⛔"),12}  {rankOne}");
 			}
 
-			// The CONTROL, and the reason the block above is quotable at all: the families whose ladder a second
+			// The control, and the reason the block above is quotable at all: the families whose ladder a second
 			// source already fixed should satisfy the same rule, and how many do is the measurement.
 			var controls = learnable.Select(f => f.Value).Where(f => f.Select(r => r.Level).Distinct().Count() == f.Select(r => r.Rank).Distinct().Count()).ToList();
 			var agree = 0;
@@ -277,7 +275,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"     control - of {tested} families whose ladder is already one level per rank, {agree} put rank 1 exactly one step below rank 2"
 			                  + $" ({rate:F0}%).");
 
-			// ⛔ The verdict, and it is the CONTROL that gives it rather than the candidates above. An extrapolation
+			// The verdict, and it is the control that gives it rather than the candidates above. An extrapolation
 			// is only worth applying if it is right where the answer is already known, and this one is not: a rule
 			// that is wrong on four families in ten would write a fabricated level into content that currently
 			// carries a merely-duplicated one. The candidate column stays because a HUMAN reading one family at a
@@ -289,16 +287,16 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     How many rank ladders are MONOTONIC under each of the two level sources - the headline measurement
-		///     behind #853, and the reason the featclass schedule was taken over field 125.
+		///     How many rank ladders are monotonic under each of the two level sources - the measurement that decides
+		///     the featclass schedule over field 125.
 		/// </summary>
 		/// <remarks>
-		///     A rank ladder that steps DOWN is incoherent whichever source states it, so this is a property the two
+		///     A rank ladder that steps down is incoherent whichever source states it, so this is a property the two
 		///     can be scored against without a capture. Measured at the time of writing: field 125 breaks exactly one
 		///     family - <c>Quell the Ether</c>, 45/30/45/60/75, the contradiction the ticket filed as unrecoverable -
 		///     and the schedule breaks none, reading 15/30/45/60/75 for it.
 		///     <para />
-		///     ⚠️ PRINTED, not asserted. A ladder is the client's statement and a future build could legitimately
+		///     printed, not asserted. A ladder is the client's statement and a future build could legitimately
 		///     ship an odd one; what would be a defect is our derivation inventing the disorder, and that shows up
 		///     here as a count moving off zero rather than as a threshold to pin.
 		/// </remarks>
@@ -318,7 +316,7 @@ namespace Faolan.Importer.Cli
 				if (byRank.Count < 2)
 					continue;
 
-				// ⚠️ The SAME rows on both sides. Several families ship a rank twice (two `GuiStackingLine`s) and only
+				// The same rows on both sides. Several families ship a rank twice (two `GuiStackingLine`s) and only
 				// one of the pair is the row an auto-trained feat teaches - so scoring `Spells.Level` over min-of-all
 				// rows while scoring the schedule over the taught row lets field 125 off: `Quell the Ether`'s taught
 				// rank 1 reads 45, its sibling 30, and taking the min silently reported a clean ladder.
@@ -358,19 +356,19 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The two level sources side by side, PER CLASS: <c>ClassSpell.GrantLevel</c> (the client's featclass
+		///     The two level sources side by side, per class: <c>ClassSpell.GrantLevel</c> (the client's featclass
 		///     schedule) against <c>Spells.Level</c> (RDB field 125), over every row the schedule answers.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ This is the measurement Gitea #864 asked for, and its point is the DISAGREEMENTS. The two fields are
-		///     independent - the schedule says when a CLASS is handed the spell, field 125 is the record's own level
-		///     word - so a difference is not automatically a defect. What the ticket ruled out with it is the rule
-		///     "retail never grants above field 125": the rows that differ UPWARD refute it outright, and they are
+		///     The point of the table is the disagreements. The two fields are independent - the schedule says when a
+		///     class is handed the spell, field 125 is the record's own level word - so a difference is not
+		///     automatically a defect. It does rule out "retail never grants above field 125": the rows that differ
+		///     upward refute that outright, and they are
 		///     printed by name rather than counted, because a one-directional rule read off three rows is exactly the
 		///     thing a full sweep exists to kill.
 		///     <para />
-		///     ⚠️ PRINTED, not asserted (Gitea #729): both populations are shipped data and both move whenever the RDB
-		///     import is re-run. The gate that CAN only be a defect is <c>--report spell-grant-check</c>, which scores
+		///     printed, not asserted: both populations are shipped data and both move whenever the RDB
+		///     import is re-run. The gate that can only be a defect is <c>--report spell-grant-check</c>, which scores
 		///     the gate this column feeds against the captured spellbooks.
 		/// </remarks>
 		private static async Task ScheduleVersusStatedLevel(DatabaseContext db)
@@ -407,15 +405,15 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"     {"TOTAL",-18} {rows.Count,5} {rows.Count - all.Count,6} {all.Count,7}"
 			                  + $" {all.Count(r => r.Schedule < r.Stated),6} {all.Count(r => r.Schedule > r.Stated),6}");
 
-			// ⚠️ The classes the schedule says NOTHING about, printed because their absence is the finding: the melee
+			// The classes the schedule says nothing about, printed because their absence is the finding: the melee
 			// kit is mostly COMBOS, and no feat teaches a combo - so the schedule can only ever corroborate or correct
-			// field 125 on the caster classes, never replace it wholesale (Gitea #864).
+			// field 125 on the caster classes, never replace it wholesale.
 			var silent = Enum.GetValues<ConanClass>().Where(c => c != default && rows.All(r => r.Class != c)).ToList();
 			if (silent.Count > 0)
 				Console.WriteLine($"     ⚠️ the schedule answers NOTHING for {string.Join(", ", silent)} - no feat teaches a combo, so these classes stay on Spells.Level.");
 
-			// ⛔ The refuting half, named. These are the rows where the class is handed the spell ABOVE the level its
-			// own record states - i.e. field 125 is not a ceiling, which is what #864 closed on.
+			// The refuting half, named. These are the rows where the class is handed the spell above the level its
+			// own record states - i.e. field 125 is not a ceiling.
 			var above = all.Where(r => r.Schedule > r.Stated).OrderByDescending(r => r.Schedule - r.Stated).ToList();
 			if (above.Count == 0)
 				return;
@@ -428,7 +426,7 @@ namespace Faolan.Importer.Cli
 		private const string UntaughtTopRank = "untaught top rank (not level-granted)";
 		private const string RankOneFromAClassFeat = "rank 1 from a class feat, level copied from rank 2";
 
-		// What the feat graph says about ONE collapsed family. Both shapes are structural rather than per-value, which
+		// What the feat graph says about one collapsed family. Both shapes are structural rather than per-value, which
 		// is why they can be named without a per-family judgement call.
 		private static string Diagnose(List<IGrouping<int, (uint Id, string Name, byte Level, int Rank)>> byRank,
 			Dictionary<uint, string[]> teachers)
@@ -436,7 +434,7 @@ namespace Faolan.Importer.Cli
 			var findings = new List<string>();
 			var taught = byRank.Select(r => r.Any(s => teachers.ContainsKey(s.Id))).ToList();
 
-			// The top rank is granted by nothing while every rank below it is, AND it repeats the level below. The
+			// The top rank is granted by nothing while every rank below it is, and it repeats the level below. The
 			// conjunction is what makes it exact - "untaught" alone also catches the Bear Shaman totems, whose UNtaught
 			// ranks are the low ones and whose top rank is taught.
 			if (byRank.Count >= 2 && !taught[^1] && taught.Take(byRank.Count - 1).All(t => t)
@@ -452,7 +450,7 @@ namespace Faolan.Importer.Cli
 					findings.Add(RankOneFromAClassFeat);
 			}
 
-			// A rank whose level falls OUTSIDE the band its own teaching feat names. Not a repair - it says the two
+			// A rank whose level falls outside the band its own teaching feat names. Not a repair - it says the two
 			// client sources disagree about this family, which is a different (and louder) problem than a copy.
 			var outside = byRank.SelectMany(r => r).Count(s => OutsideItsBand(s.Level, teachers.GetValueOrDefault(s.Id)));
 			if (outside > 0)
@@ -473,7 +471,7 @@ namespace Faolan.Importer.Cli
 
 			var bands = featNames.Select(n => SpellUnlockingBand.Match(n)).Where(m => m.Success).ToList();
 
-			// Only a rank with exactly ONE band feat can be judged: several bands on one spell is the client listing a
+			// Only a rank with exactly one band feat can be judged: several bands on one spell is the client listing a
 			// spell under more than one unlock feat, and then no single band is its statement.
 			return bands.Count == 1
 			       && (level < uint.Parse(bands[0].Groups[1].Value) || level > uint.Parse(bands[0].Groups[2].Value));

@@ -8,7 +8,7 @@ namespace Faolan.Core.Database
 	/// <param name="Created">Realms the config declared that the database did not have.</param>
 	/// <param name="Updated">
 	///     Realms whose static columns the config changed, each as "name (id N): Field was -> is".
-	///     ⚠️ Worth logging LOUDLY when it names a port: the login tier begins advertising the new one immediately,
+	///     Worth logging loudly when it names a port: the login tier begins advertising the new one immediately,
 	///     while a realm host that is already running keeps serving the old one until it is restarted.
 	/// </param>
 	/// <param name="Undeclared">
@@ -22,8 +22,8 @@ namespace Faolan.Core.Database
 
 		/// <summary>Whether there is nothing at all to report - the ordinary result of a restart that changed nothing.</summary>
 		/// <remarks>
-		///     ⚠️ Ask this rather than comparing against <see cref="Nothing" />. A record's generated equality compares
-		///     its members with <c>EqualityComparer&lt;T&gt;.Default</c>, and for an array that is REFERENCE equality -
+		///     Ask this rather than comparing against <see cref="Nothing" />. A record's generated equality compares
+		///     its members with <c>EqualityComparer&lt;T&gt;.Default</c>, and for an array that is reference equality -
 		///     so `result == Nothing` is true only for the singleton itself and silently false for every equally empty
 		///     result the reconciler builds.
 		/// </remarks>

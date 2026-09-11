@@ -8,15 +8,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #803: `NpcSpawnBuilder.WithSpawnAnimation` marks ONE delivery as an entrance - the client's one-shot "play your
-	// spawn-in clip now" trigger (`npc_stats.spawn_animation`, consumed and cleared by `SimpleChar_t` slot 36, #800).
+	// `NpcSpawnBuilder.WithSpawnAnimation` marks one delivery as an entrance - the client's one-shot "play your
+	// spawn-in clip now" trigger (`npc_stats.spawn_animation`, consumed and cleared by `SimpleChar_t` slot 36).
 	//
 	// The sender rule it implements is measured rather than assumed: retail sets the flag when the entity is
 	// (re)created (`--report spawn-animation`'s respawn test - 20 of 35 matched respawns flagged against 8.1 expected
 	// from those same templates' other first-sightings, and 6/6 on the solitary animals where a positional match
 	// cannot pick up a pack-mate). So `BroadcastNpcRespawn` is the one path that passes it.
 	//
-	// ⚠️ The stamp is a re-ENCODE, not a byte patch - the field sits inside the embedded protobuf and setting it moves
+	// The stamp is a re-encode, not a byte patch - the field sits inside the embedded protobuf and setting it moves
 	// lengths at three nesting levels. That is only safe because Parse -> Build is byte-exact, which is exactly what
 	// the second gate here asserts on the shipped bodies: everything except the one field survives the trip.
 	public class SpawnAnimationStampTests
@@ -46,9 +46,9 @@ namespace Faolan.Tests
 				var body = NpcSpawnBuilder.BuildFromType(npc, 0x00ABCDEF, new Vector3(1, 2, 3), Quaternion.Identity, 0x00A0BEEF);
 				var stamped = NpcSpawnBuilder.WithSpawnAnimation(body);
 
-				// ⚠️ The type's OWN state first. Some shipped types already carry `NpcStatCore.SpawnAnimation` (the
-				// imported mode-over-sightings value, #607), so "the flag is absent before the stamp" is false for
-				// them - and restoring what was there is what makes the round-trip below a statement about the STAMP
+				// The type's own state first. Some shipped types already carry `NpcStatCore.SpawnAnimation` (the
+				// imported mode-over-sightings value), so "the flag is absent before the stamp" is false for
+				// them - and restoring what was there is what makes the round-trip below a statement about the stamp
 				// rather than about the type it happened to run on.
 				var before = SimpleCharFullUpdateCodec.Parse(body).Character?.npc_stats;
 				Assert.NotNull(before);
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 				Assert.NotNull(read.Character?.npc_stats);
 				Assert.True(read.Character!.npc_stats!.ShouldSerializeSpawnAnimation(), $"{npc.Name}: the flag was not stamped");
 
-				// Retail never sends 0 - the field is UNSET or 1, a presence flag (#607).
+				// Retail never sends 0 - the field is unset or 1, a presence flag.
 				Assert.Equal(1u, read.Character.npc_stats.SpawnAnimation);
 
 				// ...and nothing else moved: putting the field back as it was reproduces the original bytes exactly.

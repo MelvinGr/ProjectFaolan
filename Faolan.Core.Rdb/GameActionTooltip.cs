@@ -4,26 +4,32 @@ using System.Collections.Generic;
 namespace Faolan.Core.Rdb
 {
 	/// <summary>
-	///     How the client picks the SENTENCE it draws a GameAction element with - the parts that are not simply
-	///     "look LDB 170 up by the type id" (#782).
+	///     How the client picks the sentence it draws a GameAction element with - the parts that are not simply "look
+	///     LDB 170 up by the type id".
 	/// </summary>
 	/// <remarks>
 	///     <para>
-	///         The tooltip builder is <c>FUN_0149e450</c>: a per-type-id switch (an MSVC index-byte + jump-target
+	///         The tooltip builder is <c>FUN_0149e450</c>: a per-type-id switch (an MSVC index-byte plus jump-target
 	///         table pair at <c>0x14a2e90</c>/<c>0x14a2de8</c> over <c>0xCF0A..0xD002</c>, plus a second pair at
-	///         <c>0x14a324c</c>/<c>0x14a323c</c> over <c>0xD013..0xD025</c>). 49 of the 260 registered types reach a
-	///         branch of their own; the other 211 fall to the default and the client draws nothing for them.
+	///         <c>0x14a324c</c>/<c>0x14a323c</c> over <c>0xD013..0xD025</c>). 54 of the 260 registered types reach a
+	///         branch of their own; the other 206 fall to the default and the client draws nothing for them.
 	///     </para>
 	///     <para>
 	///         Each branch fetches its sentence one of three ways, and only the first is the obvious one:
 	///         <list type="number">
-	///             <item><b>by its own type id</b> - <c>MOV EDI,0xaa; CALL FUN_0060f400</c> with the element's type in
-	///             <c>ECX</c>;</item>
-	///             <item><b>by ANOTHER type's id</b> - the same call with a LITERAL <c>MOV ECX,&lt;id&gt;</c> first.
-	///             That is <see cref="SentenceKinds" />, and it is why several very common kinds looked like they had
-	///             no sentence at all;</item>
-	///             <item><b>by a TOKEN NAME</b> - <c>PUSH 0xaa; MOV ESI,&lt;char*&gt;; CALL FUN_0060ec00</c>, keyed
-	///             into the same category by <c>elf28(token)</c> (docs/re/gameaction-tooltip-tokens.tsv).</item>
+	///             <item>
+	///                 by its own type id - <c>MOV EDI,0xaa; CALL FUN_0060f400</c> with the element's type in
+	///                 <c>ECX</c>;
+	///             </item>
+	///             <item>
+	///                 by another type's id - the same call with a literal <c>MOV ECX,&lt;id&gt;</c> first. That is
+	///                 <see cref="SentenceKinds" />, and it is why several very common kinds look like they have no
+	///                 sentence at all;
+	///             </item>
+	///             <item>
+	///                 by a token name - <c>PUSH 0xaa; MOV ESI,&lt;char*&gt;; CALL FUN_0060ec00</c>, keyed into the
+	///                 same category by <c>elf28(token)</c> (<c>docs/re/gameaction-tooltip-tokens.tsv</c>).
+	///             </item>
 	///         </list>
 	///     </para>
 	/// </remarks>
@@ -32,14 +38,14 @@ namespace Faolan.Core.Rdb
 		/// <summary>The LDB category holding one tooltip sentence per GameAction - see the type remarks.</summary>
 		public const uint LdbCategory = 170;
 
-		// Every branch whose first act is `MOV ECX,<literal>; MOV EDI,0xaa; CALL 0x0060f400` - i.e. it draws itself
-		// with ANOTHER type's sentence. Recovered mechanically from the disassembly, not inferred from the names,
-		// which matters because two of them are not name-alike at all (53098/53099 are not `...StatModifier`s).
+		// Every branch whose first act is `MOV ECX,<literal>; MOV EDI,0xaa; CALL 0x0060f400` - it draws itself with
+		// another type's sentence. Recovered mechanically from the disassembly, not inferred from the names, which
+		// matters because two of them are not name-alike at all (53098/53099 are not `...StatModifier`s).
 		private static readonly FrozenDictionary<uint, uint> Aliases = new Dictionary<uint, uint>
 		{
-			// ⭐ The interpolated family draws itself as its FLAT twin, with the ramp already resolved at the
-			// caster's level: `InterpolatedModify` reads 174/175/0, lerps them against stat 0x3C5 (Apprentice
-			// Level), and renders the result through `Modify`'s own `#2%s #1%s` (branch 0x014a12c6).
+			// The interpolated family draws itself as its flat twin, with the ramp already resolved at the caster's
+			// level: `InterpolatedModify` reads 174/175/0, lerps them against stat 0x3C5 (Apprentice Level), and
+			// renders the result through `Modify`'s own `#2%s #1%s` (branch 0x014a12c6).
 			[53220] = 53045, // InterpolatedModify        -> Modify
 			[53221] = 53110, // InterpolatedTempChangeSkill -> TempChangeSkill
 
@@ -68,14 +74,15 @@ namespace Faolan.Core.Rdb
 		public static IReadOnlyDictionary<uint, uint> SentenceKinds => Aliases;
 
 		/// <summary>
-		///     ⭐ The DAMAGE/HEAL renderer `FUN_0149aa30(buf, stat, min, max, flag)`, which is how <c>Hit</c> (53002),
-		///     its twin 53132 and <c>InterpolatedHit</c> (53219) are drawn - NOT through the `%s %s %s` sitting at
-		///     their own type id. It selects one of three token sentences, and the rule is the whole function's head:
+		///     The damage/heal renderer <c>FUN_0149aa30(buf, stat, min, max, flag)</c>, which is how <c>Hit</c>
+		///     (53002), its twin 53132 and <c>InterpolatedHit</c> (53219) are drawn - not through the
+		///     <c>%s %s %s</c> sitting at their own type id. It selects one of three token sentences, and the rule is
+		///     the whole function's head:
 		///     <code>
 		///     if (stat == 0x1B Health)  return min &lt; 0 ? DamageHealth : HealHealth;
 		///     else                      return DamageOtherStat;
 		///     </code>
-		///     The value slot is the RANGE `min-max` (built by <c>FUN_0149a700</c>), which is why these carry two
+		///     The value slot is the range <c>min-max</c> (built by <c>FUN_0149a700</c>), which is why these carry two
 		///     magnitudes where every other modifier carries one.
 		/// </summary>
 		public static string HitSentenceToken(uint statId, int minValue)
@@ -101,13 +108,13 @@ namespace Faolan.Core.Rdb
 		}.ToFrozenSet();
 
 		/// <summary>
-		///     Whether the client's tooltip builder has a BRANCH for this kind at all.
+		///     Whether the client's tooltip builder has a branch for this kind at all.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ False is an ANSWER, not a gap: 206 of the 260 registered types fall to the switch's default, and the
-		///     client draws nothing for them. `DPSHit` (53013) is the big one - 2,660 elements in the spell catalog
-		///     and no tooltip line anywhere in retail. Counting those as "sentence missing" reads as decode debt when
-		///     it is the client's own behaviour (#782).
+		///     False is an answer, not a gap: 206 of the 260 registered types fall to the switch's default, and the
+		///     client draws nothing for them. <c>DPSHit</c> (53013) is the big one - 2,660 elements in the spell
+		///     catalog and no tooltip line anywhere in retail. Counting those as "sentence missing" reads as decode
+		///     debt when it is the client's own behaviour.
 		/// </remarks>
 		public static bool HasTooltipBranch(uint kind)
 		{
@@ -115,29 +122,28 @@ namespace Faolan.Core.Rdb
 		}
 
 		/// <summary>
-		///     Why a kind that DOES have a branch still has no category-170 sentence to find - or null when its
+		///     Why a kind that does have a branch still has no category-170 sentence to find - or null when its
 		///     absence is genuinely unexplained and so still decode debt.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ A third bucket, and it exists for the same reason <see cref="HasTooltipBranch" /> does: "we could
-		///     not find a sentence" and "there is provably no sentence to find" read identically in a census and are
-		///     opposite facts. Both entries below are PROVEN, not assumed, and each is proven by something outside
-		///     the LDB lookup that failed:
+		///     A third bucket, and it exists for the same reason <see cref="HasTooltipBranch" /> does: "we could not
+		///     find a sentence" and "there is provably no sentence to find" read identically in a census and are
+		///     opposite facts. Both entries below are proven, and each is proven by something outside the LDB lookup
+		///     that failed:
 		///     <list type="bullet">
 		///         <item>
-		///             <b>53019 <c>Spell</c> / 53061 <c>BCCCastSpell</c></b> - their branches push category
-		///             <c>0x64</c> = <b>100</b>, not the <c>0xaa</c> = 170 every sentence-fetching branch pushes, and
-		///             the tokens resolve in 100 as plain label NOUNS ("Spell", "Combo", "Ability", ...). They draw a
-		///             LABEL, so there is no 170 sentence by construction
-		///             (docs/re/gameaction-tooltip-tokens.tsv's header carries the same proof).
+		///             53019 <c>Spell</c> / 53061 <c>BCCCastSpell</c> - their branches push category <c>0x64</c> =
+		///             100, not the <c>0xaa</c> = 170 every sentence-fetching branch pushes, and the tokens resolve in
+		///             100 as plain label nouns ("Spell", "Combo", "Ability", ...). They draw a label, so there is no
+		///             170 sentence by construction (<c>docs/re/gameaction-tooltip-tokens.tsv</c>'s header carries the
+		///             same proof).
 		///         </item>
 		///         <item>
-		///             <b>53170 <c>InheritedComboAttack</c></b> - its single token IS a 170 entry (<c>PerSecond</c>,
-		///             "%s per second"), but the <c>%s</c> is a number the record does not contain: branch
-		///             <c>0x014a103e</c> computes it as <c>key224 x 0.01 x [ESI] / [EBX]</c>, two floats that come
-		///             from the INVOCATION context rather than the element (the same wall #271 hit on recast). So the
-		///             sentence is found and cannot be filled from a template - rendering it would be inventing a
-		///             number.
+		///             53170 <c>InheritedComboAttack</c> - its single token is a 170 entry (<c>PerSecond</c>, "%s per
+		///             second"), but the <c>%s</c> is a number the record does not contain: branch <c>0x014a103e</c>
+		///             computes it as <c>key224 x 0.01 x [ESI] / [EBX]</c>, two floats that come from the invocation
+		///             context rather than the element. So the sentence is found and cannot be filled from a template
+		///             - rendering it would be inventing a number.
 		///         </item>
 		///     </list>
 		/// </remarks>

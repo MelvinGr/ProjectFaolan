@@ -4,10 +4,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gates for the vendor trade-OPEN reply pair (#134), against the NecroL80
+	// Byte-exact gates for the vendor trade-open reply pair, against the NecroL80
 	// sell_items_to_trader-intract-with-auctionhouse capture: the client's TalkToNpc Interact at the vendor
 	// (frame 1188, player 0x08006F31 -> vendor 0x000439AD) is answered by the 0x0D155695 trade-select echo
-	// (frame 1189) and the BARE BCC echo-ack (frame 1193 first record - the standard behavior echo without
+	// (frame 1189) and the bare BCC echo-ack (frame 1193 first record - the standard behavior echo without
 	// the combat ack's 12-zero pad), then DispatchShopData (already covered by ShopTests).
 	public class ShopOpenReplyTests
 	{
@@ -25,8 +25,8 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
-		// The trade-select echo is a plain LookAtIIR select - it had its own emitter (`ShopOpenBuilder`) under the same
-		// opcode until #530 wave 7 merged it into LookAtCodec, one IIR one codec.
+		// The trade-select echo is a plain LookAtIIR select, built by LookAtCodec rather than by an emitter of its own
+		// under the same opcode - one IIR, one codec.
 		[Fact]
 		public void TradeSelectEcho_IsByteIdenticalToFrame1189()
 		{

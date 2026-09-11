@@ -5,17 +5,18 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// SpellBookIIR (0x6BA10936). ReadSubClass (FUN_00795ba0) triggers a spellbook refresh on the carrier handle; the
-	// body carries a COUNT-FRAMED list whose elements the reader does not consume - so the wire word is
-	// (count + 1) * 0x3F1 and an empty book is 0x3F1, not a constant. Grammar from the client reader
-	// (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     SpellBookIIR - the client reader (FUN_00795ba0) triggers a spellbook refresh on the carrier handle. The body
+	///     carries a count-framed list whose elements the reader does not consume, so the trailing word is a
+	///     <see cref="ListFrame" /> count and an empty book is the empty-list frame rather than a constant. Grammar from the
+	///     client reader; see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class SpellBookCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SpellBookIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SpellBookIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -52,6 +53,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// SpellBookIIR (0x6BA10936).
+	/// <summary>The SpellBookIIR body.</summary>
 	public sealed record SpellBookIIR(uint Handle, byte Env, int Count);
 }

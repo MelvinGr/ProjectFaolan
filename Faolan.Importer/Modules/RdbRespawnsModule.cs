@@ -8,8 +8,13 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Resurrection points; on-demand records fetched from the CDN. Under --dry-run the CDN blob archive
-	// (--store) is suppressed (an out-of-DB write the transaction rollback can't undo).
+	/// <summary>
+	///     Resurrection points; on-demand records fetched from the CDN.
+	/// </summary>
+	/// <remarks>
+	///     Under --dry-run the CDN blob archive (--store) is suppressed: an out-of-DB write the transaction rollback
+	///     cannot undo.
+	/// </remarks>
 	public sealed class RdbRespawnsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

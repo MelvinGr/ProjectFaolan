@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gate for the 0x2018 DispatchResurrectRequest body (#890) - the resurrect OFFER.
+	// Byte-exact gate for the 0x2018 DispatchResurrectRequest body - the resurrect offer.
 	//
 	// The oracle is the only one that exists: `NecroL80_..._annotated_9` frame 6467, the instant the player used a
 	// Self-Resurrection Potion. One packet in a 137-capture corpus, so every field name below is the client's rather
@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		{
 			var value = ResurrectRequestCodec.Parse(Convert.FromHexString(CapturedBody));
 
-			// A SELF-resurrection: the resurrector is the player, which is what the potion is for.
+			// A self-resurrection: the resurrector is the player, which is what the potion is for.
 			Assert.Equal(0x0802E5D4u, value.ResurrectorId);
 			Assert.Equal(0x0049DDF7u, value.SpellTemplate);
 			Assert.True(value.CastSpellOnResurrect);

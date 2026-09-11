@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// NPC death -> respawn lifecycle in the world model (Gitea #404): combat applies damage
+	// NPC death -> respawn lifecycle in the world model: combat applies damage
 	// to the NPC's world-entity vitals; on death the tick counts down a respawn delay and revives it at its spawn point.
 	public class NpcLifecycleTests
 	{
@@ -18,9 +18,9 @@ namespace Faolan.Tests
 			Assert.False(npc.TickRespawn(100.0));
 		}
 
-		// The retail corpse sequence (WorldEntity.CorpseFadeSeconds): the loot bag drops on the KILL, and the body is
-		// torn down half a minute later. The ordering is the point - we used to do it backwards, holding the bag for 3s
-		// and despawning the corpse to make room for it.
+		// The retail corpse sequence (WorldEntity.CorpseFadeSeconds): the loot bag drops on the kill, and the body is
+		// torn down half a minute later. The ordering is the point: holding the bag for 3s and despawning the corpse to
+		// make room for it is backwards.
 		[Fact]
 		public void TickCorpse_DropsLootAtOnceThenFadesTheBodyMuchLater()
 		{
@@ -150,7 +150,7 @@ namespace Faolan.Tests
 			});
 
 			// Neither a living NPC nor a player produces a lifecycle effect. Nothing to filter: the living NPC here
-			// carries no ambient animations, so the tick is genuinely silent for it (#225/#766).
+			// carries no ambient animations, so the tick is genuinely silent for it.
 			Assert.Empty(world.Tick(100.0));
 		}
 

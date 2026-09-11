@@ -6,13 +6,13 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report frame-health`: how many captured frames our own strict `Rpc.Parse` REFUSES, and which methods they
-	// are on.
+	// `--report frame-health`: how many captured frames the strict `Rpc.Parse` refuses, and which methods they are
+	// on.
 	//
 	// `Rpc.Parse` is deliberately strict - an unexpected tag throws, so a desynced stream is caught at the frame
-	// boundary instead of three subsystems later (#610). That strictness is only trustworthy if we know what it
+	// boundary instead of three subsystems later. That strictness is only trustworthy if we know what it
 	// currently rejects: a refusal is either a frame we misread or a frame the dump mangled, and the two want
-	// opposite fixes. `RpcHeaderTests` asserts the same property over the FIXTURE ARCHIVE, which is a slice; this is
+	// opposite fixes. `RpcHeaderTests` asserts the same property over the fixture archive, which is a slice; this is
 	// the whole corpus, and the difference between the two populations is the point.
 	//
 	// A method that appears here is a method `--report method-bodies` cannot show, so the count is also the

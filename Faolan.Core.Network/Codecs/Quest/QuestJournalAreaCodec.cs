@@ -4,27 +4,36 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// ONE AREA's block of the J-panel journal - the area header plus its quest lines. Composed by QuestJournalCodec,
-	// which carries the first block inline and then a (so far always empty) LIST of further ones; never sent alone.
-	//
-	// Wire (client `FUN_00922c90`, the element reader `FUN_00798c70`'s list is built from):
-	//   [u32 areaId][string areaTitle][string mapName][string regionName]
-	//   [u32 acgHash][u32 trailerFlag][u32 count]
-	//   count x [u32 ordinal][u32 questId][ListFrame'd list of strings]
-	//
-	// ⚠️ `AcgHash` is NOT a magic. `FUN_005d7190` reads it as the client's **ACGHash** type: a u32 whose four bytes
-	// must each be `[0-9A-Z_]`, and which logs `Read invalid hash "..." from stream` on anything else. It is a per-AREA
-	// token - area 1054 is "RRL3", 241 is "W6QT", 1834 is "3734", 1772 is "B0DN", stable across every character and
-	// capture - so pinning it to "RRL3" (the value the first decoded capture happened to carry) rejected 31 of the 38
-	// captured journals (#544). The same token is what QuestDefinition.IndexMagic stores for the quest index.
+	/// <summary>
+	///     One area's block of the J-panel journal: the area header plus its quest lines. Composed by
+	///     <see cref="QuestJournalCodec" />, which carries the first block inline and then a list of further ones, so it is
+	///     never sent alone.
+	/// </summary>
+	/// <remarks>
+	///     Wire, from the client's FUN_00922c90 (the element the list reader FUN_00798c70 builds from):
+	///     <code>
+	///     [u32 areaId][string areaTitle][string mapName][string regionName]
+	///     [u32 acgHash][u32 trailerFlag][u32 count]
+	///     count x [u32 ordinal][u32 questId][ListFrame'd list of strings]
+	///     </code>
+	///     <para>
+	///         <c>AcgHash</c> is a per-area token, not a magic constant: FUN_005d7190 reads it as the client's ACGHash type,
+	///         a u32 whose four bytes must each be [0-9A-Z_], logging <c>Read invalid hash "..." from stream</c> on anything
+	///         else. Area 1054 is "RRL3", 241 "W6QT", 1834 "3734", 1772 "B0DN", stable across every character and capture, so
+	///         pinning it to one value rejects most captured journals. The same token is what QuestDefinition.IndexMagic
+	///         stores for the quest index.
+	///     </para>
+	/// </remarks>
 	public static class QuestJournalAreaCodec
 	{
-		// The entry's text list: the title (category 50301) and the J-panel sub-line (category 50303). Two on every
-		// captured entry, which is why the frame word 0xBD3 read as a "ChapterTag" until the client showed it framing
-		// THIS list.
+		/// <summary>
+		///     The entry's text list: the title (category 50301) and the J-panel sub-line (category 50303). Two on every
+		///     captured entry, so the frame word ahead of them is constant in the corpus and reads as a tag until the client's
+		///     reader shows it framing this list.
+		/// </summary>
 		private const int EntryTextStrings = 2;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestJournalArea value)
 		{
 			using var s = new FaolanStream();
@@ -88,16 +97,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < v.Entries.Count; i++)
 			{
 				var e = v.Entries[i];
-				// The ordinal is 1-based and sequential in every captured journal, but it is a FIELD the client reads
-				// back, not a loop index - so it round-trips from the value rather than being regenerated here.
+				// The ordinal is 1-based and sequential in every captured journal, but it is a field the client reads
+				// back rather than a loop index, so it round-trips from the value instead of being regenerated here.
 				s.WriteUInt32(e.Ordinal == 0 ? (uint)(i + 1) : e.Ordinal);
 				s.WriteUInt32(e.QuestId);
 				WriteStringList(s, [e.Title, e.SubLine]);
 			}
 		}
 
-		// A list of strings framed the client's way (`FUN_004d55b0`): a SINGLE `(count + 1) * 0x3F1` word, then the
-		// strings. No separate count word - unlike the record lists, which carry both.
+		/// <summary>
+		///     A list of strings framed the client's way (FUN_004d55b0): a single <see cref="ListFrame" /> word, then the
+		///     strings. There is no separate count word, unlike the record lists, which carry both.
+		/// </summary>
 		internal static List<string> ReadStringList(ref SpanReader r)
 		{
 			var count = r.ReadListCount();
@@ -116,7 +127,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// One area's block of the journal: the shared header plus that area's quest lines.
+	/// <summary>One area's block of the journal: the shared header plus that area's quest lines.</summary>
 	public sealed record QuestJournalArea(
 		uint QuestLineId,
 		string QuestLineTitle, // <remoteformat category=50300>
@@ -124,32 +135,42 @@ namespace Faolan.Core.Network.Codecs.Quest
 		string RegionName, // <remoteformat category=52000>
 		IReadOnlyList<QuestJournalEntry> Entries)
 	{
-		// The area's ACGHash token - see the codec note. Carried per area rather than written as a literal.
+		/// <summary>The area's ACGHash token, carried per area rather than written as a literal.</summary>
 		public uint AcgHash { get; init; }
 
-		// The line's flag - `QuestLine.TrailerFlag`, the same word the quest index block carries as TrailerC
-		// (`MainQuest_c +0x50`) and the completed journal's line record after its 4CC. This block IS that record:
-		// `FUN_00922c90` is one reader with two callers, the FullChar completed journal (through the list reader
-		// `FUN_00798c70`) and `QuestJournalIIR_c::ReadSubClass` (`FUN_0091a4e0`, the first area at IIR+0x2c and the
-		// further-area list through the same `FUN_00798c70` at +0xa0), and it stores the word at +0x6c of the 0x70-byte
-		// record either way (#929). 0 on all 49 captured journal area blocks because every one is on a line whose
-		// flag is 0 (241/386/1054/1772/1834), which is what a per-line flag predicts; the six flagged lines are all
-		// raid / world-boss / seasonal / Onslaught content no captured journal reaches.
-		//
-		// No reader anywhere in the client: a MergeType-1 journal STAMPS the incoming value onto every held record
-		// (JournalHolder_c::UpdateQuestEntryList, before the area-id match), and that is the only code that touches
-		// the slot after the reader - the journal window band (243 functions), the QJ node / tracker band (604), the
-		// holder's per-record helpers, the completed-area panel and the completed-tab tree builder all read the
-		// record's strings, hash and quest list and skip +0x6c, and `MainQuest_c::WriteToStream` (the one serializer
-		// of the +0x50 twin) has no caller and sits in no vtable. Carried so a line reproduces its captured block.
+		/// <summary>
+		///     The line's flag - QuestLine.TrailerFlag, the same word the quest index block carries as TrailerC (MainQuest_c
+		///     +0x50) and the completed journal's line record carries after its 4CC.
+		/// </summary>
+		/// <remarks>
+		///     This block is that record: FUN_00922c90 is one reader with two callers - the FullChar completed journal,
+		///     through the list reader FUN_00798c70, and QuestJournalIIR_c::ReadSubClass (FUN_0091a4e0, the first area at
+		///     IIR+0x2c and the further-area list through the same FUN_00798c70 at +0xa0) - and it stores the word at +0x6c
+		///     of the 0x70-byte record either way. It is 0 on all 49 captured journal area blocks because every one is on a
+		///     line whose flag is 0 (241, 386, 1054, 1772, 1834), which is what a per-line flag predicts; the six flagged
+		///     lines are raid, world-boss, seasonal and Onslaught content no captured journal reaches.
+		///     <para>
+		///         Nothing in the client reads it. A MergeType-1 journal stamps the incoming value onto every held record
+		///         (JournalHolder_c::UpdateQuestEntryList, before the area-id match), and that is the only code that touches
+		///         the slot after the reader: the journal window band (243 functions), the QJ node and tracker band (604), the
+		///         holder's per-record helpers, the completed-area panel and the completed-tab tree builder all read the
+		///         record's strings, hash and quest list and skip +0x6c, and MainQuest_c::WriteToStream - the one serializer
+		///         of the +0x50 twin - has no caller and sits in no vtable. It is carried so a line reproduces its captured
+		///         block.
+		///     </para>
+		/// </remarks>
 		public uint TrailerFlag { get; init; }
 	}
 
-	// One line in the journal list: the quest id plus its title (cat 50301) and list sub-line (cat 50303).
+	/// <summary>
+	///     One line in the journal list: the quest id plus its title (category 50301) and list sub-line (category 50303).
+	/// </summary>
 	public sealed record QuestJournalEntry(uint QuestId, string Title, string SubLine)
 	{
-		// The entry's 1-based position in its area block. 0 means "let the writer number it" - the factory path builds
-		// entries in order and does not care, while a parsed entry round-trips whatever the wire said.
+		/// <summary>
+		///     The entry's 1-based position in its area block. Zero means "let the writer number it": the factory path builds
+		///     entries in order and does not care, while a parsed entry round-trips whatever the wire said.
+		/// </summary>
 		public uint Ordinal { get; init; }
 	}
 }

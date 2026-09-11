@@ -7,22 +7,16 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// The world-object / dynel FULL UPDATE body, for every object class that carries one (#187): SimpleDynel
-	// (0x66AEDD50), LootBag (0xF096251E), Door (0x33A56FB0), Destructible (0x6BD56736), ClimbingDynel (0x1FD6412B)
-	// and TombStone (0x0D80E7C9). One FAMILY, one grammar (#530 rule 5a):
+	// The world-object / dynel full-update body, for every object class that carries one: SimpleDynel, LootBag, Door,
+	// Destructible, ClimbingDynel and TombStone. One family, one grammar:
 	//
 	//   [u32 subOpcode][u32 typeTag][u32 handle][u8 env][u32 transformLen][transform][ tail ]
 	//
 	// The transform is the base-class ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }; the tail
 	// is the identity message (SimpleDynelIdentityCodec) followed by the geometry record and, for a container, its
-	// loot contents. The u32 body length that precedes all of this belongs to the SENDER (#530 rule 2).
+	// loot contents. The u32 body length that precedes all of this belongs to the sender.
 	//
-	// This MERGES two emitters of the same six IIRs: WorldObjectBuilder (which built the body from a WorldObject row's
-	// typed columns) and DynelFullUpdateCodec (which parsed/rebuilt the same body with the blobs opaque). They wrote
-	// the same bytes through different framings - the builder's `[u32 fieldA=0][u8 0x2C]` is the codec's
-	// `[u8 env=0][u32 transformLen=44]`, the same five bytes read two ways - which is exactly the duplicate the
-	// one-IIR-one-codec rule exists to surface. Byte-identical to the captured body (WorldObjectBuilderTests,
-	// DynelFullUpdateCodecTests).
+	// Byte-identical to the captured body (WorldObjectBuilderTests, DynelFullUpdateCodecTests).
 	public static class WorldObjectCodec
 	{
 		public static readonly IirTypes[] HandledTypes =
@@ -31,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.World
 			IirTypes.DestructibleFullUpdateIIR, IirTypes.ClimbingDynelFullUpdateIIR, IirTypes.TombStoneFullUpdateIIR
 		];
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(WorldObjectIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -40,22 +34,31 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// Builds a world-object body from the row's TYPED COLUMNS (the retired `Data` blob is no longer read),
-		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
-		// THROWS when the row isn't lifted (no display element) - an un-lifted / partially-imported row, not a normal
-		// outcome.
-		// `isClosed` is the object's LIVE door state (#598) - it has no column, defaults to closed, and the loaded
-		// zone passes its own LiveWorldObject.IsClosed so a door the player opened stays open. `currentHealth` is the
-		// same idea for a destructible's health bar (#498): null writes the captured word, which is what the
-		// round-trip and import paths want.
+		/// <summary>
+		///     Builds a world-object body from the row's typed columns, stamped with the live
+		///     <paramref name="playfieldInstance" /> token. This is the sole burst-less / create-editor object path.
+		/// </summary>
+		/// <param name="isClosed">
+		///     The object's live door state. It has no column and defaults to closed; the loaded zone passes its own
+		///     LiveWorldObject.IsClosed so a door the player opened stays open.
+		/// </param>
+		/// <param name="currentHealth">
+		///     The same idea for a destructible's health bar: null writes the captured word, which is what the round-trip
+		///     and import paths want.
+		/// </param>
+		/// <exception cref="InvalidOperationException">
+		///     The row is not lifted (it has no display element), i.e. it was only partially imported.
+		/// </exception>
 		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance = 0, bool isClosed = true, uint? currentHealth = null)
 		{
 			ArgumentNullException.ThrowIfNull(row);
 			return Build(row, handle, row.Position, row.Rotation, WorldObjectColumns.TypeTagForClass(row.SubOpcode), playfieldInstance, isClosed, currentHealth);
 		}
 
-		// As above but with the transform supplied explicitly - how a loot bag is spawned at a live drop position with
-		// no captured world-object row behind it (LootContainerTemplate).
+		/// <summary>
+		///     As above but with the transform supplied explicitly - how a loot bag is spawned at a live drop position
+		///     with no captured world-object row behind it (LootContainerTemplate).
+		/// </summary>
 		public static byte[] Build(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, bool isClosed = true,
 			uint? currentHealth = null)
 		{
@@ -82,9 +85,9 @@ namespace Faolan.Core.Network.Codecs.World
 			var env = r.ReadU8();
 			var transform = r.ReadBytesU32Length().ToArray();
 
-			// The tail - identity message, geometry record and (for a container) the loot contents - is carried
-			// verbatim here. Its sub-records have their own codecs; which of them a body holds is the object CLASS's
-			// business, and WorldObjectColumns is what splits it.
+			// The tail - identity message, geometry record and (for a container) the loot contents - is carried verbatim
+			// here. Its sub-records have their own codecs; which of them a body holds is the object class's business, and
+			// WorldObjectColumns is what splits it.
 			return new WorldObjectIIR((uint)subOpcode, typeTag, handle, env, transform, r.ReadRemaining().ToArray());
 		}
 
@@ -93,8 +96,8 @@ namespace Faolan.Core.Network.Codecs.World
 			s.WriteUInt32(v.SubOpcode).WriteUInt32(v.TypeTag).WriteUInt32(v.Handle).WriteByte(v.Env).WriteArrayUInt32Length(v.Transform).WriteArray(v.Tail);
 		}
 
-		// The row -> value mapping the delegating Build overloads use. Stays private (and #533-shaped) rather than
-		// becoming a second encoder.
+		// The row -> value mapping the delegating Build overloads use. Stays private rather than becoming a second
+		// encoder.
 		private static WorldObjectIIR ToIir(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, bool isClosed,
 			uint? currentHealth)
 		{
@@ -104,8 +107,8 @@ namespace Faolan.Core.Network.Codecs.World
 
 			// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
 			// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
-			// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
-			// already 4 bytes, so SpawnTransformPatch's splice-free in-place re-address still holds.
+			// captured playfield token falls in [2^21, 2^28) - where the minimal varint protobuf-net writes is already
+			// 4 bytes, so SpawnTransformPatch's splice-free in-place re-address still holds.
 			var transform = new ProtoGameCodeDynelIIR
 			{
 				Position = position,
@@ -114,11 +117,11 @@ namespace Faolan.Core.Network.Codecs.World
 			}.ToProtobuf();
 
 			var identity = SimpleDynelIdentityCodec.Build(WorldObjectColumns.ToMessage(row, isClosed));
-			var geometry = WorldObjectGeometryColumns.ToWire(row, currentHealth); // the bounds record + per-class trailer (#410)
+			var geometry = WorldObjectGeometryColumns.ToWire(row, currentHealth); // the bounds record plus the per-class trailer
 
-			// A container's trailer is its loot CONTENTS, and the captured contents are not persisted (session state,
-			// #410) - every chest spawns with the same clean empty scaffold a dropped bag gets, and WithLootContents
-			// splices the live cash + items per drop.
+			// A container's trailer is its loot contents, which are session state and are not persisted: every chest
+			// spawns with the same clean empty scaffold a dropped bag gets, and WithLootContents splices the live cash and
+			// items per drop.
 			var contents = row.SubOpcode == (uint)IirTypes.LootBagFullUpdateIIR
 				? LootContainerTemplate.BuildEmptyContents()
 				: [];

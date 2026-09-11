@@ -6,38 +6,39 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// QuestRewardNotifyIIR_c (0x8BB2799C) - the server half of the pick-one-of-N quest reward exchange (#815), decoded
-	// byte-exact from xxx_mage-necromancer_login_play3, quest 10928 "The Trainer of Mages" (frames 2864 and 2911).
-	//
-	// The OFFER and the CONFIRM are ONE grammar, not two: the option count word says which you are holding, exactly the
-	// way the n3Teleport spawn blob's length does. An offer carries its options; the confirm carries none and echoes
-	// the chosen index in the trailing block.
-	//
-	//   [u32 sub][u32 0xC350 Character][u32 clientInstance][u8 env]
-	//   [u32 quest][u32 0][u32 count][count x QuestRewardEntry]
-	//   [u32 t0][u32 t1][u32 t2][u32 t3][u32 t4]
-	//
-	// ⚠️ The five trailing words are NOT decoded and are carried verbatim [V0]. The offer sent (1,0,0,1,1) and the
-	// confirm (0,0,0,2,0) - and 2 is the index the player picked, so t3 is *probably* the selection echo. That is one
-	// observation of each message, so the codec preserves the block rather than modelling it; naming t3 "SelectedIndex"
-	// off a single pair where the other value happens to be 1 would be inventing a field. What IS established is the
-	// exchange, because the grant confirms it end to end:
-	//
-	//   329.0 f2864 s OFFER   quest 10928, 3 options: 27655 Dagger / 3145335 Longsword / 3394679 Staff
-	//   335.8 f2910 c PICK    quest 10928, index 2                      (QuestRewardSelectionCodec)
-	//   336.1 f2911 s CONFIRM quest 10928, no options, trailing t3 = 2
-	//   336.1 f2911 s DispatchAddItem  slot 13, template 3394679 = "Acolyte's Staff"
-	//
-	// so the index is 0-BASED into the offered list. The offer arrives inside the quest-completion burst
-	// ({resolvegoal} -> QuestGoalIIR -> QuestIIR state 4), not on a separate turn-in.
+	/// <summary>
+	///     QuestRewardNotifyIIR_c - the server half of the pick-one-of-N quest reward exchange. Decoded byte-exact from
+	///     xxx_mage-necromancer_login_play3, quest 10928 "The Trainer of Mages" (frames 2864 and 2911).
+	/// </summary>
+	/// <remarks>
+	///     The offer and the confirm are one grammar: the option count word says which of the two you are holding. An offer
+	///     carries its options; the confirm carries none and echoes the chosen index in the trailing block.
+	///     <code>
+	///     [u32 sub][u32 class][u32 clientInstance][u8 env]
+	///     [u32 quest][u32 0][u32 count][count x QuestRewardEntry]
+	///     [u32 t0][u32 t1][u32 t2][u32 t3][u32 t4]
+	///     </code>
+	///     <para>
+	///         The five trailing words are not decoded and are carried verbatim. The offer sent (1,0,0,1,1) and the confirm
+	///         (0,0,0,2,0), where 2 is the index the player picked, so t3 is probably the selection echo - but that is one
+	///         observation of each message, so the codec preserves the block rather than modelling it. [V0]
+	///     </para>
+	///     <para>
+	///         The exchange itself is established end to end by the grant that follows it: an offer of three options at
+	///         f2864, the client's pick of index 2 at f2910 (<see cref="QuestRewardSelectionCodec" />), a confirm with no
+	///         options and trailing t3 of 2 at f2911, and in the same frame a DispatchAddItem of template 3394679
+	///         "Acolyte's Staff", the third option. The index is therefore 0-based into the offered list. The offer arrives
+	///         inside the quest-completion burst rather than on a separate turn-in.
+	///     </para>
+	/// </remarks>
 	public static class QuestRewardNotifyCodec
 	{
 		public const uint Opcode = (uint)IirTypes.QuestRewardNotifyIIR;
 
-		// The five undecoded trailing words an OFFER carries; see the type comment.
+		/// <summary>The five undecoded trailing words an offer carries.</summary>
 		public static readonly uint[] OfferTrailing = [1, 0, 0, 1, 1];
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(QuestRewardNotifyIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -124,8 +125,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// QuestRewardNotifyIIR_c - the reward offer (Options non-empty) or its confirm (Options empty). Trailing is the
-	// five-word block the codec carries verbatim; see QuestRewardNotifyCodec for what is and is not known about it.
+	/// <summary>
+	///     The QuestRewardNotifyIIR body: the reward offer when Options is non-empty, its confirm when empty. Trailing is
+	///     the five-word block the codec carries verbatim; see <see cref="QuestRewardNotifyCodec" />.
+	/// </summary>
 	public sealed record QuestRewardNotifyIIR(uint ClientInstance, byte Env, uint QuestId, IReadOnlyList<QuestRewardEntry> Options, IReadOnlyList<uint> Trailing)
 	{
 		public const int TrailingWords = 5;

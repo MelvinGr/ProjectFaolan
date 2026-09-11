@@ -16,9 +16,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (NpcTemplate.Data)
-	// so a pet-summon spell spawns it FROM THE TYPE (no world placement). Opt-in like mounts; run against a pet-summon
-	// capture, e.g. `--only pets`.
+	/// <summary>
+	///     Summonable pet creatures: lifts each pet's captured FA015807 stat core onto its creature type
+	///     (NpcTemplate.Data) so a pet-summon spell spawns it from the type, with no world placement. Opt-in like
+	///     mounts; run against a pet-summon capture with `--only pets`.
+	/// </summary>
 	public sealed class PetsModule : IImportModule
 	{
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.

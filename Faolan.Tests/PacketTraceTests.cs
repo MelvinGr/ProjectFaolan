@@ -12,11 +12,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The packet TRACE (Gitea #406 phase 6): one tracer per channel, rendering BOTH directions.
+	// The packet trace: one tracer per channel, rendering both directions.
 	//
-	// Two things are pinned here. (1) A rendered line carries the frame's REAL fields, checked against an INDEPENDENT
-	// parse of the serialized bytes - the TX path renders straight from the Rpc (no re-parse), so a wrong field
-	// extraction has to fail against something other than itself. (2) RX and TX of the same frame render IDENTICALLY
+	// Two things are pinned here. (1) A rendered line carries the frame's real fields, checked against an independent
+	// parse of the serialized bytes - the tx path renders straight from the Rpc (no re-parse), so a wrong field
+	// extraction has to fail against something other than itself. (2) rx and tx of the same frame render identically
 	// apart from the direction tag: same name, same lengths, same byte dump - which is what "unified" has to mean, and
 	// is only true because both directions go through ConanPacketTracer.Trace. Most cases run through the GameServer
 	// tracer, the one tier that renders the extra IIR sub-opcode on top of that shared line.
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		private static readonly ProtoEndpoint Receiver = Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, 0x0012D687);
 		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
-		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of method 0: on every other
+		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, not of method 0: on every other
 		// RPC class method 0 is a different method whose body would be misread as an [payloadLength][iir] header.
 		[Fact]
 		public void Method0_OnAnotherClass_IsNotReadAsAnIirCarrier()
@@ -43,8 +43,8 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("subOpcode=", line);
 		}
 
-		// A PassBlob carrier names the IIR it carries - in BOTH directions. The inbound trace used to drop it, so an
-		// inbound method 0 read as a bare "PassBlob" with no hint of which IIR the client had sent.
+		// A PassBlob carrier names the IIR it carries - in both directions. Dropping it inbound leaves an inbound
+		// method 0 reading as a bare "PassBlob" with no hint of which IIR the client sent.
 		[Fact]
 		public void PassBlobCarrier_NamesItsIir_InBothDirections()
 		{
@@ -82,9 +82,9 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("subOpcode=", line);
 		}
 
-		// THE unification gate: the same frame traced in both directions differs only by its direction tag. Naming,
+		// The unification gate: the same frame traced in both directions differs only by its direction tag. Naming,
 		// sub-opcode handling, lengths and the byte dump all come from the one render, so they cannot drift per
-		// direction (they used to: RX named through a different call path and dumped no headerData at all).
+		// direction, as they would if Rx named through a call path of its own.
 		[Theory, MemberData(nameof(Cases))]
 		public void ReceivedAndTransmitted_RenderTheSameLineApartFromTheDirectionTag(Rpc rpc)
 		{
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 				var tracer = Tracer(capture);
 
 				var wire = rpc.Serialize();
-				var inbound = Rpc.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
+				var inbound = Rpc.Parse(wire); // an rx-shaped Rpc: FrameLength stamped by the parser
 
 				tracer.Transmitted(Sent(rpc, wire));
 				tracer.Received(in inbound);
@@ -122,9 +122,9 @@ namespace Faolan.Tests
 
 				// The rendered line must carry the frame's real fields (its identity, lengths, the body hex), each read
 				// from the independently-parsed packet - never from the Rpc the render used. The identity is always the
-				// METHOD (#615): before it, the two hash-registered classes had to be special-cased because the opcode
+				// method: before it, the two hash-registered classes had to be special-cased because the opcode
 				// view carries only 7 of a 32-bit constant's bits and would name the wrong one of a colliding pair
-				// (#608/#610), while every other class rendered the opcode.
+				//, while every other class rendered the opcode.
 				var identity = parsed.Method.ToHex();
 				Assert.Contains(identity, line);
 				Assert.Contains($"bodyLength={parsed.Body.Length}", line);
@@ -151,7 +151,7 @@ namespace Faolan.Tests
 			];
 
 			// A frame on the hash-registered pair, whose method needs five varint groups and whose opcode names it only
-			// partly - the line has to come off the METHOD there, not the opcode (#608/#610).
+			// partly - the line has to come off the method there, not the opcode.
 			yield return
 			[
 				new Rpc(Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02), Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01), PlayerInterfaceMethods.AuthenticateAck,
@@ -163,7 +163,7 @@ namespace Faolan.Tests
 		}
 
 		// What the transport hands the tracer for a send: the built Rpc with the serialized frame's size stamped on it
-		// (NetworkClient.SendAsync does exactly this), so a TX line reads its whole shape off the message like an RX one.
+		// (NetworkClient.SendAsync does exactly this), so a tx line reads its whole shape off the message like an rx one.
 		private static Rpc Sent(Rpc rpc, byte[] wire)
 		{
 			return rpc with

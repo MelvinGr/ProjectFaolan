@@ -5,23 +5,27 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerAgent.UpdateCharacterSettings(ID32 nCharacter, const IOBuffer& data, const String& md5) - the PER-CHARACTER
-	// half of the settings upload, sent on the same mid-session socket as UpdateSubscriptionSettings. Gitea #611.
-	//
-	//   [u32 0xC350 (character class)][u32 characterId][ClientSettingsBuffer][u16 length][md5, LATIN1]
-	//
-	// The archive inside is the UI layout the player arranged for THIS character: `Chat\Windows.xml` (chat tabs and
-	// their placement), `DockAreas\SideBarLeft.xml` / `SideBarRight.xml`, and a per-character `Prefs_2.xml` (404 named
-	// values in the capture - shortcut bars, auto-sheathe, block flags, camera distance/pitch/yaw...). 32 KB inflated,
-	// 4.6 KB on the wire.
-	//
-	// The server's job is to hand it back at the next login (SendCharacterSettings) and to advertise its md5 in
-	// SendCharacterSettingsCheckSumMap; it never needs to read the files.
+	/// <summary>
+	///     <c>PlayerAgent.UpdateCharacterSettings(ID32 nCharacter, const IOBuffer&amp; data, const String&amp; md5)</c> -
+	///     the per-character half of the settings upload, sent on the same mid-session socket as
+	///     <c>UpdateSubscriptionSettings</c>. The body is
+	///     <c>[u32 characterClass][u32 characterId][ClientSettingsBuffer][u16 length][md5, Latin1]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The archive inside is the UI layout the player arranged for this character: <c>Chat\Windows.xml</c> (chat tabs
+	///     and their placement), <c>DockAreas\SideBarLeft.xml</c> / <c>SideBarRight.xml</c>, and a per-character
+	///     <c>Prefs_2.xml</c> (404 named values in the capture - shortcut bars, auto-sheathe, block flags, camera
+	///     distance/pitch/yaw). 32 KB inflated, 4.6 KB on the wire.
+	///     <para>
+	///         The server's job is to hand it back at the next login (<c>SendCharacterSettings</c>) and to advertise its
+	///         md5 in <c>SendCharacterSettingsCheckSumMap</c>; it never needs to read the files.
+	///     </para>
+	/// </remarks>
 	public static class UpdateCharacterSettingsCodec
 	{
 		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.UpdateCharacterSettings;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(UpdateCharacterSettings value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -44,7 +48,9 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// The per-character settings upload. `CheckSum` is the client's own md5 of `Buffer.Payload` - see
-	// UpdateSubscriptionSettings for why it is carried as sent rather than recomputed.
+	/// <summary>
+	///     The per-character settings upload. <c>CheckSum</c> is the client's own md5 of <c>Buffer.Payload</c>; see
+	///     <c>UpdateSubscriptionSettingsCodec</c> for why it is carried as sent rather than recomputed.
+	/// </summary>
 	public sealed record UpdateCharacterSettings(uint CharacterId, ClientSettingsBuffer Buffer, string CheckSum);
 }

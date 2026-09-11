@@ -7,15 +7,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The three quest-share dispatch bodies (#101). No capture performs a share, so unlike every other codec these
-	// cannot be gated against retail bytes - what CAN be gated is that each one matches the client's own READER, field
+	// The three quest-share dispatch bodies. No capture performs a share, so unlike every other codec these
+	// cannot be gated against retail bytes - what can be gated is that each one matches the client's own reader, field
 	// for field, which is the only evidence there is:
 	//
 	//   FUN_004c5bf0  DispatchQuestShareRequest            u32, u32 (one ID32), u32, string
 	//   FUN_004c58f0  DispatchQuestShareGlobalFeedback     u32, u32
 	//   FUN_004c5a50  DispatchQuestShareIndividualFeedback u32, string
 	//
-	// So these tests assert the WIDTHS and ORDER by hand rather than round-tripping a fixture: a byte count and an
+	// So these tests assert the widths and order by hand rather than round-tripping a fixture: a byte count and an
 	// explicit hex string is exactly the claim the client's reader makes, and it is the claim that breaks if someone
 	// "fixes" i_cFeedbackValue into an ID32 (it is a string - the reader calls the string primitive).
 	public class QuestShareCodecTests
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			Assert.Equal("The Scavenger", parsed.QuestName);
 		}
 
-		// The one quest-share message a capture DOES perform: retail's answer to RequestTeamQuestList. Both replies in
+		// The one quest-share message a capture does perform: retail's answer to RequestTeamQuestList. Both replies in
 		// `login_2-clients_group-trade-friend` (frames 1979 and 2853, after the requests at 1978 and 2851) carry this
 		// exact body, and they are the only two occurrences of 0x204C in the corpus.
 		// [V2: login_2-clients_group-trade-friend.tshark.json]

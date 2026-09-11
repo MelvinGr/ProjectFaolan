@@ -10,26 +10,26 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report quest-xp` (#820): what retail actually PAYS for finishing a quest, mined out of the whole corpus.
+	// `--report quest-xp`: what retail pays for finishing a quest, mined out of the whole corpus.
 	//
 	// Completing a quest awards no experience and no money on our server. The columns are imported and nothing reads
-	// them, and #820 established why the obvious sources cannot be wired: `XpReward`/`MoneyReward` are populated on 21
-	// of 5,049 quests and are ZERO on every quest of the one chain the corpus watches being completed, the RDB
-	// catalog's per-LINE reward disagrees with the observed value AND its cadence, and the client's tuning table holds
-	// no reward curve (the level curve is server-side here too). It closed as "needs more talk-completed quest
+	// them, and the obvious sources cannot be wired: `XpReward`/`MoneyReward` are populated on a handful of quests
+	// and are zero on every quest of the one chain the corpus watches being completed, the RDB catalog's per-line
+	// reward disagrees with the observed value and its cadence, and the client's tuning table holds no reward curve
+	// (the level curve is server-side here too). What is needed is more talk-completed quest
 	// completions, from different lines and levels - new captures, or mine the corpus".
 	//
 	// This is the mining half, done systematically rather than by hand.
 	//
 	// ## The one thing that has to be right: kills contaminate
 	//
-	// ⚠️ A quest that completes ON A KILL completes at the same instant the kill pays combat XP, so the experience
-	// delta around it is the KILL's, not the quest's. #820 was explicit that any correlation which does not exclude
-	// those will fit a formula to combat XP - quest 13479 shows +20 in six captures and +40 in a seventh, and it is a
-	// kill quest. So every completion here is classified by whether an NPC death record sits inside the window the
-	// delta is measured over, and the two populations are never mixed.
+	// A quest that completes on a kill completes at the same instant the kill pays combat XP, so the experience
+	// delta around it is the kill's, not the quest's. Any correlation that does not exclude those fits a formula to
+	// combat XP - quest 13479 shows +20 in six captures and +40 in a seventh, and it is a kill quest. So every
+	// completion here is classified by whether an NPC death record sits inside the window the delta is measured over,
+	// and the two populations are never mixed.
 	//
-	// ⚠️ The DELTA is measured across the completion, not from a running total: `Exp` arrives in `StatUpdateIIR` stat
+	// The DELTA is measured across the completion, not from a running total: `Exp` arrives in `StatUpdateIIR` stat
 	// blocks whenever anything touches it, so the reading either side of the completion is what the corpus states, and
 	// a completion with no `Exp` record after it yields nothing rather than a zero.
 	//
@@ -41,7 +41,7 @@ namespace Faolan.Importer.Cli
 		// one lost.
 		private const double KillContaminationWindowSeconds = 12.0;
 
-		// How close a level-up ding has to sit to a completion for the ding to be THAT completion's award. Retail
+		// How close a level-up ding has to sit to a completion for the ding to be that completion's award. Retail
 		// sends both inside one burst - the play4 rescue dings in the same 0.1 s - so this is tight on purpose: a
 		// second apart is a different event, and a wrong pairing would state a bound about the wrong award.
 		private const double DingCoincidenceSeconds = 2.0;
@@ -77,9 +77,9 @@ namespace Faolan.Importer.Cli
 					var seconds = (p.Ticks - start) / (double)TimeSpan.TicksPerSecond;
 
 					// The player's CASH - an ABSOLUTE balance in TIN, not a delta: `[u64 balanceTin][u32 reason]`.
-					// ⚠️ Two things here are load-bearing and both were wrong first time round. The balance is a U64
+					// Two things here are load-bearing and both were wrong first time round. The balance is a U64
 					// read at offset 0 (taking a u32 at 4 lands mid-field and yields nonsense deltas of ~-1e9), and
-					// this wire opcode is SHARED with `TradepostInterface`'s search results - the money body is
+					// this wire opcode is shared with `TradepostInterface`'s search results - the money body is
 					// disambiguated by being exactly 12 bytes, which is what the wallet decode records.
 					if (p.WireOpcode == CashWireOpcode && p.Body.Length == 12)
 					{
@@ -94,12 +94,12 @@ namespace Faolan.Importer.Cli
 					{
 						case StatUpdateCodec.Opcode:
 						{
-							// ⚠️ THE CONTROL, and it counts the packets that REACH here rather than the ones that
+							// the control, and it counts the packets that REACH here rather than the ones that
 							// parse. Counting after the parse cannot tell "no packet carried this opcode" from "every
 							// parse failed" - both read as zero, and zero is exactly the answer that would be believed.
 							statPackets++;
 
-							// ⚠️ Only the PLAYER has an Exp stat, so no handle filter is needed - and adding one off
+							// Only the player has an Exp stat, so no handle filter is needed - and adding one off
 							// the spawn set would drop the updates that arrive before the player's own spawn body.
 							if (!p.TryParse(StatUpdateCodec.Parse, out var stat))
 							{
@@ -147,10 +147,10 @@ namespace Faolan.Importer.Cli
 							break;
 						}
 
-						// ⭐ The OTHER place a running Exp total reaches the client, and the one the three observations
-						// on #820 actually came from: the level-up ding carries `[Exp, ExpCurrentLevelBase, MaxExp,
-						// ...]` for the level just reached (#297). It fires only on a DING, so it is a sparse source -
-						// but a quest completion that levels the character states its own new total exactly.
+						// The other place a running Exp total reaches the client: the level-up ding carries
+						// `[Exp, ExpCurrentLevelBase, MaxExp, ...]` for the level just reached. It fires only on a
+						// level-up, so it is a sparse source - but a quest completion that levels the character
+						// states its own new total exactly.
 						case NewLevelCodec.Opcode:
 						{
 							if (p.TryParse(NewLevelCodec.Parse, out var ding) && ding.Deltas.Length > 1 && ding.Deltas[0] > 0)
@@ -181,8 +181,8 @@ namespace Faolan.Importer.Cli
 					observations.Add(new QuestPayout(c.Name, questId, seconds, (long)after.Value - before.Value, cashDelta, killNear, level, after.Seconds - before.Seconds));
 				}
 
-				// ⭐ THE ONE THING THE CORPUS CAN STATE ABOUT A SINGLE AWARD. A level-up ding carries the running total
-				// AND the threshold of the level just crossed, so the OVERSHOOT (`Exp - base`) is how far the award
+				// the one THING the corpus can state about A SINGLE AWARD. A level-up ding carries the running total
+				// and the threshold of the level just crossed, so the OVERSHOOT (`Exp - base`) is how far the award
 				// that triggered the ding carried the player past it. The player was below the threshold immediately
 				// before, so that award - and it is one award, the one that fired the ding - was at least the
 				// overshoot. A quest completion in the same instant with no kill beside it makes the award the
@@ -199,7 +199,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"=== quest payouts over {captures.Count} capture(s) ===");
 			Console.WriteLine();
-			// ⚠️ The counts BEFORE the join, because "0 usable observations" has two very different causes and only
+			// The counts before the join, because "0 usable observations" has two very different causes and only
 			// one of them is a fact about retail. The first run of this printed a clean zero and the reason was that
 			// the Exp readings were missing, not the completions.
 			Console.WriteLine($"{completionsSeen} quest COMPLETION record(s) (QuestIIR state 4) across the corpus.");
@@ -250,8 +250,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 		}
 
-		// What the shipped quest data says about each quest that was actually PAID for - the join #820 needs, since
-		// its whole question is which stored value (if any) the payment corresponds to.
+		// What the shipped quest data says about each quest that was actually paid for, since the whole question is
+		// which stored value (if any) the payment corresponds to.
 		private static void QuestPayoutJoin(List<QuestPayout> clean)
 		{
 			if (clean.Count == 0)

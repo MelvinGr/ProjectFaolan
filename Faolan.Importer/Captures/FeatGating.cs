@@ -9,27 +9,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// What a combo's GATING FEAT says about it (#581).
-	//
-	// `Combos.FeatId` is not a `Feats.Id` - it is the WIRE feat id, so it resolves through `FeatIdMaps.WireFeatId ->
-	// TemplateId -> Feats.Id`. 482 of the 744 catalogued combos carry one, and **none of the 97 `combo_npc_` /
-	// `monster_` / `generic_` NPC combos does**, which is worth knowing on its own: carrying a gating feat is a
-	// mechanical discriminator for "this is a PLAYER combo".
-	//
-	// Two things are readable off the feat, and they are independent:
-	//
-	//   CLASS - the client names it in the feat's own name, in two shapes:
-	//     `<Class> Class Feat NNN`      -> that one class   (`Guardian Class Feat 041`, `Ranger Class Feat 001`)
-	//     `<Archetype>: Class Specific N` -> the archetype's three classes (`Rogue: Class Specific 1`)
-	//     `<Class>`                     -> that one class, for the handful named after the class outright (`Ranger`)
-	//   ⭐ Validated against the name-prefix rule it now leads: over every combo where BOTH speak, 134 agree and
-	//   ZERO conflict. It is narrower than the prefix on three (`Priest_…_2hb` -> Bear Shaman) and wider on none.
-	//
-	//   LEVEL - only where every LEVELLED combo the feat gates carries the same level. `Combos.Level <= 1` is the
-	//   catalog's sentinel for "not stated", so a feat that gates one levelled combo and several sentinel ones lends
-	//   its level to them. `Rogue: Class Specific 1` gates three `Rogue_05_…` combos at level 5 and the seven
-	//   `SneakAttack_*` at the sentinel, so the seven are level 5. ⚠️ Most feats gate a RANGE (`Ranger Class Feat
-	//   001` covers 5/7/10), and those lend nothing - one feat, several levels, no answer.
+	/// <summary>
+	///     What a combo's gating feat says about it.
+	/// </summary>
+	/// <remarks>
+	///     `Combos.FeatId` is not a `Feats.Id` - it is the wire feat id, so it resolves through `FeatIdMaps.WireFeatId
+	///     -> TemplateId -> Feats.Id`. No `combo_npc_` / `monster_` / `generic_` NPC combo carries one, so carrying a
+	///     gating feat is a mechanical discriminator for "this is a player combo".
+	///     Two things are readable off the feat, and they are independent.
+	///     Class - the client names it in the feat's own name: `<Class> Class Feat NNN` names that one class
+	///     (`Guardian Class Feat 041`); `<Archetype>: Class Specific N` names the archetype's three classes
+	///     (`Rogue: Class Specific 1`); a bare `<Class>` names that one class, for the handful named after the class
+	///     outright (`Ranger`). Where both the feat and the catalog name prefix speak they agree; the feat is narrower
+	///     than the prefix on a few (`Priest_…_2hb` -> Bear Shaman) and wider on none.
+	///     Level - only where every levelled combo the feat gates carries the same level. `Combos.Level <= 1` is the
+	///     catalog's sentinel for "not stated", so a feat that gates one levelled combo and several sentinel ones lends
+	///     its level to them (`Rogue: Class Specific 1` gates `Rogue_05_…` combos at level 5, so the sentinel-level
+	///     `SneakAttack_*` combos it gates are level 5). Most feats gate a range of levels, and those lend nothing.
+	/// </remarks>
 	public sealed class FeatGating
 	{
 		// `Halberdier_50_…` is gated by `Guardian Class Feat 041`; the trailing number is the feat's own index within
@@ -72,13 +69,17 @@ namespace Faolan.Importer.Captures
 			return gating;
 		}
 
-		// The classes the feat gating this combo names, or empty when it names none (or the combo has no feat).
+		/// <summary>
+		///     The classes the feat gating this combo names, or empty when it names none (or the combo has no feat).
+		/// </summary>
 		public IReadOnlyList<ConanClass> ClassesOf(uint? wireFeatId)
 		{
 			return wireFeatId is { } id && _classes.TryGetValue(id, out var classes) ? classes : [];
 		}
 
-		// The level the gating feat lends a combo whose own level is the catalog sentinel, or null.
+		/// <summary>
+		///     The level the gating feat lends a combo whose own level is the catalog sentinel, or null.
+		/// </summary>
 		public byte? LevelOf(uint? wireFeatId)
 		{
 			return wireFeatId is { } id && _levels.TryGetValue(id, out var level) ? level : null;

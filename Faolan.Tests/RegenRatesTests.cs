@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #442: the out-of-combat regen rates. These are ACCEPTANCE gates, not sanity checks - every expected number here is
+	// The out-of-combat regen rates. These are acceptance gates, not sanity checks - every expected number here is
 	// a RegenIIR (0x28D0AC99) delta retail itself sent, read straight out of the corpus, which carries the per-second
 	// rate ×100. So the formulas are pinned to two decimals with no rounding slack, and a coefficient drifting by even
 	// 0.01 fails.
@@ -24,7 +24,7 @@ namespace Faolan.Tests
 			Assert.Equal(wireDelta, (int)(RegenRates.HealthPerSecond(constitution, strength) * 100));
 		}
 
-		// DemoL80's dominant captured delta is 20353 and NecroL80's is 20803 - both are the base rate plus the SAME 12128,
+		// DemoL80's dominant captured delta is 20353 and NecroL80's is 20803 - both are the base rate plus the same 12128,
 		// which is what identifies DemoL80's (never-captured-bare) base as 8225 and rules out a per-character extra.
 		[Fact]
 		public void HealthPerSecond_TheBoostedCapturesAreTheBaseRatePlusOneSharedTerm()
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		}
 
 		// Hakotep's captured stamina deltas (3115, 3970) were never paired with a screenshot of its sheet, so they can
-		// only confirm the SHAPE - and they do: both invert to a whole attribute sum, which a wrong modifier or flat term
+		// only confirm the shape - and they do: both invert to a whole attribute sum, which a wrong modifier or flat term
 		// would not produce.
 		[Theory]
 		[InlineData(3115, 141u)]
@@ -54,10 +54,10 @@ namespace Faolan.Tests
 			Assert.Equal(wireDelta, (int)(RegenRates.StaminaPerSecond(attributeSum, 0, 0) * 100));
 		}
 
-		// AssassinL23's captured mana delta is 2470 = 0.38 × (Int 39 + Wis 26) exactly, with NOTHING added.
+		// AssassinL23's captured mana delta is 2470 = 0.38 × (Int 39 + Wis 26) exactly, with nothing added.
 		//
 		// The zero flat term is not an accident of this one character: the client seeds stat 280 (Non Combat Mana Regen)
-		// to 2000 for a class WITH a mana base (Herald of Xotli, Necromancer - whose class template then takes it to
+		// to 2000 for a class with a mana base (Herald of Xotli, Necromancer - whose class template then takes it to
 		// 2200) and never writes it at all for this Assassin, whose 74-point mana pool therefore regenerates on
 		// trickledown alone. Both L80 mage classes' bases read 2200 (a 2000 seed plus 200 from their class template).
 		[Fact]
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 			Assert.Equal(0.0, RegenRates.ManaFlatRate);
 		}
 
-		// The SECOND, independent confirmation of the mana branch - and the one that shows its base is class data rather
+		// The second, independent confirmation of the mana branch - and the one that shows its base is class data rather
 		// than universally zero. Hakotep, a level 24 Herald of Xotli: the client computes raw Int 1190 / Wis 340, i.e.
 		// display 118 / 33, and its class mana base (stat 280) is 2000 = display 20.00. Retail's captured mana delta for
 		// that character is 7738, and 0.38 × 151 + 20 = 77.38 hits it exactly.
@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			Assert.Equal(7738, (int)(RegenRates.ManaPerSecond(118, 33, 20.0) * 100));
 		}
 
-		// ⚠️ NOT the OOC rate: the level 80 casters' most common mana deltas are exactly 1% and 2% of their max mana per
+		// Not the ooc rate: the level 80 casters' most common mana deltas are exactly 1% and 2% of their max mana per
 		// second (NecroL80 6523 and 13046 on a 6523 pool; DemoL80 5830 on 5830), and none of their deltas inverts to a whole
 		// attribute sum under any observed class base. Those belong to some other mana channel - plausibly the
 		// TWK_NaturalManaRegen* in-combat twin - and must not be read as evidence about this formula.
@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			Assert.Equal(percentOfMax, wireDelta / 100.0 / maxManaDisplay * 100, 2);
 		}
 
-		// The attribute scores every expectation above is built on are the CLIENT'S OWN, read back off the
+		// The attribute scores every expectation above is built on are the client's own, read back off the
 		// ClientInterface channel for this same character (raw = display × 10 + 10): Str 210, Con 570, Int 400, Wis 270,
 		// Dex 800. That is what makes the three matches above verifications rather than a fit through assumed inputs -
 		// the inputs are retail-independent client computations, the outputs are retail's captured deltas.
@@ -105,12 +105,12 @@ namespace Faolan.Tests
 		[InlineData(800, 79u)]
 		public void TheAttributeInputs_AreTheClientsOwnValues_AtTheWireScale(int wire, uint display)
 		{
-			Assert.Equal(display, (uint)((wire - 10) / 10)); // the client's (raw - 10) / 10 IS the display score
+			Assert.Equal(display, (uint)((wire - 10) / 10)); // the client's (raw - 10) / 10 is the display score
 			Assert.Equal(wire, (int)(display * 10 + 10)); // and back, which is WorldEntity.AttributeWireScore
 		}
 
 		// The flat terms are what a naive reading of the character sheet gets wrong: the sheet prints the stat with an
-		// INTEGER divide by 100 (client FUN_016d9cb0, case 0x116), so 86.75 and 82.25 both display as their floor. Fitting
+		// integer divide by 100 (client FUN_016d9cb0, case 0x116), so 86.75 and 82.25 both display as their floor. Fitting
 		// the displayed integers as if they were rounded yields 19.5; truncation yields 20, and only 20 reproduces the
 		// captured deltas. This pins that reasoning so it cannot silently regress.
 		[Fact]
@@ -119,13 +119,13 @@ namespace Faolan.Tests
 			Assert.Equal(20.0, RegenRates.HealthFlatRate);
 			Assert.Equal(10.0, RegenRates.StaminaFlatRate);
 
-			// Each captured rate must FLOOR to the integer the sheet showed (86 / 82 / 31), not round to it.
+			// Each captured rate must floor to the integer the sheet showed (86 / 82 / 31), not round to it.
 			Assert.Equal(86, (int)RegenRates.HealthPerSecond(375, 70));
 			Assert.Equal(82, (int)RegenRates.HealthPerSecond(345, 70));
 			Assert.Equal(31, (int)RegenRates.HealthPerSecond(56, 20));
 		}
 
-		// The rate is per SECOND (median captured RegenIIR gap = 1.00 s), so a tick's gain scales with its own elapsed
+		// The rate is per second (median captured RegenIIR gap = 1.00 s), so a tick's gain scales with its own elapsed
 		// time and a fractional rate is not silently floored away over a longer tick.
 		[Fact]
 		public void Gain_ScalesWithElapsedTime_AndNeverGoesNegative()
@@ -138,13 +138,13 @@ namespace Faolan.Tests
 			Assert.Equal(0u, RegenRates.Gain(0, 10));
 		}
 
-		// #444: the decoded class BASE, at the scale the rates consume. A level-23 Assassin's base records are Str 200 /
-		// Con 170 / Dex 650 at the WIRE scale; the client adds them to its seeded 10, so the display score contributed by
+		// The decoded class base, at the scale the rates consume. A level-23 Assassin's base records are Str 200 /
+		// Con 170 / Dex 650 at the wire scale; the client adds them to its seeded 10, so the display score contributed by
 		// the base is record / 10.
 		//
-		// ⚠️ Deliberately NOT asserting base + gear == the character sheet. For our level-23 Assassin that gives Dex
+		// Deliberately not asserting base + gear == the character sheet. For our level-23 Assassin that gives Dex
 		// 65 + 16 = 81 where the sheet read 79, a 2-point gap - most likely because the sheet screenshot and the current
-		// CharacterEquipment rows are from different moments, but it is NOT established, so it is written down rather
+		// CharacterEquipment rows are from different moments, but it is not established, so it is written down rather
 		// than encoded as an expectation. The rates themselves are pinned against retail's captured deltas below and do
 		// not depend on resolving it.
 		[Theory]
@@ -156,9 +156,9 @@ namespace Faolan.Tests
 			Assert.Equal(displayContribution, (uint)(wireRecord / 10));
 		}
 
-		// A character with NO attribute scores still regenerates: the flat terms alone. This is today's live behaviour for
-		// an ungeared character, and the shape that keeps a pool from stalling (Gitea #444 - the class/level attribute
-		// base is client-side and not yet modelled, so the scores the server knows are gear + buffs only).
+		// A character with no attribute scores still regenerates: the flat terms alone. This is today's live behaviour for
+		// an ungeared character, and the shape that keeps a pool from stalling (the class/level attribute base is
+		// client-side, so the scores the server knows here are gear + buffs only).
 		[Fact]
 		public void WithNoAttributes_TheFlatTermsStillTick()
 		{

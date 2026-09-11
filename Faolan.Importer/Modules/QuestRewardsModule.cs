@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-quest pick-one-of-N reward offers (#815), harvested from the QuestRewardNotifyIIR the server sends when a
+	// Per-quest pick-one-of-N reward offers, harvested from the QuestRewardNotifyIIR the server sends when a
 	// quest completes. See QuestRewardOptionExtractor for why this cannot come from the client's quest catalog.
 	// Depends on `quests` (the QuestDefinition to hang off) and `items` (the FK, and the template the client renders).
 	public sealed class QuestRewardsModule : IImportModule
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// Two sources (#893): the journal RECORDS carry a quest's whole own set (granted + choose-one), the OFFER only
+			// Two sources: the journal records carry a quest's whole own set (granted + choose-one), the OFFER only
 			// its choose-one third. A quest seen in a record is taken from the record; an offer fills in only a quest no
 			// record ever carried.
 			var fromRecords = ctx.Captures.Select(c => QuestRewardOptionExtractor.ExtractFromRecords(c.Packets)).ToList();

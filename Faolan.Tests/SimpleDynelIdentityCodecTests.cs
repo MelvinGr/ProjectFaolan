@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the typed SimpleDynel identity codec to the captured wire bytes (#187 / #57): the
+	// Locks the typed SimpleDynel identity codec to the captured wire bytes: the
 	// SimpleDynelFullUpdateIIR (0x66AEDD50) message is lifted out of the opaque Data slice into a typed
-	// ProtoSimpleDynelIIR and rebuilt BYTE-EXACT. Record captured from
+	// ProtoSimpleDynelIIR and rebuilt byte-exact. Record captured from
 	// Hoxxling_mage-heraldofxotli_login (the "Acheronian Ruins" world dynel). Reader decoded by
 	// vtable-xref - docs/re/iir-subclass-readers.md; framing validated by tools/capture/decode_iir_subclass_readers.py.
 	public class SimpleDynelIdentityCodecTests
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			WorldObjectColumns.ApplyColumns(row, msg); // importer side
 			Assert.Equal("Acheronian Ruins", row.Name);
 			Assert.Equal(1u, row.CarsGroup);
-			// field 12 is NOT a column (#598) - it is live door state, so the rebuild below supplies it instead.
+			// field 12 is not a column - it is live door state, so the rebuild below supplies it instead.
 			Assert.Null(row.QuestItemEffect); // absent on this dynel
 			Assert.Null(row.TemplateItemId);
 

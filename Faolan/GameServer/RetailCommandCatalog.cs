@@ -3,48 +3,49 @@ using Faolan.Core.Enums;
 
 namespace Faolan.GameServer
 {
-	// Every verb in the retail client's command registry that this server does not BACK with an implementation yet
-	// (#914). They are still registered, with retail's own mask and retail's own recovered usage line, and answering
-	// one prints what it would take to make it work.
+	// Every verb in the retail client's command registry that this server does not back with an implementation. They
+	// are registered anyway, with retail's own mask and recovered usage line, and answering one prints what it would
+	// take to make it work.
 	//
-	// ⭐ Why register a command we cannot perform. The client's hidden GM affordances only ever emit verbs from its
-	// own registry, and an unregistered verb comes back as "no such command" - which reads as "this build is broken"
-	// rather than "that subsystem does not exist here". A GM who presses one of these gets the grammar, the
-	// privilege it needs, and the reason, which is the difference between a dead end and a pointer. It also means
-	// `.help` lists the WHOLE client surface, so nothing is discoverable only by reading a TSV.
+	// Registering a command that cannot be performed is deliberate: the client's hidden GM affordances only ever emit
+	// verbs from its own registry, and an unregistered verb comes back as "no such command", which reads as a broken
+	// build rather than an absent subsystem. A GM who presses one of these gets the grammar, the privilege it needs and
+	// the reason. It also means `.help` lists the whole client surface, so nothing is discoverable only by reading a
+	// TSV.
 	//
-	// ⚠️ These are NOT stubs that pretend to work: nothing is toggled, nothing is written, and the reply says so.
-	// A verb graduates OUT of this table the moment it gets a real handler - the table and the handler table are
-	// joined at startup and a verb in both is a build failure, so it cannot be silently half-implemented.
+	// These are not stubs that pretend to work: nothing is toggled, nothing is written, and the reply says so. A verb
+	// leaves this table the moment it gets a real handler - the table and the handler table are joined at startup and a
+	// verb in both is a build failure, so it cannot be silently half-implemented.
 	//
 	// The usage lines are recovered, not invented - docs/re/gm-command-args.tsv, produced by
 	// tools/ghidra/DumpCommandArgs.java. An empty usage means the class declares no parameters.
 	//
-	// ⛔ SOME OF THESE STRINGS LOOK WRONG AND ARE RETAIL'S OWN. Do not "correct" them - they were re-derived from
-	// AgeOfConan.exe directly (not from the TSV, which shares the dumper's blind spot), and the client shows the
-	// same text. Each was settled by counting how many code sites PUSH the string: one class's constructor pushes
-	// its shortdesc and longdesc ~0x33 apart, so a string pushed at two sites is used by two different classes.
+	// Some of these strings look wrong and are retail's own, so they must not be "corrected". They were re-derived from
+	// AgeOfConan.exe directly rather than from the TSV, which shares the dumper's blind spot, and the client shows the
+	// same text. Each was settled by counting how many code sites push the string: one class's constructor pushes its
+	// shortdesc and longdesc about 0x33 apart, so a string pushed at two sites is used by two different classes.
 	//
-	//   * Three verbs carry a description copy-pasted from a DIFFERENT command, because Funcom cloned the class:
+	//   * Three verbs carry a description copy-pasted from a different command, because Funcom cloned the class:
 	//       jumpspeed     <- jumpheight's ("Command for overriding the jump height.", param "height")
 	//       gametweaks    <- pet's        ("Commands for pet control.")
 	//       consumememory <- grantress's  ("Gives the target a temporary ress point.")
-	//     Each pair is two DISTINCT classes (FanaticJumpSpeedCommand_c vs FanaticJumpHeightCommand_c, ...), and the
-	//     shared string has one push site per class. There is no "jump speed" description anywhere in the binary.
-	//     ⚠️ Contrast the verbs that share a description because they ARE one class under several names -
-	//     tp/teleport/teleportself/teleporttarget, set/setlocal, reload/lazyreload - one vftable, ONE push site.
+	//     Each pair is two distinct classes (FanaticJumpSpeedCommand_c versus FanaticJumpHeightCommand_c, and so on),
+	//     and the shared string has one push site per class. There is no "jump speed" description anywhere in the
+	//     binary. Contrast the verbs that share a description because they are one class under several names -
+	//     tp/teleport/teleportself/teleporttarget, set/setlocal, reload/lazyreload - which have one vftable and one
+	//     push site.
 	//
 	//   * Eight usage lines have unbalanced brackets. That is retail's grammar, not a truncated recovery: the
 	//     append stream for each is a clean multiple of four, and the count of append() call sites in the class
-	//     equals the count recovered (spawn 44/44, token 27/27). Two of them are a Funcom TYPO - the closing
-	//     bracket is inside the HELP string, which is NUL-terminated right after it:
+	//     equals the count recovered (spawn 44/44, token 27/27). Two of them are a Funcom typo - the closing
+	//     bracket is inside the help string, which is NUL-terminated right after it:
 	//       "Literal: Clears 1 death effect]"      -> /respawn   renders `clear[`
 	//       "Integer: Normalset id to change to]"  -> /normalset renders `change[normalset`
 	//     The others (pet, space, token, spawn, dataset, resurrectionpoint) simply never append a closer.
-	//     ⛔ So do NOT add a "usage brackets balance" test - it would fail on a FAITHFUL recovery. The gate that
-	//     belongs here is the transcription one: CataloguedVerbs_MatchTheRecoveredGrammar.
+	//     A "usage brackets balance" test would therefore fail on a faithful recovery; the gate that belongs here is
+	//     the transcription one, CataloguedVerbs_MatchTheRecoveredGrammar.
 	//
-	//   * /lua's Description is its LONGdesc: FanaticLuaCommand declares no shortdesc at all. It is the only entry
+	//   * /lua's Description is its longdesc: FanaticLuaCommand declares no shortdesc at all. It is the only entry
 	//     where that fallback applies, and the gate encodes it rather than leaving it as a one-off.
 	internal static class RetailCommandCatalog
 	{

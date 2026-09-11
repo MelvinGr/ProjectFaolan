@@ -5,19 +5,21 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// DispatchCharacterNameReply (GameCharInterface) - resolves a bare character INSTANCE to a display name, in answer
-	// to the client's `RequestCharName(ID32::InstanceType nCharID)` (GameCharAgent 0x2001, whose body is 4 bytes
-	// because `ID32::InstanceType` is the instance alone).
-	//   [u32 class=0xC350][u32 characterId][name s16]
-	// The reply's `i_c` prefixes make both arguments full ID32s, hence the class word this side (#463).
-	//
-	// [V0] Built from the client's method signature - no capture of the reply exists. NEEDS in-client verification.
-	// Moved in from `GameServerListener.Inbound`'s inline stream build in #530 wave 7.
+	/// <summary>
+	///     <c>DispatchCharacterNameReply</c> - resolves a bare character instance to a display name, in answer to the
+	///     client's <c>RequestCharName(ID32::InstanceType nCharID)</c>, whose body is 4 bytes because
+	///     <c>ID32::InstanceType</c> is the instance alone. The reply is
+	///     <c>[u32 entityClass][u32 characterId][name s16]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The reply's <c>i_c</c> prefixes make both arguments full ID32s, hence the class word on this side. Built from
+	///     the client's method signature - no capture of the reply exists. [V0]
+	/// </remarks>
 	public static class CharacterNameReplyCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchCharacterNameReply;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterNameReply value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -49,6 +51,6 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// DispatchCharacterNameReply.
+	/// <summary>The DispatchCharacterNameReply body.</summary>
 	public sealed record CharacterNameReply(uint CharacterId, string Name);
 }

@@ -17,23 +17,29 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-	// The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle - independent of
-	// how a frame is parsed. ChatServerBase (the chat protocol, a typed Packet) and RpcServer (every Conan
-	// protocol listener, the structured Rpc) supply CreateClient + their ReceivedPacket, and each holds the concrete
-	// tracer its protocol traces BOTH directions through (the RX half is protocol-typed, so it lives there, not here).
+	/// <summary>
+	///     The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle - independent
+	///     of how a frame is parsed.
+	/// </summary>
+	/// <remarks>
+	///     <see cref="ChatServerBase" /> (the chat protocol) and <see cref="RpcServer" /> (every Conan protocol
+	///     listener) supply <c>CreateClient</c> and their <c>ReceivedPacket</c>, and each holds the concrete tracer its
+	///     protocol traces both directions through. The receive half is protocol-typed, so it lives there rather than
+	///     here.
+	/// </remarks>
 	public abstract class ServerBase : BackgroundService
 	{
 		protected readonly IConfiguration Configuration;
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
 
-		// The live connections and the lookups over them (#826), so "send to this character" no longer has to be a
-		// listener method - see ConnectionRegistry.
+		// The live connections and the lookups over them, so "send to this character" need not be a listener method -
+		// see ConnectionRegistry.
 		//
-		// ⚠️ INJECTED, not owned. Each listener needs its OWN registry (a chat connection is not a world connection),
-		// so most subclasses simply pass `new ConnectionRegistry()` at their base call. The GameServer takes it from
-		// the container instead, because its wire collaborators are container-resolved and would otherwise have to
-		// reach back into the listener for this one field - the last cycle standing between them and injection.
+		// Injected, not owned. Each listener needs its own registry (a chat connection is not a world connection), so
+		// most subclasses pass `new ConnectionRegistry()` at their base call. The GameServer takes it from the
+		// container instead, because its wire collaborators are container-resolved and would otherwise have to reach
+		// back into the listener for this one field.
 		protected readonly ConnectionRegistry Connections;
 		private readonly TcpListener _tcpListener;
 
@@ -60,17 +66,13 @@ namespace Faolan.Core.Network
 			}
 			catch (Exception e)
 			{
-				// FAIL THE HOST. This used to log and `return`, which is a silent fallback of the worst kind: a
-				// BackgroundService that returns early is simply gone, so a port conflict took ONE tier out and left
-				// the process "running" - a server whose world listener never bound, answering nothing, with the
-				// reason four screens up the log. Observed live: five listeners lost their ports to an already-running
-				// instance and the process carried on regardless, surviving only because Kestrel happened to fail too.
-				// A role without Kestrel (`--role login` with the MCP host off) would have sat there serving nobody.
+				// A bind failure must fail the host. Logging and returning would leave the process "running" with one
+				// tier silently gone - a BackgroundService that returns early is simply absent - so a port conflict
+				// would produce a server whose world listener never bound and that answers nothing.
 				//
 				// Rethrowing stops the host: .NET's default BackgroundServiceExceptionBehavior is StopHost, so an
 				// unhandled ExecuteAsync exception brings the process down with this log line as the cause. There is no
-				// useful degraded mode for a listener that cannot bind. (#409 weighed moving the bind itself here from
-				// the constructor and decided against it - see the note on Program.cs's pre-host block.)
+				// useful degraded mode for a listener that cannot bind.
 				Logger.LogCritical(e, "Failed to bind port {Port} - stopping the host. Another instance is probably already running.", LocalEndPoint.Port);
 				throw;
 			}
@@ -81,11 +83,11 @@ namespace Faolan.Core.Network
 				{
 					var socket = await _tcpListener.AcceptSocketAsync(cancellationToken);
 
-					// Disable Nagle. The client frames the uncompressed world-entry burst per TCP segment (no
-					// reassembly), so it needs one-packet-per-segment. With Nagle on, rapid small burst packets get
-					// coalesced into segments by ACK/CPU timing, which varies run-to-run - intermittently misframing
-					// the burst and hanging the client on the loading screen. NoDelay flushes each send as its own
-					// segment, making the segmentation deterministic.
+					// Disable Nagle. The client frames the uncompressed world-entry burst per TCP segment, with no
+					// reassembly, so it needs one packet per segment. With Nagle on, rapid small burst packets are
+					// coalesced by ACK/CPU timing, which varies run to run, intermittently misframing the burst and
+					// hanging the client on the loading screen. NoDelay flushes each send as its own segment, making
+					// the segmentation deterministic.
 					socket.NoDelay = true;
 
 					var networkClient = CreateClient(socket);
@@ -128,8 +130,7 @@ namespace Faolan.Core.Network
 		}
 
 		// Called once after each recv batch's packets are all dispatched (see NetworkClient.ReceivedBatchComplete).
-		// Default no-op; the GameServer overrides it to fire the create-editor post-morph burst deterministically
-		// (#197) instead of the debounce timer. Other listeners are unaffected.
+		// Default no-op; the GameServer overrides it to fire the create-editor post-morph burst deterministically.
 		protected virtual Task ReceivedBatchComplete(INetworkClient client)
 		{
 			return Task.CompletedTask;
@@ -145,12 +146,14 @@ namespace Faolan.Core.Network
 			return Connections.ForCharacter(characterId);
 		}
 
-		// Build the protocol-specific client for the accepted socket, wired with the shared lifecycle callbacks
-		// (OnClientDisconnected / OnBatchComplete) plus its own receive dispatch.
+		/// <summary>
+		///     Builds the protocol-specific client for the accepted socket, wired with the shared lifecycle callbacks
+		///     (<see cref="OnClientDisconnected" /> / <see cref="OnBatchComplete" />) plus its own receive dispatch.
+		/// </summary>
 		protected abstract NetworkClient CreateClient(Socket socket);
 
 		// An extra opcode-specific body dump a handler emits on its own line, on the same byte-dump gate as the packet
-		// lines - all line shaping lives in the logging layer.
+		// lines. All line shaping lives in the logging layer.
 		protected void LogPacketBodyDebug(string label, ReadOnlyMemory<byte> bytes)
 		{
 			Logger.LogBodyDump(label, bytes);
@@ -184,14 +187,17 @@ namespace Faolan.Core.Network
 		}
 	}
 
-	// The chat-protocol listener (ChatServer): each frame is parsed to a ChatServerMessage and dispatched. The chat wire
-	// frame ([u16 opcode][u16 bodyLen][body]) has no Rpc sender/receiver/CRC model, so it keeps its own typed Packet +
-	// framer rather than the structured Rpc path. This is the sole typed-Packet tier, so it is a plain concrete base (no
-	// generic TPacket/TFactory) - the packet is constructed directly by ChatNetworkClient, so there is no IPacketFactory.
+	/// <summary>
+	///     The chat-protocol listener: each frame is parsed to a <see cref="ChatServerMessage" /> and dispatched.
+	/// </summary>
+	/// <remarks>
+	///     The chat wire frame (<c>[u16 opcode][u16 bodyLen][body]</c>) has no Rpc sender/receiver/CRC model, so it
+	///     keeps its own message type and framer rather than the structured Rpc path.
+	/// </remarks>
 	public abstract class ChatServerBase : ServerBase
 	{
-		// This channel's packet trace. The listener traces its RECEIVES through it and hands it to every client so the
-		// SENDS are traced through the same object, with the same channel label (Gitea #406 phase 6).
+		// This channel's packet trace. The listener traces its receives through it and hands it to every client so the
+		// sends are traced through the same object, with the same channel label.
 		private readonly ChatPacketTracer _tracer;
 
 		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer)
@@ -221,8 +227,8 @@ namespace Faolan.Core.Network
 			};
 		}
 
-		// Inbound (RX) trace, through the SAME tracer the transport traces this channel's sends with: the method name and
-		// the frame length both come off the parsed message, so the listener passes nothing but the packet.
+		// Inbound trace, through the same tracer the transport traces this channel's sends with: the method name and the
+		// frame length both come off the parsed message, so the listener passes nothing but the packet.
 		protected void LogPacketReceived(in ChatServerMessage packet)
 		{
 			_tracer.Received(in packet);
@@ -236,11 +242,13 @@ namespace Faolan.Core.Network
 		protected abstract Task ReceivedPacket(INetworkClient client, ChatServerMessage packet);
 	}
 
-	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (Rpc.Parse)
-	// and dispatched - no per-frame Packet object, no ConanPacket (Gitea #406/#407).
+	/// <summary>
+	///     The structured-Rpc listener used by every Conan protocol tier: each frame is parsed straight to an
+	///     <see cref="Rpc" /> and dispatched, with no per-frame packet object.
+	/// </summary>
 	public abstract class RpcServer : ServerBase
 	{
-		// This channel's packet trace - both directions through one object (see ChatServerBase._tracer).
+		// This channel's packet trace - both directions through one object.
 		private readonly ConanPacketTracer _tracer;
 
 		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer, ConnectionRegistry connections)
@@ -270,9 +278,9 @@ namespace Faolan.Core.Network
 			};
 		}
 
-		// Inbound (RX) trace, through the SAME tracer the transport traces this channel's sends with (Gitea #406/#407):
-		// both the method NAME (from the Receiver.Type + Opcode pair, via ProtocolCatalog) and the FrameLength (total
-		// wire size, reported as packetLength) come straight off the parsed Rpc - the listener passes only the packet.
+		// Inbound trace, through the same tracer the transport traces this channel's sends with: both the method name
+		// (from the Receiver.Type + method pair, via ProtocolCatalog) and the FrameLength (total wire size, reported as
+		// packetLength) come straight off the parsed Rpc, so the listener passes only the packet.
 		protected void LogPacketReceived(in Rpc packet)
 		{
 			_tracer.Received(in packet);

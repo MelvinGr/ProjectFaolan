@@ -1,27 +1,29 @@
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The `FeatRequired` on-screen feedback TEXT - the `remoteformat` a FormatFeedbackIIR (0x8D5A8B6B) carries when
-	// retail REFUSES an action because the character has not trained a feat. It does not say "you cannot do that": it
-	// names the missing feat, and the client renders that name from its own string table.
-	//
-	// Captured refusing a HARVEST (#779): a Stonecutting Apprentice swung at a Marble node and got this back, naming
-	// feat template 894305 = `Stonecutting Adept` - exactly the rung the player's own chat annotation says they were
-	// missing ("tried to mine marbel. but need Adept stonecutting").
-	// [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json fr5644/fr5726]
-	//
-	// A rule-1a STRING codec (#530): the payload is text sitting inside a byte codec, and
-	// FormatFeedbackCodec.Build(instance, payload) frames it. Build-only, like AttributeChangedCodec - the client
-	// never sends this, so there is no captured inbound body a Parse could be gated against.
-	//
-	// ⭐ It generalises to ANY feat, and that is a finding rather than an assumption. Both `key` attributes are LDB
-	// DECRYPTION keys (#520), so substituting a different feat id would normally need that string's own key - but
-	// category 50220 is PLAINTEXT (every one of its seven shipped languages resolves through `--report ldb-search
-	// --report-arg id:894305` with no key at all), so the key is inert here and the captured nonces are reusable
-	// verbatim. That is the same conclusion AttributeChangedCodec reached for its three keys, and it is what makes
-	// this a codec instead of a `FeedbackXml` literal.
+	/// <summary>
+	///     The <c>FeatRequired</c> on-screen feedback text - the <c>remoteformat</c> a FormatFeedbackIIR carries when
+	///     retail refuses an action because the character has not trained a feat. It does not say "you cannot do that": it
+	///     names the missing feat, and the client renders that name from its own string table.
+	/// </summary>
+	/// <remarks>
+	///     Captured refusing a harvest: a Stonecutting Apprentice swung at a Marble node and got this back, naming feat
+	///     template 894305 = <c>Stonecutting Adept</c>, exactly the rung the player's own chat annotation says they were
+	///     missing. [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json fr5644/fr5726]
+	///     <para>
+	///         A string codec: the payload is text sitting inside a byte codec, and
+	///         <c>FormatFeedbackCodec.Build(instance, payload)</c> frames it. Build-only, like
+	///         <see cref="AttributeChangedCodec" />, since the client never sends this.
+	///     </para>
+	///     <para>
+	///         It generalises to any feat. Both <c>key</c> attributes are LDB decryption keys, so substituting a different
+	///         feat id would normally need that string's own key - but category 50220 is plaintext (every one of its seven
+	///         shipped languages resolves through <c>--report ldb-search --report-arg id:894305</c> with no key at all),
+	///         so the key is inert here and the captured nonces are reusable verbatim.
+	///     </para>
+	/// </remarks>
 	public static class FeatRequiredCodec
 	{
-		// The LDB category the missing feat's NAME is resolved through - the client's feat-name string table.
+		// The LDB category the missing feat's name is resolved through - the client's feat-name string table.
 		public const uint FeatNameCategory = 50220;
 
 		// The captured key nonces, already entity-escaped exactly as they appear on the wire.
@@ -42,9 +44,11 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// "You need <feat>" - the feat is named by its RDB TEMPLATE id (the id space `Feats.Id` uses), not by the wire
-	// feat id the character's own feat list speaks. Retail frames it as an ordinary FIFO feedback: typeFlags 0,
-	// footer 1, which are FeedbackPayload's banner defaults.
+	/// <summary>
+	///     "You need &lt;feat&gt;" - the feat is named by its RDB template id (the id space <c>Feats.Id</c> uses) rather
+	///     than by the wire feat id the character's own feat list speaks. Retail frames it as an ordinary FIFO feedback:
+	///     typeFlags 0, footer 1, which are <c>FeedbackPayload</c>'s banner defaults.
+	/// </summary>
 	public sealed record FeatRequired(
 		uint FeatTemplateId,
 		string OuterKey = FeatRequiredCodec.DefaultOuterKey,

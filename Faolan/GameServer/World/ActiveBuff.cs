@@ -3,28 +3,42 @@ using Faolan.Core.Network.Codecs.Combat;
 
 namespace Faolan.GameServer.World
 {
-	// One active buff/effect on a world entity (see WorldEntity.ActiveBuffs). CasterHandle is who applied it (the
-	// entity itself for a self-buff, the NPC for an NPC-cast debuff); the tick uses it as the removal twin's
-	// applyFrom. DurationSeconds null = lives until cancelled or the session ends, a value = the tick expires it
-	// (and sends the retail end-twin removal). Durations come from the ApplySpell payload (offset +8, ms) or the
-	// spell's RDB DurationMs (#274).
+	/// <summary>
+	///     One active buff or effect on a world entity - see <see cref="WorldEntity.ActiveBuffs" />.
+	/// </summary>
+	/// <param name="CasterHandle">
+	///     Who applied it: the entity itself for a self-buff, the NPC for an NPC-cast debuff. The tick uses it as the
+	///     removal twin's applyFrom.
+	/// </param>
+	/// <param name="DurationSeconds">
+	///     Null means the buff lives until cancelled or the session ends; a value means the tick expires it and sends
+	///     retail's end-twin removal. Durations come from the ApplySpell payload or the spell's RDB DurationMs.
+	/// </param>
 	public sealed record ActiveBuff(uint BuffId, uint CasterHandle, DateTimeOffset AppliedAt, float? DurationSeconds)
 	{
 		public DateTimeOffset LastDotTick { get; set; }
 
-		// The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null = it has
-		// no server duration (lives until cancelled).
+		/// <summary>
+		///     The absolute instant this buff expires, so its remaining time can be persisted across a relog. Null when
+		///     it has no server duration and lives until cancelled.
+		/// </summary>
 		public DateTimeOffset? ExpiresAt => DurationSeconds is { } d
 			? AppliedAt.AddSeconds(d)
 			: null;
 
-		// Damage-over-time per tick on the target's HealthCurrent (from Spell.DotDelta, captured StatDamageIIR):
-		// negative = a bleed/poison debuff, positive = a heal-over-time, 0 = no DoT. DotType is the +45 damage-school
-		// flag carried into the rebuilt packet. LastDotTick is mutable tick bookkeeping (the world tick stamps it). #274
+		/// <summary>
+		///     Damage-over-time per tick on the target's HealthCurrent, from <c>Spell.DotDelta</c> and the captured
+		///     StatDamageIIR: negative is a bleed or poison debuff, positive a heal-over-time, 0 no DoT.
+		///     <see cref="DotType" /> is the +45 damage-school flag carried into the rebuilt packet, and
+		///     <see cref="LastDotTick" /> is tick bookkeeping the world tick stamps.
+		/// </summary>
 		public int DotDelta { get; init; }
 		public uint DotType { get; init; }
 
-		// This DoT's measured tick interval in ms (Spell.DotIntervalMs); 0 = unmeasured, and the tick uses its default.
+		/// <summary>
+		///     This DoT's measured tick interval in milliseconds (<c>Spell.DotIntervalMs</c>); 0 is unmeasured, and the
+		///     tick uses its own default.
+		/// </summary>
 		public uint DotIntervalMs { get; init; }
 
 		public bool Expired(DateTimeOffset now)
@@ -32,15 +46,18 @@ namespace Faolan.GameServer.World
 			return DurationSeconds is { } d && (now - AppliedAt).TotalSeconds >= d;
 		}
 
-		// The buff duration carried by an ApplySpell (0x6B87E316) effect payload, in MILLISECONDS. The payload's own
-		// field is in CENTISECONDS (hundredths of a second - the same ×10ms unit as the RDB cast-time field), so this
-		// scales by 10 and callers stay in ms. Calibrated in-client: Rend 700 -> 7s, Butcher 400 -> 4s,
-		// Poacher-Marksman 600 -> 6s, Exhausted 10000 -> 100s. (#274)
-		//
-		// ⚠️ It takes the decoded VALUE, not bytes. The buff pipeline used to carry the payload as pre-built bytes and
-		// re-Parse them here, which made `MagicBuffDataCodec` a codec the SERVICE composed rather than its parent
-		// (#539); `MagicBuffCodec.Build(..., MagicBuffData)` composes it now, so nothing but the codec ever holds the
-		// encoded form. `null` = the removal twin, which carries no data region at all.
+		/// <summary>
+		///     The buff duration carried by an ApplySpell (0x6B87E316) effect payload, in milliseconds.
+		/// </summary>
+		/// <param name="payload">
+		///     The decoded value rather than bytes, so nothing but the codec holds the encoded form. Null is the
+		///     removal twin, which carries no data region at all.
+		/// </param>
+		/// <remarks>
+		///     The payload's own field is in centiseconds - the same x10 ms unit as the RDB cast-time field - so this
+		///     scales by 10 and callers stay in milliseconds. Calibrated in-client: Rend 700 to 7 s, Butcher 400 to
+		///     4 s, Poacher-Marksman 600 to 6 s, Exhausted 10000 to 100 s.
+		/// </remarks>
 		public static uint DurationMsFromPayload(MagicBuffData? payload)
 		{
 			return payload?.Duration * 10 ?? 0;

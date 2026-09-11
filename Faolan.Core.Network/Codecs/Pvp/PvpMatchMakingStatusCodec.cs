@@ -4,22 +4,23 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Pvp
 {
-	// s2c DispatchPvPMatchMakingYouAreInMatchMaking (0x2080): the acknowledgement of a
-	// PvPMatchMakingPutIntoMatchMaking - "you are queued for this one now". The client's own recovered field list is
-	// `(i_nMap, i_nType, i_ShowFifo, i_AsTeamMember, i_queueType)` [V1: docs/re/aoc-client-rpc-methods.json], and the
-	// captured body is 14 bytes, which is 4 + 4 + 1 + 1 + 4 and nothing else:
-	//
-	//   [u32 i_nMap][u32 i_nType][u8 i_ShowFifo][u8 i_AsTeamMember][u32 i_queueType]
-	//
-	// The three u32 fields ECHO the signup that caused it - all eight captured pairs match their request word for
-	// word, including the `(0, 0)` "join first available" one. What the server adds is the two bytes:
-	//
-	//   * `i_ShowFifo` is 1 in all eight. It is the "show it in the FIFO" flag the matchmaking messages carry
-	//     throughout (DispatchPvPMatchMakingMatchSay has its own `i_bFifo`) - the client's on-screen feedback line.
-	//   * `i_AsTeamMember` is 0 in all eight, which is what a SOLO signup means: the capture never set
-	//     `i_bBringTeam`, so the corpus shows only this side of the flag. [V0: i_AsTeamMember with a team]
-	//
-	// Gitea #882.
+	/// <summary>
+	///     s2c <c>DispatchPvPMatchMakingYouAreInMatchMaking</c> - the acknowledgement of a
+	///     <c>PvPMatchMakingPutIntoMatchMaking</c>: "you are queued for this one now".
+	/// </summary>
+	/// <remarks>
+	///     The client's recovered field list is <c>(i_nMap, i_nType, i_ShowFifo, i_AsTeamMember, i_queueType)</c>
+	///     [V1: docs/re/aoc-client-rpc-methods.json], and the captured body is 14 bytes - 4 + 4 + 1 + 1 + 4 and nothing
+	///     else.
+	///     <para>
+	///         The three u32 fields echo the signup that caused it: all eight captured pairs match their request word
+	///         for word, including the <c>(0, 0)</c> "join first available" one. What the server adds is the two bytes.
+	///         <c>i_ShowFifo</c> is 1 in all eight and is the "show it in the FIFO" flag the matchmaking messages carry
+	///         throughout - the client's on-screen feedback line. <c>i_AsTeamMember</c> is 0 in all eight, which is
+	///         what a solo signup means: the capture never set <c>i_bBringTeam</c>, so the corpus shows only this side
+	///         of the flag. [V0: i_AsTeamMember with a team]
+	///     </para>
+	/// </remarks>
 	public static class PvpMatchMakingStatusCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouAreInMatchMaking;

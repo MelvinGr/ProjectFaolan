@@ -4,20 +4,28 @@ using System.Text.RegularExpressions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Builds a catalogue of wearable armour SETS from the client RDB MESHINDEXFILE manifests (#275 gear). Each skinned
-	// armour mesh lives under `...\items\armor\_sets\NNNN_<setname>_<gender>\...`; we group those by (set number, gender)
-	// so the viewer can dress a character in a full set's worth of meshindex pieces via the equipment-overlay pipeline.
-	//
-	// This is the WARDROBE half of "wearing gear": it lets the viewer preview any authentic armour set on a character.
-	// It is NOT the per-item look mapping (which decrypted item-template field selects WHICH set for a given equipped
-	// item) - that appearance id is buried in the 1000020 template's trailing binary sub-record and is still open RE.
+	/// <summary>
+	///     Builds a catalogue of wearable armour sets from the client RDB MESHINDEXFILE manifests. Each skinned armour
+	///     mesh lives under <c>...\items\armor\_sets\NNNN_&lt;setname&gt;_&lt;gender&gt;\...</c>, so grouping by
+	///     (set number, gender) gives the viewer a full set's worth of meshindex pieces to dress a character in via the
+	///     equipment-overlay pipeline.
+	/// </summary>
+	/// <remarks>
+	///     This is the wardrobe half of wearing gear: it previews any authentic armour set on a character. Resolving
+	///     which meshes a specific equipped item wears is <see cref="ItemLookResolver" />'s job.
+	/// </remarks>
 	public sealed partial class ArmorSetCatalog
 	{
 		[GeneratedRegex(@"_sets[\\/](\d+)[ _]?(.*?)[\\/]", RegexOptions.IgnoreCase)]
 		private static partial Regex SetPathRegex();
 
-		// Scan every MESHINDEXFILE once, keep the skinned armour-set pieces, group by (set number, gender). Ordered by set
-		// number then gender. Pieces keep first-seen order. Expensive (full index scan) so callers should cache the result.
+		/// <summary>
+		///     Scans every MESHINDEXFILE once, keeping the skinned armour-set pieces grouped by (set number, gender).
+		///     Sets are ordered by number then gender; pieces keep first-seen order.
+		/// </summary>
+		/// <remarks>
+		///     This is a full index scan and therefore expensive, so callers should cache the result.
+		/// </remarks>
 		public static IReadOnlyList<ArmorSet> Build(RdbReader rdb)
 		{
 			var groups = new Dictionary<(int Number, string Gender), (string Name, List<uint> Ids)>();
@@ -64,8 +72,11 @@ namespace Faolan.Core.Rdb.Assets
 			return groups.Select(kv => new ArmorSet(kv.Key.Number, kv.Key.Gender, kv.Value.Name, kv.Value.Ids)).OrderBy(s => s.Number).ThenBy(s => s.Gender).ToList();
 		}
 
-		// Tidy a raw folder fragment into a readable set name: underscores->spaces, drop the trailing male/female word and
-		// any leading "+NNNN" / "-NNNN" / "set" tokens the export folders prefix, collapse whitespace.
+		/// <summary>
+		///     Tidies a raw folder fragment into a readable set name: underscores become spaces, the trailing
+		///     male/female word and the leading "+NNNN"/"-NNNN"/"set" tokens the export folders prefix are dropped, and
+		///     whitespace is collapsed.
+		/// </summary>
 		private static string CleanName(string raw)
 		{
 			var s = raw.Replace('_', ' ').Replace('+', ' ');

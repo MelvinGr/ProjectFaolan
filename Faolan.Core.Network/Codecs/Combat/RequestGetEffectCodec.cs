@@ -4,15 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// DispatchRequestGetEffect(nEffect) - GameCharInterface 0xB3. The server ASKING the client about an effect, which
-	// is the unusual thing about it: almost every Dispatch on this interface tells the client something (#874).
-	//
-	//   [u32 nEffect]
-	//
-	// ⚠️ **All eight captured frames are byte-identical zero.** So the field's WIDTH is the signature's and its
-	// meaning is not observable: the corpus shows retail asking for effect 0 and nothing else, which is exactly the
-	// case a value census cannot decide. What it is asking FOR needs the client's own reader.
-	// `[V0: what nEffect selects, and what the client answers with]`
+	/// <summary>
+	///     DispatchRequestGetEffect(nEffect) - the server asking the client about an effect, which is unusual on this
+	///     interface: almost every Dispatch on it tells the client something. The body is <c>[u32 nEffect]</c>.
+	/// </summary>
+	/// <remarks>
+	///     All eight captured frames are byte-identical zero, so the field's width comes from the signature and its meaning
+	///     is not observable from traffic: retail asks for effect 0 and nothing else. What it asks for needs the client's own
+	///     reader. [V0: what nEffect selects, and what the client answers with]
+	/// </remarks>
 	public static class RequestGetEffectCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchRequestGetEffect;

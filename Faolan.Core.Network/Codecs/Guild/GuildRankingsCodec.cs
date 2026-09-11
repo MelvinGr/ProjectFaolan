@@ -7,26 +7,36 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// Byte-exact codec for the 0x2038 DispatchGuildRankingsUpdate body - the global guild leaderboard behind the
-	// client's "Guild Renown Rankings" window (tabs Total/Valor/Glory/Artistry). Format decoded from the hoxxling
-	// guild_invite_accepted capture (tools/capture/decode_guild_rankings.py, GuildRankingsTests). Every list is
-	// AoC-count-framed: a leading u32 word == (elementCount + 1) * 0x3F1 (the client's readers assert word % 0x3F1
-	// == 0 and take count = word/0x3F1 - 1). Body:
-	//   [u32 (guildCount+1)*0x3F1][ guild records... ]
-	//   [u32 (4+1)*0x3F1][ 4 category sections ]
-	//   [u32 nextUpdateUnix]
-	//   record  = [u32 0x0000DEB7][u32 guildId][s16 name][u64 total][u64 valor][u64 glory][u64 artistry]
-	//             [u32 members][u32 level]        (total == valor + glory + artistry, verified for every guild)
-	//   section = [u32 categoryIndex 0..3][u32 (entryCount+1)*0x3F1][ entries... ]
-	//   entry   = [u32 0x0000DEB7][u32 guildId][u64 renown][u32 prevRank]
-	// A section's entries are ordered by renown desc, so the CURRENT rank is the entry's position; the stored word is
-	// the guild's position in the PREVIOUS snapshot, driving the window's "Change" column (change = position -
-	// prevRank). With no ranking history we emit the current position, so a fresh ranking shows no movement. Records
-	// are sorted by total desc; each section lists the top guilds by that category's renown (desc), capped at
-	// MaxRanked. A guild with zero renown in a category is absent from that section (so a brand-new guild simply
-	// doesn't appear on any tab - which is why we no longer replay the captured retail leaderboard). All the framing
-	// words are DERIVED from the counts - a 0x3F1-invalid word (e.g. the old verbatim 0 for an empty list) is exactly
-	// what makes the client abort the dispatch and drop the CsPlayerAgent connection.
+	/// <summary>
+	///     The <c>DispatchGuildRankingsUpdate</c> body - the global guild leaderboard behind the client's "Guild Renown
+	///     Rankings" window (tabs Total/Valor/Glory/Artistry).
+	/// </summary>
+	/// <remarks>
+	///     Decoded from the hoxxling guild_invite_accepted capture (tools/capture/decode_guild_rankings.py,
+	///     <c>GuildRankingsTests</c>). Every list is count-framed through <c>ListFrame</c>; the client's readers assert the
+	///     word is a whole number of frame units and derive the count from it.
+	///     <code>
+	///     [list frame][ guild records... ]
+	///     [list frame][ 4 category sections ]
+	///     [u32 nextUpdateUnix]
+	///     record  = [u32 guildEntityClass][u32 guildId][s16 name][u64 total][u64 valor][u64 glory][u64 artistry]
+	///               [u32 members][u32 level]      (total == valor + glory + artistry, verified for every guild)
+	///     section = [u32 categoryIndex 0..3][list frame][ entries... ]
+	///     entry   = [u32 guildEntityClass][u32 guildId][u64 renown][u32 prevRank]
+	///     </code>
+	///     <para>
+	///         A section's entries are ordered by renown descending, so the current rank is the entry's position; the
+	///         stored word is the guild's position in the previous snapshot, driving the window's "Change" column
+	///         (change = position - prevRank). With no ranking history the current position is emitted, so a fresh ranking
+	///         shows no movement.
+	///     </para>
+	///     <para>
+	///         Records are sorted by total descending; each section lists the top guilds by that category's renown, capped
+	///         at <c>MaxRanked</c>. A guild with zero renown in a category is absent from that section, so a brand-new
+	///         guild appears on no tab. All the framing words are derived from the counts: a word that is not a whole
+	///         number of frame units is what makes the client abort the dispatch and drop the CsPlayerAgent connection.
+	///     </para>
+	/// </remarks>
 	public static class GuildRankingsCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildRankingsUpdate;
@@ -106,7 +116,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// Sections[category] = the ranked entries for that tab (index 0..3 == Total/Valor/Glory/Artistry).
+	// Sections[category] is the ranked entries for that tab (index 0..3 = Total/Valor/Glory/Artistry).
 	public sealed record GuildRankings(IReadOnlyList<GuildRankings.Row> Records, IReadOnlyList<GuildRankings.Ranked>[] Sections, uint NextUpdateUnix)
 	{
 		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
@@ -125,10 +135,10 @@ namespace Faolan.Core.Network.Codecs.Guild
 			};
 		}
 
-		// Builds the rankings from the server's guilds. Records are sorted by total desc; each category section is the
-		// top MaxRanked guilds with renown > 0 in that category (desc, 0-based rank). nextUpdateUnix drives the
-		// window's "NEXT RANKINGS UPDATE" countdown (0 = an already-elapsed timer, which is what a stale retail
-		// capture shows too).
+		// Builds the rankings from the server's guilds. Records are sorted by total descending; each category section is
+		// the top MaxRanked guilds with renown > 0 in that category, descending and 0-based. nextUpdateUnix drives the
+		// window's "NEXT RANKINGS UPDATE" countdown; 0 is an already-elapsed timer, which is what a stale retail capture
+		// shows too.
 		public static GuildRankings FromGuilds(IEnumerable<Row> guilds, uint nextUpdateUnix = 0)
 		{
 			var rows = guilds.OrderByDescending(g => g.Total).ThenBy(g => g.Id).ToList();
@@ -147,8 +157,8 @@ namespace Faolan.Core.Network.Codecs.Guild
 			return new GuildRankings(rows, sections, nextUpdateUnix);
 		}
 
-		// One guild's catalog row. Total is derived (valor + glory + artistry) - the wire carries it explicitly but it
-		// is always the sum, so we recompute rather than store a fourth field that could drift.
+		// One guild's catalog row. Total is derived (valor + glory + artistry): the wire carries it explicitly but it is
+		// always the sum, so it is recomputed rather than stored as a fourth field that could drift.
 		public readonly record struct Row(uint Id, string Name, ulong Valor, ulong Glory, ulong Artistry, uint Members, uint Level)
 		{
 			public ulong Total => Valor + Glory + Artistry;

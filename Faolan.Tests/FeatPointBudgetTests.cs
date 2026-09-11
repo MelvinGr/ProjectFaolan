@@ -4,9 +4,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The feat-point budget, against the client's own FeatPointsTable (RDB 1000044 id 1: 71 entries of
-	// [level][points][tsPoints]). The budget used to be `level - 9`, which is right for most levels and wrong at the
-	// eight that grant two points - an error that could not surface against the captured characters because all of
-	// them fit with headroom.
+	// [level][points][tsPoints]). A `level - 9` budget is right for most levels and wrong at the eight that grant two
+	// points - an error the captured characters cannot surface, because all of them fit with headroom.
 	public class FeatPointBudgetTests
 	{
 		[Theory]
@@ -14,7 +13,7 @@ namespace Faolan.Tests
 		[InlineData(9u, 0)]
 		[InlineData(10u, 1)]  // the first point
 		[InlineData(19u, 10)] // still 1/level up to here
-		[InlineData(20u, 12)] // 20 is the first DOUBLE level: 11 + 1
+		[InlineData(20u, 12)] // 20 is the first double level: 11 + 1
 		[InlineData(40u, 34)] // 31 + three doubles (20, 30, 40)
 		[InlineData(80u, 79)] // the cap: 71 + all eight doubles
 		public void PointBudget_MatchesTheClientsTable(uint level, int expected)

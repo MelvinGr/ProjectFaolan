@@ -10,14 +10,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #324, the isolation half: guilds, auction-house listings, mail and character names are REALM-SCOPED, and the
-	// thing that enforces that is the QUERY PATH, not the schema.
+	// The isolation half of multi-realm: guilds, auction-house listings, mail and character names are realm-scoped, and the
+	// thing that enforces that is the query path, not the schema.
 	//
-	// ⚠️ That distinction is the whole reason this class exists. The three-process deployment run on 2026-08-31
+	// That distinction is the whole reason this class exists. The three-process deployment run on 2026-08-31
 	// established the model half - exactly four tables carry `RealmId`, and `IX_Characters_RealmId_Name` really does
 	// let one name exist once per realm - but a column nothing filters on isolates nothing, and a missed `WHERE`
-	// fails QUIETLY: realm B's guild list simply shows up in realm A, with no error anywhere. So every assertion
-	// below is written the way the leak would appear - two realms holding rows that COLLIDE on everything except
+	// fails quietly: realm B's guild list simply shows up in realm A, with no error anywhere. So every assertion
+	// below is written the way the leak would appear - two realms holding rows that collide on everything except
 	// their realm (same guild name, same sale id, same seller and slot, same recipient, same character name) - and
 	// then asks each realm's own reader for its own.
 	//
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 
 			Assert.NotNull(a);
 			Assert.NotNull(b);
-			Assert.NotEqual(a.Id, b.Id); // the same NAME is two different guilds
+			Assert.NotEqual(a.Id, b.Id); // the same name is two different guilds
 			Assert.Equal(RealmA, a.RealmId);
 			Assert.Equal(RealmB, b.RealmId);
 
@@ -74,13 +74,13 @@ namespace Faolan.Tests
 			Assert.Equal([100ul], (await repo.GetTradepostListings(Template, RealmA)).Select(l => l.Price));
 			Assert.Equal([200ul], (await repo.GetTradepostListings(Template, RealmB)).Select(l => l.Price));
 
-			// Sale ids are allocated PER REALM (`IX_TradepostListings_RealmId_SaleId`), so a realm's next id must not
+			// Sale ids are allocated per realm (`IX_TradepostListings_RealmId_SaleId`), so a realm's next id must not
 			// be pushed along by another realm's listings.
 			Assert.Equal(2ul, await repo.GetNextTradepostSaleId(RealmA));
 			Assert.Equal(2ul, await repo.GetNextTradepostSaleId(RealmB));
 		}
 
-		// The two WRITERS, which is where a missing filter does damage rather than merely showing the wrong number:
+		// The two writers, which is where a missing filter does damage rather than merely showing the wrong number:
 		// a cancel or a re-price keyed on the sale id alone would reach into the other realm's auction house.
 		[Fact]
 		public async Task TradepostWrites_TouchOnlyTheirOwnRealm()
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			Assert.NotNull(await repo.GetTradepostListingBySaleId(1, RealmB)); // the other realm's sale id 1 survives
 		}
 
-		// Mail is addressed by RECIPIENT NAME, and a name is only unique within a realm - so this is the one table
+		// Mail is addressed by recipient name, and a name is only unique within a realm - so this is the one table
 		// where the realm filter is what stops mail being delivered to a stranger who happens to share the name.
 		[Fact]
 		public async Task MailReads_SeeOnlyTheirOwnRealm()
@@ -124,7 +124,7 @@ namespace Faolan.Tests
 			Assert.Equal(RealmB, b.RealmId);
 		}
 
-		// ⭐ The other half of the name rule, and the reason the index is composite rather than two indexes: one realm
+		// The other half of the name rule, and the reason the index is composite rather than two indexes: one realm
 		// still may not hold the name twice.
 		[Fact]
 		public async Task ACharacterName_CannotBeTakenTwiceInOneRealm()
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 			await Assert.ThrowsAnyAsync<Exception>(() => ctx.SaveChangesAsync(TestContext.Current.CancellationToken));
 		}
 
-		// ⛔ The character LIST is deliberately NOT realm-scoped, and that is not an oversight to be "fixed": the
+		// The character list is deliberately not realm-scoped, and that is not an oversight to be "fixed": the
 		// login tier owns character selection, an account's characters live across realms, and the wire row carries
 		// `character.RealmId` per entry (PlayerAgentListener.SendCharacterList) precisely so the client can show
 		// which realm each one is on. Filtering it by realm would hide the account's other characters at selection.
@@ -167,7 +167,7 @@ namespace Faolan.Tests
 		}
 
 		// Two realms holding rows that collide on everything but the realm. Prices 100 (A) and 200 (B) are the tell:
-		// every assertion above reads a price back, so a leak shows as the wrong NUMBER rather than as a count.
+		// every assertion above reads a price back, so a leak shows as the wrong number rather than as a count.
 		private async Task<DatabaseRepository> Seed()
 		{
 			var options = TestDb.Options(_path);
@@ -203,7 +203,7 @@ namespace Faolan.Tests
 					});
 					ctx.TradepostListings.Add(new TradepostListing
 					{
-						SaleId = 1, // the SAME sale id in both realms - legal, and the collider the readers must survive
+						SaleId = 1, // the same sale id in both realms - legal, and the collider the readers must survive
 						RealmId = realmId,
 						ItemId = Template,
 						Template = Template,
@@ -213,7 +213,7 @@ namespace Faolan.Tests
 					});
 					ctx.Mails.Add(new Mail
 					{
-						MailId = mailId, // MailId is the GLOBAL pk (#368) - mail is scoped by the RealmId column alone
+						MailId = mailId, // MailId is the global pk - mail is scoped by the RealmId column alone
 						RealmId = realmId,
 						RecipientName = SharedName,
 						SenderName = "Sender",

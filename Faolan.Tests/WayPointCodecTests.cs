@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The map-marker pair (#868), pinned against the captured bytes. `--report method-bodies --report-arg WayPoint`
+	// The map-marker pair, pinned against the captured bytes. `--report method-bodies --report-arg WayPoint`
 	// is the oracle: six add frames over three captures and one remove.
 	public class WayPointCodecTests
 	{

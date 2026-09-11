@@ -8,39 +8,49 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// MainQuestUpdateIIR (0x504B7924) - the active-quest LIST that POPULATES the J-panel. WITHOUT it the client never
-	// shows an accepted quest in the log even though it received the per-quest QuestFullUpdate detail (the detail
-	// alone is not enough - decoded from randochar frame 687 / strickenbla frame 3086). Retail sends it at every
-	// grant, listing ALL the player's active quests (tracked quest first), plus the current area's journal-title slot.
-	//
-	// The client class is `MainQuestUpdateIIR_c` (`BKDR-31("MainQuestUpdateIIR_c") == 0x504B7924`); its reader is
-	// `FUN_00918560` and its consumer `MainQuestUpdateIIR_c::Activate()` = `FUN_00918cf0`.
-	//
-	// Wire (`FUN_00918560`, field offsets are the IIR object's):
-	//   [subop][class][player][u8 0x01]
-	//   [u32 operation]                        +0x2c - MainQuestUpdateOp, the Activate() switch selector
-	//   [u32 areaId]                           +0x30
-	//   [u32 trackedQuestId]                   +0x44
-	//   [u32 count] count × { [u32 ordinal][u32 questId] }    the pair vector at +0x34
-	//   [string areaTitle]                     <remoteformat areaId/50300>
-	//   [u32 unknown0][u32 unknown1][u32 unknown2][u16 leavingMissionArea]   +0x64 +0x68 +0x6c +0x70
-	//
-	// ⚠️ The reader checks NOTHING - every field is a plain read, so three values pinned as constants from the early
-	// captures rejected 8 of the 46 captured lists (#545):
-	//   * the "leading constant 1" is the OPERATION (see MainQuestUpdateOp); it is 2 = Remove on every captured
-	//     empty list, which is why "always 1" held for as long as every capture was of a quest being granted.
-	//   * the per-entry word is not a 1-based loop index. Entries can SHARE it - NecroL80's King Conan castle list
-	//     carries 15 entries whose words run 1,1,2,3,4,5,6,7,7,8,9,10,11,12,13 - so it is a group/sort key that is
-	//     carried, not regenerated. It is the same field as `QuestJournalEntry.Ordinal`: area 1834's journal and log
-	//     list in Hakotep_hox_login_gameplay0 carry an identical (1,14128) (2,14158).
-	//   * the "trailer constant 1" is `unknown0`, which is 0 on every Remove and 4 in one capture (path-of-azura).
-	//
-	// The u32 length prefix belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     MainQuestUpdateIIR - the active-quest list that populates the J-panel. Without it the client never shows an
+	///     accepted quest in the log, even having received the per-quest QuestFullUpdate detail; the detail alone is not
+	///     enough (decoded from randochar frame 687 and strickenbla frame 3086). Retail sends it at every grant, listing all
+	///     the player's active quests with the tracked quest first, plus the current area's journal-title slot.
+	/// </summary>
+	/// <remarks>
+	///     The client class is MainQuestUpdateIIR_c; its reader is FUN_00918560 and its consumer
+	///     MainQuestUpdateIIR_c::Activate (FUN_00918cf0). The field offsets below are the IIR object's:
+	///     <code>
+	///     [subop][class][player][u8 0x01]
+	///     [u32 operation]                       +0x2c - MainQuestUpdateOp, the Activate() switch selector
+	///     [u32 areaId]                          +0x30
+	///     [u32 trackedQuestId]                  +0x44
+	///     [u32 count] count x { [u32 ordinal][u32 questId] }   the pair vector at +0x34
+	///     [string areaTitle]                    remoteformat areaId / 50300
+	///     [u32 unknown0][u32 unknown1][u32 unknown2][u16 leavingMissionArea]   +0x64 +0x68 +0x6c +0x70
+	///     </code>
+	///     <para>
+	///         The reader validates nothing - every field is a plain read - and three of the fields look constant in a
+	///         grant-only corpus while 8 of the 46 captured lists disagree:
+	///         <list type="bullet">
+	///             <item>
+	///                 The leading word is the operation (see <see cref="MainQuestUpdateOp" />). It is Remove on every
+	///                 captured empty list, so it only looks like a constant 1 while every capture is of a quest being
+	///                 granted.
+	///             </item>
+	///             <item>
+	///                 The per-entry word is not a 1-based loop index: entries can share it - NecroL80's King Conan castle
+	///                 list carries 15 entries whose words run 1,1,2,3,4,5,6,7,7,8,9,10,11,12,13 - so it is a group and sort
+	///                 key that is carried rather than regenerated. It is the same field as QuestJournalEntry.Ordinal: area
+	///                 1834's journal and log list in Hakotep_hox_login_gameplay0 carry an identical (1, 14128) (2, 14158).
+	///             </item>
+	///             <item><c>unknown0</c> is 0 on every Remove and 4 in one capture (path-of-azura).</item>
+	///         </list>
+	///     </para>
+	///     <para>The u32 length prefix belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class MainQuestUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.MainQuestUpdateIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(MainQuestUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -49,12 +59,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return s.ToArray();
 		}
 
-		// The grant path's form: an Add naming every active quest in order, with the trailer retail sends for one.
-		//
-		// `line` is the granted line's row and supplies the two per-LINE trailer words - the SAME `MainQuest_c` slots
-		// the login snapshot's index block fills, so the two producers must agree or the client's tracker sorts one
-		// way at login and another after a grant (#896). Null keeps the SOLO values (1, 0), which is what every quest
-		// this path granted before the columns existed carried, and what a line with no captured block still gets.
+		/// <summary>
+		///     The grant path's form: an Add naming every active quest in order, with the trailer retail sends for one.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="line" /> is the granted line's row and supplies the two per-line trailer words - the same
+		///     MainQuest_c slots the login snapshot's index block fills, so the two producers must agree or the client's
+		///     tracker sorts one way at login and another after a grant. Null keeps the solo values (1, 0), which is what a
+		///     line with no captured block gets.
+		/// </remarks>
 		public static byte[] Build(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, string areaTitle, QuestLine? line = null)
 		{
 			ArgumentNullException.ThrowIfNull(questIds);
@@ -81,8 +94,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var handle = r.ReadU32Be();
 			r.ExpectU8(0x01, "record marker");
 
-			// Carried, not validated: the client switches on it and simply does nothing for a value it has no case
-			// for, so an unknown operation is not a malformed body.
+			// Carried, not validated: the client switches on it and does nothing for a value it has no case for, so an
+			// unknown operation is not a malformed body.
 			var operation = (MainQuestUpdateOp)r.ReadU32Be();
 			var areaId = r.ReadU32Be();
 			var trackedQuestId = r.ReadU32Be();
@@ -120,9 +133,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// The `MainQuestUpdateIIR_c::Activate()` switch on the leading word (`FUN_00918cf0`). Each name is the client's
-	// own log line for that case ("Activate() was called to add a new MainQuest.", ...); case 0 logs "was called with
-	// Invalid type!". Captures carry only Add (every populated list) and Remove (every empty one).
+	/// <summary>
+	///     The MainQuestUpdateIIR_c::Activate switch on the leading word (FUN_00918cf0). Each name is the client's own log
+	///     line for that case ("Activate() was called to add a new MainQuest.", ...); case 0 logs "was called with Invalid
+	///     type!". Captures carry only Add, on every populated list, and Remove, on every empty one.
+	/// </summary>
 	public enum MainQuestUpdateOp : uint
 	{
 		Invalid = 0,
@@ -132,11 +147,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		UpdateTimeout = 4
 	}
 
-	// One line of the J-panel list. `Ordinal` is the client's group/sort key - see the codec note; it repeats across
-	// entries, so it is carried rather than derived from the position.
+	/// <summary>
+	///     One line of the J-panel list. <c>Ordinal</c> is the client's group and sort key; it repeats across entries, so it
+	///     is carried rather than derived from the position.
+	/// </summary>
 	public sealed record MainQuestUpdateEntry(uint Ordinal, uint QuestId);
 
-	// MainQuestUpdateIIR (0x504B7924).
+	/// <summary>The MainQuestUpdateIIR body.</summary>
 	public sealed record MainQuestUpdateIIR(
 		uint PlayerHandle,
 		MainQuestUpdateOp Operation,
@@ -145,31 +162,43 @@ namespace Faolan.Core.Network.Codecs.Quest
 		IReadOnlyList<MainQuestUpdateEntry> Entries,
 		string QuestLineTitle)
 	{
-		// The three trailing words are per-LINE fields of the client's `MainQuest_c` (the object `Activate()`'s Add
-		// case builds via `CoreQuestHolder::UpdateMainQuest` = `FUN_00810840` + the ctor `FUN_00921980`): Unknown0 ->
-		// +0x48, Unknown1 -> +0x44, Unknown2 -> +0x50. Those are the SAME slots the login snapshot's quest index fills
-		// per line (`FUN_00922210`), so each word is one field with two producers:
-		// QuestIndexRegion.Block.TrailerA == Unknown0, .TableField3 == Unknown1, .TrailerC == Unknown2 (#464).
-		//
-		// What the client does with them (the snapshot side carries the variance - 97 distinct captured blocks):
-		//   * Unknown0 (+0x48, ctor default 1): the only consumer is the quest TRACKER's insert-position comparator
-		//     (`FUN_012cde80` / `FUN_012cbbb0` compare two `QJQuestNode_c` +0x70, where `FUN_012ce1c0` parked this) -
-		//     a sort tiebreaker after the level band. Constant per line; only 1, 4 and 8 occur: 1 on every solo
-		//     line (61), 4 on every raid line (BRC / Thoth-Amon's Stronghold / the Kalanthes chain, 6), 8 on every
-		//     group-dungeon line (Atzel's, the Catacombs, Oasis of Zaara [Group], every Khitai dungeon, 30). Not a
-		//     patch-era marker (the Catacombs shipped at launch and carries 8; Khitai solo lines carry 1). 0 on every
-		//     Remove because the Remove path never reads it.
-		//   * Unknown1 (+0x44): stored by both producers, serialized back out by `MainQuest_c::WriteToStream`, and no
-		//     consumer reads it - 0 on all 46 captured lists AND all 97 captured index blocks.
-		//   * Unknown2 (+0x50): no consumer found; per-line flag, 1 on 6 of 97 captured lines - five of them content
-		//     newer than the client's 1000104 catalog, plus [Kheshatta_Kalanthes] The Immortal Hand. Not
-		//     "another line chains from this one" (measured: 85/97 with misses both ways).
+		/// <summary>
+		///     The three trailing words, per-line fields of the client's MainQuest_c: Unknown0 at +0x48, Unknown1 at +0x44,
+		///     Unknown2 at +0x50. The Add case builds that object through CoreQuestHolder::UpdateMainQuest (FUN_00810840)
+		///     and the constructor FUN_00921980, and the login snapshot's quest index fills the same slots per line
+		///     (FUN_00922210), so each word is one field with two producers: QuestIndexRegion.Block.TrailerA is Unknown0,
+		///     TableField3 is Unknown1 and TrailerC is Unknown2.
+		/// </summary>
+		/// <remarks>
+		///     What the client does with them, the snapshot side carrying the variance across 97 distinct captured blocks:
+		///     <list type="bullet">
+		///         <item>
+		///             Unknown0 (+0x48, constructor default 1): the only consumer is the quest tracker's insert-position
+		///             comparator (FUN_012cde80 / FUN_012cbbb0 compare two QJQuestNode_c +0x70, where FUN_012ce1c0 parked
+		///             this), a sort tiebreaker after the level band. It is constant per line and only 1, 4 and 8 occur: 1 on
+		///             every solo line (61), 4 on every raid line (6) and 8 on every group-dungeon line (30). It is not a
+		///             patch-era marker - the Catacombs shipped at launch and carries 8, while Khitai solo lines carry 1 - and
+		///             it is 0 on every Remove, whose path never reads it.
+		///         </item>
+		///         <item>
+		///             Unknown1 (+0x44): stored by both producers and serialized back out by MainQuest_c::WriteToStream, but
+		///             read by no consumer; 0 on all 46 captured lists and all 97 captured index blocks.
+		///         </item>
+		///         <item>
+		///             Unknown2 (+0x50): no consumer found. A per-line flag, set on 6 of 97 captured lines - five of them
+		///             content newer than the client's 1000104 catalog, plus [Kheshatta_Kalanthes] The Immortal Hand. It does
+		///             not mean another line chains from this one; measured, that holds on 85 of 97 with misses both ways.
+		///         </item>
+		///     </list>
+		/// </remarks>
 		public uint Unknown0 { get; init; }
 		public uint Unknown1 { get; init; }
 		public uint Unknown2 { get; init; }
 
-		// Read as a u16 at +0x70 and used ONLY by the UpdateTimeout case, which shows "Entering mission area" when it
-		// is zero and "Leaving mission area" otherwise. 0 in every capture.
+		/// <summary>
+		///     Read as a u16 at +0x70 and used only by the UpdateTimeout case, which shows "Entering mission area" when it is
+		///     zero and "Leaving mission area" otherwise. Zero in every capture.
+		/// </summary>
 		public ushort LeavingMissionArea { get; init; }
 	}
 }

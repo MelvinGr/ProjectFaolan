@@ -6,7 +6,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The despawn packet (n3ToClientQuit 0x04B82B2D) and the playfield-token scan it is scoped by
-	// (Gitea #404, protocol_despawn_n3toclientquit). Body decoded from retail captures:
+	// (protocol_despawn_n3toclientquit). Body decoded from retail captures:
 	// [04B82B2D][0000C350][handle][0x01 marker][u32 playfield token].
 	public class N3ToClientQuitCodecTests
 	{
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryExtractPlayfieldToken_SkipsPrefixWithoutSuffix()
 		{
-			// A 000000BF that is NOT followed by the 0000040B suffix must be skipped, not mistaken for the token frame.
+			// A 000000BF that is not followed by the 0000040B suffix must be skipped, not mistaken for the token frame.
 			var snapshot = new byte[]
 			{
 				0x00, 0x00, 0x00, 0xBF, // decoy prefix
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 		// too long
 		public void Parse_RejectsWrongLength(int length)
 		{
-			// Strict by rule (#530 rule 4): a short body underruns, a long one leaves bytes unread. Both throw.
+			// Strict by rule: a short body underruns, a long one leaves bytes unread. Both throw.
 			var body = new byte[length];
 			Assert.Throws<CodecParseException>(() => N3ToClientQuitCodec.Parse(body));
 		}

@@ -7,13 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #917: relocating a LIVE non-player entity - the primitive `/teleporttarget` needed to accept an NPC.
+	// Relocating a live non-player entity - the primitive `/teleporttarget` needed to accept an NPC.
 	//
-	// The ticket asked whether a large jump needs a despawn/respawn pair rather than a move. It needs BOTH, and which
-	// one a client gets is a property of the VIEWER: a viewer that keeps the entity in sight is snapped, one that
-	// loses it is despawned, and a player standing near the destination who never saw it is spawned. The last two are
-	// what an interest pass produces, so `RelocateEntity` snaps and then re-runs the #778 sweep for the zone - which
-	// is what these gate.
+	// A large jump needs both a move and a despawn/respawn pair, and which one a client gets is a property of the
+	// viewer: a viewer that keeps the entity in sight is snapped, one that loses it is despawned, and a player standing
+	// near the destination who never saw it is spawned. The last two are what an interest pass produces, so
+	// `RelocateEntity` snaps and then re-runs the interest sweep for the zone - which is what these gate.
 	public class EntityRelocationTests
 	{
 		private const uint MapId = 4010; // Tortage Beach
@@ -31,7 +30,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(destination, mob.Position);
 
-			// MoveFrom travels with Position: it is the FROM point of the segment the tick's broadcaster sends, so
+			// MoveFrom travels with Position: it is the from point of the segment the tick's broadcaster sends, so
 			// leaving it behind would render the next ordinary step as a walk all the way back across the map.
 			Assert.Equal(destination, mob.MoveFrom);
 
@@ -41,7 +40,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// Every player in the ZONE, not just the two interest radii - the union of "was in range of the origin" and
+		// Every player in the zone, not just the two interest radii - the union of "was in range of the origin" and
 		// "is in range of the destination" is what has to be re-resolved, and the pass sends nothing to a player whose
 		// view did not change.
 		public async Task RelocateEntity_ReResolvesInterestForEveryPlayerInTheZone()
@@ -55,7 +54,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// A relocation is LIVE ONLY: it does not touch the placement the entity respawns at, so its spawn position is
+		// A relocation is live only: it does not touch the placement the entity respawns at, so its spawn position is
 		// untouched. Moving a stuck mob must not silently re-place it.
 		public async Task RelocateEntity_LeavesTheSpawnPositionAlone()
 		{

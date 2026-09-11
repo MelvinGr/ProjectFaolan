@@ -8,11 +8,11 @@ namespace Faolan.Tests
 {
 	// Golden test for the 61-byte-frame MoveTask (MoveTaskIIR 0x96C46740) - the "at-position-facing" transform form,
 	// byte-exact against frame 2480 of the strickenbla combat capture (actor 0x0002324d, stationary, facing -90deg about
-	// Y). The expected hex is the captured 0x2000 body MINUS its 4-byte totalLen prefix (the builder produces the inner
+	// Y). The expected hex is the captured 0x2000 body minus its 4-byte totalLen prefix (the builder produces the inner
 	// record that WriteArrayUInt32Length wraps).
 	public class MoveTaskCodecTests
 	{
-		// mode-08: approach/face a target entity [from][08][c350][targetHandle][01][9 zeros], byte-exact vs capture (#53).
+		// mode-08: approach/face a target entity [from][08][c350][targetHandle][01][9 zeros], byte-exact vs capture.
 		[Fact]
 		public void ApproachTargetBody_MatchesCapture()
 		{
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 			Assert.Equal("96c467400000c35000017f80000043a51acd43115c2a442a2d1a080000c35001316e7101000000000000000000", Convert.ToHexStringLower(body));
 		}
 
-		// mode-00: a bare position update [from][00][01], byte-exact against a captured player position tick (#53).
+		// mode-00: a bare position update [from][00][01], byte-exact against a captured player position tick.
 		[Fact]
 		public void BarePositionBody_MatchesCapture()
 		{
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 
 		// mode-01 PathMoveTask: the multi-waypoint patrol path, byte-exact against a captured 2-waypoint path
 		// (handle 0x00017e45, hoxxling login-gameplay): header flags=01, F=00, [u32 2][wp0=from][wp1], then the
-		// 29-byte trailer [00][f32 pathLength][12x00][from]. pathLength is the captured from->last-wp distance (#53).
+		// 29-byte trailer [00][f32 pathLength][12x00][from]. pathLength is the captured from->last-wp distance.
 		[Fact]
 		public void PathBody_MatchesCapturedTwoWaypointPath()
 		{

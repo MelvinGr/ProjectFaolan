@@ -9,9 +9,9 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Tests.Support
 {
-	// THE fixture file: Faolan.Tests/Assets/fixtures.bin holds every byte of capture-derived data the suite reads -
-	// the whole-corpus slice AND the hand-carved named fixtures (the former loose Assets/*.bin inputs and
-	// Golden/*.bin expected outputs). One file, so the repo carries one blob rather than 43.
+	// The fixture file: Faolan.Tests/Assets/fixtures.bin holds every byte of capture-derived data the suite reads -
+	// the whole-corpus slice and the hand-carved named fixtures (inputs under Assets/, expected outputs under
+	// Golden/). One file, so the repo carries one blob rather than 43.
 	//
 	// Written by `dotnet run --project Faolan.Importer -- --report fixtures` (FixtureArchiveWriter owns the format;
 	// `--report fixture-set` adds or replaces one named entry).
@@ -24,7 +24,7 @@ namespace Faolan.Tests.Support
 	{
 		public const string Magic = "FCX3";
 
-		// The DEFLATE-era magic, still read so a checkout with the older archive opens rather than failing on the
+		// The deflate-era magic, still read so a checkout with the older archive opens rather than failing on the
 		// magic. `--report fixture-repack` converts one; nothing writes it.
 		public const string LegacyDeflateMagic = "FCX2";
 
@@ -33,12 +33,12 @@ namespace Faolan.Tests.Support
 
 		public static string Path => TestPaths.Repo("Faolan.Tests", "Assets", "fixtures.bin");
 
-		// The corpus entries, in CAPTURE order - the order the gates that walk a session (e.g. "the spell book is
-		// absent only in the session's FIRST snapshot") depend on. The container stores them grouped by shape instead,
+		// The corpus entries, in capture order - the order the gates that walk a session (e.g. "the spell book is
+		// absent only in the session's first snapshot") depend on. The container stores them grouped by shape instead,
 		// purely so they compress; restoring the order here is what keeps that a container concern.
 		//
-		// "Capture order" is WITHIN a capture (by packet index); BETWEEN captures the order is by capture id, which is
-		// deterministic but arbitrary - no gate may rely on which capture comes first (#465).
+		// "Capture order" is within a capture (by packet index); Between captures the order is by capture id, which is
+		// deterministic but arbitrary - no gate may rely on which capture comes first.
 		public static IReadOnlyList<CorpusRecord> Corpus => Loaded.Value.Corpus;
 
 		public static byte[] Named(string key)
@@ -54,11 +54,11 @@ namespace Faolan.Tests.Support
 			return body;
 		}
 
-		// The same bytes as a FILE, for the tests that hand a path to something that opens it. Materialized under the
-		// test project's obj/ (gitignored, and NOT the system temp dir - a ramdisk /tmp is what the seed-fixture cache
+		// The same bytes as a file, for the tests that hand a path to something that opens it. Materialized under the
+		// test project's obj/ (gitignored, and not the system temp dir - a ramdisk /tmp is what the seed-fixture cache
 		// once filled), mirroring the archive's own key layout: obj/fixtures/assets/<name>, obj/fixtures/golden/<name>.
 		//
-		// The cache is filled in FULL on first use rather than per key, because tests reach fixtures by directory as
+		// The cache is filled in full on first use rather than per key, because tests reach fixtures by directory as
 		// well as by name (`Path.Combine(GetDirectoryName(oneAsset), "another.bin")`) - a lazily-populated directory
 		// makes that work or not depending on which test ran first. ~40 entries, ~1.4 MB, once per run.
 		public static string NamedPath(string key)
@@ -139,9 +139,9 @@ namespace Faolan.Tests.Support
 			return new Archive(corpus.OrderBy(e => e.Source, StringComparer.Ordinal).ThenBy(e => e.Index).ToList(), named);
 		}
 
-		// ⭐ BROTLI since #555 - the container change that took the file from 15.5 MB to 3.0 MB with no content
-		// change at all. Deflate's 32 KB window could not see across 45k near-duplicate bodies; a 16 MB one can.
-		// Decoding needs no window hint, so this is one call either way.
+		// Brotli: its 16 MB window sees across 45k near-duplicate bodies where deflate's 32 KB one cannot, which is
+		// the difference between a 15.5 MB file and a 3.0 MB one for identical content. Decoding needs no window hint,
+		// so this is one call either way.
 		private static byte[] Inflate(byte[] raw, int offset, int length, bool brotli)
 		{
 			using var source = new MemoryStream(raw, offset, length);
@@ -152,11 +152,11 @@ namespace Faolan.Tests.Support
 			return inflated.ToArray();
 		}
 
-		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
+		// One extracted packet: the full rebuilt wire packet, plus the provenance and frame the gates report.
 		//
-		// `Source` is the capture's OPAQUE ID - 8 lower-case hex digits, the head of the SHA-256 of the dump's file
-		// name - never the name itself (#465: the dumps are named after the characters played, and a manifest of 50k
-		// entries shipped those names ~39,000 times). It is stable across re-harvests and enough to tell captures
+		// `Source` is the capture's opaque ID - 8 lower-case hex digits, the head of the SHA-256 of the dump's file
+		// name - never the name itself (the dumps are named after the characters played, and a manifest of 50k entries
+		// would ship those names ~39,000 times). It is stable across re-harvests and enough to tell captures
 		// apart in a failure message; mapping one back to its dump needs the private capture repo
 		// (`dotnet run --project Faolan.Importer -- --report fixture-source --report-arg <id> --captures <dir>`).
 		public sealed record CorpusRecord(string Source, int Index, int Frame, uint Opcode, uint Iir, byte[] Full);

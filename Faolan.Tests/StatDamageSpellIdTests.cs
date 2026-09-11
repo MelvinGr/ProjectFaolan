@@ -7,28 +7,27 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ⛔ #767/#770 got this BACKWARDS. They measured `StatDamageIIR.SpellBaseId` over the stat ids 0, 5 and 10 - where
-	// 3,059 of 3,061 records really do carry 0 - and applied the finding to the HEALTH emitters too. Re-measured over
-	// statId 0x1B (27), retail names a REAL spell in 478 of 656 own-handle records and 1,698 of 1,724 on other
-	// handles; the zeroes are school 12, the world. So a health record states a spell, because retail states one.
+	// Measured over statId 0x1B (27), retail names a real spell in 478 of 656 own-handle records and 1,698 of 1,724
+	// on other handles; the zeroes are school 12, the world. So a health record states a spell, because retail states
+	// one. (Measuring `StatDamageIIR.SpellBaseId` over the stat ids 0, 5 and 10 instead - where 3,059 of 3,061 records
+	// really do carry 0 - gets the health emitters backwards.)
 	//
-	// ⚠️ It is NOT because a zero would void the record. #902 read it that way from a client log and the disassembly
-	// refutes it: the apply (`StatDamageIIR_t` slot 2, `FUN_008d5960`) reads `spellBaseId` only inside
-	// `if (deathReason == 10)`, and the `SetStat(statId, GetStat(statId) + delta)` above it is unconditional. The
-	// frozen health bar was the DELTA'S SCALE, fixed in `CombatService.SendStatDamage`. Keep the two apart: this gate
-	// is about matching retail, not about a client that would otherwise reject us.
+	// It is not because a zero would void the record. The disassembly refutes that reading: the apply
+	// (`StatDamageIIR_t` slot 2, `FUN_008d5960`) reads `spellBaseId` only inside `if (deathReason == 10)`, and the
+	// `SetStat(statId, GetStat(statId) + delta)` above it is unconditional. A frozen health bar is the delta's scale,
+	// which `CombatService.SendStatDamage` owns. Keep the two apart: this gate is about matching retail, not about a
+	// client that would otherwise reject us.
 	//
-	// ⚠️ #767's own diagnosis was right and only its fix was wrong. The original defect was a DOUBLE SHIFT - a value
-	// that was already a base id shifted again into `14321` - and the client said exactly the same thing about that
-	// (`failed to load spell with id 14321`). Removing the id turned a wrong spell into no spell and kept the error.
-	// The rule is "state the real base id", and the shift is what varies: `buff.BuffId` is a WIRE id and needs `>> 8`,
-	// a cast trailer's `spellId` is already a base and must not be shifted.
+	// The defect to avoid is a double shift - a value that is already a base id shifted again into `14321`, which the
+	// client reports as `failed to load spell with id 14321`. Removing the id turns a wrong spell into no spell and
+	// keeps the error. The rule is "state the real base id", and the shift is what varies: `buff.BuffId` is a wire id
+	// and needs `>> 8`, a cast trailer's `spellId` is already a base and must not be shifted.
 	//
 	// This is a source scan rather than a wire assertion, and that is deliberate: the failure it exists to catch is not
-	// a wrong byte, it is a SECOND emitter drifting away from the first. #767 fixed the spell-cast path and left the DoT
-	// tick passing `buff.BuffId >> 8`, which survived review for exactly the reason that makes this hard to notice -
-	// that value IS a real spell id, so the client loads it without complaint and nothing looks wrong in-game. A test
-	// that checked one call site would have kept passing.
+	// a wrong byte, it is a second emitter drifting away from the first. Fixing the spell-cast path and leaving a DoT
+	// tick passing `buff.BuffId >> 8` survives review for exactly the reason that makes this hard to notice - that
+	// value is a real spell id, so the client loads it without complaint and nothing looks wrong in-game. A test that
+	// checked one call site would keep passing.
 	public class StatDamageSpellIdTests
 	{
 		[Fact]
@@ -41,13 +40,13 @@ namespace Faolan.Tests
 				var name = Path.GetFileName(file);
 				foreach (var call in Calls(File.ReadAllText(file), "SendStatDamage("))
 				{
-					// The interface declaration and the listener's forwarder pass the parameter THROUGH; only a site that
+					// The interface declaration and the listener's forwarder pass the parameter through; only a site that
 					// decides the value is interesting.
 					if (call.Contains("uint spellBaseId", StringComparison.Ordinal) || call.TrimEnd().EndsWith("spellBaseId", StringComparison.Ordinal))
 						continue;
 
 					checkedCount++;
-					// Every SendStatDamage in the tree is a HEALTH record (it reports `vitals.Health`), so none of them
+					// Every SendStatDamage in the tree is a health record (it reports `vitals.Health`), so none of them
 					// may state the zero the 0/5/10 measurement licensed.
 					if (!call.Contains(nameof(CombatResolver.RetailSpellBaseId), StringComparison.Ordinal))
 						continue;

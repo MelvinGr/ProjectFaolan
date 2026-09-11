@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The RDB terrain heightmap (type 1066611) parser + world->grid sampling (#284). Format decoded + validated
+	// The RDB terrain heightmap (type 1066611) parser + world->grid sampling. Format decoded + validated
 	// byte-exact against the live client RDB: `[u32 levels=1][u32 W][u32 H]` + a W×H row-major float32 grid (row = Z),
 	// sampled as grid[round(z/cell)*W + round(x/cell)]. Real-data check (not hermetic, done manually): City of Tortage
 	// (4020) at known player ground positions matches the players' Y to <0.5u. These tests lock the parse + transform.
@@ -61,8 +61,8 @@ namespace Faolan.Tests
 			Assert.False(RdbHeightmap.TryParse(bogus.ToArray(), out _));
 		}
 
-		// The measured Tortage-beach case (#830-adjacent, the invisible loot bag). Scavenger Tuut died at Y=145.19 on
-		// the edge of a sea stack's footprint: his NEAREST heightmap cell is the rock's top at 199.63, while the beach
+		// The measured Tortage-beach case (the invisible loot bag). Scavenger Tuut died at Y=145.19 on
+		// the edge of a sea stack's footprint: his nearest heightmap cell is the rock's top at 199.63, while the beach
 		// cells a metre away read 146.1. The nearest-cell sample therefore put the ground 54 m away, the loot drop's 5 m
 		// snap tolerance refused it, and the bag kept the death Y - 0.6 m under the sand, where it can be neither seen
 		// nor clicked.
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void HeightNear_KeepsAnIndoorKillOutOfReachOfTheSurface()
 		{
-			// Kier-Dheed's case: killed at Y=153 in a cave under a surface of ~181. NOTHING nearby is at his height, so
+			// Kier-Dheed's case: killed at Y=153 in a cave under a surface of ~181. Nothing nearby is at his height, so
 			// the closest candidate is still ~28 m away and the caller's tolerance still refuses to snap - which is what
 			// stops a bag being flung into the open air above the cave.
 			var body = Build(5, 5, (gx, gz) => 181f + gx * 0.2f + gz * 0.2f);
@@ -111,9 +111,9 @@ namespace Faolan.Tests
 			Assert.Null(hm.HeightNear(-1, 0, 5f, 2f, 5f));
 		}
 
-		// #832: 1066611 is per-PLAYFIELD and bakes that playfield's own props into the surface, so playfields sharing a
+		// 1066611 is per-playfield and bakes that playfield's own props into the surface, so playfields sharing a
 		// tilemap (Tortage Island 4010 + City of Tortage 4020/4022 + End Battle 4030, all `tilemap ID="4040"`) each read
-		// their one shared terrain differently. Props only ADD height, so the lower envelope is the ground under all of
+		// their one shared terrain differently. Props only add height, so the lower envelope is the ground under all of
 		// them.
 		[Fact]
 		public void LowerEnvelope_TakesTheGroundUnderEveryPlayfieldsProps()
@@ -135,8 +135,8 @@ namespace Faolan.Tests
 				Assert.Equal(bare.HeightAt(gx, gz), hm.HeightAt(gx, gz));
 		}
 
-		// ⚠️ The honest limit of the envelope, pinned so it is a known property and not a surprise: a cell that carries
-		// a prop in EVERY sibling keeps the lowest prop, because no grid in the group ever saw the ground there. On
+		// The honest limit of the envelope, pinned so it is a known property and not a surprise: a cell that carries
+		// a prop in every sibling keeps the lowest prop, because no grid in the group ever saw the ground there. On
 		// Tortage that is the case for cells under permanent geometry, and it is why the loot drop's own sampling
 		// (HeightNear) still has to tolerate an implausible cell rather than trusting the bake.
 		[Fact]
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 			Assert.Equal(145f, hm.HeightAt(1, 0));
 		}
 
-		// A sibling at another resolution is SKIPPED, not fatal - and this is the case that made the first cut of the
+		// A sibling at another resolution is skipped, not fatal - and this is the case that made the first cut of the
 		// merge a no-op in practice: Tortage's tilemap group is 4010/4015/4020/4022/4030/4040 and 4022 alone is a 768²
 		// grid, so vetoing the group on it left the island exactly as it was.
 		[Fact]

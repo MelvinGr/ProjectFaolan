@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The kill CHAIN (#446). Every expectation is measured off the corpus by `--report chain-kill` over its 67
+	// The kill chain. Every expectation is measured off the corpus by `--report chain-kill` over its 67
 	// ChainKillIIR records:
-	//   * counts are 2 (x32) and 3 (x3) and NEVER 1 - the first kill of a chain is silent;
+	//   * counts are 2 (x32) and 3 (x3) and never 1 - the first kill of a chain is silent;
 	//   * every non-zero is closed by a 0, 32 of 32, a median 8.97s later (spread 7.90-9.22) - the window;
 	//   * escalations (2 -> 3) all land inside that window, at 1.36-7.83s.
 	public class KillChainTests
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 				player.RegisterKillInChain(at);
 			}
 
-			Assert.Equal(5u, player.KillChain); // the window is since the LAST kill, not since the chain started
+			Assert.Equal(5u, player.KillChain); // the window is since the last kill, not since the chain started
 		}
 
 		[Fact]

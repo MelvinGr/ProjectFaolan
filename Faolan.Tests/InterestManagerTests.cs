@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Interest management (Gitea #404): as a player moves, compute the spawn/move/despawn
+	// Interest management: as a player moves, compute the spawn/move/despawn
 	// events so each player's view stays correct - the logic that makes two players see each other.
 	public class InterestManagerTests
 	{
@@ -16,8 +16,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Entry_ViewerWithStaleKnown_SpawnsNotMove()
 		{
-			// #323: a re-entering player whose handle is still in a viewer's Known (stale - a prior map-change/re-enter
-			// that never clean-removed it) must be SPAWNED to that viewer at entry, not forwarded as a Move (entry
+			// A re-entering player whose handle is still in a viewer's Known (stale - a prior map-change/re-enter
+			// that never clean-removed it) must be spawned to that viewer at entry, not forwarded as a Move (entry
 			// dispatches move=null, which drops Moves -> the re-entrant would stay invisible). isEntry forces the Spawn.
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, true, true));
 
 			Assert.True(events.Has(2, 1, InterestEventType.Spawn)); // A re-spawned to B
-			Assert.False(events.Has(2, 1, InterestEventType.Move)); // NOT a (dropped) Move
+			Assert.False(events.Has(2, 1, InterestEventType.Move)); // Not a (dropped) Move
 			Assert.DoesNotContain(1u, b.Knowledge.Confirmed); // stale build forgotten -> B must re-poll the fresh spawn
 		}
 
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 			zone.Add(b);
 			InterestManager.ResolveMove(zone, a, Range); // mutually visible
 			a.Knowledge.Confirmed.Add(2);
-			b.Knowledge.Confirmed.Add(1); // both clients polled (0x2020) -> built each other; a later despawn is now safe (#245)
+			b.Knowledge.Confirmed.Add(1); // both clients polled (0x2020) -> built each other; a later despawn is now safe
 
 			// A runs far away.
 			var (events, _) = MoveTo(zone, a, 5000, 0);
@@ -155,8 +155,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Remove_UnconfirmedViewer_DoesNotDespawn()
 		{
-			// #322: A leaver disconnecting must NOT send an n3ToClientQuit to a viewer that has it in Known but never
-			// CONFIRMED building it (still loading) - the same crash the #245 gate prevents on the range-loss path.
+			// A leaver disconnecting must not send an n3ToClientQuit to a viewer that has it in Known but never
+			// confirmed building it (still loading) - the same crash the confirmed-build gate prevents on range loss.
 			// The leaver is dropped from that viewer's Known silently.
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
@@ -174,10 +174,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void Remove_PlayerLeaver_DespawnsForALoadedViewer_EvenUnconfirmed()
 		{
-			// The client renders another PLAYER's spawn without ever polling 0x2020 (measured live 2026-08-26:
+			// The client renders another player's spawn without ever polling 0x2020 (measured live 2026-08-26:
 			// zero polls for the other member's handle across a whole PvP match, model visibly rendered), so
-			// Confirmed never holds a player handle and the #322 poll gate left a phantom player standing after
-			// its owner teleported out. For a player leaver the gate is the viewer's own load state instead: a
+			// Confirmed never holds a player handle, so a poll gate would leave a phantom player standing after its
+			// owner teleported out. For a player leaver the gate is the viewer's own load state instead: a
 			// WorldEntered viewer that knew the handle gets the despawn.
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
@@ -199,7 +199,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void UnconfirmedHandleLeavingRange_DoesNotDespawn()
 		{
-			// #245: an entity spawned to a still-loading client (Known) but not yet CONFIRMED (no 0x2020 poll) must NOT
+			// An entity spawned to a still-loading client (Known) but not yet confirmed (no 0x2020 poll) must not
 			// get an n3ToClientQuit when it briefly leaves range during the load-settle churn - that despawn crashes the
 			// client (pcDynel == null). It is dropped from Known silently instead.
 			var zone = new Zone(2040);
@@ -221,12 +221,12 @@ namespace Faolan.Tests
 			return (new WorldEvents(InterestManager.ResolveMove(zone, mover, Range)), zone);
 		}
 
-		// ---- static world objects (#424) -------------------------------------------------------------------------
+		// ---- static world objects -------------------------------------------------------------------------
 		//
-		// Objects are interest-streamed like NPCs but with the OPPOSITE known-set rule, which is the whole point of
-		// these tests: retail despawns an object when the player leaves its range and re-sends the FULL spawn record
+		// Objects are interest-streamed like NPCs but with the opposite known-set rule, which is the whole point of
+		// these tests: retail despawns an object when the player leaves its range and re-sends the full spawn record
 		// when they come back (measured across the login captures - 565 of 648 repeated sends byte-identical, 212
-		// n3ToClientQuit records carrying world-object handles). NPC interest is deliberately sticky (#245); if the two
+		// n3ToClientQuit records carrying world-object handles). NPC interest is deliberately sticky; if the two
 		// ever get merged onto one set, these break.
 
 		[Fact]
@@ -257,7 +257,7 @@ namespace Faolan.Tests
 			Assert.Empty(despawn);
 		}
 
-		// The rule that separates objects from NPCs: walk away -> despawn, walk back -> the WHOLE record again.
+		// The rule that separates objects from NPCs: walk away -> despawn, walk back -> the whole record again.
 		[Fact]
 		public void WorldObjects_LeavingRangeDespawns_AndReturningResends()
 		{
@@ -272,14 +272,14 @@ namespace Faolan.Tests
 			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
 			Assert.Empty(spawn);
 			Assert.Equal([7u], despawn);
-			Assert.DoesNotContain(7u, p.Knowledge.KnownObjects); // NOT sticky - the opposite of NPC Known (#245)
+			Assert.DoesNotContain(7u, p.Knowledge.KnownObjects); // Not sticky - the opposite of NPC Known
 
 			p.Position = new Vector3(0, 0, 0);
 			var (back, _) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
 			Assert.Equal([7u], back.Select(o => o.Handle).ToArray()); // full re-send, not a diff
 		}
 
-		// #262: a gated object is absent entirely for a player without the quest, and appears once they hold it.
+		// A gated object is absent entirely for a player without the quest, and appears once they hold it.
 		[Fact]
 		public void WorldObjects_QuestGated_SpawnOnlyForTheHolder()
 		{
@@ -297,7 +297,7 @@ namespace Faolan.Tests
 
 		private static readonly IReadOnlySet<uint> NoQuests = new HashSet<uint>();
 
-		// The handle is the ZONE's, not a column - so it is passed in beside the row, the way EnsureZoneWorldObjects
+		// The handle is the zone's, not a column - so it is passed in beside the row, the way EnsureZoneWorldObjects
 		// mints it (see LiveWorldObject).
 		private static LiveWorldObject Obj(uint handle, float x, float z)
 		{

@@ -27,8 +27,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_Convenience_IsParsableFeedback()
 		{
-			// Through the PAYLOAD seam (#539): the record carries its own typeFlags/footer, so the caller no longer
-			// restates them - which is what let two services frame this message differently.
+			// Through the payload seam: the record carries its own typeFlags/footer, so no caller restates them and two
+			// services cannot frame this message differently.
 			var body = FormatFeedbackCodec.Build(0x12345678, new AttributeChanged(806, 2));
 			var p = FormatFeedbackCodec.Parse(body);
 

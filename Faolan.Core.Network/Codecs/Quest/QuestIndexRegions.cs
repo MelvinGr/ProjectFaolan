@@ -5,16 +5,22 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// VALUE factory for the quest index: turns the held QuestDefinitions (plus their areas' catalogs) into the region
-	// QuestIndexRegionCodec encodes. Not a codec - #186/#255/#304/#391.
+	/// <summary>
+	///     Value factory for the quest index: turns the held QuestDefinitions, plus their areas' catalogs, into the region
+	///     <see cref="QuestIndexRegionCodec" /> encodes. Not a codec.
+	/// </summary>
 	public static class QuestIndexRegions
 	{
-		// The index for the held quests, already ordered (primary first). Each quest contributes a goal-table block
-		// from its seeded index fields, opening with its own QuestLineId (#464 - there is no trailer chain and no
-		// terminal word; those were the next block's/next region's own leading words).
-		//
-		// `areas` maps areaId -> that area's QuestLine row; `areaCatalog` maps areaId -> every quest in the area,
-		// ordered by JournalSequence. Both are needed because a block is NOT self-contained (see Block.AreaQuestIds).
+		/// <summary>
+		///     The index for the held quests, already ordered with the primary first. Each quest contributes a goal-table
+		///     block from its seeded index fields, opening with its own QuestLineId; there is no trailer chain and no
+		///     terminal word.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="areas" /> maps an area id to that area's QuestLine row, and
+		///     <paramref name="areaCatalog" /> maps it to every quest in the area, ordered by JournalSequence. Both are
+		///     needed because a block is not self-contained; see QuestIndexRegion.Block.AreaQuestIds.
+		/// </remarks>
 		public static QuestIndexRegion ForQuests(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary, IReadOnlyDictionary<uint, QuestLine>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
@@ -32,9 +38,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					? c
 					: null;
 
-				// StepNumber is the held quest's position in its line and StepsAfter the number of steps AFTER it -
-				// per-character progress, drawn by the journal as Roman numerals (Block.StepNumber). Captured: quest
-				// 10238 seq 1 of 8 -> (1, 7); the same line held at step 3 -> (3, 5). tf3 is 0 in every captured block.
+				// StepNumber is the held quest's position in its line and StepsAfter the number of steps after it -
+				// per-character progress, drawn by the journal as Roman numerals. Captured: quest 10238 at sequence 1 of
+				// 8 gives (1, 7), and the same line held at step 3 gives (3, 5). tf3 is 0 in every captured block.
 				var areaCount = catalog?.Count ?? 0;
 				var sequence = q.JournalSequence;
 
@@ -58,21 +64,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 						? 0
 						: q.IndexTableField3,
 					AreaQuestIds = catalogIds,
-					// GENERATION has no captured sequences and emits the 1-based position. That is what the wire
-					// carried on every golden (the beach catalog is monotonic); a real catalog is NOT always monotonic,
-					// which is why a PARSED block carries the captured sequences instead of regenerating them (#391).
+					// Generation has no captured sequences and emits the 1-based position, which is what the wire carries
+					// on every golden because the beach catalog is monotonic. A real catalog is not always monotonic,
+					// which is why a parsed block carries the captured sequences instead of regenerating them.
 					AreaQuestSequences = [.. Enumerable.Range(1, catalogIds.Count).Select(n => (uint)n)],
-					// The block's trailer id is the AREA's anchor quest (catalog sequence 1), NOT the held quest - they
-					// coincide only when the held quest is the area's first (#391). Beach: held 12371 (seq 5) but the
-					// block trailer is 10238 (seq 1). Falls back to the held quest when no catalog is supplied (the
-					// beach/2-quest golden path, where they are the same quest anyway).
+					// The block's trailer id is the area's anchor quest (catalog sequence 1) rather than the held quest;
+					// the two coincide only when the held quest is the area's first. On the beach, held 12371 (sequence
+					// 5) still carries trailer 10238 (sequence 1). It falls back to the held quest when no catalog is
+					// supplied - the beach and two-quest golden path, where they are the same quest anyway.
 					TrailerQuestId = catalog is { Count: > 0 }
 						? catalog[0].QuestId
 						: q.QuestId,
-					// The two per-LINE trailer words come off the line row when the caller supplied one (#896): TrailerA
-					// is the line's category (1 solo / 4 raid / 8 group dungeon) and TrailerC its flag. Without a row
-					// the SOLO defaults stand, which is what the beach/2-quest golden path uses and why it stays
-					// byte-exact. TrailerB is 0 on every captured block and has no per-line source.
+					// The two per-line trailer words come off the line row when the caller supplied one: TrailerA is the
+					// line's category (1 solo, 4 raid, 8 group dungeon) and TrailerC its flag. Without a row the solo
+					// defaults stand, which is what the beach and two-quest golden path uses. TrailerB is 0 on every
+					// captured block and has no per-line source.
 					TrailerA = areas != null && areas.TryGetValue(q.QuestLineId, out var trailerLine)
 						? trailerLine.TrailerCategory
 						: 1,

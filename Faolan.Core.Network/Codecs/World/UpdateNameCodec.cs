@@ -4,16 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// DispatchUpdateName(nCharID, cName) - GameCharInterface 0x01. Renames a LIVE entity on the client (#874).
+	// DispatchUpdateName(nCharID, cName) - GameCharInterface 0x01. Renames a live entity on the client.
 	//
 	//   [u32 nCharID][u16 len][ascii cName]
 	//
-	// ⚠️ `nCharID` is a BARE u32 handle, not an ID32 - there is no `0xC350` class word in front of it. The single
-	// captured frame is 16 bytes: handle `0x013184AE`, length 10, "Strickenne", and 4 + 2 + 10 = 16 accounts for
-	// every byte.
+	// `nCharID` is a bare u32 handle, not an ID32 - there is no `0xC350` class word in front of it. The single
+	// captured frame is 16 bytes: handle `0x013184AE`, length 10, "Strickenne", and 4 + 2 + 10 accounts for every
+	// byte.
 	//
 	// Distinct from `SetNameIIR`, which carries the same idea as an IIR record with an entity class word; this is the
-	// RPC form, and the nameplate work (#363) is where a live rename would come from.
+	// RPC form.
 	public static class UpdateNameCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchUpdateName;

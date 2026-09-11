@@ -27,19 +27,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow
 {
-	// The three retail CREATE-EDITOR bursts (the initial scene, the creation-script burst, the post-ready burst) and the
-	// editor's scene tables and stat blocks they are built from - record for record what the captures show the
-	// editor connection receiving. Pure functions of the client (and the DB, for the scene dynels), so a static class;
-	// they were static members of CreateFlowService until #928 item 8.
+	// The three retail create-editor bursts (the initial scene, the creation-script burst, the post-ready burst) and
+	// the editor's scene tables and stat blocks they are built from - record for record what the captures show the
+	// editor connection receiving. Pure functions of the client, and of the database for the scene dynels, hence a
+	// static class.
 	public static class CreateEditorBursts
 	{
-		// The overhead name-COLOUR category retail answers RequestAggroStatus with for each of the five editor scene
+		// The overhead name-colour category retail answers RequestAggroStatus with for each of the five editor scene
 		// characters (0 friendly / 2 neutral - see UpdateAggroStatusCodec). The client polls all five as soon as the
 		// editor scene is streamed, before the character is named, and retail answers every poll: 55/55 in
 		// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create.
 		//
 		// Keyed by the burst's own handles (the captured 0x0009FF92-96 the editor scene is emitted with, above). The
-		// categories are per ROLE, not per session: the same five characters carry the same categories under three
+		// categories are per role, not per session: the same five characters carry the same categories under three
 		// different handle blocks - Female Template friendly, the other four neutral (stricken998 0x9FF92-96,
 		// Barbarian-create 0x4302E-32, Strie_rogue-assassin_create 0x818A2-A6).
 		internal static readonly FrozenDictionary<uint, uint> EditorSceneDispositions = new Dictionary<uint, uint>
@@ -56,13 +56,11 @@ namespace Faolan.GameServer.CreateFlow
 		// LoadEditorSceneDynels + CreateEditorSceneDynelTests). The client also renders the galley from its own RDB on
 		// the MapChange; retail streams these so their handles are server-known.
 		//
-		// Two values per prop, and the distinction matters: the HANDLE is what the burst EMITS (the captured wire
-		// value, re-addressed onto the row), while the DISPLAY ID - the prop's LDB string reference - is what FINDS
-		// the row. This used to be a handle list alone, looked up against the row's own CapturedHandle column, which
-		// made the burst depend on a SESSION-VOLATILE value as a persistence key (the thing the wire-protocol notes in
-		// CLAUDE.md warn against). Importing a capture whose session re-observed the editor scene renumbered all 18
-		// CapturedHandles, every lookup missed, and all 18 props silently dropped out of the burst. The display id is
-		// placement truth and is unique across map 4000.
+		// Two values per prop, and the distinction matters: the handle is what the burst emits (the captured wire
+		// value, re-addressed onto the row), while the display id - the prop's LDB string reference - is what finds the
+		// row. The row must never be looked up by its CapturedHandle: that is a session-volatile value, so re-importing
+		// a capture that re-observed the editor scene renumbers all 18 and every lookup misses, silently dropping the
+		// props from the burst. The display id is placement truth and is unique across map 4000.
 		private static readonly (uint Handle, uint DisplayId)[] EditorSceneDynels =
 		[
 			(0x0002A7EF, 347648), (0x0002A7FA, 347660), (0x0002A7ED, 837652), (0x0002A7EE, 347646), (0x0002A7F0, 347650), (0x0002A7F1, 347652), (0x0002A7F2, 347667), (0x0002A7F3, 347670),
@@ -78,28 +76,28 @@ namespace Faolan.GameServer.CreateFlow
 			var sender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59);
 			var receiver = Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, id);
 
-			// The galley scene props are WorldObjects rows on the editor map (4000), loaded here keyed by captured
-			// handle and streamed below (after the MapChange) built byte-exact from their columns via WorldObjectCodec
-			// - no verbatim bytes. Requires a DB in production; a bare no-DB golden run simply omits them.
+			// The galley scene props are WorldObjects rows on the editor map (4000), loaded here and streamed below,
+			// after the MapChange, built byte-exact from their columns via WorldObjectCodec rather than as verbatim
+			// bytes. A database is required in production; a bare no-database golden run omits them.
 			var dynelRows = await LoadEditorSceneDynels(database);
 
-			// MapChange: CONSTRUCTED from the editor map's reference point + the session playfield token (#189
-			// item 3). mapId + playfieldToken are the meaningful values; the reference position, clip planes and
-			// trailing flags are this map's constants (not yet semantically pinned - carried as builder args).
+			// MapChange, constructed from the editor map's reference point and the session playfield token. mapId and
+			// playfieldToken are the meaningful values; the reference position, clip planes and trailing flags are this
+			// map's constants, not yet semantically pinned, and are carried as builder arguments.
 			await Record(PlayfieldFCodec.Build(StartingData.EditorSpawnPosition, StartingData.EditorMapId, 0, 1, CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f,
 				BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 1u));
 
-			// The 18 galley scene props: SPAWNED FROM their map-4000 WorldObjects rows (built byte-exact by
-			// WorldObjectCodec, re-addressed to the captured handle + editor playfield), in retail send order.
+			// The 18 galley scene props, spawned from their map-4000 WorldObjects rows (built byte-exact by
+			// WorldObjectCodec, re-addressed to the captured handle and editor playfield), in retail send order.
 			foreach (var (handle, displayId) in EditorSceneDynels)
 			{
 				if (dynelRows == null)
-					break; // no DB at all (the bare golden run) - documented above, and it omits ALL of them, not some
+					break; // no database at all (the bare golden run) - it omits all of them, never some
 
 				if (!dynelRows.TryGetValue(displayId, out var dynelRow))
 				{
-					// Never quietly: a missing prop leaves a visible hole in the editor scene, and the burst that
-					// dropped all 18 of them still looked like a successful send.
+					// Never quietly: a missing prop leaves a visible hole in the editor scene, and a burst that drops
+					// every one of them still looks like a successful send.
 					logger?.LogWarning("Create-editor scene prop {DisplayId} has no map {MapId} WorldObjects row - the burst omits it.", displayId, StartingData.EditorMapId);
 					continue;
 				}
@@ -108,9 +106,8 @@ namespace Faolan.GameServer.CreateFlow
 			}
 
 			// The editor scene pedestals - the avatar (Stygian Female, the chosen looks) and the four fixed example
-			// models. TYPED DATA now, not inline bytes: `CreateEditorScene` is generated from the captured burst and
-			// gated byte-exact against it (#364), which retired both the hex blobs that used to sit here and the
-			// reconstruct-from-your-own-bytes path they fed.
+			// models. Typed data rather than inline bytes: `CreateEditorScene` is generated from the captured burst and
+			// gated byte-exact against it.
 			foreach (var pedestal in CreateEditorScene.Pedestals)
 			{
 				var scene = pedestal();
@@ -119,27 +116,27 @@ namespace Faolan.GameServer.CreateFlow
 			}
 
 			// The live avatar preview on its pedestal: the same typed record, with the session's client instance as the
-			// entity HANDLE - the one thing no capture can supply.
+			// entity handle - the one thing no capture can supply.
 			var preview = CreateEditorScene.LiveAvatarPreview();
 			preview.Handle = id;
 			await Record(SimpleCharFullUpdateCodec.Build(preview));
 
-			// The avatar's FullChar snapshot, built WHOLE from typed data (#651) - see CreateEditorAvatarSnapshot.
-			// The carrier's u32 length belongs to the SENDER (#530 rule 2), so it is written here and the codec
-			// emits the record alone.
+			// The avatar's FullChar snapshot, built whole from typed data - see CreateEditorAvatarSnapshot.
+			// The carrier's u32 length belongs to the sender, so it is written here and the codec emits the record
+			// alone.
 			var avatarSnapshot = FullPlayerCharacterCodec.Build(CreateEditorAvatar.Snapshot(id));
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59), Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, id), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteUInt32((uint)avatarSnapshot.Length).WriteArray(avatarSnapshot)));
 
-			// GameTime: CONSTRUCTED from the captured day-time + rate (#189 item 3). The resync timestamp is generated
-			// from the wall clock the same way the world-entry clock is (GameClock.ResyncTimestamp) rather than
-			// replaying the capture's; dayTime stays captured until its unit is pinned (#351).
+			// GameTime, constructed from the captured day-time and rate. The resync timestamp is generated from the
+			// wall clock the same way the world-entry clock is (GameClock.ResyncTimestamp) rather than replayed from
+			// the capture; dayTime stays at the captured value until its unit is pinned.
 			// The editor's captured time of day (0x4743EB00 = 50155s = 13:55) with a generated resync anchor. The backdrop
 			// has no day/night to track, so this stays the captured value rather than the live clock.
 			var (editorGameDay, editorUnixSeconds) = GameClock.ResyncAnchor(now ?? DateTimeOffset.UtcNow);
 			await Record(GameTimeCodec.Build(new GameTimeIIR(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds)));
 
-			// #189: constructed via StatCodec (was verbatim). env=0 for 0x0F4266, then an env=1 / value=0 run 0x0F4285..0x0F428C.
+			// Constructed via StatCodec: env=0 for 0x0F4266, then an env=1 / value=0 run 0x0F4285..0x0F428C.
 			await Record(StatCodec.Build(StatIirs.ForCharacter(id, 0x0F4266, 0x00, env: 0x00)));
 
 			for (uint statId = 0x0F4285; statId <= 0x0F428C; statId++)
@@ -171,7 +168,7 @@ namespace Faolan.GameServer.CreateFlow
 
 			await Record(StatCodec.Build(StatIirs.ForCharacter(id, 0x0360, 0x02, env: 0x00)));
 
-			// MagicBuff carries the instance twice (applyTo + applyFrom); the 54-byte APPLY payload rides verbatim.
+			// MagicBuff carries the instance twice (applyTo + applyFrom); the 54-byte apply payload rides verbatim.
 			await Record(MagicBuffCodec.Build(new MagicBuffIIR(id, 0x00, 0x00000B90, 0x00, id,
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00,
@@ -188,7 +185,8 @@ namespace Faolan.GameServer.CreateFlow
 
 			await Record(StatUpdateCodec.Build(id, EditorAvatarStats()));
 
-			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest, 			// then the "PlayOrSkip" ScriptMessage (decoded by tools/capture/decode_scryscript.py).
+			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat and its RDB resource manifest,
+			// then the "PlayOrSkip" ScriptMessage (decoded by tools/capture/decode_scryscript.py).
 			await Record(ScryScriptCodec.Build(id, CreateFlowService.CreateWorldScriptToken, 7, resources: CreateFlowService.CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
 			await Record(ScryScriptCodec.Build(id, "PlayOrSkip"));
 
@@ -213,10 +211,8 @@ namespace Faolan.GameServer.CreateFlow
 		// Verbatim replay of the fixed tail of the retail create-editor post-ready follow-up from
 		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (rows 198-199, 203-204).
 		//
-		// It used to be preceded by a hand-rolled ack per observed "instance echo" request id. Those acks were
-		// UpdateAggroStatus replies under another name (#564) and the ids were the five editor scene entities the
-		// client polls; they are answered where every other poll is, in HandleRequestAggroStatus, off the client's
-		// own RequestAggroStatus rather than replayed here.
+		// The five editor scene entities the client polls are answered where every other poll is, in
+		// HandleRequestAggroStatus, off the client's own RequestAggroStatus rather than replayed here.
 		internal static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
@@ -229,11 +225,11 @@ namespace Faolan.GameServer.CreateFlow
 				]));
 			await CreateFlowWire.SendIirRecord(client, Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59), Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, id), CharInPlayCodec.Build(new CharInPlayIIR(id)));
 
-			// The racial CHARACTER-TEMPLATE choice list the creation editor reads (Male/Female/StygianSlaver ->
+			// The racial character-template choice list the creation editor reads (Male/Female/StygianSlaver ->
 			// template ids 50000:65525x), delivered on two GameActionListIIR (0xF508F4C1) records for dynel 0xD00C.
-			// The two captured variants differ ONLY in the leading action-id word; the property-map action-tail
-			// grammar is still opaque (#190) so it rides verbatim, while the record HEADER is constructed via
-			// GameActionListCodec.Build (construct-don't-replay - see CreateFlowWire.SendGameActionListRecord).
+			// The two captured variants differ only in the leading action-id word. The property-map action-tail grammar
+			// is still opaque, so it rides verbatim, while the record header is constructed via
+			// GameActionListCodec.Build (see CreateFlowWire.SendGameActionListRecord).
 			await CreateFlowWire.SendGameActionListRecord(client, 0x59, id, 0xD00Cu,
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x39, 0xBF, 0x93, 0x00, 0x50, 0x4D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65,
@@ -256,9 +252,9 @@ namespace Faolan.GameServer.CreateFlow
 			await SendRetailCreateEditorCreationScriptBurst(client);
 		}
 
-		// The three vitals every create-editor entity is seeded with, and the avatar's own six-stat push. Raw WIRE
-		// values straight from the capture (hence SetRaw, which applies no display scale); the ids past PlayerId are
-		// unnamed in CharacterStatId. Fresh blocks per call - CharacterStatBlock is mutable.
+		// The three vitals every create-editor entity is seeded with, and the avatar's own six-stat push. Raw wire
+		// values straight from the capture, hence SetRaw, which applies no display scale; the ids past PlayerId are
+		// unnamed in CharacterStatId. Fresh blocks per call, because CharacterStatBlock is mutable.
 		private static CharacterStatBlock EditorVitals()
 		{
 			return new CharacterStatBlock()
@@ -284,7 +280,7 @@ namespace Faolan.GameServer.CreateFlow
 			if (database == null)
 				return null;
 
-			// Keyed by the row's DISPLAY ID, not its CapturedHandle - see EditorSceneDynels for why.
+			// Keyed by the row's display id, not its CapturedHandle - see EditorSceneDynels for why.
 			var rows = new Dictionary<uint, WorldObject>();
 			foreach (var o in await database.GetWorldObjects(StartingData.EditorMapId))
 			{

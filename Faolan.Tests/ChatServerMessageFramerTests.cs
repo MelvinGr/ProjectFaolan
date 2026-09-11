@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The chat framer cuts [u16 opcode][u16 bodyLength][body] frames out of a TCP stream, where a recv boundary falls
-	// ANYWHERE - mid-body, mid-header, or between frames. It buffers only the trailing partial frame, so these pin the
+	// anywhere - mid-body, mid-header, or between frames. It buffers only the trailing partial frame, so these pin the
 	// cases that buffering has to survive.
 	public class ChatServerMessageFramerTests
 	{

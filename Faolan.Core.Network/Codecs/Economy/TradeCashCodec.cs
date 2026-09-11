@@ -4,20 +4,23 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// The tin on the trade table: `[u64 tin]`, nothing else.
-	//
-	// ONE body, two directions: the client's c2s `SetTradeCash` (GameCharAgent 0x2067) and the s2c
-	// `DispatchPartnerUpdatedCash` (0x206E) echo to the other party. `Opcode` is the s2c one - the message this codec
-	// sends; the c2s twin is another interface's method index and cannot be spelled in the same enum.
-	//
-	// Split out of `PlayerTradeCodec` (which carried four unrelated messages) in #530 wave 7. PLAYER-to-player trade,
-	// #101 - decoded from login_2-clients_group-trade-friend, where both clients are on tape; byte-gated by
-	// TeamTradeFriendCodecTests.
+	/// <summary>
+	///     The tin on the trade table: <c>[u64 tin]</c>, nothing else.
+	/// </summary>
+	/// <remarks>
+	///     One body, two directions: the client's c2s <c>SetTradeCash</c> and the s2c <c>DispatchPartnerUpdatedCash</c>
+	///     echo to the other party. The declared method is the s2c one - the message this codec sends - because the c2s
+	///     twin is another interface's method index and cannot be spelled in the same enum.
+	///     <para>
+	///         Player-to-player trade, decoded from login_2-clients_group-trade-friend where both clients are on tape;
+	///         byte-gated by <c>TeamTradeFriendCodecTests</c>.
+	///     </para>
+	/// </remarks>
 	public static class TradeCashCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchPartnerUpdatedCash;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(TradeCash value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -47,6 +50,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// SetTradeCash / DispatchPartnerUpdatedCash.
+	/// <summary>The SetTradeCash / DispatchPartnerUpdatedCash body.</summary>
 	public sealed record TradeCash(ulong Tin);
 }

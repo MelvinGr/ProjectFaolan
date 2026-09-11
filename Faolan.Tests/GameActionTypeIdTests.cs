@@ -21,9 +21,9 @@ namespace Faolan.Tests
 			Assert.False(GameActionTypeId.IsValid(GameActionTypeId.End));
 		}
 
-		// ⚠️ The regression that crashed the client (2026-07-29). The descriptor table is indexed with stride 0x104;
+		// The regression that crashed the client (2026-07-29). The descriptor table is indexed with stride 0x104;
 		// reading it with 0x41 puts StartFlymode at index 548 -> 0xD12D instead of index 137 -> 0xCF92. Because
-		// 0x104 == 4 * 0x41 the wrong index STILL divides evenly, so "it lands on a descriptor" proves nothing -
+		// 0x104 == 4 * 0x41 the wrong index still divides evenly, so "it lands on a descriptor" proves nothing -
 		// only the range does.
 		[Fact]
 		public void TheFourTimesInflatedId_IsRejected()

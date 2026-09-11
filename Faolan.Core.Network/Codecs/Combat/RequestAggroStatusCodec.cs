@@ -5,11 +5,15 @@ using Faolan.Core.Network.Codecs.Team;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// RequestAggroStatus (GameCharAgentProject 0x2000) - the client asking what colour a target's overhead name is.
-	// `RequestAggroStatus(const ID32& charId, const ID32& targetId)`, so two bare entity ids and nothing else.
-	//
-	// ⚠️ It GATES the loading screen: the in-world poll must be answered or the client never finishes entering the
-	// world (GameServerListener.Inbound). The reply is `UpdateAggroStatusCodec`.
+	/// <summary>
+	///     RequestAggroStatus - the client asking what colour a target's overhead name is. The signature is
+	///     <c>RequestAggroStatus(const ID32&amp; charId, const ID32&amp; targetId)</c>, so two bare entity ids and nothing
+	///     else.
+	/// </summary>
+	/// <remarks>
+	///     The in-world poll gates the loading screen: it must be answered or the client never finishes entering the world
+	///     (see GameServerListener.Inbound). The reply is <see cref="UpdateAggroStatusCodec" />.
+	/// </remarks>
 	public static class RequestAggroStatusCodec
 	{
 		public const uint Method = (uint)GameCharAgentProjectMethods.RequestAggroStatus;
@@ -42,6 +46,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// RequestAggroStatus(charId, targetId) - the polling player and the entity whose name colour it wants.
+	/// <summary>
+	///     The RequestAggroStatus body: the polling player and the entity whose name colour it wants.
+	/// </summary>
 	public sealed record RequestAggroStatus(EntityId Character, EntityId Target);
 }

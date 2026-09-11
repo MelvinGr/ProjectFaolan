@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #748: a TAG (`GameCharInterface.DispatchAddTag`, one u32) is an ACHIEVEMENT, and the client's own LDB names it -
+	// A tag (`GameCharInterface.DispatchAddTag`, one u32) is an achievement, and the client's own LDB names it -
 	// category 55701 the title, 55700 what earns it. Without the catalog a granted achievement is a number.
 	//
-	// The gate that matters is the CRIB: every tag id the corpus was captured awarding must resolve, and resolve to
+	// The gate that matters is the crib: every tag id the corpus was captured awarding must resolve, and resolve to
 	// something that matches what that capture was doing. An id-keyed import is trivially self-consistent, so the only
 	// way to know the keying is right is to check it against wire evidence the import never saw.
 	public class AchievementCatalogTests
@@ -38,12 +38,12 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task TagsThatAreNotAchievements_AreAbsent_NotInvented()
 		{
-			// 6617 is the ONE captured tag id of fourteen that resolves to nothing in the achievement catalog - and this
+			// 6617 is the one captured tag id of fourteen that resolves to nothing in the achievement catalog - and this
 			// codebase had already recovered it from the client's shop Lua as one of the item-shop "bundle shown"
-			// `HasTag` gates (6617-6620, 7316, 7416-7421). That is #748's "second phenomenon", isolated to an id.
+			// `HasTag` gates (6617-6620, 7316, 7416-7421), so it is a tag that is not an achievement at all.
 			//
 			// So its absence is the correct state and worth pinning: an import that started inventing rows for
-			// unresolvable ids would make the catalog useless as the thing that says WHICH tags are achievements.
+			// unresolvable ids would make the catalog useless as the thing that says which tags are achievements.
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.InRange(rows.Count, 4000, 6000);
 			Assert.All(rows, a => Assert.False(string.IsNullOrWhiteSpace(a.Name)));
 
-			// About a quarter carry a description, and that is the CLIENT's data, not a partial import - so it is pinned
+			// About a quarter carry a description, and that is the client's data, not a partial import - so it is pinned
 			// rather than asserted away. A run that suddenly filled them all would mean 55700 was being read for
 			// something else.
 			var described = rows.Count(a => a.Description != null);

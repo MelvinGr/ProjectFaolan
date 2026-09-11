@@ -7,14 +7,14 @@ namespace Faolan.Tests.Support
 	// Multi-packet capture fixtures under Faolan.Tests/Assets: whole Conan packets concatenated back to back.
 	//
 	// No container format is needed because a packet already frames itself - it opens with a u32 counting every byte
-	// AFTER that word ([u32 length][u32 crc32][u32 headerLen][header][body], Rpc.cs), so the stream is walked by
+	// after that word ([u32 length][u32 crc32][u32 headerLen][header][body], Rpc.cs), so the stream is walked by
 	// following the prefix, and the IIR type is read out of the body exactly as CorpusExtract does. Callers never
 	// have to name the type a fixture holds, which is what keeps a mislabelled fixture from quietly changing what an
 	// extractor dispatches on.
 	//
-	// These exist so the tests that only ever wanted ONE packet (or one capture's worth) stop reading the 14 MB
+	// These exist so the tests that only ever wanted one packet (or one capture's worth) stop reading the 14 MB
 	// whole-corpus extract: the recipe book, the mount spawns, the Casilda quest packets. A gate that reads the
-	// corpus for its BREADTH keeps reading the corpus - see CorpusExtract.
+	// corpus for its breadth keeps reading the corpus - see CorpusExtract.
 	public static class CapturedFixture
 	{
 		// Every packet in `assetName`, in capture order.

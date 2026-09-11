@@ -5,14 +5,15 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// ThreatLevelIIR (0x1745EF6C) - a threat/aggro level (u32) plus a bool (FUN_007a8fd0).
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     ThreatLevelIIR - a threat/aggro level (u32) plus a bool; client reader FUN_007a8fd0.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class ThreatLevelCodec
 	{
 		public const uint Opcode = (uint)IirTypes.ThreatLevelIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(ThreatLevelIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -50,6 +51,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// ThreatLevelIIR (0x1745EF6C).
+	/// <summary>The ThreatLevelIIR body.</summary>
 	public sealed record ThreatLevelIIR(uint Handle, byte Env, uint Threat, byte Flag);
 }

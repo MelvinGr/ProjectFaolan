@@ -4,14 +4,13 @@ using System.Linq;
 
 namespace Faolan.GameServer.Session
 {
-	// Where a world entry's time goes, step by step. `SendBurstlessWorldEntry` marks each step as it finishes and
-	// logs the whole line at the end, so every real entry in faolan.log carries its own profile - which is how the
-	// "first player in the map" spike can be attributed rather than guessed at (#938).
+	// Where a world entry's time goes, step by step. `SendBurstlessWorldEntry` marks each step as it finishes and logs
+	// the whole line at the end, so every real entry in faolan.log carries its own profile.
 	//
-	// ⭐ The reason it is a breakdown and not a total: the total mixes three costs with three different fixes. What
-	// is paid once per SERVER lifetime (a lazily built catalog) is a startup warm-up; what is paid once per MAP (the
-	// zone's NPCs, objects and terrain) is a map pre-load; what is paid on EVERY entry (the character's own rows,
-	// the snapshot) is a query to make cheaper. One number cannot say which you are looking at.
+	// It is a breakdown rather than a total because the total mixes three costs with three different fixes: what is
+	// paid once per server lifetime (a lazily built catalog) is a startup warm-up, what is paid once per map (the
+	// zone's NPCs, objects and terrain) is a map pre-load, and what is paid on every entry (the character's own rows,
+	// the snapshot) is a query to make cheaper. One number cannot say which of the three is in front of you.
 	public sealed class WorldEntryTiming
 	{
 		private readonly Stopwatch _clock = Stopwatch.StartNew();

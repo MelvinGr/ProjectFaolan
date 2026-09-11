@@ -11,10 +11,9 @@ namespace Faolan.Tests
 	// Knubot answer index). These are c2s parsers, so a round-trip (build the framing -> parse) pins them.
 	public class InboundParserTests
 	{
-		// The regression guard that the old synthetic round-trip could not be: the two messages ALIAS on the wire
-		// for fields 1-3, so a delete decodes into the move message with NO error and files template_id into
-		// DestinationContainerId. That is exactly how parsing drops as moves went unnoticed. Pin the aliasing so
-		// nobody "simplifies" the two codecs back into one.
+		// The two messages alias on the wire for fields 1-3, so a delete decodes into the move message with no error
+		// and files template_id into DestinationContainerId - which is how parsing a drop as a move goes unnoticed. Pin
+		// the aliasing so nobody "simplifies" the two codecs back into one.
 		[Fact]
 		public void DeleteItem_DecodesIntoTheMoveMessage_WhichIsWhyTheBugHid()
 		{
@@ -34,17 +33,17 @@ namespace Faolan.Tests
 			};
 			var wire = new FaolanStream().WriteProtobufByteLength(drop).ToArray();
 
-			// Same bytes, read as the WRONG message: no throw, fields 1-2 land correctly...
+			// Same bytes, read as the wrong message: no throw, fields 1-2 land correctly...
 			var asMove = new FaolanStream(wire).ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
 			Assert.Equal(104u, asMove.SourceContainerId.Type);
 			Assert.Equal(7, asMove.SourceItemPos);
 
-			// ...and the item TEMPLATE id silently poses as the destination container.
+			// ...and the item template id silently poses as the destination container.
 			Assert.Equal(3774542u, asMove.DestinationContainerId.Type);
 			Assert.Equal(0, asMove.DestinationItemPos); // field 4 absent - the only structural tell
 		}
 
-		// DeleteItemIIR carries ProtoDeleteItemIIR { container_id, item_pos, template_id } - NOT the sibling move
+		// DeleteItemIIR carries ProtoDeleteItemIIR { container_id, item_pos, template_id } - not the sibling move
 		// message. Proven from the client: DeleteItemIIR_t's constructor installs ProtoDeleteItemIIR::vftable and
 		// fills three fields, while MoveInventoryItemIIR_t installs ProtoMoveInventoryItemIIR::vftable and fills a
 		// fourth (tools/ghidra/DumpDeleteItemFns.java).
@@ -107,10 +106,10 @@ namespace Faolan.Tests
 			Assert.Equal(9, parsed.DestinationItemPos);
 		}
 
-		// The answer pick is an ordinary Knubot record: KnubotBase header then the chosen option index (#534). This
-		// used to assert only "the index is the LAST u32" against a hand-made 12-byte body - which the old codec
-		// satisfied by construction, since it read everything before the last word as an opaque prefix. Round-trip
-		// through the family codec instead, so the header is asserted too.
+		// The answer pick is an ordinary Knubot record: KnubotBase header then the chosen option index. Asserting only
+		// "the index is the last u32" against a hand-made 12-byte body is satisfied by any codec that reads everything
+		// before the last word as an opaque prefix, so the round-trip goes through the family codec and the header is
+		// asserted too.
 		[Fact]
 		public void KnubotAnswer_RoundTripsThroughTheFamilyCodec()
 		{
@@ -124,7 +123,7 @@ namespace Faolan.Tests
 			Assert.Equal(bytes, KnubotCodec.Build(parsed));
 		}
 
-		// Strict parse (#530 rule 4): a body too short to carry the record is a decode FAILURE, not a silent 0 that
+		// Strict parse: a body too short to carry the record is a decode failure, not a silent 0 that
 		// would route the player to option zero.
 		[Fact]
 		public void KnubotAnswer_TooShort_Throws()

@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The feat PROC engine's pure half (#697): which procs an event reaches, and the per-event chance a per-minute
+	// The feat proc engine's pure half: which procs an event reaches, and the per-event chance a per-minute
 	// rate becomes. The trigger values come from the client's own proc tooltip switch (FeatProcTrigger); the rate's
 	// unit from its "Procs per Minute" label.
 	public class FeatProcRulesTests
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, ProcRules.Chance(perMinute, seconds), 6);
 		}
 
-		// A combo landing reaches both combo-form triggers of THAT combo and nothing else - not another combo's, and
+		// A combo landing reaches both combo-form triggers of that combo and nothing else - not another combo's, and
 		// never a spell-line row, whatever its trigger.
 		[Fact]
 		public void ForCombo_ReachesBothComboTriggersOfThatComboOnly()

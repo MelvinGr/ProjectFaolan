@@ -3,11 +3,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The suffix table is a transcription of the client's own `FUN_01119f20` (#775), so what a gate can usefully
-	// assert is that it reproduces the lines a HUMAN has read off the screen - the same licence
+	// The suffix table is a transcription of the client's own `FUN_01119f20`, so what a gate can usefully
+	// assert is that it reproduces the lines a human has read off the screen - the same licence
 	// `StatDisplayScaleTests` gives the divisor table next door.
 	//
-	// The oracle here is the in-client `Gangrenous Stench` tooltip (screenshots on Gitea #772), whose every number is
+	// The oracle here is the in-client `Gangrenous Stench` tooltip (screenshots), whose every number is
 	// the product of a divisor and a suffix. It is the case that makes the two tables' independence visible: the four
 	// invulnerability ratings are a ÷100 that draws `%`, `Damage Multiplier` is a ÷1 that draws `%`, and the vitals
 	// are a ÷100 that draws nothing. Deriving either table from the other gets two of those three wrong.
@@ -22,10 +22,10 @@ namespace Faolan.Tests
 			{ (uint)CharacterStatId.CrushingInvulnerability, StatUnit.Percent, "Gangrenous Stench: -1000 -> -10%" },
 			{ (uint)CharacterStatId.PoisonInvulnerability, StatUnit.Percent, "Gangrenous Stench: -1000 -> -10%" },
 
-			// The same tooltip's "-5% Damage Multiplier" off a stored -5 - a percent whose DIVISOR is 1.
+			// The same tooltip's "-5% Damage Multiplier" off a stored -5 - a percent whose divisor is 1.
 			{ (uint)CharacterStatId.DamageMultiplier, StatUnit.Percent, "Gangrenous Stench: -5 -> -5%" },
 
-			// A vital is a ÷100 with NO suffix: the sheet draws 4285, not 4285%.
+			// A vital is a ÷100 with no suffix: the sheet draws 4285, not 4285%.
 			{ (uint)CharacterStatId.HealthMax, StatUnit.None, "character sheet: 428500 -> 4285" },
 			{ (uint)CharacterStatId.StaminaMax, StatUnit.None, "character sheet: 205300 -> 2053" },
 
@@ -39,9 +39,9 @@ namespace Faolan.Tests
 			{ (uint)CharacterStatId.AttackRange, StatUnit.Metres, "the m literal at 0x01fb3ac8" },
 			{ (uint)CharacterStatId.SpellColumnRadius, StatUnit.Metres, "SpellColumnRadius, the only other metre id" },
 
-			// ⭐ The counter-intuitive pair `StatDisplayScaleTests` calls out, and this table EXPLAINS it. That one
+			// The counter-intuitive pair `StatDisplayScaleTests` calls out, and this table explains it. That one
 			// records 0x0177 as a ÷1 whose tooltip nevertheless ends in a percent sign, with the note "the trailing %
-			// is a FORMAT, not a scale". This is that format: both ids draw `%`, and only 0x017C also divides.
+			// is a format, not a scale". This is that format: both ids draw `%`, and only 0x017C also divides.
 			{ (uint)CharacterStatId.FatalityChance, StatUnit.Percent, "0x177: raw value, percent sign" },
 			{ (uint)CharacterStatId.SpellFatalityChance, StatUnit.Percent, "0x17C: the ×100 twin, same sign" }
 		};
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 				$"stat 0x{statId:X} ({source}): expected {expected}, table says {StatUnitSuffix.Of(statId)}");
 		}
 
-		// ⚠️ The suffix and the divisor are DIFFERENT tables and this is the assertion that keeps anyone from
+		// The suffix and the divisor are different tables and this is the assertion that keeps anyone from
 		// collapsing them: a ÷100 that draws nothing and a ÷1 that draws a percent both exist, so neither set is a
 		// function of the other.
 		[Fact]

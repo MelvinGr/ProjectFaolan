@@ -4,12 +4,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Phases 0x0B and 0x0C of the BehaviorControlCenterIIR carry a bare u32 INSTEAD of a command (#809). The client's
+	// Phases 0x0B and 0x0C of the BehaviorControlCenterIIR carry a bare u32 instead of a command. The client's
 	// `ReadSubClass` (FUN_005e24e0) gives them their own switch arm - read one word into `this+0x28`, return - and its
-	// writer (FUN_005e2650) mirrors it, so the record ends there and is 18 bytes on the wire. The codec used to read
-	// every phase as a command and so refused all nine captured records, running out of bytes looking for an argsLen.
+	// writer (FUN_005e2650) mirrors it, so the record ends there and is 18 bytes on the wire. Reading every phase as a
+	// command instead runs out of bytes looking for an argsLen and refuses all nine captured records.
 	//
-	// What the word MEANS is undecoded [V0]: all nine are s2c, so no client-side call site names it. It is 60 on four
+	// What the word means is undecoded [V0]: all nine are s2c, so no client-side call site names it. It is 60 on four
 	// records from four different actors and captures, 84 on three from one NPC and 33 / 83 once each.
 	public class BehaviorStatePhaseTests
 	{

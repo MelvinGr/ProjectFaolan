@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One `<parameter>` slot of an ambient bark (#493). A bark used to be assumed to carry at most one, inlined onto
-	// NpcChatter as a name-only column; the Damsel in Distress line carries TWO and aborted the whole import, so the
-	// slots became a child collection - the same shape ConversationScreenParameter already has for dialogue screens.
+	// One `<parameter>` slot of an ambient bark. A bark carries any number of them - the Damsel in Distress line
+	// carries two - so they are a child collection rather than a name-only column on NpcChatter, the same shape
+	// ConversationScreenParameter has for dialogue screens.
 	//
-	// Keyed by the parent's natural key plus the slot's ORDINAL, because the order is part of the payload: the client
+	// Keyed by the parent's natural key plus the slot's ordinal, because the order is part of the payload: the client
 	// is fed the rendered string verbatim and the slots must come back in the captured order to round-trip.
 	[PrimaryKey(nameof(NpcTemplateId), nameof(Channel), nameof(SayInChat), nameof(Ordinal))]
 	public class NpcChatterParameter
@@ -30,10 +30,10 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string Name { get; set; } = null!;
 
-		// The slot's value as the capture carries it (escaped exactly), or NULL for a SESSION slot whose value is
+		// The slot's value as the capture carries it (escaped exactly), or null for a session slot whose value is
 		// regenerated per send. `helptext` is content - a `<localized>` element naming a string table entry - and must
-		// be stored; `DetectedChar.name` / `Target.Name` are the addressed player and must NOT be, or the capturing
-		// player's real character name rides the DB into faolan.sql (#417).
+		// be stored; `DetectedChar.name` / `Target.Name` are the addressed player and must not be, or the capturing
+		// player's real character name rides the DB into faolan.sql.
 		public string? Value { get; set; }
 	}
 }

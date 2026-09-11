@@ -4,20 +4,19 @@ using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The FullChar (0x737A6DF9) snapshot's SUB-CLASS - the tails behind the protobuf root:
-	//
-	//   [Quest_c journal][completed-quest journal][quest index][PFAccessWindow_ catalog][stat block]
-	//
-	// The journal, the completed journal and the index are typed regions (Codecs/Quest); the catalog and the stat
-	// block have their own codecs here. Every region is read SEQUENTIALLY - the old landmark search for the catalog's
-	// first `PFAccessWindow_` name (and the "opaque gap" it implied) is gone with #464's re-carve: the quest index is
-	// self-delimiting (no terminal word; that was the catalog's own ListFrame), so the catalog's frame word is simply
-	// the next thing in the stream, and the stat block's two empty list frames are the next thing after the catalog.
-	// Nothing is carried verbatim: the post-catalog remainder used to keep a byte[] fallback "for tails whose stat
-	// block does not open with the two empty list frames", and no captured tail is one.
+	/// <summary>
+	///     The FullChar snapshot's sub-class - the tails behind the protobuf root:
+	///     <c>[Quest_c journal][completed-quest journal][quest index][PFAccessWindow_ catalog][stat block]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The journal, the completed journal and the index are typed regions (Codecs/Quest); the catalog and the stat
+	///     block have their own codecs here. Every region is read sequentially: the quest index is self-delimiting, so the
+	///     catalog's frame word is simply the next thing in the stream, and the stat block's two empty list frames are the
+	///     next thing after the catalog. Nothing is carried verbatim.
+	/// </remarks>
 	public static class FullCharSnapshotSubClassCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(FullCharSnapshotSubClass value)
 		{
 			using var s = new FaolanStream();
@@ -35,9 +34,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		internal static FullCharSnapshotSubClass Read(ref SpanReader r)
 		{
-			// The @609 per-goal objective region is NOT a separate top-level region: it is interleaved per quest and
-			// QuestcRegionCodec already consumed each record's own (QuestcRecord.Objectives, #384). So the boundary
-			// past the journal is the journal's own end.
+			// The @609 per-goal objective region is not a separate top-level region: it is interleaved per quest and
+			// QuestcRegionCodec already consumes each record's own (QuestcRecord.Objectives), so the boundary past the journal is
+			// the journal's own end.
 			var quests = QuestcRegionCodec.Read(ref r);
 			var completed = CompletedQuestJournalRegionCodec.Read(ref r);
 			var index = QuestIndexRegionCodec.Read(ref r);

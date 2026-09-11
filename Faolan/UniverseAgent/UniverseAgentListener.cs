@@ -30,9 +30,9 @@ namespace Faolan.UniverseAgent
 				case UniverseAgentMethods.InitiateAuthentication:
 				{
 					// UniverseAgent.InitiateAuthentication(const std::string& username, const uint32 nGameID) - the
-					// client's own signature (docs/re/aoc-client-rpc-methods.json). nGameID is the product/title id
-					// the login is FOR; the retail client hardcodes 1 (all 116 captured logins across the corpus,
-					// three different accounts). Read and ignored - we serve exactly one game.
+					// client's own signature (docs/re/aoc-client-rpc-methods.json). nGameID is the product id the login
+					// is for; the retail client hardcodes 1 (all 116 captured logins across the corpus, three different
+					// accounts). Read and ignored, because this server serves one game.
 					var accountName = body.ReadString();
 					var gameId = body.ReadUInt32();
 					if (gameId != 1)
@@ -60,14 +60,14 @@ namespace Faolan.UniverseAgent
 					var loginKey = body.ReadString();
 					var account = client.Session.Account;
 
-					// THREE outcomes, and Server:PrivateKey alone decides which two are reachable: with a key, we either
-					// decrypted the block (validate the password) or we did not (REFUSE - the client is unpatched, and
-					// a server that holds a key holds it to make the password required); with no key, there is nothing
-					// to decrypt with, so every client takes the accept-any path on its account name alone.
+					// Three outcomes, and Server:PrivateKey alone decides which two are reachable: with a key, the block
+					// either decrypted (validate the password) or it did not (refuse - the client is unpatched, and a
+					// server that holds a key holds it to make the password required); with no key there is nothing to
+					// decrypt with, so every client takes the accept-any path on its account name alone.
 					//
-					// ⚠️ "We could not decrypt" is NOT the same as "we hold no key" - it is also every unpatched client
-					// on a server that DOES hold one, which is the common case. Keep the two apart: the key is read
-					// FIRST, and the decrypt failure below it can then only mean an unpatched client.
+					// "Could not decrypt" is not the same as "no key is held" - it is also every unpatched client on a
+					// server that does hold one, which is the common case. The key is therefore read first, so the
+					// decrypt failure below it can only mean an unpatched client.
 					bool authenticated;
 					if (Configuration.ServerPrivateKey is { } privateKey)
 					{
@@ -102,10 +102,10 @@ namespace Faolan.UniverseAgent
 						break;
 					}
 
-					// A TIMED ban lifts itself here (#918), not on a background timer: the expiry is a column, so a
+					// A timed ban lifts itself here rather than on a background timer: the expiry is a column, so a
 					// restart inside the window still holds the ban and one that spanned the whole window releases it.
-					// This is the ONE place that transition happens, which is why it sits before the state check
-					// rather than beside it.
+					// This is the one place that transition happens, which is why it sits before the state check rather
+					// than beside it.
 					if (await Database.ClearExpiredBan(account.Id, DateTimeOffset.UtcNow))
 					{
 						Logger.LogInformation("UniverseAgent login: timed ban on '{UserName}' had expired - lifted.", account.UserName);

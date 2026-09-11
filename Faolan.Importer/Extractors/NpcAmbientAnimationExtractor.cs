@@ -10,12 +10,12 @@ using ProtoBuf;
 
 namespace Faolan.Importer.Extractors
 {
-	// The AMBIENT ANIMATIONS retail plays for each creature type (#766), harvested from the captured
+	// The ambient ANIMATIONS retail plays for each creature type, harvested from the captured
 	// `BehaviorId.Emote` records: `[bcc_action_id = the animation][activation_time = its length in centiseconds]`,
 	// no tail. `--report ambient-animation` measures the same records across every other dimension (cadence, the
-	// per-actor counter, how the duration relates to the spacing); this extracts the part that is DATA.
+	// per-actor counter, how the duration relates to the spacing); this extracts the part that is data.
 	//
-	// Attribution is by ACTOR HANDLE against the same capture's FA015807 spawns, and a record whose actor no spawn
+	// Attribution is by actor handle against the same capture's FA015807 spawns, and a record whose actor no spawn
 	// named is dropped - the handle is meaningless outside the session that minted it.
 	public static class NpcAmbientAnimationExtractor
 	{
@@ -28,7 +28,7 @@ namespace Faolan.Importer.Extractors
 			ArgumentNullException.ThrowIfNull(packets);
 
 			// Who is who. A retail character id sits below the handle bases, so the number line cannot tell an NPC
-			// from a player - the spawn's `player_stats` is the only reliable test (the BccAttackTail rule). A LATER
+			// from a player - the spawn's `player_stats` is the only reliable test (the BccAttackTail rule). A later
 			// spawn wins: handles are recycled within a session.
 			var templates = new Dictionary<uint, uint>();
 			foreach (var p in packets)
@@ -83,7 +83,7 @@ namespace Faolan.Importer.Extractors
 				.ToList();
 		}
 
-		// Merges the per-capture harvests: weights ADD (a creature seen idling in three captures is three captures'
+		// Merges the per-capture harvests: weights add (a creature seen idling in three captures is three captures'
 		// worth of evidence) and the duration is the modal one across all of them.
 		public static List<Entry> Merge(IEnumerable<Entry> entries)
 		{

@@ -2,12 +2,15 @@ using System;
 
 namespace Faolan.Core.Protobuf
 {
-	// A 128-bit TEA key (the wire's four words). Hand-extended over the generated protobuf partial.
-	//
-	// It is a VALUE, so it compares by value. The generated class is a plain reference type, which means
-	// `Assert.Equal(a, b)` on two identical keys fails and `key1 == key2` silently asks the wrong question - a
-	// footgun for exactly the comparisons this type invites (does this item's key match the template's? did the
-	// re-encoded LDB key survive the round-trip?). Equality here is the four words and nothing else.
+	/// <summary>
+	///     A 128-bit TEA key (the wire's four words). Hand-extended over the generated protobuf partial.
+	/// </summary>
+	/// <remarks>
+	///     It is a value, so it compares by value. The generated class is a plain reference type, which would make
+	///     <c>Assert.Equal(a, b)</c> on two identical keys fail and <c>key1 == key2</c> ask the wrong question - a
+	///     footgun for exactly the comparisons this type invites (does this item's key match the template's? did the
+	///     re-encoded LDB key survive the round-trip?). Equality here is the four words and nothing else.
+	/// </remarks>
 	public partial class ProtoDecryptionKey : ICloneable, IEquatable<ProtoDecryptionKey>
 	{
 		public object Clone()
@@ -46,8 +49,10 @@ namespace Faolan.Core.Protobuf
 			return !(left == right);
 		}
 
-		// All four words zero - the "no key" a default-constructed instance carries, distinguishable from a real key
-		// without reaching for null (the owned EF mapping cannot be null per-column).
+		/// <summary>
+		///     All four words zero - the "no key" a default-constructed instance carries, distinguishable from a real
+		///     key without reaching for null (the owned EF mapping cannot be null per column).
+		/// </summary>
 		public bool IsEmpty => Key1 == 0 && Key2 == 0 && Key3 == 0 && Key4 == 0;
 
 		public override string ToString()

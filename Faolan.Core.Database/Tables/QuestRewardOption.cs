@@ -3,28 +3,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One item of a quest's OWN reward set - what completing THIS quest pays (Gitea #893, off #815/#464).
+	// One item of a quest's own reward set - what completing this quest pays.
 	//
-	// ⚠️ The table is named for its first third. It began as the pick-one-of-N offer harvested from
-	// `QuestRewardNotifyIIR` (#815), and it is not renamed because an EF class rename scaffolds as DROP + CREATE
+	// The table is named for its first third, the pick-one-of-N offer harvested from
+	// `QuestRewardNotifyIIR`, and it is not renamed because an EF class rename scaffolds as drop + create
 	// (see the `ef_renames_cross` note). What it holds now is the whole set the `Quest_c` journal record carries as
-	// its `obj1`/`obj2` lists: `Optional = false` rows are GRANTED outright at completion, `Optional = true` rows
-	// are OFFERED and the player picks one.
+	// its `obj1`/`obj2` lists: `Optional = false` rows are granted outright at completion, `Optional = true` rows
+	// are offered and the player picks one.
 	//
-	// ⭐ WHERE THE ROWS COME FROM, and why they are per QUEST while `QuestLineRewards` is per LINE. Every captured
+	// Where the rows come from, and why they are per quest while `QuestLineRewards` is per line. Every captured
 	// journal record carries four reward lists, and the client's own renderer (FUN_01617260) plus the catalog settle
-	// what they are: `obj3`/`obj4` are the LINE's guaranteed/optional reward - identical to RDB 1000104's
+	// what they are: `obj3`/`obj4` are the line's guaranteed/optional reward - identical to RDB 1000104's
 	// `MainQuest.reward` / `optional_reward` on 1,553 of 1,553 captured records - previewed on every step that is not
 	// the line's last; `obj1`/`obj2` are this quest's own, paid at its completion (quest 10928 offered exactly its
 	// obj2 and granted the pick). The own set is server-side data the catalog never states (the catalog's `Quest`
 	// record has no reward field), so it is harvested here from the records and from the offers, and the
 	// `--report quest-reward-lists` measurement is where both claims are re-run.
 	//
-	// ⭐ On a line's LAST step the line's reward FOLDS into the quest's own set (574 captured last-step records
+	// On a line's last step the line's reward folds into the quest's own set (574 captured last-step records
 	// carry their line's catalog lists as obj1/obj2), which is what `GetQuestRewardOptions`' catalog fallback pays
 	// for un-harvested final quests - a decision when it was written, an observation now.
 	//
-	// Keyed by (QuestId, Pos), with the optional rows numbered densely FIRST so `Pos` on an optional row IS the
+	// Keyed by (QuestId, Pos), with the optional rows numbered densely first so `Pos` on an optional row is the
 	// index the client answers with (QuestRewardSelectionIIR, 0-based into the offered list). Natural composite
 	// key, no surrogate: the importer delete+reinserts the set on every re-harvest.
 	[PrimaryKey(nameof(QuestId), nameof(Pos))]
@@ -47,7 +47,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(ItemTemplateId))]
 		public virtual Item Item { get; set; } = null!;
 
-		// The item LEVEL the record states for this reward. It equals the item's own `Items.Level` on every captured
+		// The item level the record states for this reward. It equals the item's own `Items.Level` on every captured
 		// element (5,248 of 5,248 on the line half) - carried per row rather than read off the item so a quest that
 		// rewards a scaled item is not silently re-levelled by an Items edit.
 		public ulong Level { get; set; }

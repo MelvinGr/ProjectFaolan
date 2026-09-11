@@ -8,8 +8,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the ChatTextIIR (0xE0B51102) body - a world/system chat line the server
-	// pushes into the client's chat window (#103). Oracle: the localized CriteriaYou system line from the DemoL80
-	// randomActions capture (#7564). Proves the codec reconstructs the captured bytes from the parsed fields
+	// pushes into the client's chat window. Oracle: the localized CriteriaYou system line from the DemoL80
+	// randomActions capture. Proves the codec reconstructs the captured bytes from the parsed fields
 	// (construct-don't-replay) and that Parse is its faithful inverse.
 	public class ChatTextCodecTests
 	{
@@ -25,9 +25,9 @@ namespace Faolan.Tests
 		                                        "6b65793d2671756f743b4d7052662e43782e255e4d476446585426616d703b71756f743b3958282671756f743b202667743b22" +
 		                                        "202f3e3c2f72656d6f7465666f726d61743e0040000001";
 
-		// The record now LEADS with its sub-opcode: the carrier's [u32 len] is the sender's (#530 rule 2), written by
-		// WorldIir.Send. So every captured oracle here is compared against `CapturedRecord.Bytes(...)` - the capture minus its
-		// first four bytes. No wire byte moved.
+		// The record leads with its sub-opcode: the carrier's [u32 len] is the sender's, written by WorldIir.Send. So
+		// every captured oracle here is compared against `CapturedRecord.Bytes(...)` - the capture minus its first four
+		// bytes.
 		[Fact]
 		public void Build_FromArbitraryXml_LeadsWithTheSubopcode()
 		{
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedRecord.Hex(CriteriaLineBody), Convert.ToHexStringLower(rebuilt));
 		}
 
-		// ⭐ The oracle above is not a generic "system line" - it is the mounted-spellweave REFUSAL (#744). The same
+		// The oracle above is not a generic "system line" - it is the mounted-spellweave refusal. The same
 		// 431-byte body answers a `PerformSpecialAction` from the saddle twice in
 		// demol80-demonologist_login_gameplay_annotated_2 (frames 2652 / 2704), seconds before the maintainer noted
 		// "spellweaving while mounted shows a message". LDB 100/562 is `'%s must not have %s running.'`, and the two

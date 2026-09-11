@@ -14,17 +14,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #398: the in-range NPCs ride the world-ENTRY BURST, before the client's first move, which is the shape retail
+	// The in-range NPCs ride the world-entry burst, before the client's first move, which is the shape retail
 	// sends (fr64-75 of the Hoxxling beach login capture). BuildEntryNpcBurst is what builds them.
 	//
-	// ⛔ It was DEAD for three weeks and said so in the log every single login - `0 in-range NPCs` on a map holding
-	// 168 of them. The guard at the top read `entity?.SpawnBody == null`, and #429 then stopped a PLAYER from ever
-	// having a SpawnBody at all (a player's record is rebuilt from live state per send, because a cached one describes
-	// them as they were at login). #429 converted the two other places where SpawnBody "had quietly doubled as the
-	// is-this-spawnable-yet flag" and missed this one, so every entry took the early return.
-	//
-	// Nothing here needs the player's own body - the records it builds are the NPCS'. These gates say that in the one
-	// way that cannot rot: the player entity in them has NO SpawnBody, exactly as a live one never will.
+	// Nothing here needs the player's own body - the records it builds are the NPCs'. A guard such as
+	// `entity?.SpawnBody == null` would take the early return on every entry, because a player never has a SpawnBody:
+	// a player's record is rebuilt from live state per send, since a cached one describes them as they were at login.
+	// These gates say that in the one way that cannot rot: the player entity in them has no SpawnBody, exactly as a
+	// live one never will.
 	public class EntryNpcBurstTests : IDisposable
 	{
 		private const uint MapId = 4010;
@@ -49,7 +46,7 @@ namespace Faolan.Tests
 
 			Assert.Single(records);
 			Assert.Same(npc, Assert.Single(npcs));
-			// and it is SEEDED, which is what stops the interest layer re-spawning or culling it afterwards (#245).
+			// And it is seeded, which is what stops the interest layer re-spawning or culling it afterwards.
 			Assert.Contains(NpcHandle, player.Knowledge.Known);
 			// the handle -> name/template routing the click path reads is registered at the same time
 			Assert.Equal(npc.Name, client.Session.SpawnedNpcNamesByHandle[NpcHandle]);

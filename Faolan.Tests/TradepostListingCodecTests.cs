@@ -8,11 +8,11 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the DispatchTradepostSearchResults grid against the NecroL80
-	// auctionhouse capture (pkt#1028: seller "Jocko", item 0x755D, price 1,000,000). Proves a DB-backed listing
+	// auctionhouse capture (packet 1028: seller "Jocko", item 0x755D, price 1,000,000). Proves a DB-backed listing
 	// row rebuilds the captured bytes (construct-don't-replay) and that Parse is its faithful inverse.
 	public class TradepostListingCodecTests
 	{
-		// The captured single-row body (bytes after the 0x2005 opcode) - same blob the PoC replay used.
+		// The captured single-row body (the bytes after the 0x2005 opcode).
 		private const string CapturedBody = "000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
 		                                    "da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
 		                                    "d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_WithMintHandles_GivesEachRowAUniqueHandle()
 		{
-			// #212: multiple listings of one item all carry the same stored handle (or 0 for fresh sells); the
+			// Multiple listings of one item all carry the same stored handle (or 0 for fresh sells); the
 			// client collapses rows sharing a handle, so the live search path mints a unique handle per row.
 			var listings = Enumerable
 				.Range(0, 5)
@@ -100,7 +100,7 @@ namespace Faolan.Tests
 						Key3 = 0xe2fd8092,
 						Key4 = 0xf17b5c5a
 					},
-					// #749: the wire's `Level` comes off the joined TEMPLATE now, not a per-listing column.
+					// The wire's `Level` comes off the joined template now, not a per-listing column.
 					Level = 1
 				},
 				Template = 0x3e0a97,

@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report teleport-match`: how well the client's own teleport table (RDB 1000087) lines up with the zone-line
-	// `WorldObject` rows we hold (#883). This is the measurement that decides whether importing it is possible at
-	// all - the table has no door NAME, so the match back to a row can only be POSITIONAL, and a positional key is
+	// `WorldObject` rows we hold. This is the measurement that decides whether importing it is possible at
+	// all - the table has no door name, so the match back to a row can only be POSITIONAL, and a positional key is
 	// only usable if the two coordinate systems actually agree.
 	public static partial class ReportCli
 	{
@@ -65,13 +65,13 @@ namespace Faolan.Importer.Cli
 				if (ranked.Count(r => r.Dist <= 2f) > 1)
 					ambiguousAt2++;
 
-				// Where we ALREADY know the destination from a capture, does the client's table agree? That is the
+				// Where we already know the destination from a capture, does the client's table agree? That is the
 				// only independent check on whether the positional match picked the right door.
 				if (best.Door.DestinationMapId is { } known)
 				{
-					// Provenance proxy: a CAPTURED link carries the arrival position; a #341 name-resolved one is
-					// map-only. Worth separating, because "the capture disagrees" and "our name guess disagrees" are
-					// very different claims about which side is wrong.
+					// Provenance proxy: a captured link carries the arrival position; a name-resolved one is map-only.
+					// Worth separating, because "the capture disagrees" and "our name guess disagrees" are very
+					// different claims about which side is wrong.
 					var captured = best.Door.DestinationX != null;
 					if (known == t.DestMapId)
 						agree++;

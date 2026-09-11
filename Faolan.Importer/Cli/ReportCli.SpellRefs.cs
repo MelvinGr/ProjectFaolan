@@ -8,17 +8,17 @@ using Faolan.Importer.Rdb;
 namespace Faolan.Importer.Cli
 {
 	// `--report spell-refs --report-arg <spellId>[,<spellId>...]`: every spell record whose GameAction element
-	// region NAMES the given spell, with the whole element printed by key.
+	// region names the given spell, with the whole element printed by key.
 	//
-	// The inverse of `--report spell-template`, which shows what ONE record carries. A buff whose own record is
+	// The inverse of `--report spell-template`, which shows what one record carries. A buff whose own record is
 	// nearly empty - `Root Immunity` (3882140) has five property fields and no elements at all - has its mechanics
-	// stated by whatever APPLIES it, and that applier is only findable by scanning the corpus for the id. #659 is
-	// the worked case: four spells retail sends a real duration for while their own record's field 8 is 0 or 1 cs.
+	// stated by whatever applies it, and that applier is only findable by scanning the corpus for the id. The worked
+	// case is a spell retail sends a real duration for while its own record's field 8 is 0 or 1 cs.
 	//
-	// `--report-arg kind:<typeId>[,<typeId>...]` searches by element KIND instead of by referenced value - every
+	// `--report-arg kind:<typeId>[,<typeId>...]` searches by element kind instead of by referenced value - every
 	// spell carrying a `StartSpellWeavingMode` (53190), a `Summon`, a `Teleport`. A kind is the only way to reach a
-	// mechanic whose id you do NOT already know, which is the case the value search cannot serve: #141's per-class
-	// spellweave profile was found this way, by asking which records declare the weave-mode kind at all rather than
+	// mechanic whose id you do not already know, which is the case the value search cannot serve: the per-class
+	// spellweave profile is found this way, by asking which records declare the weave-mode kind at all rather than
 	// by guessing a trance-buff id to look for.
 	public static partial class ReportCli
 	{
@@ -64,7 +64,7 @@ namespace Faolan.Importer.Cli
 				var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
 				{
-					// A text slot's u32 is its BYTE LENGTH, so a short string would collide with a small id. The ids
+					// A text slot's u32 is its byte length, so a short string would collide with a small id. The ids
 					// this report is asked about are spell ids (7 digits), well past any text length, and matching on
 					// every value slot is what keeps the search independent of which key a kind carries the id in.
 					var target = byKind

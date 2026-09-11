@@ -3,9 +3,9 @@ using System.Threading;
 namespace Faolan.Web.Content
 {
 	// One upstream tag's share of the mirror store: how many blobs it holds and how many bytes they occupy.
-	// Both numbers answer the same question - how complete the archive is - so they are counted together and
-	// mutated IN PLACE: the tally is created once per tag by the startup scan and then kept live by the store
-	// path, which reaches it through a ConcurrentDictionary entry that is never replaced.
+	// Both numbers answer the same question - how complete the archive is - so they are counted together and mutated in
+	// place: the tally is created once per tag by the startup scan and then kept live by the store path, which reaches
+	// it through a ConcurrentDictionary entry that is never replaced.
 	internal sealed class StoreTally
 	{
 		private long _bytes;

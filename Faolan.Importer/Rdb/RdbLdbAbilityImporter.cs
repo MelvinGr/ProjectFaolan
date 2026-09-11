@@ -9,22 +9,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Rdb
 {
-	// #303: the FULL ability catalog, from the client's own data instead of only the abilities a capture happened to
-	// grant. The captured `0x2052` grants yield 27; the client knows **265**.
+	// the full ability catalog, from the client's own data instead of only the abilities a capture happened to
+	// grant. The captured `0x2052` grants yield 27; the client knows 265.
 	//
-	// **What an ability IS, in RDB terms.** An ability is an RDB type-**1000020** record - the same type as an item
-	// template - so the type alone cannot tell them apart. The LDB does: an ability is named in cat **50210**, the
-	// ABILITY/SPELL name category (with its description in 50211), and is *not* named in the ITEM name categories
+	// What an ability is, in RDB terms. An ability is an RDB type-1000020 record - the same type as an item
+	// template - so the type alone cannot tell them apart. The LDB does: an ability is named in cat 50210, the
+	// ABILITY/spell name category (with its description in 50211), and is *not* named in the item name categories
 	// (50200/50220). That classifier is validated both ways against the catalog we already have: all 27 captured
-	// abilities are 1000020 + 50210, and **0** of them carry an item name, while the 12 candidates that do carry one
+	// abilities are 1000020 + 50210, and 0 of them carry an item name, while the 12 candidates that do carry one
 	// are consumables whose spell-name entry is their effect (e.g. "Purple Lotus Powder Spray").
 	//
-	// ⚠️ **A row from here is IDENTITY ONLY and cannot be granted.** The `0x2052` grant carries the ability's 128-bit
+	// A row from here is identity only and cannot be granted. The `0x2052` grant carries the ability's 128-bit
 	// TEA key (its `Key` quad, the key to its own 1000020 template) and the keys are random - not derivable from the
 	// id (checked). So an ability nobody ever saw granted has a name and nothing else: `Key`/`Data0`/`Slot` stay zero,
 	// which is what `Ability.IsGrantable` reads. The grant path refuses to emit those rather than sending a `0x2052`
 	// with a null key. Recovering the rest needs a capture that grants them - the same key blocker as the item
-	// catalog (#415).
+	// catalog.
 	//
 	// Existing rows are never touched: a captured ability keeps its name, key and slot.
 	public static class RdbLdbAbilityImporter
@@ -36,8 +36,8 @@ namespace Faolan.Importer.Rdb
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 
-			// The English cat-50210 page is picked by cribbing against the SPELL names the catalog already carries -
-			// the same self-calibrating trick RdbLdbNameImporter uses, since language is per-PAGE and this client
+			// The English cat-50210 page is picked by cribbing against the spell names the catalog already carries -
+			// the same self-calibrating trick RdbLdbNameImporter uses, since language is per-page and this client
 			// bundles seven. Abilities ride that same page (they share the category).
 			var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => RdbLdbNameImporter.Norm(s.Name!));
 

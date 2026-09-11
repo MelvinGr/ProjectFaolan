@@ -1,6 +1,6 @@
 namespace Faolan.Core.Enums
 {
-	public enum ItemType // TODO: Maybe just use ContainerKind directly instead of this enum?
+	public enum ItemType
 	{
 		Normal = (int)ContainerKind.Bag,
 		Resource = (int)ContainerKind.Resource,

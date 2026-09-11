@@ -14,7 +14,7 @@ namespace Faolan.Importer.Extractors
 {
 	// Harvests the full identity of every item seen in captures: the template id, the Data1..4 identity quad, and
 	// the hash. Two sources, both yielding (template -> CapturedItem): the 0x737A6DF9 inventory snapshot
-	// (bag/equipped container entries, tail.f8 hash) AND the FA015807 character SPAWN's worn-equipment entries
+	// (bag/equipped container entries, tail.f8 hash) and the FA015807 character spawn's worn-equipment entries
 	// (ProtoAcgItem: Key1..4 = the quad, Template1 = id, Hash = hash). The spawn source is what makes items a
 	// character only ever WORE (never carried in a bag snapshot - e.g. Seadog's Shorts) buildable, so the spawn
 	// equipment renderer (PlayerSpawnEquipment, gated on Hash != 0) can draw them. The quad + hash are
@@ -22,7 +22,7 @@ namespace Faolan.Importer.Extractors
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/re/spawn-dissection.md Phase 5.
 	public static class ItemHashHarvester
 	{
-		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
+		// The container an item was captured in is its kind: ItemType's values are the same protocol container-kind
 		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the
 		// equipped container (101): that is a LOCATION, not an item class - worn gear is ordinary Normal loot - so it
 		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
@@ -30,7 +30,7 @@ namespace Faolan.Importer.Extractors
 		private const uint EquippedContainerKind = 101;
 
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
-		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
+		// snapshot's containers and/or a character spawn's worn equipment - into `into`. Conflicting identities for the
 		// same template are reported (should not happen).
 		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string>? conflicts = null, IDictionary<uint, ItemType>? types = null)
 		{
@@ -79,10 +79,10 @@ namespace Faolan.Importer.Extractors
 				// not a parseable loot-bag packet
 			}
 
-			// ⭐ Auction-house SEARCH RESULTS (DispatchTradepostSearchResults). Its breadth is the same kind the
+			// Auction-house SEARCH RESULTS (DispatchTradepostSearchResults). Its breadth is the same kind the
 			// `itemref://` chat links have and no other harvest source does: a listing describes whatever a STRANGER
 			// is selling, so it reaches items nobody in the corpus ever owned - and each row carries the full
-			// ProtoInventoryGameEntry, key quad and sockets included. Found by an exhaustive key hunt (#897), which
+			// ProtoInventoryGameEntry, key quad and sockets included. Found by an exhaustive key hunt, which
 			// turned up 20 keys riding this shape and none of them held.
 			try
 			{
@@ -93,7 +93,7 @@ namespace Faolan.Importer.Extractors
 				// not a parseable search-results packet
 			}
 
-			// Fifth source: live DispatchAddItem (0x2020) - its inventoryID container type IS the item's kind (0x68 Bag /
+			// Fifth source: live DispatchAddItem (0x2020) - its inventoryID container type is the item's kind (0x68 Bag /
 			// 0x71 Quest), so a quest key delivered to the quest tab is TYPED Quest from data (no domain-knowledge guess).
 			// This is the only source that types an item the snapshot never showed in its quest container (the key only
 			// arrives via this live add in the chain captures). Carries `types` so the classification reaches the upsert.
@@ -108,7 +108,7 @@ namespace Faolan.Importer.Extractors
 
 			// Sixth source: the personal BANK (BankIIR 0x0BA1C1CB). Unlike the world-entry snapshot (a multi-container
 			// root), the bank packet carries a SINGLE container blob (kind 105) after [c350][instance][u8 env][u32 len];
-			// its field-4 entries are the stashed items in the same InventoryListEntry codec. This is the ONLY source
+			// its field-4 entries are the stashed items in the same InventoryListEntry codec. This is the only source
 			// that reaches items a character merely STASHED (crafting mats/food/spare gear - never worn, vended, looted).
 			try
 			{
@@ -133,7 +133,7 @@ namespace Faolan.Importer.Extractors
 			}
 
 			// Eighth source: the Claims/Redeem list (CoreClaimIIR 0x06EC1255, sub 0x0001). Each claim row carries the
-			// item's ProtoDecryptionKey (the Data quad) - the SAME key the client needs to decrypt the template - so a
+			// item's ProtoDecryptionKey (the Data quad) - the same key the client needs to decrypt the template - so a
 			// claim capture is a key source for the (often shop-only) items it offers. No hash on the wire here (hash 0);
 			// the item still redeems via the live DispatchAddItem path and the client renders it from the key.
 			try
@@ -147,16 +147,15 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var (template, item) in found)
 			{
-				// ⚠️ This used to `continue` on any existing entry, so the FIRST packet to mention a template won
-				// outright - and a template's first sighting is often a source that carries no hash. The Claims/Redeem
-				// list is exactly that (identity quad, hash 0), so nine claim items shipped at Hash 0 even though the
-				// SAME capture delivers them seconds later via a live 0x2020 add that DOES carry the hash: the good
-				// record arrived second and was dropped, and logged as a "conflict" for good measure (#719).
+				// An existing entry is merged with, never skipped. A template's first sighting is often a source that
+				// carries no hash - the Claims/Redeem list is exactly that (identity quad, hash 0) - while the same
+				// capture delivers the hash seconds later via a live 0x2020 add. First-sighting-wins would drop the
+				// good record and log it as a conflict.
 				if (into.TryGetValue(template, out var existing) && !existing.Equals(item))
 				{
-					// Filling in a MISSING hash or level is not a disagreement - it is the reason there are several
-					// sources. A real conflict is a different identity quad, or two different NON-ZERO hashes/levels.
-					// Normalising BOTH nullable fields the same way is what keeps a level-only difference (a claim row
+					// Filling in a missing hash or level is not a disagreement - it is the reason there are several
+					// sources. A real conflict is a different identity quad, or two different non-zero hashes/levels.
+					// Normalising both nullable fields the same way is what keeps a level-only difference (a claim row
 					// carries a level but no hash; a loot bag the reverse) from reading as a conflict.
 					var reconciled = Reconcile(existing, item);
 					var oneIsJustMissingAField = reconciled.Equals(Reconcile(item, existing));
@@ -176,10 +175,10 @@ namespace Faolan.Importer.Extractors
 				: (ItemType)(uint)kind;
 		}
 
-		// Recovers (template -> CapturedItem) AND the item's TYPE from a live DispatchAddItem (GameCharInterface s2c
-		// 0x2020). Its inventoryID's container type IS the item's kind (the protocol numbers equal ItemType/ContainerKind:
+		// Recovers (template -> CapturedItem) and the item's type from a live DispatchAddItem (GameCharInterface s2c
+		// 0x2020). Its inventoryID's container type is the item's kind (the protocol numbers equal ItemType/ContainerKind:
 		// 0x68 = 104 Bag/Normal, 0x71 = 113 Quest), so the Casilda chain key - delivered to the quest tab via a live 0x71
-		// add and NEVER present in any snapshot quest container - is typed Quest straight from the wire, no hardcoded
+		// add and never present in any snapshot quest container - is typed Quest straight from the wire, no hardcoded
 		// override. Body grammar mirrors WriteAddItemBody: [u32 containerType][u32 charId][u32 itemPos][u32 len + entry]
 		// [u32 feedback]; the entry is a bare ProtoInventoryGameEntry (no Pos wrapper).
 		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
@@ -255,7 +254,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Recovers (template -> CapturedItem) from a Claims/Redeem list (0x2000 packet whose payload sub-opcode is the
-		// CoreClaimIIR 0x06EC1255, sub 0x0001). Each 106-byte entry's 16-byte token IS the item's ProtoDecryptionKey
+		// CoreClaimIIR 0x06EC1255, sub 0x0001). Each 106-byte entry's 16-byte token is the item's ProtoDecryptionKey
 		// (4×u32 big-endian = the Data quad). Hash is not carried here, so it stays 0 (the item redeems via live add).
 		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
@@ -290,7 +289,7 @@ namespace Faolan.Importer.Extractors
 				if ((d1 | d2 | d3 | d4) == 0)
 					continue;
 
-				// The claim row carries no hash but DOES carry the item's level (the entry's u64, decoded by
+				// The claim row carries no hash but does carry the item's level (the entry's u64, decoded by
 				// CoreClaimCodec as Level - see docs/subsystems/item-claims.md).
 				Record(into, claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0, (uint)claim.Level));
 			}
@@ -345,15 +344,14 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// ⭐ The GEMS socketed into an entry, as items in their own right (#897).
+		// The GEMS socketed into an entry, as items in their own right.
 		//
 		// A socket lives in `ProtoInventoryGameEntry.slot_map` (field 4, `{ slot, item }`), and a gem that has been
-		// slotted NEVER appears as a top-level entry again - it exists only inside the piece it is set into. Every
-		// source here walks top-level entries, so each one is blind to sockets until told otherwise, and that is a
-		// per-source omission rather than a shared one: the snapshot path was taught to walk them in #870 and the
-		// other four were left behind. This is that walk, once, so the next source added gets it for free.
+		// slotted never appears as a top-level entry again - it exists only inside the piece it is set into. Every
+		// source here walks top-level entries, so each one is blind to sockets until told otherwise. The walk lives
+		// here, once, so the next source added gets it for free rather than repeating a per-source omission.
 		//
-		// `Record` rather than a direct assignment, because a gem can ALSO be seen loose in a bag before it is
+		// `Record` rather than a direct assignment, because a gem can also be seen loose in a bag before it is
 		// slotted, and the two sightings must merge on the never-downgrade rule instead of racing.
 		private static void RecordSockets(IDictionary<uint, CapturedItem> into, ProtoInventoryGameEntry? entry)
 		{
@@ -386,18 +384,18 @@ namespace Faolan.Importer.Extractors
 					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
 						map[template.Value] = CapturedItem.From(entry.Item!.ItemData!);
-						// Only classify from a container whose kind IS a real ItemType (Resource/Quest); the Bank (105)
-						// holds items of every kind in one container, so it must NOT stamp a type - leave the DB default.
+						// Only classify from a container whose kind is a real ItemType (Resource/Quest); the Bank (105)
+						// holds items of every kind in one container, so it must not stamp a type - leave the DB default.
 						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(itemType))
 							types[template.Value] = itemType;
 					}
 
-					// The GEMS socketed into this item are items too, and they are only ever seen HERE - a gem in a
+					// The GEMS socketed into this item are items too, and they are only ever seen here - a gem in a
 					// socket never appears as an inventory entry of its own once it has been slotted. That is why 9 of
 					// the 13 gem templates the corpus carries were missing from `Items` entirely: every other source
 					// walks top-level entries, so a socketed gem was invisible to all of them.
 					//
-					// `Record` rather than a direct assignment, because a gem CAN also be seen loose in a bag (before
+					// `Record` rather than a direct assignment, because a gem can also be seen loose in a bag (before
 					// it is slotted) and the two sightings must merge on the never-downgrade rule instead of racing.
 					foreach (var (_, gem) in SnapshotRoot.SocketsOf(entry))
 					{
@@ -432,7 +430,7 @@ namespace Faolan.Importer.Extractors
 
 		// Recovers (template -> CapturedItem) from an auction-house search result.
 		//
-		// ⚠️ `DispatchTradepostSearchResults` and `GameCharInterface.DispatchUpdateCash` are BOTH method index 5, so
+		// `DispatchTradepostSearchResults` and `GameCharInterface.DispatchUpdateCash` are both method index 5, so
 		// they render as the same `0x2005` on the wire and cannot be told apart by opcode - the 12-byte wallet
 		// update and a 1.2 KB grid of listings. The discriminator is the TradepostInterface class id in the header
 		// region, which a wallet update never names. (`CaptureListingImporter` carries the same guard for the same
@@ -455,7 +453,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var row in TradepostListingCodec.Parse(packetBytes[bodyStart..]).Rows)
 			{
-				// ⚠️ A listing's ProtoAcgItem carries NO hash (it is 0 on the wire), which is fine and is why the
+				// A listing's ProtoAcgItem carries no hash (it is 0 on the wire), which is fine and is why the
 				// hash is not gated on here: the key is the payoff, and an AH item renders through the live add.
 				var acg = row.Entry?.ItemData;
 				if (acg?.Key1 != null && acg.Template1 != 0)
@@ -473,7 +471,7 @@ namespace Faolan.Importer.Extractors
 			return haystack.IndexOf(needle) >= 0;
 		}
 
-		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
+		// Recovers (template -> CapturedItem) from a character spawn's worn equipment. The spawn body holds a
 		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
 		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
 		// the hash). SpawnBodyReader scans the body for the character message, so this works on any packet
@@ -491,10 +489,10 @@ namespace Faolan.Importer.Extractors
 			if (!SpawnBodyReader.TryReadCharacterMessage(packetBytes[bodyStart..], out var read))
 				return;
 
-			// ⭐⭐ The worn item AND its socketed GEMS (#897). `InventoryEntry.gem_slots` (field 3) is a list whose
-			// every element carries its own full `ProtoAcgItem` - template, hash and identity quad - so a socketed
-			// gem is an item the spawn hands us exactly as it hands us the piece it is set into. This used to read
-			// `entry.Item` alone and drop them.
+			// The worn item and its socketed gems. `InventoryEntry.gem_slots` (field 3) is a list whose every element
+			// carries its own full `ProtoAcgItem` - template, hash and identity quad - so a socketed gem is an item
+			// the spawn hands us exactly as it hands us the piece it is set into. Reading `entry.Item` alone would
+			// drop them.
 			//
 			// Measured: an exhaustive key hunt over the corpus (`--report feat-keys --report-arg exhaustive`) found
 			// 20 records whose TEA key rides a `SimpleCharFullUpdateIIR` the importer already parses and did not
@@ -508,12 +506,11 @@ namespace Faolan.Importer.Extractors
 				if (template == 0)
 					continue;
 
-				// ⭐⭐ A hash-0 entry is KEPT (#897). This used to require `hash != 0` too, on the grounds that a
-				// spawn entry is only "buildable" with one - which is true of the equipment RENDERER
-				// (`PlayerSpawnEquipment` is gated on `Hash != 0`) and irrelevant to the thing that matters most
-				// here: the identity QUAD is the item's TEA key, and a template we hold a key for is one
-				// `RdbItemImporter` can decrypt however absent its hash is. The loot-bag source three functions down
-				// already keeps hash-0 entries for exactly this reason; this one silently dropped them.
+				// A hash-0 entry is kept. Requiring `hash != 0` is a rule about the equipment renderer
+				// (`PlayerSpawnEquipment` is gated on `Hash != 0`) and irrelevant to what matters here: the identity
+				// quad is the item's TEA key, and a template we hold a key for is one `RdbItemImporter` can decrypt
+				// however absent its hash is. The loot-bag source three functions down keeps hash-0 entries for
+				// exactly this reason.
 				//
 				// Measured: an exhaustive key hunt over the corpus (`--report feat-keys --report-arg exhaustive`)
 				// found 20 records whose key rides a `SimpleCharFullUpdateIIR` we parse and did not hold - every one
@@ -526,21 +523,21 @@ namespace Faolan.Importer.Extractors
 
 		// Records an item, UPGRADING an entry that arrived without a hash.
 		//
-		// ⚠️ This was `into.TryAdd`, and first-record-wins silently cost us the hash for every item whose FIRST
+		// This was `into.TryAdd`, and first-record-wins silently cost us the hash for every item whose first
 		// sighting was a hash-less source. The Claims/Redeem list is exactly that: it carries the identity quad but
 		// sends hash 0 (retail does not put one in a claim row), so nine of the maintainer's claim items sat at Hash 0 in the
-		// shipped DB even though the SAME capture delivers them again seconds later via a live 0x2020 add that DOES
-		// carry the hash. `TryAdd` threw the good record away because the claim row got there first (#719).
+		// shipped DB even though the same capture delivers them again seconds later via a live 0x2020 add that does
+		// carry the hash. `TryAdd` threw the good record away because the claim row got there first.
 		//
-		// The identity quad is never overwritten - only a MISSING hash is filled - so a source that legitimately has
+		// The identity quad is never overwritten - only a missing hash is filled - so a source that legitimately has
 		// no hash cannot clobber one that does, whichever order they appear in. Cross-checked before relying on it:
 		// over the 75 templates the live-add source carries a hash for, our DB already agreed on 64 and DISAGREED on
-		// ZERO, so the hash is the same per-template value whichever source it comes from.
-		// The LEVEL upgrades on exactly the same rule and for the same reason: several sources carry it (the snapshot
+		// zero, so the hash is the same per-template value whichever source it comes from.
+		// The level upgrades on exactly the same rule and for the same reason: several sources carry it (the snapshot
 		// entry, the live add, a shop window, an AH listing, a claim row) and several do not, so first-record-wins
 		// would lose it whenever the first sighting happened to be a source without one. They do not disagree when
 		// both have it - across the dumps, an AH listing and a shop window report the same level as the inventory
-		// entry for every template seen in both (10/10 and 19/19) - so filling a missing one is safe (#725).
+		// entry for every template seen in both (10/10 and 19/19) - so filling a missing one is safe.
 		private static void Record(IDictionary<uint, CapturedItem> into, uint template, CapturedItem captured)
 		{
 			if (!into.TryGetValue(template, out var existing))
@@ -555,7 +552,7 @@ namespace Faolan.Importer.Extractors
 			if (existing.Level == 0 && captured.Level != 0)
 				existing = existing with { Level = captured.Level };
 
-			// The PAIR fills on the same rule and for the same reason: most sources carry a ProtoAcgItem and can
+			// The pair fills on the same rule and for the same reason: most sources carry a ProtoAcgItem and can
 			// answer it, some (a claim row) cannot, and first-record-wins would lose it whenever a source that cannot
 			// happened to arrive first.
 			if (existing.Pair == null && captured.Pair != null)
@@ -564,7 +561,7 @@ namespace Faolan.Importer.Extractors
 			into[template] = existing;
 		}
 
-		// `a` with any field it is MISSING taken from `b`. Two captures agree iff reconciling them in both
+		// `a` with any field it is missing taken from `b`. Two captures agree iff reconciling them in both
 		// directions lands on the same record - which is true exactly when they differ only in fields one of them
 		// left at 0, and false when they genuinely disagree.
 		private static CapturedItem Reconcile(CapturedItem a, CapturedItem b)
@@ -593,37 +590,36 @@ namespace Faolan.Importer.Extractors
 			if (record.Length < 4 || record.ReadU32Be(0) != FullPlayerCharacterCodec.Opcode)
 				return false;
 
-			// SnapshotRoot, NOT FullPlayerCharacterCodec.Parse: we only want the containers, and the full record also
-			// deserializes the SUB-CLASS, whose Quest_c decode still fails on a level-80 journal ("marker 0x2 != 0x412").
-			// That threw away a perfectly good root and cost us every item only ever seen in an L80 bag (#383).
+			// SnapshotRoot, not FullPlayerCharacterCodec.Parse: we only want the containers, and the full record also
+			// deserializes the sub-class, whose Quest_c decode still fails on a level-80 journal ("marker 0x2 != 0x412").
+			// That threw away a perfectly good root and cost us every item only ever seen in an L80 bag.
 			root = SnapshotRoot.Of(record);
 			return true;
 		}
 
 		// `Level` is ProtoAcgItem.level - the entry's wire level. Measured over all 8,644 inventory entries in the
-		// capture dumps it is strictly PER-TEMPLATE (0 templates carry two different levels) and every source that
+		// capture dumps it is strictly per-template (0 templates carry two different levels) and every source that
 		// carries it agrees: an AH listing and a shop window report the same level as the inventory entry
 		// (10/10 and 19/19 of the templates seen in both). So it belongs on the template, harvested here alongside
-		// the identity quad, rather than only being copied onto the per-instance rows (#725).
+		// the identity quad, rather than only being copied onto the per-instance rows.
 		//
 		// 0 means the source did not carry one - like Hash, it must never DOWNGRADE a level another source set.
 		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash, uint Level = 0, CapturedPair? Pair = null)
 		{
-			// Everything one ProtoAcgItem says about a template's identity, in one place. The nine construction sites
-			// below used to spell the quad out by hand; adding the PAIR to each would have been five more positional
-			// arguments at every one of them, and the sites that hold no ProtoAcgItem (a claim row, an AH listing)
-			// cannot answer it at all.
+			// Everything one ProtoAcgItem says about a template's identity, in one place, so the construction sites
+			// below do not spell the quad out by hand. The sites that hold no ProtoAcgItem (a claim row, an AH
+			// listing) cannot answer it at all and use the positional constructor instead.
 			public static CapturedItem From(ProtoAcgItem acg)
 			{
 				return new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level, PairOf(acg));
 			}
 
-			// The SECOND template and its key (#752), recorded only when it is a REAL second one. 341 of the 344
+			// The second template and its key, recorded only when it is a real second one. 341 of the 344
 			// captured pairs have `template2 == template1`, and recording those would fill the column on every item
 			// with a value that says nothing - a null here is what makes `Item.TemplateId2` mean "there is a second
 			// endpoint", rather than "we saw an item".
 			//
-			// ⚠️ Requires key2 as well. The second template is TEA-encrypted under its own key (cross-pairing the
+			// Requires key2 as well. The second template is TEA-encrypted under its own key (cross-pairing the
 			// keys yields garbage headers), so a pair without one is not a pair we can send.
 			private static CapturedPair? PairOf(ProtoAcgItem acg)
 			{
@@ -633,7 +629,7 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// The HIGH endpoint of a level-scaled item: its template and the key that decrypts it (#752).
+		// The high endpoint of a level-scaled item: its template and the key that decrypts it.
 		public readonly record struct CapturedPair(uint Template2, uint Key1, uint Key2, uint Key3, uint Key4);
 	}
 }

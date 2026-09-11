@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the typed LootBagFullUpdateIIR (0xF096251E) contents codec to the captured wire bytes (#187): the
+	// Locks the typed LootBagFullUpdateIIR (0xF096251E) contents codec to the captured wire bytes: the
 	// trailing ProtoLootBagIIR (cash + looter ids + item inventory) is lifted out of the loot-bag body and rebuilt
-	// BYTE-EXACT, and a from-scratch construction (BuildLootBag) reproduces the same bytes when fed the captured
+	// byte-exact, and a from-scratch construction (BuildLootBag) reproduces the same bytes when fed the captured
 	// cash + inventory. Record captured from the "Chest [N7FU]" loot bag. Reader decoded by vtable-xref
 	// (docs/re/iir-subclass-readers.md); the contents protobuf round-trips losslessly through protobuf-net.
 	public class LootBagContentsCodecTests

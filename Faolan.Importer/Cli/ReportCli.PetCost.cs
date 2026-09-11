@@ -11,24 +11,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report pet-cost`: which field of a summoned pet's SPAWN carries the point it costs? (Gitea #823.)
+	// `--report pet-cost`: which field of a summoned pet's spawn carries the point it costs?
 	//
 	// The client shows every necromancer pet as costing 2 regardless of type - `Dread Archmage: Blood Arcanist`
-	// should cost 4 - and the accounting is entirely client-side: stat `0x1C8 PetPoints` appears in ZERO updates
-	// across all 59 necromancer captures. So the client computes the cost from something it already holds, and
-	// #823's reading is that it costs the PET it receives rather than the spell that was cast.
+	// should cost 4 - and the accounting is entirely client-side: stat `0x1C8 PetPoints` appears in zero updates
+	// across all 59 necromancer captures. So the client computes the cost from something it already holds, and the
+	// candidate reading is that it costs the pet it receives rather than the spell that was cast.
 	//
-	// ⭐ The corpus can test that, which the ticket did not realise: it holds pets of THREE different cost classes -
-	// 89 spawns of cost-1 creatures (Demon Warlord, Demon Familiar, Blighted One, ...), 13 of cost-2 (Arcanist,
+	// The corpus can test that: it holds pets of three different cost classes -
+	// 89 spawns of cost-1 creatures (Demon Warlord, Demon Familiar, Blighted One,...), 13 of cost-2 (Arcanist,
 	// Magus, Reaper) and 53 of cost-4 (Archmagus, Blood Arcanist). A field that carries the cost must read 1, 2 and 4
 	// on the right ones, so this discriminates well.
 	//
-	// ⛔ **And nothing does.** Of the 64 numeric fields the character message carries, 60 are present on all 155 pet
-	// spawns and 29 of those actually vary - and NOT ONE equals the pet's cost. `generic_stats` is empty on every
+	// And nothing does. Of the 64 numeric fields the character message carries, 60 are present on all 155 pet
+	// spawns and 29 of those actually vary - and not one equals the pet's cost. `generic_stats` is empty on every
 	// pet. So the pet's spawn body does not carry its cost, which REFUTES this ticket's central reading: the client
 	// cannot be costing "the pet it receives" from anything in the pet's own spawn.
 	//
-	// ⚠️ Two creature types differ in a great many fields, so a raw diff is noise. The test is "does the field EQUAL
+	// Two creature types differ in a great many fields, so a raw diff is noise. The test is "does the field equal
 	// the cost", never "does it differ" - the latter would name dozens. And the counts above are printed as a control
 	// on the sweep itself, because "no field equals the cost" and "the sweep collected no fields" print the same.
 	public static partial class ReportCli
@@ -75,21 +75,21 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The THIRD place a cost could live, and the only one that is a message WE build: the
-		///     <c>PetIIR</c> owner-assign's <c>(f1, f2, f3)</c> KIND triple (#823).
+		///     The third place a cost could live, and the only one that is a message we build: the
+		///     <c>PetIIR</c> owner-assign's <c>(f1, f2, f3)</c> kind triple.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The reason to look. <c>PetCodec</c> carries the triple as two named constants -
+		///     The reason to look. <c>PetCodec</c> carries the triple as two named constants -
 		///     <c>CombatKind = (0, 2, 2)</c> and <c>SocialKind = (5, 0, 1)</c> - and its own comment says where they
-		///     come from: <i>"the capture shows a COMBAT pet = (0,2,2) and a SOCIAL pet = (5,0,1)"</i>. Two capture
+		///     come from: <i>"the capture shows a combat pet = (0,2,2) and a SOCIAL pet = (5,0,1)"</i>. Two capture
 		///     rows, generalised to every pet. So the server sends a literal <b>2</b> in two of the three slots for
 		///     every combat pet it ever summons, and the symptom this ticket opened on is that <b>every pet costs
 		///     2</b>. That coincidence is worth measuring before anything else.
 		///     <para />
-		///     The test is the corpus: resolve each assign's PET HANDLE to the creature it spawned as, and cross-tab
+		///     The test is the corpus: resolve each assign's pet handle to the creature it spawned as, and cross-tab
 		///     the triple against that creature's cost. If a slot is the cost it reads 1, 2 and 4 on the right ones.
 		///     <para />
-		///     ⚠️ A miss here is weaker than a hit. The triple could be a UI slot or a command set and the client
+		///     A miss here is weaker than a hit. The triple could be a UI slot or a command set and the client
 		///     could still cost from its own RDB - so "no slot equals the cost" leaves the constant unjustified
 		///     rather than exonerated, which is why the observed triples are printed either way.
 		/// </remarks>
@@ -104,7 +104,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 			{
 				// Handle -> creature name, from the same capture's spawns. A pet's assign names it only by handle, so
-				// the spawn is the only thing that says WHICH creature was bound.
+				// the spawn is the only thing that says which creature was bound.
 				var nameOf = new Dictionary<uint, string>();
 				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
 				{
@@ -131,7 +131,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// ⚠️ The control, first: "no slot carries the cost" and "no assign was resolved" print the same otherwise.
+			// The control, first: "no slot carries the cost" and "no assign was resolved" print the same otherwise.
 			Console.WriteLine($"    control - {assigns} owner-assign(s) captured, {rows.Count} resolved to a costed creature ({unresolved} unresolved)");
 			if (rows.Count == 0)
 			{
@@ -158,19 +158,19 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The second sweep: which fields DETERMINE the cost, as opposed to carrying it (#823).
+		///     The second sweep: which fields DETERMINE the cost, as opposed to carrying it.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The first sweep asks "does this field EQUAL the cost", and its negative is real but narrower than it
-		///     reads. If the client looks a cost UP - by the summoning spell, by the pet's template - then the field
-		///     it reads carries a KEY, and a key does not equal what it resolves to. That sweep would miss it, and
+		///     The first sweep asks "does this field equal the cost", and its negative is real but narrower than it
+		///     reads. If the client looks a cost up - by the summoning spell, by the pet's template - then the field
+		///     it reads carries a key, and a key does not equal what it resolves to. That sweep would miss it, and
 		///     the refutation it produced ("the pet's spawn does not carry its cost") is only about the value.
 		///     <para />
 		///     So: group the samples by the field's value and ask whether every group is one cost. That is what a key
 		///     looks like.
 		///     <para />
-		///     ⚠️ <b>Purity alone would name dozens</b>, and the reason is the trap this repo has hit before: a field
-		///     that is nearly UNIQUE per sample determines everything for free (a handle, a position, a timestamp).
+		///     <b>Purity alone would name dozens</b>, and the reason is the trap this repo has hit before: a field
+		///     that is nearly unique per sample determines everything for free (a handle, a position, a timestamp).
 		///     The distinct-value count is printed beside every hit and the interpretation is stated with it - a field
 		///     with as many values as there are CREATURES is the creature's identity, which is a real answer; a field
 		///     with as many values as there are SAMPLES is telling you nothing.
@@ -195,7 +195,7 @@ namespace Faolan.Importer.Cli
 				if (distinct < 2)
 					continue; // a constant determines nothing; it is the base rate wearing a purity score
 
-				// ⚠️ The whole judgement is here, and it is about the VALUE COUNT rather than the purity.
+				// The whole judgement is here, and it is about the value count rather than the purity.
 				var shape = distinct >= rows.Count
 					? "⛔ one value per SAMPLE - determines everything for free, says nothing"
 					: distinct <= 4
@@ -214,7 +214,7 @@ namespace Faolan.Importer.Cli
 			{
 				Console.WriteLine($"    {field,-46} {distinct,4} distinct value(s)   {shape}");
 
-				// ⭐ The MAPPING, for the ones small enough to read. A key is only actionable once you can see what
+				// The MAPPING, for the ones small enough to read. A key is only actionable once you can see what
 				// retail put in it - that is what says whether OUR spawn sends the same value.
 				if (distinct > 24)
 					continue;
@@ -228,7 +228,7 @@ namespace Faolan.Importer.Cli
 		{
 			await using var db = OpenDb();
 
-			// creature NAME -> the point cost of the spell that summons it. The link is the summon spell's own
+			// creature name -> the point cost of the spell that summons it. The link is the summon spell's own
 			// `SummonSpawnHash`, but the names are what a spawn body carries, so the join is by name here and the
 			// costs are quoted from the spell rows.
 			var costOf = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
@@ -244,7 +244,7 @@ namespace Faolan.Importer.Cli
 
 			var seen = new List<(string Name, uint Cost, uint Level, uint[] Stats)>();
 
-			// ⭐ Every NUMERIC field of the character message, by name, so the sweep is not limited to the one array
+			// Every NUMERIC field of the character message, by name, so the sweep is not limited to the one array
 			// I guessed at. A per-entity cost has to be SOME number the body carries, and reflection asks all of them
 			// rather than requiring the right guess up front.
 			var numeric = new List<(string Field, uint Cost, ulong Value)>();
@@ -275,15 +275,15 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			if (byCost.Count < 2)
 			{
-				// ⛔ The answer #823 needs and the corpus may not have. One cost class cannot discriminate: every
-				// candidate field reads the same on every sample, so nothing can be ruled in OR out.
+				// One cost class cannot discriminate: every candidate field reads the same on every sample, so
+				// nothing can be ruled in or out.
 				Console.WriteLine("  ⛔ Fewer than TWO cost classes are captured, so nothing here can discriminate: a field that");
 				Console.WriteLine("     carried the cost and a field that was constant would look identical. This needs a capture of");
 				Console.WriteLine("     a pet whose cost differs from the ones already held.");
 				return 1;
 			}
 
-			// ⭐ THE TEST. A field carrying the cost reads the cost - so score each stat SLOT by whether its value
+			// the test. A field carrying the cost reads the cost - so score each stat slot by whether its value
 			// equals the pet's own cost on every sample that has it.
 			var width = seen.Max(s => s.Stats.Length);
 			Console.WriteLine($"  generic_stats is up to {width} slot(s) wide. A slot carrying the cost equals it on EVERY sample:");
@@ -315,10 +315,10 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// ⭐ The general sweep: every numeric field the message carries, scored the same way. A field that is the
+			// The general sweep: every numeric field the message carries, scored the same way. A field that is the
 			// cost equals it on every sample; anything less is not the field.
 			Console.WriteLine();
-			// ⚠️ The control on the sweep itself. "No field equals the cost" and "the sweep collected no fields" are
+			// The control on the sweep itself. "No field equals the cost" and "the sweep collected no fields" are
 			// the same printed answer, and only one of them is a finding.
 			var groups = numeric.GroupBy(n => n.Field).ToList();
 			var complete = groups.Count(g => g.Count() >= seen.Count);

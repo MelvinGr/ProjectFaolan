@@ -7,42 +7,38 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// SimpleCharFullUpdateIIR (0xFA015807) - the ENTITY SPAWN body, for a player and for an NPC alike:
-	//
-	//   [u32 subop][u32 class][u32 handle][u32 fieldA]
-	//   [varint transformLen][0x0A vec3][0x12 quat][opt 0x25 scale][0x18 playfield varint]
-	//   [pre-IIR scaffold]                                     SpawnPreIirCodec
-	//   [u8 0x41][u32 coreCharIirHeader][u32 msgLen][msg]      the embedded CoreCharacterFullUpdateIIR
-	//   [post-IIR stream]                                      SpawnPostIirCodec
-	//
-	// ONE codec for the message (#530 rule 5, wave 5b). It used to be THREE emitters of the same IIR:
-	// `PlayerSpawnScaffoldCodec` (which declared the opcode), `NpcSpawnBuilder.BuildBody` and
-	// `NpcSpawnPreIirCodec` - and two of them wrote the same transform through different framings, exactly the way
-	// wave 3's WorldObject merge did: the player wrote the transform's length as the literal `0x2C` and the NPC
-	// computed it, which is the same 44 bytes for every 4-byte playfield token and diverges for any other width.
-	// Computing it is what makes a short token (a 0 token gives a 41-byte transform) stay self-consistent, and a
-	// mismatch there desyncs the client's version read into "Wrong client version of SimpleCharFullupdateIIR".
-	//
-	// The two families differ in ONE region, the post-IIR entry slot; see SpawnPostIir.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2) - this builds the record only.
+	/// <summary>
+	///     SimpleCharFullUpdateIIR - the entity spawn body, for a player and for an NPC alike:
+	///     <code>
+	///     [u32 subop][u32 class][u32 handle][u32 fieldA]
+	///     [varint transformLen][0x0A vec3][0x12 quat][opt 0x25 scale][0x18 playfield varint]
+	///     [pre-IIR scaffold]                                     SpawnPreIirCodec
+	///     [u8 0x41][u32 coreCharIirHeader][u32 msgLen][msg]      the embedded CoreCharacterFullUpdateIIR
+	///     [post-IIR stream]                                      SpawnPostIirCodec
+	///     </code>
+	/// </summary>
+	/// <remarks>
+	///     The two families differ in one region, the post-IIR entry slot; see <see cref="SpawnPostIir" />. The u32 carrier
+	///     length belongs to the framing sender, so this builds the record only.
+	/// </remarks>
 	public static class SimpleCharFullUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SimpleCharFullUpdateIIR;
 
-		// The embedded CoreCharacterFullUpdateIIR's version byte, 'A'. The client rejects any other value.
+		/// <summary>The embedded CoreCharacterFullUpdateIIR's version byte, 'A'. The client rejects any other value.</summary>
 		public const byte CoreCharacterVersion = 0x41;
 
-		// The transform component's protobuf field tags: a ProtoGameCodeDynelIIR
-		// { position = 1, rotation = 2, playfield_instance = 3 }. All 15787 captured FA015807/66AEDD50 groups carry
-		// exactly those three fields in that order; field 4 (a fixed32) is never observed - see the Scale note on
-		// the value type.
+		/// <summary>
+		///     The transform component's protobuf field tags: a ProtoGameCodeDynelIIR with position 1, rotation 2 and
+		///     playfield_instance 3. All 15,787 captured spawn and dynel groups carry exactly those three fields in that
+		///     order; field 4, a fixed32, is never observed - see the Scale remark on the value type.
+		/// </summary>
 		private const byte PositionTag = 0x0A;
 		private const byte RotationTag = 0x12;
 		private const byte ScaleTag = 0x25;
 		private const byte PlayfieldTag = 0x18;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SimpleCharFullUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -76,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			value.CoreCharIirHeader = r.ReadU32Be();
 			value.Character = r.ReadBytesU32Length().FromProtobuf<ProtoCoreCharacterIIR>();
 
-			// The post-IIR runs to the end of the record, and its grammar is end-anchored - see SpawnPostIirCodec.
+			// The post-IIR runs to the end of the record, and its grammar is end-anchored; see SpawnPostIirCodec.
 			value.Post = SpawnPostIirCodec.Read(r.ReadRemaining());
 			return value;
 		}
@@ -85,11 +81,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			s.WriteUInt32(Opcode).WriteUInt32(v.Ack).WriteUInt32(v.Handle).WriteUInt32(v.FieldA);
 
-			// The transform-length prefix: the client reads EXACTLY this many bytes as the base transform, THEN
-			// reads the SimpleCharFullUpdateIIR version byte - so it MUST equal the actual transform length. It is
-			// 0x2C (44) for the usual 4-byte playfield-token varint (every captured token falls in [2^21, 2^28),
-			// which protobuf writes as 4 bytes), which is why it was long hardcoded on the player side. A 0/small
-			// token encodes to a SHORTER varint; a hardcoded 0x2C then over-reads by 3 and the client asserts.
+			// The transform-length prefix must be computed, never hardcoded: the client reads exactly this many bytes
+			// as the base transform and then reads the version byte, so it has to equal the actual transform length.
+			// It is 44 for the usual 4-byte playfield-token varint - every captured token falls in the range protobuf
+			// writes as four bytes - but a zero or small token encodes shorter, and a fixed 44 then over-reads by three
+			// and the client asserts.
 			using var transform = new FaolanStream();
 			transform.WriteByte(PositionTag).WriteProtobufByteLength((ProtoVec3)v.Position).WriteByte(RotationTag).WriteProtobufByteLength((ProtoQuat)v.Rotation);
 			if (v.Scale != null)
@@ -102,9 +98,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			SpawnPreIirCodec.Write(s, v.PreIir);
 
-			// A U32 length, not a byte one: the CharacterIIR is [u32 msgLen][protobuf], and every real character's
-			// message is longer than 255 bytes (Dikketest's is 382), so the byte-length helper throws on everything
-			// except a fixture small enough to hide it.
+			// A u32 length, not a byte one: the CharacterIIR is [u32 msgLen][protobuf], and every real character's
+			// message is longer than 255 bytes, so the byte-length helper throws on everything except a fixture small
+			// enough to hide it.
 			s.WriteByte(v.CoreCharVersion).WriteUInt32(v.CoreCharIirHeader).WriteProtobufUInt32Length(v.Character);
 
 			SpawnPostIirCodec.Write(s, v.Post);
@@ -131,40 +127,51 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 	}
 
-	// SimpleCharFullUpdateIIR (0xFA015807) - a whole entity spawn, per the validated grammar in
-	// docs/re/player-spawn-generation.md and docs/re/fa015807-spawn-reader.md.
+	/// <summary>
+	///     The SimpleCharFullUpdateIIR body - a whole entity spawn, per the validated grammar in
+	///     docs/re/player-spawn-generation.md and docs/re/fa015807-spawn-reader.md.
+	/// </summary>
 	public sealed record SimpleCharFullUpdateIIR
 	{
 		public uint Ack { get; set; } = EntityClass.Character;
 		public uint Handle { get; set; }
 		public uint FieldA { get; set; }
 
-		// Transform component (the 0x2C group). #352 kept these two as raw field payloads on the grounds that
-		// typing "would lose the exact captured field-set" - measured over 11,632 captured player spawns, the field
-		// set NEVER varies (vec3 is always {0D,15,1D}, quat always {0D,15,1D,25}). So there is no captured field-set
-		// to lose, and the byte-exact regeneration gate over every captured spawn is what says so.
+		/// <summary>
+		///     The transform component. Typed rather than kept as raw field payloads: measured over 11,632 captured player
+		///     spawns the field set never varies - the vec3 is always {0D,15,1D} and the quaternion always {0D,15,1D,25} -
+		///     and the byte-exact regeneration gate over every captured spawn confirms nothing is lost.
+		/// </summary>
 		public Vector3 Position { get; set; }
 		public Quaternion Rotation { get; set; }
 
-		// Field 4 as a fixed32, kept RAW - unlike the two above this one is genuinely unmodelled: it is absent from
-		// all 11,632 captured player spawns, so the corpus proves nothing about what it would contain, and
-		// ProtoGameCodeDynelIIR declares field 4 as `repeated RunningEffects` (length-delimited, not fixed32). If a
-		// 0x25 ever does turn up, one of the two models is wrong and it needs decoding, not typing.
-		public byte[]? Scale { get; set; } // null when absent
+		/// <summary>
+		///     Field 4 as a fixed32, kept raw because it is genuinely unmodelled: it is absent from all 11,632 captured
+		///     player spawns, so the corpus proves nothing about what it would contain, and ProtoGameCodeDynelIIR declares
+		///     field 4 as a length-delimited repeated RunningEffects rather than a fixed32. If one ever does turn up, one of
+		///     the two models is wrong and it needs decoding rather than typing. Null when absent.
+		/// </summary>
+		public byte[]? Scale { get; set; }
 
 		public ulong Playfield { get; set; }
 
-		// The client's own SimpleCharFullUpdateIIR scaffold between the transform and the embedded CoreCharacter.
+		/// <summary>
+		///     The client's own SimpleCharFullUpdateIIR scaffold, between the transform and the embedded CoreCharacter.
+		/// </summary>
 		public SpawnPreIir PreIir { get; set; } = new SpawnPreIir();
 
-		// The head of the embedded CoreCharacterFullUpdateIIR: its version byte and the type-stable
-		// field-presence/shape word that follows it. Every captured player frame carries 0x8208 (one carries
-		// 0x820A); an NPC's comes from NpcStatCore.IirHeader.
+		/// <summary>
+		///     The head of the embedded CoreCharacterFullUpdateIIR: its version byte and the type-stable field-presence and
+		///     shape word that follows it. Every captured player frame carries 0x8208, one carrying 0x820A; an NPC's comes
+		///     from NpcStatCore.IirHeader.
+		/// </summary>
 		public byte CoreCharVersion { get; set; } = SimpleCharFullUpdateCodec.CoreCharacterVersion;
 		public uint CoreCharIirHeader { get; set; } = DefaultCoreCharIirHeader;
 
-		// The embedded character message - identity, appearance, equipment. TYPED, not bytes: its re-encode is
-		// byte-identical on every captured spawn (ProtobufCorpusRoundTripTests).
+		/// <summary>
+		///     The embedded character message - identity, appearance, equipment. Typed rather than bytes: its re-encode is
+		///     byte-identical on every captured spawn (ProtobufCorpusRoundTripTests).
+		/// </summary>
 		public ProtoCoreCharacterIIR Character { get; set; } = new ProtoCoreCharacterIIR();
 
 		public SpawnPostIir Post { get; set; } = new SpawnPostIir();

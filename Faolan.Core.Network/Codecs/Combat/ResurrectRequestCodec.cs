@@ -5,24 +5,26 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// s2c DispatchResurrectRequest (0x2014) - "someone is offering to resurrect you". It is an OFFER, not the
-	// resurrection: the client holds it and answers on the GameCharAgent tier, with `ResurrectMe(resurrectSpellID)`
-	// to accept or `CancelResurrectionRequest(resurrectRequesterID, resurrectSpellID)` to decline - which is why the
-	// spell id here is what comes back, and why it needs to resolve in nothing for the exchange to work.
-	//
-	//   [ID32 resurrector][u32 spellTemplate][u8 castSpellOnResurrect]
-	//
-	// ⭐ The three field NAMES are the client's own (#890): `GameCharInterfaceDispatch_t::DispatchResurrectRequest`
-	// (`FUN_004c0160`) reads them in order and asserts "stream bad after 'i_cResurrectorID'", "after
-	// 'i_nSpellTemplate'", "after 'i_castSpellOnResurrect'" - two u32 reads for the ID32, one for the template, one
-	// byte for the flag, then a virtual call at slot 0x64 == (0x18 + 1) * 4, the interface's own slot rule.
-	//
-	// ⚠️ The corpus carries exactly ONE of these, in `NecroL80_..._annotated_9`: a SELF-resurrection, where the
-	// resurrector is the player themselves. It is sent the instant the Self-Resurrection Potion is USED - while alive
-	// - because that is what the potion does: the item's tooltip says it "provides the imbiber with an option to
-	// resurrect themselves at the location of their death... The option to self-resurrect will persist until it is
-	// used." So the offer is armed at use time and answered at death. Nothing about the DEATH side of the exchange is
-	// captured, and a player-to-player resurrect (where the resurrector is somebody else) is not captured at all.
+	/// <summary>
+	///     s2c DispatchResurrectRequest - "someone is offering to resurrect you". It is an offer, not the resurrection: the
+	///     client holds it and answers on the GameCharAgent tier with <c>ResurrectMe(resurrectSpellID)</c> to accept or
+	///     <c>CancelResurrectionRequest(resurrectRequesterID, resurrectSpellID)</c> to decline, so the spell id here is the
+	///     token that comes back and need not resolve to anything for the exchange to work. Body:
+	///     <c>[ID32 resurrector][u32 spellTemplate][u8 castSpellOnResurrect]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The three field names are the client's own: GameCharInterfaceDispatch_t::DispatchResurrectRequest (FUN_004c0160)
+	///     reads them in order and asserts "stream bad after 'i_cResurrectorID'", "after 'i_nSpellTemplate'" and "after
+	///     'i_castSpellOnResurrect'" - two u32 reads for the ID32, one for the template, one byte for the flag, then a
+	///     virtual call at slot 0x64.
+	///     <para>
+	///         The corpus carries exactly one of these, in NecroL80_..._annotated_9: a self-resurrection, where the resurrector
+	///         is the player. It is sent the instant the Self-Resurrection Potion is used, while alive, because that is what
+	///         the potion does - its tooltip says the option "will persist until it is used" - so the offer is armed at use
+	///         time and answered at death. The death side of the exchange is not captured, nor is a player-to-player
+	///         resurrect.
+	///     </para>
+	/// </remarks>
 	public static class ResurrectRequestCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchResurrectRequest;
@@ -51,8 +53,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// `ResurrectorId` is the character offering the resurrection - the player themselves for a self-resurrection.
-	// `SpellTemplate` is the token the answer echoes back, and `CastSpellOnResurrect` says whether that spell is cast
-	// when the offer is taken (1 in the captured request, and 1 in the field the client's own effect carries).
+	/// <summary>
+	///     The DispatchResurrectRequest body. <c>ResurrectorId</c> is the character offering the resurrection - the player
+	///     themselves for a self-resurrection. <c>SpellTemplate</c> is the token the answer echoes back, and
+	///     <c>CastSpellOnResurrect</c> says whether that spell is cast when the offer is taken; it is 1 in the captured
+	///     request and in the field the client's own effect carries.
+	/// </summary>
 	public sealed record ResurrectRequest(uint ResurrectorId, uint SpellTemplate, bool CastSpellOnResurrect);
 }

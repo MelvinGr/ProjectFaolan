@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #921: a harvest node's map pin is `WaypointType` (0xAC) on the dynel. Retail flips it to `ResourceGatheringActive`
+	// A harvest node's map pin is `WaypointType` (0xAC) on the dynel. Retail flips it to `ResourceGatheringActive`
 	// beside the first swing of a bout and restores the node's own kind 10 s after the last swing. The bytes are the
 	// captured push; the timing is the zone's countdown.
 	public class HarvestGatheringPinTests

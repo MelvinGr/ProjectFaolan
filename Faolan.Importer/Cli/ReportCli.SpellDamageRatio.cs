@@ -13,18 +13,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spell-damage-ratio` (#924): every captured spell hit against what the spell's own template STATES for
-	// the caster's level, as a ratio - and, the question the ticket actually turns on, **how many distinct CASTERS the
-	// corpus holds**.
+	// `--report spell-damage-ratio`: every captured spell hit against what the spell's own template states for
+	// the caster's level, as a ratio - and, the question the ticket actually turns on, how many distinct CASTERS the
+	// corpus holds.
 	//
-	// ⭐ `StatDamageIIR` names the spell that caused it (`SpellBaseId`), so a health hit can be joined to the spell
-	// catalog rather than aggregated by damage SCHOOL, which is what hid the split. Done per spell, the corpus divides
-	// cleanly: at Tortage levels the stated hit IS the damage (ratio 1.00), and at level 80 it is ~4.7x.
+	// `StatDamageIIR` names the spell that caused it (`SpellBaseId`), so a health hit can be joined to the spell
+	// catalog rather than aggregated by damage school, which is what hid the split. Done per spell, the corpus divides
+	// cleanly: at Tortage levels the stated hit is the damage (ratio 1.00), and at level 80 it is ~4.7x.
 	//
-	// ⚠️ **The ratio cannot be turned into a rule from this corpus, and the last column is why.** A multiplier that is
-	// per-CASTER cannot be separated from one that is per-LEVEL while every level-80 hit comes from one character, and
+	// The ratio cannot be turned into a rule from this corpus, and the last column is why. A multiplier that is
+	// per-caster cannot be separated from one that is per-level while every level-80 hit comes from one character, and
 	// its inputs never travel: across every level-80 capture the only caster stat pushed is `MagicRating`. So this
-	// report exists to be RE-RUN - the moment a second geared caster is harvested, the caster column moves and the
+	// report exists to be RE-run - the moment a second geared caster is harvested, the caster column moves and the
 	// separation becomes possible. Recording "one caster" as a fact in prose is what goes stale.
 	public static partial class ReportCli
 	{
@@ -43,7 +43,7 @@ namespace Faolan.Importer.Cli
 			Dictionary<uint, uint> kinds;
 			await using (var db = OpenDb())
 			{
-				// Every spell's health-effect KIND, flat or not. The census below uses it to say why a spell carries no
+				// Every spell's health-effect kind, flat or not. The census below uses it to say why a spell carries no
 				// ratio - "it states a percent" is a different answer from "we hold no effect row for it", and reading
 				// a blank as the second when it is the first is what sent the first cut of this ticket wrong.
 				kinds = (await db.SpellStatEffects.AsNoTracking()
@@ -54,11 +54,11 @@ namespace Faolan.Importer.Cli
 					.ToDictionary(g => g.Key, g => g.First().EffectKind);
 
 				stated = (await db.SpellStatEffects.AsNoTracking()
-						// ⛔ FLAT kinds only. `HitPercentage` (53007) states a percent OF THE TARGET'S POOL, not a
+						// FLAT kinds only. `HitPercentage` (53007) states a percent of the target's POOL, not a
 						// magnitude - so its "stated" number is 1, 2 or 5 and the observed hit is 1%, 2% or 5% of
 						// whatever was hit. A first cut of this included them and read the resulting quotients as a
 						// per-caster constant: 6341 for the necromancer, 6126 and 5949 for the demonologist. Those are
-						// TARGET HEALTH POOLS (634,100 / 612,600 / 594,900), and they looked like exactly the finding
+						// target health POOLS (634,100 / 612,600 / 594,900), and they looked like exactly the finding
 						// the ticket is after - two casters, same level, different constants, one of them moving
 						// between sessions. See SpellPoolEffects for the kinds.
 						.Where(e => e.StatId == CharacterStatId.HealthCurrent && e.Amount < 0 && FlatDamageKinds.Contains(e.EffectKind))
@@ -67,7 +67,7 @@ namespace Faolan.Importer.Cli
 					.GroupBy(e => e.SpellId)
 					.ToDictionary(g => g.Key, g =>
 					{
-						// ⚠️ The INSTANT row, not the first one. A spell that both hits and ticks carries the same
+						// The INSTANT row, not the first one. A spell that both hits and ticks carries the same
 						// magnitudes twice, distinguished only by `PeriodCentiseconds` - taking either indifferently
 						// compares a direct hit against a DoT's per-tick number.
 						var e = g.FirstOrDefault(r => r.PeriodCentiseconds == 0) ?? g.First();
@@ -94,7 +94,7 @@ namespace Faolan.Importer.Cli
 				var playerLevel = 0u;
 				var perCasterSpell = new Dictionary<(uint Caster, uint Spell), List<int>>();
 
-				// ⭐ The TARGET's own level, off its own spawn record - which is what the per-target ratios below turn
+				// The target's own level, off its own spawn record - which is what the per-target ratios below turn
 				// out to be a function of. Never off NpcSpawns: a spawn row is a per-respawn observation.
 				var targetLevel = new Dictionary<uint, uint>();
 				var targetName = new Dictionary<uint, string>();
@@ -177,14 +177,14 @@ namespace Faolan.Importer.Cli
 				                  + $"{(mid is { } m ? m.ToString() : "-"),9} {(mid is { } m2 and > 0 ? $"{(double)median / m2:F2}" : "-"),6}");
 			}
 
-			// ⭐ THE COLUMN THE TICKET TURNS ON. Everything above is a ratio; this is whether the ratio can ever become
+			// the column the TICKET TURNS on. Everything above is a ratio; this is whether the ratio can ever become
 			// a rule from what we hold.
 			Console.WriteLine();
 			SpellCasterCensus(rows, names, kinds, stated);
 			SpellDamageByTarget(perTarget, names, stated);
 			SpellDamageByTargetLevel(perTarget, stated);
 
-			// ⚠️ PLAYER casters only. Every pet, guard and mob that lands a spell hit carries its own handle, which is
+			// player casters only. Every pet, guard and mob that lands a spell hit carries its own handle, which is
 			// how a first cut of this counted 41 "casters" at the level cap - a number that would have unblocked the
 			// ticket on the strength of the necromancer's own pets.
 			var players = rows.Where(r => r.IsPlayer).ToList();
@@ -195,7 +195,7 @@ namespace Faolan.Importer.Cli
 				                  + $"{rows.Where(r => r.PlayerLevel == g.Key).Select(r => r.Caster).Distinct().Count(),12} {g.Select(r => r.Capture).Distinct().Count(),9}");
 			}
 
-			// ⚠️ A caster only COUNTS if it lands a hit this report can ratio - i.e. one whose spell states a flat
+			// A caster only COUNTS if it lands a hit this report can ratio - i.e. one whose spell states a flat
 			// magnitude. A second caster whose every captured hit is a percent-of-pool separates nothing.
 			var atCap = players.Where(r => r.PlayerLevel >= 80).ToList();
 			var comparable = atCap.Where(r => StatedMid(stated, r.SpellId, r.PlayerLevel) is > 0).Select(r => r.Caster).Distinct().Count();
@@ -209,22 +209,22 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐⭐ The ratio against the TARGET'S LEVEL, with critical hits taken out - the curve the per-target table
+		///     The ratio against the target's level, with critical hits taken out - the curve the per-target table
 		///     above is a function of.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ <b>A crit is a clean x2 and has to come out first.</b> Every target's hits form a tight base cluster
+		///     <b>A crit is a clean x2 and has to come out first.</b> Every target's hits form a tight base cluster
 		///     plus occasional outliers at almost exactly twice it - Pestilential Blast on Boros is ten hits of
 		///     15,444-16,900 and one of 32,199; on Argus five of 15,402-16,531 and two of 33,562/33,769. Left in, those
 		///     inflate a target's mean by up to 2x and scatter the curve; taken out, what is left per target is the
 		///     spell's own stated roll at +/-5%.
 		///     <para />
-		///     ⭐⭐ <b>The ratio falls as the target's level rises</b>, which is what mitigation looks like, and it is
+		///     <b>The ratio falls as the target's level rises</b>, which is what mitigation looks like, and it is
 		///     why the ticket's ~4.7x is not a caster property: that figure is an average over a target mixture that is
-		///     mostly LOW-level mobs. Against the level-80 creatures a level-80 player actually fights it is ~2.5.
+		///     mostly low-level mobs. Against the level-80 creatures a level-80 player actually fights it is ~2.5.
 		///     <para />
-		///     ⚠️ The curve is not clean below the top: level 31 gives both 3.70 and 4.82 on the same spell, so target
-		///     level is a strong predictor and not the whole rule. What IS solid is the floor at the top and the shape.
+		///     The curve is not clean below the top: level 31 gives both 3.70 and 4.82 on the same spell, so target
+		///     level is a strong predictor and not the whole rule. What is solid is the floor at the top and the shape.
 		/// </remarks>
 		private static void SpellDamageByTargetLevel(IReadOnlyList<(string Capture, uint Caster, uint PlayerLevel, uint SpellId, uint Target, string TargetName, uint TargetLevel, int Damage)> hits,
 			IReadOnlyDictionary<uint, StatedRamp> stated)
@@ -275,14 +275,14 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐⭐ The ratio, per TARGET - which is what the ~4.7x actually varies with.
+		///     The ratio, per target - which is what the ~4.7x actually varies with.
 		/// </summary>
 		/// <remarks>
-		///     ⛔ <b>This refutes the ticket's central claim.</b> #924 read the ~4.7x as a per-CASTER multiplier
-		///     because five spells whose bases differ 3x all landed near it. Split by target instead of aggregated per
-		///     spell, the same corpus says otherwise: within ONE target the spread is 1.03-1.11, i.e. the spell's own
-		///     stated roll and nothing else, while ACROSS targets in the SAME capture, from the SAME caster at the
-		///     SAME level with the SAME spell, the mean ratio runs 2.53 to 8.02.
+		///     The ~4.7x is not a per-caster multiplier, however much five spells whose bases differ 3x all landing
+		///     near it suggests one. Split by target instead of aggregated per spell, the corpus says otherwise:
+		///     within one target the spread is 1.03-1.11, i.e. the spell's own stated roll and nothing else, while
+		///     across targets in the same capture, from the same caster at the
+		///     same level with the same spell, the mean ratio runs 2.53 to 8.02.
 		///     <para />
 		///     A per-caster multiplier cannot vary between two mobs killed a minute apart. So the "4.7x" was an
 		///     average over a mixture of targets, exactly as the medians were an average over a mixture of ratios -
@@ -316,17 +316,16 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     What each PLAYER caster was actually seen casting, with the reason a spell carries no ratio.
+		///     What each player caster was actually seen casting, with the reason a spell carries no ratio.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ The ratio table above drops a spell the moment it cannot be scored, which is exactly the population
-		///     this ticket needs to look at: the question is no longer "what is the ratio" but "does the SECOND caster
-		///     ever land a hit that can be ratioed at all". A table that only shows scorable rows cannot answer it,
-		///     and the first cut of this reported the demonologist as casting three spells when the real question was
-		///     which of its spells are flat.
+		///     The ratio table above drops a spell the moment it cannot be scored, which is exactly the population
+		///     worth looking at: the question is not "what is the ratio" but "does the second caster ever land a hit
+		///     that can be ratioed at all". A table that only shows scorable rows cannot answer it, and would report
+		///     a caster as casting three spells when the real question is which of its spells are flat.
 		///     <para />
-		///     ⭐⭐ <c>DPSHit</c> (53013) is the one to watch. Those spells are DETERMINISTIC at level 80 - the
-		///     necromancer's `Curse of Blood` lands the same number on 46 of 79 hits - so ONE captured demonologist
+		///     <c>DPSHit</c> (53013) is the one to watch. Those spells are DETERMINISTIC at level 80 - the
+		///     necromancer's `Curse of Blood` lands the same number on 46 of 79 hits - so one captured demonologist
 		///     DPSHit would give that character's constant exactly, with no median and no roll to average out. That is
 		///     the cheapest separation this ticket can get.
 		/// </remarks>
@@ -357,7 +356,7 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// `HitPercentage` - states a percent of the TARGET'S pool, so it can never be ratioed against a magnitude.
+		// `HitPercentage` - states a percent of the target's pool, so it can never be ratioed against a magnitude.
 		private const uint PercentKind = 53007;
 
 		// A spell's stated pool move as the template holds it: a roll between `Amount` and `MaxAmount`, each ramping
@@ -370,7 +369,7 @@ namespace Faolan.Importer.Cli
 
 		private sealed record StatedRamp(int Low, int LowAtHighLevel, int High, int HighAtHighLevel, uint LowLevel, uint HighLevel);
 
-		// The MIDDLE of what the spell's template states at `level`, in the WIRE's own hundredths - the same units a
+		// The MIDDLE of what the spell's template states at `level`, in the wire's own hundredths - the same units a
 		// StatDamage delta carries, so the ratio is unit-free. (Dividing this by 100 and comparing against a raw wire
 		// median is how a first cut of this reported ratios of ~600.)
 		private static int? StatedMid(IReadOnlyDictionary<uint, StatedRamp> stated, uint spellId, uint level)

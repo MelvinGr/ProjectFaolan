@@ -8,9 +8,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The rule that turns "one NPC, several captured versions of the same screen" into quest-gated VARIANTS (#526),
-	// derived from the quest state each capture was in (#639 - it used to be a five-row table keyed on capture FILE
-	// NAMES, so a Casilda screen from any unlisted capture was silently dropped).
+	// The rule that turns "one NPC, several captured versions of the same screen" into quest-gated variants, derived
+	// from the quest state each capture was in. A table keyed on capture file names instead would silently drop a
+	// screen from any capture it does not list.
 	//
 	// The corpus exercises it at 31 groups, but only through the importer, which the suite cannot run (the captures
 	// are a separate private repo). These pin the rule itself on the shapes the corpus actually contains.
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			Assert.All(split, e => Assert.Null(e.ConditionQuestId));
 		}
 
-		// Casilda's greeting, reduced: the offer (no chain progress) and the in-progress line. The LESS-informed
+		// Casilda's greeting, reduced: the offer (no chain progress) and the in-progress line. The less-informed
 		// capture is the fallback a fresh character gets; the other is gated on the quest its captures agree on.
 		[Fact]
 		public void DisagreeingCaptures_SplitOnTheQuestTheyAgreeOn()
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			var offer = Assert.Single(split, e => Signature(e) == "12493,7615");
 			Assert.Null(offer.ConditionQuestId);
 
-			// 10238 is carried by only ONE of the two in-progress captures, so it cannot be what selects the variant.
+			// 10238 is carried by only one of the two in-progress captures, so it cannot be what selects the variant.
 			foreach (var gated in split.Where(e => Signature(e) == "12493,12557"))
 			{
 				Assert.Equal(13479u, gated.ConditionQuestId);
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 			Assert.Equal(13480u, gated.ConditionQuestId);
 		}
 
-		// Casilda's later chain greetings all sit on top of a still-active escort, so ACTIVE beats COMPLETED when both
+		// Casilda's later chain greetings all sit on top of a still-active escort, so active beats completed when both
 		// would do: a gate on a quest the player finished long ago is true from far earlier in the chain, and would win
 		// the runtime's most-recent-quest tiebreak against the beat the player is actually on.
 		[Fact]
@@ -84,9 +84,9 @@ namespace Faolan.Tests
 			Assert.Equal(QuestState.Active, gated.ConditionQuestState);
 		}
 
-		// Two captures of the SAME screen, one of which happened to carry a trailing close window, are different
-		// signatures with identical quest state. That pair must not cost the group its other gates - the whole
-		// Casilda "" group (six real variants) used to collapse to "keeping the richest" because of it.
+		// Two captures of the same screen, one of which happened to carry a trailing close window, are different
+		// signatures with identical quest state. That pair must not cost the group its other gates: the Casilda ""
+		// group is six real variants, and collapsing it to "keep the richest" loses five of them.
 		[Fact]
 		public void IndistinguishableVariants_DoNotCostTheGroupItsOtherGates()
 		{
@@ -105,8 +105,8 @@ namespace Faolan.Tests
 		}
 
 		// The quest state is not the only condition retail varies a screen on. Elethia says "Hello.{social greet}" the
-		// first time you open her window and "What now?" every time after, with the SAME option list and the same quest
-		// state - so the split falls to the greeting count (#645).
+		// first time you open her window and "What now?" every time after, with the same option list and the same quest
+		// state - so the split falls to the greeting count.
 		[Fact]
 		public void VariantsTheQuestStateCannotSplit_FallBackToTheGreetingCount()
 		{
@@ -120,9 +120,9 @@ namespace Faolan.Tests
 			Assert.All(split.Where(e => Signature(e) == "10614"), e => Assert.True(e.RequiresRepeatGreeting));
 		}
 
-		// ...but only when the flag splits the group CLEANLY. A variant the corpus caught on BOTH a first meeting and a
+		// ...but only when the flag splits the group cleanly. A variant the corpus caught on both a first meeting and a
 		// repeat is a correlation, not the condition, and putting a gate on it would hide the screen from half the
-		// players it belongs to - so that group keeps the old behaviour and says so.
+		// players it belongs to - so that group stays ungated and says so.
 		[Fact]
 		public void AGreetingCountThatOnlyCorrelates_IsNotTakenAsTheGate()
 		{

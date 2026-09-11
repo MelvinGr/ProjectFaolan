@@ -17,15 +17,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #528: the quest-triggered AMBUSH - the third trigger shape, after quest-gated visibility (#261/#262) and the
-	// proximity lure (#502).
+	// The quest-triggered ambush - the third trigger shape, after quest-gated visibility and the
+	// proximity lure.
 	//
-	// Decoded from `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: the player picks up the FIRST Quarry
+	// Decoded from `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: the player picks up the first Quarry
 	// Stonebrick for quest 12371 at t=315.6 and a `Bat Demon` arrives at t=318.6, 3.6 u away, already hating them.
-	// They go on to pick up all three bricks and get exactly ONE Bat Demon, which is what pins the trigger to the
+	// They go on to pick up all three bricks and get exactly one Bat Demon, which is what pins the trigger to the
 	// goal's first advance rather than to every pickup.
 	//
-	// What this gates is the TRIGGER (does the right goal spring it, once); the spawn itself is the world layer's and
+	// What this gates is the trigger (does the right goal spring it, once); the spawn itself is the world layer's and
 	// shares its machinery with the encounter swap.
 	public class QuestAmbushTests : IDisposable
 	{
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			Assert.Equal([BatDemon], outbound.Ambushes);
 		}
 
-		// One Bat Demon for three bricks: the trigger is the goal's FIRST advance, not every tick of it.
+		// One Bat Demon for three bricks: the trigger is the goal's first advance, not every tick of it.
 		[Fact]
 		public async Task TheSecondAndThirdPickups_SpringNothingMore()
 		{

@@ -14,59 +14,57 @@ using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report daily-kills` (#887): what do stats 1000069 and 1000070 actually COUNT?
+	// `--report daily-kills`: what do stats 1000069 and 1000070 actually count?
 	//
 	// The client's stat table names them `DailyPvEKills` and `DailyPvPKills`, and the puzzle was that the PvP-named
 	// one moves 118 times in a corpus with no PvP in it, caps at exactly 20, and outruns the PvE-named one two to
 	// one in the same session. Two readings had been eliminated - the pairing is not off by one, and they are not
 	// one stream under two names - leaving "why does 1000069 run to 13 against its own cap of 5".
 	//
-	// ⭐ **The question none of that asked is the simplest one: does either counter move once per KILL?** Both are
+	// The question none of that asked is the simplest one: does either counter move once per kill? Both are
 	// monotone +1 counters, so counting a capture's INCREMENTS against the NPC deaths in the same capture says what
 	// each one counts, and no amount of reasoning about the caps can.
 	//
-	// ⭐⭐ **1000070 is a witnessed-NPC-death counter with a hard clamp at 20.** Two separate facts, and the report
+	// 1000070 is a witnessed-NPC-death counter with a hard clamp at 20. Two separate facts, and the report
 	// separates them because either alone is ambiguous:
-	//   * WHAT: where a capture's deaths stay under 20, its increments EQUAL the death count exactly (9=9, 10=10,
-	//     11=11, ... on 7 of 15);
-	//   * WHERE IT STOPS: four captures run 29, 34, 37 and 39 deaths and the counter stops dead on 20 in every one.
+	//   * what: where a capture's deaths stay under 20, its increments equal the death count exactly (9=9, 10=10,
+	//     11=11,... on 7 of 15);
+	//   * where it STOPS: four captures run 29, 34, 37 and 39 deaths and the counter stops dead on 20 in every one.
 	//
-	// ⚠️ So it counts PvE deaths under a PvP name. The name is the CLIENT's; what the server puts in the slot is
+	// So it counts PvE deaths under a PvP name. The name is the client's; what the server puts in the slot is
 	// what this measures, and they disagree. `DailyPvPKillsCap` = 20 is the clamp, so the id pairing is right and the
 	// naming is what is off - which is the opposite way round from the swap that was already rejected.
 	//
-	// ⭐⭐ **1000069 is the daily FATALITY count** (#887, 2026-08-25). It used to read as "a SUBSET - about a third of
-	// deaths - and it does not clamp at its stated cap of 5". The subset is the fatality roll: the report's direct
-	// pairing puts every one of its 49 bumps within twelve packets AFTER the two Fatality self-buffs land on the
-	// player (5070797 + 791221, the pair FatalityService applies on a fatality kill) and every one of the 49 applies
-	// before a bump - a bijection, both ways, over every capture. The lifetime `1379 PvEFatalities` stat is pushed in
-	// the same burst. So both counters wear the wrong name: 1000070 "DailyPvPKills" counts every witnessed kill
-	// (clamped at 20) and 1000069 "DailyPvEKills" counts the fatalities among them, which is why it looked like a
-	// third (the client's fatality chance is level-tiered 5%..30%) and why the same mob was counted one time and
-	// not the next. `DailyPvEKillsCap` = 5 clamps nothing observable (13 fatalities in one session).
+	// 1000069 is the daily fatality count. The report's direct pairing puts every one of its bumps within twelve
+	// packets after the two Fatality self-buffs land on the player (5070797 and 791221, the pair FatalityService
+	// applies on a fatality kill), and every one of those applies before a bump - a bijection, both ways, over every
+	// capture. The lifetime PvEFatalities stat is pushed in the same burst. So both counters wear the wrong name:
+	// 1000070 "DailyPvPKills" counts every witnessed kill, clamped at 20, and 1000069 "DailyPvEKills" counts the
+	// fatalities among them - which is why it reads as roughly a third (the client's fatality chance is level-tiered,
+	// 5% to 30%) and why the same mob is counted one time and not the next. `DailyPvEKillsCap` = 5 clamps nothing
+	// observable: 13 fatalities have been seen in one session.
 	//
-	// ⚠️ The death-pairing tables further down are how this was found and are kept as the instrument, but they are
-	// APPROXIMATE: the +70 push precedes its death behaviour by a few packets and drifts once a death the client
-	// never saw slips the k-th-increment pairing. The direct fatality pairing above them is the measurement.
+	// The death-pairing tables further down are the instrument, but they are approximate: the +70 push precedes its
+	// death behaviour by a few packets and drifts once a death the client never saw slips the k-th-increment pairing.
+	// The direct fatality pairing above them is the measurement.
 	//
-	// ⭐ One asymmetry in the CLIENT that lines up with the asymmetry in the DATA: the client builds a global tweak
+	// One asymmetry in the client that lines up with the asymmetry in the data: the client builds a global tweak
 	// accessor for `DailyPvPKillsCap` (a `SignalTarget` at `0x02D243D8`, constructed at `0x01DF61A0`) and builds
-	// **none** for `DailyPvEKillsCap`. The band that construction sits in is the PvP-XP economy run -
+	// none for `DailyPvEKillsCap`. The band that construction sits in is the PvP-XP economy run -
 	// `PvPXPFromPvPCapMultiplier`, `MinigamePvEXPMultiplier`, `PvEXPFromPvPGroupPenalty`, `TWK_MinLevelForPvPXP`.
-	// ⛔ That is NOT a second consumer: nothing reads the global except its own ctor and its atexit, so if anything
+	// That is not a second consumer: nothing reads the global except its own ctor and its atexit, so if anything
 	// consumes it, it does so through the signal and the address route ends there. What it does establish is that
 	// the two caps are not interchangeable in the client, which is the shape the clamp asymmetry has.
 	//
-	// ⚠️ A death here is any NPC death the client was told about, which is NOT the same as a kill the player made.
+	// A death here is any NPC death the client was told about, which is not the same as a kill the player made.
 	// The report prints both, because the difference is what a per-kill counter would resolve - and note the
 	// player-damage column reads 0 for a NECROMANCER, whose pets deal the damage.
 	//
-	// ⭐⭐ And the CAPS are answered too (#887 closed, 2026-08-31): they are the daily challenges' COMPLETION
-	// targets, not counter clamps. In four independent sessions, the instant 1000069 reaches 5 (and 1000070
-	// reaches 20) the server fires the challenge-completion burst - DailyDailyCounter/DailyWeeklyCounter/
-	// DailyMonthlyCounter + CounterDailyChallenges in one frame, plus level-scaled cash and a
-	// DispatchDisplayItemLootChatMessage granting one of item 5063859 - player-annotated "daily challenge
-	// compelted" in NecroL80_..._chat-annotated-3. 1000069 keeps counting past its target (13 observed) while
+	// The caps are the daily challenges' completion targets, not counter clamps. In four independent sessions, the
+	// instant 1000069 reaches 5 - and 1000070 reaches 20 - the server fires the challenge-completion burst:
+	// DailyDailyCounter, DailyWeeklyCounter and DailyMonthlyCounter plus CounterDailyChallenges in one frame, with
+	// level-scaled cash and a DispatchDisplayItemLootChatMessage granting one of item 5063859 (player-annotated
+	// "daily challenge compelted" in NecroL80_..._chat-annotated-3). 1000069 keeps counting past its target while
 	// 1000070 saturates at its own; that residual asymmetry is recorded in docs/subsystems/daily-challenges.md.
 	public static partial class ReportCli
 	{
@@ -143,7 +141,7 @@ namespace Faolan.Importer.Cli
 			                  + $"{rows.Sum(r => r.Deaths)} NPC deaths, {rows.Sum(r => r.ByPlayer)} the player damaged");
 			Console.WriteLine();
 
-			// ⭐ THE FINDING. Where the capture's deaths stay under 20, 1000070's increments EQUAL them exactly; where
+			// The finding. Where the capture's deaths stay under 20, 1000070's increments equal them exactly; where
 			// the deaths run past 20, the counter stops dead on 20 and the deaths carry on. That is a witnessed-kill
 			// counter with a hard clamp, and it is two separate facts - what it counts, and where it stops - that the
 			// equality alone would not have separated.
@@ -163,9 +161,9 @@ namespace Faolan.Importer.Cli
 			DailyKillAttribution(captures);
 		}
 
-		// ⭐ The SUBSET question, asked the only way it can be answered: attribute each increment to the death that
+		// The subset question, asked the only way it can be answered: attribute each increment to the death that
 		// precedes it in the same capture, then compare the deaths that earned a +1 with the ones that did not. A
-		// per-capture ratio ("about a third") cannot say WHICH third; a time-aligned table can.
+		// per-capture ratio ("about a third") cannot say which third; a time-aligned table can.
 		//
 		// An increment is attributed to the latest not-yet-attributed NPC death at or before it in packet order. The
 		// distance (in packets) is printed beside each attribution so a match that is really a coincidence is visible
@@ -202,15 +200,15 @@ namespace Faolan.Importer.Cli
 
 				var deaths = new List<(int Index, uint Actor)>();
 				var attackers = new Dictionary<uint, HashSet<uint>>();
-				// Per-kill OUTCOMES, by packet index: a loot bag spawning, a fatality self-buff landing on the player,
+				// Per-kill outcomes, by packet index: a loot bag spawning, a fatality self-buff landing on the player,
 				// a quest-goal tick. Each is matched to the death it follows within a short window, to ask whether
 				// 1000069 is counting an outcome rather than a property of the mob.
 				var lootBags = new List<int>();
 				var fatalities = new List<int>();
 				var questTicks = new List<int>();
-				// Mobs that landed a hit or a cast on a PLAYER - i.e. fought back - keyed by mob handle.
+				// Mobs that landed a hit or a cast on a player - i.e. fought back - keyed by mob handle.
 				var hitPlayer = new HashSet<uint>();
-				// Every damage event ON a target, in order: what the killing blow was, and how many hits it took.
+				// Every damage event on a target, in order: what the killing blow was, and how many hits it took.
 				var damageLog = new Dictionary<uint, List<(int Index, char Kind, uint Attacker, uint Spell)>>();
 				// The player's level as the session goes - the beach dings several times in one capture.
 				var levelAt = new List<(int Index, uint Level)>();
@@ -268,7 +266,7 @@ namespace Faolan.Importer.Cli
 					else if (p.SubOpcode == MagicBuffCodec.Opcode && p.TryParse(MagicBuffCodec.Parse, out var buff)
 					         && buff.Form == MagicBuffIds.FormApply && buff.SpellBaseId == FatalityService.FatalityBuffA && playerHandles.Contains(buff.ApplyTo))
 					{
-						// ⚠️ Not gated on IsDownload - that flag marks the COMPRESSED frames, not the s2c direction, and
+						// Not gated on IsDownload - that flag marks the compressed frames, not the s2c direction, and
 						// the fatality applies ride uncompressed. The 0.1 s marker buff is the one counted; its 10 s
 						// sibling lands in the same frame and would double the count.
 						fatalities.Add(i);
@@ -311,7 +309,7 @@ namespace Faolan.Importer.Cli
 				if (moves69.Count == 0 && moves70.Count == 0 && fatalities.Count == 0)
 					continue;
 
-				// ⭐⭐ THE DIRECT MEASUREMENT - no death pairing involved. A 1000069 bump and the fatality buffs on the
+				// The direct measurement, with no death pairing involved. A 1000069 bump and the fatality buffs on the
 				// player arrive in the same burst (buffs first, bump a few packets later), so pair them straight.
 				var bumpIdx = moves69.SelectMany(m => Enumerable.Repeat(m.Index, m.Delta)).ToList();
 				var usedBumps = new HashSet<int>();
@@ -328,9 +326,9 @@ namespace Faolan.Importer.Cli
 				bumps69 += bumpIdx.Count;
 				bumpsAfterFatality += usedBumps.Count;
 
-				// Attribute. ⭐ 1000070 follows EVERY death about twenty packets later (until it clamps), so its k-th
-				// increment IS the k-th death - that pairing is exact and needs no window. A 1000069 increment rides the
-				// same refresh: on a counted kill it is pushed a few packets BEFORE the 1000070 bump of that kill. So
+				// Attribute. 1000070 follows every death about twenty packets later (until it clamps), so its k-th
+				// increment is the k-th death - that pairing is exact and needs no window. A 1000069 increment rides the
+				// same refresh: on a counted kill it is pushed a few packets before the 1000070 bump of that kill. So
 				// a +69 is attributed to the death whose +70 push is nearest to it; past the clamp (no +70 any more) it
 				// falls back to the latest death before it. "Latest death before the +69" alone was one kill off,
 				// because the +69 lands before the +70 of the kill it belongs to, not after.
@@ -383,7 +381,7 @@ namespace Faolan.Importer.Cli
 					var c70 = by70.TryGetValue(index, out var d70) ? $"+70({d70})" : "";
 					// Outcomes within the 60 packets after the death (a bag spawns and a fatality buff lands within a few).
 					var loot = lootBags.Any(b => b >= index && b - index <= 60);
-					// The fatality buffs land on the KILLER a dozen-odd packets BEFORE the victim's death behaviour goes out
+					// The fatality buffs land on the killer a dozen-odd packets before the victim's death behaviour goes out
 					// (the +69 push sits between them), so the window opens well before the death index.
 					var fatal = fatalities.Any(f => f >= index - 40 && f - index <= 60);
 					var quest = questTicks.Any(q => q >= index && q - index <= 60);

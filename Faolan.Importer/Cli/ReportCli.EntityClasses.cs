@@ -11,8 +11,8 @@ namespace Faolan.Importer.Cli
 	//
 	// `EntityClass` (Faolan.Core.Network/Constants) is a small enumerated registry based at 50000, and it has holes -
 	// 51323 and 51324 sit inside the world-object cluster with no name. A hole is not harmless: a class word is how a
-	// message that names an entity says WHICH KIND it names, so an unnamed one turns up as a bare hex literal in
-	// whatever decodes next (it did, in `DispatchAddWayPoint` - #868).
+	// message that names an entity says which kind it names, so an unnamed one turns up as a bare hex literal in
+	// whatever decodes next.
 	//
 	// The IIR type is already known per record, and the record carries the class word in its second u32, so the
 	// mapping needs no reasoning at all: it just has to be read off the corpus and printed beside the names we hold.
@@ -43,7 +43,7 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				// `--report-arg <IirTypeName>` also DUMPS the matching records - a class word says what kind of thing
+				// `--report-arg <IirTypeName>` also dumps the matching records - a class word says what kind of thing
 				// an entity is, and the next question is always what one of them looks like.
 				if (dumpType != null && subOpcode.ToString().Contains(dumpType, StringComparison.OrdinalIgnoreCase) && dumped++ < 20)
 				{

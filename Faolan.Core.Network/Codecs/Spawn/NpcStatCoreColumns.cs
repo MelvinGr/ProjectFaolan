@@ -6,16 +6,26 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// #244 stat-core lift: converts between a captured CharacterIIR's stat-core sub-messages
-	// (CharacterStats / NpcStats / CharacterBcc) and the typed NpcStatCore side table, so an NPC spawn body can be
-	// CONSTRUCTED from the DB instead of spliced from the captured Data blob. Explicit per-field mapping (no
-	// reflection): it runs in the per-spawn build path, and a hand-written map is compile-checked - a proto field
-	// that gains no column is a build error, not a silently dropped field. Presence is preserved exactly: a field is
-	// copied only when ShouldSerialize is true (Lift) / the column is non-null (build), so an unset field stays off
-	// the wire, which is what keeps the rebuilt core byte-identical to the capture (verified in NpcStatCoreColumnsTests).
+	/// <summary>
+	///     Converts between a captured CharacterIIR's stat-core sub-messages (CharacterStats, NpcStats, CharacterBcc) and
+	///     the typed NpcStatCore side table, so an NPC spawn body can be constructed from the database rather than spliced
+	///     from a captured blob.
+	/// </summary>
+	/// <remarks>
+	///     The mapping is explicit per field rather than reflective: it runs in the per-spawn build path, and a
+	///     hand-written map is compile-checked, so a proto field that gains no column is a build error rather than a
+	///     silently dropped field.
+	///     <para>
+	///         Presence is preserved exactly - a field is copied only when ShouldSerialize is true on the lift side, or the
+	///         column is non-null on the build side - so an unset field stays off the wire, which is what keeps the rebuilt
+	///         core byte-identical to the capture (NpcStatCoreColumnsTests).
+	///     </para>
+	/// </remarks>
 	public static class NpcStatCoreColumns
 	{
-		// Captured message -> typed columns (importer side). A column stays null unless the proto field was set.
+		/// <summary>
+		///     Captured message to typed columns, the importer side. A column stays null unless the proto field was set.
+		/// </summary>
 		public static NpcStatCore Lift(ProtoCoreCharacterIIR m)
 		{
 			var s = m.Stats;
@@ -165,41 +175,38 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		/// <summary>
-		///     Resets the ACTION-ANIMATION slot to its resting value, for a core that is about to become a TYPE row.
-		///     Gitea #602.
+		///     Resets the action-animation slot to its resting value, for a core that is about to become a type row.
 		///     <para>
-		///         <see cref="Lift" /> itself is faithful to the message it is handed and must stay that way - it is the
-		///         message↔columns map, and `NpcStatCoreColumnsTests.StatCore_RoundTripsByteExact` gates that it loses
-		///         nothing. The fault this fixes is one level up: a TYPE row is lifted from ONE representative spawn, so
-		///         a field that has no type-level value at all still gets one - whatever that NPC happened to be doing
-		///         at the instant it was captured - and then every other placement of the type inherits it.
+		///         <see cref="Lift" /> is faithful to the message it is handed and must stay that way - it is the
+		///         message-to-columns map, and NpcStatCoreColumnsTests.StatCore_RoundTripsByteExact gates that it loses
+		///         nothing. This operates one level up: a type row is lifted from one representative spawn, so a field with
+		///         no type-level value at all still gets one - whatever that NPC happened to be doing at the instant it was
+		///         captured - and every other placement of the type then inherits it.
 		///     </para>
 		///     <para>
-		///         The action slot is that, unambiguously. Only 31 of 1018 lifted types carry `AnimActionId` at all;
-		///         retail sends 0 on 93% of spawns, `AnimActionTimer` 0 on 92% and `AnimActionBlend` false on 95%
-		///         (`--report field-stability`, third table). So a non-zero value here means the representative was
-		///         caught PART-WAY THROUGH an emote, and nothing about the type.
+		///         The action slot is unambiguously that. Only 31 of 1018 lifted types carry <c>AnimActionId</c> at all;
+		///         retail sends 0 on 93% of spawns, <c>AnimActionTimer</c> 0 on 92% and <c>AnimActionBlend</c> false on 95%
+		///         (<c>--report field-stability</c>, third table), so a non-zero value means the representative was caught
+		///         part-way through an emote and says nothing about the type.
 		///     </para>
 		///     <para>
-		///         ⚠️ Presence is preserved: a field is reset only where the type actually carried one, never introduced.
-		///         Nulling it instead would drop it from the rebuilt message and change the body's LENGTH, which is a
-		///         bigger divergence from retail than the value ever was.
+		///         Presence is preserved: a field is reset only where the type actually carried one, and never introduced.
+		///         Nulling it instead would drop it from the rebuilt message and change the body's length, which is a bigger
+		///         divergence from retail than the value ever was.
 		///     </para>
 		///     <para>
-		///         ⚠️ `AnimIdleTimer` is deliberately NOT reset, and the reason is the whole lesson of this issue. It
-		///         looks like the clearest case: 50.2% type / 45.2% placement stability, and 92 of its 94 DISTINCT
-		///         values lie strictly between 0 and 1, which reads as an animation phase sampled at a random instant.
-		///         Weighted by how often retail actually sends them, those 92 carry only 24% of sightings - the field
-		///         RESTS at exactly 0 (264x) or exactly 1 (269x) and is merely caught in between mid-blend. Which
-		///         endpoint a type rests at is real type-level information: flattening all 1018 types to 0 dropped
-		///         `--report spawn-diff` from 340 byte-exact rebuilds to 173. Counting distinct values instead of
-		///         their frequency is what made a bimodal flag look continuous.
+		///         <c>AnimIdleTimer</c> is deliberately not reset. It looks like the clearest case - 50.2% type and 45.2%
+		///         placement stability, with 92 of its 94 distinct values strictly between 0 and 1, which reads as an
+		///         animation phase sampled at a random instant - but weighted by how often retail sends them those 92 carry
+		///         only 24% of sightings: the field rests at exactly 0 (264 times) or exactly 1 (269 times) and is merely
+		///         caught in between mid-blend. Which endpoint a type rests at is real type-level information; flattening all
+		///         1018 types to 0 drops <c>--report spawn-diff</c> from 340 byte-exact rebuilds to 173.
 		///     </para>
 		///     <para>
-		///         ⚠️ `MovementMode` (59.0/60.6) and `npc_stats.SpawnAnimation` (86.2/74.4) also measure as
-		///         per-spawn-event, and are also left alone - neither has a resting value clear enough to reset TO
-		///         (MovementMode's mode carries 69% of spawns), and picking the mode would be the same guess this
-		///         method exists to remove. Tracked separately.
+		///         <c>MovementMode</c> (59.0/60.6) and <c>npc_stats.SpawnAnimation</c> (86.2/74.4) also measure as
+		///         per-spawn-event and are also left alone: neither has a resting value clear enough to reset to -
+		///         MovementMode's mode carries 69% of spawns - and picking the mode would be the same guess this method
+		///         exists to remove.
 		///     </para>
 		/// </summary>
 		public static void ClearPerSpawnEventState(NpcStatCore core)
@@ -212,14 +219,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				core.AnimActionBlend = false;
 		}
 
-		// Reads the CoreCharacter-IIR header word X out of a captured FA015807 body (#244): the embedded message is
-		// preceded by [u8 0x41 version][u32 X][u32 msgLen], and X is a type-stable field-presence/shape mask lifted
-		// so the header can be rebuilt from the DB. Returns null when the body is not a decodable spawn.
-		//
-		// `body` is the raw wire body INCLUDING its leading u32 carrier length, which the codec does not own (#530
-		// rule 2) - so the length is stripped here, at the boundary between a captured body and the record. The walk
-		// used to SCAN for the character message and index back 9 bytes; the codec reads the body sequentially, so
-		// the word is simply a field on the value now.
+		/// <summary>
+		///     Reads the CoreCharacter-IIR header word out of a captured spawn body: the embedded message is preceded by
+		///     <c>[u8 version][u32 header][u32 msgLen]</c>, and that header word is a type-stable field-presence and shape
+		///     mask, lifted so the header can be rebuilt from the database. Returns null when the body is not a decodable
+		///     spawn.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="body" /> is the raw wire body including its leading u32 carrier length, which the codec does
+		///     not own, so the length is stripped here, at the boundary between a captured body and the record.
+		/// </remarks>
 		public static uint? ReadIirHeaderWord(byte[] body)
 		{
 			if (body == null || body.Length < 4)
@@ -235,7 +244,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 		}
 
-		// Typed columns -> CharacterBcc (build side).
+		/// <summary>Typed columns to CharacterBcc, the build side.</summary>
 		public static ProtoCoreCharacterIIR.CharacterBcc ToBcc(NpcStatCore c)
 		{
 			var b = new ProtoCoreCharacterIIR.CharacterBcc();
@@ -262,7 +271,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return b;
 		}
 
-		// Typed columns -> NpcStats (build side).
+		/// <summary>Typed columns to NpcStats, the build side.</summary>
 		public static ProtoCoreCharacterIIR.NpcStats ToNpcStats(NpcStatCore c)
 		{
 			var n = new ProtoCoreCharacterIIR.NpcStats();
@@ -297,8 +306,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return n;
 		}
 
-		// Typed columns -> CharacterStats (build side). Only the non-null columns are set, so ShouldSerialize matches
-		// the original and the field stays off the wire when it was unset.
+		/// <summary>
+		///     Typed columns to CharacterStats, the build side. Only the non-null columns are set, so ShouldSerialize matches
+		///     the original and a field that was unset stays off the wire.
+		/// </summary>
 		public static ProtoCoreCharacterIIR.CharacterStats ToStats(NpcStatCore c)
 		{
 			var s = new ProtoCoreCharacterIIR.CharacterStats();

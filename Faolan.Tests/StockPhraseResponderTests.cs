@@ -11,9 +11,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #234 create-cutscene speech: the s2c ReceivedStockPhraseText (0x205D) reply to the client's
+	// The create-cutscene speech: the s2c ReceivedStockPhraseText (0x205D) reply to the client's
 	// PlayStockphraseAsSubtitle request. Golden-gated against the retail create capture
-	// (Blablabla_soldier-guardian_create_*): each stock phrase now lives in the committed faolan.db (StockPhrases,
+	// (Blablabla_soldier-guardian_create_*): each stock phrase lives in the committed faolan.db (StockPhrases,
 	// harvested by the importer's stock-phrases module), and building its 0x205D body with the captured threadCtx
 	// must be byte-identical to the captured response. Proves the DB-sourced phrase + the build reproduce retail.
 	public class StockPhraseResponderTests
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 		{
 			var phrases = await Repo().GetStockPhrases();
 			Assert.True(phrases.TryGetValue(stockKey, out var phrase), $"no StockPhrases row for {stockKey}");
-			// #410: the payload is REBUILT from the row's columns (the raw blob column is gone), so this gate now
+			// The payload is rebuilt from the row's columns (the raw blob column is gone), so this gate now
 			// also proves the columnization is lossless - the bytes must still equal the captured reply exactly.
 			var body = ReceivedStockPhraseTextCodec.Build(new ReceivedStockPhraseText(threadCtx, RemoteFormatScreenCodec.Build(RemoteFormatScreens.ForStockPhrase(phrase))));
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));

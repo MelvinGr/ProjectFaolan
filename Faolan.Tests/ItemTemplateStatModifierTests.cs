@@ -9,8 +9,8 @@ namespace Faolan.Tests
 {
 	// Golden decode of the item stat-modifier region (docs/rdb/item-template-stats.md, #3). Ground truth is the
 	// in-client-verified Royal Signet tooltip (template 3774542, verified 2026-06-07 in docs/re/spawn-dissection.md
-	// STEP (b)): +30 Constitution / +52 Magic Damage / +15 Hit Rating. The bytes below are that item's real decrypted
-	// RDB template BODY (the span after the 12-byte RDB-Id header), so this is NOT self-referential - it proves the
+	// step (b)): +30 Constitution / +52 Magic Damage / +15 Hit Rating. The bytes below are that item's real decrypted
+	// RDB template body (the span after the 12-byte RDB-Id header), so this is not self-referential - it proves the
 	// parser reproduces an independently-observed tooltip.
 	public class ItemTemplateStatModifierTests
 	{
@@ -19,8 +19,8 @@ namespace Faolan.Tests
 		                                             "AAAAAAEAAAAAAAAAAgAAAAkAAAA2AQAADwAAADXPAAAAAAAABAAAAAAAAAABAAAAAAAAAAIAAAAJAAAAJgMAACwBAAA1zwAAAAAAAAQA" +
 		                                             "AAAAAAAAAQAAAAAAAAACAAAACQAAAF0DAABQFAAAFgAAACQAAADiBwAABgAAAOIHAAAAAAAApB8AAF0AAAA=";
 
-		// #441: the region is NOT 4-byte aligned to the body in most templates, and a word-aligned scan cannot see an
-		// unaligned record at all - it silently returns ZERO, which is why 2873 of 3248 templates read as "no stats" while
+		// The region is not 4-byte aligned to the body in most templates, and a word-aligned scan cannot see an
+		// unaligned record at all - it silently returns zero, which is why 2873 of 3248 templates read as "no stats" while
 		// the client applied a full list from the same bytes. This builds the exact 10-word record the parser anchors on,
 		// at every possible byte phase, and requires it to be found in all four.
 		[Theory]
@@ -97,8 +97,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #597: `Parse` is the POSITIONAL pair view - payload words 0 and 1 - and that is (stat, value) only for the
-		// kinds whose key list puts them there. `ParseStatModifiers` addresses BY KEY and drops the kinds that are not
+		// `Parse` is the positional pair view - payload words 0 and 1 - and that is (stat, value) only for the
+		// kinds whose key list puts them there. `ParseStatModifiers` addresses by key and drops the kinds that are not
 		// a modifier of the carrier's own stats at all. The payloads below are real feat records, from
 		// `--report feat-effect-kinds`.
 		[Fact]
@@ -111,15 +111,15 @@ namespace Faolan.Tests
 				// `DisplayLearnAbility` (53176) - [Line, 187]. No stat slot at all: the pair view read the Line word
 				// (1) as CharacterStatId.HealthMax and the ability ref as a +4232751 health bonus.
 				53176, 0, 4, 0, 1, 0, 2, 9, 1, 4232751,
-				// `SpellStatModifier` (53054) - [Spell, Stat, Value, Amount]. It HAS a stat, but the stat belongs to
-				// the SPELL, not the carrier - and the pair view filed the spell id as the stat id. Its own table is
-				// FeatSpellStatModifiers (#593).
+				// `SpellStatModifier` (53054) - [Spell, Stat, Value, Amount]. It has a stat, but the stat belongs to
+				// the spell, not the carrier - and the pair view filed the spell id as the stat id. Its own table is
+				// FeatSpellStatModifiers.
 				53054, 0, 4, 0, 1, 0, 2, 9, 3962388, 347, 200, 0,
 				// `AddPercentSkillModifier` (53189) - [66, SkillType, 67, Value]. No stat slot; the pair view reported
 				// (66's value, a skill type).
 				53189, 0, 4, 0, 1, 0, 2, 9, 1095, 2, 1095, 5,
 				// `InterpolatedModify` (53220) - [Stat, low, lowLevel, high, highLevel]. A stat modifier, but its
-				// magnitude is key 174 and NOT key 175 `Amount`; the pair view landed on 174 by luck of position.
+				// magnitude is key 174 and not key 175 `Amount`; the pair view landed on 174 by luck of position.
 				53220, 0, 4, 0, 1, 0, 2, 9, 1, 887, 20, 17500, 80
 			];
 			var body = new byte[4 + words.Length * 4];
@@ -132,7 +132,7 @@ namespace Faolan.Tests
 			Assert.Equal([280u, 1u], mods.Select(m => m.StatId));
 			Assert.Equal([2000u, 887u], mods.Select(m => m.WireAmount));
 
-			// …and the interpolated one carries the whole RAMP beside its low endpoint (#599), while the plain
+			// …and the interpolated one carries the whole ramp beside its low endpoint, while the plain
 			// `Modify` carries none - `Ramp` is what tells the two apart without a kind allowlist at the call site.
 			Assert.Null(mods[0].Ramp);
 			Assert.Equal(new LevelRamp(887, 17500, 20, 80), mods[1].Ramp);
@@ -145,10 +145,10 @@ namespace Faolan.Tests
 			Assert.Contains(positional, m => m is { Kind: 53176, StatId: 1, WireAmount: 4232751 });
 		}
 
-		// #783: the two damage families state a RANGE, and `InterpolatedHit` states it TWICE - once at each end of a
+		// The two damage families state a range, and `InterpolatedHit` states it twice - once at each end of a
 		// level ramp. Reading only the first magnitude reported a 58.40-71.40 hit as a flat 58.40 and a level-80
 		// number as a level-75 one, on 2,900 shipped rows. The payloads are `Gangrenous Stench`'s tick (221068) and
-		// `Lifestrike (Rank 1)`'s damage half, both read off the client's own tooltip (#782).
+		// `Lifestrike (Rank 1)`'s damage half, both read off the client's own tooltip.
 		[Fact]
 		public void ParseSpellStatEffects_CarriesBothEndpointsAndBothRamps()
 		{
@@ -158,7 +158,7 @@ namespace Faolan.Tests
 				53002, 0, 4, 0, 1, 0, 2, 9, 27, unchecked((uint)-410), unchecked((uint)-500), 3,
 				// `InterpolatedHit` (53219) - [Stat, 168, 170, 172, 169, 171, 173, 71]: the min ramps 168 -> 169 and
 				// the max 170 -> 171, both over levels 172..173. `IsLevelRamp` tests 174/175 - the interpolated
-				// MODIFY family's slots - so this read as having no ramp at all.
+				// modify family's slots - so this read as having no ramp at all.
 				53219, 0, 4, 0, 1, 0, 2, 9, 27, unchecked((uint)-5840), unchecked((uint)-7140), 75, unchecked((uint)-6220), unchecked((uint)-7610), 80, 3
 			];
 			var body = new byte[4 + words.Length * 4];
@@ -176,7 +176,7 @@ namespace Faolan.Tests
 			Assert.Null(mods[0].MaxRamp);
 
 			// The interpolated one: 58.40-71.40 at level 75 ramping to 62.20-76.10 at 80, which is four magnitudes
-			// and two levels. `Ramp` is the LOW endpoint's and `MaxRamp` the high one's - they share their levels.
+			// and two levels. `Ramp` is the low endpoint's and `MaxRamp` the high one's - they share their levels.
 			Assert.Equal(-5840, (int)mods[1].WireAmount);
 			Assert.Equal(-7140, mods[1].MaxAmount);
 			Assert.Equal(new LevelRamp(-5840, -6220, 75, 80), mods[1].Ramp);

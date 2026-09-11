@@ -20,12 +20,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// The live in-memory world (Gitea #404): owns the world model + the connected players'
-	// authoritative transforms/vitals, and drives the 10 Hz simulation tick (NPC respawn/AI, vitals regen, player
-	// death/respawn, resurrection-point discovery). Extracted out of GameServerListener so the simulation's state +
-	// timing are no longer fused with the networking front-door; it reaches the wire through IWorldOutbound. Packet
-	// CONSTRUCTION (spawn/move/loot broadcasts) and persistence still live on the listener for now (see the
-	// architecture roadmap's later decomposition increments).
+	/// <summary>
+	///     The live in-memory world: what is in it and what it is doing this tick. Owns the world model and the
+	///     connected players' authoritative transforms and vitals, and drives the 10 Hz simulation tick - NPC respawn
+	///     and AI, vitals regen, player death and respawn, resurrection-point discovery.
+	/// </summary>
+	/// <remarks>
+	///     It holds no networking of its own and reaches the wire through <see cref="IWorldOutbound" />, bound at
+	///     <see cref="Start" />.
+	/// </remarks>
 	public sealed class WorldSimulation
 	{
 		/// <summary>
@@ -33,59 +36,47 @@ namespace Faolan.GameServer.World
 		///     else. Every viewer-set decision in <c>WorldBroadcaster</c> and <c>InterestManager</c> turns on it.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ <b>MEASURED, not invented</b> (#856, <c>--report interest-radius</c>). It was <b>150 u</b>, which
-		///     nothing measured and the corpus now REFUTES: of the ~750 despawns that survive the report's filters,
-		///     <b>76% arrive inside 150 u</b>, and an interest despawn cannot fire inside the boundary.
+		///     Measured, not invented (<c>--report interest-radius</c>). The distribution is a radius rather than a smear -
+		///     zero samples below 20 u, a mode at 45-55 u and a decaying tail - and the player's speed separates its two
+		///     halves: the median rises from 68 u at 2-4 u/s to 391 u at 12-20 u/s while the p10 does not move, which is
+		///     what a boundary plus a variable sweep overshoot predicts. Read off the slow buckets, where the overshoot is
+		///     a few units, the boundary lands at ~60 u.
 		///     <para>
-		///         The distribution is a radius rather than a smear - zero samples below 20 u, a mode at 45-55 u and a
-		///         decaying tail - and the player's SPEED separates its two halves: the median rises from 68 u at
-		///         2-4 u/s to 391 u at 12-20 u/s while the p10 does not move, which is what "boundary plus a variable
-		///         sweep overshoot" predicts. Read off the slow buckets, where the overshoot is a few units, the
-		///         boundary lands at ~60 u.
-		///     </para>
-		///     <para>
-		///         ⚠️ This is the DESPAWN radius. Retail may run hysteresis (spawn nearer than it despawns), and only
-		///         the despawn side is measurable - nothing bulk-despawns at login, which is what makes it clean.
-		///         Using one constant for both means we stream a little more eagerly than retail on the way in, which
-		///         is the safe direction.
-		///     </para>
-		///     <para>
-		///         ⚠️ Not yet checked in-client, and it is a 6x cut in streamed AREA - see #856.
+		///         This is the despawn radius. Retail may run hysteresis, spawning nearer than it despawns, and only the
+		///         despawn side is measurable - nothing bulk-despawns at login, which is what makes it clean. Using one
+		///         constant for both streams a little more eagerly than retail on the way in, which is the safe direction.
 		///     </para>
 		/// </remarks>
 		public const float PlayerInterestRange = 60f;
 
-		// NPC auto-attack. The hostile-NPC swing now plays the decoded attack-ANIMATION ack (the "second BccAck" with
-		// actor = NPC handle - ApplyNpcAttack -> IWorldOutbound.SendNpcAttackAnimation, docs/subsystems/combat.md) and then the
-		// 0x96B8DC59 vitals move for the HP drop. CAVEAT (why this was once gated off): on a zone with many hostiles
-		// (Tortage Beach has ~400) a player who keeps dying can hit a death-loop (re-enters the world every ~10s, never
-		// finishes loading). Kept on to exercise real combat death + the death/release screen (#214).
+		// NPC auto-attack. The hostile-NPC swing plays the decoded attack-animation ack (the second BccAck, with actor set
+		// to the NPC handle - ApplyNpcAttack into IWorldOutbound.SendNpcAttackAnimation, docs/subsystems/combat.md) and
+		// then the 0x96B8DC59 vitals move for the HP drop. The kill switch exists because on a zone with many hostiles
+		// (Tortage Beach has ~400) a player who keeps dying can hit a death loop, re-entering the world every ~10 s and
+		// never finishing loading.
 		private const bool NpcAutoAttackEnabled = true;
 
-		// #766: play each creature's ambient idle animations (BehaviorId.Emote) so a standing NPC looks alive rather than
-		// frozen on its spawn pose. Confirmed-gated in the broadcaster (never hits a loading client). A kill-switch for
-		// the in-client pass, in case the animations want disabling rather than just re-timing.
+		// Play each creature's ambient idle animations (BehaviorId.Emote) so a standing NPC looks alive rather than frozen
+		// on its spawn pose. Confirmed-gated in the broadcaster, so it never reaches a loading client. The kill switch is
+		// for the in-client pass, in case the animations want disabling rather than re-timing.
 		private const bool NpcAmbientAnimationEnabled = true;
 
-		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
-		// is replaced on the next pass - so it tracks the DefaultRespawnDelaySeconds placed mobs use rather than being
-		// a number of its own. It was 15 s alongside the old 15 s respawn; leaving it there while placed spawns moved to
-		// the measured 150 s would have made the ambient population the fast-respawning one, which is the complaint that
-		// started this.
+		// Ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member is
+		// replaced on the next pass - so it tracks the DefaultRespawnDelaySeconds placed mobs use rather than being a
+		// number of its own.
 		//
-		// ⚠️ **The corpus is not settled on that** (#855). Splitting `--report respawn-interval`'s 23 matches by
-		// whether the creature HAS a placement separates them cleanly: the placed ones cluster (Brutal Pirate
-		// 149.9-150.2 across three captures, Wild Cow/Wild Pig 119.5-120.0), while the eleven with NO placement -
-		// ambient or summoned - run a 3.4 s to 99.6 s continuum (eight Hatchlings 3.4-15.4, three Panthers
-		// 20.4/60.2/99.6). So retail's ambient population may well come back far faster than its placed one. It is
-		// NOT changed here because a continuum is not a timer's signature - a real interval piles up at one value,
-		// which is exactly what distinguishes the two clusters above - and a nest spawning ADDS during a fight
-		// produces the same shape. Recording the tension rather than acting on it.
+		// The corpus is not settled on that. Splitting `--report respawn-interval`'s 23 matches by whether the creature
+		// has a placement separates them cleanly: the placed ones cluster (Brutal Pirate 149.9-150.2 across three
+		// captures, Wild Cow and Wild Pig 119.5-120.0), while the eleven with no placement - ambient or summoned - run a
+		// 3.4 s to 99.6 s continuum (eight Hatchlings 3.4-15.4, three Panthers 20.4/60.2/99.6). Retail's ambient
+		// population may well come back far faster than its placed one, but a continuum is not a timer's signature - a
+		// real interval piles up at one value, which is what distinguishes the two clusters - and a nest adding spawns
+		// during a fight produces the same shape.
 		private const double AmbientMaintainIntervalSeconds = NpcRoute.DefaultRespawnDelaySeconds;
 
-		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and
-		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 60 u range, so a second's granularity is two
-		// units of travel, and the pass costs one distance check per entity in the player's zone.
+		// How often a standing player's interest is re-resolved, so entities that moved themselves stream in and out.
+		// Slow on purpose: the subjects walk at ~2.2 u/s against a 60 u range, so a second's granularity is two units of
+		// travel, and the pass costs one distance check per entity in the player's zone.
 		private const double InterestSweepIntervalSeconds = 1.0;
 
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
@@ -109,33 +100,33 @@ namespace Faolan.GameServer.World
 		// Local-say range in world units. Built-NPC tests showed a +4-unit offset renders "beside" the player, so
 		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
 		private const float SayRangeUnits = 50f;
-		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
-		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new ConcurrentDictionary<uint, MapRegion[]>(); // #348: per-map banner volumes, read every tick
+		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new ConcurrentDictionary<uint, MapRegion[]>(); // per-map banner volumes, read every tick
 
 		private readonly IChatServerDispatcher _agents;
 		private readonly ICharacterRepository _characters;
 		private readonly IWorldRepository _worldData;
 		private readonly ILogger _logger;
 
-		// BOUND AT Start, NOT AT CONSTRUCTION (#826). Everything this port reaches - WorldBroadcaster above all - is
-		// built ON the simulation, so demanding it in the ctor is what made GameServerListener the façade for 41
-		// members it does not implement: a genuine WorldSimulation <-> WorldBroadcaster construction cycle that no
-		// container can build. Binding it at Start breaks that: the simulation now constructs with no outbound
-		// dependency at all, and the tick - the only thing that uses it - does not run until Start.
+		// Bound at Start, never in the constructor. Everything this port reaches - WorldBroadcaster above all - is built
+		// on the simulation, so demanding it in the constructor closes a WorldSimulation/WorldBroadcaster cycle that no
+		// container can build. Binding it at Start means the simulation constructs with no outbound dependency at all,
+		// and the tick, the only thing that uses it, does not run until Start.
 		private IWorldOutbound _output = null!;
 
-		// #813/#784/#786: the spell-area + chain-edge CATALOG, read directly rather than through IWorldOutbound.
-		// It is a pure read over the DB (SpellAreaCatalog takes nothing else), so routing four table lookups through
-		// the wire façade only made the port wider and the tick's dependency on the listener look bigger than it is.
+		// The spell-area and chain-edge catalog, read directly rather than through IWorldOutbound: it is a pure read over
+		// the database, so routing four table lookups through the wire port would only widen the port.
 		private readonly SpellAreaCatalog _spellAreas;
 
-		// #272: send what `entity` has walked but not yet had broadcast, and end its move.
-		//
-		// The tick throttles a chase into ~6u segments (`MoveBroadcastSegment`) and flushes the remainder in its own
-		// `EndMove` when the entity arrives. DEATH is the one way a move ends without going through that, so a creature
-		// killed mid-chase leaves up to 6u the client never saw - and the death POSE states the true position, so the
-		// corpse jumps that far onto its killer before playing its death animation. Lives here because the tick owns
-		// the segment bookkeeping this is finishing.
+		/// <summary>
+		///     Sends what <paramref name="entity" /> has walked but not yet had broadcast, and ends its move.
+		/// </summary>
+		/// <remarks>
+		///     The tick throttles a chase into ~6 u segments (<c>MoveBroadcastSegment</c>) and flushes the remainder in its
+		///     own <c>EndMove</c> when the entity arrives. Death is the one way a move ends without going through that, so
+		///     a creature killed mid-chase leaves up to 6 u the client never saw - and the death pose states the true
+		///     position, so the corpse jumps that far onto its killer before playing its death animation. This lives here
+		///     because the tick owns the segment bookkeeping it is finishing.
+		/// </remarks>
 		public async Task FlushPendingMove(WorldEntity entity)
 		{
 			ArgumentNullException.ThrowIfNull(entity);
@@ -146,8 +137,8 @@ namespace Faolan.GameServer.World
 		private Task _tickTask = Task.CompletedTask;
 		public PlayerRegistry Players { get; }
 
-		// Server-side terrain (RDB heightmap): ground-height snapping + terrain line-of-sight (#284). Reached by the
-		// broadcaster (loot-bag Y) and the WorldState tick (aggro line-of-sight).
+		// Server-side terrain (RDB heightmap): ground-height snapping and terrain line-of-sight. Reached by the
+		// broadcaster for a loot bag's Y, and by the WorldState tick for aggro line-of-sight.
 		public TerrainService? Terrain { get; }
 
 		// The live world model + the connected players' authoritative world entities (transform + vitals).
@@ -157,9 +148,9 @@ namespace Faolan.GameServer.World
 		// the client's dev "Server Framerate" overlay, and by the slow-tick warning below. See TickMetrics.
 		public TickMetrics Metrics { get; } = new TickMetrics(1.0 / BaseTickSeconds);
 
-		// ⚠️ `World` and `Players` arrive by INJECTION rather than being created here (#900). Both are shared with
-		// PlayerDeathService, which must not hold this class - so the state they both read is what gets passed, not
-		// a reference back to their owner.
+		// `World` and `Players` arrive by injection rather than being created here. Both are shared with
+		// PlayerDeathService, which must not hold this class, so the state they both read is what gets passed rather than
+		// a reference back to its owner.
 		public WorldSimulation(ICharacterRepository characters, IWorldRepository worldData, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
 			WorldState world, PlayerRegistry players, PlayerDeathService playerDeaths, BuffTickService buffTicks, NpcCombatService npcCombat, TerrainService? terrain = null)
 		{
@@ -176,8 +167,8 @@ namespace Faolan.GameServer.World
 			_npcCombat = npcCombat;
 		}
 
-		// A player dying, releasing and coming back. Forwarded to below so the listener's call sites are unchanged;
-		// the tick drives its two per-tick halves directly. See World/PlayerDeathService.cs.
+		// A player dying, releasing and coming back. Forwarded to below so callers keep one collaborator; the tick drives
+		// its two per-tick halves directly. See World/PlayerDeathService.cs.
 		private readonly PlayerDeathService _playerDeaths;
 
 		// The per-tick life of an applied buff: expiry, DoT damage, aura areas. Driven by the tick below; its
@@ -197,14 +188,15 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
-		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
-		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
-		// regen happens then, so this is just defensive).
-		//
-		// It lives here rather than on CombatService (its historical home) because it reads nothing but this class:
-		// keeping it there made BuffService depend on CombatService for one call, which closed the construction cycle
-		// SpellEffectOutbound -> BuffService -> CombatService -> FatalityService -> SpellEffectOutbound.
+		/// <summary>
+		///     The player's own live vitals. The world model is the single source of truth: they live on the player's
+		///     WorldEntity, as an NPC's do, seeded from CharacterMaxStats and never persisted - only CharacterMaxStats is.
+		/// </summary>
+		/// <remarks>
+		///     Falls back to a transient seed only when the player is not in the world yet, which is defensive: no combat or
+		///     regen happens then. It lives on this class because it reads nothing else; putting it on CombatService would
+		///     make BuffService depend on CombatService for one call and close a construction cycle.
+		/// </remarks>
 		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
 		{
 			var entity = PlayerWorldEntity(client);
@@ -214,10 +206,15 @@ namespace Faolan.GameServer.World
 			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
 		}
 
-		// Registers (or relocates) the player in the live world after world entry, SEEDING the authoritative WorldEntity
-		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
-		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
-		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
+		/// <summary>
+		///     Registers, or relocates, the player in the live world after world entry, seeding the authoritative
+		///     WorldEntity transform and vitals from the persisted Character.
+		/// </summary>
+		/// <remarks>
+		///     After this the WorldEntity is the source of truth for live position and vitals; the Character is re-read only
+		///     on a fresh entry or teleport. Idempotent - GetOrAdd keeps the existing entity, so vitals are not reset across
+		///     a re-entry, teleport or respawn.
+		/// </remarks>
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
 			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null, IReadOnlyDictionary<uint, ComboFeatBonus>? comboBonuses = null,
@@ -226,74 +223,71 @@ namespace Faolan.GameServer.World
 			var character = client.Session.Character;
 
 			var handle = character.Id;
-			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
-			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
+			// The player's pre-existing entity, null on a fresh login, decides whether this is a re-entry that should
+			// keep its current instance or a fresh placement that picks one from the map's mode.
 			Players.TryGetValue(client, out var existing);
-			// #3: seed the max vitals with the equipped-gear bonus so the regen bar fills past the class base. Only the
-			// fresh-entry seed uses it; a re-entry keeps its existing (already gear-aware) vitals via GetOrAdd.
+			// Seed the max vitals with the equipped-gear bonus so the regen bar fills past the class base. Only the
+			// fresh-entry seed uses it; a re-entry keeps its existing, already gear-aware, vitals through GetOrAdd.
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
 				Vitals = EntityVitals.FromCharacter(character, statBonuses, classBase),
-				// #401: cache the worn-gear physical armor + magical Protection for incoming-damage mitigation.
+				// Cache the worn-gear physical armor and magical Protection for incoming-damage mitigation.
 				ArmorRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
 				Protection = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.Protection) ?? 0),
-				// #399: cache the worn-gear Hit Rating (hit chance, not yet consumed) + the crit stats.
+				// Cache the worn-gear Hit Rating (hit chance, not yet consumed) and the crit stats.
 				HitRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
 				CriticalRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CriticalRating) ?? 0),
 				CriticalDamageRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CriticalDamageRating) ?? 0),
 				CombatRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CombatRating) ?? 0),
-				// #399: cache the worn-gear Magic Damage added flat to the player's spell hits.
+				// Cache the worn-gear Magic Damage added flat to the player's spell hits.
 				MagicDamage = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
 				// Cache the worn-gear natural mana/stamina regen added onto the base regen tick.
 				NaturalManaRegen = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.NaturalManaRegen) ?? 0),
 				NaturalStaminaRegen = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0),
-				// #400: seed the live drawn weapon set from the persisted value so a mid-session swap starts from the set
-				// the character last had out (and the statBonuses above were aggregated for that same set).
+				// Seed the live drawn weapon set from the persisted value so a mid-session swap starts from the set the
+				// character last had out; the statBonuses above were aggregated for that same set.
 				ActiveWeaponSet = character.ActiveWeaponSet,
-				// #367: keep the gear bonuses themselves, not just their sum into the fields above - they are the
-				// baseline a buff's stat delta is added to (and removed from) by BuffStatEffects.
+				// Keep the gear bonuses themselves, not just their sum into the fields above: they are the baseline a
+				// buff's stat delta is added to, and removed from, by BuffStatEffects.
 				GearBonuses = statBonuses ?? new Dictionary<CharacterStatId, int>(),
 				ClassBase = classBase ?? new Dictionary<CharacterStatId, int>(),
-				// #590: the feat boosts for this character's spells, already fanned out from line to rank.
+				// The feat boosts for this character's spells, already fanned out from line to rank.
 				SpellBoosts = spellBoosts ?? new Dictionary<uint, int>(),
-				// #592: the caster's attribute scores and class, which is what the magic-damage scaling term reads,
-				// plus the per-spell attribute overrides. Same inputs as the pools above (VitalAttributes.From), so
-				// the two never disagree about what the character's Intelligence is.
+				// The caster's attribute scores and class, which is what the magic-damage scaling term reads, plus the
+				// per-spell attribute overrides. Same inputs as the pools above (VitalAttributes.From), so the two never
+				// disagree about what the character's Intelligence is.
 				Attributes = VitalAttributes.From(classBase, statBonuses),
-				// ⚠️ The character's LEVEL. This was never set, so every player entity carried Level 0 while only NPCs
-				// got a real one - and two things read it, both silently wrong:
-				//   * BuffStatEffects resolves a RAMPED buff delta off it (#599: the same buff is +887 health at level
-				//     20 and +17500 at level 80), so every ramped buff on a player was resolved at level 0;
-				//   * RebaseFromAttributes passes it to CharacterMaxStats.ClassBaseHundredths, which THROWS on 0.
-				// The throw is what finally surfaced it: the rebase only runs when an equip CHANGES an attribute, so
-				// equipping a piece with an attribute bonus killed the packet loop and dropped the player's connection.
+				// The character's level, which must be set: BuffStatEffects resolves a ramped buff delta off it (the
+				// same buff is +887 health at level 20 and +17,500 at level 80), and RebaseFromAttributes passes it to
+				// CharacterMaxStats.ClassBaseHundredths, which throws on 0.
 				Level = character.Level,
 				CharacterClass = character.Class,
 				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>(),
-				// #697: what the character's feats do to their combos, resolved once here for the same reason the
-				// spell boosts are - a swing must not turn into a query.
+				// What the character's feats do to their combos, resolved once here for the same reason the spell
+				// boosts are: a swing must not turn into a query.
 				ComboBonuses = comboBonuses ?? new Dictionary<uint, ComboFeatBonus>(),
-				// #697: and the procs they hang off those combos and the character's spell lines.
+				// And the procs those feats hang off the combos and the character's spell lines.
 				Procs = featProcs ?? []
 			});
-			// The CLIENT's copy of the vitals is reseeded from the world-entry snapshot, not from a push - so what we
-			// last pushed says nothing about what it now holds, and a current that happens to match would never be
-			// restated. Forget it here so the first push after entry states all three (#902).
+			// The client's copy of the vitals is reseeded from the world-entry snapshot rather than from a push, so what
+			// was last pushed says nothing about what it now holds and a current that happens to match would never be
+			// restated. Forgetting it here makes the first push after entry state all three.
 			entity.Vitals?.ForgetPushedCurrents();
 
-			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
-			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
+			// Re-apply the account-persisted GM toggles: the live entity is fresh on each world entry, since a map change
+			// is a new world connection, so these would otherwise be lost on every zone. Only GMs carry them.
 			if (client.Session.Account is { } account)
 			{
 				entity.GodMode = account.HasGmPrivilege(GmPrivileges.GodMode);
 				entity.Invisible = account.HasGmPrivilege(GmPrivileges.InvisibleToMonsters);
 			}
 
-			// #512: `teamId` is what makes a GROUP map route to the party's copy rather than to a private one. It is
-			// passed IN rather than looked up here, because the roster lives on the CS tier and the world model does
-			// not reach across listeners - the caller crosses that seam.
-			// #309: an EPIC entry routes to an epic copy of the map - same content, never the same zone as a normal
-			// one - and the zone remembers its difficulty so re-entry routing and the (future) stat tuning can ask it.
+			// `teamId` is what makes a group map route to the party's copy rather than to a private one. It is passed in
+			// rather than looked up here, because the roster lives on the CS tier and the world model does not reach
+			// across listeners; the caller crosses that seam.
+			//
+			// An epic entry routes to an epic copy of the map - the same content, never the same zone as a normal one -
+			// and the zone remembers its difficulty so re-entry routing and stat tuning can ask it.
 			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId, epic, pvpMatchId);
 			World.ZoneFor(character.MapId, instanceId).IsEpic = epic;
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
@@ -303,13 +297,18 @@ namespace Faolan.GameServer.World
 				instanceId, character.Position, nearby);
 		}
 
-		// A same-MAP (same-playfield) teleport: relocate the player to `destination` on their CURRENT map with NO
-		// loading screen, reusing the death-revive same-map path (IntendedTeleport with the LIVE playfield token +
-		// n3Teleport). This is how a same-playfield zone-line door works - e.g. the Thirsty Dog Inn, whose UseObject
-		// (door handle 0xBEB) resolves to IntendedTeleport destMap == the current map + an N3Teleport, with NO reconnect
-		// (Hoxxling_..._gameplay2: door 0xBEB -> arrival (45, 158.05, 124) on map 4020, the player already on 4020).
-		// Contrast DoTeleport, which cross-maps via a full 0x2002 handoff + reconnect (loading screen). The position is
-		// persisted so it survives relog.
+		/// <summary>
+		///     A same-map (same-playfield) teleport: relocates the player to <paramref name="destination" /> on their
+		///     current map with no loading screen, reusing the death-revive same-map path - an IntendedTeleport with the
+		///     live playfield token, then an n3Teleport. The position is persisted so it survives a relog.
+		/// </summary>
+		/// <remarks>
+		///     This is how a same-playfield zone-line door works: the Thirsty Dog Inn's UseObject (door handle 0xBEB)
+		///     resolves to an IntendedTeleport whose destination map is the current map, plus an N3Teleport, with no
+		///     reconnect (Hoxxling_..._gameplay2: door 0xBEB, arrival (45, 158.05, 124) on map 4020, with the player
+		///     already on 4020). Contrast DoTeleport, which cross-maps through a full 0x2002 handoff and reconnect, and so
+		///     shows a loading screen.
+		/// </remarks>
 		public async Task RelocateSameMap(INetworkClient client, Vector3 destination)
 		{
 			var entity = PlayerWorldEntity(client);
@@ -327,35 +326,37 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
-		// ⭐ Relocate a live NON-PLAYER entity within its own zone (#917). The player twin is `RelocateSameMap` above;
-		// this is the one for anything the world model holds that is not a character - an NPC, a corpse, a loot bag.
-		//
-		// **The ticket's open question, answered: a large jump is not "a move OR a despawn/respawn pair", it is BOTH,
-		// and which one a client gets is a property of the VIEWER, not of the jump.** Three populations:
-		//
-		//   - a viewer who keeps the entity in sight gets the mode-02 snap (`BroadcastEntitySnap`);
-		//   - a viewer who loses it gets a despawn;
-		//   - a player standing near the DESTINATION, who has never seen it, gets a spawn.
-		//
-		// The last two are exactly what an interest pass produces, so this does not re-implement them: it re-runs
-		// `ResolveInterest` for every player in the zone. That is the #778 sweep, whose whole subject is "an entity
-		// moved ITSELF and the player did not" - a teleport is that, at maximum step size. Sweeping the zone rather
-		// than the two radii is deliberate: the union of "was in range of the origin" and "is in range of the
-		// destination" is what has to be re-resolved, and the pass is a cheap set-difference against `Known` that
-		// sends nothing to a player whose view did not change.
-		//
-		// `MoveFrom` is reset with `Position` on purpose. It is the FROM point of the segment the tick's broadcaster
-		// sends, so leaving it at the old spot would make the next ordinary step render as a walk all the way back
-		// across the map.
-		//
-		// ⚠️ This is LIVE ONLY - it does not touch `NpcSpawn`, which is the placement the entity respawns at. Move a
-		// creature and kill it, and it comes back where it was placed. That is the right default for repositioning a
-		// stuck mob or staging a scene, and it means this is not a world-editing primitive.
-		//
-		// ⚠️ Same zone only. Crossing to another map means leaving one `Zone` and entering another, with a handle that
-		// every viewer of the old zone still holds; nothing here does that.
-		//
-		// Returns the number of players whose interest was re-resolved.
+		/// <summary>
+		///     Relocates a live non-player entity within its own zone - an NPC, a corpse, a loot bag. The player twin is
+		///     <see cref="RelocateSameMap" />.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         A large jump is both a move and a despawn/respawn pair, and which one a client gets is a property of the
+		///         viewer rather than of the jump. A viewer who keeps the entity in sight gets the mode-02 snap
+		///         (<c>BroadcastEntitySnap</c>); a viewer who loses it gets a despawn; and a player standing near the
+		///         destination, who has never seen it, gets a spawn.
+		///     </para>
+		///     <para>
+		///         The last two are what an interest pass already produces, so this re-runs <c>ResolveInterest</c> for every
+		///         player in the zone rather than re-implementing them. Sweeping the whole zone is deliberate: the union of
+		///         "was in range of the origin" and "is in range of the destination" is what has to be re-resolved, and the
+		///         pass is a cheap set difference against <c>Known</c> that sends nothing to a player whose view did not
+		///         change.
+		///     </para>
+		///     <para>
+		///         <c>MoveFrom</c> is reset with <c>Position</c> on purpose: it is the from-point of the segment the tick's
+		///         broadcaster sends, so leaving it at the old spot would make the next ordinary step render as a walk all
+		///         the way back across the map.
+		///     </para>
+		///     <para>
+		///         Live only - it does not touch <c>NpcSpawn</c>, which is the placement the entity respawns at, so a
+		///         creature moved and then killed comes back where it was placed. Same zone only: crossing to another map
+		///         means leaving one <c>Zone</c> and entering another, with a handle every viewer of the old zone still
+		///         holds, and nothing here does that.
+		///     </para>
+		/// </remarks>
+		/// <returns>The number of players whose interest was re-resolved.</returns>
 		public async Task<int> RelocateEntity(WorldEntity entity, Vector3 destination)
 		{
 			ArgumentNullException.ThrowIfNull(entity);
@@ -381,9 +382,11 @@ namespace Faolan.GameServer.World
 			return resolved;
 		}
 
-		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
-		// leaver is still in the zone so its viewers resolve), then calls this. Returns false if the player wasn't in
-		// the world.
+		/// <summary>
+		///     Removes the player from the world model on disconnect. The caller broadcasts the despawn first, while the
+		///     leaver is still in the zone so its viewers resolve, and then calls this.
+		/// </summary>
+		/// <returns>False if the player was not in the world.</returns>
 		public bool RemovePlayer(INetworkClient client, [MaybeNullWhen(false)] out WorldEntity entity)
 		{
 			if (!Players.TryRemove(client, out entity))
@@ -394,15 +397,18 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// The character ids that should hear a proximity "say" from `sender`: same-map players within SayRangeUnits of
-		// the sender, plus the sender (you always hear yourself). Resolved against the live world model.
+		/// <summary>
+		///     The character ids that should hear a proximity "say" from <paramref name="sender" />: same-map players within
+		///     <c>SayRangeUnits</c> of the sender, plus the sender, who always hears themselves. Resolved against the live
+		///     world model.
+		/// </summary>
 		public IReadOnlyCollection<uint> SayRecipients(INetworkClient sender)
 		{
 			var ids = new HashSet<uint>();
 			var entity = PlayerWorldEntity(sender);
 			if (entity == null)
 			{
-				// Not in the world model yet - fall back to just the sender so they still see their own message.
+				// Not in the world model yet - fall back to the sender alone so they still see their own message.
 				if (sender.Session.Character != null)
 					ids.Add(sender.Session.Character.Id);
 				return ids;
@@ -415,10 +421,15 @@ namespace Faolan.GameServer.World
 			return ids;
 		}
 
-		// Starts the simulation tick on the given lifetime token (owned by the listener so startup/shutdown stay in one
-		// place). The task is held so StopAsync can await a clean exit.
-		// `output` arrives here rather than in the ctor - see the _output field for why. Start is called from the
-		// listener's StartAsync, long after every collaborator exists, and nothing touches the port before it.
+		/// <summary>
+		///     Starts the simulation tick on the given lifetime token, owned by the listener so startup and shutdown stay in
+		///     one place. The task is held so <see cref="StopAsync" /> can await a clean exit.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="output" /> arrives here rather than in the constructor - see the <c>_output</c> field for
+		///     why. Start is called from the listener's StartAsync, long after every collaborator exists, and nothing
+		///     touches the port before it.
+		/// </remarks>
 		public void Start(CancellationToken cancellationToken, IWorldOutbound output)
 		{
 			BindOutbound(output);
@@ -428,8 +439,8 @@ namespace Faolan.GameServer.World
 			_tickTask = RunTickLoop(cancellationToken);
 		}
 
-		// The binding on its own, for tests that drive tick methods directly instead of running the loop
-		// (InternalsVisibleTo Faolan.Tests is global). Production goes through Start.
+		// The binding on its own, for tests that drive tick methods directly instead of running the loop. Production goes
+		// through Start.
 		internal void BindOutbound(IWorldOutbound output)
 		{
 			_output = output;
@@ -455,9 +466,9 @@ namespace Faolan.GameServer.World
 			return areas;
 		}
 
-		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when
-		// a pool actually rose (a player at full HP/stamina/mana costs nothing). The rates are ATTRIBUTE-driven and
-		// corpus-verified (RegenRates, #442) - they replaced flat fractions of the pool max, which retail does not use.
+		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when a
+		// pool actually rose, so a player at full health, stamina and mana costs nothing. The rates are attribute-driven
+		// and corpus-verified (RegenRates); retail does not use flat fractions of the pool max.
 		private async Task RegenerateConnectedPlayers(double elapsedSeconds)
 		{
 			foreach (var pair in Players)
@@ -467,17 +478,17 @@ namespace Faolan.GameServer.World
 
 				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character, pair.Value.GearBonuses, pair.Value.ClassBase);
 				if (vitals.IsDead)
-					continue; // corpses don't regen - the respawn timer revives them
+					continue; // corpses do not regen - the respawn timer revives them
 
-				// HP + mana regen is OUT-OF-COMBAT only (retail's OOCHealth/ManaRegeneration): halt them while the player
-				// has dealt/taken damage within CombatRegenPause. Stamina (the action resource) keeps regenerating.
+				// Health and mana regen are out-of-combat only (retail's OOCHealth/ManaRegeneration): halted while the
+				// player has dealt or taken damage within CombatRegenPause. Stamina, the action resource, keeps going.
 				var entity = pair.Value;
 				var inCombat = (DateTimeOffset.UtcNow - entity.LastCombatAt).TotalSeconds < CombatRegenPause;
 				uint beforeH = vitals.Health, beforeM = vitals.Mana, beforeS = vitals.Stamina;
 
-				// Retail's rates, from the character's attribute scores (RegenRates: the tweak table's own 0.15/0.38
-				// modifiers, each confirmed against a captured RegenIIR delta at ×100 precision). Stamina keeps its
-				// worn-gear Natural Stamina Regen on top - that item stat (0x385) is additive to the OOC rate.
+				// Retail's rates, from the character's attribute scores (RegenRates: the tweak table's own 0.15 and 0.38
+				// modifiers, each confirmed against a captured RegenIIR delta at x100 precision). Stamina keeps its
+				// worn-gear Natural Stamina Regen on top - that item stat (0x385) is additive to the out-of-combat rate.
 				uint strength = entity.AttributeScore(CharacterStatId.Strength),
 					constitution = entity.AttributeScore(CharacterStatId.Constitution),
 					dexterity = entity.AttributeScore(CharacterStatId.Dexterity),
@@ -492,32 +503,33 @@ namespace Faolan.GameServer.World
 				if (!changed)
 					continue;
 
-				// Retail's compact RegenIIR delta (0x28D0AC99): the per-tick rise per pool, ×100 to the wire vitals
-				// scale. The client's apply (FUN_0079dd10) reads stat -> adds the delta -> writes it back through the
-				// SAME setter StatUpdateIIR's apply uses (entity+0x10c vtable +0xc), so this is retail's own channel
-				// for moving the bars without a full stat block.
+				// Retail's compact RegenIIR delta (0x28D0AC99): the per-tick rise per pool, x100 to the wire vitals
+				// scale. The client's apply (FUN_0079dd10) reads the stat, adds the delta and writes it back through the
+				// same setter StatUpdateIIR's apply uses (entity+0x10c vtable +0xc), so this is retail's own channel for
+				// moving the bars without a full stat block.
 				await _output.SendRegen(client, entity.Handle, (int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
-				// ...and then the AUTHORITATIVE 0x96B8DC59 block, which is what actually makes regen visible (#2, the
-				// in-client-verified channel). Sending the delta ALONE was a regression: 2026-07-22 replaced this push
-				// with the RegenIIR and regen stopped ticking in-client, even though the packet is byte-identical in
-				// shape to all 1502 captured retail RegenIIRs (len 29, env 0, class 0xC350, three BE i32). Order
-				// matters: the delta goes FIRST so the absolute value lands last and wins - the client can never
-				// double-apply, and any client/server drift is corrected every tick. Retail is lighter (it pins a pool
-				// with a StatUpdate only on the tick that tops it off - Hoxxling_mage-heraldofxotli_login_gameplay
-				// 18:49:49.912 sends REGEN(2060,1992,882) + a StatUpdate setting stamina/mana to their max); thinning
-				// ours down to that shape needs the delta channel proven in-client first (Gitea #2).
+				// Then the authoritative 0x96B8DC59 block, which is the in-client-verified channel and what actually
+				// makes regen visible. The delta alone does not: regen stops ticking in-client even though the packet is
+				// byte-identical in shape to all 1,502 captured retail RegenIIRs (len 29, env 0, class 0xC350, three
+				// big-endian i32). Order matters - the delta goes first so the absolute value lands last and wins, which
+				// means the client can never double-apply and any drift is corrected every tick.
+				//
+				// Retail is lighter, pinning a pool with a StatUpdate only on the tick that tops it off
+				// (Hoxxling_mage-heraldofxotli_login_gameplay 18:49:49.912 sends REGEN(2060,1992,882) plus a StatUpdate
+				// setting stamina and mana to their max); thinning this down to that shape needs the delta channel proven
+				// in-client first.
 				await _output.PushVitals(client, vitals);
 			}
 		}
 
-		// The server game loop (Gitea #404): a 10 Hz base tick that advances continuous systems
-		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers, boundary-crossing tests) and runs
-		// rate-based systems (vitals regen, ambient pools) via a TickAccumulator at their own interval, dt-scaled.
-		// Wall-clock dt is measured so a late tick doesn't desync the rates. Cancelled on shutdown.
+		// The server game loop: a 10 Hz base tick that advances continuous systems every tick with the real elapsed dt
+		// (NPC respawn and AI, player death timers, boundary-crossing tests) and runs rate-based systems (vitals regen,
+		// ambient pools) through a TickAccumulator at their own dt-scaled interval. Wall-clock dt is measured so a late
+		// tick does not desync the rates. Cancelled on shutdown.
 		//
-		// Hang a system where its CADENCE belongs, not on whatever block already exists: a crossing test has to sample
-		// fast to catch a boundary, a rate-based one must not. Bolting the two together silently handed discovery and
-		// the area banners the regen interval as their sampling rate, which is a bug wearing a tick's clothes.
+		// Hang a system where its cadence belongs, not on whatever block already exists: a crossing test has to sample
+		// fast to catch a boundary, a rate-based one must not. Bolting the two together silently gives the crossing test
+		// the rate-based interval as its sampling rate.
 		private async Task RunTickLoop(CancellationToken cancellationToken)
 		{
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
@@ -535,23 +547,21 @@ namespace Faolan.GameServer.World
 					var dt = Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
 					lastTimestamp = now;
 
-					// ONE BAD TICK MUST NOT KILL THE WORLD. This try used to sit outside the while, so any exception
-					// from any tick ended the loop for the process lifetime - and silently: the listeners keep
-					// accepting clients while nothing moves, regenerates, respawns, aggroes or discovers anything. A
-					// transient SQLite "database is locked" from DiscoverRespawnPoint was enough to do it (a stray
-					// concurrent reader is enough to produce one), and the only trace was a single log line.
+					// One bad tick must not kill the world, so this try has to stay inside the loop: an exception that
+					// escapes it ends the tick for the process lifetime, and silently - the listeners keep accepting
+					// clients while nothing moves, regenerates, respawns, aggroes or discovers anything. A transient
+					// SQLite "database is locked" from a stray concurrent reader is enough to produce one.
 					try
 					{
 						// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
-						// wire-visible effects (NPC respawns, loot expiry, NPC attacks) for us to broadcast.
+						// wire-visible effects - NPC respawns, loot expiry, NPC attacks - to broadcast.
 						foreach (var effect in World.Tick(dt))
 						{
-							// A dead NPC must emit NO live broadcast (move / patrol / follow / heartbeat / chatter / attack /
-							// combat-mode). A move effect generated the tick it died - or one processed across an await after
-							// the player's kill ran OnNpcKilled and sent the death-pose - would otherwise override that
-							// death-pose and walk / re-animate the corpse, so a patrolling NPC appears to walk off and vanish
-							// instead of dying in place. Only the corpse-lifecycle effects (linger->loot, respawn, fade) apply
-							// once dead.
+							// A dead NPC must emit no live broadcast - move, patrol, follow, heartbeat, chatter, attack or
+							// combat mode. A move effect generated the tick it died, or processed across an await after the
+							// player's kill ran OnNpcKilled and sent the death pose, would override that pose and walk or
+							// re-animate the corpse, so a patrolling NPC appears to walk off and vanish instead of dying in
+							// place. Only the corpse-lifecycle effects - linger to loot, respawn, fade - apply once dead.
 							if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootDropped or WorldTickEffectType.NpcCorpseFaded or WorldTickEffectType.NpcCorpseQuit
 								    or WorldTickEffectType.NpcCorpseRemoved or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
 								continue;
@@ -584,14 +594,14 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcCorpseRemoved:
 								{
-									// The fade + quit have already gone out (the two stages before this one), so the
+									// The fade and quit have already gone out in the two stages before this one, so the
 									// entity is off every client's screen; this only drops it from the model.
 									World.Remove(effect.Entity);
 									break;
 								}
 
 								case WorldTickEffectType.LootExpired:
-								case WorldTickEffectType.TimedDespawn: // a summon's lifetime ran out (#140) - same teardown
+								case WorldTickEffectType.TimedDespawn: // a summon's lifetime ran out - same teardown
 								{
 									await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
 									World.Remove(effect.Entity);
@@ -600,8 +610,8 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcAttack:
 								{
-									// Gated by NpcAutoAttackEnabled (the once-feared respawn/world-re-entry death-loop on a
-									// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
+									// Gated by NpcAutoAttackEnabled; the swing plays the decoded attack-animation ack (see
+									// ApplyNpcAttack).
 									if (NpcAutoAttackEnabled)
 										await _npcCombat.ApplyNpcAttack(effect.Entity, effect.Target!);
 									break;
@@ -616,15 +626,15 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcPatrol:
 								{
-									await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat sim
+									await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat simulation
 									break;
 								}
 
 								case WorldTickEffectType.NpcFollow:
 								{
-									// #827: bound to the LEADER, which is what makes the client walk her rather than
+									// Bound to the leader, which is what makes the client walk the follower rather than
 									// interpolate a bare segment and be re-anchored. Falls back to the plain step if the
-									// leader is somehow gone by the time the effect is drained.
+									// leader is gone by the time the effect is drained.
 									if (effect.Target is { } leader)
 										await _output.BroadcastNpcFollow(effect.Entity, leader);
 									else
@@ -643,12 +653,12 @@ namespace Faolan.GameServer.World
 								case WorldTickEffectType.NpcEnterCombat:
 								case WorldTickEffectType.NpcExitCombat:
 								{
-									// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
-									// rest of the combat sim since combat mode only has meaning alongside the auto-attack swing.
+									// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers. Gated with the rest of
+									// the combat simulation, since combat mode only has meaning alongside the auto-attack swing.
 									if (NpcAutoAttackEnabled)
 									{
 										await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
-										// On engage, also push the aggro so the threat/hate is visible (#216).
+										// On engage, also push the aggro so the threat is visible.
 										if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
 											await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
 									}
@@ -658,7 +668,7 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcShieldRose:
 								{
-									// #20 directional combat: the defender's blue guard arcs. Gated with the combat sim - the
+									// Directional combat: the defender's blue guard arcs. Gated with the combat simulation - the
 									// rose only means anything when the NPC is actually fighting back.
 									if (NpcAutoAttackEnabled)
 										await _output.BroadcastShieldRose(effect.Entity);
@@ -667,7 +677,7 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcStopped:
 								{
-									// The NPC arrived home and stopped; close its move with a StopIIR (#190).
+									// The NPC arrived home and stopped; close its move with a StopIIR.
 									if (NpcAutoAttackEnabled)
 										await _output.BroadcastNpcStop(effect.Entity);
 									break;
@@ -675,8 +685,8 @@ namespace Faolan.GameServer.World
 
 									case WorldTickEffectType.NpcAmbientAnimation:
 								{
-									// #766: the ambient idle animation - a citizen leaning on a wall rather than standing
-									// to attention. Cosmetic, so ungated like the heartbeat above; the tick already picked
+									// The ambient idle animation - a citizen leaning on a wall rather than standing to
+									// attention. Cosmetic, so ungated like the heartbeat above; the tick has already picked
 									// which animation and how long it runs.
 									if (NpcAmbientAnimationEnabled)
 										await _output.BroadcastNpcAmbientAnimation(effect.Entity);
@@ -685,9 +695,9 @@ namespace Faolan.GameServer.World
 
 							case WorldTickEffectType.EncounterBark:
 								{
-									// #502: the lure calls for help as a player closes. Cosmetic - it is the swap that
-									// matters - but it is the tell that the encounter is armed, and it is a real captured
-									// line (its `event(2)` channel is what marks these apart from ambient chatter).
+									// The lure calls for help as a player closes. Cosmetic - the swap is what matters - but
+									// it is the tell that the encounter is armed, and it is a real captured line; its
+									// `event(2)` channel is what marks these apart from ambient chatter.
 									var lure = effect.Entity;
 									if (lure.Presentation.EncounterLines is not { Length: > 0 } barkLines)
 										break;
@@ -716,13 +726,13 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcChatter:
 								{
-									// Ambient bark: the NPC local-says a random line from ITS OWN type's set (chat server
+									// Ambient bark: the NPC local-says a random line from its own type's set (chat server
 									// CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the NPC
 									// handle so the client shows the bubble over it.
 									//
-									// The lines are per TEMPLATE, never a shared pool: six types carry any, each with the
+									// The lines are per template, never a shared pool: six types carry any, each with the
 									// client's own group - `RenownCrier` is Tatianus the Crier alone, so his "consider joining
-									// a guild" line cannot come out of anyone else. (A group MAY span types where retail shares
+									// a guild" line cannot come out of anyone else. (A group may span types where retail shares
 									// one: the Nobleman and one Noblewoman both bark `RenownBystanderLovers`. That is the
 									// client's grouping, not ours.)
 									var npc = effect.Entity;
@@ -739,10 +749,10 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcGreeting:
 								{
-									// #694: the crier noticed a player ARRIVE and greets them. Not the ambient tier - the cue
-									// is the arrival, and the channel is `sendtell`, so it goes to THAT PLAYER ALONE rather
-									// than everyone in earshot. That is also what makes the addressee slot coherent: the line
-									// is "…, {DetectedChar.name}!", and there is exactly one name it can carry.
+									// The crier noticed a player arrive and greets them. Not the ambient tier - the cue is
+									// the arrival, and the channel is `sendtell`, so it goes to that player alone rather than
+									// to everyone in earshot. That is also what makes the addressee slot coherent: the line
+									// is "..., {DetectedChar.name}!", and there is exactly one name it can carry.
 									var greeter = effect.Entity;
 									if (effect.Target is not { } greeted || greeter.Presentation.GreetingLines is not { Length: > 0 } greetings)
 										break;
@@ -753,13 +763,13 @@ namespace Faolan.GameServer.World
 							}
 						}
 
-						// #678: the staged visual sequence a harvested world object plays - fade, mesh swap, collision
-						// drop, and the regrowth ten seconds later. Retail paces these against the CLIENT's own fade,
-						// so they are timed steps rather than one burst.
+						// The staged visual sequence a harvested world object plays - fade, mesh swap, collision drop,
+						// and the regrowth ten seconds later. Retail paces these against the client's own fade, so they
+						// are timed steps rather than one burst.
 						foreach (var step in World.TickVisualSequences(dt))
 							await _output.PlayDynelVisualStep(step);
 
-						// #921: a harvest node shows the "being gathered" pin until 10 s after its last swing.
+						// A harvest node shows the "being gathered" pin until 10 s after its last swing.
 						foreach (var (zone, node) in World.TickGatheringPins(dt))
 							await _output.RestoreNodeWaypointType(zone, node);
 
@@ -769,16 +779,15 @@ namespace Faolan.GameServer.World
 						await _buffTicks.TickBuffExpiry();
 						await _buffTicks.TickDots();
 						await _buffTicks.TickAuras();
-						await _buffTicks.TickNpcBuffs(); // #776: the same three jobs - expire, bleed, emit - for buffs sitting on a MOB
-						await _output.CompleteDueTradeskills(); // #793: a craft/socket whose ~5 s retail bar has run out
+						await _buffTicks.TickNpcBuffs(); // the same three jobs - expire, bleed, emit - for buffs sitting on a mob
+						await _output.CompleteDueTradeskills(); // a craft or socket whose ~5 s retail bar has run out
 
-						// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
-						// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
-						// several units between samples, so both fired late, well inside the boundary. In-client that read
-						// as having to stand on top of a resurrection point before it registered; the radius was never the
-						// problem. Cheap enough to run hot: the points/areas and the per-player discovered set are all
-						// cached, so a tick is a handful of distance checks per player, and only an actual discovery
-						// touches the DB.
+						// Boundary crossing tests, every base tick at 10 Hz. They must not hang off a slower accumulator: a
+						// walking player covers several units between 1 Hz samples, so both would fire late, well inside the
+						// boundary - in-client that reads as having to stand on top of a resurrection point before it
+						// registers. Cheap enough to run hot: the points, areas and per-player discovered set are all cached,
+						// so a tick is a handful of distance checks per player, and only an actual discovery touches the
+						// database.
 						await _playerDeaths.DiscoverNearbyRespawnPoints();
 						await TickAreaBanners();
 
@@ -786,17 +795,17 @@ namespace Faolan.GameServer.World
 						if (regen.Advance(dt, out var regenElapsed))
 							await RegenerateConnectedPlayers(regenElapsed);
 
-						// #778: the interest pass nobody else drives - the one for a player who is standing still while the
-						// world walks past them. Every other pass is triggered by the PLAYER moving, entering or changing
-						// quests, so without this an NPC that walked out of range stayed frozen on their screen for ever
-						// and one that walked in never appeared.
+						// The interest pass nobody else drives: the one for a player standing still while the world walks
+						// past them. Every other pass is triggered by the player moving, entering or changing quests, so
+						// without this an NPC that walks out of range stays frozen on their screen and one that walks in
+						// never appears.
 						if (interestSweep.Advance(dt, out _))
 						{
 							foreach (var client in Players.Keys)
 								await _output.ResolveInterest(client);
 						}
 
-						// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
+						// Keep the ambient spawn-group pools at strength by respawning killed members. A no-op when disabled.
 						if (ambientMaintain.Advance(dt, out _))
 							await _output.MaintainAmbientPools();
 
@@ -816,7 +825,7 @@ namespace Faolan.GameServer.World
 							_logger.LogError(ex, "Game tick failed ({Count} consecutive); the world keeps ticking.", consecutiveFailures);
 					}
 
-					// Measure the tick's WORK (start-of-work -> here), not the period - the period is the timer's and
+					// Measure the tick's work (start-of-work -> here), not the period - the period is the timer's and
 					// says nothing about load. A failed tick is still a tick and is still measured: a loop that throws
 					// instantly would otherwise report a perfectly healthy rate while doing nothing.
 					Metrics.RecordTick(Stopwatch.GetElapsedTime(now).TotalSeconds);
@@ -839,23 +848,20 @@ namespace Faolan.GameServer.World
 			}
 			catch (Exception ex)
 			{
-				// Only a failure of the TIMER itself reaches here now - a per-tick fault is caught above.
+				// Only a failure of the timer itself reaches here - a per-tick fault is caught above.
 				_logger.LogError(ex, "Game tick loop terminated.");
 			}
 		}
 
-		// #348: floats the area banner when a player CROSSES into a named sub-area. A map has many - Old Tarantia
-		// fires seventeen - so this is a per-tick position test against the playfield's banner volumes, not a
-		// per-playfield event; entering a playfield lands you in an area and that is simply the first crossing.
+		// Floats the area banner when a player crosses into a named sub-area. A map has many - Old Tarantia fires
+		// seventeen - so this is a per-tick position test against the playfield's banner volumes rather than a
+		// per-playfield event; entering a playfield lands the player in an area, and that is simply the first crossing.
 		//
-		// The volumes are the CLIENT'S OWN (#513/#679/#680): exact concave polygons with a real height band, tested
-		// with NO slack. They used to be a hull over the positions retail was seen firing each banner at, widened by a
-		// slack radius because a hull can only cover ground a captured player actually walked - so banners fired early
-		// or late at the edges, and areas nobody had walked stayed silent. That is gone, and with it the guesswork:
-		// the server now fires on the boundary the client draws.
+		// The volumes are the client's own: exact concave polygons with a real height band, tested with no slack, so the
+		// server fires on the boundary the client draws.
 		//
-		// The SMALLEST containing volume wins. The client's regions nest and overlap - a ward inside a district - and
-		// the tighter one is the more specific claim.
+		// The smallest containing volume wins. The client's regions nest and overlap - a ward inside a district - and the
+		// tighter one is the more specific claim.
 		private async Task TickAreaBanners()
 		{
 			foreach (var (client, entity) in Players)
@@ -881,31 +887,24 @@ namespace Faolan.GameServer.World
 
 				var now = best?.AreaNameId ?? 0;
 				if (now == entity.CurrentAreaNameId)
-					continue; // still in the same area (or still in none) - a banner per tick would spam
+					continue; // still in the same area, or still in none - a banner per tick would spam
 
 				entity.CurrentAreaNameId = now;
 				if (now == 0)
 					continue; // left an area into unnamed ground - retail shows nothing
 
 				await _output.SendAreaNameBanner(client, now);
-				// Logged by id AND by the client's own name for the volume: the wire carries only the id (the client
-				// renders the text from its own LDB), and the region name is what makes a line readable without a
-				// lookup. 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
+				// Logged by id and by the client's own name for the volume: the wire carries only the id, since the
+				// client renders the text from its own LDB, and the region name is what makes the line readable without
+				// a lookup. 3373519 is "Bridge of Vilerus I", to read one by hand.
 				_logger.LogInformation("World: {Player} entered area {Id} ('{Region}') on map {Map}.", client.Session.Character.Name, now, best!.Name, entity.MapId);
 			}
 		}
 
-		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
-		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
-		// untracked.
-		// Drops expired buffs (those with a known duration, now imported from RDB field 0x008 into Spell.DurationMs and
-		// armed at apply time, #274) and tells the client by sending the retail end-twin removal (SendBuffRemoval). The
-		// client does NOT self-expire the icon - the combat captures show retail explicitly removes each timed buff
-		// with the rank-1 empty-payload twin - so without this the icon counts to 0 and sticks.
-		// #446: close a lapsed kill chain. Retail pairs every non-zero ChainKillIIR with a 0 about 9s later - 32 of 32
-		// in the corpus - so the chain has a visible END, and without this the client would keep the last count on
-		// screen forever. The kill side is CombatService.AnnounceKillChain; the window is
-		// WorldEntity.ChainKillWindowSeconds, measured.
+		// Closes a lapsed kill chain. Retail pairs every non-zero ChainKillIIR with a 0 about 9 s later - 32 of 32 in the
+		// corpus - so the chain has a visible end, and without this the client keeps the last count on screen forever.
+		// The kill side is CombatService.AnnounceKillChain; the window is the measured
+		// WorldEntity.ChainKillWindowSeconds.
 		private async Task TickKillChains()
 		{
 			var now = DateTimeOffset.UtcNow;

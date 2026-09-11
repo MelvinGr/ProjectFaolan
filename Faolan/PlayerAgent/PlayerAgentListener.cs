@@ -17,19 +17,18 @@ namespace Faolan.PlayerAgent
 	public partial class PlayerAgentListener : RpcServer
 	{
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.ServerPlayerAgentPort, logger, configuration,
-			// The TX naming fall-back is the METHOD catalog: this tier has no opcodes (#613), and the four login
-			// handoffs address the ServiceConnection, which no receiver-keyed map covers.
+			// The TX naming fall-back is the method catalog: this tier has no opcodes, and the four login handoffs
+			// address the ServiceConnection, which no receiver-keyed map covers.
 			database, new ConanPacketTracer(logger, "PlayerAgent", typeof(PlayerInterfaceMethods)), new ConnectionRegistry())
 		{
-			//
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			// Dispatch on the METHOD, not the opcode. On this interface pair `Rpc.Opcode` is only the method varint's
-			// first group (`0x2080 | (constant & 0x7F)`), so two methods can share one - `0x20EC` is both
+			// Dispatch is on the method, never the opcode. On this interface pair `Rpc.Opcode` is only the method
+			// varint's first group (`0x2080 | (constant & 0x7F)`), so two methods can share one - `0x20EC` is both
 			// ReceivedCharacterSettings and AuthenticateLoggedIn, `0x20D6` both VerifyLanguageSetting and
-			// UpdateCharacterPreview, and retail sends all four. The whole varint is what tells them apart (#608); an
+			// UpdateCharacterPreview, and retail sends all four. The whole varint is what tells them apart; an
 			// opcode-keyed switch would read an 8-byte AuthenticateLoggedIn as a no-arg ack.
 			var method = (PlayerAgentMethods)packet.Method;
 			LogPacketReceived(packet);
@@ -54,8 +53,8 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				// The SECOND, short-lived PlayerAgent socket the client opens mid-session - while in world, ~80s after the
-				// login connection closed - to push settings it has changed (#611). It bootstraps with the same
+				// The second, short-lived PlayerAgent socket the client opens mid-session - while in world, ~80 s after
+				// the login connection closed - to push settings it has changed. It bootstraps with the same
 				// (account, cookie) pair the login connection used and wants the same AuthenticateAck back; the uploads
 				// that follow arrive on it without any further handshake.
 				case PlayerAgentMethods.AuthenticateLoggedIn:
@@ -73,9 +72,9 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				// The three uploads that ride that socket. Each is stored COMPRESSED and byte-for-byte as sent: the
-				// checksum the client compares against is an md5 over exactly those bytes, so re-encoding them would make
-				// every cached client copy read as stale (see ClientSettingsBufferCodec).
+				// The three uploads that ride that socket. Each is stored compressed and byte-for-byte as sent: the
+				// checksum the client compares against is an md5 over exactly those bytes, so re-encoding them would
+				// make every cached client copy read as stale (see ClientSettingsBufferCodec).
 				case PlayerAgentMethods.UpdateSubscriptionSettings:
 				{
 					var upload = UpdateSubscriptionSettingsCodec.Parse(packet.Body.Span);
@@ -115,11 +114,12 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentMethods.GetStartupData:
 				{
-					// PlayerAgent.GetStartupData(const String& md5) - a single wire string (u16 length + LATIN1), NOT a
-					// bare u16: the client's checksum over its CACHED startup data, so the server can skip resending
-					// what the client already has. Empty on a first login / after a character create (`0000` in the
-					// corpus), a 32-char lowercase hex md5 once a cache exists. We always resend the full list, so it
-					// is read for the log only - but it must be read as a STRING or the 32 bytes stay in the body.
+					// PlayerAgent.GetStartupData(const String& md5) - a single wire string (u16 length + Latin-1), not a
+					// bare u16: the client's checksum over its cached startup data, so the server can skip resending
+					// what the client already has. Empty on a first login or after a character create (`0000` in the
+					// corpus), a 32-character lowercase hex md5 once a cache exists. The full list is always resent, so
+					// the value is read for the log only - but it must be read as a string or the 32 bytes stay in the
+					// body.
 					var startupDataMd5 = body.ReadString();
 
 					Logger.LogDebug("GetStartupData: client startup-data md5 '{Md5}' (we always resend the full list).", startupDataMd5);
@@ -132,12 +132,12 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentMethods.FinishGetStartupData:
 				{
 					// PlayerAgent.FinishGetStartupData(const CharacterCheckSumMap& characterMap) - the client reporting
-					// the md5 it has cached PER CHARACTER, the entry-level twin of GetStartupData's whole-list md5.
-					// Wire: [ListFrame count][ u32 characterId, string md5 ]*. Same "we always resend" story, so the
-					// entries only get logged.
+					// the md5 it has cached per character, the entry-level twin of GetStartupData's whole-list md5.
+					// Wire: [ListFrame count][ u32 characterId, string md5 ]*. The full list is always resent, so the
+					// entries are only logged.
 					//
-					// The client's own count-framed list (ListFrame): a malformed word means we would loop on garbage,
-					// so reject it rather than trusting inbound arithmetic.
+					// The client's own count-framed list (ListFrame): a malformed word would loop on garbage, so it is
+					// rejected rather than trusting inbound arithmetic.
 					var word = body.ReadUInt32();
 					if (!ListFrame.TryCountOf(word, out var charCount))
 					{
@@ -163,7 +163,6 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentMethods.LoadFacebookToken:
 				{
-					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
 					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
 
 					break;
@@ -174,11 +173,10 @@ namespace Faolan.PlayerAgent
 					// PlayerAgent.LoginCharacter(ID32::InstanceType nCharInstance, const StrStrMap& dataMap,
 					//   const std::string& cClientLanguage, const uint16 regionCode, const uint16 ageCode,
 					//   const uint16 genderCode, const String& igrID, const uint32 userType, const uint32 serviceType)
-					// The client's own signature (docs/re/aoc-client-rpc-methods.json). The old u32/u8 run read the
-					// right characterId and then walked the rest misaligned - the tail below is the real grammar, and
-					// it is byte-identical in all 88 captured logins:
+					// The client's own signature (docs/re/aoc-client-rpc-methods.json). The tail is byte-identical in
+					// all 88 captured logins:
 					//   [charId][ListFrame 0][string "en"][0][0][0][string "_"][0][0]
-					// i.e. everything after the id is a constant the retail client always sends: an EMPTY dataMap, the
+					// i.e. everything after the id is a constant the retail client always sends: an empty dataMap, the
 					// UI language, zeroed region/age/gender (the age-gate fields the launcher never fills), the "_"
 					// placeholder IGR (internet-gaming-room / cafe) id, and account userType/serviceType 0.
 					var characterId = body.ReadUInt32();
@@ -225,10 +223,10 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentMethods.ReceivedCharacterSettings: // after 0x20B9
 				{
-					// #573: this step normally follows LoginCharacter, which selects the character - but a client that
-					// resumes the sequence after its connection was replaced sends this one WITHOUT that one, and every
-					// handoff below needs the selected character. Recover it from the account's last-played id; if there
-					// is nothing to recover the client is out of sequence, which is not something to throw over.
+					// This step normally follows LoginCharacter, which selects the character - but a client that resumes
+					// the sequence after its connection was replaced sends this one without that one, and every handoff
+					// below needs the selected character. Recover it from the account's last-played id; if there is
+					// nothing to recover the client is out of sequence, which is not something to throw over.
 					if (!await EnsureSessionCharacter(client))
 					{
 						Logger.LogWarning("ReceivedCharacterSettings with no character selected and no last-played id on account {AccountId:X8} - skipping the handoff block.",
@@ -242,8 +240,8 @@ namespace Faolan.PlayerAgent
 					await SendGameServer(client, packet.Sender);
 
 					// OverrideGameTweaks: the 19 dynamic game tweaks the client applies on login. The named-tweak set and
-					// its wire format are GameTweaksCodec's (#530 wave 7). Like the three handoffs above it addresses
-					// the ServiceConnection and restates PlayerInterface#1 as the routing context (#610).
+					// its wire format are GameTweaksCodec's. Like the three handoffs above it addresses the
+					// ServiceConnection and restates PlayerInterface#1 as the routing context.
 					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceMethods.OverrideGameTweaks,
 						GameTweaksCodec.Build(GameTweakSets.Defaults())) { RoutingContext = PlayerInterfaceRoutingContext });
 
@@ -252,7 +250,7 @@ namespace Faolan.PlayerAgent
 
 				// PlayerAgent.CreateCharacter(uint i_nDimID, const std::string& cRDBDSN, const uint16 regionCode,
 				// const uint16 ageCode, const uint16 genderCode, const String& igrID, const uint32 userType,
-				// const uint32 serviceType). `i_nDimID` is the DIMENSION = the realm the character is created on (1 or
+				// const uint32 serviceType). `i_nDimID` is the dimension = the realm the character is created on (1 or
 				// 2 across the captures, matching the realm the player picked). Everything after it is the same
 				// constant tail LoginCharacter carries - an empty count-framed field where `cRDBDSN` sits, zeroed
 				// region/age/gender, the "_" placeholder IGR id, and userType/serviceType 0 - so it is read to keep the
@@ -281,9 +279,9 @@ namespace Faolan.PlayerAgent
 					// The character's real DB id IS the client instance for the whole create flow: the client
 					// opens both the creator and the world GameServer connections with it, and the editor/world
 					// bursts are constructed with it at send time (see the burst builders in CreateFlowService).
-					// This mirrors retail, where the create session uses one generated instance throughout
-					// (there is no temporary const). ClientInstance is no longer a Character FK, so handing out
-					// the real id is safe.
+					// This mirrors retail, where the create session uses one generated instance throughout, and
+					// there is no temporary placeholder. ClientInstance is not a Character foreign key, so
+					// handing out the real id is safe.
 					client.Session.Account.ClientInstance = newCharacter.Id;
 					Logger.LogInformation("CreateCharacter: created character {CharacterId:X8}; using it as the create-flow client instance.", newCharacter.Id);
 					await Database.SaveAccount(client.Session.Account);

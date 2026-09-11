@@ -4,13 +4,17 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The bare `[u32 characterId]` body of the friend-list request/echo pair: c2s AddFriend (0x0028) and
-	// RemoveFriend (0x0029) both carry only the character to act on, and the s2c FriendRemoved echoes the id
-	// straight back. An ADD gets no echo of this shape - it is answered by the presence push, the name binding and
-	// the state (FriendPresenceCodec / ChatSenderInfoCodec / FriendStateCodec).
-	//
-	// `Opcode` names the s2c echo, which is the one direction that is ours to emit; the two c2s requests share the
-	// same one-field body and parse through the same codec.
+	/// <summary>
+	///     The bare <c>[u32 characterId]</c> body of the friend-list request/echo pair: c2s <c>AddFriend</c> and
+	///     <c>RemoveFriend</c> both carry only the character to act on, and the s2c <c>FriendRemoved</c> echoes the id
+	///     straight back.
+	/// </summary>
+	/// <remarks>
+	///     An add gets no echo of this shape: it is answered by the presence push, the name binding and the state
+	///     (<see cref="FriendPresenceCodec" />, <see cref="ChatSenderInfoCodec" />, <see cref="FriendStateCodec" />). The
+	///     declared opcode names the s2c echo, which is the one direction that is ours to emit; the two c2s requests share
+	///     the same one-field body and parse through the same codec.
+	/// </remarks>
 	public static class FriendRefCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.FriendRemoved;

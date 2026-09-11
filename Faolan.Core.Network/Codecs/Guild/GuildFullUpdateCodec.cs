@@ -5,26 +5,31 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildUpdate (0x203F) - the whole guild state, pushed on login for a guilded character and again whenever
-	// the roster changes. Three arguments, each with its own "stream bad after '<arg>'" abort in the client:
-	//   i_pcGuild     = the CoreGuild header (GuildHeaderCodec)
-	//   i_pcMember    = the authenticated member's record
-	//   i_cMemberList = [u32 (count+1)*0x3F1][member records]      the FULL roster, count-framed
-	//
-	// ⚠️ The roster must include EVERY member, the viewing player included - it fills the client's member std::map
-	// (CoreGuild+0x1e4 node ptr / +0x1e8 _Mysize count). `i_pcMember` is a separate self-POINTER, not a map entry, so
-	// excluding self left the map empty; the guild-management panel then divides the summed renown by the map size
-	// (FUN_0176d4a0), and a 0 count is an integer-divide-by-zero crash the instant the panel opens.
-	//
-	// ⚠️ The list count is a real 0x3F1 count, not a "self contribution" counter - CoreGuild's list reader
-	// (FUN_0134ed30) asserts it is a multiple of 0x3F1. Retail's word for a 173-member roster was 0x2ADCE = 174*0x3F1.
-	//
-	// Moved in from `GuildService.SendGuildFullUpdate` in #530 wave 7 - the service kept the fan-out and the send.
+	/// <summary>
+	///     <c>DispatchGuildUpdate</c> - the whole guild state, pushed on login for a guilded character and again whenever
+	///     the roster changes.
+	/// </summary>
+	/// <remarks>
+	///     Three arguments, each with its own "stream bad after '&lt;arg&gt;'" abort in the client:
+	///     <c>i_pcGuild</c> is the CoreGuild header (<see cref="GuildHeaderCodec" />), <c>i_pcMember</c> is the
+	///     authenticated member's record, and <c>i_cMemberList</c> is the full roster, count-framed.
+	///     <para>
+	///         The roster must include every member, the viewing player included: it fills the client's member std::map
+	///         (CoreGuild+0x1e4 node pointer / +0x1e8 count). <c>i_pcMember</c> is a separate self-pointer rather than a
+	///         map entry, so excluding self leaves the map empty, and the guild-management panel then divides the summed
+	///         renown by the map size (FUN_0176d4a0) - an integer divide by zero the instant the panel opens.
+	///     </para>
+	///     <para>
+	///         The list count is a real count frame, not a "self contribution" counter: CoreGuild's list reader
+	///         (FUN_0134ed30) asserts it is a multiple of the frame unit. Retail's word for a 173-member roster is the
+	///         frame for 174.
+	///     </para>
+	/// </remarks>
 	public static class GuildFullUpdateCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildUpdate;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GuildFullUpdate value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -67,6 +72,9 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// DispatchGuildUpdate's three arguments. `Roster` is the whole membership, `Self` the authenticated member.
+	/// <summary>
+	///     DispatchGuildUpdate's three arguments. <c>Roster</c> is the whole membership and <c>Self</c> the authenticated
+	///     member.
+	/// </summary>
 	public sealed record GuildFullUpdate(GuildHeader Guild, GuildMemberRecord Self, IReadOnlyList<GuildMemberRecord> Roster);
 }

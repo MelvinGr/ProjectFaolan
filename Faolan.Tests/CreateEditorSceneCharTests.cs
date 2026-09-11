@@ -7,15 +7,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The create-editor SCENE CHARACTERS (the SimpleCharFullUpdateIIR / FA015807 records the initial burst streams)
-	// are built from TYPED DATA and reproduce retail byte-for-byte (#189, #364).
+	// The create-editor scene characters (the SimpleCharFullUpdateIIR / FA015807 records the initial burst streams)
+	// are built from typed data and reproduce retail byte-for-byte.
 	//
-	// The gate used to be that each record reconstructed from ITS OWN BYTES - real construction, but the data was still
-	// the capture. It is now `CreateEditorScene`, generated from the burst and emitted as typed values, so the build
-	// side touches no captured bytes at all. That is the whole of #364's "sourcing the scene from rows rather than from
-	// these bytes", minus a DB table it does not need: the scene is five fixed pedestals, not content anyone edits.
+	// The data is `CreateEditorScene`, generated from the burst and emitted as typed values, so the build side touches
+	// no captured bytes at all. It needs no DB table behind it: the scene is five fixed pedestals, not content anyone
+	// edits.
 	//
-	// ⚠️ Some pre-IIR words are the retail server's own uninitialised memory. Resolving the slots they sit in names them
+	// Some pre-IIR words are the retail server's own uninitialised memory. Resolving the slots they sit in names them
 	// `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`, `Onslaught2SpecialsKilled` and the like - a
 	// create-editor pedestal has no seasonal PvP record, so `0x7151E7E0` in that slot is a leaked pointer, not data.
 	// They are reproduced because the gate is byte-exactness against retail; dropping them would be a behavioural
@@ -29,9 +28,9 @@ namespace Faolan.Tests
 			_o = o;
 		}
 
-		// THE gate for #364: each pedestal is rebuilt from the generated TYPED DATA - no captured bytes involved on
-		// the build side at all - and must reproduce the captured record exactly. This is what makes CreateEditorScene
-		// a parse of the capture rather than a transcription of it: a wrong emit cannot pass here.
+		// Each pedestal is rebuilt from the generated typed data - no captured bytes involved on the build side at all -
+		// and must reproduce the captured record exactly. This is what makes CreateEditorScene a parse of the capture
+		// rather than a transcription of it: a wrong emit cannot pass here.
 		[Fact]
 		public void EverySceneChar_BuildsFromTypedData_ByteExact()
 		{
@@ -46,7 +45,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The session's playfield token is stamped on the MODEL and rides the ordinary codec - it is not patched into
+		// The session's playfield token is stamped on the model and rides the ordinary codec - it is not patched into
 		// bytes. Everything else in the record must be untouched by that, which is what this pins.
 		[Fact]
 		public void ThePlayfieldToken_IsTheOnlyThingTheSessionChanges()

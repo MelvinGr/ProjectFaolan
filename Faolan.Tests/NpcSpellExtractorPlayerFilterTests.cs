@@ -11,24 +11,24 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #616: `NpcSpellExtractor` joins a cast's applyFrom handle to a NAME through `NpcSpawnExtractor`, and the
-	// worry was that the name is all that separates an NPC's cast from another PLAYER's - because
+	// `NpcSpellExtractor` joins a cast's applyFrom handle to a name through `NpcSpawnExtractor`, and the
+	// worry was that the name is all that separates an NPC's cast from another player's - because
 	// `SimpleCharFullUpdate` spawns both, and a stranger standing next to the capturing client is broadcast to it
 	// exactly like an NPC. A stranger named `Guard` would then be harvested as that NPC's spell.
 	//
-	// The separation is already STRUCTURAL, and these gates are what say so rather than a comment. A player's spawn
+	// The separation is already structural, and these gates are what say so rather than a comment. A player's spawn
 	// carries `player_stats` and no `npc_stats`, and `NpcSpawnExtractor.TryBuildEntry` drops it on exactly that
-	// (#244) - so a player-backed handle never enters the name map at all, and the name it would have collided under
+	// - so a player-backed handle never enters the name map at all, and the name it would have collided under
 	// is never consulted. The downstream `NpcTemplates` join in `NpcImportOps.ImportNpcSpells` is a second line, not the
 	// only one.
 	//
-	// Written as a whole-corpus measurement because the claim is about what the corpus CONTAINS: if the extractor's
-	// guard regressed, or a player spawn shape appeared that it does not recognise, a single hand-built fixture
-	// would keep passing.
+	// Written as a whole-corpus measurement because the claim is about what the corpus contains: if the extractor's
+	// guard regresses, or a player spawn shape appears that it does not recognise, a single hand-built fixture would
+	// keep passing.
 	public class NpcSpellExtractorPlayerFilterTests
 	{
 		// Every captured character spawn, split by what the message says it is. If the extractor ever yields an entry
-		// for a body carrying player_stats, a player handle is in the name map and #616's hole is open.
+		// for a body carrying player_stats, a player handle is in the name map and the filter has a hole.
 		[Fact]
 		public void NoPlayerBackedSpawnEverReachesTheNameMap()
 		{

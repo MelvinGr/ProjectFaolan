@@ -4,23 +4,26 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerAgent.UpdateSubscriptionSettings(const IOBuffer& data, const String& md5) - the client uploading its
-	// ACCOUNT-wide settings on the mid-session socket. Gitea #611.
-	//
-	//   [ClientSettingsBuffer][u16 length][md5, LATIN1]
-	//
-	// No id: the settings belong to whatever account the socket authenticated as, which is what makes these
-	// "subscription" rather than character settings. The archive inside carries `hotkeys.xml` and the account-wide
-	// `Prefs_2.xml` (audio/video/chat-bubble/camera preferences - 60 named values in the captures).
-	//
-	// The md5 is over the COMPRESSED payload, marker and size included - see ClientSettingsBuffer.CheckSum, which
-	// reproduces both captured sightings exactly. Its purpose is the checksum map the server hands back at login, so a
-	// client can tell whether the copy it cached is still current.
+	/// <summary>
+	///     <c>PlayerAgent.UpdateSubscriptionSettings(const IOBuffer&amp; data, const String&amp; md5)</c> - the client
+	///     uploading its account-wide settings on the mid-session socket. The body is
+	///     <c>[ClientSettingsBuffer][u16 length][md5, Latin1]</c>.
+	/// </summary>
+	/// <remarks>
+	///     There is no id: the settings belong to whatever account the socket authenticated as, which is what makes these
+	///     subscription rather than character settings. The archive inside carries <c>hotkeys.xml</c> and the account-wide
+	///     <c>Prefs_2.xml</c> (audio, video, chat-bubble and camera preferences - 60 named values in the captures).
+	///     <para>
+	///         The md5 is over the compressed payload, marker and size included - see <c>ClientSettingsBuffer.CheckSum</c>,
+	///         which reproduces both captured sightings exactly. Its purpose is the checksum map the server hands back at
+	///         login, so a client can tell whether the copy it cached is still current.
+	///     </para>
+	/// </remarks>
 	public static class UpdateSubscriptionSettingsCodec
 	{
 		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.UpdateSubscriptionSettings;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(UpdateSubscriptionSettings value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -41,7 +44,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// The account-wide settings upload. `CheckSum` is the client's own md5 of `Buffer.Payload`; it is kept as SENT
-	// rather than recomputed so a disagreement with `Buffer.CheckSum` is visible instead of silently papered over.
+	/// <summary>
+	///     The account-wide settings upload. <c>CheckSum</c> is the client's own md5 of <c>Buffer.Payload</c>, kept as sent
+	///     rather than recomputed so a disagreement with <c>Buffer.CheckSum</c> is visible instead of silently papered
+	///     over.
+	/// </summary>
 	public sealed record UpdateSubscriptionSettings(ClientSettingsBuffer Buffer, string CheckSum);
 }

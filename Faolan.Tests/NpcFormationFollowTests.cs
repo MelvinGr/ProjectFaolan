@@ -7,16 +7,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #741: one NPC bound to ANOTHER NPC's movement - the ambient formation-follow the maintainer's "giner & scruffy
+	// One NPC bound to another NPC's movement - the ambient formation-follow the maintainer's "giner & scruffy
 	// should be chasing each other" annotation names.
 	//
-	// The tick used to require the leader to be a PLAYER, which is what made the behaviour inexpressible: binding an
-	// NPC leader cleared itself on the very next tick. These gates hold that open, and hold the wire form the corpus
-	// states.
+	// The tick must not require the leader to be a player: with that requirement, binding an NPC leader clears itself
+	// on the very next tick. These gates hold that open, and hold the wire form the corpus states.
 	public class NpcFormationFollowTests
 	{
 		// The wire form, from the capture: `[u32 class][u32 leaderHandle][f32 x][f32 y][f32 z][u32 slot]`. The offset
-		// is a VECTOR, which is what the Black Dragon Guard formation proves - its four followers sit on a 3x3 grid -
+		// is a vector, which is what the Black Dragon Guard formation proves - its four followers sit on a 3x3 grid -
 		// and reading word 4 as a lone scalar was right for Scruffy and wrong for the 55 records displaced on X.
 		[Fact]
 		public void TheFollowTask_CarriesAnOffsetVectorAndASlot()
@@ -53,7 +52,7 @@ namespace Faolan.Tests
 				"a formation follower should close on its NPC leader");
 		}
 
-		// It settles at its own FORMATION SLOT rather than inside the leader, the same fan-out a player's pets get -
+		// It settles at its own formation slot rather than inside the leader, the same fan-out a player's pets get -
 		// which is what retail's four Black Dragon Guard Patrollers do behind one captain.
 		[Fact]
 		public void TwoFollowersOfOneLeader_SettleOnDifferentSpots()
@@ -76,8 +75,8 @@ namespace Faolan.Tests
 			Assert.True(Vector3.Distance(a.Position, leader.Position) > 0.5f, "a follower holds a slot beside its leader, not inside it");
 		}
 
-		// A DEAD leader drops the binding - a formation has nothing to hold onto once its leader is a corpse. (A
-		// player leader is exempt: a dead player is still the escort's leader, which is #262's behaviour.)
+		// A dead leader drops the binding - a formation has nothing to hold onto once its leader is a corpse. (A
+		// player leader is exempt: a dead player is still the escort's leader.)
 		[Fact]
 		public void ADeadNpcLeader_ReleasesItsFollowers()
 		{

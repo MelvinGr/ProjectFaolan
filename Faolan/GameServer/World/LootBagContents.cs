@@ -7,21 +7,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// What is IN a loot bag, and taking things out of it. A loot bag is a world entity, so its contents live on that
-	// entity (`WorldEntity.LootItems` / `.CashTin`); this owns the reads and writes against them, and the roll that
-	// decides what a fresh bag holds.
-	//
-	// The third corner of the loot path, and the reason it is worth naming (#826):
-	//   * `LootService`      orchestrates the client's four loot opcodes (all / single / cash / close)
-	//   * `LootBagContents`  owns the bag's contents - this file
-	//   * `WorldBroadcaster` spawns the bag, streams it, fades it and pushes the window updates
-	// LootService used to reach through the broadcaster for the middle one, which meant "what is in the bag" and "tell
-	// the client about the bag" had the same address. They are different questions and only one of them touches the
-	// wire.
-	//
-	// ⚠️ Every method resolves the bag from the CALLER's zone (`PlayerWorldEntity` -> `ZoneForEntity` -> `TryGet`)
-	// rather than trusting the handle. A handle is session-volatile and client-supplied, so a bag one player can see is
-	// not automatically one another player may empty; the zone lookup is what scopes it.
+	/// <summary>
+	///     What is in a loot bag, and taking things out of it: a loot bag is a world entity, so its contents live on
+	///     that entity (<c>WorldEntity.LootItems</c> and <c>.CashTin</c>), and this owns the reads and writes against
+	///     them plus the roll that decides what a fresh bag holds.
+	/// </summary>
+	/// <remarks>
+	///     One of three corners of the loot path, which are different questions and only one of which touches the wire:
+	///     <see cref="LootService" /> orchestrates the client's four loot opcodes (all, single, cash, close), this
+	///     class owns the bag's contents, and <see cref="LootBroadcaster" /> spawns the bag, streams it, fades it and
+	///     pushes the window updates.
+	///     <para>
+	///         Every method resolves the bag from the caller's own zone rather than trusting the handle. A handle is
+	///         session-volatile and client-supplied, so a bag one player can see is not automatically one another
+	///         player may empty; the zone lookup is what scopes it.
+	///     </para>
+	/// </remarks>
 	public sealed class LootBagContents
 	{
 		private readonly ICatalogRepository _catalog;
@@ -37,11 +38,15 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// The SOURCE NPC of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
-		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
-		// is RDB content we don't materialise. Both halves travel together (#521): the TEMPLATE is what a resolved goal
-		// matches on and the NAME is the fallback for one whose target has no template row yet. (null, 0) for a non-bag
-		// handle or a bag with no source.
+		/// <summary>
+		///     The source NPC of a loot bag - a corpse bag reuses the dead NPC's entity and handle, so its name is the
+		///     NPC's - which is the match key for a LootFromNpc quest goal, since the quest item itself is RDB content
+		///     this server does not materialise.
+		/// </summary>
+		/// <returns>
+		///     Both halves together: the template is what a resolved goal matches on, and the name is the fallback for
+		///     one whose target has no template row. (null, 0) for a non-bag handle or a bag with no source.
+		/// </returns>
 		public (string? Name, uint TemplateId) BagSource(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -60,7 +65,7 @@ namespace Faolan.GameServer.World
 				return null;
 
 			var item = bag.LootItems[index];
-			bag.LootItems[index] = 0; // looted-slot sentinel: survivors keep their stable Pos for the client's next drag
+			bag.LootItems[index] = 0; // looted-slot sentinel: survivors keep their stable position for the next drag
 			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count(i => i != 0));
 			return item;
 		}
@@ -71,7 +76,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable || bag.LootItems.All(i => i == 0))
 				return [];
 
-			// Grant the still-present items (skip already-drag-looted slots, now 0); loot-all empties + closes the bag.
+			// Grant the still-present items, skipping already-drag-looted slots; loot-all empties and closes the bag.
 			var taken = bag.LootItems.Where(i => i != 0).ToArray();
 			bag.LootItems.Clear();
 			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
@@ -103,8 +108,10 @@ namespace Faolan.GameServer.World
 			return cash;
 		}
 
-		// A few random snapshot-buildable item templates for a loot bag. Drops from the MAP's loot pool when it has
-		// one, so what a corpse holds belongs to where it died.
+		/// <summary>
+		///     A few random snapshot-buildable item templates for a loot bag, drawn from the map's loot pool when it
+		///     has one, so what a corpse holds belongs to where it died.
+		/// </summary>
 		public async Task<List<uint>> RollLootItems(int count, uint mapId)
 		{
 			if (count <= 0)

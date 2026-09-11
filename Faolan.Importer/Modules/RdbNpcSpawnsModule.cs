@@ -8,8 +8,12 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Authoritative open-world NPC spawn points from the RDB "NPC roam/movement" layout (type 1010506, #332). Clean
-	// rebuild - the set is fully derived from the fixed client RDB, so Overwrite-only.
+	/// <summary>
+	///     Authoritative open-world NPC spawn points from the RDB "NPC roam/movement" layout (type 1010506).
+	/// </summary>
+	/// <remarks>
+	///     Overwrite-only: the set is fully derived from the fixed client RDB, so every run is a clean rebuild.
+	/// </remarks>
 	public sealed class RdbNpcSpawnsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

@@ -2,11 +2,16 @@ using System.IO;
 
 namespace Faolan.Core.Protobuf
 {
-	// Hand-rolled reader for the RpcHeader endpoint fields, the counterpart to ToProtobuf() (locked byte-exact by
-	// ProtoEndpointGoldenTests). Rpc.Parse reads the header's caller_id (field 1, tag 0x0A) then endpoint_id
-	// (field 2, tag 0x12) straight off the FaolanStream with this, instead of a generic protobuf tree walk +
-	// protobuf-net round-trip - the endpoint wire is fixed and tiny: [tag][len][ 0x0D type(fixed32 LE)  0x10
-	// instance(varint)  (0x18 token(varint))? ].
+	/// <summary>
+	///     Hand-rolled reader for the RpcHeader endpoint fields, the counterpart to <c>ToProtobuf()</c> and locked
+	///     byte-exact by <c>ProtoEndpointGoldenTests</c>.
+	/// </summary>
+	/// <remarks>
+	///     <c>Rpc.Parse</c> reads the header's <c>caller_id</c> (field 1, tag 0x0A) then <c>endpoint_id</c> (field 2,
+	///     tag 0x12) straight off the <see cref="FaolanStream" /> with this, rather than a generic protobuf tree walk
+	///     plus a protobuf-net round-trip: the endpoint wire is fixed and tiny -
+	///     <c>[tag][len][0x0D type(fixed32 LE)  0x10 instance(varint)  (0x18 token(varint))?]</c>.
+	/// </remarks>
 	public partial class ProtoEndpoint
 	{
 		public enum FieldTags : byte
@@ -16,7 +21,10 @@ namespace Faolan.Core.Protobuf
 			Token = 0x18 // field 3, wire type 0 (varint)
 		}
 
-		// Reads one length-delimited endpoint field (its outer tag + length, then the sub-message) from `stream`.
+		/// <summary>
+		///     Reads one length-delimited endpoint field (its outer tag and length, then the sub-message) from
+		///     <paramref name="stream" />.
+		/// </summary>
 		public static ProtoEndpoint Read(FaolanStream stream)
 		{
 			stream.ReadVarint(); // outer field tag (caller_id 0x0A / endpoint_id 0x12), wire type 2

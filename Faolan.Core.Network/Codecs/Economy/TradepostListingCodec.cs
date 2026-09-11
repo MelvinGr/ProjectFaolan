@@ -7,53 +7,55 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// Parses/builds the DispatchTradepostSearchResults (S→C 0x2005) body - the auction-house listing grid.
-	// Wire grammar (decoded 2026-06-13 from the NecroL80 auctionhouse capture, tools/capture/decode_tradepost.py,
-	// validated byte-exact on pkt#1028; docs/subsystems/tradepost-protocol.md):
-	//   [head:u32][ row ]*
-	// Per row (all integers big-endian):
-	//   [saleId:u64][handle:u32][nameLen:u16][seller ascii][price:u64][qty:u32][itemId:u32]
-	//   [instanceField:u64][itemHandle:u32][entryLen:u32][ProtoInventoryGameEntry]
-	// The trailing entry is the SAME ProtoInventoryGameEntry the FullChar snapshot / shop / add-item use: ItemId =
-	// the saleId, stats {0:flags, 26:qty, 258:price, 265:timestamp}, item_data = the listed instance's ProtoAcgItem
-	// (its own Data1..4 quad + template). So one entry codec serves the snapshot, the shop window, the live add,
-	// and the AH grid (and, later, the mail attachment).
-	// The value used to be a self-serializing `ICodec<ParsedResults>` (#530 wave 7 retired the interface here).
+	/// <summary>
+	///     The <c>DispatchTradepostSearchResults</c> body - the auction-house listing grid.
+	/// </summary>
+	/// <remarks>
+	///     Decoded from the NecroL80 auctionhouse capture (tools/capture/decode_tradepost.py), validated byte-exact on
+	///     pkt#1028; docs/subsystems/tradepost-protocol.md. The body is <c>[head:u32][ row ]*</c>, and per row, all
+	///     integers big-endian:
+	///     <code>
+	///     [saleId:u64][handle:u32][nameLen:u16][seller ascii][price:u64][qty:u32][itemId:u32]
+	///     [instanceField:u64][itemHandle:u32][entryLen:u32][ProtoInventoryGameEntry]
+	///     </code>
+	///     The trailing entry is the same <c>ProtoInventoryGameEntry</c> the FullChar snapshot, shop and add-item use:
+	///     <c>ItemId</c> is the saleId, the stats are {0: flags, 26: qty, 258: price, 265: timestamp}, and
+	///     <c>item_data</c> is the listed instance's <c>ProtoAcgItem</c> (its own Data1..4 quad plus template). One entry
+	///     codec therefore serves the snapshot, the shop window, the live add, the AH grid and the mail attachment.
+	/// </remarks>
 	public static class TradepostListingCodec
 	{
 		public const uint Method = (uint)TradepostInterfaceMethods.DispatchTradepostSearchResults;
 
-		// The flag word (stat 0) every captured listing carries; the default for a freshly-created listing.
+		// The flag word (stat 0) every captured listing carries; the default for a freshly created listing.
 		public const uint DefaultEntryFlags = 0x421;
 
-		// Entry stat ids carried per listing (decoded from the capture; 0/265 semantics still loose - preserved).
-		// These same stat ids drive the bank "listed" overlay (TradepostMailHandler reuses them).
+		// Entry stat ids carried per listing (decoded from the capture; the 0 and 265 semantics are still loose and are
+		// preserved). These same stat ids drive the bank "listed" overlay.
 		public const uint StatFlags = 0;
 		public const uint StatPrice = 258;
 		public const uint StatQuantity = 26;
 		public const uint StatTimestamp = 265;
 
-		// Builds the full body from DB listing rows. `head` is the shared 0x3F1 LIST COUNT - (rowCount+1) * 0x3F1, the
-		// same framing GuildSearchResult/TradeskillRecipeCodec/ResurrectionSpotsBody use - NOT, as this once claimed,
-		// an echo of the search query's category. It only looks like an echo because the query happens to carry 0x7E2
-		// too, and because a 1-row result is 2 * 0x3F1 = 0x7E2 exactly. The captures settle it: an EMPTY result is a
-		// 4-byte body carrying head 0x3F1 (= 0 rows) and nothing else, and head tracks the row count all the way up
-		// (0x1375F = 79 * 0x3F1 for a 78-row grid). The call site already computes it correctly.
+		// Builds the full body from DB listing rows. `head` is the shared list count - the same framing GuildSearchResult,
+		// TradeskillRecipeCodec and ResurrectionSpotsBody use - rather than an echo of the search query's category. The
+		// captures settle it: an empty result is a 4-byte body carrying the empty frame and nothing else, and head tracks the
+		// row count all the way up (a 78-row grid frames as 79).
 		//
-		// Listings are emitted in the order given (the client renders them as-is - sort by price ascending at the
-		// call site to match retail).
+		// Listings are emitted in the order given - the client renders them as-is, so sort by price ascending at the call
+		// site to match retail.
 		//
-		// `mintHandles` optionally overrides the per-row display handles (Handle + ItemHandle) by row index. The
-		// client keys the search grid by the per-row dynel handle, so rows that share one handle COLLAPSE to a single
-		// visible row (#212) - and stored listings all carry the same seeded handle (or 0 for freshly-sold ones).
-		// Live search supplies a minter that gives each row a UNIQUE handle; the buy path keys on SaleId, not the
-		// handle, so these are pure session-volatile display ids. Left null for the byte-exact golden replay tests.
+		// `mintHandles` optionally overrides the per-row display handles (Handle and ItemHandle) by row index. The client
+		// keys the search grid by the per-row dynel handle, so rows that share one handle collapse to a single visible row,
+		// and stored listings all carry the same seeded handle (or 0 for freshly sold ones). Live search supplies a minter
+		// that gives each row a unique handle; the buy path keys on SaleId rather than the handle, so these are pure
+		// session-volatile display ids. Left null for the byte-exact golden replay tests.
 		public static byte[] Build(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
 		{
 			return Build(TradepostListings.FromRows(head, listings, mintHandles));
 		}
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ParsedResults value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -112,13 +114,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// One row of the AH grid.
+	/// <summary>One row of the AH grid.</summary>
 	public sealed record ParsedRow(ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId, ulong InstanceField, uint ItemHandle, ProtoInventoryGameEntry Entry);
 
-	// The decoded AH search grid: the 0x3F1 list `Head` plus its rows.
+	/// <summary>The decoded AH search grid: the list <c>Head</c> plus its rows.</summary>
 	public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows);
 
-	// The grid forms, as VALUE factories - row -> value mapping (#533).
+	/// <summary>The grid forms, as value factories: a row-to-value mapping.</summary>
 	public static class TradepostListings
 	{
 		public static ParsedResults FromRows(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
@@ -137,14 +139,14 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return new ParsedResults(head, rows);
 		}
 
-		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItems emits, with the
-		// AH-specific stat set). The listed instance's TEA key is per-TEMPLATE and lives in Items, reached through the
-		// TemplateItem nav (FK on Template) - Include it before building.
+		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItems emits, with the AH-specific stat
+		// set). The listed instance's TEA key is per-template and lives in Items, reached through the TemplateItem nav (FK on
+		// Template), so Include it before building.
 		//
-		// #749: `Level` comes off that same joined template rather than from a per-listing copy. The level is strictly
-		// per-TEMPLATE - across 8,644 captured inventory sightings not one template carries two different levels
-		// (#725) - so a copy on the listing held nothing the template does not, and the column is gone. `ItemHash`
-		// stays on the row and is NOT `Items.Hash`: it is the captured wire value, and an AH-delivered item sends 0.
+		// `Level` comes off that same joined template rather than from a per-listing copy: the level is strictly
+		// per-template, since across 8,644 captured inventory sightings not one template carries two different levels.
+		// `ItemHash` stays on the row and is not `Items.Hash` - it is the captured wire value, and an AH-delivered item sends
+		// 0.
 		public static ProtoInventoryGameEntry Entry(TradepostListing listing)
 		{
 			var key = (listing.TemplateItem ?? throw new InvalidOperationException(

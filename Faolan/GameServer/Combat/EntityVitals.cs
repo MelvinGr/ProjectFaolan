@@ -23,39 +23,40 @@ namespace Faolan.GameServer.Combat
 		public uint Stamina { get; set; }
 
 		/// <summary>
-		///     The part of each max pool that does NOT come from gear or buffs - the character's persisted
-		///     <c>CharacterMaxStats</c> plus its class/level base (#444). Kept so a bonus can be RE-applied as a total
-		///     rather than added and subtracted: a buff that raises max health has to give it back when it ends, and an
+		///     The part of each max pool that does not come from gear or buffs - the character's persisted
+		///     <c>CharacterMaxStats</c> plus its class/level base. Kept so a bonus can be re-applied as a total rather
+		///     than added and subtracted: a buff that raises max health has to give it back when it ends, and an
 		///     add/subtract pair drifts the moment the buff is refreshed, re-applied on relog or cleared by death.
 		/// </summary>
 		public uint BaseMaxHealth { get; private set; }
 
 		/// <summary>
-		///     What the three MAX stat ids (0x0001/0x01F9/0x01FB) carry on the wire: the CLASS BASE, which the client
-		///     tops up with its own attribute/gear/feat terms to produce the number it draws. Set by
-		///     <see cref="FromCharacter" />; null for an NPC, which has no class curve and whose reported max IS its
+		///     What the three max stat ids (0x0001/0x01F9/0x01FB) carry on the wire: the class base, which the client
+		///     tops up with its own attribute, gear and feat terms to produce the number it draws. Set by
+		///     <see cref="FromCharacter" />; null for an NPC, which has no class curve and whose reported max is its
 		///     max.
 		///     <para>
-		///         MaxHealth/MaxMana/MaxStamina are OUR ceiling - what regen fills toward, and equal to the number the
-		///         client draws - so they are a DIFFERENT quantity from this. Sending the ceiling here made the client
-		///         top up an already-topped-up value and draw 1754 where retail drew 1270 (#580). Retail proves the
-		///         split in one packet: AssassinL23's world-entry push carries <c>HpBase 77200</c> beside
+		///         MaxHealth/MaxMana/MaxStamina are this server's ceiling - what regen fills toward, and equal to the
+		///         number the client draws - so they are a different quantity from this. Sending the ceiling here makes
+		///         the client top up an already-topped-up value and draw 1754 where retail draws 1270. Retail states
+		///         the split in one packet: AssassinL23's world-entry push carries <c>HpBase 77200</c> beside
 		///         <c>HpCur 127000</c>, and <c>ManaBase 0</c> beside <c>ManaCur 7400</c> - a 0 base even though the
 		///         character wears a +74 mana item, which is what keeps the mana bar hidden for a class that has no
 		///         mana pool.
 		///     </para>
 		/// </summary>
 		public (uint Health, uint Mana, uint Stamina)? ClassBasePools { get; private set; }
-		// ^ in the RAW WIRE hundredths the class curve is stored in, not display units: Guardian stamina is 172.5 at
-		// level 1 and truncating it to 172 would put a value on the wire that the class curve never produces.
+		// Held in the raw wire hundredths the class curve is stored in, not display units: Guardian stamina is 172.5
+		// at level 1, and truncating it to 172 would put a value on the wire that the class curve never produces.
 
 		public uint BaseMaxMana { get; private set; }
 		public uint BaseMaxStamina { get; private set; }
 
 		/// <summary>
-		///     Sets one max pool to <c>base + bonus</c>, where the bonus is the gear + active-buff total for that stat in
-		///     DISPLAY units. Returns the new max so the caller can push exactly what the client should show - a buff sync
-		///     reports the stat's buffed VALUE, but the wire's <c>HealthMax</c> is the whole pool, not the bonus.
+		///     Sets one max pool to <c>base + bonus</c>, where the bonus is the gear plus active-buff total for that
+		///     stat in display units. Returns the new max so the caller can push exactly what the client should show -
+		///     a buff sync reports the stat's buffed value, but the wire's <c>HealthMax</c> is the whole pool, not the
+		///     bonus.
 		///     <para>
 		///         A shrinking max clamps current down with it, so a buff ending cannot leave a player above their bar; a
 		///         growing one leaves current where it is, so it fills by regen rather than jumping.
@@ -94,17 +95,17 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Recomputes the three <c>BaseMax*</c> pools from a NEW set of attribute scores (#584), for when a buff,
-		///     a debuff or an equip moves an attribute mid-session. Returns true when anything actually moved.
+		///     Recomputes the three <c>BaseMax*</c> pools from a new set of attribute scores, for when a buff, a debuff
+		///     or an equip moves an attribute mid-session. Returns true when anything actually moved.
 		///     <para>
-		///         Each pool is <c>class base + Σ weight × attribute + class row + flat pool bonuses</c>, and only the
-		///         FLAT half tracked live: <see cref="SetMaxFromBonus" /> re-applies it on every buff change, while the
-		///         attribute half was computed once in <see cref="FromCharacter" /> and then frozen. So a +10
-		///         Constitution buff - worth +80 max health on an Assassin - was worth exactly nothing.
+		///         Each pool is <c>class base + sum(weight x attribute) + class row + flat pool bonuses</c>. The flat
+		///         half is re-applied by <see cref="SetMaxFromBonus" /> on every buff change; the attribute half is
+		///         computed in <see cref="FromCharacter" /> and only moves when this runs, which is what makes a +10
+		///         Constitution buff worth its +80 max health on an Assassin.
 		///     </para>
 		///     <para>
-		///         ⚠️ This sets the BASE only. The caller must re-run <see cref="SetMaxFromBonus" /> for each pool
-		///         afterwards, or the flat gear/buff term is dropped along with the stale base it was sitting on.
+		///         This sets the base only. The caller must re-run <see cref="SetMaxFromBonus" /> for each pool
+		///         afterwards, or the flat gear and buff term is dropped along with the stale base it was sitting on.
 		///     </para>
 		/// </summary>
 		public bool RebaseFromAttributes(ConanClass @class, ushort level, VitalAttributes attributes,
@@ -146,8 +147,8 @@ namespace Faolan.GameServer.Combat
 
 		/// <summary>
 		///     Regenerates the three pools by the given amounts, each clamped to its max. Returns true if any pool
-		///     actually increased, so the caller can skip pushing a vitals update when nothing changed (e.g. at full).
-		///     Driven by the game loop (Gitea #404).
+		///     actually increased, so the caller can skip pushing a vitals update when nothing changed (at full, for
+		///     instance). Driven by the game loop.
 		/// </summary>
 		public bool Regenerate(uint health, uint stamina, uint mana)
 		{
@@ -175,14 +176,19 @@ namespace Faolan.GameServer.Combat
 
 		/// <summary>
 		///     Restores all three pools to <paramref name="percentOfMax" />% of their max - a resurrection point's
-		///     <c>RestorationLevel</c> (#375). Real, designed data: of the 538 imported points 344 restore 10%, 157
-		///     restore 100%, and the rest 7/20/25/30/50/70 - so the common point leaves you vulnerable and a
-		///     starter/safe point brings you back whole. Reviving everyone at full flattened that away.
-		///     Always leaves at least 1 in each pool, so a 0/garbage value can never revive a player dead. A
-		///     non-positive percent means "no data" and restores full.
-		///     The exact semantic is INFERRED: the RDB names the field but not what it scales. Health is near-certain;
-		///     whether it also scales stamina/mana is unverified, and applying it to all three is the reading that
-		///     matches the name. An in-client A/B (die near a 10% point vs a 100% one) settles it.
+		///     <c>RestorationLevel</c>. Designed data: of the 538 imported points 344 restore 10%, 157 restore 100%,
+		///     and the rest 7/20/25/30/50/70, so the common point leaves you vulnerable and a starter or safe point
+		///     brings you back whole.
+		///     <para>
+		///         Always leaves at least 1 in each pool, so a 0 or garbage value can never revive a player dead. A
+		///         non-positive percent means "no data" and restores full.
+		///     </para>
+		///     <para>
+		///         The exact semantic is inferred: the RDB names the field but not what it scales. Health is
+		///         near-certain; whether it also scales stamina and mana is unverified, and applying it to all three is
+		///         the reading that matches the name. An in-client A/B - dying near a 10% point against a 100% one -
+		///         settles it.
+		///     </para>
 		/// </summary>
 		public void ReviveTo(float percentOfMax)
 		{
@@ -199,14 +205,14 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Re-seeds this entity's MAX pools from a freshly computed set and fills every pool to it - the `.level`
-		///     / max-changed path, which recomputes through <see cref="FromCharacter" /> and then has to land the
-		///     result on the LIVE object the world already holds.
+		///     Re-seeds this entity's max pools from a freshly computed set and fills every pool to it - the
+		///     <c>.level</c> and max-changed path, which recomputes through <see cref="FromCharacter" /> and then has
+		///     to land the result on the live object the world already holds.
 		///     <para>
 		///         It carries the buff engine's baseline (<see cref="BaseMaxHealth" /> and friends) and the wire's
 		///         <see cref="ClassBasePools" /> across too, not just the three maxima. Both are functions of the
-		///         character's class and LEVEL, so copying the maxima alone left a levelled character announcing the
-		///         class base of the level they came from.
+		///         character's class and level, so copying the maxima alone leaves a levelled character announcing the
+		///         class base of the level it came from.
 		///     </para>
 		/// </summary>
 		public void ReseedMaxFrom(EntityVitals seeded)
@@ -231,12 +237,11 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current AND max id for each of
-		///     Health/Stamina/Mana. The current/max ids are in-client verified (2026-06-14): current =
-		///     {0x001B,0x01F8,0x01FA}, max = {0x0001,0x01F9,0x01FB} (see CharacterStatId). A regen/damage delta
-		///     mutates the CURRENT value, so it must ride the current id - sending it under the max id (the old bug)
-		///     grew the player's MAX bar instead of refilling current. The max ids carry
-		///     <see cref="ClassBasePools" />, not our ceiling.
+		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current and max id for each of Health,
+		///     Stamina and Mana. The two id sets are in-client verified: current = {0x001B,0x01F8,0x01FA}, max =
+		///     {0x0001,0x01F9,0x01FB} (see <see cref="CharacterStatId" />). A regen or damage delta mutates the current
+		///     value, so it must ride the current id; under the max id it would grow the player's max bar instead of
+		///     refilling current. The max ids carry <see cref="ClassBasePools" />, not this server's ceiling.
 		/// </summary>
 		public CharacterStatBlock ToVitalsBlock()
 		{
@@ -254,13 +259,12 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     What a <c>RegenIIR</c> has to carry to bring these three pools up to their max: each pool's SHORTFALL in
-		///     the wire's ×100 vitals scale, and 0 for a pool that is already full.
+		///     What a <c>RegenIIR</c> has to carry to bring these three pools up to their max: each pool's shortfall in
+		///     the wire's x100 vitals scale, and 0 for a pool that is already full.
 		///     <para>
-		///         A RegenIIR is a DELTA the client ADDS to its own current vitals, so the only correct value is this
-		///         entity's own shortfall. The create-world burst used to replay the captured <c>0 / 0x8F2 / 0</c>
-		///         verbatim and hand every new character +22.90 mana on top of a pool the same world entry had just
-		///         announced as full - a level-1 Necromancer stood up reading 269 against a 246 max.
+		///         A RegenIIR is a delta the client adds to its own current vitals, so the only correct value is this
+		///         entity's own shortfall. A replayed constant would be added on top of a pool world entry has already
+		///         announced as full, leaving the character above its own maximum.
 		///     </para>
 		/// </summary>
 		public (int Health, int Mana, int Stamina) ToRefillDeltas()
@@ -276,21 +280,21 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     The three CURRENTS only - what retail sends when a pool MOVES, as opposed to when it is seeded (#586).
+		///     The three currents only - what retail sends when a pool moves, as opposed to when it is seeded.
 		///     <para>
-		///         Measured over the whole corpus (<c>--report vitals-shape</c>): of the 4,900 <c>0x96B8DC59</c>
-		///         blocks retail sends on a handle that is not the session's own character, <b>3,694 carry exactly
-		///         <c>{HealthCurrent, StaminaCurrent, ManaCurrent}</c></b> and only 16 carry the six-record
-		///         current+max form - and those 16 sit in the multi-character captures, i.e. another player coming
-		///         into interest range, which is a SEED rather than a change. The six-record form on the session's own
-		///         handle is likewise rare (81 blocks) against a flood of single-stat pushes.
+		///         Measured over the whole corpus (<c>--report vitals-shape</c>): of the 4,900 <c>0x96B8DC59</c> blocks
+		///         retail sends on a handle that is not the session's own character, 3,694 carry exactly
+		///         <c>{HealthCurrent, StaminaCurrent, ManaCurrent}</c> and only 16 carry the six-record current+max
+		///         form - and those 16 sit in the multi-character captures, another player coming into interest range,
+		///         which is a seed rather than a change. The six-record form on the session's own handle is likewise
+		///         rare (81 blocks) against a flood of single-stat pushes.
 		///     </para>
 		///     <para>
-		///         So the max ids belong to the seed, not to the update. Sending them on every hit - which is what
-		///         <see cref="ToVitalsBlock" /> did everywhere - is three extra records per entity per swing on the
-		///         hottest packet path in the game, and for an NPC they are a fabrication besides: an NPC has no class
-		///         curve, so <see cref="ClassBasePools" /> is null and the max ids fall back to carrying our own
-		///         ceiling, which is not the quantity that slot holds for a player.
+		///         The max ids therefore belong to the seed, not to the update. Sending them on every hit would be
+		///         three extra records per entity per swing on the hottest packet path in the game, and for an NPC they
+		///         would be a fabrication besides: an NPC has no class curve, so <see cref="ClassBasePools" /> is null
+		///         and the max ids fall back to this server's own ceiling, which is not the quantity that slot holds
+		///         for a player.
 		///     </para>
 		/// </summary>
 		public CharacterStatBlock ToCurrentsBlock()
@@ -301,24 +305,25 @@ namespace Faolan.GameServer.Combat
 				.Set(CharacterStatId.ManaCurrent, Mana);
 		}
 
-		// What the last own-handle push actually stated, so the next one can carry only what MOVED. uint.MaxValue is
-		// "never pushed", which no pool can equal, so the first push after world entry always states all three.
+		// What the last own-handle push stated, so the next one can carry only what moved. uint.MaxValue is "never
+		// pushed", which no pool can equal, so the first push after world entry always states all three.
 		private uint _pushedHealth = uint.MaxValue, _pushedStamina = uint.MaxValue, _pushedMana = uint.MaxValue;
 
 		/// <summary>
-		///     The currents that have CHANGED since the last call, and nothing else - an empty block when none have.
+		///     The currents that have changed since the last call, and nothing else - an empty block when none have.
 		///     Stamps what it returns, so it is a state transition and must be called once per push.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ This is what #586's title said ("a vitals push carries what MOVED") and what its code did not do: it
-		///     sent all three currents on every push regardless. On the player's OWN handle that is not retail's shape -
-		///     the corpus splits the own-handle blocks as `[0x01FA]` x1171, `[0x001B]` x211 and `[0x01F8]` x121 against
-		///     only x12 for the three-current form, while that same three-current form is what retail says about OTHER
-		///     entities (x4,676). So a single-stat block IS the own-handle idiom and we were using the other one.
-		///
-		///     ⛔ The concrete cost was a health record on every tick of a fight. HP regen is halted in combat, but
-		///     STAMINA's is not, so the regen tick still fired every second and restated `HealthCurrent` with it -
-		///     announcing a health "change" that had not happened, once a second, for the whole fight (#902).
+		///     <para>
+		///         A single-stat block is the own-handle idiom: the corpus splits the own-handle blocks as
+		///         <c>[0x01FA]</c> x1171, <c>[0x001B]</c> x211 and <c>[0x01F8]</c> x121 against only x12 for the
+		///         three-current form, while that three-current form is what retail says about other entities (x4,676).
+		///     </para>
+		///     <para>
+		///         Pushing all three regardless costs a health record on every tick of a fight: HP regen halts in
+		///         combat but stamina's does not, so the regen tick fires every second and would restate
+		///         <c>HealthCurrent</c> with it, announcing a change that did not happen.
+		///     </para>
 		/// </remarks>
 		public CharacterStatBlock ToChangedCurrentsBlock()
 		{
@@ -336,8 +341,8 @@ namespace Faolan.GameServer.Combat
 
 		/// <summary>
 		///     Forgets what was last pushed, so the next <see cref="ToChangedCurrentsBlock" /> restates every current.
-		///     Called wherever the CLIENT's copy is reseeded from something other than a push - world entry, a
-		///     resurrection - because after that our record of what it holds is no longer about the same client state.
+		///     Call it wherever the client's copy is reseeded from something other than a push - world entry, a
+		///     resurrection - because after that the record of what the client holds no longer describes its state.
 		/// </summary>
 		public void ForgetPushedCurrents()
 		{
@@ -345,29 +350,32 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none),
-		///     PLUS the equipped-gear vital bonuses (#3) so worn +HP/+Stamina/+Mana raises the max and the regen bar can
-		///     fill past the class base. The world model's single seed point for a player's live vitals - used both by
-		///     combat and by the world simulation when a player is registered. <paramref name="statBonuses" /> is the
-		///     MaxStatAggregator output (display-unit totals by stat); null/absent = no gear bonus.
+		///     Full-health vitals seeded from a character's persisted max stats (class and level defaults if it has
+		///     none), plus the equipped-gear vital bonuses, so worn +HP/+Stamina/+Mana raises the max and the regen bar
+		///     can fill past the class base. The world model's single seed point for a player's live vitals, used both
+		///     by combat and by the world simulation when a player is registered.
 		/// </summary>
+		/// <param name="statBonuses">
+		///     The <see cref="MaxStatAggregator" /> output - display-unit totals by stat. Null or absent means no gear
+		///     bonus.
+		/// </param>
 		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
 		{
-			// The ceiling is retail's DISPLAYED maximum, built from the same three terms the client builds it from -
+			// The ceiling is retail's displayed maximum, built from the same three terms the client builds it from:
 			// the class/level curve, the attribute-scaled top-up, and the class/level ClassAttributeBases pool rows
-			// (#444, the "class-feat" HealthMax: +386 for a level-80 Necromancer). CharacterMaxStats.For owns that
-			// arithmetic; the attributes it scales off are this character's totals, which is why gear has to be
-			// folded into them and not just into the flat pool bonus below.
+			// (the "class-feat" HealthMax, +386 for a level-80 Necromancer). CharacterMaxStats.For owns that
+			// arithmetic, and the attributes it scales off are this character's totals, which is why gear has to be
+			// folded into them and not only into the flat pool bonus below.
 			//
-			// The client's own version of this sum is readable off the ClientInterface channel (#450) and agrees term
-			// for term - for the level-80 Necromancer: 2371 class base + 3000 attribute (8 x 375 Constitution) + 386
+			// The client's own version of this sum is readable off the ClientInterface channel and agrees term for
+			// term - for the level-80 Necromancer: 2371 class base + 3000 attribute (8 x 375 Constitution) + 386
 			// class-feat + 584 item = the captured 6341.
 			//
 			// The remaining term - buffs that raise a max pool (Focused Mind's +mana, Sustaining Wrath's +health) - is
 			// not here because it is not fixed at world entry: BuffStatEffects re-applies it through SetMaxFromBonus on
 			// every change to the entity's live buffs, on top of the base these terms establish. A buff that raises an
-			// ATTRIBUTE re-runs For through RebaseFromAttributes, on the same path and for the same reason (#584).
+			// attribute re-runs For through RebaseFromAttributes, on the same path and for the same reason.
 			var max = character.MaxVitals(VitalAttributes.From(classBase, statBonuses), classBase);
 
 			var vitals = FromMax(max.Health, max.Mana, max.Stamina);
@@ -379,8 +387,8 @@ namespace Faolan.GameServer.Combat
 				vitals.SetMaxFromBonus(stat, statBonuses?.GetValueOrDefault(stat) ?? 0);
 
 			vitals.ReviveToFull();
-			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
-			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
+			// A character that logged out dead is still dead: seed current health at 0, max staying full, so the world
+			// model agrees with the dead login snapshot and the respawn paths, which gate on IsDead, work.
 			if (character.IsDead)
 				vitals.Health = 0;
 			return vitals;
@@ -428,7 +436,7 @@ namespace Faolan.GameServer.Combat
 				: (uint)total;
 		}
 
-		// The class BASE for this character's three pools, in the wire's hundredths - what the max stat ids carry.
+		// The class base for this character's three pools, in the wire's hundredths - what the max stat ids carry.
 		// Straight off the class curve with no attribute, gear or feat term: retail's AssassinL23 push carries
 		// HpBase 77200 against a drawn 127000, and ManaBase 0 against a drawn 7400.
 		private static (uint Health, uint Mana, uint Stamina) ClassBaseWire(Character character)

@@ -8,7 +8,7 @@ namespace Faolan.Tests
 	// Locks the editor-slider -> spawn-morph mapping (zigzag-decoded value / 1000, face slot = wire sliderId,
 	// fixed body slider ids, retail entry order) against the Hoxxling all-sliders create capture: feeding the
 	// raw SetMorphValue stream through TryApply and generating entries must reproduce his 28 captured morph
-	// entries bit-exact (tags AND float bits).
+	// entries bit-exact (tags and float bits).
 	public class CharacterMorphsTests
 	{
 		// Hoxxling's SetMorphValue stream, verbatim from
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 		}
 
 		// The read-side zigzag decode (protobuf field 3 is ZigZag): the same transform CreateFlowService applies
-		// via the proto reader before calling TryApply. The stream data above is captured RAW varints.
+		// via the proto reader before calling TryApply. The stream data above is captured raw varints.
 		private static int Zz(uint v)
 		{
 			return (int)(v >> 1) ^ -(int)(v & 1);

@@ -5,12 +5,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The class BASE vitals curve, RDB 1000511 `HitsManaAndStamina_c` (Gitea #450 / #3 / #469).
+	// The class base vitals curve, RDB 1000511 `HitsManaAndStamina_c`.
 	//
 	// The gate is retail's own numbers: the 0x96B8DC59 stat push that follows a NewLevelIIR carries the base for
 	// the level just reached, and every such push in the corpus is listed below with the capture it came from. A
-	// curve fitted to L1 anchors (which is what this replaced) cannot pass this - the old growth values were out by
-	// 50% on the Guardian and 70% on the Assassin.
+	// curve fitted to L1 anchors alone cannot pass this: its growth values are out by 50% on the Guardian and 70% on
+	// the Assassin.
 	public class ClassBaseVitalsCurveTests
 	{
 		// Every captured (class, level) -> retail's own wire base, from the 0x96B8DC59 that follows the level-up.
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			Assert.Equal((health, mana, stamina), CharacterMaxStats.ClassBaseHundredths(@class, level));
 		}
 
-		// The pool a class does NOT have stays 0 at every level, so the client keeps hiding that bar. Growth must not
+		// The pool a class does not have stays 0 at every level, so the client keeps hiding that bar. Growth must not
 		// resurrect it: a `base + growth * steps` written without the zero check would give a Necromancer stamina.
 		[Theory]
 		[InlineData(ConanClass.Necromancer, 80)]
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, CharacterMaxStats.ClassBaseHundredths(@class, level).Stamina);
 		}
 
-		// Level 0 THROWS rather than being read as level 1. Every character row is allocated at level 1, so a 0 is a
+		// Level 0 throws rather than being read as level 1. Every character row is allocated at level 1, so a 0 is a
 		// corrupt row, and serving it a level-1 curve would make it indistinguishable from a new character.
 		[Theory]
 		[InlineData(ConanClass.Guardian)]
@@ -71,9 +71,9 @@ namespace Faolan.Tests
 			Assert.Throws<ArgumentOutOfRangeException>(() => CharacterMaxStats.ClassBaseHundredths((ConanClass)0, 10));
 		}
 
-		// The base is NOT the displayed max, which is the whole reason this curve is not simply wired into
+		// The base is not the displayed max, which is the whole reason this curve is not simply wired into
 		// CharacterMaxStats. AssassinL23's captured sheet reads 1270 health; the class base at 23 is 772. The 498
-		// difference is the client's own gear/feat/attribute contribution (#450), and asserting the gap here is what
+		// difference is the client's own gear/feat/attribute contribution, and asserting the gap here is what
 		// stops someone "fixing" the discrepancy by swapping one for the other.
 		[Fact]
 		public void ClassBase_IsWellBelowTheCapturedSheet_ForAGearedCharacter()

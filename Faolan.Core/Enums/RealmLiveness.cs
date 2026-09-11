@@ -3,18 +3,17 @@ using System;
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     Whether a realm row means "a host is serving this realm RIGHT NOW" (#922) - <see cref="RealmOnlineStatus" />
-	///     read together with the heartbeat that keeps it honest.
+	///     Whether a realm row means "a host is serving this realm right now" - <see cref="RealmOnlineStatus" /> read
+	///     together with the heartbeat that keeps it honest.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ The flag alone cannot say it. A realm that crashes and is never restarted leaves <c>Online</c> in the
-	///     row for ever, because nothing re-reconciles it - #909 made the flag mean SERVING and made a realm's own
-	///     restart clear its stale Online, but there is no restart in that case. A two-value column cannot decay on
-	///     its own; the absence has to be observed, and the observation is the stamp's AGE.
+	///     The flag alone cannot say it. A realm that crashes and is never restarted leaves <c>Online</c> in the row
+	///     for ever, because nothing re-reconciles it. A two-value column cannot decay on its own; the absence has to
+	///     be observed, and the observation is the stamp's age.
 	///     <para />
-	///     ⭐ It is a pure function on purpose. The rule has one production reader today (the login tier's realm
-	///     list) and will grow more, and a staleness rule copied per reader is a rule that drifts - so every consumer
-	///     of <c>OnlineStatus</c> becomes a consumer of the pair by calling this rather than by re-deriving it.
+	///     It is a pure function on purpose: a staleness rule copied per reader is a rule that drifts, so every
+	///     consumer of <c>OnlineStatus</c> becomes a consumer of the pair by calling this rather than by re-deriving
+	///     it.
 	/// </remarks>
 	public static class RealmLiveness
 	{
@@ -24,8 +23,7 @@ namespace Faolan.Core.Enums
 		/// <remarks>
 		///     Four times <see cref="HeartbeatInterval" />, so three consecutive missed stamps - a slow save, a GC
 		///     pause, a moment of database contention - do not take a healthy realm out of the list. The cost of the
-		///     margin is how long a crashed realm keeps being advertised, which is bounded by this and was previously
-		///     unbounded.
+		///     margin is how long a crashed realm keeps being advertised, which this bounds.
 		/// </remarks>
 		public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(2);
 
@@ -33,15 +31,14 @@ namespace Faolan.Core.Enums
 		public static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
 		/// <summary>
-		///     Whether a realm should be treated as up: the flag says Online AND the heartbeat is fresh.
+		///     Whether a realm should be treated as up: the flag says Online and the heartbeat is fresh.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ A NULL <paramref name="lastSeenUtc" /> is NOT serving even when the flag says Online. That is the
-		///     row of a realm whose host predates the heartbeat, or one whose flag was set by hand - neither is
-		///     evidence that anything is listening, and reading "no news" as good news is the exact failure this
-		///     exists to remove.
+		///     A null <paramref name="lastSeenUtc" /> is not serving even when the flag says Online. That is the row of
+		///     a realm whose host predates the heartbeat, or one whose flag was set by hand - neither is evidence that
+		///     anything is listening, and reading "no news" as good news is the exact failure this exists to remove.
 		///     <para />
-		///     A stamp in the FUTURE is accepted rather than rejected: the two processes may be on different machines
+		///     A stamp in the future is accepted rather than rejected: the two processes may be on different machines
 		///     and a little clock skew must not take a live realm down. Only the past is measured.
 		/// </remarks>
 		public static bool IsServing(RealmOnlineStatus status, DateTimeOffset? lastSeenUtc, DateTimeOffset utcNow)
@@ -49,7 +46,7 @@ namespace Faolan.Core.Enums
 			return status == RealmOnlineStatus.Online && lastSeenUtc is { } seen && utcNow - seen <= StaleAfter;
 		}
 
-		/// <summary>The status to SHOW for a realm - <see cref="IsServing" /> collapsed back onto the wire enum.</summary>
+		/// <summary>The status to show for a realm - <see cref="IsServing" /> collapsed back onto the wire enum.</summary>
 		public static RealmOnlineStatus Effective(RealmOnlineStatus status, DateTimeOffset? lastSeenUtc, DateTimeOffset utcNow)
 		{
 			return IsServing(status, lastSeenUtc, utcNow) ? RealmOnlineStatus.Online : RealmOnlineStatus.Offline;

@@ -93,12 +93,16 @@ namespace Faolan.Core.Crypt
 			0xDE0506F1
 		];
 
-		// Skips the leading 8-byte [length][crc32] header of a framed packet stream. Typed as FaolanStream (the
-		// base of PacketStream) so this primitive lives in the Faolan.Core base layer without depending on the
-		// Network.Packets layer above it.
+		/// <summary>
+		///     Computes the CRC32 of a framed packet buffer, skipping its leading 8-byte [length][crc32] header.
+		/// </summary>
+		/// <remarks>
+		///     Typed as <see cref="FaolanStream" /> (the base of PacketStream) so this primitive stays in the
+		///     Faolan.Core base layer without depending on the Network.Packets layer above it.
+		/// </remarks>
 		public static unsafe uint Calculate(FaolanStream packetBuffer)
 		{
-			fixed (byte* pointer = packetBuffer.ToArray()) // skip length and hash
+			fixed (byte* pointer = packetBuffer.ToArray())
 			{
 				return Calculate((uint*)(pointer + sizeof(uint) * 2), packetBuffer.Length - sizeof(uint) * 2);
 			}

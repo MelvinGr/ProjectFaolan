@@ -14,35 +14,35 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Enforces the EF model conventions that keep the schema readable from the ENTITY, not from a distant
+	// Enforces the EF model conventions that keep the schema readable from the entity, not from a distant
 	// configuration block.
 	//
 	// A relationship's foreign key is declared with `[ForeignKey]` on the navigation property of the entity that
-	// owns it - never with a fluent `.HasForeignKey(...)` in DatabaseContext.OnModelCreating. Reading
-	// `Faolan.Core.Database/Tables/Foo.cs` should tell you what Foo points at; a fluent FK moves half of that into a
-	// 400-line method nobody reads next to the entity. COMPOSITE keys are no exception and are not a reason to
+	// owns it - never with a fluent `.HasForeignKey(...)` in DatabaseContext.OnModelCreating. Reading an entity's own
+	// file under `Faolan.Core.Database/Tables/` should tell you what it points at; a fluent FK moves half of that into
+	// a 400-line method nobody reads next to the entity. Composite keys are no exception and are not a reason to
 	// reach for the fluent API: `[ForeignKey]` takes a comma-separated column list, and an interpolated `nameof`
 	// chain keeps it rename-safe -
 	//
 	//     [ForeignKey($"{nameof(ConversationNodeId)},{nameof(PacketSequence)}")]
 	//     public virtual ConversationPacket Packet { get; set; } = null!;
 	//
-	// What legitimately STAYS fluent is everything that is not the FK column mapping: `.OnDelete(...)` (no
+	// What legitimately stays fluent is everything that is not the FK column mapping: `.OnDelete(...)` (no
 	// attribute exists), `.ValueGeneratedNever()`, and the `HasMany/WithOne` pairing that names both ends.
 	public class DatabaseConventionTests
 	{
-		// Files that may declare a fluent foreign key, with the reason. NOT a place to silence the test - if you are
+		// Files that may declare a fluent foreign key, with the reason. Not a place to silence the test - if you are
 		// adding an entry, first check whether [ForeignKey] with a comma-separated column list does the job.
-		// Currently EMPTY: every relationship in the model is attribute-declared.
+		// Currently empty: every relationship in the model is attribute-declared.
 		private static readonly Dictionary<string, string> FluentForeignKeyAllowlist = new Dictionary<string, string>(StringComparer.Ordinal);
 		private static readonly Regex FluentForeignKey = new Regex(@"\.Has(Foreign|Principal)Key\s*[(<]");
 
-		// ⚠️ Timestamps are DateTimeOffset, never DateTime (the maintainer's standing rule). A DateTime carries no offset, so
+		// Timestamps are DateTimeOffset, never DateTime (the maintainer's standing rule). A DateTime carries no offset, so
 		// the instant it records is ambiguous the moment the process, host or deployment changes timezone - and it
 		// round-trips through SQLite with its Kind reset to Unspecified, so a value written as UTC reads back
 		// comparing wrong against a local `now`. DateTimeOffset carries the offset and cannot lose it.
 		//
-		// This scans the model's own source rather than the EF metadata so the failure names the FILE and LINE to fix.
+		// This scans the model's own source rather than the EF metadata so the failure names the file and line to fix.
 		[Fact]
 		public void Timestamps_AreDateTimeOffset_NotDateTime()
 		{
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 				$"A composite key takes a comma-separated column list - see ConversationScreen. Offenders: {string.Join(", ", offenders)}");
 		}
 
-		// The DERIVED-id tables (DerivedKey): every stored id must equal the id its own identity computes to.
+		// The derived-id tables (DerivedKey): every stored id must equal the id its own identity computes to.
 		//
 		// This is the gate that makes the whole scheme trustworthy. A derived key is only worth having if the
 		// stored value and the function agree - if they ever drift (someone edits ComputeId, or a row is written
@@ -133,17 +133,17 @@ namespace Faolan.Tests
 			Assert.True(wrong.Count == 0, $"{wrong.Count} row(s) carry an id that is not derived from their identity: {string.Join("; ", wrong.Take(5))}");
 		}
 
-		// No GAME-CONTENT table may have a store-generated key. It is what lets `faolan.sql` be the WHOLE seed: the
-		// per-dialect `faolan.seq.{sqlite,postgres}.sql` counter-resync sidecars were empty because of this gate, and
-		// are now deleted. The invariant was quietly false until #646: `FeatIdMaps.WireFeatId` is harvested from RDB
-		// 1000042 and assigned explicitly by RdbFeatImporter, yet it was declared AUTOINCREMENT, so the SQLite sidecar
-		// carried a high-water mark of 2,000,500 over 6,593 rows. SqlSeedWriter throws on the next one; this names it
-		// at the model level, before a seed is even written.
+		// No game-content table may have a store-generated key. It is what lets `faolan.sql` be the whole seed: with
+		// every key carried by the rows themselves there is no per-dialect counter to resync after the seed loads. The
+		// shape to watch for is a key that is assigned explicitly and declared autoincrement anyway - `FeatIdMaps
+		// .WireFeatId` is harvested from RDB 1000042 and assigned by RdbFeatImporter - which leaves a high-water mark
+		// in the database for rows the seed already numbers. SqlSeedWriter throws on such a table; this names it at the
+		// model level, before a seed is even written.
 		//
 		// A generated key on a table the importer delete+reinserts is a real defect, not cosmetics: the value is
 		// reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql` lines for zero semantic
 		// change and cascades into every child FK. The scope is exactly the seed's own table set (SqlSeedWriter's
-		// ContentTables), because PLAYER state legitimately generates ids - a new character or auction listing has
+		// ContentTables), because player state legitimately generates ids - a new character or auction listing has
 		// no natural key to be assigned from.
 		[Fact]
 		public async Task NoGameContentTable_HasAStoreGeneratedKey()

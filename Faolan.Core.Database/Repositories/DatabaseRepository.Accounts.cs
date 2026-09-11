@@ -22,12 +22,12 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 
-		/// <summary>Bans an account until <paramref name="expiresAt" />, in one write (#918).</summary>
+		/// <summary>Bans an account until <paramref name="expiresAt" />, in one write.</summary>
 		Task<bool> BanUntil(uint accountId, DateTimeOffset expiresAt);
 
 		/// <summary>
-		///     Lifts a TIMED ban whose moment has passed; true when one actually lifted. An indefinite ban
-		///     (<c>BanExpiresAt</c> NULL) is never touched.
+		///     Lifts a timed ban whose moment has passed; true when one actually lifted. An indefinite ban
+		///     (<c>BanExpiresAt</c> null) is never touched.
 		/// </summary>
 		Task<bool> ClearExpiredBan(uint accountId, DateTimeOffset now);
 		Task SetAccountSubscriptionSettings(uint accountId, byte[] settings);
@@ -55,14 +55,14 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
-		// Case-INSENSITIVE, matching how the web login has always looked accounts up (Identity's FindByNameAsync
+		// Case-insensitive, matching how the web login has always looked accounts up (Identity's FindByNameAsync
 		// normalises to upper-case). This was an exact match, so the two logins disagreed: the web let you in as
 		// "Faolan" when the row said "faolan" and the game did not, for the same account and the same password.
-		// Usernames are alphanumeric ASCII, so UPPER() folding is exact here.
+		// Usernames are alphanumeric ASCII, so upper() folding is exact here.
 		//
-		// ⚠️ The unique index on UserName is still BINARY collation, so the DATABASE would accept "Faolan" and
+		// The unique index on UserName is still binary collation, so the database would accept "Faolan" and
 		// "faolan" as two rows even though nothing can now tell them apart. Nothing creates such a pair today -
-		// registration has always checked case-insensitively - but making the index NOCASE is the real fix.
+		// registration has always checked case-insensitively - but making the index nocase is the real fix.
 		public async Task<Account?> GetAccount(string userName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -92,7 +92,7 @@ namespace Faolan.Core.Database.Repositories
 					.SetProperty(a => a.GmLevel, account.GmLevel));
 		}
 
-		// The account-wide client settings archive (#611). Its own method rather than a field on SaveAccount: that one
+		// The account-wide client settings archive. Its own method rather than a field on SaveAccount: that one
 		// runs on nearly every login step, and rewriting a 1 KB blob each time would be pure churn.
 		public async Task SetAccountSubscriptionSettings(uint accountId, byte[] settings)
 		{
@@ -112,7 +112,7 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClaimsAvailable, available));
 		}
 
-		// Rotates the login nonce. Called on every Authenticate BEFORE the challenge goes out, so a login block
+		// Rotates the login nonce. Called on every Authenticate before the challenge goes out, so a login block
 		// captured off the wire can never be replayed against the next attempt.
 		public async Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge)
 		{
@@ -127,9 +127,9 @@ namespace Faolan.Core.Database.Repositories
 			       1;
 		}
 
-		// ⚠️ Clears any timed-ban expiry alongside the state (#918). Every state change is a decision that supersedes
+		// Clears any timed-ban expiry alongside the state. Every state change is a decision that supersedes
 		// a pending lift: `.unban` obviously, but `.ban` too - an indefinite ban must not inherit a `.kickban`'s
-		// leftover expiry and silently lift itself. `BanUntil` is the ONE path that sets one.
+		// leftover expiry and silently lift itself. `BanUntil` is the one path that sets one.
 		public async Task<bool> SetAccountState(uint accountId, AccountState state)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -137,7 +137,7 @@ namespace Faolan.Core.Database.Repositories
 				.ExecuteUpdateAsync(s => s.SetProperty(a => a.State, state).SetProperty(a => a.BanExpiresAt, (DateTimeOffset?)null)) == 1;
 		}
 
-		// A TIMED ban: banned now, lifting itself at `expiresAt` (#918). One write, so the state and its expiry can
+		// A timed ban: banned now, lifting itself at `expiresAt`. One write, so the state and its expiry can
 		// never disagree.
 		public async Task<bool> BanUntil(uint accountId, DateTimeOffset expiresAt)
 		{
@@ -149,16 +149,16 @@ namespace Faolan.Core.Database.Repositories
 		// Lifts a timed ban whose moment has passed. Returns true when it actually lifted one, so the caller can log
 		// the transition rather than guess at it.
 		//
-		// ⭐ This is what makes the lift survive a restart in BOTH directions - a server that was down through the
+		// This is what makes the lift survive a restart in both directions - a server that was down through the
 		// whole window lifts on the next login attempt, and one that comes back inside the window still holds the ban.
-		// Scoped to `Banned` rows with an expiry that has elapsed, so an indefinite ban (`BanExpiresAt` NULL) can
+		// Scoped to `Banned` rows with an expiry that has elapsed, so an indefinite ban (`BanExpiresAt` null) can
 		// never be caught by it.
 		public async Task<bool> ClearExpiredBan(uint accountId, DateTimeOffset now)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 
-			// ⚠️ The expiry is compared HERE rather than in the Where clause, and that is a provider limit rather than
-			// a preference: SQLite cannot translate a `DateTimeOffset` ORDERING (it stores one as text), so
+			// The expiry is compared here rather than in the Where clause, and that is a provider limit rather than
+			// a preference: SQLite cannot translate a `DateTimeOffset` ordering (it stores one as text), so
 			// `a.BanExpiresAt <= now` inside `ExecuteUpdate` throws "could not be translated" at runtime - a failure
 			// that only appears when the path is actually taken. Reading the row first costs one query on a path that
 			// already loads the account, and keeps the column the same `DateTimeOffset?` as its neighbours.

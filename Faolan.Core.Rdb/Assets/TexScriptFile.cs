@@ -5,16 +5,21 @@ using System.Xml.Linq;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Parses an Age of Conan RDB TexScript (type 1010035) - the XML node graph that builds a character's final part
-	// texture from its base ("originaltexture") via colour operations (#275). The CHARACTERCREATOR's
-	// skincolor/haircolor/eyecolor and the per-character CharacterBodyResources reference these by id.
-	//
-	//   <texscript name="..">
-	//     <operation id=1 mesh="-4" name="originaltexture" .../>   <!-- mesh: -3 skin, -4 hair, -5 eyes, -1/-2 body -->
-	//     <operation id=3 name="tinting" red=145 green=151 blue=151 .../>      <!-- multiply the base by an RGB -->
-	//     <operation id=3 name="projecttexture" textureid=213240 .../>          <!-- overlay/replace with a texture -->
-	//     <operation id=2 name="finishedtexture"/>
-	//   </texscript>
+	/// <summary>
+	///     Parses an Age of Conan RDB TexScript (type 1010035): the XML node graph that builds a character's final part
+	///     texture from its base ("originaltexture") via colour operations. The CHARACTERCREATOR's
+	///     skincolor/haircolor/eyecolor and the per-character CharacterBodyResources reference these by id.
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     &lt;texscript name=".."&gt;
+	///       &lt;operation id=1 mesh="-4" name="originaltexture" .../&gt;   mesh: -3 skin, -4 hair, -5 eyes, -1/-2 body
+	///       &lt;operation id=3 name="tinting" red=145 green=151 blue=151 .../&gt;   multiply the base by an RGB
+	///       &lt;operation id=3 name="projecttexture" textureid=213240 .../&gt;      overlay/replace with a texture
+	///       &lt;operation id=2 name="finishedtexture"/&gt;
+	///     &lt;/texscript&gt;
+	///     </code>
+	/// </remarks>
 	public sealed record TexScriptFile(uint Id, string? Name, int MeshTarget, TexScriptFile.Operation Op)
 	{
 		public const uint Type = 1010035;
@@ -75,9 +80,15 @@ namespace Faolan.Core.Rdb.Assets
 				: fallback;
 		}
 
-		// Tint: R/G/B multiply. Project: overlay TextureId at (U,V) on the target atlas, sized by Scale (percent of the
-		// decal's native size), rotated Rotation degrees, alpha-blended by Blend. Placement is meaningful for body decals
-		// (mesh -1/-2 tattoos); the eye/skin projects cover the whole part so the placement defaults (full-cover) are unused.
+		/// <summary>
+		///     One colour operation. Tint multiplies by R/G/B; Project overlays <c>TextureId</c> at (U, V) on the
+		///     target atlas, sized by <c>Scale</c> as a percentage of the decal's native size, rotated
+		///     <c>Rotation</c> degrees and alpha-blended by <c>Blend</c>.
+		/// </summary>
+		/// <remarks>
+		///     Placement is only meaningful for body decals (the mesh -1/-2 tattoos); the eye and skin projections
+		///     cover the whole part, so their full-cover placement defaults go unused.
+		/// </remarks>
 		public readonly record struct Operation(Kind Kind, byte R, byte G, byte B, uint TextureId, float U = 0.5f, float V = 0.5f, float Scale = 100f, float Rotation = 0f, float Blend = 1f);
 	}
 }

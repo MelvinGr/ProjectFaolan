@@ -7,24 +7,25 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report duplicate-records`: which s2c StatIIR records does retail send TWICE, back to back and byte-identical?
+	// `--report duplicate-records`: which s2c StatIIR records does retail send twice, back to back and byte-identical?
 	//
-	// Gitea #842 is a `[V0]` on one of them - the hostile-flip `CarsGroup` restate, which arrives as two separate
-	// packets sharing one TCP segment, with no second value and no `0x00`/`0x01` env pair, 3 of 3 in the corpus. We
-	// replay both because the capture says so; what is unknown is WHY there is a second copy, a stat set being
+	// The case that raises it is the hostile-flip `CarsGroup` restate, which arrives as two separate packets sharing
+	// one TCP segment, with no second value and no `0x00`/`0x01` env pair, in every capture that carries it. Both are
+	// replayed because the capture says so; what is unknown is why there is a second copy at all, a stat set being
 	// idempotent.
 	//
-	// ⭐ The question this answers is the one that decides whether #842 is special: **is duplication a property of
-	// that record, or a thing retail does generally?** If many stats arrive doubled then "two emitters on one event"
-	// is an ordinary shape and CarsGroup is not a puzzle; if CarsGroup is alone in it, the doubling is specific and
-	// worth explaining.
+	// So the question is whether duplication is a property of that record or a thing retail does generally. If many
+	// stats arrive doubled then two emitters on one event is an ordinary shape and CarsGroup is not a puzzle; if it is
+	// alone in it, the doubling is specific and worth explaining.
 	//
-	// ⚠️ Adjacency is required, not just recurrence. A stat that is simply SENT OFTEN would dominate any count of
+	// Adjacency is required, not just recurrence: a stat that is simply sent often would dominate any count of
 	// repeats, so a pair counts only when the second copy is the very next StatIIR for that entity with nothing
-	// between them - which is what the #842 observation actually is.
+	// between them, which is what the observation actually is.
+	//
+	// Open work tracked in Gitea #842.
 	public static partial class ReportCli
 	{
-		// The `CarsGroup` value a dialogue-driven hostile flip sets - #842's subject (`NpcStatCore.MobCarsGroup`).
+		// The `CarsGroup` value a dialogue-driven hostile flip sets (`NpcStatCore.MobCarsGroup`).
 		private const uint HostileFlipValue = 3;
 
 		private static int DuplicateRecords(IReadOnlyList<NamedCapture> captures)
@@ -33,7 +34,7 @@ namespace Faolan.Importer.Cli
 			var singles = new Dictionary<uint, int>();
 			var carsGroupCaptures = new List<string>();
 
-			// #842 is about the hostile flip specifically - `CarsGroup == 3` on a CHARACTER - so that value is split
+			// The subject is the hostile flip specifically - `CarsGroup == 3` on a character - so that value is split
 			// out rather than pooled with every other CarsGroup send, or the comparison is not like for like.
 			var flipDoubled = 0;
 			var flipSingle = 0;
@@ -42,7 +43,7 @@ namespace Faolan.Importer.Cli
 
 			foreach (var capture in captures)
 			{
-				// The previous StatIIR seen, per ENTITY: a duplicate is the same (entity, stat, value) arriving with
+				// The previous StatIIR seen, per entity: a duplicate is the same (entity, stat, value) arriving with
 				// nothing else for that entity in between.
 				var previous = new Dictionary<uint, (uint StatId, uint Value)>();
 
@@ -82,7 +83,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine("=== which StatIIR records does retail send TWICE, back to back? (#842) ===");
 			Console.WriteLine();
-			// ⚠️ Counted at arrival, ahead of the parse, so "no packet carried this" cannot read as "none was doubled".
+			// Counted at arrival, ahead of the parse, so "no packet carried this" cannot read as "none was doubled".
 			Console.WriteLine($"  control - StatIIR: {arrivals,7} arrived, {parsed,7} parsed");
 			Console.WriteLine();
 
@@ -105,9 +106,9 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"  the hostile flip itself (CarsGroup == {HostileFlipValue}): {flipDoubled} doubled, {flipSingle} single.");
 
-			// ⭐ THE FINDING. A stat whose doubled count EQUALS its single count is one that always arrives as a pair -
-			// each pair contributing one "first" and one "repeat" - which is a property of retail's SENDER, not of the
-			// event. That is the shape #842 is looking at, and it is not rare.
+			// The finding. A stat whose doubled count equals its single count is one that always arrives as a pair -
+			// each pair contributing one "first" and one "repeat" - which is a property of retail's sender, not of the
+			// event. That is the shape the hostile flip has, and it is not rare.
 			var alwaysPaired = pairs.Where(kv => singles.GetValueOrDefault(kv.Key) == kv.Value && kv.Value > 0)
 				.OrderByDescending(kv => kv.Value)
 				.ToList();

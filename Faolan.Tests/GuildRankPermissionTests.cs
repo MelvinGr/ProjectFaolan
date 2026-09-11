@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #799: WHICH guild ranks may withdraw from the guild bank. It was a `[V0]` - the one captured banking session
+	// Which guild ranks may withdraw from the guild bank. It was a `[V0]` - the one captured banking session
 	// cannot answer it, because the member banking there is that guild's own leader - and the answer turned out to
-	// be in the client's shipped data all along: RDB 1000518 `GuildRankDataTable` carries a permission BITMASK per
+	// be in the client's shipped data all along: RDB 1000518 `GuildRankDataTable` carries a permission bitmask per
 	// rung, and the guild-management view names the bits (`tools/ghidra/DumpGuildRankPermissions.java`).
 	//
-	// ⚠️ The suite runs from a plain clone, so it cannot re-read the RDB. Asserting the transcription against itself
-	// would be worth nothing, so what is gated here is the STRUCTURE the shipped table has - properties a
+	// The suite runs from a plain clone, so it cannot re-read the RDB. Asserting the transcription against itself
+	// would be worth nothing, so what is gated here is the structure the shipped table has - properties a
 	// transcription slip breaks - plus the one derived rule the server now enforces.
 	public class GuildRankPermissionTests
 	{
@@ -57,13 +57,13 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ The answer to #799, stated as the rule the server enforces: the LOWEST rung that may withdraw. Six forms
+		// The rule the server enforces: the lowest rung that may withdraw. Six forms
 		// of seven hand it to the top two rungs; Stygian hands it to the leader alone, because its second rung
-		// carries 6430 rather than 7518 and 6430 is the mask WITHOUT `WithdrawMoney`.
+		// carries 6430 rather than 7518 and 6430 is the mask without `WithdrawMoney`.
 		[Theory]
 		[InlineData(GuildGoverningForm.Cimmerian, 3)]      // War Chief
 		[InlineData(GuildGoverningForm.Acheron, 4)]        // Deathbringer Envoy
-		[InlineData(GuildGoverningForm.Stygian, 3)]        // Emissary of Set - the LEADER, no deputy tier
+		[InlineData(GuildGoverningForm.Stygian, 3)]        // Emissary of Set - the leader, no deputy tier
 		[InlineData(GuildGoverningForm.Aquilonian, 4)]     // Ambassador
 		[InlineData(GuildGoverningForm.Nemedian, 4)]       // Commandant
 		[InlineData(GuildGoverningForm.HyborianMilita, 4)] // Taxiarchos
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Equal(form == GuildGoverningForm.Stygian, lowest == GuildRankLadder.LeaderRank(form));
 		}
 
-		// Kick/promote/demote reach FURTHER down than the bank does - which is the half of the change that stops
+		// Kick/promote/demote reach further down than the bank does - which is the half of the change that stops
 		// these being leader-only. Every mask above `None` carries them, so the boundary is "any rung with rights".
 		[Fact]
 		public void EveryRungWithAnyRightMayInviteKickPromoteAndDemote()
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 				}
 		}
 
-		// A form or rung outside the table gets NOTHING - the caller is deciding whether to let someone drain a bank,
+		// A form or rung outside the table gets nothing - the caller is deciding whether to let someone drain a bank,
 		// so an unknown rung must not fall back to a default set.
 		[Fact]
 		public void AnUnknownRungHoldsNothing()

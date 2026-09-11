@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A 16-bit opcode is a method INDEX, so the same number names a different method on each RPC class - the receiver's
+	// A 16-bit opcode is a method index, so the same number names a different method on each RPC class - the receiver's
 	// Type hash disambiguates. ProtocolCatalog is the one place that (Receiver.Type, method) -> name/enum mapping lives;
-	// it drives BOTH the inbound (UL) trace (agent classes) and the outbound (DL) fall-back naming (interface classes).
-	// (Replaces the retired GameServerMethodNames + its test - the resolver is now global across every tier.)
+	// it drives both the inbound (UL) trace (agent classes) and the outbound (dl) fall-back naming (interface classes),
+	// globally across every tier.
 	public class ProtocolCatalogTests
 	{
-		// The DL fall-back path (MethodEnumFor) still returns the interface enum for a defined method, and null otherwise
+		// The dl fall-back path (MethodEnumFor) still returns the interface enum for a defined method, and null otherwise
 		// so the caller drops back to its listener-default enum.
 		[Fact]
 		public void MethodEnumFor_ResolvesInterfaceEnum_ElseNull()
@@ -37,10 +37,9 @@ namespace Faolan.Tests
 			Assert.Equal(expected, ProtocolCatalog.ResolveName(receiverType, method));
 		}
 
-		// The hash-registered pair has NO opcode (#613), so a frame there is named from its method constant - the same
-		// lookup as every other class since #615 folded the two maps into one. Three cases, and the third is the one
-		// that used to be impossible to get right: an unknown method must render as a constant, never as the 7-bit
-		// opcode view that names two methods at once.
+		// The hash-registered pair has no opcode, so a frame there is named from its method constant - the same
+		// lookup as every other class. Three cases, and the third is the one that is easy to get wrong: an unknown
+		// method must render as a constant, never as the 7-bit opcode view that names two methods at once.
 		[Fact]
 		public void ResolveName_NamesTheHashRegisteredPair_FromItsMethod()
 		{
@@ -50,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal("AuthenticateAck (0x5DC18991)", ProtocolCatalog.ResolveName(new Rpc(agent, player, PlayerInterfaceMethods.AuthenticateAck, ReadOnlyMemory<byte>.Empty)));
 
 			// A login handoff addresses the ServiceConnection, which no receiver-keyed map covers - only the listener's
-			// fall-back method enum can name it. Before #613 this path reached Rpc.Opcode, which #615 deleted.
+			// fall-back method enum can name it.
 			var handoff = new Rpc(Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x01),
 				PlayerInterfaceMethods.LoginConnectReady, ReadOnlyMemory<byte>.Empty);
 			Assert.Equal("LoginConnectReady (0xD8B66C79)", ProtocolCatalog.ResolveName(in handoff, typeof(PlayerInterfaceMethods)));

@@ -10,9 +10,9 @@ namespace Faolan.Tests
 	// RdbXml.Carve is the one place every RDB XML reader clips the element out of a body, and it exists because two
 	// separate silent-drop bugs came from doing it ad hoc:
 	//
-	//  - requiring a `</root>` dropped SELF-CLOSING elements - 151 of the 744 combo defs (#313), which is what made
+	//  - requiring a `</root>` dropped self-closing elements - 151 of the 744 combo defs, which is what made
 	//    that issue conclude the ids "live in a TEA-encrypted RDB type";
-	//  - anchoring on the first '<' latched onto a 0x3C byte inside the BINARY 12-byte RDB-Id header - 1,693 of the
+	//  - anchoring on the first '<' latched onto a 0x3C byte inside the binary 12-byte RDB-Id header - 1,693 of the
 	//    29,854 mesh manifests, a data-dependent failure that only shows up when parsed count is compared to
 	//    available count.
 	//
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 
 			var mesh = MeshIndexFile.Parse(9234, body);
 			Assert.Equal("W:\\achardb\\hut.max", mesh.SourceFile);
-			Assert.Equal(6532u, mesh.RenderMeshId); // the FIRST RenderMesh line is the model
+			Assert.Equal(6532u, mesh.RenderMeshId); // the first RenderMesh line is the model
 			Assert.Equal(6536u, mesh.CollisionMeshId);
 			Assert.Empty(mesh.Materials); // the text form carries no material graph - absent, not wrong
 		}

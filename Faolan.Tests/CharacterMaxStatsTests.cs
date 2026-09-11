@@ -11,10 +11,9 @@ namespace Faolan.Tests
 	// docs/subsystems/player-stats.md.
 	public class CharacterMaxStatsTests
 	{
-		// Level 0 THROWS; it used to be read as level 1. Every character row is allocated at level 1
-		// (DatabaseRepository.CreateCharacter) and no shipped character is below it, so a 0 is a corrupt row - and
-		// quietly serving it level-1 vitals made a broken character indistinguishable from a new one. Nothing in the
-		// server depended on the old behaviour: this test was its only consumer.
+		// Level 0 throws. Every character row is allocated at level 1 (DatabaseRepository.CreateCharacter) and no
+		// shipped character is below it, so a 0 is a corrupt row - and quietly serving it level-1 vitals would make a
+		// broken character indistinguishable from a new one.
 		[Fact]
 		public void Defaults_LevelZero_Throws()
 		{
@@ -31,7 +30,7 @@ namespace Faolan.Tests
 			Assert.True(soldier.Health > mage.Health);
 		}
 
-		// AssassinL23, the captured L23 Assassin, EXACTLY - the case the whole curve is anchored on. Their world-entry
+		// AssassinL23, the captured L23 Assassin, exactly - the case the whole curve is anchored on. Their world-entry
 		// 0x96B8DC59 carries HpCur 127000 / StamCur 114800 / ManaCur 7400 beside HpBase 77200 / StamBase 73600 /
 		// ManaBase 0, and the client's sheet draws those currents as the maxima.
 		//
@@ -47,12 +46,12 @@ namespace Faolan.Tests
 
 			Assert.Equal(1220u, stats.Health);  // 772 class base + 8 x 56 Constitution;      + 50 gear = 1270
 			Assert.Equal(1046u, stats.Stamina); // 736 class base + 2 x (20 + 79 + 56);       + 102 gear = 1148
-			// An Assassin has NO mana pool, so neither the class base nor the attribute columns give it one - the 74
+			// An Assassin has no mana pool, so neither the class base nor the attribute columns give it one - the 74
 			// the sheet shows is entirely the worn item's, added on top by EntityVitals.
 			Assert.Equal(0u, stats.Mana);
 		}
 
-		// Every class's LEVEL-1 sheet, from the retail login snapshots (#242) - twelve independent anchors that the
+		// Every class's level-1 sheet, from the retail login snapshots - twelve independent anchors that the
 		// class base alone does not reproduce: each one needs the attribute term (8 / 3,3 / 2,2,2 per point off a flat
 		// level-1 attribute base of 1) and, for four classes, the ClassAttributeBases HealthMax row on top. The
 		// Guardian is the one that proves the rounding: 172.5 stamina + 6 = 178.5 draws as 179.
@@ -79,10 +78,9 @@ namespace Faolan.Tests
 			Assert.Equal(stamina, stats.Stamina);
 		}
 
-		// The ceiling FOLLOWS the level with nothing to keep in sync, because it is computed rather than stored
-		// (#578). It used to be a persisted CharacterMaxStats row that only the `.level` GM command refreshed, so a
-		// combat level-up wrote the new Level and left the row at its creation value - a level-2 necromancer came back
-		// from a relog reading 89/955, its current health seeded from the level-1 ceiling.
+		// The ceiling follows the level with nothing to keep in sync, because it is computed rather than stored. A
+		// persisted row is only as fresh as its last writer: a combat level-up that wrote the new Level and left the row
+		// at its creation value would seed a level-2 character's current health from the level-1 ceiling.
 		[Fact]
 		public void MaxVitals_FollowTheLevel_WithNothingToKeepInSync()
 		{
@@ -97,9 +95,9 @@ namespace Faolan.Tests
 			Assert.True(atTwo.Health > atOne.Health);
 		}
 
-		// Two characters of the same class and level have the SAME ceiling regardless of where they came from. An
-		// imported character used to carry the capture's own vitals, so it disagreed with a created one by ~2x at L80;
-		// deriving is what makes them identical - an imported character must be no different from a created one.
+		// Two characters of the same class and level have the same ceiling regardless of where they came from: deriving
+		// it, rather than carrying a capture's own vitals, is what makes an imported character no different from a
+		// created one.
 		[Fact]
 		public void MaxVitals_AreIdenticalForImportedAndCreatedCharacters()
 		{

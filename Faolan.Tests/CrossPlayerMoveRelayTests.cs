@@ -11,8 +11,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Cross-player move relay - "other players see me move (and jump)". Ground truth: xxx_2clients_jumping, a
-	// two-client session recorded for nothing else. Retail relays a move VERBATIM: the c2s carrier reappears s2c
-	// byte-for-byte with only the env byte cleared (0x01 -> 0x00), to the mover's own client AND to the other one.
+	// two-client session recorded for nothing else. Retail relays a move verbatim: the c2s carrier reappears s2c
+	// byte-for-byte with only the env byte cleared (0x01 -> 0x00), to the mover's own client and to the other one.
 	// Measured over the whole corpus: 9,438 of 9,932 c2s CharDCMove records have an s2c twin identical bar that byte;
 	// in the jumping capture all 35 do, on both streams.
 	//
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		private const string CapturedJumpC2S =
 			"000000394517aa810000c350013184ae0156443d1031432fc8084427daa03ef577443f60a940040000000040ef42360000000000000000427b94660000";
 
-		// Its s2c twin as the OTHER client received it (idx 1342, frame 1252, the second client's stream): the same
+		// Its s2c twin as the other client received it (idx 1342, frame 1252, the second client's stream): the same
 		// bytes with env 0x01 -> 0x00. Byte-identical to the echo the jumper itself got (idx 1340).
 		private const string CapturedJumpS2C =
 			"000000394517aa810000c350013184ae0056443d1031432fc8084427daa03ef577443f60a940040000000040ef42360000000000000000427b94660000";
@@ -41,7 +41,7 @@ namespace Faolan.Tests
 		{
 			var record = Convert.FromHexString(CapturedJumpC2S);
 			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4)); // the carrier's [u32 len] is the sender's (#530 rule 2)
-			Assert.True(((MoveFlag)parsed.Flag1).HasFlag(MoveFlag.Airborne)); // this capture IS a jump
+			Assert.True(((MoveFlag)parsed.Flag1).HasFlag(MoveFlag.Airborne)); // this capture is a jump
 
 			var sim = TestWorld.Simulation();
 			var broadcaster = TestWorld.Broadcaster(sim);

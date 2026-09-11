@@ -1,11 +1,14 @@
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The GenericDisplayAreaName FIFO-banner TEXT - the top-of-screen zone/area-name reveal. Byte-exact against the
-	// captured banners (all carry this same token/category/key; only the text id varies per area - the ids are per
-	// SUB-REGION, sourced from the client's region volumes, #348).
-	//
-	// A rule-1a STRING codec (#530); FormatFeedbackCodec.Build(instance, FifoBannerTypeFlags, 1, text) frames it.
-	// Build-only: the client never sends a banner, so there is no inbound body to gate a Parse against.
+	/// <summary>
+	///     The GenericDisplayAreaName FIFO-banner text - the top-of-screen zone or area-name reveal.
+	/// </summary>
+	/// <remarks>
+	///     Byte-exact against the captured banners, all of which carry the same token, category and key; only the text id
+	///     varies per area, and those ids are per sub-region, sourced from the client's region volumes. A string codec:
+	///     <c>FormatFeedbackCodec.Build(instance, FifoBannerTypeFlags, 1, text)</c> frames it. Build-only, since the
+	///     client never sends a banner and there is no inbound body to gate a Parse against.
+	/// </remarks>
 	public static class AreaNameBannerCodec
 	{
 		public static string Build(AreaNameBanner value)
@@ -21,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// A FIFO-banner payload: FormatFeedbackCodec frames it with the banner typeFlags and footer 1.
+	/// <summary>A FIFO-banner payload: <see cref="FormatFeedbackCodec" /> frames it with the banner typeFlags and footer 1.</summary>
 	public sealed record AreaNameBanner(uint TextId) : FeedbackPayload
 	{
 		public override uint TypeFlags => FormatFeedbackCodec.FifoBannerTypeFlags;

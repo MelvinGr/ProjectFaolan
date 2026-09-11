@@ -13,7 +13,8 @@ namespace Faolan.Tests
 		{
 			var body = ComboBookCodec.Build(0x01316d8a, 0x0035F6BE);
 
-			// The captured payload's leading 00000012 is the carrier's u32 length, which #530 rule 2 moved to the sender.
+			// The captured payload's leading 00000012 is the carrier's u32 length, which the framing sender writes:
+			// Build returns the body alone.
 			Assert.Equal("a8bbeb7f0000c35001316d8a00010035f6be", Convert.ToHexStringLower(body));
 
 			// Parse recovers the fields and rebuilds byte-for-byte.

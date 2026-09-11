@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The GM privilege model (#449): gm_level is a BITMASK, not a level. The values are the client's own - the bits
+	// The GM privilege model: gm_level is a bitmask, not a level. The values are the client's own - the bits
 	// come from FanaticGMLevelCommand_c's constructor and the roles are registered beside them - so these tests pin
 	// what was decoded rather than checking arithmetic we invented. docs/subsystems/gm-commands.md has the evidence.
 	public class GmPrivilegeTests
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 		}
 
 		// The observation that settled the whole model: at gm_level = 10 the retail client refused /kill. Under a
-		// LEVEL reading that says "kill needs > 10"; under the mask reading it says 10 simply does not contain
+		// level reading that says "kill needs > 10"; under the mask reading it says 10 simply does not contain
 		// NPCCommands - and the same 10 does contain TeleportDynels, so /whereis would have worked.
 		[Fact]
 		public void TheLevelTenObservation_IsExplainedByTheMask()
@@ -44,13 +44,13 @@ namespace Faolan.Tests
 			Assert.NotEqual(0u, observed & (uint)GmPrivileges.TeleportDynels); // /whereis: would have been offered
 		}
 
-		// ⛔ THE ONE BIT THAT IS NOT A UI PERMISSION, and the reason a role is never applied to an account
-		// silently. `GodMode` (0x200) is CLIENT-SIDE INVULNERABILITY: the local player's stat setter opens with
+		// The one bit that is not a UI permission, and the reason a role is never applied to an account
+		// silently. `GodMode` (0x200) is client-side invulnerability: the local player's stat setter opens with
 		// `GetStat(0xD7); if (gmLevel & 0x200) { if (new < old) return; }` (`FUN_010fd220` @010fde41, and the same gate
-		// again for stamina and mana), so with it set the client DISCARDS every server-driven decrease - damage lands,
-		// the character dies, and the bar never moves. That was #902, proven in-client with Frida on that setter.
+		// again for stamina and mana), so with it set the client discards every server-driven decrease - damage lands,
+		// the character dies, and the bar never moves. Proven in-client with Frida on that setter.
 		//
-		// Both shipped roles carry it AND `InvisibleToMonsters`, so "give this account support2" is also "make them
+		// Both shipped roles carry it and `InvisibleToMonsters`, so "give this account support2" is also "make them
 		// invulnerable on screen and unaggroable". That is why `Account.GmLevel` is set explicitly and why the migration
 		// that introduced it does not backfill a role. docs/subsystems/gm-commands.md has the disassembly.
 		[Fact]

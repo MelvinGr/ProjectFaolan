@@ -6,10 +6,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #258: the access-window region of the FullChar snapshot tails is now emitted from the TYPED AccessWindowCatalog
-	// (the 86 PfAccessWindowEntry records) instead of the captured AccessWindowTable.bin blob. These prove the typed
-	// catalog serializes byte-for-byte to the captured region carried in BeachTailsTemplate.bin (the surviving oracle),
-	// so retiring the .bin changed nothing on the wire.
+	// The access-window region of the FullChar snapshot tails is emitted from the typed AccessWindowCatalog (the 86
+	// PfAccessWindowEntry records). These prove the typed catalog serializes byte-for-byte to the captured region
+	// carried in BeachTailsTemplate.bin, which is the oracle for that region.
 	public class AccessWindowCatalogTests
 	{
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");

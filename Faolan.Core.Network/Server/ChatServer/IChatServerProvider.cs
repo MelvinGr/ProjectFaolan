@@ -6,20 +6,25 @@ namespace Faolan.Core.Network.Server.ChatServer
 {
 	public interface IChatServerProvider
 	{
-		// Delivers a character's "say" to ChatServer clients as a CharacterChat (0x0022). `recipientCharacterIds`
-		// scopes it to those characters (proximity say - the GameServer computes who is in range, since it holds the
-		// live positions); null = every connected client (server-wide).
+		/// <summary>
+		///     Delivers a character's "say" to ChatServer clients as a CharacterChat.
+		/// </summary>
+		/// <param name="recipientCharacterIds">
+		///     Scopes the message to those characters - the proximity say, whose in-range set the GameServer computes
+		///     because it holds the live positions. Null delivers to every connected client.
+		/// </param>
 		Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null);
 
-		// An NPC's ambient/encounter BARK, as the typed content rather than pre-rendered wire text. The world model
-		// caches the bark VALUE and this tier renders it, so the remoteformat layer stays inside `Codecs/` - the
-		// broadcaster used to build the string at spawn time and store it on the entity (#539).
+		/// <summary>
+		///     An NPC's ambient or encounter bark, as typed content rather than pre-rendered wire text. The world model
+		///     caches the bark value and this tier renders it, which keeps the remoteformat layer inside
+		///     <c>Codecs/</c>.
+		/// </summary>
 		Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null);
 
 		/// <summary>
-		///     The COMPLETE live <see cref="INetworkClientSession" /> of every connected client - full session state.
-		///     Cheap, read-only, safe to call at any time (e.g. the MCP list_sessions tool); do not mutate the returned
-		///     objects.
+		///     The complete live <see cref="INetworkClientSession" /> of every connected client. Cheap, read-only and
+		///     safe to call at any time; do not mutate the returned objects.
 		/// </summary>
 		IEnumerable<INetworkClientSession> GetWorldSessions();
 
@@ -31,39 +36,37 @@ namespace Faolan.Core.Network.Server.ChatServer
 
 		/// <summary>
 		///     Brings a character's <c>~Playfield</c> chat channel in line with the map they are now on: drops the old
-		///     channel (0x003D) and subscribes the new one (0x003C). IDEMPOTENT - a call naming the map the client is
-		///     already subscribed to does nothing, so the world tier can call it after any map change without tracking
-		///     what it sent last.
+		///     channel and subscribes the new one. Idempotent: a call naming the map the client is already subscribed to
+		///     does nothing, so the world tier can call it after any map change without tracking what it sent last.
 		///     <para>
-		///         It matters because channel routing is the CLIENT's job: a ChannelChat is relayed to everyone and each
-		///         client shows only the channels it is subscribed to. Leaving the subscription stale does not just
-		///         linger - the player keeps hearing the playfield they left and never hears the one they are in (#562).
+		///         Channel routing is the client's job - a ChannelChat is relayed to everyone and each client shows only
+		///         the channels it is subscribed to - so a stale subscription leaves the player hearing the playfield
+		///         they left and never the one they are in.
 		///     </para>
 		/// </summary>
 		Task RefreshPlayfieldChannel(uint characterId, uint mapId);
 
 		/// <summary>
 		///     Brings a character's <c>~Guild</c> chat channel in line with the guild they are now in: drops the old
-		///     channel (0x003D) and subscribes the new one (0x003C). <paramref name="guildId" /> is null when they are
-		///     guildless, which just drops. IDEMPOTENT, like <see cref="RefreshPlayfieldChannel" />, so the guild tier
-		///     can call it after any membership change without tracking what it sent last.
+		///     channel and subscribes the new one. <paramref name="guildId" /> is null when they are guildless, which
+		///     only drops. Idempotent, like <see cref="RefreshPlayfieldChannel" />, so the guild tier can call it after
+		///     any membership change without tracking what it sent last.
 		///     <para>
-		///         The subscription is what makes the guild chat TAB appear: without it the window opens but the tab
-		///         never does, because a channel the client holds no subscription for is one it silently drops (#663).
+		///         The subscription is what makes the guild chat tab appear: without it the window opens but the tab
+		///         never does, because a channel the client holds no subscription for is one it silently drops.
 		///     </para>
 		/// </summary>
 		Task RefreshGuildChannel(uint characterId, uint? guildId);
 
 		/// <summary>
 		///     Brings a character's <c>~Team</c> chat channel in line with the team they are now in, or drops it when
-		///     <paramref name="teamId" /> is null. Same idempotent contract as
-		///     <see cref="RefreshGuildChannel" />; the id is the team id (#668).
+		///     <paramref name="teamId" /> is null. Same idempotent contract as <see cref="RefreshGuildChannel" />.
 		/// </summary>
 		Task RefreshTeamChannel(uint characterId, uint? teamId);
 
 		/// <summary>
-		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
-		///     character has no connected ChatServer client.
+		///     Whispers a single character as the synthetic "Claude" sender. Returns false when the character has no
+		///     connected ChatServer client.
 		/// </summary>
 		Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message);
 

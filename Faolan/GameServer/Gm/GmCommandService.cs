@@ -36,9 +36,11 @@ using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Gm
 {
-	// The `.command` GM commands: the table, the privilege gate and every handler (this file: the ones we wrote; the
-	// Retail partial: the client's own verbs). Off the listener since #928 item 5 - the listener routes a chat line
-	// to Handle and nothing else.
+	/// <summary>
+	///     The `.command` GM commands: the table, the privilege gate and every handler. This file holds the commands
+	///     written for this server; the Retail partial holds the client's own verbs. The listener routes a chat line to
+	///     <see cref="Handle" /> and nothing else.
+	/// </summary>
 	public sealed partial class GmCommandService
 	{
 		private readonly ILogger _logger;
@@ -72,8 +74,8 @@ namespace Faolan.GameServer.Gm
 		private readonly TagService _tags;
 		private readonly TradepostService _tradepost;
 
-		// The `.command` table - built ONCE per service, per realm. It used to be a `static` on the listener filled with
-		// instance-bound delegates, which was safe only because a process hosts a single realm.
+		// The `.command` table, built once per service and therefore once per realm. It must not become a static: the
+		// delegates are instance-bound, so a shared table would leak one realm's handlers into another.
 		private readonly AlternateAdvancementService _alternateAdvancement;
 		private readonly Dictionary<string, GmCommandEntry> _gmCommandsDict;
 
@@ -119,11 +121,14 @@ namespace Faolan.GameServer.Gm
 			_gmCommandsDict = BuildTable();
 		}
 
-		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
-		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
-		// snapshot so it appears live (the snapshot is the ONLY item-delivery packet - there is no incremental
-		// server add-item; see protocol_containeradditem). Without a stashed snapshot template (pre-world or a
-		// non-replay session) the item still persists and renders on next login.
+		/// <summary>
+		///     `.additem &lt;itemId&gt; [count]` - adds an item, by faolan.db Items id, to the calling character's bag:
+		///     persists a CharacterInventory row in the first free bag slot, then delivers it live.
+		/// </summary>
+		/// <remarks>
+		///     Without a stashed snapshot template - pre-world, or a non-replay session - the item still persists and
+		///     renders on the next login.
+		/// </remarks>
 		private async Task AddItemCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -136,9 +141,8 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// A missing Items row is the only refusal left. This also demanded a harvested hash until #723, which
-			// made the 232 never-captured templates un-`.additem`-able - and .additem is the standard bootstrap for
-			// testing exactly those.
+			// A missing Items row is the only refusal: a harvested hash is not required, which is what keeps the 232
+			// never-captured templates reachable - and .additem is the standard bootstrap for testing exactly those.
 			var item = await _database.GetItem(itemId);
 			if (item == null)
 			{
@@ -146,8 +150,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Persist + deliver live via DispatchAddItem (0x2020) - it appears without a relog now that the live
-			// add path exists (the old "no live add packet exists" caveat is gone).
+			// Persist and deliver live through DispatchAddItem (0x2020), so it appears without a relog.
 			var slot = await _economyOutbound.GrantItemToBackpack(client, itemId, count);
 			if (slot == null)
 			{
@@ -158,10 +161,15 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot} (live DispatchAddItem).");
 		}
 
-		// .ban <account|character name>   - ban an account (sets State = Banned; login rejects non-Active accounts).
-		// .unban <account|character name> - lift a ban (State = Active). Accepts either the account username OR one of
-		// its character names. Banning also kicks the account's live world connections (the State change alone only
-		// blocks the NEXT login). You can't ban your own account.
+		/// <summary>
+		///     `.ban &lt;account|character name&gt;` bans an account (State = Banned; login rejects any non-Active
+		///     account) and `.unban` lifts it (State = Active). Either the account username or one of its character names
+		///     is accepted.
+		/// </summary>
+		/// <remarks>
+		///     Banning also kicks the account's live world connections: the State change alone blocks only the next login.
+		///     An account cannot ban itself.
+		/// </remarks>
 		private async Task BanCommand(INetworkClient client, string arguments, bool ban)
 		{
 			var gmId = client.Session.Character.Id;
@@ -172,7 +180,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Resolve the target account: by username first, else by a character name -> its owning account.
+			// Resolve the target account: by username first, else by a character name and its owning account.
 			var account = await _database.GetAccount(name);
 			if (account == null && await _database.GetCharacterByName(name, client.Session.Character.RealmId) is { } ch)
 				account = await _database.GetAccount(ch.AccountId);
@@ -206,7 +214,7 @@ namespace Faolan.GameServer.Gm
 			var kicked = 0;
 			if (ban)
 			{
-				// Snapshot before iterating: Stop() -> Disconnected mutates the client set.
+				// Snapshot before iterating: Stop() raises Disconnected, which mutates the client set.
 				foreach (var c in _connections.Clients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
 				{
 					if (c.Session.Character?.Id is { } cid)
@@ -221,12 +229,17 @@ namespace Faolan.GameServer.Gm
 				: $"Unbanned account '{account.UserName}'.");
 		}
 
-		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
-		// it live for nearby players AND delete its NpcSpawn row(s) so it never renders again. The tool for scrubbing
-		// captured import artifacts (phantom players that happened to be in the pcap when the world was captured). A
-		// faction mob (hostile) deletes only the rows at the target's spot (don't wipe every same-name mob); a neutral
-		// named entity deletes every same-name row on the map (its cross-session captures collapse to one render).
-		// Unlike a plain live despawn (comes back on relog), .delete is durable.
+		/// <summary>
+		///     `.delete [&lt;handle&gt;]` - permanently removes the player's currently selected target, or the given
+		///     handle: despawns it live for nearby players and deletes its NpcSpawn rows so it never renders again. Unlike
+		///     a plain live despawn, which comes back on relog, this is durable.
+		/// </summary>
+		/// <remarks>
+		///     The tool for scrubbing captured import artifacts - phantom players that happened to be in the capture when
+		///     the world was recorded. A hostile faction mob deletes only the rows at the target's spot, so a same-name mob
+		///     elsewhere survives; a neutral named entity deletes every same-name row on the map, because its
+		///     cross-session captures collapse to one render.
+		/// </remarks>
 		private async Task DeleteCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -245,7 +258,7 @@ namespace Faolan.GameServer.Gm
 			var entity = await _npcs.DespawnEntityForPlayer(client, handle);
 			if (entity == null)
 			{
-				// Not a live entity - it may be a static WORLD OBJECT (chest/door/dynel), which lives only in the DB.
+				// Not a live entity - it may be a static world object (chest, door, dynel), which lives only in the database.
 				var obj = await _worldObjects.DeleteWorldObjectForPlayer(client, handle);
 				if (obj != null)
 				{
@@ -274,21 +287,28 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"matchstart: {outcome}");
 		}
 
-		// .matchstop [reason]  - end the caller's started PvP match NOW, without waiting out its clock (#146). The
-		// client's own abort path: every member gets DispatchForceStopMinigame with the reason line, then the match
-		// dissolves and each member is put back where the countdown teleport found them. The test bootstrap for the
-		// end half of the match loop, the way `.matchstart` is for the start half.
+		/// <summary>
+		///     `.matchstop [reason]` - ends the caller's started PvP match immediately, without waiting out its clock. The
+		///     client's own abort path: every member gets DispatchForceStopMinigame with the reason line, then the match
+		///     dissolves and each member is put back where the countdown teleport found them.
+		/// </summary>
+		/// <remarks>The test bootstrap for the end half of the match loop, as `.matchstart` is for the start half.</remarks>
 		private async Task MatchStopCommand(INetworkClient client, string arguments)
 		{
 			var outcome = await _csPlayerAgentDispatcher.ForcePvpMatchStop(client.Session.Character.Id, (arguments ?? "").Trim());
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"matchstop: {outcome}");
 		}
 
-		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
-		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
-		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
-		// link, so a named/quest NPC in the area (never linked) is safe. Durable; takes effect on the next zone reload.
-		// NB re-running the `npcs` importer resurrects the captured rows.
+		/// <summary>
+		///     `.graduatenpcgroup &lt;group name&gt;` - graduates a resolved spawn area: deletes the captured NpcSpawn rows
+		///     linked to it, materialised by the resolver's auto-link and `.setnpcgroup`, so the ambient pool becomes the
+		///     sole source of that population and the captured/ambient density overlap goes away.
+		/// </summary>
+		/// <remarks>
+		///     A clean foreign-key delete on the membership link, so a named or quest NPC in the area - which is never
+		///     linked - is safe. Durable, and takes effect on the next zone reload; re-running the `npcs` importer
+		///     resurrects the captured rows.
+		/// </remarks>
 		private async Task GraduateNpcGroupCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -343,11 +363,11 @@ namespace Faolan.GameServer.Gm
 
 			if (_gmCommandsDict.TryGetValue(command, out var entry))
 			{
-				// Per-command privilege gate (#904): retail gates each command against the gm_level BITMASK, not a
+				// Per-command privilege gate: retail gates each command against the gm_level bitmask rather than a
 				// boolean, so the per-bit admin UI has to bite here too - un-checking NPCCommands must stop `.kill`.
-				// ⚠️ RequiredMask == None means UNRESTRICTED (any GM), the client's own convention (FUN_006c86b0);
-				// getting that backwards would lock every GM out of every unmasked command. The outer IsGm gates on
-				// the callers still stand - this is the per-command refinement inside them.
+				// RequiredMask == None means unrestricted, i.e. any GM, which is the client's own convention
+				// (FUN_006c86b0); reading it the other way would lock every GM out of every unmasked command. The outer
+				// IsGm gates on the callers still stand - this is the per-command refinement inside them.
 				if (entry.RequiredMask != GmPrivileges.None && client.Session.Account?.HasGmPrivilege(entry.RequiredMask) != true)
 				{
 					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
@@ -365,21 +385,24 @@ namespace Faolan.GameServer.Gm
 				}
 			}
 			else
-				// Echo the prefix the caller actually used: the same table serves our `.cmd` chat commands and the
-				// client's own `/cmd` GM commands (FanaticCommandIIR), and telling a `/teleport` user to "type .help"
-				// with the wrong prefix reads as a different tool.
+				// Echo the prefix the caller actually used: the same table serves the `.cmd` chat commands and the
+				// client's own `/cmd` GM commands (FanaticCommandIIR), and telling a `/teleport` user to type `.help`
+				// reads as a different tool.
 				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 					$"Unknown command: '{command}' - type {commandText[0]}help for info");
 		}
 
-		// .aa                     - report the AA pools and the perk-token wallets
-		// .aa xp <n>              - pay n AA xp into the PvE pool (the give-away fires if it fills)
-		// .aa token <pool> <n>    - credit a token pool outright
-		//
-		// The test bootstrap for #150, and it exists because the retail TRIGGER is out of reach: retail pays AA xp for
-		// a kill only at the level cap, so nothing on a level-1..6 dev character can fill a 1,000,000-xp pool or buy a
-		// perk. Everything below it - the announcement, the pool push, the give-away, the wallet - is the ordinary
-		// path; this only supplies the event.
+		/// <summary>
+		///     The alternate-advancement bootstrap: `.aa` reports the AA pools and the perk-token wallets, `.aa xp
+		///     &lt;n&gt;` pays n AA xp into the PvE pool (the give-away fires if it fills), and `.aa token &lt;pool&gt;
+		///     &lt;n&gt;` credits a token pool outright.
+		/// </summary>
+		/// <remarks>
+		///     It exists because the retail trigger is out of reach: retail pays AA xp for a kill only at the level cap, so
+		///     nothing on a level 1-6 dev character can fill a 1,000,000-xp pool or buy a perk. Everything below this - the
+		///     announcement, the pool push, the give-away, the wallet - is the ordinary path; the command only supplies the
+		///     event.
+		/// </remarks>
 		private async Task AlternateAdvancementCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -423,7 +446,7 @@ namespace Faolan.GameServer.Gm
 				["teleport"] = TeleportCommand,
 				// The retail client's own verbs for the same thing, so a GM's muscle memory works: the client
 				// registers /teleport, /teleportself and /tp all under the TeleportSelf privilege, and its
-				// FanaticCommandIIR routes through this same table (#448).
+				// FanaticCommandIIR routes through this same table.
 				["teleportself"] = TeleportCommand,
 				["tp"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
@@ -435,15 +458,14 @@ namespace Faolan.GameServer.Gm
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
 				["aa"] = AlternateAdvancementCommand,
-				// ⚠️ `feat` is retail's READ-ONLY lister (mask GetStats, on your target); the manipulator is `feats`
-				// (mask SetStats). Ours was the manipulator wearing the reader's name and mask - the same mismatch
-				// `.time` had (#914 rule 1), so it moved to `feats` and `feat` now does what retail's does.
+				// `feat` is retail's read-only lister (mask GetStats, on your target); the manipulator is `feats`
+				// (mask SetStats). A verb must not carry retail's name over someone else's meaning.
 				["feat"] = (client, _) => FeatListCommand(client),
 				["feats"] = _feats.FeatCommand,
 				["char"] = (client, _) => CharLogCommand(client),
 				["kickban"] = KickBanCommand,
-				// Batch C2. ⚠️ `removeitem` is GONE (#914 rule 1): `/inventory delete <slot>` is the same job, and
-				// retail's form also carries deleteall and the equip-all verbs ours never had.
+				// `/inventory delete <slot>` covers what a separate `removeitem` verb would, and retail's form also
+				// carries deleteall and the equip-all verbs.
 				["getfaction"] = GetFactionCommand,
 				["setfaction"] = SetFactionCommand,
 				["magic"] = MagicCommand,
@@ -470,11 +492,11 @@ namespace Faolan.GameServer.Gm
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
-				// #914 Wave A - the retail client's own observability verbs, on the grammar recovered in #913.
-				// ⚠️ `time` is NOT here on purpose. Retail's own `/time` manipulates FRAME times (the deltatimer system);
-				// the time-of-day setter is `/settime`, which is what our `.time` actually was. Keeping ours under `time`
-				// would be retail's name over someone else's meaning, so it moved (#914 rule 1) and `/gametime` took the
-				// `reset` form, where retail puts it.
+				// The retail client's own observability verbs, on the client's own grammar.
+				//
+				// `time` is not here on purpose. Retail's `/time` manipulates frame times (the deltatimer system); the
+				// time-of-day setter is `/settime`, and `/gametime` carries the `reset` form, which is where retail puts
+				// it.
 				["settime"] = SetTimeCommand,
 				["gametime"] = GameTimeCommand,
 				["distance"] = (client, _) => DistanceCommand(client),
@@ -484,27 +506,27 @@ namespace Faolan.GameServer.Gm
 				["ghost"] = GhostCommand,
 				["system"] = (client, _) => SystemInfoCommand(client),
 				["hatedbylist"] = (client, _) => HatedByListCommand(client),
-				// Wave B1 - character administration and the environment/economy levers.
+				// Character administration and the environment and economy levers.
 				["summon"] = SummonCommand,
 				["unsummon"] = UnsummonCommand,
 				["assist"] = AssistCommand,
 				["falldamage"] = FallDamageCommand,
 				["cash"] = CashCommand,
-				// Wave B2 - the combat levers.
+				// The combat levers.
 				["inflict"] = InflictCommand,
 				["areaknockback"] = AreaKnockbackCommand,
 				["resurrect"] = ResurrectCommand,
-				// Wave B3 - the stat family. ⚠️ `setstat` is GONE (#914 rule 1): it pushed a raw stat to the CLIENT
-				// without touching server state, which is precisely retail's `/setlocal`, not its `/set`. The two verbs
-				// are one class in the client, separated by the registry record's mode WORD at [0xC] (#923), so they are one method here.
+				// The stat family. Pushing a raw stat to the client without touching server state is retail's
+				// `/setlocal`, not its `/set`; the two verbs are one class in the client, separated by the registry
+				// record's mode word at [0xC], so they are one method here.
 				["get"] = GetStatCommand,
 				["set"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: false),
 				["setlocal"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: true),
 				["getskill"] = GetSkillCommand,
 				["teleporttarget"] = TeleportTargetCommand,
-				// Wave B4 - the broadcast family and the monster-visibility flag. ⚠️ `invisible` is GONE (#914 rule 1):
-				// `/mobs` is the same InvisibleToMonsters flag with the same account persistence, and retail's form is
-				// strictly richer - explicit on/off instead of a toggle, and it can be aimed at another character.
+				// The broadcast family and the monster-visibility flag. `/mobs` is the InvisibleToMonsters flag with
+				// account persistence, in retail's richer form: explicit on/off rather than a toggle, and it can be
+				// aimed at another character.
 				["broadcast"] = (client, arguments) => BroadcastCommand(client, arguments, "broadcast"),
 				["servcast"] = (client, arguments) => BroadcastCommand(client, arguments, "servcast"),
 				["sitecast"] = (client, arguments) => BroadcastCommand(client, arguments, "sitecast"),
@@ -512,32 +534,31 @@ namespace Faolan.GameServer.Gm
 				["tradeskill"] = TradeskillCommand,
 				["waypoint"] = WayPointCommand,
 				["resist"] = ResistCommand,
-				// #146: force-form a PvP match from the minigame queue as it stands, however few are queued (down
-				// to one member - a solo walk of the teleport + match-instance flow). The queue lives on the CS
-				// tier, so this crosses the same seam the team ops do.
+				// Force-form a PvP match from the minigame queue as it stands, however few are queued - down to one
+				// member, which walks the teleport and match-instance flow solo. The queue lives on the CS tier, so
+				// this crosses the same seam the team ops do.
 				["matchstart"] = (client, _) => MatchStartCommand(client),
-				// #146: the end half - stop the caller's started match now instead of waiting out its time limit.
+				// The end half: stop the caller's started match now instead of waiting out its time limit.
 				["matchstop"] = MatchStopCommand
 			});
 		}
 
-		// The gm_level bit each verb requires (#904), joined with the handler table at construction. Two
-		// provenances, kept visibly apart:
-		//   * RETAIL - the verb exists in the client's own command registry (docs/re/gm-command-registry.tsv) and
+		// The gm_level bit each verb requires, joined with the handler table at construction. Two provenances, kept
+		// visibly apart:
+		//   * retail - the verb exists in the client's own command registry (docs/re/gm-command-registry.tsv) and
 		//     the mask is retail's, reused exactly;
-		//   * OURS - retail has no such verb (.additem, .ah, ...), so the bit is a CHOICE by family, not a
-		//     recovered fact. Do not cite these as decoded.
-		// None = unrestricted (any GM), the client's own convention for an unmasked command (FUN_006c86b0), and a
-		// multi-bit mask would pass on ANY set bit - the client's `(level & mask) != 0` test.
+		//   * local - retail has no such verb (.additem, .ah, ...), so the bit is a choice by family rather than a
+		//     recovered fact, and must not be cited as decoded.
+		// None means unrestricted, i.e. any GM, which is the client's own convention for an unmasked command
+		// (FUN_006c86b0). A multi-bit mask passes on any set bit - the client's `(level & mask) != 0` test.
 		internal static readonly Dictionary<string, GmPrivileges> GmCommandMasks = new Dictionary<string, GmPrivileges>(StringComparer.OrdinalIgnoreCase)
 		{
-			// RETAIL, from the registry: /save /time /tradeskill = Developer 0x1, the /teleport family =
+			// Retail, from the registry: /save /time /tradeskill = Developer 0x1, the /teleport family =
 			// TeleportSelf 0x4, /knockback = PlayerDamage 0x10, /feat = GetStats 0x20, /level = SetStats 0x40,
 			// /kill = NpcCommands 0x80000.
 			["save"] = GmPrivileges.Developer,
-			// #914 Wave A - RETAIL's own masks, from the registry: /settime /gametime /ghost /hatedbylist /system are
-			// Developer 0x1 (except /system, see below), /whereis /playfieldinfo /playfieldinstancelock = TeleportDynels
-			// 0x8, /distance = GetStats 0x20.
+			// Retail's own masks, from the registry: /settime /gametime /ghost /hatedbylist are Developer 0x1,
+			// /whereis /playfieldinfo /playfieldinstancelock = TeleportDynels 0x8, /distance = GetStats 0x20.
 			["settime"] = GmPrivileges.Developer,
 			["gametime"] = GmPrivileges.Developer,
 			["ghost"] = GmPrivileges.Developer,
@@ -546,29 +567,29 @@ namespace Faolan.GameServer.Gm
 			["playfieldinfo"] = GmPrivileges.TeleportDynels,
 			["playfieldinstancelock"] = GmPrivileges.TeleportDynels,
 			["distance"] = GmPrivileges.GetStats,
-			// ⚠️ Retail registers /system at mask 0x0 - UNRESTRICTED - and we match retail rather than inventing a bit.
-			// It is the only verb besides our own `.help` that is unmasked.
+			// Retail registers /system at mask 0x0, unrestricted, and that is matched rather than a bit invented. It is
+			// the only verb besides `.help` that is unmasked.
 			["system"] = GmPrivileges.None,
-			// Wave B1, again retail's own masks: /summon /assist = AssistSummon 0x2000, /unsummon = TeleportDynels
-			// 0x8, /falldamage = PlayerDamage 0x10, /cash = SetStats 0x40.
+			// Again retail's own masks: /summon /assist = AssistSummon 0x2000, /unsummon = TeleportDynels 0x8,
+			// /falldamage = PlayerDamage 0x10, /cash = SetStats 0x40.
 			["summon"] = GmPrivileges.AssistSummon,
 			["assist"] = GmPrivileges.AssistSummon,
 			["unsummon"] = GmPrivileges.TeleportDynels,
 			["falldamage"] = GmPrivileges.PlayerDamage,
 			["cash"] = GmPrivileges.SetStats,
-			// Wave B2: /inflict /areaknockback = PlayerDamage 0x10, /resurrect = AcgSpawn 0x1000.
+			// /inflict /areaknockback = PlayerDamage 0x10, /resurrect = AcgSpawn 0x1000.
 			["inflict"] = GmPrivileges.PlayerDamage,
 			["areaknockback"] = GmPrivileges.PlayerDamage,
 			["resurrect"] = GmPrivileges.AcgSpawn,
-			// Wave B3: /get /getskill = GetStats 0x20, /set /setlocal = SetStats 0x40, /teleporttarget =
-			// TeleportDynels 0x8 (NOT TeleportSelf - retail masks moving somebody else higher than moving yourself).
+			// /get /getskill = GetStats 0x20, /set /setlocal = SetStats 0x40, /teleporttarget = TeleportDynels 0x8,
+			// not TeleportSelf - retail masks moving somebody else higher than moving yourself.
 			["get"] = GmPrivileges.GetStats,
 			["getskill"] = GmPrivileges.GetStats,
 			["set"] = GmPrivileges.SetStats,
 			["setlocal"] = GmPrivileges.SetStats,
 			["teleporttarget"] = GmPrivileges.TeleportDynels,
-			// Wave B4: /broadcast /servcast = Broadcast 0x400, /sitecast = Sitecast 0x800 (its own bit - the wider
-			// reach), /mobs = Developer 0x1.
+			// /broadcast /servcast = Broadcast 0x400, /sitecast = Sitecast 0x800 - its own bit, for the wider reach -
+			// and /mobs = Developer 0x1.
 			["broadcast"] = GmPrivileges.Broadcast,
 			["servcast"] = GmPrivileges.Broadcast,
 			["sitecast"] = GmPrivileges.Sitecast,
@@ -582,7 +603,7 @@ namespace Faolan.GameServer.Gm
 			["feats"] = GmPrivileges.SetStats,
 			["char"] = GmPrivileges.Developer,
 			["kickban"] = GmPrivileges.CanKick,
-			// Batch C2: /getfaction /setfaction = Developer 0x1, /magic = SetStats 0x40, /inventory = AcgSpawn 0x1000.
+			// /getfaction /setfaction = Developer 0x1, /magic = SetStats 0x40, /inventory = AcgSpawn 0x1000.
 			["getfaction"] = GmPrivileges.Developer,
 			["setfaction"] = GmPrivileges.Developer,
 			["magic"] = GmPrivileges.SetStats,
@@ -596,7 +617,7 @@ namespace Faolan.GameServer.Gm
 			["kill"] = GmPrivileges.NpcCommands,
 			["aa"] = GmPrivileges.SetStats,
 
-			// OURS - family choices. `help` is unrestricted and lists only what the caller may run.
+			// Local verbs - family choices. `help` is unrestricted and lists only what the caller may run.
 			["help"] = GmPrivileges.None,
 			["maps"] = GmPrivileges.Developer,
 			["position"] = GmPrivileges.Developer,
@@ -627,12 +648,16 @@ namespace Faolan.GameServer.Gm
 			["matchstop"] = GmPrivileges.Developer
 		};
 
-		// Joins the handler table with GmCommandMasks, refusing to come up on ANY asymmetry - a verb with a handler
-		// but no mask would otherwise dispatch ungated (or a mask with no handler would rot silently), and a loud
-		// boot failure is the cheapest place to catch both. GmCommandTableTests pins the retail half of the masks.
-		// `unbackedReply` builds the handler for a catalog verb. It is a parameter rather than a direct call because
-		// this join is static and the reply needs the listener's chat dispatcher; a null one (the tests' path) still
-		// registers every catalog verb, so the table's SHAPE is identical either way.
+		/// <summary>
+		///     Joins the handler table with GmCommandMasks, refusing to come up on any asymmetry.
+		/// </summary>
+		/// <remarks>
+		///     A verb with a handler but no mask would dispatch ungated, and a mask with no handler would rot silently, so
+		///     a loud boot failure is the cheapest place to catch both. GmCommandTableTests pins the retail half of the
+		///     masks. <paramref name="unbackedReply" /> builds the handler for a catalog verb; it is a parameter rather
+		///     than a direct call because this join is static and the reply needs the chat dispatcher. A null one still
+		///     registers every catalog verb, so the table's shape is identical either way.
+		/// </remarks>
 		internal static Dictionary<string, GmCommandEntry> BuildGmCommands(Dictionary<string, GmCommandDelegate> handlers,
 			Func<RetailCommandCatalog.Unbacked, GmCommandDelegate>? unbackedReply = null)
 		{
@@ -642,9 +667,9 @@ namespace Faolan.GameServer.Gm
 				throw new InvalidOperationException(
 					$"GM command tables disagree - no mask: [{noMask.JoinAsString(", ")}], no handler: [{noHandler.JoinAsString(", ")}].");
 
-			// ⚠️ A verb cannot be in both tables. The catalog is what we do NOT back yet, so a verb appearing there
-			// AND in the handler table means an implementation landed without its catalog row being removed - and
-			// the unbacked reply would shadow it or the other way round, depending on insertion order. Refuse.
+			// A verb cannot be in both tables. The catalog is what is not backed yet, so a verb appearing there and
+			// in the handler table means an implementation landed without its catalog row being removed - and the
+			// unbacked reply would shadow it, or the other way round, depending on insertion order.
 			var doubleBooked = RetailCommandCatalog.Verbs.Where(u => handlers.ContainsKey(u.Verb)).Select(u => u.Verb).ToList();
 			if (doubleBooked.Count > 0)
 				throw new InvalidOperationException(
@@ -673,19 +698,25 @@ namespace Faolan.GameServer.Gm
 		}
 
 
-		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
-		// given handle, or self. An NPC runs the full combat death lifecycle (vitals push, despawn/corpse-loot, XP, 		// kill-quest advance); self drops the player's vitals to 0 and the world tick respawns them at the nearest
-		// resurrection point. No arg + nothing selected -> a system message rather than a no-op.
+		/// <summary>
+		///     `.kill [&lt;handle&gt; | self]` - kills the player's currently selected target (the last LookAt or
+		///     SelectDeselect), the given handle, or self.
+		/// </summary>
+		/// <remarks>
+		///     An NPC runs the full combat death lifecycle: vitals push, despawn and corpse loot, XP, kill-quest advance.
+		///     `self` drops the player's vitals to 0 and the world tick respawns them at the nearest resurrection point.
+		///     With no argument and nothing selected it answers with a system message rather than doing nothing silently.
+		/// </remarks>
 		private async Task KillCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var selfHandle = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
 
-			// RETAIL GRAMMAR (#914): `[all | radius r]`. Retail's own caveat - "the kill all and kill radius only works
-			// on ..." - is truncated in the recovered description, so we apply the one restriction that is obviously
-			// right and is what the parameter help says twice: both forms kill CHARACTER DYNELS, i.e. NPCs, never
-			// players. A GM sweeping a playfield must not take the other GMs with it.
+			// Retail's grammar is `[all | radius r]`. Retail's own caveat - "the kill all and kill radius only works
+			// on ..." - is truncated in the recovered description, so the one restriction applied is what the parameter
+			// help states twice: both forms kill character dynels, i.e. NPCs, never players. A GM sweeping a playfield
+			// must not take the other GMs with it.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 			if (tokens.Length > 0 && tokens[0].Equals("all", StringComparison.OrdinalIgnoreCase))
 			{
@@ -732,10 +763,12 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
 		}
 
-		// `.kill all` and `.kill radius <r>` - a null radius is the whole playfield.
-		//
-		// ⚠️ Players are never swept. Retail's parameter help says "character dynels" for both forms, and a GM
-		// clearing a zone taking every other player with it would be a spectacular way to learn that.
+		/// <summary>
+		///     `.kill all` and `.kill radius &lt;r&gt;` - a null radius means the whole playfield.
+		/// </summary>
+		/// <remarks>
+		///     Players are never swept: retail's parameter help says "character dynels" for both forms.
+		/// </remarks>
 		private async Task KillArea(INetworkClient client, float? radius)
 		{
 			var characterId = client.Session.Character.Id;
@@ -753,7 +786,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Snapshot first: killing runs the whole lifecycle (corpse, loot, respawn arming), which mutates the zone.
+			// Snapshot first: killing runs the whole lifecycle - corpse, loot, respawn arming - which mutates the zone.
 			var doomed = (radius is { } r
 					? zone.EntitiesInRange(player.Position, r, player.Handle)
 					: zone.Entities.Where(e => e.Handle != player.Handle))
@@ -767,41 +800,47 @@ namespace Faolan.GameServer.Gm
 				$"Killed {doomed.Length} NPC(s){(radius is { } shown ? $" within {shown:0.#}u" : " on this playfield")}. Players were not touched.");
 		}
 
-		// .hurt [<percent>]  - drop the caller's three pools to `percent` of their max (default 50) and push the
-		// authoritative vitals. The test bootstrap for the regen tick (Gitea #2): losing HP/mana to a mob or to casting
-		// is unreliable to stage, and the pools have to end up BELOW max for the tick to emit anything at all. Never
-		// kills - health floors at 1 - so this exercises regen rather than the death/release path (.kill self does that).
+		/// <summary>
+		///     `.hurt [&lt;percent&gt;]` - drops the caller's three pools to <c>percent</c> of their max (default 50) and
+		///     pushes the authoritative vitals.
+		/// </summary>
+		/// <remarks>
+		///     The test bootstrap for the regen tick: losing health or mana to a mob or to casting is unreliable to stage,
+		///     and the pools have to end up below max for the tick to emit anything at all. It never kills - health floors
+		///     at 1 - so it exercises regen rather than the death and release path, which `.kill self` covers.
+		/// </remarks>
 		private async Task HurtCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
-			var percent = 50u; // default: half of every pool
+			var percent = 50u; // half of every pool
 			if (arg.Length > 0 && (!uint.TryParse(arg, out percent) || percent > 100))
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .hurt [<percent 0-100>]  (default 50)");
 				return;
 			}
 
-			// Only ever LOWER a pool. This used to SET each one to `percent` of max, which topped UP anything already
-			// below that - .hurt 50 on a character sitting at 0/74 mana handed it 37 mana. Min() keeps it a damage
-			// command whatever state the pools are in.
+			// Only ever lower a pool. Setting each one to `percent` of max would top up anything already below that -
+			// `.hurt 50` on a character sitting at 0/74 mana would hand it 37 mana - so Min() is what keeps this a
+			// damage command whatever state the pools are in.
 			var vitals = _simulation.GetOrAddPlayerVitals(client);
 			vitals.Health = Math.Max(1, Math.Min(vitals.Health, vitals.MaxHealth * percent / 100));
 			vitals.Mana = Math.Min(vitals.Mana, vitals.MaxMana * percent / 100);
 			vitals.Stamina = Math.Min(vitals.Stamina, vitals.MaxStamina * percent / 100);
-			// ⚠️ EXPERIMENT (2026-08-30, in-client): the player's own bar does not move for ANY vitals push we send.
-			// `--report vitals-shape` says retail's own-handle health change is a SINGLE-stat block - {HealthCurrent}
-			// alone, 211 captured - while the six-record current+max form is a SEED (93, at entry/stream-in) and the
-			// three-current form is what it sends about OTHER entities (4,676) and never about you. We have only ever
-			// sent the latter two. This sends retail's shape; if the bar moves, the shape is the whole bug.
+			// Retail's own-handle health change is a single-stat block - {HealthCurrent} alone, 211 captured
+			// (`--report vitals-shape`) - where the six-record current-plus-max form is a seed (93, at entry or
+			// stream-in) and the three-current form is what it sends about other entities (4,676) and never about the
+			// recipient. This command sends retail's own-handle shape.
 			await GameWire.SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, vitals.Health), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Hurt to {percent}%: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}.");
 		}
 
-		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
-		// is interacting with an auctioneer NPC). Sends DispatchOpenTradepost so the client opens the AH window and
-		// then sends TradepostOpen + searches, which HandleTradepostPacket answers with listings.
+		/// <summary>
+		///     `.ah` - opens the auction house at the player's position. Sends DispatchOpenTradepost so the client opens the
+		///     window and then sends TradepostOpen and its searches, which HandleTradepostPacket answers with listings.
+		/// </summary>
+		/// <remarks>A bootstrap for the tradepost; the real trigger is interacting with an auctioneer NPC.</remarks>
 		private async Task OpenAuctionHouseCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -816,16 +855,17 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bankCount} item(s).");
 		}
 
-		// .position  - print the caller's current map + live position (the in-world entity transform when
-		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
-		// .resist <knockback|criminalteam|<metaTypeId>> [percentage]  - push a spell RESISTANCE, 0 to remove it (#869).
-		//
-		// The retail trigger for the only metatype we have seen in quantity is a `Criminal Protection` buff nothing
-		// grants yet (#503), and the other is knockback immunity for a knockback that is not implemented (#496) - so
-		// this is the standard GM bootstrap for a decoded message with no live trigger.
-		//
-		// A metatype is an id into LDB category 55200, so a raw id is accepted as well as the two named ones: the
-		// catalog has hundreds of entries and this is the instrument for finding out what any of them does in-client.
+		/// <summary>
+		///     `.resist &lt;knockback|criminalteam|&lt;metaTypeId&gt;&gt; [percentage]` - pushes a spell resistance; 0
+		///     removes it.
+		/// </summary>
+		/// <remarks>
+		///     The standard GM bootstrap for a decoded message with no live trigger: the only metatype seen in quantity is
+		///     a `Criminal Protection` buff nothing grants yet, and the other is knockback immunity for a knockback that is
+		///     not implemented. A metatype is an id into LDB category 55200, so a raw id is accepted as well as the two
+		///     named ones - the catalog has hundreds of entries, and this is the instrument for finding out what any of
+		///     them does in-client.
+		/// </remarks>
 		private async Task ResistCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -857,32 +897,35 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// The remove carries the percentage too - retail's remove frames repeat the value the add carried, they
-			// do not send 0. So a `.resist X 0` sends a REMOVE of the full-immunity value, not an add of zero.
+			// The remove carries the percentage too: retail's remove frames repeat the value the add carried rather
+			// than sending 0, so `.resist X 0` sends a remove of the full-immunity value, not an add of zero.
 			var add = percentage > 0;
 			await GameWire.SendSpellResistance(client, metaType, add ? percentage : SpellMetaTypes.FullImmunity, add);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				add ? $"Resistance to metatype {metaType} set to {percentage}%." : $"Resistance to metatype {metaType} removed.");
 		}
 
-		// .waypoint [off] | [<labelId> [<tooltipId>]]  - plant a map marker at the player's current position, or take
-		// it down (#868).
-		//
-		// The retail trigger is a DEATH: every captured `DispatchAddWayPoint` is a TOMBSTONE pin, labelled
-		// *"Tombstone"* / *"Locate your Tombstone to reduce death penalty!"* and addressed at an `EntityClass.TombStone`
-		// id. We have no tombstone entity to point at yet - that rides with the death-penalty work (#497) - so this is
-		// the standard GM bootstrap for a decoded message whose retail trigger is not wired.
-		//
-		// The marker id is the player's own handle under the tombstone class. That is a stand-in for the corpse's id,
-		// and it is honest about being one: what matters for the in-client check is that the pin appears on the map at
-		// the right place with the right label, and that the remove takes it down again.
-		//
-		// ⚠️ **The pin's ICON is not selectable from this message** (#911, recovered from the client - see
-		// `WayPointCodec`'s remark). `i_nLabel` and `i_nToolTip` are LDB category-100 TEXT lookups (the title and the
-		// tooltip), and `i_cID` never reaches the client's waypoint-add at all - it is the marker KEY the remove
-		// addresses. The look comes from a waypoint TYPE the client keeps in its own record, and the server-driven
-		// path zeroes it. So the two optional arguments here change what the pin SAYS, which is the only thing about
-		// it this message can vary; "it should not look like a tombstone" cannot be answered from here.
+		/// <summary>
+		///     `.waypoint [off] | [&lt;labelId&gt; [&lt;tooltipId&gt;]]` - plants a map marker at the player's current
+		///     position, or takes it down.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The retail trigger is a death: every captured <c>DispatchAddWayPoint</c> is a tombstone pin, labelled
+		///         "Tombstone" / "Locate your Tombstone to reduce death penalty!" and addressed at an
+		///         <c>EntityClass.TombStone</c> id. There is no tombstone entity to point at yet, so this is the standard
+		///         GM bootstrap for a decoded message whose retail trigger is not wired. The marker id is the player's own
+		///         handle under the tombstone class, a stand-in for the corpse's id: what the in-client check needs is that
+		///         the pin appears at the right place with the right label and that the remove takes it down again.
+		///     </para>
+		///     <para>
+		///         The pin's icon is not selectable from this message - see <c>WayPointCodec</c>'s remark.
+		///         <c>i_nLabel</c> and <c>i_nToolTip</c> are LDB category-100 text lookups (the title and the tooltip), and
+		///         <c>i_cID</c> never reaches the client's waypoint-add at all: it is the marker key the remove addresses.
+		///         The look comes from a waypoint type the client keeps in its own record, and the server-driven path
+		///         zeroes it, so the two optional arguments change only what the pin says.
+		///     </para>
+		/// </remarks>
 		private async Task WayPointCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -912,6 +955,10 @@ namespace Faolan.GameServer.Gm
 				+ $" (label {label}, tooltip {toolTip} - LDB category 100). Use .waypoint off to remove it.");
 		}
 
+		/// <summary>
+		///     `.position` - prints the caller's current map and live position: the in-world entity transform when
+		///     connected, else the persisted Character position. Formatted so the x y z can be pasted into `.teleport`.
+		/// </summary>
 		private Task PositionCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -922,16 +969,17 @@ namespace Faolan.GameServer.Gm
 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
 		}
 
-		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
-		// .heroicmode <n>  - set stat 0x0A9, which the client's own descriptor registry names `HeroicMode` (#625).
-		// Named for the STAT and not for a mechanic, because there is no mechanic here: nothing in retail is known to
-		// set it, so a GM command is the only way the column is ever anything but 0.
-		//
-		// ⚠️ Was `.chosengod` until #625. The client names this stat TWICE and the two disagree - the exe's descriptor
-		// registry says `HeroicMode`, LDB 615 says `ChosenGod` - and we take the exe's. See Character.HeroicMode.
-		//
-		// ⚠️ The argument is the RAW WIRE NUMBER. The client stores this stat and never reads it back, so nothing it
-		// draws could show a wrong VALUE either way - only the name is now the client's.
+		/// <summary>
+		///     `.heroicmode &lt;n&gt;` - sets stat 0x0A9, which the client's own descriptor registry names
+		///     <c>HeroicMode</c>.
+		/// </summary>
+		/// <remarks>
+		///     Named for the stat rather than for a mechanic, because there is no mechanic here: nothing in retail is known
+		///     to set it, so a GM command is the only way the column is ever anything but 0. The client names this stat
+		///     twice and the two disagree - the exe's descriptor registry says <c>HeroicMode</c>, LDB 615 says
+		///     <c>ChosenGod</c> - and the exe's name is taken. See Character.HeroicMode. The argument is the raw wire
+		///     number; the client stores this stat and never reads it back.
+		/// </remarks>
 		private async Task HeroicModeCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -948,9 +996,15 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"HeroicMode set to {value}.");
 		}
 
-		// `.criminal 0` to clear it. The standard test bootstrap: the retail trigger is killing another player, and PvP
-		// player-vs-player combat is not modelled, so without this the criminal branches in ShopService are
-		// unreachable. Also awards the measured murder points so the stat moves as it does in the capture.
+		/// <summary>
+		///     `.criminal [seconds]` - flags the calling character criminal for <c>seconds</c>, defaulting to retail's
+		///     300 s; `.criminal 0` clears it. Also awards the measured murder points so the stat moves as it does in the
+		///     capture.
+		/// </summary>
+		/// <remarks>
+		///     The standard test bootstrap: the retail trigger is killing another player, and player-versus-player combat
+		///     is not modelled, so without this the criminal branches in ShopService are unreachable.
+		/// </remarks>
 		private async Task CriminalCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -987,15 +1041,17 @@ namespace Faolan.GameServer.Gm
 				$"Criminal for {seconds}s ({spell?.Name ?? "Criminal"} {CriminalStatus.CriminalSpellId}); murder points {character.MurderPoints}.");
 		}
 
-		// .removeitem <slot>  - the inverse of .additem: clear the calling character's bag cell `slot` (persisted
-		// CharacterInventory row) and push the live DispatchRemoveItem (0x201F) so it disappears without a relog.
-		// `.tag <id>` / `.tag <name substring>` - award an achievement (#748). The retail TRIGGERS are per-achievement
-		// content nobody has mapped yet (a vista, a kill streak, a first pet), so this is the standard GM bootstrap for
-		// a feature whose real trigger is not wired: it exercises the whole path - persist, award, and the client's own
-		// banner - against a catalog entry rather than a made-up id.
-		//
-		// No argument lists what the character already holds, which is the other half of checking this works: the award
-		// is a one-shot event and the SNAPSHOT is what carries the set on a relog.
+		/// <summary>
+		///     `.tag &lt;id&gt;` or `.tag &lt;name substring&gt;` - awards an achievement. With no argument it lists what
+		///     the character already holds.
+		/// </summary>
+		/// <remarks>
+		///     The retail triggers are per-achievement content nobody has mapped yet - a vista, a kill streak, a first pet
+		///     - so this is the standard GM bootstrap for a feature whose real trigger is not wired: it exercises persist,
+		///     award and the client's own banner against a catalog entry rather than a made-up id. The listing is the other
+		///     half of checking it works, because the award is a one-shot event and the snapshot is what carries the set
+		///     across a relog.
+		/// </remarks>
 		private async Task TagCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1017,7 +1073,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// An id, or a name to look up - a 4,095-entry catalog is not something to search by hand.
+			// An id, or a name to look up: a 4,095-entry catalog is not something to search by hand.
 			if (!uint.TryParse(argument, out var tagId))
 			{
 				var matches = await _database.FindAchievements(argument, 6);
@@ -1048,11 +1104,11 @@ namespace Faolan.GameServer.Gm
 		}
 
 
-		// Lists only the commands the CALLER's privilege mask passes - the same per-bit filtering the client's own
-		// /help applies to the retail command set (#904).
-		// What a verb the client registers but we do not back yet answers with: retail's own usage line and what it
-		// would take. ⚠️ Deliberately not a silent no-op and not an error - the command EXISTS in the client, so
-		// "unknown command" would be a lie about the client and a shrug about us.
+		/// <summary>
+		///     What a verb the client registers but this server does not back yet answers with: retail's own usage line and
+		///     what it would take. Deliberately neither a silent no-op nor an error - the command exists in the client, so
+		///     "unknown command" would be wrong about the client.
+		/// </summary>
 		private Task SendUnbackedVerbReply(INetworkClient client, RetailCommandCatalog.Unbacked unbacked)
 		{
 			var usage = string.IsNullOrEmpty(unbacked.Usage) ? "(takes no arguments)" : $".{unbacked.Verb} {unbacked.Usage}";
@@ -1064,9 +1120,11 @@ namespace Faolan.GameServer.Gm
 			]));
 		}
 
-		// ⚠️ Lists EVERY verb the caller's mask passes, backed or not (the dev's standing rule) - the client's whole command
-		// surface is discoverable from in-game rather than only by reading a TSV. Unbacked ones are marked so the
-		// listing does not promise more than it delivers.
+		/// <summary>
+		///     Lists every verb the caller's mask passes, backed or not, so the client's whole command surface is
+		///     discoverable in-game rather than only by reading the registry TSV. Unbacked verbs are marked so the listing
+		///     does not promise more than it delivers.
+		/// </summary>
 		private Task SendGmHelpText(INetworkClient client)
 		{
 			var account = client.Session.Account;
@@ -1079,9 +1137,12 @@ namespace Faolan.GameServer.Gm
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Raw($"Available Commands:<br />{available.JoinAsString("<br />")}"));
 		}
 
-		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist, 		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
-		// rides the next login snapshot). Test-bootstrap convenience for level-gated features (e.g. #206 Totem of
-		// Origin's min-20). The stat's wire scale is applied at send.
+		/// <summary>
+		///     `.level &lt;n&gt;` - sets the player's character level, regenerates its MaxStats from the new class and
+		///     level, persists it, and pushes the Level stat plus refreshed vitals so the change shows without a relog. The
+		///     persisted level also rides the next login snapshot, and the stat's wire scale is applied at send.
+		/// </summary>
+		/// <remarks>Test-bootstrap convenience for level-gated features, such as the Totem of Origin's minimum of 20.</remarks>
 		private async Task SetLevelCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -1093,22 +1154,27 @@ namespace Faolan.GameServer.Gm
 			}
 
 			// Everything a level change entails - persist, ding burst, attribute lines, vitals, rating quad, the
-			// level-gated ability/spell unlocks and their castability grants - belongs to the progression service, so a
-			// GM set and an XP-driven ding are LITERALLY the same code rather than two copies held in step by comment.
-			// They were two copies, and the comments said so ("must not diverge").
+			// level-gated ability and spell unlocks and their castability grants - belongs to the progression service, so
+			// that a GM set and an XP-driven ding run the same code rather than two copies held in step by hand.
 			await _levelUp.SetLevel(client, level);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
 
-		// .setnpcgroup [<group name>] [clear]  - manual creature assignment for an RDB spawn AREA (#363). Target/select
-		// an NPC standing in the area (its type IS what the area spawns), then run this:
-		//   .setnpcgroup                 -> assign the SELECTED NPC's creature to the area the NPC stands in
-		//   .setnpcgroup <group>         -> assign it to the named area on that map
-		//   .setnpcgroup clear           -> CLEAR the area the NPC stands in (back to unresolved)
-		//   .setnpcgroup <group> clear   -> clear the named area
-		// A set marks the area Manual (never re-guessed); a clear reverts NpcTemplateId to null so the resolver may
-		// re-guess it. The dev nameplate labels (.togglenpcgroup) show each NPC's area so you know what to type.
+		/// <summary>
+		///     `.setnpcgroup [&lt;group name&gt;] [clear]` - manual creature assignment for an RDB spawn area. Select an NPC
+		///     standing in the area, whose type is what the area spawns, then:
+		///     <code>
+		///     .setnpcgroup                 assign the selected NPC's creature to the area the NPC stands in
+		///     .setnpcgroup &lt;group&gt;         assign it to the named area on that map
+		///     .setnpcgroup clear           clear the area the NPC stands in, back to unresolved
+		///     .setnpcgroup &lt;group&gt; clear   clear the named area
+		///     </code>
+		/// </summary>
+		/// <remarks>
+		///     A set marks the area Manual, so it is never re-guessed; a clear reverts NpcTemplateId to null so the
+		///     resolver may re-guess it. The dev nameplate labels (.togglenpcgroup) show each NPC's area.
+		/// </remarks>
 		private async Task SetNpcGroupCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1126,7 +1192,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// A trailing "clear"/"none"/"-" makes this a CLEAR; the rest (if any) is the target group name.
+			// A trailing "clear"/"none"/"-" makes this a clear; the rest (if any) is the target group name.
 			var tokens = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 			var clearing = tokens.Length > 0 && tokens[^1] is "clear" or "none" or "-";
 			var groupName = string.Join(' ', clearing
@@ -1158,18 +1224,25 @@ namespace Faolan.GameServer.Gm
 				$"Spawn area '{area.GroupName}' (map {npc.MapId}) now spawns '{StripAreaLabel(npc.Name)}' [manual]; linked {linked} captured spawn(s) (graduate to remove them).");
 		}
 
-		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
-		// localized CriteriaYou line (arbitrary literal text needs a literal-text remoteformat template, like the
-		// FIFO banner). The test bootstrap for the ChatTextIIR path.
+		/// <summary>
+		///     `.syschat` - pushes a world or system chat line into the chat window through ChatTextIIR, using the captured
+		///     localized CriteriaYou line. Arbitrary literal text needs a literal-text remoteformat template, as the FIFO
+		///     banner uses. The test bootstrap for the ChatTextIIR path.
+		/// </summary>
 		private async Task SysChatCommand(INetworkClient client)
 		{
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR).");
 		}
 
-		// .toast <text>  - push ARBITRARY literal text to the top-of-screen FIFO banner ("toast"), NOT the chat window
-		// (#664). The GenericDisplayAreaName FIFO template resolves to the format body `{DisplayedText}`, so a literal
-		// type-7 parameter renders verbatim - the same envelope the area-name banner uses, minus the nested <localized>.
-		// The test bootstrap for DynamicAreaBannerCodec; the mechanism the closed-as-impossible #664 said had no path.
+		/// <summary>
+		///     `.toast &lt;text&gt;` - pushes arbitrary literal text to the top-of-screen FIFO banner, not to the chat
+		///     window. The test bootstrap for DynamicAreaBannerCodec.
+		/// </summary>
+		/// <remarks>
+		///     The GenericDisplayAreaName FIFO template resolves to the format body <c>{DisplayedText}</c>, so a literal
+		///     type-7 parameter renders verbatim - the same envelope the area-name banner uses, minus the nested
+		///     <c>&lt;localized&gt;</c>.
+		/// </remarks>
 		private async Task ToastCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1184,9 +1257,12 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Toasted: '{text}'");
 		}
 
-		// .target  - print info about the player's currently SELECTED target (last in-game LookAt/SelectDeselect):
-		// name, wire handle, kind, template id, level, vitals, hostility, position, and the spawn area/group it belongs
-		// to (the #363 labeling aid - read the group without the nameplate toggle). Reported in-game via system message.
+		/// <summary>
+		///     `.target` - prints information about the player's currently selected target, the last in-game LookAt or
+		///     SelectDeselect: name, wire handle, kind, template id, level, vitals, hostility, position, and the spawn area
+		///     it belongs to. Reported in-game as a system message.
+		/// </summary>
+		/// <remarks>The spawn area is the labelling aid - it reads the group without the nameplate toggle.</remarks>
 		private async Task TargetInfoCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1203,7 +1279,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// A live ENTITY (player / NPC / loot bag) in the zone entity model.
+			// A live entity (player / NPC / loot bag) in the zone entity model.
 			if (_simulation.World.ZoneForEntity(player).TryGet(handle, out var t))
 			{
 				var kind = t.IsPlayer
@@ -1224,13 +1300,13 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model, it hangs off the
+			// Not a live entity - a static world object (chest/door/dynel) isn't in the entity model, it hangs off the
 			// loaded zone. Resolve it there so a selected chest/door still reports.
 			if (_simulation.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 			{
 				var obj = live.Row;
 				var oname = WorldObjectDisplay.ToWire(obj) ?? obj.Name ?? "(unnamed object)";
-				// A name-resolved zone-line (#341) knows its destination map but no arrival - report the map either way,
+				// A name-resolved zone-line knows its destination map but no arrival - report the map either way,
 				// and say which the row is, because "no arrival" is exactly what sends the player to the default spawn.
 				var dest = obj.DestinationMapId is { } destMap
 					? $" · teleports to map {destMap} {(obj.DestinationPosition is { } dp ? $"({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})" : "(no captured arrival - default spawn)")}"
@@ -1245,32 +1321,16 @@ namespace Faolan.GameServer.Gm
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Selected handle 0x{handle:X8} isn't a live entity or a known world object in your zone (it may have despawned).");
 		}
 
-		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
-		//
-		// Retail never changes playfield in place: it sends a 0x2002 world-address advert on the current
-		// connection, the client opens a FRESH connection and does a full world entry there (changemap capture
-		// account-faolan-...-changemap: :7027 -> :7030, frame 4214 advertises gs013-nj4...:7030). This matters
-		// because the client only loads a playfield's resources (camera paths, geometry, NPCs) during a fresh
-		// world entry - confirmed via Ghidra: camera paths are an RDB resource (e_RDB_CameraPaths, type 1000047)
-		// keyed by playfield id, loaded by CameraPathMap_c::LoadPlayfieldPaths only on the n3Camera init a fresh
-		// entry runs (see docs/subsystems/create-cutscene-camera-paths.md). A soft in-place MapChange on the live connection
-		// does NOT trigger that reload, so the old playfield's resources stay loaded - that was the teleport bug.
-		//
-		// The handoff is the SAME packet (same 0xb171ce13 -> 0x6c67c147 conversation, byte-identical) the create
-		// enter-world flow already sends (SendWorldHandoff), proving our single-host server CAN do it: it
-		// advertises our own GameServer, the client reconnects, and the existing-character Hello path runs
-		// SendWorldEntry for the (now persisted) target map - identical to logging in on that map, which works.
-		// .teleport <mapId | name>  - resolves the argument to a map (numeric id, or a case-insensitive name match
-		// so `.teleport Khemi` works) then hands off to DoTeleport. Also accepts `.teleport <x> <y> <z>` (three numeric
-		// tokens) to move to a position on the CURRENT map. Gives a usage/echo message instead of throwing on a
-		// missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
-		// .knockback [distance] - shoves the player away from their current TARGET (or, with no target, away from the
-		// direction they are facing) using the real wire path: the forced-move MoveTask + SetPos pair plus the
-		// "Knockback immunity" buff retail applies alongside it (#496).
-		//
-		// This is the standard GM bootstrap for a feature whose retail trigger is not wired. Here the trigger is
-		// genuinely unknown rather than merely unbuilt: the corpus has ONE knockback and the ApplySpell in that batch
-		// names the immunity guard, not the ability that did the knocking, so nothing says which attacks knock back.
+		/// <summary>
+		///     `.knockback [distance]` - shoves the player away from their current target, or with no target away from the
+		///     direction they are facing, using the real wire path: the forced-move MoveTask and SetPos pair plus the
+		///     "Knockback immunity" buff retail applies alongside it.
+		/// </summary>
+		/// <remarks>
+		///     The standard GM bootstrap for a feature whose retail trigger is not wired. Here the trigger is genuinely
+		///     unknown rather than merely unbuilt: the corpus has one knockback, and the ApplySpell in that batch names the
+		///     immunity guard rather than the ability that did the knocking, so nothing says which attacks knock back.
+		/// </remarks>
 		private async Task KnockbackCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1289,9 +1349,9 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// The SOURCE is what the player is pushed away from. Their current target is the natural stand-in for the
-			// attacker; with none, push away from a point just in front of them so the command still demonstrates the
-			// mechanic (being shoved backwards) instead of doing nothing.
+			// The source is what the player is pushed away from. Their current target is the natural stand-in for the
+			// attacker; with none, push away from a point just in front of them so the command still demonstrates being
+			// shoved backwards instead of doing nothing.
 			var zone = _simulation.World.ZoneForEntity(entity);
 			Vector3 source;
 			if (client.Session.SelectedTargetHandle is { } target && zone != null && zone.TryGet(target, out var targetEntity))
@@ -1310,14 +1370,16 @@ namespace Faolan.GameServer.Gm
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", "Not displaced (no direction to push along, or fully resisted)."));
 		}
 
-		// .travel <npc name> [answer path] - drives local travel (#506/#514). With no path it LISTS what that NPC
-		// offers; with one it runs that trip directly.
-		//
-		// Since #514 the retail trigger IS wired - a wagoneer's destination pick inside the ordinary Knubot
-		// conversation runs the whole flow - so this is no longer the only way in. It stays as the diagnostic: it names
-		// the answer path of every destination, which is the wiring key, and runs a trip without walking the tree.
-		// ⚠️ It deliberately skips the FARE (that is charged one screen earlier, when the destination list is served),
-		// so a GM trip is free.
+		/// <summary>
+		///     `.travel &lt;npc name&gt; [answer path]` - drives local travel. With no path it lists what that NPC offers;
+		///     with one it runs that trip directly.
+		/// </summary>
+		/// <remarks>
+		///     The retail trigger is wired - a wagoneer's destination pick inside the ordinary Knubot conversation runs the
+		///     whole flow - so this is the diagnostic rather than the only way in: it names the answer path of every
+		///     destination, which is the wiring key, and runs a trip without walking the tree. It deliberately skips the
+		///     fare, which is charged one screen earlier when the destination list is served, so a GM trip is free.
+		/// </remarks>
 		private async Task TravelCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1328,7 +1390,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// The destination's OPTION ID, when present, is the LAST whitespace-separated token - NPC names contain
+			// The destination's option id, when present, is the last whitespace-separated token: NPC names contain
 			// spaces, so splitting from the front would break on every real traveller, and no NPC name ends in digits.
 			var split = arg.LastIndexOf(' ');
 			var npcName = arg;
@@ -1371,6 +1433,33 @@ namespace Faolan.GameServer.Gm
 			await _travel.Travel(client, npcName, picked);
 		}
 
+		/// <summary>
+		///     `.teleport &lt;mapId | name&gt;` - resolves the argument to a map (a numeric id, or a case-insensitive name
+		///     match so `.teleport Khemi` works) and then hands off to DoTeleport. Also accepts `.teleport &lt;x&gt;
+		///     &lt;y&gt; &lt;z&gt;`, three numeric tokens, to move to a position on the current map. A missing or garbled
+		///     argument answers with a usage line rather than throwing.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         A playfield change goes through retail's handoff and reconnect, never in place: the server sends a
+		///         0x2002 world-address advert on the current connection, the client opens a fresh connection and does a
+		///         full world entry there (changemap capture account-faolan-...-changemap: :7027 to :7030, frame 4214
+		///         advertises gs013-nj4...:7030).
+		///     </para>
+		///     <para>
+		///         This matters because the client only loads a playfield's resources - camera paths, geometry, NPCs -
+		///         during a fresh world entry: camera paths are an RDB resource (e_RDB_CameraPaths, type 1000047) keyed by
+		///         playfield id, loaded by CameraPathMap_c::LoadPlayfieldPaths only on the n3Camera init a fresh entry runs
+		///         (see docs/subsystems/create-cutscene-camera-paths.md). A soft in-place MapChange on the live connection
+		///         does not trigger that reload, so the old playfield's resources stay loaded.
+		///     </para>
+		///     <para>
+		///         The handoff is the same packet - the same 0xb171ce13 to 0x6c67c147 conversation, byte-identical - the
+		///         create enter-world flow sends: it advertises this server's own GameServer, the client reconnects, and
+		///         the existing-character Hello path runs SendWorldEntry for the now-persisted target map, which is
+		///         identical to logging in on that map.
+		///     </para>
+		/// </remarks>
 		private async Task TeleportCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1386,15 +1475,14 @@ namespace Faolan.GameServer.Gm
 			// Invariant culture throughout so a comma-decimal locale doesn't reject the dotted coordinates.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-			// RETAIL GRAMMAR (#913). The client's own hidden GM affordance - right-click the map -> "teleport to
-			// location" - emits `/teleportself <posx> <posz>`: TWO coordinates and no Y, on the current playfield.
+			// Retail's grammar. The client's own hidden GM affordance - right-click the map, then "teleport to
+			// location" - emits `/teleportself <posx> <posz>`: two coordinates and no Y, on the current playfield.
 			// Recovered from FanaticTeleportCommand_c's parameter descriptor (docs/re/gm-command-args.tsv), which
 			// declares the family as
 			//     posx posz [[y posy][playfield]] [proxy model type group subgroup running]
-			// so Y is optional and arrives behind a literal `y` token, with the playfield after it. We used to parse
-			// the whole argument as a map name and answer "No map matching '534 657'", which is what made every one
-			// of those clicks fail. The forms below are RETAIL's; ours (`<x> <y> <z>`, `<map>`) are unchanged and
-			// handled after them - a 3-token form is unambiguously ours, since retail's third token is the literal `y`.
+			// so Y is optional and arrives behind a literal `y` token, with the playfield after it. These forms are
+			// matched before the local ones (`<x> <y> <z>`, `<map>`), which are handled below; a 3-token form is
+			// unambiguously local, because retail's third token is the literal `y`.
 			if (tokens.Length is 2 or 4 or 5 &&
 			    float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var retailX) &&
 			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var retailZ) &&
@@ -1426,7 +1514,7 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change). Ours.
+			// `.teleport <x> <y> <z>` - three numeric tokens are a position on the current map, with no map change.
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
 			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
@@ -1434,9 +1522,9 @@ namespace Faolan.GameServer.Gm
 				return;
 			}
 
-			// .teleport <mapId | name> <x> <y> <z>  - jump to a precise spot on a NAMED (or numeric) map in one command
-			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
-			// spaces, so everything before the last three tokens is the map argument.
+			// `.teleport <mapId | name> <x> <y> <z>` - a precise spot on a named or numeric map in one command. The map
+			// is the leading token or tokens and the trailing three are the coordinates; a map name may contain spaces,
+			// so everything before the last three tokens is the map argument.
 			if (tokens.Length >= 4 && float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx) &&
 			    float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
 			{
@@ -1468,8 +1556,14 @@ namespace Faolan.GameServer.Gm
 			await _teleport.DoTeleport(characterId, match.Id);
 		}
 
-		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage.
-		// The toggle is persisted on the account (#279) and re-applied to the live WorldEntity on every world entry, 		// so it survives relog AND map changes (a playfield change is a fresh world connection / entity). Self-target only.
+		/// <summary>
+		///     `.godmode` - toggles invincibility on the caller: hostile NPC swings land their animation but deal no
+		///     damage. Self-target only.
+		/// </summary>
+		/// <remarks>
+		///     The toggle is persisted on the account and re-applied to the live WorldEntity on every world entry, so it
+		///     survives both a relog and a map change - a playfield change is a fresh world connection and entity.
+		/// </remarks>
 		private async Task ToggleGodModeCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1489,8 +1583,8 @@ namespace Faolan.GameServer.Gm
 		}
 
 
-		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
-		// resolves to an RDB spawn AREA shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
+		// `.togglenpcgroup` - toggles the dev spawn-area nameplate labels live for this session: each NPC that
+		// resolves to an RDB spawn area shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
 		// the client draws NPC names from the template LDB and ignores the spawn name). Pairs with .setnpcgroup: read
 		// the area off the nameplate, assign with .setnpcgroup. Off by default; the toggle re-applies to nearby NPCs now.
 		private async Task ToggleNpcGroupCommand(INetworkClient client)
@@ -1500,22 +1594,23 @@ namespace Faolan.GameServer.Gm
 				$"Spawn-area nameplate labels {(on ? "ON" : "OFF")} - {affected} nearby NPC(s) updated. Walk to re-stream the rest.");
 		}
 
-		// .weaponset [primary | secondary]  - the server-side test bootstrap for the SwitchWeaponsButton set switch (#400).
-		// No arg (or "swap"/"toggle") flips the active loadout; "primary"/"secondary" (or 1/2) forces one. Persists the
-		// set and mirrors it on the live entity so the login-time gear-stat aggregation (which counts only the active
-		// set's weapons) uses it. NB this drives the MODEL only - the cross-player swap RELAY needs the real BCC payload,
-		// so exercise that with the retail weapon-swap key against a live viewer.
-		// .tradeskill [<profession> [<rank>]]  - train a tradeskill profession (#735). No argument reports what the
-		// character has trained and what each profession's ladder looks like.
-		//
-		// This is the standard GM bootstrap for a feature whose RETAIL trigger is not wired: the learn path is a
-		// trainer conversation and no capture shows one, so nothing here can be built from the corpus. What IS
-		// retail is everything downstream - the ladder, the rank, and the recipe book the rank buys - so a GM grant
-		// puts a character in a state the rest of the system reads exactly as it would a trained one.
-		//
-		// Trains the whole chain UP TO the named rank, because that is what a character who reached it holds: each
-		// rung names the one below it as its prerequisite. `AddCharacterFeats` collapses the rows per base and keeps
-		// the highest of each, so the stored set is the same 3 rows retail's would be.
+		/// <summary>
+		///     `.tradeskill [&lt;profession&gt; [&lt;rank&gt;]]` - trains a tradeskill profession. With no argument it
+		///     reports what the character has trained and what each profession's ladder looks like.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The standard GM bootstrap for a feature whose retail trigger is not wired: the learn path is a trainer
+		///         conversation and no capture shows one, so it cannot be built from the corpus. Everything downstream - the
+		///         ladder, the rank, and the recipe book the rank buys - is retail, so a GM grant puts a character in a
+		///         state the rest of the system reads exactly as it would a trained one.
+		///     </para>
+		///     <para>
+		///         It trains the whole chain up to the named rank, because that is what a character who reached it holds:
+		///         each rung names the one below it as its prerequisite. <c>AddCharacterFeats</c> collapses the rows per
+		///         base and keeps the highest of each, so the stored set is the same three rows retail's would be.
+		///     </para>
+		/// </remarks>
 		private async Task TradeskillCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1564,6 +1659,15 @@ namespace Faolan.GameServer.Gm
 			_logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, TradeskillLadder.RankName(wanted));
 		}
 
+		/// <summary>
+		///     `.weaponset [primary | secondary]` - the server-side test bootstrap for the SwitchWeaponsButton set switch.
+		///     No argument, or "swap"/"toggle", flips the active loadout; "primary"/"secondary" (or 1/2) forces one.
+		/// </summary>
+		/// <remarks>
+		///     Persists the set and mirrors it on the live entity so the login-time gear-stat aggregation, which counts
+		///     only the active set's weapons, uses it. This drives the model only - the cross-player swap relay needs the
+		///     real BCC payload, so exercise that with the retail weapon-swap key against a live viewer.
+		/// </remarks>
 		private async Task WeaponSetCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1625,12 +1729,18 @@ namespace Faolan.GameServer.Gm
 
 		internal delegate Task GmCommandDelegate(INetworkClient client, string arguments);
 
-		// A registered GM command: its handler and the gm_level bit(s) it requires. None = unrestricted (any GM),
-		// the client's own convention for an unmasked command; a multi-bit mask passes on ANY set bit, the client's
-		// `(level & mask) != 0` test (#904).
+		/// <summary>
+		///     A registered GM command: its handler and the gm_level bits it requires. None means unrestricted, i.e. any
+		///     GM, which is the client's own convention for an unmasked command; a multi-bit mask passes on any set bit,
+		///     the client's <c>(level &amp; mask) != 0</c> test.
+		/// </summary>
 		internal sealed record GmCommandEntry(GmCommandDelegate Handler, GmPrivileges RequiredMask);
 
-		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
+		/// <summary>
+		///     Resolves a map argument - a numeric id, an exact case-insensitive name, or the first name-contains match -
+		///     to its Map row, or null if nothing matches. Shared by the `.teleport &lt;name&gt;` and `.teleport
+		///     &lt;name&gt; x y z` forms.
+		/// </summary>
 		private async Task<Map?> ResolveMap(string arg)
 		{
 			if (uint.TryParse(arg, out var id))
@@ -1643,18 +1753,21 @@ namespace Faolan.GameServer.Gm
 			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault(m => m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
 		}
 
-		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
-		// (Gitea #404) and movement is not otherwise persisted, so this snapshots every
-		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
-		// more live state - vitals, buffs, … - as those become persisted.)
+		/// <summary>
+		///     `.save` - flushes the live world state to the database. The WorldEntity is the source of truth for the live
+		///     transform and movement is not otherwise persisted, so this snapshots every connected player's authoritative
+		///     position and map back onto their persisted Character and saves it.
+		/// </summary>
 		private async Task SaveChanges(uint characterId)
 		{
 			var saved = await _persistence.FlushAllAsync();
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
 		}
 
-		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
-		// malformed/overflowing value.
+		/// <summary>
+		///     Parses a wire handle from a GM-command argument: "0x"-prefixed hex, or plain decimal. Returns false on a
+		///     malformed or overflowing value.
+		/// </summary>
 		private static bool TryParseHandle(string arg, out uint handle)
 		{
 			handle = 0;
@@ -1675,7 +1788,7 @@ namespace Faolan.GameServer.Gm
 			}
 		}
 
-		// Lists maps for `.maps`, optionally filtered to those whose name CONTAINS `search` (case-insensitive) -
+		// Lists maps for `.maps`, optionally filtered to those whose name contains `search` (case-insensitive) -
 		// e.g. `.maps castle`. A blank search lists all maps.
 		private async Task SendListAllMaps(uint characterId, string? search = null)
 		{

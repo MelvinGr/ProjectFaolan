@@ -8,16 +8,16 @@ using Faolan.GameServer.Wire;
 namespace Faolan.GameServer.Progression
 {
 	/// <summary>
-	///     What a LEVEL-UP pushes to the client (#826), off GameServerListener: the re-seeded vitals plus the three
-	///     "you gained this" messages. The senders themselves stay in the listener's .Outbound partial and are reached
-	///     statically - they hold no state - so this owns the level-up SHAPE without owning the wire builders.
+	///     What a level-up pushes to the client: the re-seeded vitals plus the three "you gained this" messages. The
+	///     senders themselves are static and hold no state, so this owns the level-up shape without owning the wire
+	///     builders.
 	/// </summary>
 	public sealed class LevelUpOutbound : ILevelUpOutbound
 	{
-		// ⚠️ BOUND, not injected, and this is a real CYCLE rather than a preference: CombatService takes
-		// LevelUpService, which takes this. Passing `_combat` in the ctor captured a field that is not assigned until
-		// 16 lines later - it compiled clean and held NULL, so the first level-up would have thrown. Same shape and
-		// same fix as EconomyOutbound's collect-goal hook.
+		// Bound rather than injected, because this is a genuine cycle: CombatService takes LevelUpService, which takes
+		// this. Passing `_combat` in the constructor would capture a field that is not assigned until later - it
+		// compiles clean and holds null, so the first level-up would throw. Same shape as EconomyOutbound's
+		// collect-goal hook.
 		private Func<INetworkClient, Task<EntityVitals>> _reseedFromMaxStats = null!;
 
 		// Bound in the listener ctor immediately after CombatService exists, long before any XP can be awarded.

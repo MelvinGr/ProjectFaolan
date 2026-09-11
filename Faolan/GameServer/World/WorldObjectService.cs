@@ -18,31 +18,38 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// INTERACTING with a world object (#826): opening a door or container, sitting on a bench, harvesting a node,
-	// picking up a quest item, playing a dynel's visual sequence, and the GM delete.
-	//
-	// Its subject is `LiveWorldObject` - a static thing streamed once at world entry and living only in the zone's
-	// object table - which is a different subject from `WorldBroadcaster`'s: that class is about `WorldEntity`
-	// (spawn / despawn / move / interest). That is the seam. What deliberately STAYS on the broadcaster is world-object
-	// STREAMING (`BuildEntryWorldObjects` / `StreamWorldObjects`), because streaming is an interest pass and
-	// `DispatchInterest` drives it - moving it here would only trade this dependency for a cycle.
-	//
-	// It reaches the broadcaster for exactly two ops, both pure senders: `SendWorldDespawn` (a removed object still
-	// leaves the client's world the same way an entity does) and `BroadcastBehaviorToViewers` (the sit / stand-up
-	// pose the onlookers must see).
+	/// <summary>
+	///     Interacting with a world object: opening a door or container, sitting on a bench, harvesting a node, picking
+	///     up a quest item, playing a dynel's visual sequence, and the GM delete.
+	/// </summary>
+	/// <remarks>
+	///     Its subject is <see cref="LiveWorldObject" />, a static thing streamed once at world entry and living only in
+	///     the zone's object table, where <see cref="WorldBroadcaster" />'s subject is <see cref="WorldEntity" /> -
+	///     spawn, despawn, move and interest. World-object streaming stays on the broadcaster, because streaming is an
+	///     interest pass and the interest dispatch drives it; moving it here would trade this dependency for a cycle.
+	///     <para>
+	///         This service reaches the broadcaster for two operations, both pure senders: the world despawn, because a
+	///         removed object leaves the client's world the way an entity does, and the behaviour broadcast, for the
+	///         sit and stand-up poses the onlookers must see.
+	///     </para>
+	/// </remarks>
 	public sealed class WorldObjectService
 	{
-		// How far from the SEAT the player must get before the server stands them up. Retail's sit capture puts it at
-		// ~1.25: the seated player is parked at Z=620.49 (pkt 6812), wobbles 0.10-0.19 while sitting, then reaches
-		// Z=621.74 and the standup goes out immediately (pkt 6841 -> 6844). 2.0 was too generous to ever fire - in
-		// the in-client bench test the walk-off only reached 1.78 from the seat and the server never stood the player up.
-		//
-		// ⚠️ A seated player still streams position syncs at (roughly) the seat position - plus a one-time seat-snap of
-		// up to ~1 unit - and those must NOT be read as "left the bench" (that stood the player straight back up). Only
-		// a real walk exceeds this: the seated position syncs drift < 1 unit.
+		/// <summary>How far from the seat the player must get before the server stands them up.</summary>
+		/// <remarks>
+		///     Retail's sit capture puts it at about 1.25: the seated player is parked at Z=620.49 (packet 6812),
+		///     wobbles 0.10 to 0.19 while sitting, then reaches Z=621.74 and the standup goes out immediately (packets
+		///     6841 to 6844). A threshold of 2.0 never fires - an in-client walk-off only reached 1.78 from the seat.
+		///     <para>
+		///         A seated player still streams position syncs at roughly the seat position, plus a one-time seat snap
+		///         of up to about a unit, and those must not be read as leaving the bench, which would stand the player
+		///         straight back up. Only a real walk exceeds this distance: the seated syncs drift less than a unit.
+		///     </para>
+		/// </remarks>
 		private const float SeatLeaveDistance = 1.0f;
 
-		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
+		// The object class the sit remoteformat names; the capture reads
+		// startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel.
 		private const string BenchObjectClass = "TavernBenchSimpleDynel";
 
 		private readonly WorldBroadcaster _broadcaster;
@@ -58,10 +65,12 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// GM .delete of a static WORLD OBJECT (chest/door/dynel): these aren't in the live entity model (they stream
-		// once at world entry), so a handle that isn't a live entity may still be one. Despawns it live for nearby
-		// players AND deletes its DB row so it's gone on relog too. Returns the deleted row, or null if the handle isn't
-		// a known world object on the player's map.
+		/// <summary>
+		///     The GM delete of a static world object - a chest, door or dynel. These are not in the live entity model,
+		///     since they stream once at world entry, so a handle that is not a live entity may still be one of them.
+		/// </summary>
+		/// <remarks>It despawns the object live for nearby players and deletes its row, so it is gone on relog too.</remarks>
+		/// <returns>The deleted row, or null when the handle is not a known world object on the player's map.</returns>
 		public async Task<WorldObject?> DeleteWorldObjectForPlayer(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -74,10 +83,10 @@ namespace Faolan.GameServer.World
 
 			var obj = live.Row;
 
-			// World objects aren't tracked in Known, so we can't use that #245 gate; instead only despawn for viewers
-			// that have ENTERED the world (they received the world-object burst, so the handle is safe to quit for them).
-			// A world object is removed by its OWN class (SimpleDynel / LootBag / ZoneLabel / ...), not Character - a
-			// Character-classed despawn silently misses it (#366). Derive the class from its spawn IIR.
+			// World objects are not tracked in a viewer's Known set, so the confirmed-handle gate does not apply here:
+			// despawn only for viewers that have entered the world, who received the world-object burst and can
+			// therefore be told to drop the handle. A world object is removed by its own class - SimpleDynel, LootBag,
+			// ZoneLabel and so on - never Character, which a client silently ignores; the class comes from its spawn.
 			var classWord = WorldObjectColumns.TypeTagForClass(obj.SubOpcode);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -91,10 +100,15 @@ namespace Faolan.GameServer.World
 			return obj;
 		}
 
-		// #262: whether the used world object is a quest-item PICKUP (a QuestItemEffect dynel - e.g. a quarry Stone
-		// Brick), as opposed to a door/container. Only reports the object KIND; the pickup's EFFECT (grant item +
-		// advance the CollectItem goal) is quest-driven, so the caller no-ops it when no collect quest is active - which
-		// is what gates the brick nodes to Shipwrecked-V holders.
+		/// <summary>
+		///     Whether the used world object is a quest-item pickup - a <c>QuestItemEffect</c> dynel such as a quarry
+		///     Stone Brick - as opposed to a door or container.
+		/// </summary>
+		/// <remarks>
+		///     It reports only the object kind. The pickup's effect, granting the item and advancing the collect goal,
+		///     is quest-driven, so the caller does nothing when no collect quest is active, which is what gates the
+		///     brick nodes to holders of the quest.
+		/// </remarks>
 		public Task<bool> IsQuestPickup(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -104,16 +118,18 @@ namespace Faolan.GameServer.World
 			return Task.FromResult(_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var obj) && obj.Row.QuestItemEffect is > 0);
 		}
 
-		// A player used a STATIC world object (Interact UseObject) that isn't a loot bag - a DOOR/GATE (e.g. the
-		// "King Conan's Throne Room" gate). Reply with the SimpleDynelVisualChange so the client drops the door's
-		// collision and plays its open animation, matching the conans-castle capture (rec 1697 -> 1698).
-		//
-		// Both halves are now named rather than numbered (#678): `SetKdTree 0` is what removes the collision, and
-		// "object_open" is a BASE ANIMATION name, not a state string. Retail's own close is the mirror image -
-		// "object_closed" plus `SetKdTree` back to the object's `Kdtree` - which is why the collision id is the
-		// object's own and not a constant. The object is resolved through the ZONE - the handle it was streamed with
-		// is the zone's, not a column. Returns false if no such object exists, so the caller can fall through to the
-		// loot-bag path.
+		/// <summary>
+		///     A player used a static world object that is not a loot bag - a door or gate. The reply drops the door's
+		///     collision and plays its open animation, matching the conans-castle capture at records 1697 and 1698.
+		/// </summary>
+		/// <remarks>
+		///     Setting the kd-tree to 0 is what removes the collision, and <c>object_open</c> is a base animation name
+		///     rather than a state string. Retail's close is the mirror image - <c>object_closed</c> plus the kd-tree
+		///     restored to the object's own <c>Kdtree</c> - which is why the collision id is the object's and not a
+		///     constant. The object is resolved through the zone, because the handle it was streamed with is the
+		///     zone's rather than a column.
+		/// </remarks>
+		/// <returns>False when no such object exists, so the caller can fall through to the loot-bag path.</returns>
 		public async Task<bool> OpenWorldObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -129,8 +145,10 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// The resource NODE the player clicked, or null when the object is not one (#494). A query, so the listener can
-		// own the grant the way it already owns the quest-item pickup's - see the UseObject handler.
+		/// <summary>
+		///     The resource node the player clicked, or null when the object is not one. A query, so the caller owns
+		///     the grant the way it owns the quest-item pickup's.
+		/// </summary>
 		public LiveWorldObject? HarvestNodeAt(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -142,9 +160,10 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// The achievement VISTA the player clicked, or null when the object is not one (#780). A query, like
-		// HarvestNodeAt above, so the listener owns the send sequence and the tag award the way it already owns the
-		// harvest grant.
+		/// <summary>
+		///     The achievement vista the player clicked, or null when the object is not one. A query, like
+		///     <see cref="HarvestNodeAt" />, so the caller owns the send sequence and the tag award.
+		/// </summary>
 		public LiveWorldObject? VistaAt(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -156,14 +175,17 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// Remove an EXHAUSTED harvest node from the live world for everyone who can see it, without touching its row.
-		//
-		// Deliberately NOT DeleteWorldObjectForPlayer: that deletes the row, which would make a harvested node gone for
-		// good in every future session. The row stays and only this zone stops streaming it, so the node is back on the
-		// next map load - the closest thing to retail's regrowth we can do without a measured respawn cadence.
-		//
-		// Wire handling mirrors DeleteWorldObjectForPlayer: a world object is quit by its OWN class word, not Character
-		// (#366), and world objects aren't tracked in Known so the gate is "has this viewer entered the world".
+		/// <summary>
+		///     Remove an exhausted harvest node from the live world for everyone who can see it, without touching its
+		///     row.
+		/// </summary>
+		/// <remarks>
+		///     Deliberately not <see cref="DeleteWorldObjectForPlayer" />, which deletes the row and would make a
+		///     harvested node gone for good in every future session. The row stays and only this zone stops streaming
+		///     it, so the node is back on the next map load - the closest approximation to retail's regrowth without a
+		///     measured respawn cadence. The wire handling mirrors the delete: a world object is quit by its own class
+		///     word, and the gate is whether the viewer has entered the world.
+		/// </remarks>
 		public async Task DespawnHarvestedNode(INetworkClient client, LiveWorldObject node)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -181,11 +203,15 @@ namespace Faolan.GameServer.World
 			zone.RemoveWorldObject(node.Handle);
 		}
 
-		// Resolve a used world object's interaction, DATA-DRIVEN from its InteractAction + Destination* columns
-		// (populated by the world-teleports importer from captured UseObject->N3Teleport sequences). A teleporter
-		// WITHOUT a captured destination yields Teleport.DestMapId == 0 so the caller can surface a message. (Whether
-		// it's a same-playfield Teleport or a cross-playfield ProxyTeleport, the handoff path is the same - DoTeleport
-		// change-maps only when the destination map differs.)
+		/// <summary>
+		///     Resolve a used world object's interaction from its <c>InteractAction</c> and destination columns, which
+		///     the world-teleports importer populates from captured use-then-teleport sequences.
+		/// </summary>
+		/// <remarks>
+		///     A teleporter with no captured destination yields a destination map of 0, so the caller can surface a
+		///     message. Same-playfield and cross-playfield teleports take the same handoff path, because the teleport
+		///     changes map only when the destination map differs.
+		/// </remarks>
 		public Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -201,21 +227,26 @@ namespace Faolan.GameServer.World
 			return Task.FromResult(new UsedObjectInteraction(obj.InteractAction, teleport, obj.Id));
 		}
 
-		// FALLBACK standup, for a player who leaves the seat without asking (a teleport, or a client that skips the
-		// request). The normal path is StandUp below, called when the client's own standup request arrives (behaviour 1,
-		// phase 2) - inferring it from movement was our model, not retail's. No-op when not seated or still within
-		// SeatLeaveDistance of the seat. Broadcasts the "standup" animation to the actor + nearby viewers and clears
-		// the seated state.
+		/// <summary>
+		///     The fallback standup, for a player who leaves the seat without asking - a teleport, or a client that
+		///     skips the request.
+		/// </summary>
+		/// <remarks>
+		///     The normal path is <see cref="StandUp" />, called when the client's own standup request arrives;
+		///     inferring it from movement is not what retail does. A no-op when the player is not seated or is still
+		///     within <see cref="SeatLeaveDistance" /> of the seat; otherwise it broadcasts the standup animation to
+		///     the actor and nearby viewers and clears the seated state.
+		/// </remarks>
 		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
 		{
 			if (client.Session.SeatedOnHandle is null)
 				return;
 
-			// Anchor to where the client actually PARKED the character. A bench has several seats (3 on the Old
-			// Tarantia ones), so the sit animation snaps the player to a spot up to ~1.3 units from the position they
-			// clicked at - measuring from the click point spends the whole budget on the snap, in an arbitrary
-			// direction, and is why a real walk-off never crossed the threshold. The first move after sitting is the
-			// parked position (retail's pkt 6812), so anchor there and measure from it.
+			// Anchor to where the client parked the character. A bench has several seats - three on the Old Tarantia
+			// ones - so the sit animation snaps the player up to about 1.3 units from the position they clicked at, and
+			// measuring from the click point spends the whole budget on that snap in an arbitrary direction, so a real
+			// walk-off never crosses the threshold. The first move after sitting is the parked position (retail's
+			// packet 6812), so it becomes the anchor.
 			if (client.Session.SeatedPosition is not { } seat)
 			{
 				client.Session.SeatedPosition = newPosition;
@@ -228,8 +259,11 @@ namespace Faolan.GameServer.World
 			await StandUp(client);
 		}
 
-		// Send the standup animation and clear the seated state, unconditionally. This is the path retail actually uses:
-		// getting up is CLIENT-INITIATED, not movement-inferred - see the behaviour-1 branch in the BCC handler.
+		/// <summary>
+		///     Send the standup animation and clear the seated state, unconditionally. This is the path retail uses:
+		///     getting up is client-initiated rather than inferred from movement - see the behaviour-1 branch in the
+		///     BCC handler.
+		/// </summary>
 		public async Task StandUp(INetworkClient client)
 		{
 			if (client.Session.SeatedOnHandle is not { } handle)
@@ -248,12 +282,18 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
 		}
 
-		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench
-		// plays the actor's "chair_sit_calm" animation (a server-originated BehaviorControlCenterIIR) and marks the
-		// session seated; standing back up is triggered by the next move (StandUpIfSeated). Recognized by the object
-		// NAME ("Bench"), the same stable key as shop vendors / the auctioneer. Returns false when the used object is
-		// NOT a bench, so the caller falls through to the normal open-object / loot path. Renders for the actor and
-		// every nearby player who already sees them.
+		/// <summary>
+		///     Seat the player on a bench.
+		/// </summary>
+		/// <remarks>
+		///     Interacting with a bench plays the actor's <c>chair_sit_calm</c> animation, a server-originated
+		///     behaviour record, and marks the session seated; it renders for the actor and every nearby player who
+		///     already sees them. A bench is recognised by the object name, the same stable key shop vendors and the
+		///     auctioneer use.
+		/// </remarks>
+		/// <returns>
+		///     False when the used object is not a bench, so the caller falls through to the open-object and loot paths.
+		/// </returns>
 		public async Task<bool> TrySitOnObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -265,16 +305,16 @@ namespace Faolan.GameServer.World
 
 			var obj = live.Row;
 
-			// The sit is a TWO-phase handshake (#355, capture sit-bench frames 6805-6813). The client sends the bench
-			// UseObject TWICE: request #1 BEFORE it has the pose, request #2 AFTER it receives the animation. Retail
-			// answers EACH - request #1 with the hold-echo (0x12 seq 0x0004) + the sit animation (0x2A), request #2 with
-			// the hold-assert (0x12 seq 0x000F) that COMMITS the pose. Answering only request #1 (our old behavior: send
-			// all three up-front, then silently absorb the duplicate) leaves the client's second confirm unanswered, so
-			// the sit-down plays and then reverts after the ~2.6s chair_sit_calm blend. Split it: seat + echo + animate
-			// on the first, assert once on the second, absorb any further duplicates.
+			// The sit is a two-phase handshake (capture sit-bench, frames 6805-6813). The client sends the bench
+			// UseObject twice: once before it has the pose, and again after it receives the animation. Retail answers
+			// each - the first with the hold-echo (behaviour 0x12, sequence 0x0004) and the sit animation (0x2A), the
+			// second with the hold-assert (0x12, sequence 0x000F) that commits the pose. Sending all three up front and
+			// absorbing the duplicate leaves the client's second confirm unanswered, so the sit plays and then reverts
+			// after the roughly 2.6 s animation blend. Hence: seat, echo and animate on the first request, assert once
+			// on the second, and absorb any further duplicates.
 			if (client.Session.SeatedOnHandle == handle)
 			{
-				// Phase 2 - the client's confirming re-send. Commit the pose with the hold-assert, exactly once.
+				// Phase two, the client's confirming re-send: commit the pose with the hold-assert, exactly once.
 				if (!client.Session.SeatedHoldConfirmed)
 				{
 					var assert = BehaviorControlCenterCodec.Build(BehaviorAnimations.BenchSitState(player.Handle, BehaviorAnimations.SeqObjectHold, handle));
@@ -287,9 +327,9 @@ namespace Faolan.GameServer.World
 				return true;
 			}
 
-			// Phase 1 - the initial UseObject. Retail brackets the sit ANIMATION with the object-action hold STATE
-			// (behaviorId 0x12): the hold-echo BEFORE the animation, then the animation itself. The hold-assert is NOT
-			// sent yet - it answers the client's phase-2 re-send above.
+			// Phase one, the initial UseObject. Retail brackets the sit animation with the object-action hold state
+			// (behaviour 0x12): the hold-echo first, then the animation itself. The hold-assert is not sent yet, since
+			// it answers the client's phase-two re-send above.
 			var sit = BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerSitOnObject(player.Handle, handle, BehaviorAnimations.SitRemoteformat(BenchObjectClass)));
 			var holdEcho = BehaviorControlCenterCodec.Build(BehaviorAnimations.BenchSitState(player.Handle, BehaviorAnimations.SeqBegin, handle));
 
@@ -300,47 +340,48 @@ namespace Faolan.GameServer.World
 			}
 
 			client.Session.SeatedOnHandle = handle;
-			client.Session.SeatedPosition = null; // anchored from the parked spot on the first move after sitting
+			client.Session.SeatedPosition = null; // anchored at the parked spot on the first move after sitting
 			client.Session.SeatedHoldConfirmed = false;
 			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
 			return true;
 		}
 
-		// #262/#678: the visual response to harvesting a quest dynel (a quarry Stone Brick). Opens retail's sequence
-		// with the fade-out and schedules the rest of it on the zone - see [[DynelVisualSequence]] for the steps and
-		// their measured timings, and PlayDynelVisualStep for what each one puts on the wire.
-		//
-		// ⚠️ **The node DOES go away, and it comes back ~14 s later; it is not permanent and it is not destroyed.**
-		// Both halves of that were misread before. The first reading was that the opening state means "vanish", so
-		// the method was called `HidePickupObject`; the second (#529) was that a harvested brick is never removed at
-		// all, because the same handle gets a second sequence 14 s later with no `n3ToClientQuit` between them. The
-		// second sequence is the REGROWTH: no client interaction precedes it, and it is the run that SETS the brick's
-		// mesh and collision rather than clearing them. What is true in both readings is that the object is never
-		// destroyed - the handle survives - which is why nothing in this path may treat the node as consumed.
-		//
-		// The glow that marks a brick as takeable is drawn by the CLIENT off its own quest tracking, and the wire
-		// says so rather than it being an assumption. The dynel's body carries `quest_item_effect`
-		// (ProtoSimpleDynelIIR field 6, `QuestItemEffect`) as a bare flag that names NO quest id - and the twelve
-		// bodies are byte-identical on every re-send, so nothing per-player or per-quest is encoded in them. The
-		// client therefore has to supply the quest half itself, which it can: `QuestFullUpdate` gives it the goal's
-		// target and required count, and the `QuestGoal` Progress/Satisfied stream keeps its progress current. Retail
-		// sends no per-dynel packet when the glow goes out on the third brick - only the QuestGoal pair for the goal.
-		//
-		// ⚠️ So do not try to gate the glow server-side. Our job is the flag and an accurate QuestGoal stream; the
-		// client owns the rest. [V0: whether the client's final gate is "goal not yet satisfied" or "held count <
-		// required" - both fit, and the corpus cannot separate them because the two coincide on this quest.]
-		//
-		// NOT built: the particle puff retail plays over the brick (`StartParticleEffect` 1010207:3667224 at the
-		// node's position, stopped a second later). The effect id is per-object CONTENT and no column holds one, so
-		// building it would mean hardcoding one capture's dust cloud onto every pickup in the world.
-		//
-		// ⚠️ And harvesting it is NOT the way out, which #686 assumed it was. The corpus holds 192
-		// `StartParticleEffect` records over 13 effect ids, but they are two different phenomena and the ATTRACTOR
-		// separates them cleanly: 191 carry an attachment point (34 or 35) and are STANDING decorations bolted to a
-		// bone - six of their effect ids are literally the ones the objects' own geometry nodes already declare
-		// (#687). Exactly ONE record is a harvest puff: attractor 0 (free-standing at a position), effect 3667224,
-		// handle 0x6AF3 - this brick, in the one capture that harvests one. So a harvested `HarvestEffectId` column
-		// would hold a single row, and building the puff from it is the same hardcoding under a new name.
+		/// <summary>
+		///     The visual response to harvesting a quest dynel, such as a quarry Stone Brick: it opens retail's
+		///     sequence with the fade-out and schedules the rest of it on the zone.
+		/// </summary>
+		/// <remarks>
+		///     See <see cref="DynelVisualSequence" /> for the steps and their measured timings, and
+		///     <see cref="PlayDynelVisualStep" /> for what each one puts on the wire.
+		///     <para>
+		///         The node goes away and comes back about 14 s later. It is never destroyed: the same handle gets a
+		///         second sequence with no quit record between them, and that second run is the regrowth - no client
+		///         interaction precedes it, and it sets the brick's mesh and collision rather than clearing them.
+		///         Nothing in this path may therefore treat the node as consumed.
+		///     </para>
+		///     <para>
+		///         The glow that marks a brick as takeable is drawn by the client off its own quest tracking, and the
+		///         wire says so: the dynel's body carries <c>quest_item_effect</c> (ProtoSimpleDynelIIR field 6) as a
+		///         bare flag naming no quest id, and the twelve bodies are byte-identical on every re-send, so nothing
+		///         per-player or per-quest is encoded in them. The client supplies the quest half itself, which it can,
+		///         because the quest full update gives it the goal's target and required count and the goal stream
+		///         keeps its progress current. Retail sends no per-dynel packet when the glow goes out on the third
+		///         brick, only the goal pair. So the glow must not be gated server-side: the server's job is the flag
+		///         and an accurate goal stream. [V0: whether the client's final gate is "goal not yet satisfied" or
+		///         "held count below required" - both fit, and the corpus cannot separate them because the two coincide
+		///         on this quest.]
+		///     </para>
+		///     <para>
+		///         The particle puff retail plays over the brick (<c>StartParticleEffect</c> 1010207:3667224 at the
+		///         node's position, stopped a second later) is deliberately not built. The effect id is per-object
+		///         content and no column holds one, so building it would hardcode one capture's dust cloud onto every
+		///         pickup in the world - and harvesting the ids is no way round that. The corpus holds 192 particle
+		///         records over 13 effect ids, but 191 carry an attachment point (34 or 35) and are standing
+		///         decorations bolted to a bone, six of whose effect ids the objects' own geometry nodes already
+		///         declare. Exactly one record is a harvest puff: attractor 0, free-standing at a position, effect
+		///         3667224, handle 0x6AF3 - this brick, in the one capture that harvests one.
+		///     </para>
+		/// </remarks>
 		public async Task MarkPickupHarvested(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -358,11 +399,13 @@ namespace Faolan.GameServer.World
 				(2 * DynelVisualSequence.FadeSeconds) + DynelVisualSequence.RespawnDelaySeconds);
 		}
 
-		// A harvest node's new health after a swing, to everyone who can see it (#732). Retail streams this on the very
-		// same StatIIR the respawn steps use for CarsGroup - stat 0x1B HealthCurrent, addressed to the node's own
-		// destructible class - and the client turns health/max into the PERCENTAGE in the node's health bar. Without
-		// it a depleted node keeps reading full, which is what makes the number the player actually steers by.
-		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5, dynel 0x2688: 298 -> 198 -> 98]
+		/// <summary>A harvest node's new health after a swing, sent to everyone who can see it.</summary>
+		/// <remarks>
+		///     Retail streams this on the same stat record the respawn steps use for <c>CarsGroup</c> - stat 0x1B,
+		///     HealthCurrent, addressed to the node's own destructible class - and the client turns health over max
+		///     into the percentage in the node's health bar. Without it a depleted node keeps reading full.
+		///     [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5, dynel 0x2688: 298 -> 198 -> 98]
+		/// </remarks>
 		public Task BroadcastNodeHealth(INetworkClient client, LiveWorldObject node, uint health)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -373,16 +416,17 @@ namespace Faolan.GameServer.World
 			return BroadcastToViewers(_sim.World.ZoneForEntity(player), node, StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.HealthCurrent, health)));
 		}
 
-		// #921: a swing landed, so the node's map pin becomes the "being gathered" icon. The pin IS a stat on the dynel
-		// - `WaypointType` (0xAC), which the client's stat-apply turns straight into a minimap icon - and retail moves
-		// it in two pushes per bout: `ResourceGatheringActive` beside the first swing's health drop, and the node's
-		// own kind (the same value its spawn carries) 10-15 s after the last swing. Nothing goes out for a swing that
-		// lands inside the window; the zone's countdown just restarts.
-		//
-		// ⚠️ The gathering push is sent TWICE, back to back, because that is what retail does: every one of the 672
-		// captured WaypointType pushes is a doubled frame (336 pairs), while the HealthCurrent push beside it is single.
-		// A node whose row holds no WaypointType never had a pin and gets nothing - there is no kind to come back to.
-		// [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json dynel 0x4D0: health 351 -> 251, 0xAC = 0x1D x2, 0xAC = 0x11 x2 ten seconds later]
+		/// <summary>A swing landed, so the node's map pin becomes the "being gathered" icon.</summary>
+		/// <remarks>
+		///     The pin is a stat on the dynel - <c>WaypointType</c> (0xAC), which the client's stat apply turns
+		///     straight into a minimap icon - and retail moves it in two pushes per bout: <c>ResourceGatheringActive</c>
+		///     beside the first swing's health drop, and the node's own kind, the value its spawn carries, 10 to 15 s
+		///     after the last swing. A swing that lands inside the window sends nothing and merely restarts the zone's
+		///     countdown. A node whose row holds no waypoint type never had a pin and gets nothing, because there is no
+		///     kind to come back to.
+		///     [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json dynel 0x4D0: health 351 -> 251,
+		///     0xAC = 0x1D twice, 0xAC = 0x11 twice ten seconds later]
+		/// </remarks>
 		public async Task BroadcastGatheringPin(INetworkClient client, LiveWorldObject node)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -396,7 +440,9 @@ namespace Faolan.GameServer.World
 			await BroadcastWaypointType(zone, node, WaypointType.ResourceGatheringActive);
 		}
 
-		// The gathering window ran out (the tick's call): put the node's own kind back on its pin.
+		/// <summary>
+		///     The gathering window ran out, which the tick calls: put the node's own kind back on its pin.
+		/// </summary>
 		public static Task RestoreNodeWaypointType(Zone zone, LiveWorldObject node)
 		{
 			return node.Row.WaypointType is { } kind
@@ -409,24 +455,28 @@ namespace Faolan.GameServer.World
 			var typeTag = WorldObjectColumns.TypeTagForClass(node.SubOpcode);
 			var body = StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.WaypointType, (uint)type));
 
-			for (var i = 0; i < 2; i++) // doubled, as retail sends it (see BroadcastGatheringPin)
+			for (var i = 0; i < 2; i++) // doubled, as retail sends it - see BroadcastGatheringPin
 				await BroadcastToViewers(zone, node, body);
 		}
 
-		// #678: one due step of a harvested object's staged visual sequence, put on the wire for everyone who can see
-		// it. Each step is exactly what retail sends at that moment:
-		//
-		//   HarvestClearMesh       ChangeMesh(0, the object's asset TYPE) + FadeIn      - draw nothing, fade back in
-		//   HarvestClearCollision  StatIIR CarsGroup + SetKdTree(0)                     - and it stops blocking
-		//   RespawnFadeOut         FadeOut                                              - the regrowth begins
-		//   RespawnMesh            ChangeMesh(the row's asset) + FadeIn                 - the node is drawn again
-		//   RespawnCollision       StatIIR CarsGroup + SetKdTree(the row's Kdtree)      - and blocks again
-		//
-		// Every value comes from the object's own row: `GeometryAssetId`/`GeometryAssetType` are the pair its spawn
-		// already carries, `Kdtree` is the collision mesh (the client's mesh manifest names the very same record -
-		// 1010030:23748 `quest_quarry_stonebrick01` lists `<CollisionMesh2 file="168444"/>`, and 168444 is what
-		// retail restores AND what the column holds), and `CarsGroup` is the same value the spawn's proto field 5
-		// states. Nothing here is a constant lifted from a capture.
+		/// <summary>
+		///     One due step of a harvested object's staged visual sequence, put on the wire for everyone who can see it.
+		/// </summary>
+		/// <remarks>
+		///     Each step is what retail sends at that moment:
+		///     <code>
+		///     HarvestClearMesh       ChangeMesh(0, the object's asset type) + FadeIn   - draw nothing, fade back in
+		///     HarvestClearCollision  CarsGroup stat + SetKdTree(0)                     - and it stops blocking
+		///     RespawnFadeOut         FadeOut                                           - the regrowth begins
+		///     RespawnMesh            ChangeMesh(the row's asset) + FadeIn              - the node is drawn again
+		///     RespawnCollision       CarsGroup stat + SetKdTree(the row's Kdtree)      - and blocks again
+		///     </code>
+		///     Every value comes from the object's own row: the geometry asset id and type are the pair its spawn
+		///     carries, <c>Kdtree</c> is the collision mesh - the client's mesh manifest names the same record, since
+		///     1010030:23748 <c>quest_quarry_stonebrick01</c> lists <c>CollisionMesh2 file="168444"</c>, which is both
+		///     what retail restores and what the column holds - and <c>CarsGroup</c> is the value the spawn's protobuf
+		///     field 5 states. Nothing here is a constant lifted from a capture.
+		/// </remarks>
 		public async Task PlayDynelVisualStep(DueDynelVisualStep due)
 		{
 			var (zone, node, step) = due;
@@ -478,8 +528,11 @@ namespace Faolan.GameServer.World
 			return BroadcastToViewers(zone, node, SimpleDynelVisualChangeCodec.Build(change));
 		}
 
-		// Every player near enough to see the object gets it - a world object's state is the world's, not the
-		// harvester's. Gated on WorldEntered like the despawn path: a still-loading client has no dynel to change.
+		/// <summary>
+		///     Every player near enough to see the object gets it: a world object's state is the world's, not the
+		///     harvester's. Gated on world entry like the despawn path, because a still-loading client has no dynel to
+		///     change.
+		/// </summary>
 		private static async Task BroadcastToViewers(Zone zone, LiveWorldObject node, byte[] body)
 		{
 			foreach (var viewer in zone.PlayersInRange(node.Position, WorldSimulation.PlayerInterestRange))

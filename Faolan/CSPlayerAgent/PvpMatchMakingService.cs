@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// The PvP minigame QUEUE (#882), built message-for-message from the capture that walks it end to end
+	// The PvP minigame queue, built message-for-message from the capture that walks it end to end
 	// (`NecroL80_mage-necromancer_login_gameplay_annotated_group-finder_pvp-matchmaking`, t=1057..1150 - seven signups
 	// and four removals, each one annotated by the player as they made it):
 	//
@@ -19,23 +19,23 @@ namespace Faolan.CSPlayerAgent
 	//                                     -> s DispatchPvPMatchMakingYouAreInMatchMaking(the request + two flags)
 	//   c PvPMatchMakingRemoveFromMatchMaking()   -> s the empty 0x2081 ack
 	//   c PvPMatchMakingRequestInfo(queueType)    -> s DispatchPvPMatchMakingInfoRequestReturn(the live board)
-	//   c PvPMatchMakingIsInMatchMaking()         -> retail answers with NO PACKET AT ALL
+	//   c PvPMatchMakingIsInMatchMaking()         -> retail answers with no packet at all
 	//
-	// ⭐ A character holds exactly ONE signup. That is not an assumption: every `PutIntoMatchMaking` in the capture
-	// raises its own map's count by one AND drops the previously chosen map's count by one, in the same board, and
-	// `PvPMatchMakingRemoveFromMatchMaking` takes no argument - there is only ever one thing to remove.
+	// A character holds exactly one signup, which the capture shows rather than assumes: every `PutIntoMatchMaking`
+	// raises its own map's count by one and drops the previously chosen map's count by one in the same board, and
+	// `PvPMatchMakingRemoveFromMatchMaking` takes no argument, so there is only ever one thing to remove.
 	//
-	// ⛔ MATCHMAKING PROPER IS NOT MODELLED, and deliberately so. Forming a match out of the queue would mean
-	// sending `DispatchPvPMatchMakingWantsToStart` / `...YouJoinedMatch` / `...StartClicked` and running a minigame
-	// instance - and `PvPMatchRules_c`, the element three of those carry, has ZERO captured instances and an
-	// unpinned column layout (docs/re/minigame-massivepvp-messages.md, `[V0: the PvPMatchRules_c element layout]`).
-	// What is built here is the whole of what the corpus shows: the queue, its board, and the acks. A player who
-	// signs up stays signed up and the counter moves; nothing pops.
+	// Matchmaking proper is deliberately not modelled here. Forming a match out of the queue would mean sending
+	// `DispatchPvPMatchMakingWantsToStart` / `...YouJoinedMatch` / `...StartClicked` and running a minigame instance,
+	// and `PvPMatchRules_c`, the element three of those carry, has zero captured instances and an unpinned column
+	// layout (docs/re/minigame-massivepvp-messages.md, `[V0: the PvPMatchRules_c element layout]`). What is built here
+	// is the whole of what the corpus shows: the queue, its board and the acks. PvpMatchService runs the formation on
+	// top of it.
 	public sealed class PvpMatchMakingService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections)
 	{
 		// characterId -> the one signup it holds. Removed by RemoveFromMatchMaking and by the disconnect hook, so a
 		// logged-off queuer stops being counted (retail's board is live state, and a stale row is a visible lie).
-		// The sequence makes Queued() FIFO: a ConcurrentDictionary enumerates in ARBITRARY order, and the match
+		// The sequence makes Queued() FIFO: a ConcurrentDictionary enumerates in arbitrary order, and the match
 		// formation's anchor (and so the formed match's leader) is meant to be the longest-queued signup.
 		private readonly ConcurrentDictionary<uint, (long Seq, PvpMatchMakingSignup Signup)> _signups = [];
 
@@ -64,10 +64,10 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			// `i_bBringTeam` is 0 in every captured signup, so the corpus shows only the solo side of this. It is a
-			// real field the client sets from its own checkbox though, and ignoring it would silently queue one
-			// character where the player asked for six. Each member is queued for the same minigame and gets the
-			// SAME acknowledgement message with `i_AsTeamMember` set - which is the one field on that message whose
-			// purpose is exactly this. No uncaptured message shape goes out.
+			// real field the client sets from its own checkbox, though, and ignoring it would silently queue one
+			// character where the player asked for six. Each member is queued for the same minigame and gets the same
+			// acknowledgement message with `i_AsTeamMember` set, which is the one field on that message whose purpose
+			// is exactly this. No uncaptured message shape goes out.
 			var members = teams.TeamOf(characterId) is { } teamId
 				? teams.MembersOf(teamId).Where(m => m != characterId).ToList()
 				: [];
@@ -97,10 +97,8 @@ namespace Faolan.CSPlayerAgent
 			else
 				logger.LogDebug("PvP matchmaking: {CharacterId:X8} left the queue while holding no signup.", characterId);
 
-			// ⭐ The ack is named now (#876): 0x81's own override raises the feedback token
-			// `YouAreNoLongerInPvPMatchMaking`, which is exactly what this is - the answer to a withdrawal. It was
-			// sent as `Reserved0x81` on the strength of being 1:1 with the removals in the capture and empty every
-			// time; the recovered name says the same thing from the client's side, which is the corroboration that
+			// The ack's name comes from the client: 0x81's own override raises the feedback token
+			// `YouAreNoLongerInPvPMatchMaking`, which is what this is - the answer to a withdrawal. says the same thing from the client's side, which is the corroboration that
 			// reading never had.
 			await Send(client, (uint)CSPlayerInterfaceMethods.DispatchPvPMatchMakingRemovedFromMatchMaking, []);
 		}
@@ -108,7 +106,7 @@ namespace Faolan.CSPlayerAgent
 		/// <summary>c2s 0x2054: the board poll. The reply is the same for every queueType the client asks about.</summary>
 		public async Task HandleRequestInfo(INetworkClient client, uint queueType)
 		{
-			// Every captured request carries queueType 0 and every reply carries BOTH the type-4 and the type-5
+			// Every captured request carries queueType 0 and every reply carries both the type-4 and the type-5
 			// groups, so the board is not filtered by the argument - it is the whole board. Logged rather than
 			// applied, so a request for another queue type shows up if one ever appears.
 			if (queueType != 0)
@@ -129,8 +127,8 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		/// <summary>
-		///     The live signups, for the match-formation pass (#146): PvpMatchService pairs compatible ones after
-		///     each new signup. Snapshot semantics - formation dequeues through <see cref="Forget" />.
+		///     The live signups, for the match-formation pass: PvpMatchService pairs compatible ones after each new
+		///     signup. Snapshot semantics - formation dequeues through <see cref="Forget" />.
 		/// </summary>
 		public IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> Queued()
 		{

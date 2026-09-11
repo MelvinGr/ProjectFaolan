@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The equip-slot resolver (#916), which reads the client's own item-template fields: `Placement` (the slot
+	// The equip-slot resolver, which reads the client's own item-template fields: `Placement` (the slot
 	// bitmask), `DefaultPos` (the preferred one) and `OccupySlots` (everything worn consumes).
 	//
-	// Every mask below is a REAL shipped value - the comment names the item it came from - so these are the catalogue's
+	// Every mask below is a real shipped value - the comment names the item it came from - so these are the catalogue's
 	// own shapes rather than invented ones. The reading was validated against all 72 template/slot pairs the corpus
 	// records as actually worn (`ItemInstances` container 101); see `Item.Placement`.
 	public class EquipSlotResolverTests
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// "Ornate Gold Ring": Placement 1536 = bits 9|10. A ring goes on EITHER hand, left first, and the corpus has
+		// "Ornate Gold Ring": Placement 1536 = bits 9|10. A ring goes on either hand, left first, and the corpus has
 		// the same template worn at slot 9 on one character and slot 10 on another.
 		public void ARingTakesEitherFinger_LeftFirst()
 		{
@@ -44,8 +44,8 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// "Ceremonial Dagger": Placement 320 = bits 6|8. A hand bit is a HAND, not a slot - slots 20/21 are weapon
-		// SET 2 and are set-neutral (#400) - so a one-hander's four candidates are both hands of both sets.
+		// "Ceremonial Dagger": Placement 320 = bits 6|8. A hand bit is a hand, not a slot - slots 20/21 are weapon
+		// set 2 and are set-neutral - so a one-hander's four candidates are both hands of both sets.
 		public void AOneHanderOffersBothHandsOfBothWeaponSets()
 		{
 			var dagger = Template(320, 6);
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 
 		[Fact]
 		// "Totemic Folio" and 44 more of category 30009 (tomes, folios, trinkets): the one-hander mask 320, but
-		// `DefaultPos` 8. This is the case that proves DefaultPos has to be READ - it is not the low bit of the mask.
+		// `DefaultPos` 8. This is the case that proves DefaultPos has to be read - it is not the low bit of the mask.
 		public void AnOffHandFocusPrefersTheOffHand_DespiteCarryingTheOneHanderMask()
 		{
 			var folio = Template(320, 8);
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		// "Prison key", "Boar Pelt", "Crate of Steel" and 1,046 more: Placement 0. Not equippable is a STATEMENT the
+		// "Prison key", "Boar Pelt", "Crate of Steel" and 1,046 more: Placement 0. Not equippable is a statement the
 		// template makes, and it is the single most common answer in the catalogue.
 		public void PlacementZeroIsNotEquippable()
 		{

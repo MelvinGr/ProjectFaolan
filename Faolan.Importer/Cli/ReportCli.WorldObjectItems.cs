@@ -6,22 +6,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report world-object-items`: which world objects point at an item template we cannot hand over, and WHY.
+	// `--report world-object-items`: which world objects point at an item template we cannot hand over, and why.
 	//
 	// A quest-pickup node and a harvest node both pay out an `Items` row. When there is no such row the interaction
-	// still runs - the node fades, regrows, and the player gets nothing - which is exactly how Gitea #824 presented
-	// ('Spool of Thread' harvests but grants nothing). The listener now refuses that grant out loud, but the
-	// underlying question is a data one and belongs in a report (#729): shipped data on both sides.
+	// still runs - the node fades, regrows, and the player gets nothing ('Spool of Thread' harvests but grants
+	// nothing). The listener refuses that grant out loud, but the underlying question is a data one and belongs in a
+	// report: shipped data on both sides.
 	//
-	// ⭐ The split is the point, because only ONE half of it can ever be fixed by importing harder:
+	// The split is the point, because only one half of it can ever be fixed by importing harder:
 	//
-	//   * **shipped, keyless** - the client carries the template in RDB 1000020/1000620 and we hold no TEA key for
-	//     it. Dead end by construction (#203, closed won't-fix): the key is server-assigned, cryptographically
+	//   * shipped, keyless - the client carries the template in RDB 1000020/1000620 and we hold no TEA key for
+	//     it. Dead end by construction: the key is server-assigned, cryptographically
 	//     random per item, and reaches us only by riding a `ProtoAcgItem` in some capture. There is no derivation and
-	//     no key table, and `Items.Key1..4` are NOT NULL because the CLIENT needs the quad to decrypt the template
+	//     no key table, and `Items.Key1..4` are not null because the client needs the quad to decrypt the template
 	//     from its own RDB - so a name-only row would be unusable rather than merely incomplete. These need a
-	//     CAPTURE that references the item, which in practice means someone holding, looting or linking it.
-	//   * **not shipped** - the client has no template either, so the reference is to something that is not an item
+	//     capture that references the item, which in practice means someone holding, looting or linking it.
+	//   * not shipped - the client has no template either, so the reference is to something that is not an item
 	//     template in this build. An import can never produce these and should not be blamed for them.
 	public static partial class ReportCli
 	{
@@ -83,9 +83,9 @@ namespace Faolan.Importer.Cli
 			if (absent.Count > 40)
 				Console.WriteLine($"  ... and {absent.Count - 40} more");
 
-			// ⚠️ Reported, never asserted. Both populations are a fact about how much of the game the corpus has
+			// Reported, never asserted. Both populations are a fact about how much of the game the corpus has
 			// touched, and that moves whenever captures are added - so a non-zero count here is not a defect. The
-			// direction that WOULD be one (a node handing out an item we hold no row for, silently) is fixed in the
+			// direction that would be one (a node handing out an item we hold no row for, silently) is fixed in the
 			// listener instead, where the grant now refuses out loud.
 			return 0;
 		}

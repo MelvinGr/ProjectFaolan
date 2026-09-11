@@ -8,7 +8,7 @@ namespace Faolan.Tests
 {
 	// The anti-drift guard for docs/protocol/gen/. Each generated page is rendered from the repo's own source of
 	// truth (the compiled opcode enums, the .proto, ...) and compared to what is committed. Editing Opcodes.cs then
-	// FORCES a regenerated page in the same commit - the page can never silently disagree with the code.
+	// forces a regenerated page in the same commit - the page can never silently disagree with the code.
 	//
 	// To regenerate after an intentional change: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`
 	// then commit the updated docs/protocol/gen/*.md.
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 		}
 
 		// The BKDR-31 class-id guard is the same one the Wireshark generator applies; assert it independently so a
-		// renamed/typo'd RPC class fails HERE too (with a clear message) rather than only in the page diff.
+		// renamed/typo'd RPC class fails here too (with a clear message) rather than only in the page diff.
 		[Fact]
 		public void RpcClassIds_AreBkdr31OfTheClassName()
 		{

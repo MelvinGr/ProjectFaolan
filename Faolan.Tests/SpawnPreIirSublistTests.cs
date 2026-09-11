@@ -7,16 +7,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The pre-IIR scaffold's SUBLIST is a list on both sides of the family (#466 / #475).
+	// The pre-IIR scaffold's sublist is a list on both sides of the family.
 	//
-	// It was held on NpcSpawnPreIir as the four raw bytes `00 00 03 F1` - "the count==0 framing word" - and the
-	// codec REJECTED any spawn whose list was not empty, calling it "variable-width, out of scope". Worse, it found
-	// the scaffold by subtracting the empty form's width from the CoreCharacter's offset, so a non-empty list did
-	// not merely lose the list: the subtraction landed mid-field and the whole scaffold was undecodable.
+	// Held as the four raw bytes `00 00 03 F1` - "the count==0 framing word" - it forces a codec to reject any spawn
+	// whose list is not empty, and worse, to find the scaffold by subtracting the empty form's width from the
+	// CoreCharacter's offset: a non-empty list then does not merely lose the list, the subtraction lands mid-field and
+	// the whole scaffold is undecodable.
 	//
-	// The player side has modelled this list as typed entries since #466 (the character's saved feat specs). Both
-	// families run the same client reader, so it is now one shared type - and since #530 wave 5b one shared scaffold
-	// (SpawnPreIir) read by one codec.
+	// Typed, it is the character's saved feat specs on the player side. Both families run the same client reader, so
+	// it is one shared type in one shared scaffold (SpawnPreIir), read by one codec.
 	public class SpawnPreIirSublistTests
 	{
 		[Fact]
@@ -38,31 +37,31 @@ namespace Faolan.Tests
 				decoded++;
 				sublistSizes[scaffold.Sublist.Count] = sublistSizes.GetValueOrDefault(scaffold.Sublist.Count) + 1;
 
-				// The width is DERIVED from the scaffold's own grammar, and the re-encode has to be exactly that wide.
+				// The width is derived from the scaffold's own grammar, and the re-encode has to be exactly that wide.
 				// That the bytes themselves match the capture is SimpleCharFullUpdateCorpusTests' whole-record gate,
-				// which reproduces every one of these spawns - the scaffold no longer has an offset of its own to be
-				// right or wrong about, because the body is read sequentially.
+				// which reproduces every one of these spawns - the scaffold has no offset of its own to be right or
+				// wrong about, because the body is read sequentially.
 				Assert.Equal(scaffold.ByteCount, Rebuild(scaffold).Length);
 			}
 
 			// Every captured scaffold, player and NPC alike - the codec is family-neutral because the client reader
-			// is. (What the player model used to call "the frame" was this scaffold plus the embedded CoreCharacter's
-			// 5-byte head, which is the message's, not the scaffold's.)
+			// is. (A "frame" that takes in the embedded CoreCharacter's 5-byte head is this scaffold plus bytes that
+			// belong to the message.)
 			Assert.Equal(0, undecodable);
 			Assert.Equal(17717, decoded);
 
-			// ⚠️ THE SIX. Six of the single-entry frames are one NPC - Viriden - carrying the same key-0/flag-0/
-			// unnamed/no-ids entry a fresh player carries; before this they were the only captured spawns the NPC
-			// codec could not read at all. (That split was 226 + 6 when it was counted by hand on the 2026-07-27
-			// corpus; it is the TOTAL that is pinned here, since nothing in this walk knows an entity's name.) The
-			// four-entry-or-fewer player frames are the feat specs (#474).
+			// The six. Six of the single-entry frames are one NPC - Viriden - carrying the same key-0/flag-0/
+			// unnamed/no-ids entry a fresh player carries, which is the shape a list-blind codec cannot read at all.
+			// (That split is 226 + 6 counted by hand on the 2026-07-27 corpus; it is the total that is pinned here,
+			// since nothing in this walk knows an entity's name.) The
+			// four-entry-or-fewer player frames are the feat specs.
 			Assert.Equal(17421, sublistSizes[0]);
 			Assert.Equal(286, sublistSizes[1]);
 			Assert.Equal(9, sublistSizes[2]);
 			Assert.Equal(1, sublistSizes[4]);
 		}
 
-		// The scaffold composes into a spawn record rather than standing alone (#530 rule 5c).
+		// The scaffold composes into a spawn record rather than standing alone.
 		private static byte[] Rebuild(SpawnPreIir frame)
 		{
 			using var s = new FaolanStream();
@@ -70,8 +69,8 @@ namespace Faolan.Tests
 			return s.ToArray();
 		}
 
-		// The from-scratch fresh scaffold emits an EMPTY sublist, which frames as ForCount(0) - the same four bytes
-		// that used to be hardcoded. Pinned so the typed list cannot start emitting a different fresh form.
+		// The from-scratch fresh scaffold emits an empty sublist, which frames as ForCount(0). Pinned so the typed list
+		// cannot start emitting a different fresh form.
 		[Fact]
 		public void TheFreshScaffold_EmitsAnEmptySublist()
 		{
@@ -81,7 +80,7 @@ namespace Faolan.Tests
 			Assert.Equal(SpawnPreIir.FixedLength, fresh.ByteCount);
 			Assert.Equal(SpawnPreIir.FixedLength, Rebuild(fresh).Length);
 			// And an entry costs exactly its own width - [u32 key][u8 flag][u16 len][count word] + name + ids - which
-			// is what makes the fixed-width subtraction this codec used to do wrong rather than merely lossy.
+			// is what makes a fixed-width subtraction wrong rather than merely lossy.
 			var withEntry = SpawnPreIirs.Minimal();
 			withEntry.Sublist.Add(new SpawnPreFrameSublistEntry());
 			Assert.Equal(SpawnPreIir.FixedLength + 11, Rebuild(withEntry).Length);

@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Spell resistance (#869). `--report method-bodies --report-arg Resistance` is the oracle: 17 frames over 5
+	// Spell resistance. `--report method-bodies --report-arg Resistance` is the oracle: 17 frames over 5
 	// captures, every one of them eight bytes, and only two distinct metatypes.
 	public class SpellResistanceCodecTests
 	{

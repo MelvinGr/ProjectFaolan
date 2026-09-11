@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
 {
-	// The pick-one-of-N quest reward exchange (#815), server side.
+	// The pick-one-of-N quest reward exchange, server side.
 	//
 	//   completion -> QuestRewardNotifyIIR (the offer)
 	//   c2s        -> QuestRewardSelectionIIR (the index)
@@ -22,7 +22,7 @@ namespace Faolan.GameServer.Quest
 	// Decoded from xxx_mage-necromancer_login_play3 on quest 10928, where the offer rode the completion burst and the
 	// pick was answered with a DispatchAddItem for the template at that index.
 	//
-	// ⚠️ The offer is sent for the quest that just completed and NOT re-sent. A player who ignores the window keeps a
+	// The offer is sent for the quest that just completed and is not re-sent. A player who ignores the window keeps a
 	// claimable reward: `TryGrant` only requires the quest to be completed and unrewarded, exactly as the wire allows,
 	// because nothing binds the client's answer to the moment of the offer.
 	public sealed class QuestRewardService
@@ -32,14 +32,12 @@ namespace Faolan.GameServer.Quest
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
 
-		// The XP side of a completion reward. `LevelUpService.ApplyXp` is the one owner of "experience in, levels
-		// out" and its own header names this as the second caller it was factored for - a quest award is a SOURCE of
-		// experience, not a second copy of the ding burst.
+		// The XP side of a completion reward. `LevelUpService.ApplyXp` is the one owner of "experience in, levels out";
+		// a quest award is a source of experience, not a second copy of the ding burst.
 		//
-		// A DELEGATE seam rather than the service itself: this is a single shared op, which is the case CLAUDE.md
-		// names for a `Func<>` (an interface earns its keep once several ops travel together). Taking the class would
-		// also drag a whole WorldSimulation into every test of the item reward, which is what made the XP half
-		// untestable in the first draft of this.
+		// A delegate seam rather than the service itself, because this is a single shared op - an interface earns its
+		// keep once several ops travel together. Taking the class would also drag a whole WorldSimulation into every
+		// test of the item reward.
 		private readonly Func<INetworkClient, uint, Task> _applyXp;
 
 		public QuestRewardService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, Func<INetworkClient, uint, Task> applyXp, ILogger logger)
@@ -56,25 +54,26 @@ namespace Faolan.GameServer.Quest
 		///     that states neither, which is almost all of them.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ **What is paid is exactly what the client's own journal ADVERTISED** (#820). `XpReward` (Quest_c
-		///     @+0x28) and `MoneyReward` (@+0x20) are the `XP:` and `Money:` lines of the quest's detail pane -
-		///     established in-client by driving quest 13227's column to 5553, 0 and 7777 and reading the panel back
-		///     (#759/#802). So this is not a modelled payout: it is the number retail's own client showed the player
-		///     when they took the quest, and paying anything else would be a divergence the player can SEE.
+		///     What is paid is exactly what the client's own journal advertised. `XpReward` (Quest_c @+0x28) and
+		///     `MoneyReward` (@+0x20) are the `XP:` and `Money:` lines of the quest's detail pane, established
+		///     in-client by driving quest 13227's column to 5553, 0 and 7777 and reading the panel back. So this is not
+		///     a modelled payout: it is the number the client showed the player when they took the quest, and paying
+		///     anything else would be a divergence the player can see.
 		///     <para />
-		///     ⛔ **And nothing is invented where the record is silent.** 21 of 5049 quests carry a money reward and a
-		///     comparable few an XP one; the rest pay zero here. That is knowingly short of retail - the captured
-		///     Tortage chain carries 0 in every reward slot and retail still paid experience - but the magnitude is
-		///     UNMEASURABLE from what we hold, and the reason is the wire rather than the sample: `CharacterStatId.Exp`
-		///     appears in none of the 20,213 stat records across 134 captures, so no observation isolates a quest's
-		///     award (`--report quest-xp`). The two lower bounds the corpus can state are quest 10830 >= 532 and
-		///     10915 >= 13. A formula fitted to that would be a guess shipped into 5,000 quests, so the silent quests
-		///     stay silent until a capture or an in-client reading says otherwise - open work in Gitea #820.
+		///     Nothing is invented where the record is silent. 21 of 5049 quests carry a money reward and a comparable
+		///     few an XP one; the rest pay zero. That is knowingly short of retail - the captured Tortage chain carries
+		///     0 in every reward slot and retail still paid experience - but the magnitude is unmeasurable from the
+		///     corpus, and the reason is the wire rather than the sample: `CharacterStatId.Exp` appears in none of the
+		///     20,213 stat records across 134 captures, so no observation isolates a quest's award
+		///     (<c>--report quest-xp</c>). The two lower bounds the corpus can state are quest 10830 &gt;= 532 and
+		///     10915 &gt;= 13. A formula fitted to that would be a guess shipped into 5,000 quests, so the silent
+		///     quests stay silent until a capture or an in-client reading says otherwise. Open work tracked in
+		///     Gitea #820.
 		///     <para />
-		///     ⚠️ The second decoded reward pair (`FieldF0`/`FieldF8`) is deliberately NOT paid. It is a money+xp pair
-		///     of the same kind generated by the same formula, but the client never reads it (three functions touch
-		///     those offsets: the constructor, the stream reader and the stream writer - #802), so it advertises
-		///     nothing to the player and paying it would be a choice the evidence does not make for us.
+		///     The second decoded reward pair (`FieldF0`/`FieldF8`) is deliberately not paid. It is a money and xp pair
+		///     of the same kind generated by the same formula, but the client never reads it - three functions touch
+		///     those offsets: the constructor, the stream reader and the stream writer - so it advertises nothing to
+		///     the player.
 		/// </remarks>
 		public async Task GrantCompletionRewards(INetworkClient client, uint questId)
 		{
@@ -86,9 +85,9 @@ namespace Faolan.GameServer.Quest
 			if (def == null)
 				return;
 
-			// The GUARANTEED items - the journal record's obj1 (#893): this quest's own harvested set, or on the line's
-			// last step with nothing harvested, the line's catalog reward. Granted through the same live add every
-			// other item grant uses; an item we hold no row for is logged and skipped rather than invented.
+			// The guaranteed items - the journal record's obj1: this quest's own harvested set, or on the line's last
+			// step with nothing harvested, the line's catalog reward. Granted through the same live add every other
+			// item grant uses; an item with no row is logged and skipped rather than invented.
 			foreach (var reward in await _database.GetQuestGuaranteedRewards(questId))
 			{
 				if (await _economy.GrantItemToBackpack(client, reward.ItemTemplateId, Math.Max(1u, reward.Quantity)) == null)
@@ -100,7 +99,7 @@ namespace Faolan.GameServer.Quest
 
 			if (def.MoneyReward > 0)
 			{
-				// Stored RAW as the wire carries it, which is already TIN - the same unit the wallet column and
+				// Stored raw as the wire carries it, which is already tin - the same unit the wallet column and
 				// `SendUpdateCash` use - so there is no conversion here and there must not be one.
 				character.Money += def.MoneyReward;
 				await _database.SetCharacterMoney(character.Id, character.Money);
@@ -161,7 +160,7 @@ namespace Faolan.GameServer.Quest
 			}
 
 			// Idempotence, not paranoia: the selection is an ordinary c2s packet and arrives whenever the client sends
-			// it, so the ANSWER is what closes the reward, not the completion.
+			// it, so the answer is what closes the reward, not the completion.
 			if (quest.RewardChosenPos != null)
 			{
 				_logger.LogInformation("Quest reward refused for {Char}: quest {Quest} was already rewarded (option {Pos}).", character.Name, questId, quest.RewardChosenPos);
@@ -176,10 +175,10 @@ namespace Faolan.GameServer.Quest
 				return false;
 			}
 
-			// Recorded BEFORE the grant: if the item hand-off throws, the reward stays spent rather than becoming
+			// Recorded before the grant: if the item hand-off throws, the reward stays spent rather than becoming
 			// re-claimable, which is the safe direction for a duplicate.
 			await _database.SetCharacterQuestReward(character.Id, questId, index);
-			_outbound.ForgetQuestMarkers(character.Id); // #939
+			_outbound.ForgetQuestMarkers(character.Id);
 
 			if (await _economy.GrantItemToBackpack(client, picked.ItemTemplateId) == null)
 			{
@@ -192,9 +191,9 @@ namespace Faolan.GameServer.Quest
 			return true;
 		}
 
-		// The wire entries for an offer. The client decrypts each option's template from its OWN RDB using the key we
-		// ship, so the key must be the item's real ProtoDecryptionKey or the row renders as "No name" - the same rule
-		// the claim list documents. An item we hold no key for is dropped rather than sent nameless.
+		// The wire entries for an offer. The client decrypts each option's template from its own RDB using the key this
+		// sends, so the key must be the item's real ProtoDecryptionKey or the row renders as "No name" - the same rule
+		// the claim list documents. An item with no key is dropped rather than sent nameless.
 		private async Task<List<QuestRewardEntry>> BuildEntries(IReadOnlyList<QuestRewardOption> options)
 		{
 			var entries = new List<QuestRewardEntry>(options.Count);
@@ -214,8 +213,9 @@ namespace Faolan.GameServer.Quest
 					continue;
 				}
 
-				// Pos is renumbered densely over what actually resolved, because the index the client answers with is
-				// an index into the list we SEND. A dropped option must not leave a hole that shifts every later pick.
+				// Pos is renumbered densely over what actually resolved, because the index the client answers with is an
+				// index into the list that was sent. A dropped option must not leave a hole that shifts every later
+				// pick.
 				entries.Add(new QuestRewardEntry(item.Id, option.Level == 0 ? item.Level : option.Level, new byte[QuestRewardEntry.CodeLength], key,
 					new byte[QuestRewardEntry.BatchGuidLength]));
 			}
@@ -224,8 +224,8 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// The item's ProtoDecryptionKey as the on-wire 16-byte token: Key1..4 big-endian, the same layout the claim
-		// list ships. Null when the item carries no key - unlike a claim row (which stays valid and merely lists as
-		// "No name"), a reward the player cannot read is not worth OFFERING, so the caller drops it instead.
+		// list ships. Null when the item carries no key: unlike a claim row, which stays valid and merely lists as
+		// "No name", a reward the player cannot read is not worth offering, so the caller drops it instead.
 		private static byte[]? ItemKeyBytes(Item item)
 		{
 			if (item.Key is not { } k || k.IsEmpty)

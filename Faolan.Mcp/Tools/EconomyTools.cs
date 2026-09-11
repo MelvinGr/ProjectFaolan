@@ -127,9 +127,9 @@ namespace Faolan.Mcp.Tools
 			[Description("Optional: only listings in this realm (0 = every realm)")] uint realmId = 0,
 			[Description("Max results (default 25)")] int limit = 25)
 		{
-			// ⚠️ An auction house is REALM-SCOPED (#324), and every in-game read of it filters on the realm - so a
-			// cross-realm listing here is an inspection convenience, not the player's view. Sale ids are unique per
-			// realm rather than globally, so `RealmId` rides on every row: without it two realms' sale id 1 are
+			// An auction house is realm-scoped and every in-game read of it filters on the realm, so a cross-realm
+			// listing here is an inspection convenience rather than the player's view. Sale ids are unique per realm
+			// rather than globally, so `RealmId` rides on every row: without it two realms' sale id 1 are
 			// indistinguishable in this output.
 			var rows = await _db.Query(ctx => ctx.TradepostListings
 				.Where(l => (itemId == 0 || l.ItemId == itemId) && (sellerName == null || l.SellerName == sellerName) && (realmId == 0 || l.RealmId == realmId))
@@ -172,12 +172,12 @@ namespace Faolan.Mcp.Tools
 
 			var mail = new Mail
 			{
-				// MailId IS the wire id and the primary key (#368), so it comes from the repository's allocator - the
-				// same one the in-game mail path uses - rather than from a random draw.
+				// MailId is the wire id and the primary key, so it comes from the repository's allocator - the same one
+				// the in-game mail path uses - rather than from a random draw.
 				MailId = await _db.GetNextMailId(),
-				// Mail is realm-scoped (#324) and RealmId is an FK to Realms, so leaving it at the default 0 makes the
-				// insert fail on the foreign key. It is the RECIPIENT's realm - the mailbox read path pairs the same two
-				// columns (GetMailsForRecipient(name, realmId)).
+				// Mail is realm-scoped and RealmId is a foreign key to Realms, so leaving it at the default 0 fails the
+				// insert. It is the recipient's realm: the mailbox read path pairs the same two columns
+				// (GetMailsForRecipient(name, realmId)).
 				RealmId = recipient.RealmId,
 				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = recipient.Name,
@@ -200,7 +200,7 @@ namespace Faolan.Mcp.Tools
 				mail.Attachments.Add(new MailAttachment
 				{
 					// Only has to be unique among this mail's attachments, so the mail id serves - the same choice the
-					// server's mail path makes (GameServerListener.Tradepost.cs).
+					// server's mail path makes (TradepostService).
 					ItemInstanceId = mail.MailId,
 					Quantity = count == 0
 						? 1u

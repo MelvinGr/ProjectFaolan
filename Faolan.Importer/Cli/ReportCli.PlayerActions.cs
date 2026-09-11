@@ -11,13 +11,13 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Cli
 {
 	// `--report player-actions`: every `PerformSpecialAction` (0x205A) the corpus contains, grouped by its selector
-	// word, with the server's ANSWER - the player-addressed BehaviorControlCenterIIR records and the other IIRs that
-	// follow it within a short window (#505).
+	// word, with the server's answer - the player-addressed BehaviorControlCenterIIR records and the other IIRs that
+	// follow it within a short window.
 	//
 	// The selector catalog in docs/subsystems/player-actions.md was measured by hand against the chat-annotated
 	// captures. This ships that measurement so it can be re-derived instead of trusted, and it adds the half the
-	// hand pass could not do mechanically: **the selector is the granted ability's `Slot`** - the leading u32 of that
-	// ability's 0x2052 grant - so a selector NAMES ITSELF out of the Abilities catalog. That is what settles the two
+	// hand pass could not do mechanically: the selector is the granted ability's `Slot` - the leading u32 of that
+	// ability's 0x2052 grant - so a selector names itself out of the Abilities catalog. That is what settles the two
 	// selectors the hand pass left as `[V0: unidentified]`, and it is why an ungranted action is one the client never
 	// sends: the client only has the number if a grant gave it the number.
 	//
@@ -38,9 +38,9 @@ namespace Faolan.Importer.Cli
 			foreach (var capture in captures)
 			{
 				var packets = capture.Packets;
-				// The PLAYER's own handle, so an answer can be told from the ambient NPC traffic that shares the
+				// The player's own handle, so an answer can be told from the ambient NPC traffic that shares the
 				// window. The client only ever sends BehaviorControlCenter records for the character it drives, so
-				// the most common actor across the c2s ones IS the player - no session state needed, and it works
+				// the most common actor across the c2s ones is the player - no session state needed, and it works
 				// on a capture whose character we do not otherwise know. Without this the window folds in every
 				// nearby NPC's idle Emote and the per-selector spec reads as noise.
 				var player = PlayerHandle(packets);

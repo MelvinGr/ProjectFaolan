@@ -4,10 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderReadyCheckStatus (0x20C9): the ready-check tally after a member answers. Captured as
-	// [00000001][00000000][00000001] right after the solo queuer's ReadyGroupFinder(true) (chat-annotated-4 frame
-	// 11943), which reads as one ready, none declined, one expected - a solo private team confirms itself. The
-	// middle word never varies in the corpus; the field names are that reading, not a client-verified layout.
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderReadyCheckStatus</c> - the ready-check tally after a member answers.
+	/// </summary>
+	/// <remarks>
+	///     Captured as <c>[00000001][00000000][00000001]</c> right after the solo queuer's
+	///     <c>ReadyGroupFinder(true)</c> (chat-annotated-4 frame 11943), which reads as one ready, none declined, one
+	///     expected - a solo private team confirming itself. The middle word never varies in the corpus, and the field
+	///     names are that reading rather than a client-verified layout.
+	/// </remarks>
 	public static class GroupFinderReadyCheckStatusCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderReadyCheckStatus;

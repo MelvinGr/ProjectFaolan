@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gates for the two combat DAMAGE IIRs (#274), decoded from the guardian combat capture
-	// (Blablabla_..._random-actions-combat). The captured carrier CONTENTS (without the leading [u32 length], which
+	// Byte-exact gates for the two combat damage IIRs, decoded from the guardian combat capture
+	// (Blablabla_..._random-actions-combat). The captured carrier contents (without the leading [u32 length], which
 	// the live sender adds via WriteArrayUInt32Length) must be reproduced from their typed fields.
 	public class CombatDamageCodecTests
 	{
@@ -31,12 +31,12 @@ namespace Faolan.Tests
 			Assert.Equal(built, DamageResultCodec.Build(rt));
 		}
 
-		// The ENVIRONMENTAL form of StatDamageIIR - fall damage (#495/#504). Golden:
+		// The environmental form of StatDamageIIR - fall damage. Golden:
 		// NecroL80_mage-necromancer_login_gameplay_chat-annotated-3 frame 11451 (19:43:30.109), the 11.9-unit fall that
 		// also applied Bruised Body. Stat 0x1B (Health), school 12, and every caster/spell word zero.
 		//
-		// This being a SEPARATE codec from StatDamage is the point of the test: the combat form's `statValue` is the
-		// target's resulting health and its count word is 2, while here the first word is the DAMAGE MAGNITUDE (219125 =
+		// This being a separate codec from StatDamage is the point of the test: the combat form's `statValue` is the
+		// target's resulting health and its count word is 2, while here the first word is the damage magnitude (219125 =
 		// 2191.25 health), the delta is exactly its negation, and the count word is 0. Building this with the combat
 		// builder would put an EntityClass marker at word 8 and a 1 at word 13, neither of which retail sends.
 		[Fact]
@@ -60,16 +60,16 @@ namespace Faolan.Tests
 		}
 
 		/// <summary>
-		///     The environmental record's amount is a WIRE value, and the SENDER is what converts it (#937).
+		///     The environmental record's amount is a wire value, and the sender is what converts it.
 		/// </summary>
 		/// <remarks>
-		///     ⛔ <b>The bug this pins was visible in game and invisible here.</b> `EnvironmentService` works in DISPLAY
+		///     <b>The bug this pins was visible in game and invisible here.</b> `EnvironmentService` works in display
 		///     units, like everything on `EntityVitals`, and handed them straight to the record while the vitals push
-		///     beside it scaled through `CharacterStatBlock.Set`. So a fall moved the health BAR by the right amount
+		///     beside it scaled through `CharacterStatBlock.Set`. So a fall moved the health bar by the right amount
 		///     and rendered a floating number a hundredth of it - "1" for a fall that cost 27 health.
 		///     <para />
 		///     The golden above is retail's own frame and could not catch it: it builds the record from an
-		///     already-scaled 219125 and says nothing about who scales. This asserts the CONVERSION instead, which is
+		///     already-scaled 219125 and says nothing about who scales. This asserts the conversion instead, which is
 		///     where the two halves of a fall disagreed.
 		/// </remarks>
 		[Fact]
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			// 2191.25.
 			Assert.Equal(219100u, EnvironmentOutbound.WireAmount(2191, (uint)CharacterStatId.HealthCurrent));
 
-			// And it is the stat's OWN scale, not a flat 100: the same table the vitals push goes through.
+			// And it is the stat's own scale, not a flat 100: the same table the vitals push goes through.
 			Assert.Equal(StatDisplayScale.Of((uint)CharacterStatId.HealthCurrent),
 				EnvironmentOutbound.WireAmount(1, (uint)CharacterStatId.HealthCurrent));
 		}

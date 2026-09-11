@@ -3,10 +3,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One entry of the spawn scaffold's feat/ability ID list (the 5-byte [u8 rank][u32 id] groups after the
-	// entry table, ascending ids, 0x3F1-terminated on the wire). Per-character progression data - fresh
-	// characters start with ~20 ids, geared ones have 40+. See docs/re/player-spawn-generation.md
-	// "VALIDATED GRAMMAR" / [[CharacterAttribute]].
+	/// <summary>
+	///     One entry of the spawn scaffold's feat/ability id list: the 5-byte [u8 rank][u32 id] groups that follow the
+	///     entry table on the wire. Per-character progression data; fresh characters carry around 20 ids, geared ones
+	///     40 or more.
+	/// </summary>
+	/// <remarks>
+	///     The wire grammar is documented in docs/re/player-spawn-generation.md.
+	/// </remarks>
 	[PrimaryKey(nameof(CharacterId), nameof(SkillId))]
 	public class CharacterSkill
 	{
@@ -15,10 +19,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
 
-		// The feat/ability id (wire order is ascending SkillId).
+		/// <summary>The feat/ability id. Wire order is ascending <see cref="SkillId" />.</summary>
 		public uint SkillId { get; set; }
 
-		// The per-id rank/slot byte (0 on fresh characters; geared captures carry values like 0x08/0x41-0x4B).
+		/// <summary>
+		///     The per-id rank/slot byte: 0 on fresh characters, while geared captures carry values like 0x08 and
+		///     0x41-0x4B.
+		/// </summary>
 		public byte Rank { get; set; }
 	}
 }

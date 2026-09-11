@@ -2,11 +2,16 @@ using Faolan.Core.Network.Codecs.Combat;
 
 namespace Faolan.GameServer.Combat
 {
-	// The canonical combat-input directions a combo step requires. AoC combos are a SEQUENCE of directional melee
-	// swings the player performs in order (Combo.Actions, e.g. "UR,UP"); completing the sequence fires the finisher.
-	// The five directional keys (the four quadrants + overhead) dominate the catalog; Head/Thrust are rare specials.
-	// This enum is the CATALOG's vocabulary - `SwingDirection` is the WIRE's, and `ComboInputs.ToSwingDirection`
-	// is the bridge.
+	/// <summary>
+	///     The canonical combat-input directions a combo step requires.
+	/// </summary>
+	/// <remarks>
+	///     AoC combos are a sequence of directional melee swings the player performs in order (<c>Combo.Actions</c>,
+	///     e.g. "UR,UP"); completing the sequence fires the finisher. The five directional keys - the four quadrants
+	///     plus overhead - dominate the catalog, while Head and Thrust are rare specials. This enum is the catalog's
+	///     vocabulary; <see cref="SwingDirection" /> is the wire's, and <see cref="ComboInputs.ToSwingDirection" /> is
+	///     the bridge.
+	/// </remarks>
 	public enum ComboInput
 	{
 		UpperLeft,
@@ -20,13 +25,17 @@ namespace Faolan.GameServer.Combat
 
 	public static class ComboInputs
 	{
-		// The wire zone a catalog step keys to, or null when the step is not one of the five (`Thrust`, which is a
-		// distinct special rather than a direction of swing).
-		//
-		// ⚠️ `Up` and `Head` are the SAME zone. The client's own config key for the overhead direction is
-		// `attack_dir_bm_head` (`FUN_0152f740`, the block whose order gives `SwingDirection`) - so the catalog's two
-		// spellings are two names for the overhead key, not two keys. They stayed separate enum members because the
-		// catalog spells both and the parser must accept both.
+		/// <summary>
+		///     The wire zone a catalog step keys to, or null when the step is not one of the five - <c>Thrust</c> is a
+		///     distinct special rather than a direction of swing.
+		/// </summary>
+		/// <remarks>
+		///     <c>Up</c> and <c>Head</c> are the same zone: the client's config key for the overhead direction is
+		///     <c>attack_dir_bm_head</c> (<c>FUN_0152f740</c>, the block whose order gives
+		///     <see cref="SwingDirection" />), so the catalog's two spellings are two names for the overhead key rather
+		///     than two keys. They remain separate enum members because the catalog spells both and the parser must
+		///     accept both.
+		/// </remarks>
 		public static SwingDirection? ToSwingDirection(this ComboInput input)
 		{
 			return input switch

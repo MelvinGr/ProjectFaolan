@@ -38,7 +38,7 @@ namespace Faolan.Importer.Rdb
 
 			var bytes = rdb.ReadDecompressed(entry);
 
-			// Carve by ROOT TAG, not from the first '<': the 12-byte RDB-Id header ahead of the XML is binary and can
+			// Carve by ROOT tag, not from the first '<': the 12-byte RDB-Id header ahead of the XML is binary and can
 			// contain a 0x3C byte, which would anchor the parse inside it (see RdbXml).
 			var xml = RdbXml.Carve(Encoding.UTF8.GetString(bytes), "root");
 			if (xml == null)
@@ -70,7 +70,7 @@ namespace Faolan.Importer.Rdb
 					.ToList();
 
 				// FACE morphs, the sibling of BodyNodes above and unimported until the coverage check below pointed at
-				// it: 21 more MorphNode ranges per sex (EyebrowScale, BrowLow/BrowHigh, ...). Same shape, own category.
+				// it: 21 more MorphNode ranges per sex (EyebrowScale, BrowLow/BrowHigh,...). Same shape, own category.
 				var faceMorphs = sexEl
 					.Elements("FaceNodes")
 					.Elements("MorphNode")
@@ -85,9 +85,9 @@ namespace Faolan.Importer.Rdb
 					.Where(v => v.Value != null)
 					.ToList();
 
-				// PER-SEX, written ONCE - these hang off the sex element, not a race one. They used to be duplicated
-				// into every race so a single (sex, race) query returned them, which stored 66 definitions as 264 rows
-				// and implied morphs vary by race. They do not.
+				// Per-sex, written once - these hang off the sex element, not a race one. Duplicating them into every
+				// race so a single (sex, race) query returns them would store 66 definitions as 264 rows and imply
+				// morphs vary by race. They do not.
 				foreach (var m in morphs)
 					sexRows.Add(SexRow(sex, "morph", m.Seq, m.Name!, null, m.Min, m.Max)); // Name != null by the Where above
 
@@ -99,7 +99,7 @@ namespace Faolan.Importer.Rdb
 
 				foreach (var raceEl in sexEl.Elements())
 				{
-					// The sex element's non-race children (BodyNodes / FaceNodes / voice) are read ABOVE, per sex
+					// The sex element's non-race children (BodyNodes / FaceNodes / voice) are read above, per sex
 					// rather than per race - skip them here without complaining, or the guard cries wolf on data it
 					// already has.
 					if (SexLevelElements.Contains(raceEl.Name.LocalName))
@@ -108,7 +108,7 @@ namespace Faolan.Importer.Rdb
 					if (!TryRace(raceEl.Name.LocalName, out var race))
 					{
 						// Say so. A race element we cannot name is appearance data being dropped, and the silent
-						// `continue` here is what hid Khitan (#469).
+						// `continue` here is what hid Khitan.
 						Console.WriteLine($"RDB appearance: unknown race element <{raceEl.Name.LocalName}> - its choices are SKIPPED.");
 						continue;
 					}
@@ -150,7 +150,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			// ⚠️ COVERAGE CHECK. The suite cannot do this - it runs from a plain clone with no RDB - so the guard
+			// COVERAGE check. The suite cannot do this - it runs from a plain clone with no RDB - so the guard
 			// lives here, where the file is open. A client patch that adds a category would otherwise be imported as
 			// "nothing", and the row count would still look plausible: that is precisely how beard, piercings and
 			// body were missed. Loud rather than fatal, because a new element is content to add, not corruption.
@@ -284,7 +284,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// Every per-race child element this importer reads. Kept beside the reads deliberately: adding an AddList call
-		// without adding its name here makes the coverage check complain about an element that IS handled, which is a
+		// without adding its name here makes the coverage check complain about an element that is handled, which is a
 		// far better failure than the reverse.
 		// Children of the SEX element that are not races - read per sex, above the race loop.
 		private static readonly HashSet<string> SexLevelElements = new(StringComparer.OrdinalIgnoreCase) { "BodyNodes", "FaceNodes", "voice" };
@@ -318,7 +318,7 @@ namespace Faolan.Importer.Rdb
 
 				// Rise of the Godslayer. The CHARACTERCREATOR XML has carried a <khitan> section all along and this
 				// switch did not know the name, so every Khitan choice fell through to `default` and was dropped by
-				// the caller's `continue` - silently, which is how it went unnoticed (#469).
+				// the caller's `continue` - silently, which is how it went unnoticed.
 				case "khitan":
 				{
 					race = Race.Khitan;

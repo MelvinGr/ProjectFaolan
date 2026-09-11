@@ -3,19 +3,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The damage-school numbering (#487). Cold used to sit at 5 with everything after it one too high, which made a
-	// necromancer's Pestilential Blast decode as Holy and their Ice Strike as Siege.
+	// The damage-school numbering. Cold sits after the nine-school run, not at 5: placing it in the middle pushes
+	// everything after it one too high, decoding a necromancer's Pestilential Blast as Holy and their Ice Strike as
+	// Siege.
 	//
 	// Two independent oracles pin it, and they agree:
 	//
 	//   1. the client's own combat log (`/logcombat on`, recorded alongside the pcap in
 	//      NecroL80_mage-necromancer_login_combat2) names `unholy damage` = 7 and `frost damage` = 10;
-	//   2. every per-school stat family in LDB category 615 lists NINE schools with Cold absent from the run -
+	//   2. every per-school stat family in LDB category 615 lists nine schools with Cold absent from the run -
 	//      Invulnerability 902..910, Damage 995..1003, Damage (ranged) ..988..994, Protection 926..931,
 	//      Combat Rating 1007..1011 - so numbering that run from 1 puts Unholy at 7 and leaves Cold at 10.
 	public class DamageSchoolNumberingTests
 	{
-		// The combat log's two named schools - the observations the old numbering could not produce.
+		// The combat log's two named schools.
 		[Fact]
 		public void TheCombatLogsNamedSchools_Match()
 		{
@@ -23,7 +24,7 @@ namespace Faolan.Tests
 			Assert.Equal(10u, (uint)DamageSchool.Cold); // "frost damage"
 		}
 
-		// The nine-school run the client's stat table lists, in order, with Cold NOT among them.
+		// The nine-school run the client's stat table lists, in order, with Cold not among them.
 		[Theory]
 		[InlineData(DamageSchool.Slashing, 1)]
 		[InlineData(DamageSchool.Piercing, 2)]
@@ -39,7 +40,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, (uint)school);
 		}
 
-		// Cold is APPENDED after the nine, not inserted at 5. Asserted as a relationship rather than a bare number so
+		// Cold is appended after the nine, not inserted at 5. Asserted as a relationship rather than a bare number so
 		// the intent survives: whatever Siege is, Cold is the next one.
 		[Fact]
 		public void Cold_ComesAfterTheNine_NotInTheMiddle()
@@ -48,8 +49,8 @@ namespace Faolan.Tests
 			Assert.True((uint)DamageSchool.Cold > (uint)DamageSchool.Fire + 1, "Cold must not sit immediately after Fire - that was the #487 bug");
 		}
 
-		// The two values outside the school range proper. Environmental is what fall damage and hazards carry (#495 /
-		// #504); Heal marks a restore and, uniquely, only ever appears with a non-negative delta.
+		// The two values outside the school range proper. Environmental is what fall damage and hazards carry; Heal
+		// marks a restore and, uniquely, only ever appears with a non-negative delta.
 		[Fact]
 		public void TheNonSchoolValues_AreOutsideTheRun()
 		{
@@ -58,7 +59,7 @@ namespace Faolan.Tests
 			Assert.True((uint)DamageSchool.Environmental > (uint)DamageSchool.Cold);
 		}
 
-		// A necromancer's own spells must no longer read as the wrong element - the symptom that opened the ticket.
+		// A necromancer's own spells must not read as the wrong element.
 		[Fact]
 		public void ANecromancersSpells_NoLongerDecodeAsHolyAndSiege()
 		{

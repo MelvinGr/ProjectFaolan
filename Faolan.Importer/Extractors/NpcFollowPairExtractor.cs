@@ -7,12 +7,12 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// One harvested formation-follow: a creature that retail bound to ANOTHER creature's movement, by NAME (the
+	// One harvested formation-follow: a creature that retail bound to ANOTHER creature's movement, by name (the
 	// stable NpcTemplate join key - the wire handle is session-volatile), with the offset and slot it held.
 	public sealed record NpcFollowPair(string Follower, string Leader, float OffsetX, float OffsetY, float OffsetZ, uint Slot);
 
-	// Harvests NPC-follows-NPC from the captured mode-07 MoveTasks (#741). The maintainer's annotation "giner &
-	// scruffy should be chasing each other" names an AMBIENT behaviour we had nothing for; the wire turns out to be
+	// Harvests NPC-follows-NPC from the captured mode-07 MoveTasks. The maintainer's annotation "giner &
+	// scruffy should be chasing each other" names an ambient behaviour we had nothing for; the wire turns out to be
 	// an ordinary MoveTaskIIR whose task is `Formation`, naming the other NPC's handle:
 	//
 	//   [u32 class 0xC350][u32 leaderHandle][f32 offsetX][f32 offsetY][f32 offsetZ][u32 slot]
@@ -20,8 +20,8 @@ namespace Faolan.Importer.Extractors
 	// It is not a mutual chase - one NPC walks a path (a mode-04 list) and the other is BOUND to it, its own
 	// from-position landing within a couple of units of the leader's every time.
 	//
-	// Both handles are resolved to creature NAMES through the FA015807 spawns of the SAME capture, exactly as
-	// NpcDeathBehaviorExtractor resolves a dying handle - so a pair only survives when we know what BOTH ends are,
+	// Both handles are resolved to creature names through the FA015807 spawns of the same capture, exactly as
+	// NpcDeathBehaviorExtractor resolves a dying handle - so a pair only survives when we know what both ends are,
 	// which is also what drops the pairs whose leader is a player's pet or another player.
 	public static class NpcFollowPairExtractor
 	{
@@ -68,11 +68,11 @@ namespace Faolan.Importer.Extractors
 			return results;
 		}
 
-		// Merge harvests across captures to ONE leader per follower name. A creature follows the same kind of leader
+		// Merge harvests across captures to one leader per follower name. A creature follows the same kind of leader
 		// everywhere in the corpus; where a name were ever seen behind two different leaders the MAJORITY wins, the
 		// same defensive rule the death-animation merge uses.
 		//
-		// ⚠️ The OFFSET is deliberately not merged in: it is per-INSTANCE, not per-type - the four
+		// The OFFSET is deliberately not merged in: it is per-instance, not per-type - the four
 		// `Black Dragon Guard Patroller`s that share one captain each hold a different corner of a 3x3 grid. Picking
 		// one of them and stamping it on the type would put every follower of that type in the same spot.
 		public static List<NpcFollowPair> Merge(IEnumerable<NpcFollowPair> all)

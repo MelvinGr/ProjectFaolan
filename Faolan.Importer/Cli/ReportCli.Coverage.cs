@@ -16,11 +16,12 @@ namespace Faolan.Importer.Cli
 {
 	public static partial class ReportCli
 	{
-		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
-		// Content coverage: of the NPCs/vendors we've actually INTERACTED with across the capture corpus, how many did
-		// we import. Capture-relative by necessity (there is no authoritative game-wide vendor/dialogue list - retail
-		// dialogue is TEA-encrypted in the RDB), so it measures import completeness OF WHAT WE'VE SEEN and names the
-		// gaps to go capture/decode. `--report-arg readme` rewrites the marked section of README.md; else it prints.
+		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC).
+		// Content coverage: of the NPCs and vendors the corpus actually interacted with, how many are imported.
+		// Capture-relative by necessity - there is no authoritative game-wide vendor or dialogue list, retail dialogue
+		// being TEA-encrypted in the RDB - so it measures import completeness of what has been seen and names the gaps
+		// left to capture or decode. `--report-arg readme` rewrites the marked section of README.md; otherwise it
+		// prints.
 		private static async Task Coverage(IReadOnlyList<NamedCapture> captures, string? arg, string? rdbDir)
 		{
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
@@ -39,17 +40,17 @@ namespace Faolan.Importer.Cli
 			var convImported = (await db.ConversationNodes.Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-			// A greeted VENDOR opens its shop, not a conversation - exclude vendors (imported shops) from the dialogue
-			// denominator so they don't read as conversation gaps. A real conversation gap = greeted, but neither a
-			// dialogue node NOR a shop was imported for it (it falls to the "no dialogue or shop imported" bubble).
+			// A greeted vendor opens its shop, not a conversation, so vendors (imported shops) are excluded from the
+			// dialogue denominator and do not read as conversation gaps. A real conversation gap is an NPC that was
+			// greeted but has neither a dialogue node nor a shop imported for it.
 			var greetedTalkers = greeted.Where(n => !shopImported.Contains(n)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var convGaps = greetedTalkers.Where(n => !convImported.Contains(n)).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
 
-			// ⚠️ "Greeted" means the client CLICKED the NPC (a UseCharacter BCC), which is not the same as dialogue
-			// having followed. So a name in convGaps is one of two very different things, and they want opposite work
-			// (#878): either the capture carries a conversation the importer dropped - a real gap - or the click
-			// produced no dialogue at all, in which case the NPC is not a dialogue NPC and is only deflating the
-			// figure. Splitting them needs the second population: which gap names the EXTRACTOR finds a walk for.
+			// "Greeted" means the client clicked the NPC (a UseCharacter BCC), which is not the same as dialogue
+			// having followed. So a name in convGaps is one of two very different things, wanting opposite work:
+			// either the capture carries a conversation the importer dropped - a real gap - or the click produced no
+			// dialogue at all, in which case the NPC is not a dialogue NPC and is only deflating the figure.
+			// Splitting them needs the second population: which gap names the extractor finds a walk for.
 			var walkedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
 				foreach (var walk in ConversationExtractor.Extract(c.Packets))
@@ -69,11 +70,12 @@ namespace Faolan.Importer.Cli
 				block.AppendLine($"  - of the {convGaps.Count} conversation gap(s): **{droppedByImporter.Count} carry a conversation in the corpus** (a real import gap), "
 				                 + $"{noDialogueAtAll.Count} were clicked but produced no dialogue (not a dialogue NPC)");
 
-			// RDB item/feat/ability template decryption (optional - needs the client RDB). The whole catalog (type
-			// 1000020) is TEA-encrypted; we can only decrypt an entry whose key we've harvested from a capture (item
-			// quads via ItemHashHarvester, ability keys via the 0x2052 grants). There is NO plaintext category tag in
-			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
-			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
+			// RDB item, feat and ability template decryption - optional, since it needs the client RDB. The whole
+			// catalog (type 1000020) is TEA-encrypted, and only an entry whose key has been harvested from a capture
+			// can be decrypted (item quads through ItemHashHarvester, ability keys through the grants). There is no
+			// plaintext category tag in the encrypted RDBH header, so an undecrypted entry's category is unknowable
+			// and a per-category percentage of the total is impossible: the report gives the overall decrypted share
+			// plus the absolute per-category decrypted counts.
 			var rdb = string.IsNullOrEmpty(rdbDir)
 				? RdbDir()
 				: rdbDir;
@@ -114,10 +116,9 @@ namespace Faolan.Importer.Cli
 						plaintext++;
 				}
 
-				// ⚠️ This line used to end "0 feats (feat keys absent from captures)", which reads as a blocker and is
-				// not one: measured with `--report feat-keys`, ALL 19,777 feat ids are in the catalog and every one of
-				// them is PLAINTEXT. Feats hold no keys because feats need none. Saying "0 keys" about a category that
-				// requires zero keys is a true number that states the opposite of the truth (#877).
+				// Feats are not counted as a key gap: every feat id in the catalog is plaintext (`--report feat-keys`),
+				// so feats hold no keys because they need none. Reporting "0 feat keys" would be a true number that
+				// states the opposite of the truth.
 				block.AppendLine(
 					$"- **RDB template catalog** (type 1000020, partly TEA-encrypted) — {decrypted:N0}/{encrypted:N0} of the ENCRYPTED entries decrypted (**{Pct(decrypted, encrypted)}**), "
 					+ $"from {itemsDec:N0} item and {abilitiesDec:N0} ability keys harvested from captures. (+{plaintext:N0} plaintext entries need no key at all - the feat catalog is entirely among them.)");
@@ -136,7 +137,7 @@ namespace Faolan.Importer.Cli
 			if (shopGaps.Count > 0)
 				Console.WriteLine($"\nshop gaps ({shopGaps.Count}) - a vendor window is in a dump, no Shop row:\n  {string.Join(", ", shopGaps)}");
 
-			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
+			// Imported-content stats: the scale of the database, on one `·`-separated line.
 			var stats = $"**Imported content** (the DB is the server's source of truth): " +
 						$"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
 						$"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +

@@ -7,10 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the equivalence between the generated ProtoEndpoint and the hand-rolled header byte[] literals the
-	// codebase has long used. A serialized ProtoEndpoint{Type,Instance} must be byte-identical to
-	// [0x0D <type LE32> 0x10 <instance varint>] so the typed WriteHeader / Endpoints path stays a drop-in
-	// replacement for the verbatim retail-replay bytes (the client is proven to accept those exact bytes).
+	// A serialized ProtoEndpoint{Type,Instance} must be byte-identical to [0x0D <type LE32> 0x10 <instance varint>],
+	// the header encoding the client accepts. That equivalence is what lets the typed WriteHeader / Endpoints path
+	// carry the endpoints retail sends; the literals below are those retail bytes.
 	public class ProtoEndpointGoldenTests
 	{
 		[Fact]

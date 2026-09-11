@@ -23,37 +23,37 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Feats
 {
-	// Feat TRAINING + RESET (untrain-all). Feats ride the player spawn's pre-IIR list (see PlayerSpawnScaffoldRows /
-	// docs/subsystems/feats.md); this is the live protocol that mutates that set:
-	//   - TRAIN: c2s FeatIIR (0x28DA68A0) state 0x04 [feat ids] -> server adds them to CharacterFeat -> s2c FeatIIR
+	// Feat training and reset (untrain-all). Feats ride the player spawn's pre-IIR list (see PlayerSpawnScaffoldRows
+	// and docs/subsystems/feats.md); this is the live protocol that mutates that set:
+	//   - Train: c2s FeatIIR (0x28DA68A0) state 0x04 [feat ids] -> the server adds them to CharacterFeat -> s2c FeatIIR
 	//     state 0x05 (echoes the list). The client renders the trained feats off the ack; they persist for next spawn.
-	//   - RESET (untrain all): retail shows a confirm dialog (DispatchFeatUntrainMessageBox -> FeatUntrainAnswer) and
-	//     then RELOADS the world (the "loading screen" the capture is named for) so the fresh spawn carries the cleared
-	//     list. We clear CharacterFeat and reload via the change-map re-entry (a teleport to the current spot).
-	// Decoded from the hakotep untrain/train captures; #251. Extracted from GameServerListener as a composed
-	// collaborator (#200): the world-reload rides a teleport delegate seam (the listener's DoTeleport).
+	//   - Reset (untrain all): retail shows a confirm dialog (DispatchFeatUntrainMessageBox -> FeatUntrainAnswer) and
+	//     then reloads the world (the "loading screen" the capture is named for) so the fresh spawn carries the cleared
+	//     list. Here CharacterFeat is cleared and the world reloads via the change-map re-entry, a teleport to the
+	//     current spot.
+	// Decoded from the hakotep untrain/train captures. The world reload rides a teleport delegate seam.
 	public sealed class FeatService
 	{
 		private readonly Func<uint, uint, Vector3?, Task> _teleport;
 		private readonly ICharacterProgressionRepository _database;
 
-		// The CATALOG half, for one question: what the character's LEVEL grants, which is the guard on the untrain's
-		// spell revoke (#920). A second narrow interface rather than widening `_database` to `IDatabaseRepository` -
-		// the question genuinely belongs to the catalog, and the same instance answers both.
+		// The catalog half, for one question: what the character's level grants, which is the guard on the untrain's
+		// spell revoke. A second narrow interface rather than widening `_database` to `IDatabaseRepository` - the
+		// question belongs to the catalog, and the same instance answers both.
 		private readonly ICatalogRepository _catalog;
 		private readonly IChatServerDispatcher _chat;
 		private readonly ILogger _logger;
 
-		// The two halves of the live SPELLBOOK - teach (DispatchLearnSpell 0x200A) and revoke (DispatchForgetSpell
-		// 0x200B) - are the listener's ops, the same pair `ILevelUpOutbound` exposes for the ding and `/magic forget`
-		// uses (#915). They arrive as delegates rather than a port because this service needs exactly these two, and
-		// they are one cluster: a feat that teaches a spell has to be able to take it back (#920).
+		// The two halves of the live spellbook - teach (DispatchLearnSpell 0x200A) and revoke (DispatchForgetSpell
+		// 0x200B) - the same pair `ILevelUpOutbound` exposes for the ding and `/magic forget` uses. They arrive as
+		// delegates rather than a port because this service needs exactly these two, and they are one cluster: a feat
+		// that teaches a spell has to be able to take it back.
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
 		private readonly Func<INetworkClient, uint, Task> _forgetSpell;
 
-		// #150: an ALTERNATE-ADVANCEMENT perk arrives here as an ordinary feat train carrying a perk id - the client's
+		// An alternate-advancement perk arrives here as an ordinary feat train carrying a perk id - the client's
 		// `TrainAAFeat` goes through the same `FeatHolder` train virtual a class feat does, which is why AA needs no
-		// message of its own. What differs is the PRICE: a perk is charged to a token pool, never to the class
+		// message of its own. What differs is the price: a perk is charged to a token pool, never to the class
 		// feat-point budget.
 		private readonly AlternateAdvancementService _alternateAdvancement;
 
@@ -71,7 +71,7 @@ namespace Faolan.GameServer.Feats
 		}
 
 		// .feat list | .feat train <id> [<id>...] | .feat reset  - the test bootstrap for the feat subsystem (the retail
-		// trigger is the client's Feats window with its point economy, which we can't drive from the server). train/reset
+		// trigger is the client's Feats window with its point economy, which the server cannot drive). train and reset
 		// reload the world so the change shows immediately.
 		public async Task FeatCommand(INetworkClient client, string arguments)
 		{
@@ -149,9 +149,9 @@ namespace Faolan.GameServer.Feats
 			}
 			catch (CodecParseException e)
 			{
-				// The codec is STRICT (#530 rule 4), so a body we cannot account for throws rather than decoding into
-				// something plausible. Caught HERE because a malformed c2s frame is the peer's problem, not a reason to
-				// tear the session down - but it is logged with the offset the reader stopped at.
+				// The codec is strict, so a body it cannot account for throws rather than decoding into something
+				// plausible. Caught here because a malformed c2s frame is the peer's problem rather than a reason to
+				// tear the session down; it is logged with the offset the reader stopped at.
 				_logger.LogDebug("Unparseable FeatIIR ({Length} bytes): {Reason}", rawPayload.Length, e.Message);
 				return;
 			}
@@ -173,7 +173,8 @@ namespace Faolan.GameServer.Feats
 
 			if (added < 0)
 			{
-				// Over the feat-point budget (safety net; the client normally pre-validates). Don't add or ack.
+				// Over the feat-point budget (a safety net; the client normally pre-validates). Nothing is added or
+				// acked.
 				await _chat.SendSystemMessage(character.Id, "Not enough feat points to train that.");
 				return;
 			}
@@ -186,8 +187,8 @@ namespace Faolan.GameServer.Feats
 			_logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));
 		}
 
-		// c2s FeatUntrainAnswer (0x203E): the confirm-dialog reply. Reset ALL feats only when the player CONFIRMED and
-		// the echoed token matches the outstanding request (guards against a stray/replayed answer).
+		// c2s FeatUntrainAnswer (0x203E): the confirm-dialog reply. All feats are reset only when the player confirmed
+		// and the echoed token matches the outstanding request, which guards against a stray or replayed answer.
 		public async Task HandleFeatUntrainAnswer(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
@@ -214,9 +215,9 @@ namespace Faolan.GameServer.Feats
 			await ResetFeats(client, character);
 		}
 
-		// c2s UntrainFeat (0x2041): the client clicked "untrain all feats". Retail answers with a CONFIRM messagebox
-		// (DispatchFeatUntrainMessageBox 0x2064) and only resets once the client confirms - so we send the dialog and
-		// remember its token; the reset happens in HandleFeatUntrainAnswer. No feats -> nothing to confirm.
+		// c2s UntrainFeat (0x2041): the client clicked "untrain all feats". Retail answers with a confirm messagebox
+		// (DispatchFeatUntrainMessageBox 0x2064) and only resets once the client confirms, so the dialog goes out here
+		// and its token is remembered; the reset happens in HandleFeatUntrainAnswer. No feats means nothing to confirm.
 		public async Task HandleFeatUntrainRequest(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -234,11 +235,12 @@ namespace Faolan.GameServer.Feats
 			_logger.LogInformation("Sent feat untrain-all confirm to character {CharacterId} ({Count} feats).", character.Id, feats.Length);
 		}
 
-		// Clear ALL of the character's trained feats and reload the world so the fresh spawn carries the cleared list
-		// (the "loading screen" the retail untrain triggers). Shared by the confirm-dialog answer and the .feat GM reset.
+		// Clear all of the character's trained feats and reload the world so the fresh spawn carries the cleared list
+		// (the "loading screen" the retail untrain triggers). Shared by the confirm-dialog answer and the .feat GM
+		// reset.
 		private async Task ResetFeats(INetworkClient client, Character character)
 		{
-			// Read the set BEFORE clearing it - it is what says which spells to take back (#920).
+			// Read the set before clearing it - it is what says which spells to take back.
 			var held = await _database.GetCharacterFeats(character.Id);
 			var cleared = await _database.ClearCharacterFeats(character.Id);
 			_logger.LogInformation("Character {CharacterId} reset {Cleared} feat(s).", character.Id, cleared);
@@ -250,31 +252,21 @@ namespace Faolan.GameServer.Feats
 		}
 
 		/// <summary>
-		///     Takes back the spells the untrained feats had TAUGHT (#920) - the mirror of
-		///     <see cref="GrantSpellsTaughtBy" />, which is what made this a one-way door: a spell a feat handed over
-		///     survived the untrain of that feat for ever, because world entry re-grants the whole
-		///     <c>CharacterSpells</c> set.
+		///     Takes back the spells the untrained feats had taught - the mirror of
+		///     <see cref="GrantSpellsTaughtBy" />. Without it an untrain is a one-way door: world entry re-grants the
+		///     whole <c>CharacterSpells</c> set, so a spell a feat handed over would survive the untrain for ever.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ <b>A spell the character's LEVEL also grants is kept.</b> Retail's untrain-all refunds spent points;
-		///     it does not un-grant what levelling handed over, and the two paths overlap - the tree and the
-		///     level ladder can name the same spell. `GetClassSpellsUnlockedBetween(class, 0, level)` is what the ding
-		///     path itself teaches from, so asking it is asking the same question the next ding would answer, rather
-		///     than a second rule that could drift from it.
+		///     A spell the character's level also grants is kept: retail's untrain-all refunds spent points, it does
+		///     not un-grant what levelling handed over, and the two paths overlap because the tree and the level ladder
+		///     can name the same spell. <c>GetClassSpellsUnlockedBetween(class, 0, level)</c> is what the ding path
+		///     itself teaches from, so asking it asks the same question the next ding would answer rather than a second
+		///     rule that could drift from it.
 		///     <para />
-		///     ⛔ The ticket's stated blocker - <i>"ClearCharacterFeats wipes every feat row including the AUTOMATIC
-		///     ones, so revoking every feat-taught spell would strip the character's level-earned spells too"</i> -
-		///     is answered TWICE over, which is why the revoke is safe off the cleared set:
-		///     <list type="number">
-		///         <item><description>since #862 an auto-trained feat is never written to <c>CharacterFeat</c> at all
-		///         (0 of the 56 rows in the shipped database are autotrained), so "every feat row" and "every
-		///         purchased feat" are already the same set;</description></item>
-		///         <item><description>and <c>GetSpellsTaughtByFeats</c> excludes
-		///         <c>Feat.AutomaticUnlockCategory</c> grants in its own <c>where</c>, so even a stored automatic feat
-		///         could not contribute a spell here.</description></item>
-		///     </list>
-		///     The level check above is therefore not that guard restated - it covers the OTHER overlap, a tree feat
-		///     teaching a spell the class's level ladder also hands out.
+		///     Revoking off the cleared feat set cannot strip a level-earned spell: an auto-trained feat is never
+		///     written to <c>CharacterFeat</c> (0 of the 56 rows in the shipped database are autotrained), and
+		///     <c>GetSpellsTaughtByFeats</c> excludes <c>Feat.AutomaticUnlockCategory</c> grants in its own
+		///     <c>where</c>, so even a stored automatic feat could not contribute a spell here.
 		/// </remarks>
 		private async Task RevokeSpellsTaughtBy(INetworkClient client, Character character, IReadOnlyList<uint> featIds)
 		{
@@ -297,7 +289,7 @@ namespace Faolan.GameServer.Feats
 		}
 
 		/// <summary>
-		///     Which of the spells the untrained feats taught actually come back: everything the character's LEVEL
+		///     Which of the spells the untrained feats taught actually come back: everything the character's level
 		///     does not also grant. A pure function of the two sets, split from its caller so the rule is testable
 		///     without a world, a client or a database.
 		/// </summary>
@@ -306,13 +298,13 @@ namespace Faolan.GameServer.Feats
 			return taughtByUntrainedFeats.Where(spellId => !grantedByLevel.Contains(spellId));
 		}
 
-		// What TrainWithinBudget returns when it has ALREADY told the player why - the perk charge names the pool and
+		// What TrainWithinBudget returns when it has already told the player why - the perk charge names the pool and
 		// the shortfall, which the caller's generic "not enough feat points" would only contradict.
 		private const int RejectedAndExplained = -2;
 
-		// Trains `requested` onto the character iff the resulting feat set is legal: within the feat-point budget AND
-		// with every PREREQUISITE satisfied (FeatPrereq, the client's own feat-tree edges - #251). Returns the number
-		// of feats added, or -1 when the train is rejected.
+		// Trains `requested` onto the character only if the resulting feat set is legal: within the feat-point budget
+		// and with every prerequisite satisfied (FeatPrereq, the client's own feat-tree edges). Returns the number of
+		// feats added, or -1 when the train is rejected.
 		private async Task<int> TrainWithinBudget(INetworkClient client, ushort level, IReadOnlyList<uint> requested)
 		{
 			var character = client.Session.Character;
@@ -320,18 +312,18 @@ namespace Faolan.GameServer.Feats
 			var existing = await _database.GetCharacterFeats(characterId);
 			var after = existing.Concat(requested.Where(id => !existing.Contains(id))).ToList();
 
-			// ⭐ #150: split the request into PERKS and ordinary feats before either budget is asked about. They are
-			// two currencies - a perk's price is a per-placement `FeatPerkCost` in an AA token pool, an ordinary
-			// feat's is one point per rank against the level budget - and charging a perk to the feat-point budget
-			// (which is what happened before) both overspends the wrong purse and leaves the tokens untouched.
+			// Split the request into perks and ordinary feats before either budget is asked about. They are two
+			// currencies - a perk's price is a per-placement `FeatPerkCost` in an AA token pool, an ordinary feat's is
+			// one point per rank against the level budget - so charging a perk to the feat-point budget would both
+			// overspend the wrong purse and leave the tokens untouched.
 			var perkPrices = await _database.GetPerkCosts(character.Class, after);
 			if (!await ChargePerks(client, requested, perkPrices))
 				return RejectedAndExplained;
 
 			after = after.Where(id => !perkPrices.ContainsKey(id)).ToList();
 
-			// #850: the AUTOMATIC feats cost nothing. A character accumulates them by levelling, not by spending, and
-			// counting them was enough on its own to reject every train request at level 80 for three classes - their
+			// The automatic feats cost nothing: a character accumulates them by levelling rather than by spending.
+			// Counting them is enough on its own to reject every train request at level 80 for three classes - their
 			// automatic set alone comes to 153, 97 and 89 points against a budget of 79.
 			var free = await _database.GetAutotrainedFeatWireIds();
 			if (!FeatRules.WithinBudget(level, after, free))
@@ -341,10 +333,10 @@ namespace Faolan.GameServer.Feats
 				return -1;
 			}
 
-			// Checked against the RESULTING set, not against `requested`: training a feat and its prerequisite in one
-			// request is legal, and so is a prerequisite the character already holds. The perks come back in for this:
-			// they are outside the POINT budget, not outside the prerequisite graph - an AA tree has tiers like any
-			// other.
+			// Checked against the resulting set rather than against `requested`: training a feat and its prerequisite
+			// in one request is legal, and so is a prerequisite the character already holds. The perks come back in
+			// for this - they are outside the point budget, not outside the prerequisite graph, and an AA tree has
+			// tiers like any other.
 			var whole = after.Concat(perkPrices.Keys).ToList();
 			var prereqs = await _database.GetFeatPrereqs(whole);
 			var missing = FeatRules.MissingPrerequisites(whole, prereqs);
@@ -361,17 +353,17 @@ namespace Faolan.GameServer.Feats
 		}
 
 		/// <summary>
-		///     Charges the ALTERNATE-ADVANCEMENT perks in a train request to their token pools (#150). False - and
-		///     nothing charged - when any one of them is unaffordable, so a mixed request is all-or-nothing.
+		///     Charges the alternate-advancement perks in a train request to their token pools. False - and nothing
+		///     charged - when any one of them is unaffordable, so a mixed request is all-or-nothing.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Only NEW perks are charged. A train request that re-names a perk the character already holds is not
-		///     a second purchase, and the client sends the whole resulting set often enough that charging per request
+		///     Only new perks are charged. A train request that re-names a perk the character already holds is not a
+		///     second purchase, and the client sends the whole resulting set often enough that charging per request
 		///     would bill a player repeatedly for one perk.
 		///     <para />
-		///     ⚠️ The affordability of the WHOLE request is checked before anything is spent. Spending as it goes
-		///     would leave a player who could afford two of three perks having paid for two and trained none, because
-		///     the caller rejects the request outright.
+		///     The affordability of the whole request is checked before anything is spent: spending as it goes would
+		///     leave a player who could afford two of three perks having paid for two and trained none, because the
+		///     caller rejects the request outright.
 		/// </remarks>
 		private async Task<bool> ChargePerks(INetworkClient client, IReadOnlyList<uint> requested, IReadOnlyDictionary<uint, (TokenPool Pool, uint Cost)> prices)
 		{
@@ -409,12 +401,11 @@ namespace Faolan.GameServer.Feats
 			return true;
 		}
 
-		// ⭐ A feat that TEACHES a spell hands it over when it is trained (#847). The catalog carries two grant
-		// mechanisms and the level path only owns one of them: `Feat.AutomaticUnlockCategory` feats teach what a ding
-		// gives, and the feat TREE teaches the rest - one named `Spell - <name>` feat per spell, bought with a point.
-		// Both captured level-80s hold SOME of their class's tree spells and not others, which is what says the tree
-		// half is a purchase rather than a handout; before this it was the only half nothing granted, because the
-		// level path had (correctly) stopped offering it.
+		// A feat that teaches a spell hands it over when it is trained. The catalog carries two grant mechanisms and
+		// the level path owns only one of them: `Feat.AutomaticUnlockCategory` feats teach what a ding gives, and the
+		// feat tree teaches the rest - one named `Spell - <name>` feat per spell, bought with a point. Both captured
+		// level-80s hold some of their class's tree spells and not others, which is what makes the tree half a purchase
+		// rather than a handout.
 		//
 		// Idempotent by construction: `AddCharacterSpell` reports whether the row was new, and only a new one is
 		// announced, so re-training a feat the character already holds re-toasts nothing.

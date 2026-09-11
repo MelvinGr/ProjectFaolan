@@ -44,7 +44,7 @@ namespace Faolan.Mcp.Tools
 		[McpServerTool(Name = "get_map_npc_spawns"), Description("List the configured NPC spawn entries for a given map id.")]
 		public async Task<string> GetMapNpcSpawns([Description("Numeric map id")] uint mapId)
 		{
-			// null = no class filter: on a class-specific map (an armory) this lists EVERY class's copy, which is what
+			// null = no class filter: on a class-specific map (an armory) this lists every class's copy, which is what
 			// an inspection tool should show. The live world asks for one class's set instead.
 			var spawns = await _db.GetNpcSpawns(mapId, null);
 			return Serialize(spawns);
@@ -101,7 +101,7 @@ namespace Faolan.Mcp.Tools
 				: Serialize(spawns.Select(n => new
 				{
 					n.Id,
-					n.NpcTemplate?.Name, // #244: name on the NpcTemplate type, community on its StatCore
+					n.NpcTemplate?.Name, // the name lives on the NpcTemplate type, the community on its StatCore
 					n.MapId,
 					n.Level,
 					n.Health,

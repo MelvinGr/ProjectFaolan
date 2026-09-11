@@ -5,24 +5,22 @@ using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Inventory
 {
-	// Which slots a "take N of item X out of the inventory" touches, and by how much (#521's quest hand-in). PURE: the
-	// arithmetic is separated from the DB write + wire push so it can be tested directly, the same split
+	// Which slots a "take N of item X out of the inventory" touches, and by how much - the quest hand-in's arithmetic.
+	// Pure: it is separated from the database write and the wire push so it can be tested directly, the same split
 	// QuestProgress.CanHandIn has from the service that supplies its count.
 	//
-	// The two things worth getting right, and neither is visible from a single-stack example:
-	//   - a stack LARGER than what is wanted is decremented, not cleared - handing in 3 of 5 bricks must leave 2;
-	//   - a stack can be SPLIT across cells and across containers, so the walk spans both and stops the moment the
+	// The two things worth getting right, neither of which is visible from a single-stack example:
+	//   - a stack larger than what is wanted is decremented rather than cleared - handing in 3 of 5 bricks leaves 2;
+	//   - a stack can be split across cells and across containers, so the walk spans both and stops the moment the
 	//     count is met rather than draining every slot holding the item.
 	public static class InventoryTake
 	{
 		// One slot's share of the take. `Taken` is how many come out of it; `Remaining` is what is left behind, so 0
 		// means the cell is cleared and anything else means it is rewritten with the smaller stack.
 		//
-		// A partial take DECREMENTS the item in place (the instance is not re-minted), so nothing per-instance needs
-		// carrying through the step - the crafter and any socketed gems stay on the row by construction. The step used
-		// to carry the CreatorName for exactly that reason: the cell was REWRITTEN, and the writer assigned the crafter
-		// rather than leaving it (#727), so a decremented stack of a player-made item lost its "Created by" line
-		// unless the plan passed the name back in. That whole class of hand-carrying is what #750 removed.
+		// A partial take decrements the item in place - the instance is not re-minted - so nothing per-instance needs
+		// carrying through the step: the crafter and any socketed gems stay on the row by construction. Rewriting the
+		// cell instead is what would make a decremented stack of a player-made item lose its "Created by" line.
 		public readonly record struct Step(ContainerKind Container, int Slot, uint Taken, uint Remaining);
 
 		// The steps that remove `count` of `itemTemplateId`, in container-then-slot order. Takes as much as it can and

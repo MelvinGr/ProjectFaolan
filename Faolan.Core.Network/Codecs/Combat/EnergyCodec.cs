@@ -5,20 +5,22 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// EnergyIIR (0x40749B8A) - the actor's energy after an action; stamina-only in the captures.
-	//
-	//   [subop][class][actor][u8 env=0x01][u32 stamina]     (17 B)
-	//
-	// The env byte is 0x01 here, not the 0x00 most world IIRs carry - capture-derived (strickenbla combat capture; see
-	// protocol_stats_and_combat).
+	/// <summary>
+	///     EnergyIIR - the actor's energy after an action, stamina-only in the captures:
+	///     <c>[subop][class][actor][u8 env=0x01][u32 stamina]</c>, 17 bytes.
+	/// </summary>
+	/// <remarks>
+	///     The env byte is 0x01 here rather than the 0x00 most world IIRs carry; capture-derived from the strickenbla combat
+	///     capture.
+	/// </remarks>
 	public static class EnergyCodec
 	{
 		public const uint Opcode = (uint)IirTypes.EnergyIIR;
 
-		// The env byte every captured EnergyIIR carries.
+		/// <summary>The env byte every captured EnergyIIR carries.</summary>
 		public const byte StaminaEnv = 0x01;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(EnergyIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -55,6 +57,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// EnergyIIR (0x40749B8A).
+	/// <summary>The EnergyIIR body.</summary>
 	public sealed record EnergyIIR(uint Actor, byte Env, uint Stamina);
 }

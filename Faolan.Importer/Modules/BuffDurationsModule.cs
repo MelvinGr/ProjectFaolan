@@ -16,9 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// The buff duration retail states, for the spell rows whose RDB record leaves property field 8 empty (#659).
+	// The buff duration retail states, for the spell rows whose RDB record leaves property field 8 empty.
 	//
-	// ⚠️ It is registered LAST in ModuleRegistry.All, after the rdb-* modules, and that placement is the whole
+	// It is registered last in ModuleRegistry.All, after the rdb-* modules, and that placement is the whole
 	// ordering contract: `rdb-spells` writes `Spells.DurationMs` unconditionally, so this has to run after it or its
 	// three rows are silently reinstated at 0/1 ms. `RdbSpellsModule.RequiredAfter` names it for the same reason.
 	public sealed class BuffDurationsModule : IImportModule
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// Per-capture lists, not ctx.RawPackets: the rule counts DISTINCT captures stating a duration, which is
+			// Per-capture lists, not ctx.RawPackets: the rule counts distinct captures stating a duration, which is
 			// what separates a base duration from one restore's remaining time.
 			var (seen, adopted) = await CaptureSpellImporter.ImportBuffDurationsAsync(ctx.Db,
 				[.. ctx.Captures.Select(c => (IReadOnlyList<CapturedPacket>)c.Packets)]);

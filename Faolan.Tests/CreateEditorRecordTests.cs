@@ -8,16 +8,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the fixed-grammar character-create EDITOR IIR records to the captured bytes (issue #189,
-	// decoded by tools/capture/decode_create_editor.py, see docs/subsystems/create-editor-bursts.md). These records are
+	// Locks the fixed-grammar character-create editor IIR records to the captured bytes (decoded by
+	// tools/capture/decode_create_editor.py, see docs/subsystems/create-editor-bursts.md). These records are
 	// streamed verbatim today by RetailCreateEditorInitialBurst; the byte-exact builders are the first step
 	// of replacing that replay with construction. Capture: account-stricken998-character-create-no-worldenter
 	// (editor avatar handle 0x021662C8).
 	//
-	// The expected strings carry the record's own SUB-OPCODE, because a codec's `Build` returns the whole record
-	// (#530 rule 2 keeps only the carrier LENGTH out). They used to start at the entity class, because these all went
-	// through `CreateEditorRecordBuilder`, whose job was slicing that word back off for a burst helper that re-wrote
-	// it - the helper #542 retired.
+	// The expected strings carry the record's own sub-opcode, because a codec's `Build` returns the whole record -
+	// only the carrier's length prefix stays with the sender.
 	public class CreateEditorRecordTests
 	{
 		[Fact]
@@ -88,8 +86,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void GameTimeIir_MatchesCapturedBytes()
 		{
-			// First GameTimeIIR of the editor stream. The captured bytes are unchanged; the SPLIT is the corrected one
-			// (#351): a bool, then f32 dayTime = 0x47929B00 = 75062s, then the word the apply ignores (2), then the
+			// First GameTimeIIR of the editor stream. The captured bytes are unchanged; the split is the corrected one
+			//: a bool, then f32 dayTime = 0x47929B00 = 75062s, then the word the apply ignores (2), then the
 			// anchor's two halves (gameDay 0x00019292, unix 0x6A25B9BD), then rate 1.0.
 			Assert.Equal("4f57dc0800000000000000000147929b0000000002000192926a25b9bd3f800000",
 				Convert.ToHexStringLower(GameTimeCodec.Build(new GameTimeIIR(BitConverter.UInt32BitsToSingle(0x47929B00), 2u, 0x00019292u, 0x6A25B9BDu))));

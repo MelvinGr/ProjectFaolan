@@ -4,19 +4,17 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	/// <summary>
-	///     A spell a feat GRANTS (#593) - "Spell Unlocking 60-80 teaches Blood Pact, Covenant of Vengeance and Drain
+	///     A spell a feat grants - "Spell Unlocking 60-80 teaches Blood Pact, Covenant of Vengeance and Drain
 	///     Essence ranks 1-4". Not a modifier: nothing about an existing spell changes, the character simply gains one.
 	/// </summary>
 	/// <remarks>
 	///     GameAction kind 53019 (<c>Spell</c>), whose key list is a single slot - one spell template id and nothing
-	///     else. That one-word shape is the whole reason it looked undecodable for a while (#591): read as the
-	///     <c>(reference, magnitude)</c> pair every OTHER kind carries, its "magnitude" was the next element's type
-	///     word, which is why the value appeared to repeat the kind id.
+	///     else. It must not be read as the <c>(reference, magnitude)</c> pair every other kind carries: the second
+	///     word belongs to the next element, so such a read returns that element's type word as a magnitude.
 	///     <para>
 	///         Kept apart from <see cref="FeatSpellStatModifier" /> deliberately. Filing a grant as a modifier would
-	///         record a spell the feat GIVES you as a boost to one you already have - the trap #591 named, and the
-	///         reason these kinds stayed out of the DB until each was decoded on its own evidence. All 1,749 records
-	///         resolve to a shipped <see cref="Spell.Id" />.
+	///         record a spell the feat gives you as a boost to one you already have. All 1,749 records resolve to a
+	///         shipped <see cref="Spell.Id" />.
 	///     </para>
 	/// </remarks>
 	[PrimaryKey(nameof(FeatId), nameof(Sequence))]

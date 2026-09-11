@@ -4,10 +4,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for the server->client combat-state records (#216/#218,
-	// docs/re/iir-readers-combat-world.md): CombatShield, ThreatLevel, HateListUpdate, StatDamage. Oracles are captured
-	// bodies. Their leading four bytes are the carrier's u32 LENGTH, which #530 rule 2 moved off the codecs and onto
-	// the sender - `Record()` drops it, and the wire is unchanged.
+	// Byte-exact construct + round-trip for the server->client combat-state records
+	// (docs/re/iir-readers-combat-world.md): CombatShield, ThreatLevel, HateListUpdate, StatDamage. Oracles are
+	// captured bodies. Their leading four bytes are the carrier's u32 length, which belongs to the sender rather than
+	// the codec - `Record()` drops it.
 	public class CombatRecordCodecTests
 	{
 		private const string CombatShieldBody = "00000011cffd05190000c35000017f80000000006f";
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			var captured = Record(StatDamageBody);
 			var p = StatDamageCodec.Parse(captured);
 			Assert.Equal(0x00017F80u, p.Handle); // the target
-			Assert.Equal(0x01316E71u, p.Caster); // the attacker - a NAMED field since #530 wave 4, not word [9] of a bag
+			Assert.Equal(0x01316E71u, p.Caster); // the attacker - a named field since #530 wave 4, not word [9] of a bag
 			Assert.Equal(StatDamageBody[8..], Convert.ToHexStringLower(StatDamageCodec.Build(p)));
 		}
 
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			Assert.Equal(ThreatLevelBody[8..], Convert.ToHexStringLower(ThreatLevelCodec.Build(p.Handle, p.Threat, p.Flag, p.Env)));
 		}
 
-		// The captured payload WITHOUT its leading u32 length - the sender's, since #530 rule 2.
+		// The captured payload without its leading u32 length, which belongs to the sender.
 		private static byte[] Record(string hex)
 		{
 			return Convert.FromHexString(hex)[4..];

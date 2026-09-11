@@ -17,11 +17,11 @@ using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Core.Cli
 {
-	// [NoReorder] because this file is THREE views of one list - the catalog, the accessors, the key constants - and
+	// [NoReorder] because this file is three views of one list - the catalog, the accessors, the key constants - and
 	// they are all in the same order, ordinal by key, so a reader can scan them side by side and a missing entry shows
-	// up as a gap. ReSharper's layout would otherwise regroup the accessors by RETURN TYPE (it has, twice), which
-	// interleaves the sections into an order nothing else in the tree shares. The solution's own layout pattern
-	// exempts a type carrying this attribute (see ProjectFaolan.sln.DotSettings, "Non-reorderable types"), and
+	// up as a gap. ReSharper's layout would otherwise regroup the accessors by return type, which interleaves the
+	// sections into an order nothing else in the tree shares. The solution's own layout pattern exempts a type
+	// carrying this attribute (see ProjectFaolan.sln.DotSettings, "Non-reorderable types"), and
 	// FaolanSettingsTests.TheCatalog_IsInKeyOrder pins the catalog half, which no editor setting can.
 	[NoReorder]
 	public static class FaolanSettings
@@ -58,16 +58,16 @@ namespace Faolan.Core.Cli
 
 		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(setting => new KeyValuePair<string, string?>(setting.Key(), DefaultText(setting)));
 
-		// Declared AFTER All on purpose: a static field initializer runs in textual order, so this one needs the
+		// Declared after All on purpose: a static field initializer runs in textual order, so this one needs the
 		// catalog to exist already.
 		private static readonly Dictionary<string, Option> ByKey = All.ToDictionary(Key, StringComparer.OrdinalIgnoreCase);
 
-		// One accessor per catalog entry, IN CATALOG ORDER (see [NoReorder] above), NAMED for its key with the colon
+		// One accessor per catalog entry, in catalog order (see [NoReorder] above), named for its key with the colon
 		// dropped - `Server:UniverseAgentPort` reads back as `config.ServerUniverseAgentPort`, exactly as the Keys
 		// const beside it is named. So a key and its accessor are one grep, and an accessor cannot drift into naming a
 		// section it does not belong to (`UniverseAgentPort`, `WelcomeString`, `RdbDir` all read as global).
 		//
-		// One kind of member is legitimately not a key: a DERIVED value (`McpUrl`, `ServerUniverseAddress`), which sits
+		// One kind of member is legitimately not a key: a derived value (`McpUrl`, `ServerUniverseAddress`), which sits
 		// directly under the setting it is derived from.
 		extension(IConfiguration config)
 		{
@@ -93,8 +93,8 @@ namespace Faolan.Core.Cli
 
 			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 			public ushort McpPort => Value<ushort>(config, Keys.McpPort);
-			// ⚠️ The BASE port, so this is the FIRST realm's endpoint. A realm host adds its offset (#910,
-			// `FaolanMcpServiceCollectionExtensions.McpPortFor`), so in a multi-realm run this URL reaches realm 1 only.
+			// The base port, so this is the first realm's endpoint. A realm host adds its offset
+			// (`FaolanMcpServiceCollectionExtensions.McpPortFor`), so in a multi-realm run this URL reaches realm 1 only.
 			// That is right for Faolan.Web, which is not realm-aware; anything that needs another realm's endpoint has
 			// to derive it the same way the host does.
 			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
@@ -119,7 +119,7 @@ namespace Faolan.Core.Cli
 					: throw new InvalidOperationException($"{Keys.ServerPublicKey} must be {ClientLoginEncryption.PublicHexLength} characters long")
 				: null;
 
-			// Where a CLIENT dials to log in - the ADVERTISED address (never Server:ListenAddress, which is an
+			// Where a client dials to log in - the advertised address (never Server:ListenAddress, which is an
 			// interface: 0.0.0.0 is by design unreachable as a destination) and the UniverseAgent port, which is the
 			// pair the client's LocalConfig.xml <UniverseAddr> holds. Derived rather than a setting of its own, like
 			// McpUrl: a second copy of either half is a copy that can disagree with the port the server binds.
@@ -159,9 +159,9 @@ namespace Faolan.Core.Cli
 				blocks.Add(Object(section, run));
 			}
 
-			// The declared realms are the one part of this file that is NOT a catalog setting (a list of records fits
+			// The declared realms are the one part of this file that is not a catalog setting (a list of records fits
 			// neither the flat key/accessor shape nor the command line), so the block is rendered by its own owner and
-			// spliced in HERE - at the position "Realms" sorts to among the section names, keeping the whole file in
+			// spliced in here - at the position "Realms" sorts to among the section names, keeping the whole file in
 			// one ordinal order.
 			blocks.Insert(blocks.Count(b => string.CompareOrdinal(b.Section, FaolanRealms.Section) < 0), new Block(FaolanRealms.DefaultJsonLines(), FaolanRealms.Section));
 
@@ -261,10 +261,10 @@ namespace Faolan.Core.Cli
 					$"'{key}' is set to '{text}', which is not one of {Enum.GetValues<T>().JoinAsString(", ")}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
-		// An OPTIONAL setting is written as JSON `null`, not as a commented-out line and not as "": the file then NAMES
+		// An optional setting is written as JSON `null`, not as a commented-out line and not as "": the file then names
 		// every key the catalog holds, which is the point of generating it, and null is what an unset setting resolves
 		// to anyway (the configuration provider reads a JSON null back as no value, so the accessor sees exactly the
-		// state it would if the line were absent). An empty string would not be that state - it is a VALUE, and a key
+		// state it would if the line were absent). An empty string would not be that state - it is a value, and a key
 		// that parses its text has to reject it.
 		private static Block Entry(Option setting, int depth)
 		{
@@ -366,7 +366,7 @@ namespace Faolan.Core.Cli
 				: throw new InvalidOperationException($"'{key}' is set to '{text}', which is not a {typeof(T).Name}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
-		// Section carries the section NAME, not a bare flag: the generated file is ordinal by key, and the Realms
+		// Section carries the section name, not a bare flag: the generated file is ordinal by key, and the Realms
 		// block (which is not a catalog setting - see FaolanRealms) has to be inserted at the position its name sorts
 		// to rather than appended, or the file stops being scannable in one order.
 		private sealed record Block(List<string> Lines, string? Section = null);

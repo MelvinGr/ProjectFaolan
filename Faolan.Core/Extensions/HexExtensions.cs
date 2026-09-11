@@ -25,7 +25,7 @@ namespace Faolan.Core.Extensions
 		}
 
 		/// <summary>
-		///     Hex -> <see cref="BigInteger" />, forced POSITIVE: a leading high bit would otherwise read as a negative
+		///     Hex to <see cref="BigInteger" />, forced positive: a leading high bit would otherwise read as a negative
 		///     two's-complement value and every <c>ModPow</c> over it would be wrong.
 		/// </summary>
 		public static BigInteger ToBigInteger(string hex)
@@ -54,7 +54,7 @@ namespace Faolan.Core.Extensions
 		}
 
 		/// <summary>
-		///     8 hex chars -> 4 bytes -> u32, reading the string's FIRST byte as the value's most significant - the
+		///     8 hex chars to 4 bytes to u32, reading the string's first byte as the value's most significant - the
 		///     plain reading, and what <c>%08x</c> on the far side produced.
 		/// </summary>
 		/// <exception cref="FormatException">Not exactly 8 hex characters.</exception>
@@ -66,8 +66,8 @@ namespace Faolan.Core.Extensions
 		}
 
 		/// <summary>
-		///     8 hex chars -> 4 bytes b0 b1 b2 b3 -> u32 <c>b0 | b1&lt;&lt;8 | b2&lt;&lt;16 | b3&lt;&lt;24</c>. The hex
-		///     spells the bytes in memory order, so the WORD comes out byte-swapped - the client's <c>popHexInt</c>.
+		///     8 hex chars to 4 bytes b0 b1 b2 b3 to u32 <c>b0 | b1&lt;&lt;8 | b2&lt;&lt;16 | b3&lt;&lt;24</c>. The hex
+		///     spells the bytes in memory order, so the word comes out byte-swapped - the client's <c>popHexInt</c>.
 		/// </summary>
 		/// <exception cref="FormatException">Not exactly 8 hex characters.</exception>
 		public static uint ToU32Le(ReadOnlySpan<char> hex)
@@ -79,8 +79,8 @@ namespace Faolan.Core.Extensions
 
 		// Strict on purpose: FromHexString rejects a stray space and a "0x" prefix, and the length check rejects a
 		// short word - all of which Convert.ToUInt32(s, 16) would have quietly accepted. Callers decrypt whatever
-		// comes back, so a body that isn't hex has to fail HERE rather than turn into a plausible-looking word.
-		// The span IS the value (not a field at an offset), so BinaryPrimitives is right and SpanExtensions is not.
+		// comes back, so a body that is not hex has to fail here rather than turn into a plausible-looking word.
+		// The span is the value (not a field at an offset), so BinaryPrimitives is right and SpanExtensions is not.
 		private static void ToBytes(ReadOnlySpan<char> hex, Span<byte> destination)
 		{
 			if (hex.Length != destination.Length * 2 || Convert.FromHexString(hex, destination, out _, out var written) != OperationStatus.Done || written != destination.Length)

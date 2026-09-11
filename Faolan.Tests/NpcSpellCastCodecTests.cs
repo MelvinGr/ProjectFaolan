@@ -8,14 +8,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gate for the NPC spell-cast form of MagicBuffCodec (#232). NpcSpellCast.bin is a captured ApplySpell
+	// Byte-exact gate for the NPC spell-cast form of MagicBuffCodec. NpcSpellCast.bin is a captured ApplySpell
 	// (0x6B87E316) carrier content from the hoxxling beach capture: the NPC at handle 0x17E29 casting spell
 	// 0x316AA600 at the player (0x1316E71). Rebuilding it from its own fields must reproduce the bytes - so the sim
 	// can construct an NPC cast from an NpcSpell row instead of replaying a captured blob.
 	public class NpcSpellCastCodecTests
 	{
-		// #253: the server->client buff-REMOVAL carrier is the same ApplySpell shape with the rank-1 "end" spell id
-		// and an EMPTY payload. Byte-exact against the mount buff end captured at dismount (mount 0x31eb15, end id
+		// The server->client buff-removal carrier is the same ApplySpell shape with the rank-1 "end" spell id
+		// and an empty payload. Byte-exact against the mount buff end captured at dismount (mount 0x31eb15, end id
 		// 0x31eb1501, self-applied to/from player handle 0x0802e5d4 - NecroL80 *_dismount, frame 1449).
 		[Fact]
 		public void Build_EmptyPayload_IsTheBuffRemovalEndTwin()
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal(built, MagicBuffCodec.Build(rt));
 		}
 
-		// #26: the mount RIDE buff (the ApplySpell that seats the player after the horse spawns) built from the
+		// The mount ride buff (the ApplySpell that seats the player after the horse spawns) built from the
 		// MountCatalog constants must reproduce the captured apply byte-for-byte - NecroL80 *_mount_move_dismount,
 		// frame 520 (self-applied to/from player handle 0x0802e5d4, spell 0x31EB1500 + the 54-byte payload).
 		[Fact]
@@ -63,20 +63,20 @@ namespace Faolan.Tests
 			Assert.Equal(capturedCarrier, built);
 		}
 
-		// #342: retail's WORLD-ENTRY mount restore is the same record as a fresh mount cast. Riding out of the no-mount
+		// Retail's world-entry mount restore is the same record as a fresh mount cast. Riding out of the no-mount
 		// King Conan castle (NecroL80_..._login_leave_king_conan_castle-Dismount, the ride buff two records after the
 		// FullChar snapshot), retail re-seats the mount with an apply that differs from the cast above in only 6 of 84
-		// bytes. So there is no "already active" / silent variant of this record to prefer, which is what rules out the
-		// snapshot-reconstruction approach the ticket proposed: the snapshot has no buff region, and retail would not
-		// use one if it had.
+		// bytes. So there is no "already active" / silent variant of this record to prefer, which is what rules out
+		// reconstructing the restore from the snapshot: the snapshot has no buff region, and retail would not use one if
+		// it had.
 		//
 		// Those 6 bytes were long filed as "the per-application effect id and the trailing nonce, which vary by
-		// definition". They are nothing of the sort, and decoding them (#480) is what turns this pair into evidence for
-		// how a restore is SHAPED:
+		// definition". They are nothing of the sort, and decoding them is what turns this pair into evidence for
+		// how a restore is shaped:
 		//   * bytes 35..37 are the payload's Duration - 8_509_794 cs (23.638 h) against the fresh cast's 8_640_000
-		//     (24 h). Retail restores with the REMAINING time, not the full duration. 21.7 minutes had elapsed.
-		//   * bytes 77..79 are the payload's absolute EXPIRY STAMP, in milliseconds of the server's uptime.
-		// Subtracting each record's own duration from its own stamp recovers the instant each was APPLIED, and the two
+		//     (24 h). Retail restores with the remaining time, not the full duration. 21.7 minutes had elapsed.
+		//   * bytes 77..79 are the payload's absolute expiry stamp, in milliseconds of the server's uptime.
+		// Subtracting each record's own duration from its own stamp recovers the instant each was applied, and the two
 		// captures - separate files, separate sessions - land 91.8 seconds apart on one server's uptime: 3.15135 days
 		// and 3.15029 days. Two independently captured absolute timestamps agreeing to a minute and a half is what
 		// pins the clock, and it is the same clock DispatchPong carries (see MagicBuffExpiryStampTests).

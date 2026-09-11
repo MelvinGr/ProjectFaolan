@@ -15,13 +15,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The pick-one-of-N quest reward exchange (#815), server side. The CODEC is gated byte-exact against the capture in
-	// QuestRewardCodecTests; what this gates is the POLICY around it - who may claim, how often, and what the offer is
+	// The pick-one-of-N quest reward exchange, server side. The codec is gated byte-exact against the capture in
+	// QuestRewardCodecTests; what this gates is the policy around it - who may claim, how often, and what the offer is
 	// built from.
 	//
 	// The idempotence case is the point. The quest completes exactly once, but the grant is driven by
 	// QuestRewardSelectionIIR - an ordinary c2s packet naming its own quest id - so nothing stops a client sending it
-	// twice or naming a quest it finished long ago. The reward is closed by the recorded ANSWER, not by the completion.
+	// twice or naming a quest it finished long ago. The reward is closed by the recorded answer, not by the completion.
 	public class QuestRewardServiceTests : IDisposable
 	{
 		private const uint CharacterId = 4242;
@@ -117,8 +117,8 @@ namespace Faolan.Tests
 		// not a LevelUpService, which would need a WorldSimulation behind it to say the same thing.
 		private readonly List<uint> _xpAwards = [];
 
-		// #820: a quest pays the experience and money its OWN record states - which are the numbers the client's
-		// journal advertised on its `XP:` and `Money:` lines, established in-client (#759/#802). Anything else would
+		// A quest pays the experience and money its own record states - which are the numbers the client's
+		// journal advertised on its `XP:` and `Money:` lines, established in-client. Anything else would
 		// be a divergence the player can see on the panel they took the quest from.
 		[Fact]
 		public async Task CompletingAQuestThatStatesRewards_PaysBoth()
@@ -130,15 +130,15 @@ namespace Faolan.Tests
 
 			Assert.Equal([5553u], _xpAwards);
 
-			// TIN in the column, TIN on the wire, and an ABSOLUTE balance rather than a delta - so 400 + 111200.
+			// Tin in the column, tin on the wire, and an absolute balance rather than a delta - so 400 + 111200.
 			var cash = Assert.Single(economy.CashUpdates);
 			Assert.Equal((111600ul, UpdateCashReason.Gain), cash);
 			Assert.Equal(111600ul, client.Session.Character.Money);
 		}
 
-		// ⛔ And nothing is invented where the record is silent, which is almost every quest: 21 of 5049 carry a money
+		// And nothing is invented where the record is silent, which is almost every quest: 21 of 5049 carry a money
 		// reward. Retail pays experience on quests whose every reward slot is zero, but the magnitude is unmeasurable
-		// from what we hold (`CharacterStatId.Exp` is on no stat record in the whole corpus - see #820), so a formula
+		// from what we hold (`CharacterStatId.Exp` is on no stat record in the whole corpus), so a formula
 		// here would be a guess shipped into five thousand quests. Paying nothing is the honest answer until a
 		// capture says otherwise, and this is what holds that line.
 		[Fact]
@@ -155,7 +155,7 @@ namespace Faolan.Tests
 		}
 
 		// The two halves are independent - a quest may pay experience only, which is the commoner shape of the pair
-		// (the money carriers are a SUBSET of the xp carriers).
+		// (the money carriers are a subset of the xp carriers).
 		[Fact]
 		public async Task AQuestThatPaysExperienceOnly_SendsNoWalletUpdate()
 		{
@@ -244,7 +244,7 @@ namespace Faolan.Tests
 		}
 
 		// Records which templates actually reached the backpack - the difference between "confirmed" and "granted" -
-		// and the wallet pushes, which is how #820's money award is observed.
+		// and the wallet pushes, which is how the money award is observed.
 		private sealed class RecordingEconomy : NoOpEconomyOutbound
 		{
 			public List<uint> Granted { get; } = [];

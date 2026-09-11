@@ -9,12 +9,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// Imports the client's forbidden-word list (RDB 1065100) into `NameFilterTerm` as HASHES - the words themselves
-	// must not land in a repo that goes public, and `faolan.sql` mirrors every row as reviewable text. See
-	// `NameFilterTerm` and `CharacterNameRules` for why hashing costs the check nothing.
-	//
-	// The list is deduped (most terms are listed twice) and filtered to terms that can actually be a substring of a
-	// character name: 3..16 characters, no separators.
+	/// <summary>
+	///     Imports the client's forbidden-word list (RDB 1065100) into <see cref="NameFilterTerm" /> as hashes.
+	/// </summary>
+	/// <remarks>
+	///     The words themselves must not land in a repo that goes public, and faolan.sql mirrors every row as
+	///     reviewable text; see <see cref="NameFilterTerm" /> and <see cref="CharacterNameRules" /> for why hashing
+	///     costs the check nothing. The list is deduped, since most terms are listed twice, and filtered to terms that
+	///     can actually be a substring of a character name: 3 to 16 characters, no separators.
+	/// </remarks>
 	public static class RdbNameFilterImporter
 	{
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase = null, bool overwrite = false)
@@ -51,8 +54,9 @@ namespace Faolan.Importer.Rdb
 			return new Result(terms.Count, usable.Count, added);
 		}
 
-		// Shipped = what the record carries, Usable = what survives dedupe + the substring-shaped filter,
-		// Added = rows written.
+		/// <param name="Shipped">What the record carries.</param>
+		/// <param name="Usable">What survives dedupe and the substring-shaped filter.</param>
+		/// <param name="Added">Rows written.</param>
 		public sealed record Result(int Shipped, int Usable, int Added);
 	}
 }

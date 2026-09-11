@@ -9,31 +9,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report disposition-rule`: is the LAST-RESORT hostility rule (`NpcDispositionTiers.IsMob`) better than the
-	// default it replaced, and does it leave the townsfolk alone? (Gitea #841.)
+	// `--report disposition-rule`: is the last-resort hostility rule (`NpcDispositionTiers.IsMob`) better than a bare
+	// default, and does it leave the townsfolk alone?
 	//
-	// The chain that decides an NPC's overhead disposition is three OBSERVATIONS and one inference (see
-	// `NpcDispositionTiers`). This report exists for the inference. It scores it - and its ablations, including the
-	// rule the 2026-07-11 regression removed and the default that replaced it - against the templates retail was
-	// captured answering for DIRECTLY, which is ground truth no tier of the chain contributed to.
+	// The chain that decides an NPC's overhead disposition is three observations and one inference (see
+	// `NpcDispositionTiers`), and this report exists for the inference. It scores that rule, and its ablations,
+	// against the templates retail was captured answering for directly - ground truth no tier of the chain
+	// contributed to.
 	//
-	// ⚠️ The success criterion is not "the crocodiles bite". A rule that is right for wildlife and wrong for townsfolk
-	// is exactly what caused the regression: `Hostile = Community > 0` aggroed every Citizen, vendor and Gate Guard
-	// because community 1 is the civilian/default faction. So the number that decides adoption is not accuracy but the
-	// FRIENDLY-SIDE error - how many templates retail called friendly the rule would call hostile - and the check
-	// FAILS on any of those rather than on a percentage.
+	// The success criterion is not "the crocodiles bite". A rule that is right for wildlife and wrong for townsfolk is
+	// the failure mode to avoid: `Hostile = Community > 0` aggroes every Citizen, vendor and Gate Guard, because
+	// community 1 is the civilian default faction. So the number that decides adoption is not accuracy but the
+	// friendly-side error - how many templates retail called friendly the rule would call hostile - and the check
+	// fails on any of those rather than on a percentage.
 	//
-	// ⭐ **Why it is a REPORT and not a test**, the same argument as `--report npc-pose-check`: it scores importer
-	// OUTPUT (the rule, and the `NpcStatCores.Disposition` it writes) against importer INPUT (the captured polls). The
-	// two populations diverge the moment a capture is added - a new dump both labels templates the rule was scored on
-	// and shrinks the unknown set it fires over - so every count here MOVES with the corpus and is printed rather than
+	// It is a report and not a test, the same argument as `--report npc-pose-check`: it scores importer output (the
+	// rule, and the `NpcStatCores.Disposition` it writes) against importer input (the captured polls). The two
+	// populations diverge the moment a capture is added, since a new dump both labels templates the rule was scored on
+	// and shrinks the unknown set it fires over, so every count here moves with the corpus and is printed rather than
 	// pinned. What stays asserted is the one direction that can only be a defect.
 	public static partial class ReportCli
 	{
 		private static async Task<int> DispositionRule(IReadOnlyList<NamedCapture> captures)
 		{
 			// Tier 1, and the ground truth for everything below: the templates retail answered a RequestAggroStatus
-			// for. 406 of 414 vote unanimously (#731), so the majority is not papering over a split.
+			// for. The votes are near-unanimous per template, so the majority is not papering over a split.
 			var templateVotes = new Dictionary<uint, Dictionary<uint, int>>();
 			foreach (var capture in captures)
 			foreach (var (templateId, category) in NpcDispositionExtractor.Extract(capture.Packets))
@@ -62,8 +62,8 @@ namespace Faolan.Importer.Cli
 				$"{truth.Count(c => polled[c.NpcTemplateId] == 1)} hostile, {truth.Count(c => polled[c.NpcTemplateId] == 2)} neutral.");
 
 			// The ablations. Each is a "call this one hostile" predicate; everything it does not fire on keeps the
-			// current behaviour, which is the friendly default - so the scoring below is deliberately BINARY. The two
-			// middle rows are the rule the regression removed, in both of its readings.
+			// current behaviour, which is the friendly default - so the scoring below is deliberately binary. The two
+			// middle rows are the community-only rule, in both of its readings.
 			var candidates = new (string Name, Func<NpcStatCore, bool> Predicate)[]
 			{
 				("always friendly (today's default)", _ => false),
@@ -75,7 +75,7 @@ namespace Faolan.Importer.Cli
 
 			// A rule that scores well but fires on nothing has not fixed anything, and a rule scored only on the polled
 			// population is scored on the population it will never see - so the same table carries both: how each
-			// candidate does against ground truth, and how many of the templates that actually REACH the last resort
+			// candidate does against ground truth, and how many of the templates that actually reach the last resort
 			// it would answer for.
 			var commByTemplate = cores.ToDictionary(c => c.NpcTemplateId, c => (long?)c.Community ?? NpcDispositionTiers.NullCommunity);
 			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
@@ -123,10 +123,10 @@ namespace Faolan.Importer.Cli
 					$"{correct / (double)truth.Count,7:P1} {reachTier4.Count(predicate),6}");
 			}
 
-			// Why the AND, since the collision group alone scores HIGHER above: the two differ only over the creatures
+			// Why the and, since the collision group alone scores higher above: the two differ only over the creatures
 			// carrying the mob group in the civilian faction or in none, which is where the passive wildlife sits - the
 			// rabbits, hens, deer, badgers and rats retail answers NEUTRAL for. The `fills` column is what settles it:
-			// on the population that actually reaches the last resort the two answer the SAME templates, so the AND
+			// on the population that actually reaches the last resort the two answer the same templates, so the and
 			// costs nothing today, and over ground truth it halves the neutral-side error. A rule that makes a rabbit
 			// bite is a visible defect; leaving a creature friendly is the status quo this tier improves on.
 			Console.WriteLine();
@@ -153,8 +153,8 @@ namespace Faolan.Importer.Cli
 			if (filled.Count > 12)
 				Console.WriteLine($"      ... and {filled.Count - 12} more");
 
-			// The one assertion. A template retail was captured calling FRIENDLY that the rule would call hostile is
-			// the regression signature - a townsperson that aggros - and no percentage excuses it.
+			// The one assertion. A template retail was captured calling friendly that the rule would call hostile is a
+			// townsperson that aggros, and no percentage excuses it.
 			var regressions = truth.Where(c => polled[c.NpcTemplateId] == 0 && NpcDispositionTiers.IsMob(c)).ToList();
 			Console.WriteLine();
 			if (regressions.Count == 0)

@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Directional combat (#20) - the defender's shield rose. Every expectation here is a measurement, so the class
+	// Directional combat - the defender's shield rose. Every expectation here is a measurement, so the class
 	// doubles as the record of the decode:
 	//   * the 10 packed distributions and the "one shield moves" transition shape come from the 110 CombatShieldIIR
 	//     records / 39 transitions in the capture corpus;
 	//   * the mitigation table comes from the client's own balance sheet (RDB 1000516 `Combat_PvE{0..3}ShieldBonus`
 	//     0.2/0/-0.33/-0.66 and `Combat_PvP{0..3}ShieldBonus` 0.2/0/-0.15/-0.30), which the client registers and never
-	//     reads - so they are the SERVER's numbers;
+	//     reads - so they are the server's numbers;
 	//   * the direction ability ids are the LDB names of the swing tail's last word (769094 Upper Left Attack,
 	//     769095 Upper Right Attack, 769099 Overhead Attack).
 	public class CombatShieldRoseTests
@@ -112,7 +112,7 @@ namespace Faolan.Tests
 		}
 
 		// A combo step / spell / plain unarmed jab carries no direction ability, so it takes no arc modifier at all -
-		// the flat behaviour every non-directional path had before this landed.
+		// the flat behaviour every non-directional path gets.
 		[Theory, InlineData(0u), InlineData(769098u), InlineData(108900u)]
 		public void ArcFor_IsNullForAnUndirectedAbility(uint abilityId)
 		{
@@ -160,7 +160,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, CombatShieldRose.ApplyArcMitigation(0, 300, ShieldArc.Left));
 		}
 
-		// #620: a player's rose is the only one that arrives from OUTSIDE, so it is the only one that needs the client's
+		// A player's rose is the only one that arrives from outside, so it is the only one that needs the client's
 		// own overflow rule applied to it - FUN_0113de90 resets stat 0xA5 to 111 when the digits sum above three.
 		[Theory, InlineData(300u, 300u), InlineData(111u, 111u), InlineData(21u, 21u), InlineData(0u, 0u), InlineData(333u, 111u), InlineData(999u, 111u),
 		 InlineData(1000u, 111u), InlineData(uint.MaxValue, 111u)]
@@ -176,9 +176,9 @@ namespace Faolan.Tests
 			Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 0, ShieldArc.Mid));
 		}
 
-		// #621/#673: an NPC's swing carries no direction ability, so the server picks the zone it swings from. It is a
-		// direction of the SWING, not of the attacker's position - so the first thing to gate is that it reaches all
-		// FIVE zones retail's mobs use (a stuck selector would silently make one guard the only one that matters).
+		// An NPC's swing carries no direction ability, so the server picks the zone it swings from. It is a
+		// direction of the swing, not of the attacker's position - so the first thing to gate is that it reaches all
+		// five zones retail's mobs use (a stuck selector would silently make one guard the only one that matters).
 		[Fact]
 		public void RollSwingDirection_ReachesAllFiveOfTheClientsZones()
 		{
@@ -190,7 +190,7 @@ namespace Faolan.Tests
 			Assert.Equal(Enum.GetValues<SwingDirection>().ToHashSet(), seen);
 		}
 
-		// The measurement the five-zone model rests on (#673): collapsed onto the three GUARD arcs, the corpus's 2,709
+		// The measurement the five-zone model rests on: collapsed onto the three guard arcs, the corpus's 2,709
 		// NPC-actor swings are uniform (918/896/895, chi-square 0.37 on 2 df). So the arc draw must stay uniform even
 		// though the zone draw is not - a model fitted to the raw five-way counts would bias the mitigation, which is
 		// the only thing the arc is spent on.
@@ -207,7 +207,7 @@ namespace Faolan.Tests
 				Assert.InRange(n / (double)rolls, 0.32, 0.347);
 		}
 
-		// The height axis IS biased, and measured: within the two side arcs the corpus is 1,056 upper / 757 lower.
+		// The height axis is biased, and measured: within the two side arcs the corpus is 1,056 upper / 757 lower.
 		// Uniform-over-five would put 40% of every side arc's swings in each of upper and lower, so a wide band still
 		// separates the model that was fitted from the one that was not.
 		[Fact]
@@ -237,7 +237,7 @@ namespace Faolan.Tests
 		}
 
 		// The client's own collapse (`FUN_005edd90` folds Lower Left -> Upper Left and Lower Right -> Upper Right):
-		// a lower zone is guarded by the arc on its OWN side, which is what lets three shields cover five zones.
+		// a lower zone is guarded by the arc on its own side, which is what lets three shields cover five zones.
 		[Theory]
 		[InlineData(SwingDirection.UpperLeft, ShieldArc.Left)]
 		[InlineData(SwingDirection.LowerLeft, ShieldArc.Left)]
@@ -250,7 +250,7 @@ namespace Faolan.Tests
 		}
 
 		// The ability id -> zone mapping, in the client's enum order. `ArcFor` is this composed with `ArcOf`, so this
-		// is what pins the two LOWER abilities that no captured player swing ever carries.
+		// is what pins the two lower abilities that no captured player swing ever carries.
 		[Theory]
 		[InlineData(769094u, SwingDirection.UpperLeft)]
 		[InlineData(769095u, SwingDirection.UpperRight)]
@@ -262,7 +262,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, CombatShieldRose.DirectionFor(abilityId));
 		}
 
-		// The mob's swing goes through the SAME table as a player's directed swing - a mob hitting a guard the player
+		// The mob's swing goes through the same table as a player's directed swing - a mob hitting a guard the player
 		// stacked is mitigated, one hitting a bare arc is not. The player defender takes the gentler PvP column.
 		[Fact]
 		public void ApplyArcMitigation_AMobsSwingIsMitigatedByTheArcThePlayerStacked()
@@ -277,7 +277,7 @@ namespace Faolan.Tests
 				Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 111, arc, playerVersusPlayer: true));
 		}
 
-		// #673: the zone the mitigation charges for is the zone the ACK states, and the mapping is the client's own -
+		// The zone the mitigation charges for is the zone the ack states, and the mapping is the client's own -
 		// `FUN_005e3b30` is the same switch over the same 1..5 order. The first three are pinned to the `Abilities`
 		// rows `Upper Left`/`Upper Right`/`Overhead Attack` by the corpus with zero exceptions, and the two lower ones
 		// by the combo parser's `0xCC -> 0xC9` / `0xCD -> 0xCA` fold. So this asserts a decoded correspondence, not a
@@ -293,7 +293,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, BehaviorAcks.SwingDirectionCode(direction));
 		}
 
-		// Every zone maps, and to a DISTINCT code - a mapping that collapsed two zones onto one would state the wrong
+		// Every zone maps, and to a distinct code - a mapping that collapsed two zones onto one would state the wrong
 		// direction on the wire for one of them and never fail an equality test written zone-by-zone.
 		[Fact]
 		public void SwingDirectionCode_IsOneToOneOverTheWholeEnum()

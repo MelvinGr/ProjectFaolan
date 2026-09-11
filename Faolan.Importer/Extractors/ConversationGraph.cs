@@ -7,18 +7,18 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// Folds the harvested WALKS into the dialogue GRAPH the runtime serves (#642).
+	// Folds the harvested WALKS into the dialogue GRAPH the runtime serves.
 	//
 	// A capture is a walk: the player opened a window and clicked their way down one route, so the extractor produces
-	// one row per (route position, quest state). That is the right shape to HARVEST and the wrong shape to STORE -
+	// one row per (route position, quest state). That is the right shape to HARVEST and the wrong shape to store -
 	// keyed by the answer-index path it cannot represent a loop, it stores every convergent screen once per route that
-	// reaches it, and an answer INDEX means different things in different variants of the same screen.
+	// reaches it, and an answer index means different things in different variants of the same screen.
 	//
-	// This turns those walks into what retail actually has: screens named by their CONTENT, and explicit edges named by
+	// This turns those walks into what retail actually has: screens named by their content, and explicit edges named by
 	// the clicked option's own LDB string id.
 	//
 	//   1. Signature each walk by the ordered `category:id` list of its remoteformat screens.
-	//   2. Partition-refine within each signature group: two same-content walks MERGE unless a SHARED (option, gate)
+	//   2. Partition-refine within each signature group: two same-content walks MERGE unless a shared (option, gate)
 	//      slot leads to children in different classes. Shared-only is what lets a truncated loop lap merge into the
 	//      fuller screen instead of splitting off; iterate to a fixed point (terminates, and handles cycles).
 	//   3. Emit one node per class, with a Discriminator assigned deterministically within the signature group.
@@ -51,7 +51,7 @@ namespace Faolan.Importer.Extractors
 
 			var report = new List<string>();
 
-			// #646: a walk whose NPC could not be attributed to a TEMPLATE is dropped here, before anything is folded.
+			// a walk whose NPC could not be attributed to a template is dropped here, before anything is folded.
 			// The template is the screen's identity now, so an unattributed walk has no key - and the runtime routes a
 			// click by template, so it could never be reached even if it were stored. Reported per NPC rather than
 			// silently skipped: a template that stops resolving is a harvest regression, not a shrug.
@@ -158,7 +158,7 @@ namespace Faolan.Importer.Extractors
 		// looked alike folding into one is exactly the mistake this catches - and the edge dedup can drop a branch when
 		// two routes disagree about where the same option leads.
 		//
-		// ⚠️ A hop carries its OWN gate, not the leaf walk's (#644). The route is a chain of harvested (parent, child)
+		// A hop carries its own gate, not the leaf walk's. The route is a chain of harvested (parent, child)
 		// pairs and `EdgeGate` is evaluated per pair, so the gate on hop 1 is generally a different quest from the gate
 		// on hop 4 - a route can cross an ungated screen on the way to a gated one, and vice versa. Replaying with the
 		// LEAF's gate at every hop was the original bug behind the three unreplayable walks: at Turach's root, option
@@ -168,7 +168,7 @@ namespace Faolan.Importer.Extractors
 		// leaf's gate matched a SIBLING branch at hop 1 and sent the replay down the wrong sub-tree.
 		//
 		// Also reports the screens nothing reaches. Under the answer-path key an unreachable screen was not even
-		// expressible (the path WAS the route), so this is a class of defect that only becomes visible here.
+		// expressible (the path was the route), so this is a class of defect that only becomes visible here.
 		private static void Verify(Graph graph, List<Harvested> walks, Dictionary<Harvested, string> classOf, Dictionary<string, uint> nodeIdOf,
 			Dictionary<Harvested, (Harvested Parent, uint OptionId)> parents)
 		{
@@ -179,7 +179,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var h in walks)
 			{
-				// Climb to the root the capture opened on, collecting each click AND the gate that click was harvested
+				// Climb to the root the capture opened on, collecting each click and the gate that click was harvested
 				// under - the same (option, gate) slot the fold keyed the edge by.
 				var route = new List<(uint Option, uint? Quest, QuestState? State)>();
 				var at = h;
@@ -226,7 +226,7 @@ namespace Faolan.Importer.Extractors
 				}
 				else
 				{
-					// Named, not just counted: a walk that no longer replays is a branch the fold moved or lost, and the
+					// Named, not just counted: a walk that does not replay is a branch the fold moved or lost, and the
 					// route it took is the whole diagnosis. Bounded so a systematic break reports a symptom rather than
 					// 500 lines of one.
 					lost++;
@@ -254,16 +254,16 @@ namespace Faolan.Importer.Extractors
 			return list == null ? [] : [.. list.Screens.OrderBy(s => s.Sequence).Select(s => s.ScreenId)];
 		}
 
-		// The walk each non-root walk BRANCHED FROM, and the LDB id of the option that was clicked.
+		// The walk each non-root walk BRANCHED from, and the LDB id of the option that was clicked.
 		//
-		// Both come off the WIRE (ConversationWalk.ParentContentKey / OptionId): the extractor names the screen the
+		// Both come off the wire (ConversationWalk.ParentContentKey / OptionId): the extractor names the screen the
 		// player was looking at when they picked, by content, and the option they clicked, by its own LDB id.
 		//
-		// ⚠️ Deliberately not derived from the answer path, which was the first attempt and is wrong. A path only says
+		// Deliberately not derived from the answer path, which was the first attempt and is wrong. A path only says
 		// "one pick shallower", and where a screen has quest-gated VARIANTS that is several different screens. Casilda's
 		// `2` sub-tree is the worked example: harvested under her five-option 12373 greeting but itself ungated, so the
-		// path-derived parent attached it to the three-option unconditional greeting and index 2 named "Goodbye". The
-		// walk-replay gate is what caught it - 21 of 553 walks could no longer be walked to.
+		// path-derived parent attaches it to the three-option unconditional greeting, where index 2 names "Goodbye".
+		// The walk-replay gate is what catches that: the affected walks cannot be walked to.
 		//
 		// The content key identifies the parent SCREEN, which may still be several walks (the same screen appears once
 		// per route that reaches it); any of them will do, because they all fold into the same class. The same-gate one
@@ -297,11 +297,11 @@ namespace Faolan.Importer.Extractors
 					if (!uint.TryParse(cut < 0 ? h.Walk.AnswerPath : h.Walk.AnswerPath[(cut + 1)..], out var index))
 						continue;
 
-					// A path names SEVERAL walks (one per quest-gated variant of that screen), and the index has to name a
+					// A path names several walks (one per quest-gated variant of that screen), and the index has to name a
 					// button on the one we pick - so a candidate that never offered that many options cannot be the
 					// parent, whatever the gate says. Shortlisting on that before the gate preference is what recovers
 					// Casilda's '0>0>0', whose same-path candidates include a close screen with no answer list at all
-					// (#644). If none can, fall back to the whole list so the report still names the real shortfall.
+					// . If none can, fall back to the whole list so the report still names the real shortfall.
 					var candidates = byPath[(h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, parentPath)].ToList();
 					var offering = candidates.Where(c => OptionIdsOf(c).Count > index).ToList();
 					parent = Pick(offering.Count > 0 ? offering : candidates, h, parentPath);
@@ -309,7 +309,7 @@ namespace Faolan.Importer.Extractors
 					if (index >= offered.Count)
 					{
 						// Named rather than counted, so the branch that is actually lost can be looked up in the corpus
-						// instead of standing as an anonymous "1" forever (#644).
+						// instead of standing as an anonymous "1" forever.
 						dropped++;
 						report.Add($"  unlinkable: {h.Walk.NpcName} '{h.Walk.AnswerPath}' - parent '{parentPath}' "
 						           + (parent == null ? "was never captured" : $"offers {offered.Count} option(s), so index {index} names none"));
@@ -331,7 +331,7 @@ namespace Faolan.Importer.Extractors
 			return links;
 
 			// The content key names the parent SCREEN, which is usually several walks - the same screen appears once per
-			// route that reaches it. Preferring the walk at the child's own parent PATH keeps those routes apart, which
+			// route that reaches it. Preferring the walk at the child's own parent path keeps those routes apart, which
 			// is what lets the refinement see that two same-content screens lead different places (Laranga's 19827: one
 			// route's "Goodbye" goes to 20148, the other's to 1384). Then the runtime's own precedence: the parent
 			// captured under this walk's gate, else the unconditional one.
@@ -351,14 +351,14 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// One refinement round: split a class whenever two of its walks disagree about where a SHARED (option, gate)
+		// One refinement round: split a class whenever two of its walks disagree about where a shared (option, gate)
 		// slot leads. Shared-only is deliberate - a walk that simply stops earlier (a loop lap the capture truncated,
 		// a route nobody explored past this point) says nothing about the slots it never exercised, so it merges into
 		// the fuller screen instead of splitting off as a near-duplicate.
 		private static Dictionary<Harvested, string> Refine(List<Harvested> walks, Dictionary<Harvested, string> classOf,
 			Dictionary<Harvested, (Harvested Parent, uint OptionId)> parents, Dictionary<Harvested, List<uint>> options)
 		{
-			// slot map per walk: what each of ITS options leads to, in the current classification.
+			// slot map per walk: what each of its options leads to, in the current classification.
 			var slots = walks.ToDictionary(h => h, _ => new Dictionary<(uint, uint?, QuestState?), string>());
 			foreach (var (child, link) in parents)
 			{
@@ -397,8 +397,8 @@ namespace Faolan.Importer.Extractors
 			return a.Any(kv => b.TryGetValue(kv.Key, out var other) && other != kv.Value);
 		}
 
-		// The gate to put ON the branch. A child gated exactly as its parent adds nothing - the player satisfied that
-		// gate to be standing on the parent at all - so only a gate the parent does NOT already carry is written down.
+		// The gate to put on the branch. A child gated exactly as its parent adds nothing - the player satisfied that
+		// gate to be standing on the parent at all - so only a gate the parent does not already carry is written down.
 		private static (uint? Quest, QuestState? State) EdgeGate(ConversationWalk parent, ConversationWalk child)
 		{
 			return child.ConditionQuestId == parent.ConditionQuestId && child.ConditionQuestState == parent.ConditionQuestState
@@ -417,7 +417,7 @@ namespace Faolan.Importer.Extractors
 		// One screen's raw packets as the columnized rows this class reads. The same decode the conversation import
 		// runs, so a content key computed here agrees with the imported graph by construction.
 		//
-		// A packet that will not columnize is SKIPPED rather than fatal: the callers are naming a screen for the sake of
+		// A packet that will not columnize is skipped rather than fatal: the callers are naming a screen for the sake of
 		// a link, and ImportConversations is where a body we cannot rebuild is an error.
 		internal static Harvested Columnize(List<byte[]> screen)
 		{
@@ -436,11 +436,11 @@ namespace Faolan.Importer.Extractors
 			return new Harvested(new ConversationWalk(0, "", 0, screen, ""), packets);
 		}
 
-		// What the screen SAYS: the ordered `category:id` of every remoteformat screen it carries - the NPC's spoken
+		// What the screen says: the ordered `category:id` of every remoteformat screen it carries - the NPC's spoken
 		// line (50002), each option button (50001; 0 is the universal "Goodbye") and the close screen (100:0). In the
 		// shipped data that pair determines the LDB decryption key 1:1, so it is a content-derived name.
 		//
-		// ⚠️ A SPURIOUS trailing close is excluded, exactly as ConversationService.ServeScreen excludes it: a captured
+		// A SPURIOUS trailing close is excluded, exactly as ConversationService.ServeScreen excludes it: a captured
 		// screen that offers options sometimes also carries a CloseChatWindow because the capturing session shut the
 		// window right after, and the runtime drops that packet so the option list stays interactive. Counting it as
 		// content split Casilda's 12369 greeting off as a second screen with no branches of its own - so the root
@@ -456,8 +456,8 @@ namespace Faolan.Importer.Extractors
 				.Select(s => $"{s.Category}:{s.ScreenId}"));
 		}
 
-		// The option buttons this screen offers, in the order the client draws them - so an answer INDEX resolves to
-		// the option's own LDB id. The LAST answer list wins: a screen that carries several is one the capture
+		// The option buttons this screen offers, in the order the client draws them - so an answer index resolves to
+		// the option's own LDB id. The last answer list wins: a screen that carries several is one the capture
 		// re-sent, and the last is what was on screen when the player clicked.
 		internal static List<uint> OptionIdsOf(Harvested h)
 		{

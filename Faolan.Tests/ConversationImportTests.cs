@@ -12,15 +12,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The conversation import WRITING the folded graph (#642), against a real database: the screens, the branches
+	// The conversation import writing the folded graph, against a real database: the screens, the branches
 	// between them, the roots that open them, and the delete order that lets a rebuild reuse the same derived keys.
 	//
 	// ConversationGraphTests pins the fold itself; this pins that what the fold produced survives the round-trip -
 	// including the FK shape, which is where an edge naming two nodes is easy to get wrong.
 	//
-	// ⚠️ This replaced the incremental-upsert tests (#419). The fold is a global partition over every harvested walk,
-	// so a dump can no longer be merged into a database that has forgotten the walks the rest came from; the merge rule
-	// those tests existed for ("the most complete capture of a screen wins") now runs inside the fold instead.
+	// The fold is a global partition over every harvested walk, so a dump cannot be merged into a database that has
+	// forgotten the walks the rest came from; the merge rule ("the most complete capture of a screen wins") runs
+	// inside the fold.
 	public class ConversationImportTests
 	{
 		private const uint QuestLineId = 241;
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		private const uint MapId = 4010;
 		private const uint TypeId = 42008;
 
-		// Casilda's real NPC template - the screen's identity since #646, and a real FK, so the row has to exist.
+		// Casilda's real NPC template - the screen's identity, and a real FK, so the row has to exist.
 		private const uint NpcTemplate = 9411;
 
 		[Fact]
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			});
 		}
 
-		// A rebuild reuses the very same derived ids, so it must DROP the wiring before the screens: an edge names two
+		// A rebuild reuses the very same derived ids, so it must drop the wiring before the screens: an edge names two
 		// nodes and the inbound end deliberately does not cascade, so deleting a screen underneath a live edge is a
 		// foreign-key violation rather than a silent orphan.
 		[Fact]
@@ -73,8 +73,8 @@ namespace Faolan.Tests
 			});
 		}
 
-		// The rebuild is what the corpus SAYS, so a screen the new set no longer produces goes - together with the
-		// branch that reached it.
+		// The rebuild is what the corpus says: a screen the new set does not produce goes, together with the branch
+		// that reached it.
 		[Fact]
 		public async Task ARebuildDropsWhatTheCorpusNoLongerProduces()
 		{
@@ -107,9 +107,9 @@ namespace Faolan.Tests
 			});
 		}
 
-		// One harvested walk. The ROOT is a spoken line plus the captured answer list, which is what names the branch out
+		// One harvested walk. The root is a spoken line plus the captured answer list, which is what names the branch out
 		// of it; the child is a terminal close, so the two screens differ in content and stay two nodes (identical
-		// content would - correctly - fold into one). Real captured records: the importer REJECTS a packet it cannot
+		// content would - correctly - fold into one). Real captured records: the importer rejects a packet it cannot
 		// decode and rebuild byte-for-byte, so a synthetic blob would not survive the import.
 		private static ConversationWalk Walk(string answerPath, uint grant = 0)
 		{
@@ -137,8 +137,8 @@ namespace Faolan.Tests
 				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
 				// GrantQuestId is a real FK, and a QuestDefinition FKs its area and map in turn - so the grant a branch
-				// carries needs that whole chain present before it can be referenced. Since #646 the NPC TEMPLATE is a
-				// non-null FK on both the node and the root, so it joins that set.
+				// carries needs that whole chain present before it can be referenced. The NPC template is a non-null FK
+				// on both the node and the root, so it joins that set.
 				db.Maps.Add(new Map
 				{
 					Id = MapId,

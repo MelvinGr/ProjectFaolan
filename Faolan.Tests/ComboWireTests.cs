@@ -13,11 +13,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The melee-combo WIRE claims (#139), gated against the captured swings in `assets/combo-swings.bin` - every
+	// The melee-combo wire claims, gated against the captured swings in `assets/combo-swings.bin` - every
 	// `Combat:*` BehaviorControlCenter record in the corpus whose CommandMessage args carry a `combo_id`, whole and
 	// in capture order (`--report combo-swings --report-arg <file>` writes it).
 	//
-	// The claim being locked is that the combo is STATED on the wire, not inferred: `combo_id` (field 7) is the
+	// The claim being locked is that the combo is stated on the wire, not inferred: `combo_id` (field 7) is the
 	// `Combos` catalog id verbatim and `combo_attack_num` (field 8) is the step within it. That had been read as a
 	// raw byte run instead - "[08][animByte][2B marker][u32 counter][u32 cid = 0x300038XX]" - which is the protobuf
 	// misparsed ("0x300038XX" is `[30 00]` execution_status then the `[38 ...]` combo_id tag), and which left the
@@ -42,8 +42,8 @@ namespace Faolan.Tests
 			Assert.True(swings.Select(s => s.Args.ComboId).Distinct().Count() >= 60, "fewer distinct combos than the corpus carries");
 		}
 
-		// `combo_attack_num` is the STEP INDEX, and this is what proves it: over every captured swing of a combo
-		// that HAS a key sequence, the value stays inside that sequence - it never once runs past the last step.
+		// `combo_attack_num` is the step index, and this is what proves it: over every captured swing of a combo
+		// that has a key sequence, the value stays inside that sequence - it never once runs past the last step.
 		// A field that merely correlated with the step would not be bounded by the catalog's own step count.
 		[Fact]
 		public async Task ComboAttackNum_StaysInsideTheCatalogStepSequence()
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 		}
 
 		// The NPC-combo set. All 69 `action`-marker rows are named `combo_npc_*`, and the wire agrees from the other
-		// side: those ids arrive ONLY as a server-to-client record, never as a client request. So `action` is not a
+		// side: those ids arrive only as a server-to-client record, never as a client request. So `action` is not a
 		// placeholder for "an input the catalog does not model" - it is "no input at all, because the AI drives it".
 		[Fact]
 		public async Task NpcComboRows_AreTheActionMarkerSet()
@@ -90,7 +90,7 @@ namespace Faolan.Tests
 			Assert.True(Swings().Count(s => npcIds.Contains(s.Args.ComboId)) >= 400, "the fixture carries no NPC combo swings");
 		}
 
-		// A combo's payload is a SPELL: `Combo.GameActionId` resolves into the `Spells` catalog for the overwhelming
+		// A combo's payload is a spell: `Combo.GameActionId` resolves into the `Spells` catalog for the overwhelming
 		// majority of the shipped rows, which is what lets the finisher run the ordinary cast path (damage + effect)
 		// instead of a bespoke combo-damage model. Locked as a ratchet so an import that stopped resolving them
 		// fails here rather than silently making every finisher a no-op.
@@ -108,9 +108,9 @@ namespace Faolan.Tests
 		}
 
 		// Every captured swing that lands on a step of a directional combo, grouped by (class/weapon family,
-		// direction), gives ONE `bcc_action_id` per cell in the families the corpus covers well - so the animation
-		// id the old read called "animByte" is the direction after all, just per class+weapon rather than universal.
-		// The exception is the session's FIRST swing of a family, which uses a distinct draw-and-strike animation;
+		// direction), gives one `bcc_action_id` per cell in the families the corpus covers well - so the animation
+		// id is the direction, per class+weapon rather than universal.
+		// The exception is the session's first swing of a family, which uses a distinct draw-and-strike animation;
 		// those are the 96xxx / 200xxx ids, so the assertion is on the dominant id per cell, not on uniqueness.
 		[Fact]
 		public async Task BccActionId_IsTheDirection_PerClassAndWeapon()
@@ -159,7 +159,7 @@ namespace Faolan.Tests
 				Assert.True(args.ShouldSerializeComboId(), "the fixture must hold only swings that carry a combo id");
 
 				// The direction is not in the record, so it comes from the fixture's own capture order: the client
-				// REQUESTS on phase 0x02/0x03 and the server answers on 0x04/0x07/0x0A/0x0F.
+				// requests on phase 0x02/0x03 and the server answers on 0x04/0x07/0x0A/0x0F.
 				swings.Add(new Swing(bcc.Actor, (byte)bcc.Seq is not (0x02 or 0x03), args));
 			}
 

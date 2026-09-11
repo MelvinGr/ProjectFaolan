@@ -10,15 +10,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ⭐ The POSITIVE CONTROL for `FeatKeyScanner` - the thing whose absence let it ship broken twice over (#895).
+	// The positive control for `FeatKeyScanner` - the thing whose absence let it ship broken twice over.
 	//
-	// The scanner's whole output is a NEGATIVE: "no captured packet contains a key that opens these records". That
-	// answer is worthless unless the instrument can find a key that IS there, and for the corpus scan it never could:
+	// The scanner's whole output is a negative: "no captured packet contains a key that opens these records". That
+	// answer is worthless unless the instrument can find a key that is there, and for the corpus scan it never could:
 	//
-	//   1. it reconstructed every candidate as four LITTLE-endian words, in a protocol that is big-endian and whose
+	//   1. it reconstructed every candidate as four little-endian words, in a protocol that is big-endian and whose
 	//      one key-carrying reader (`AddSpecialAbilityCodec`, the 0x2052 ability grant) takes four `ReadU32Be`; and
 	//   2. its oracle asserted that a correct key yields `[u32 1000020][u32 id]`, when `RdbReader.ReadDecrypted`
-	//      decrypts and THEN calls `UnwrapIOz1` - what comes out from under the cipher is an `IOz1` container.
+	//      decrypts and then calls `UnwrapIOz1` - what comes out from under the cipher is an `IOz1` container.
 	//
 	// Both were invisible because a broken search and an empty corpus produce the same output. The corpus check that
 	// caught them (two ability records whose keys we already hold, planted in the target list) needs the private data
@@ -52,12 +52,12 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The negative half: a capture that does NOT carry the key must not produce a hit, or the control above proves
+		// The negative half: a capture that does not carry the key must not produce a hit, or the control above proves
 		// nothing. 16 bytes of a plausible-looking body, none of them the key.
-		// ⭐⭐ The layout the corpus actually uses for most keys, and the one a contiguous-window scan cannot see: a
+		// The layout the corpus actually uses for most keys, and the one a contiguous-window scan cannot see: a
 		// `ProtoAcgItem` writes the quad as four protobuf `fixed32` fields, so a tag byte separates each word.
 		// Without this the scan finds only the minority that ride the raw fixed-width form - it scored 3 of 20 on a
-		// real recall check and the miss was very nearly written up as a fact about the captures (#897).
+		// real recall check and the miss was very nearly written up as a fact about the captures.
 		[Fact]
 		public void AKeyCarriedAsProtobufFixed32Fields_IsFound()
 		{
@@ -90,7 +90,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⚠️ And the oracle has to be the CONTAINER, not the template: a record whose first plaintext block is
+		// And the oracle has to be the container, not the template: a record whose first plaintext block is
 		// `[1000020][id]` is the un-wrapped shape, which does occur, so both are accepted - but the wrapped one is
 		// what an encrypted 1000020 record actually opens with, and asserting only the bare form is bug 2 above.
 		[Fact]
@@ -120,7 +120,7 @@ namespace Faolan.Tests
 			return block;
 		}
 
-		// A packet body with the key inside it, BIG-endian, at a deliberately unaligned offset - the scanner's windows
+		// A packet body with the key inside it, big-endian, at a deliberately unaligned offset - the scanner's windows
 		// are byte-aligned for exactly this reason.
 		private static byte[] BodyCarrying(uint[] key)
 		{

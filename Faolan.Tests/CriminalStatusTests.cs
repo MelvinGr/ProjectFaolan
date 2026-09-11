@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The PvP criminal system (#503). The annotated capture walks the whole mechanic - kill a player, become criminal
+	// The PvP criminal system. The annotated capture walks the whole mechanic - kill a player, become criminal
 	// with murder points, get refused by an NPC, work again once the debuff drops - and these gate the parts of it the
 	// server now models.
 	public class CriminalStatusTests
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.Equal("Murderer", murderer!.Name);
 		}
 
-		// The RULES are the client's own words, not ours. Both descriptions state the vendor and travel-NPC refusal,
+		// The rules are the client's own words, not ours. Both descriptions state the vendor and travel-NPC refusal,
 		// and only the Murderer one adds the guards - which is the whole basis for treating them as two tiers, so a
 		// re-import that emptied those strings would quietly remove the evidence.
 		[Fact]
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			Assert.Equal(trades, CriminalStatus.TradesWithCriminals(vendorName));
 		}
 
-		// IsCriminal is a question about TIME, not a stored bool - the debuff expires on its own, with nothing needing
+		// IsCriminal is a question about time, not a stored bool - the debuff expires on its own, with nothing needing
 		// to run to clear it. An expiry in the past must therefore read as not-criminal.
 		[Fact]
 		public void IsCriminal_TracksTheExpiry_NotAFlag()
@@ -94,8 +94,8 @@ namespace Faolan.Tests
 			Assert.False(character.IsCriminal); // lapsed, with nothing having had to tick
 		}
 
-		// The murder-point pool reaches the login snapshot on stat 0x449, which the client's LDB names "Murder Points".
-		// It used to be carried as a fixed 0; the criminal system needs it to move.
+		// The murder-point pool reaches the login snapshot on stat 0x449, which the client's LDB names "Murder Points",
+		// and must carry the character's own count - the criminal system needs it to move.
 		[Fact]
 		public void MurderPoints_ReachTheSnapshotSheet()
 		{

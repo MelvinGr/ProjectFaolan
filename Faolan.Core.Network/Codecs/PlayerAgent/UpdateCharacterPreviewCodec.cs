@@ -5,21 +5,23 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerAgent.UpdateCharacterPreview(ID32 nCharacter, const IOBuffer& data) - the client uploading the character's
-	// SELECT-SCREEN preview, on the same mid-session socket as the settings. Gitea #611.
-	//
-	//   [u32 0xC350 (character class)][u32 characterId][ClientSettingsBuffer]
-	//
-	// No md5 trailer: unlike the two settings methods the preview has no checksum map to feed, so the client never
-	// advertises one. The buffer holds a single archive member, `preview.bin` - a binary appearance record (id/float
-	// triples plus texscript names such as `*texscript_1108153`) whose internals are not decoded; the server stores it
-	// verbatim and streams it straight back as SendCharacterPreview, one per character, before the character list.
-	// That is what draws the posed, geared character on the select screen without the client having to load the world.
+	/// <summary>
+	///     <c>PlayerAgent.UpdateCharacterPreview(ID32 nCharacter, const IOBuffer&amp; data)</c> - the client uploading the
+	///     character's select-screen preview, on the same mid-session socket as the settings. The body is
+	///     <c>[u32 characterClass][u32 characterId][ClientSettingsBuffer]</c>.
+	/// </summary>
+	/// <remarks>
+	///     There is no md5 trailer: unlike the two settings methods the preview has no checksum map to feed, so the client
+	///     never advertises one. The buffer holds a single archive member, <c>preview.bin</c> (see
+	///     <see cref="CharacterPreviewSetCodec" />); the server stores it verbatim and streams it straight back as
+	///     <c>SendCharacterPreview</c>, one per character, before the character list. That is what draws the posed, geared
+	///     character on the select screen without the client having to load the world.
+	/// </remarks>
 	public static class UpdateCharacterPreviewCodec
 	{
 		public const PlayerAgentMethods MethodOpcode = PlayerAgentMethods.UpdateCharacterPreview;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(UpdateCharacterPreview value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -41,6 +43,6 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// The character-select preview upload.
+	/// <summary>The character-select preview upload.</summary>
 	public sealed record UpdateCharacterPreview(uint CharacterId, ClientSettingsBuffer Buffer);
 }

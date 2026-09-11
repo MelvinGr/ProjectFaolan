@@ -6,20 +6,19 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	// DispatchSetIsSprinting(isSprinting) / DispatchSyncCanSprint(canSprint) / DispatchSyncRegenDelayed(regenDelayed) -
 	// GameCharInterfaceProject 0x0B / 0x0C / 0x0D. Three server-owned booleans about the sprint pool, each one byte,
-	// each addressed to the character it is about through the receiver endpoint (#867). The verb is in the method and
-	// the layout is identical, so they share one codec (`HandledMethods`, #530).
+	// each addressed to the character it is about through the receiver endpoint. The verb is in the method and the
+	// layout is identical, so they share one codec (`HandledMethods`).
 	//
-	// The client names them itself: `DispatchSetIsSprinting(isSprinting)`, `DispatchSyncCanSprint(canSprint)`,
-	// `DispatchSyncRegenDelayed(regenDelayed)` (docs/re/aoc-client-rpc-methods.json).
+	// The client names them itself (docs/re/aoc-client-rpc-methods.json).
 	//
 	// Corpus (`--report sprint`, 134 captures): `isSprinting` is 00 x1314 / 01 x1310 - a near-perfect split, as an
-	// on-off toggle must be. `canSprint` is 01 x325 / 00 x151. `regenDelayed` is **00 in all 1,226 frames**: every
-	// captured send CLEARS the delay, so the corpus proves the transport and not the set condition.
+	// on-off toggle must be. `canSprint` is 01 x325 / 00 x151. `regenDelayed` is 00 in all 1,226 frames: every captured
+	// send clears the delay, so the corpus proves the transport and not the set condition.
 	// `[V0: what sets regenDelayed - no capture carries a 1]`
 	//
-	// ⚠️ The body carries NO entity. Which character a flag is about is decided by the RPC receiver endpoint's
-	// instance, and in all 65 captures that carry `isSprinting` it is one instance per capture - the session's own
-	// character. So this is the server's authoritative echo to the player, not a broadcast about anybody else.
+	// The body carries no entity. Which character a flag is about is decided by the RPC receiver endpoint's instance,
+	// and in all 65 captures that carry `isSprinting` it is one instance per capture - the session's own character. So
+	// this is the server's authoritative echo to the player, not a broadcast about anybody else.
 	public static class SprintFlagCodec
 	{
 		public static readonly GameCharInterfaceProjectMethods[] HandledMethods =

@@ -14,16 +14,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Dialogue
 {
-	// The create-world cutscene's STOCK-PHRASE subtitle channel (Kalanthes's beach lines), distinct from the
-	// interactive ConversationService: the client fires PlayStockphraseAsSubtitle (0x205E) per line and blocks up
-	// to 60s for a ReceivedStockPhraseText (0x205D) reply. The remoteformat payloads are DB-sourced (StockPhrases,
-	// harvested from captures by the importer's stock-phrases module) - keyed by the {stock_N} token.
+	/// <summary>
+	///     The create-world cutscene's stock-phrase subtitle channel (Kalanthes's beach lines), distinct from the
+	///     interactive <see cref="ConversationService" />.
+	/// </summary>
+	/// <remarks>
+	///     The client fires <c>PlayStockphraseAsSubtitle</c> per line and blocks for up to 60 seconds waiting for a
+	///     <c>ReceivedStockPhraseText</c> reply, so an unanswered line stalls the cutscene. The remoteformat payloads
+	///     come from the <c>StockPhrases</c> table, harvested from captures by the importer's stock-phrases module and
+	///     keyed by the <c>{stock_N}</c> token.
+	/// </remarks>
 	public sealed class StockConversationService
 	{
 		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;
 
-		// {stock_N} -> captured remoteformat, loaded once from the DB (small, stable server content).
+		// {stock_N} -> captured remoteformat. Loaded once: the table is small and does not change at runtime.
 		private Dictionary<string, StockPhrase>? _phrases;
 
 		public StockConversationService(ILogger logger, ICatalogRepository database)
@@ -41,7 +47,6 @@ namespace Faolan.GameServer.Dialogue
 			}
 			catch (CodecParseException e)
 			{
-				// Say WHY rather than "could not parse": the codec names the offset and what it expected there.
 				_logger.LogWarning(e, "PlayStockphraseAsSubtitle: could not parse request body ({Len} bytes)", requestBody.Length);
 				return;
 			}

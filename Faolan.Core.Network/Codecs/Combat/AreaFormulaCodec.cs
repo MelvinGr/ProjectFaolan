@@ -6,17 +6,17 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// AreaFormulaIIR (0xCE30BE4E). ReadSubClass (FUN_0079e330) reads two COUNT-FRAMED lists (the same list invariant as
-	// GameActionListIIR: wire word = (N + 1) * 0x3F1) with a u32 between and after: the first list is entity refs
-	// [class][instance], the second is world positions [x][y][z] floats - an area/AoE formula (a set of targets + a
-	// centre). Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     AreaFormulaIIR - an area/AoE formula: a set of targets plus a centre. The client reader (FUN_0079e330) reads two
+	///     count-framed lists with a u32 between and after them; the first list holds entity refs [class][instance], the
+	///     second world positions [x][y][z] as floats. Grammar from the client reader, see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class AreaFormulaCodec
 	{
 		public const uint Opcode = (uint)IirTypes.AreaFormulaIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(AreaFormulaIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -71,6 +71,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// AreaFormulaIIR (0xCE30BE4E).
+	/// <summary>The AreaFormulaIIR body.</summary>
 	public sealed record AreaFormulaIIR(uint Handle, byte Env, (uint Class, uint Instance)[] Refs, uint FieldA, Vector3[] Positions, uint FieldB);
 }

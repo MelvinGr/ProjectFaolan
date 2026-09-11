@@ -5,7 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Helpers
 {
-	// builder.Logging.AddProvider(new FileLoggerProvider("logs/app.log"));
+	/// <summary>
+	///     A buffered file logging provider. Register it with
+	///     <c>builder.Logging.AddProvider(new FileLoggerProvider("logs/app.log"))</c>.
+	/// </summary>
 	public sealed class FileLoggerProvider : ILoggerProvider
 	{
 		private readonly StreamWriter _streamWriter;
@@ -19,10 +22,10 @@ namespace Faolan.Core.Helpers
 			if (!string.IsNullOrEmpty(directory))
 				Directory.CreateDirectory(directory);
 
-			// AutoFlush is OFF: flushing on every line turns each log call into a synchronous disk write under a
-			// lock, which causes severe lag spikes under the in-world packet stream (hundreds of log lines/sec).
-			// Buffer the writes and flush on a timer instead - logs still appear within ~1s, without the per-line
-			// disk I/O on the hot path.
+			// AutoFlush is off: flushing on every line turns each log call into a synchronous disk write under a lock,
+			// which causes severe lag spikes under the in-world packet stream (hundreds of log lines a second). The
+			// writes are buffered and flushed on a timer instead, so logs still appear within about a second without
+			// the per-line disk I/O on the hot path.
 			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
 			{
 				AutoFlush = false
@@ -77,9 +80,6 @@ namespace Faolan.Core.Helpers
 
 		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
 		{
-			//if (!IsEnabled(logLevel))
-			//	return;
-
 			var message = formatter(state, exception);
 
 			lock (Lock)

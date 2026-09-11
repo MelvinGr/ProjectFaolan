@@ -11,7 +11,7 @@ namespace Faolan.Tests.Support
 {
 	// A fake INetworkClient that records every packet sent, for golden-byte tests of the server's burst senders.
 	// The bursts produce byte-exact retail packets that the client is proven to accept, so converting a verbatim
-	// blob to explicit WriteHeader()/Write*() calls MUST be byte-identical - these tests lock that.
+	// blob to explicit WriteHeader()/Write*() calls must be byte-identical - these tests lock that.
 	public sealed class RecordingNetworkClient : INetworkClient
 	{
 		public INetworkClientSession Session { get; } = new NetworkClientSession();
@@ -28,7 +28,7 @@ namespace Faolan.Tests.Support
 			// reads Character.Id. Tests that need more character fields replace or mutate this.
 			//
 			// Level 1 and a real class because a Character is never legitimately at level 0 - creation allocates at 1,
-			// and the class-derived paths (e.g. the create editor's RDB 1000511 base push) THROW on a 0 rather than
+			// and the class-derived paths (e.g. the create editor's RDB 1000511 base push) throw on a 0 rather than
 			// inventing a curve. A default-constructed stand-in would fail those for a reason that says nothing about
 			// the behaviour under test.
 			Session.Character = new Character

@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the humanoid NPC post-IIR APPEARANCE / morph table codec against a real capture (Casilda). Decoding her
+	// Locks the humanoid NPC post-IIR appearance / morph table codec against a real capture (Casilda). Decoding her
 	// post-IIR into morph rows and re-encoding them reproduces the captured bytes exactly - the construction oracle
-	// that lets the appearance table generate from the DB so NpcSpawn.Data can be retired (Gitea #185 / #243).
+	// that lets the appearance table generate from the DB rather than from a captured blob.
 	public class NpcSpawnAppearanceTests
 	{
 		// Animals (the 41-byte minimal post-IIR) carry no table under either decoder.
@@ -33,10 +33,10 @@ namespace Faolan.Tests
 			Assert.Equal(AppearancePostIir(strict), AppearancePostIir(lenient));
 		}
 
-		// #243 lenient decode: a mid-session humanoid capture carries the SAME morph table behind a large RUNTIME
+		// The lenient decode: a mid-session humanoid capture carries the same morph table behind a large runtime
 		// first record instead of the fresh 5-byte one. Strict TryDecodeAppearance declines it; the lenient decode
 		// recovers the identical table. Synthesized from Casilda's clean capture by swapping her fresh first record
-		// for a runtime block - which, like every captured first record, ENDS in the buff list's framing word (#475).
+		// for a runtime block - which, like every captured first record, ends in the buff list's framing word.
 		[Fact]
 		public void DecodeAppearanceLenient_RuntimeBearing_RecoversSameMorphs()
 		{
@@ -55,10 +55,10 @@ namespace Faolan.Tests
 			Assert.Equal(AppearancePostIir(cleanMorphs), AppearancePostIir(lenientMorphs));
 		}
 
-		// The same body with an ACTIVE BUFF on it, which is the case the lenient decode used to lose (#475). It found
-		// the table by arithmetic - at 12 + firstRecordLen - and a buff record sits between that offset and the table,
-		// so a buffed humanoid was classified no-morph and would spawn BALD. Reading the stream finds the table
-		// wherever the buffs leave it. Over the corpus this is 269 more captured bodies, and no lost ones.
+		// The same body with an active buff on it. Finding the table by arithmetic - at 12 + firstRecordLen - puts a
+		// buff record between that offset and the table, so a buffed humanoid is classified no-morph and spawns bald.
+		// Reading the stream finds the table wherever the buffs leave it: over the corpus that is 269 more captured
+		// bodies, and no lost ones.
 		[Fact]
 		public void DecodeAppearanceLenient_WithAnActiveBuff_StillRecoversTheTable()
 		{
@@ -72,18 +72,18 @@ namespace Faolan.Tests
 			Assert.True(NpcSpawnAppearance.TryLiftLenient(buffed, out var morphs));
 			Assert.Equal(AppearancePostIir(cleanMorphs), AppearancePostIir(morphs));
 
-			// And the whole stream still walks: the buff is READ, not skipped past.
+			// And the whole stream still walks: the buff is read, not skipped past.
 			Assert.True(SpawnBodyReader.TryParse(buffed, out var spawn));
 			Assert.Single(spawn.Post.BuffRecords);
 		}
 
-		// A mid-session body: Casilda's morph table behind a RUNTIME first record (the entity's current move task,
-		// #477) and `buffs` active buff records - the shape a capture taken in play carries, where a fresh spawn
+		// A mid-session body: Casilda's morph table behind a runtime first record (the entity's current move task,
+		// its move task) and `buffs` active buff records - the shape a capture taken in play carries, where a fresh spawn
 		// drops both.
 		private static byte[] BuildRuntimeBearing(byte[] body, int postStart, System.Collections.Generic.List<AppearanceEntry> morphs, int buffs)
 		{
-			// The runtime state is a MOVE TASK - decoded in #477, and the reader requires the slot to BE one rather
-			// than accepting any bytes of the right length. A mode-3 Jump node is the shortest real task.
+			// The runtime state is a move task, and the reader requires the slot to be one rather than accepting any
+			// bytes of the right length. A mode-3 Jump node is the shortest real task.
 			var runtime = SpawnPostIirs.Npc(SpawnPostIirs.MovementModeRun, morphs);
 			runtime.MoveTask = new MoveTaskNode
 			{
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 			return runtimeBody;
 		}
 
-		// The canonical FRESH appearance post-IIR for a set of morph rows: what the from-DB build emits, and the
+		// The canonical fresh appearance post-IIR for a set of morph rows: what the from-DB build emits, and the
 		// form both lift paths are compared through.
 		private static byte[] AppearancePostIir(System.Collections.Generic.IReadOnlyList<AppearanceEntry> morphs)
 		{

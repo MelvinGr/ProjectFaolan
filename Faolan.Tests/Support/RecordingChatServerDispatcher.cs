@@ -6,9 +6,8 @@ using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.Tests.Support
 {
-	// An IChatServerDispatcher that RECORDS the channel moves the CS services make (a member's ~Team / ~Guild
-	// subscription following a roster change) and swallows everything else. It replaced four byte-identical
-	// per-file no-op copies (#928 item 2).
+	// An IChatServerDispatcher that records the channel moves the CS services make (a member's ~Team / ~Guild
+	// subscription following a roster change) and swallows everything else.
 	public sealed class RecordingChatServerDispatcher : IChatServerDispatcher
 	{
 		public List<(uint Character, uint? Team)> TeamChannel { get; } = [];

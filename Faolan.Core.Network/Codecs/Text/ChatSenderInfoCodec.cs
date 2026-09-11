@@ -4,13 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// s2c ChatSenderInfo (0x0014) - the id -> NAME binding: [u32 characterId][u32 0][string name]. The chat tier
-	// never puts a name on any other message, so this is what teaches the client who an id is. It is sent BEFORE a
-	// whisper or a channel post so the speaker can be shown, and once per friend when a friend list is delivered.
-	//
-	// ⚠️ Omitting it on a friend add leaves the client with an id and a state but no NAME, and it renders nothing at
-	// all - no entry, no error. That is why the friend list stayed empty while the other two messages were
-	// byte-perfect.
+	/// <summary>
+	///     s2c <c>ChatSenderInfo</c> - the id-to-name binding: <c>[u32 characterId][u32 0][string name]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The chat tier never puts a name on any other message, so this is what teaches the client who an id is. It is
+	///     sent before a whisper or a channel post so the speaker can be shown, and once per friend when a friend list is
+	///     delivered. Omitting it on a friend add leaves the client with an id and a state but no name, and it renders
+	///     nothing at all - no entry and no error.
+	/// </remarks>
 	public static class ChatSenderInfoCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.ChatSenderInfo;

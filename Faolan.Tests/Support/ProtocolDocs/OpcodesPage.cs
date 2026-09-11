@@ -9,7 +9,7 @@ using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/opcodes.md from the COMPILED method enums (reflection, not source parsing), so the
+	// Generates docs/protocol/gen/opcodes.md from the compiled method enums (reflection, not source parsing), so the
 	// page can never disagree with what the server actually dispatches. Trailing `// ...` notes are lifted from
 	// Opcodes.cs as best-effort prose enrichment only - they are never the source of the names or values.
 	//
@@ -20,10 +20,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	{
 		public const string RelativePath = "docs/protocol/gen/opcodes.md";
 
-		// The class ids + the enum->class pairing come from `RpcInterfaces`, the one owner of both. This page used to
-		// restate them, which is two copies of a table that only stays in step by hand. What stays HERE is the
-		// ASSERTION - recomputing every id from its class name below - because verifying the table is this
-		// generator's job, and owning it is not.
+		// The class ids + the enum->class pairing come from `RpcInterfaces`, the one owner of both; restating them here
+		// would be a second copy of a table that only stays in step by hand. What this page keeps is the assertion -
+		// recomputing every id from its class name below - because verifying the table is this generator's job, and
+		// owning it is not.
 		// Kept as a name the two doc generators already call; the hash itself is Faolan.Core.Crypt.Bkdr31.
 		public static uint Bkdr31(string name)
 		{
@@ -114,9 +114,9 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 
 				sb.AppendLine();
-				// An RPC table is keyed by the method CONSTANT, with the two bytes a dump shows for it alongside - the
-				// column the codebase used to call "Opcode", kept so the 3,961 in-repo `0x2NNN` references remain
-				// findable, but no longer the key (#613/#615). The chat enums have no RpcHeader and no method field, so
+				// An RPC table is keyed by the method constant, with the two bytes a dump shows for it alongside - the
+				// column often called "Opcode", kept so in-repo `0x2NNN` references remain findable, but not the key.
+				// The chat enums have no RpcHeader and no method field, so
 				// their numbers really are opcodes and there is nothing to render.
 				var isRpc = e.Name.EndsWith("Methods", StringComparison.Ordinal);
 				sb.AppendLine(isRpc ? "| method_instance | Reads as | Name | Note |" : "| Opcode | Name | Note |");

@@ -3,8 +3,10 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// One node of the recursive MoveTask AST. A plain value (#530 rule 1: a value does not serialize itself) -
-	// MoveTaskNodeCodec below owns the reading and the writing.
+	/// <summary>
+	///     One node of the recursive MoveTask tree. A plain value that does not serialize itself;
+	///     <see cref="MoveTaskNodeCodec" /> below owns the reading and the writing.
+	/// </summary>
 	public sealed class MoveTaskNode
 	{
 		public List<MoveTaskNode> Children { get; set; } = [];
@@ -43,27 +45,35 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// modes 2 Rotate / 10 SetPos: 7 u32 (to3 + quat4); mode 2 adds a trailing u16.
 		public uint[] Vec7 { get; set; } = new uint[7];
-		// PathFlags & 1 = the roam route is sent BY REFERENCE rather than by value: instead of an explicit waypoint
-		// list, these two u16 index the playfield's territory table (RDB 1010506, `GameData::PlayfieldTerritory_c`)
-		// which the CLIENT already holds. PathMoveTask::InitRoamPath resolves
-		// `territories[TerritoryIndex].paths[TerritoryPathIndex]` and walks it, bounds-checking both (#490). The rest
-		// of the plan - anchor, speed, duration, remaining - is sent either way, so the two forms are interchangeable
-		// encodings of one movement plan and every client reproduces the same route.
+		/// <summary>
+		///     With bit 0 of <see cref="PathFlags" /> set, the roam route is sent by reference rather than by value: instead
+		///     of an explicit waypoint list, these two u16 index the playfield's territory table (RDB 1010506,
+		///     GameData::PlayfieldTerritory_c) which the client already holds. PathMoveTask::InitRoamPath resolves
+		///     <c>territories[TerritoryIndex].paths[TerritoryPathIndex]</c> and walks it, bounds-checking both. The rest of
+		///     the plan - anchor, speed, duration, remaining - is sent either way, so the two forms are interchangeable
+		///     encodings of one movement plan and every client reproduces the same route.
+		/// </summary>
 		public ushort TerritoryIndex { get; set; }
 
-		// Index of the wander path WITHIN that territory. 0xFFFF means "no roam path" (the client's -1 guard).
+		/// <summary>
+		///     The index of the wander path within that territory. 0xFFFF means no roam path, which is the client's own
+		///     guard value.
+		/// </summary>
 		public ushort TerritoryPathIndex { get; set; }
 		public ushort RotateTail { get; set; }
 
 		internal bool HasHeaderFloats => (HeaderFlags & 1) == 0;
 	}
 
-	// The MoveTask node grammar (docs/re/movetask-grammar.md, #53), decoded 100% - every one of the 6225 captured
-	// records round-trips byte-exact (MoveTaskCodecCorpusTests). A class-(c) SUB-RECORD codec (#530 rule 5c): it is
-	// only ever composed - by MoveTaskCodec (the MoveTaskIIR packet) and by the spawn post-IIR's move-task slot - so
-	// it declares no opcode and exposes only the internal Read/Write pair.
-	//
-	// 4-byte fields are kept as raw u32 bits rather than floats so float values round-trip exactly.
+	/// <summary>
+	///     The MoveTask node grammar (docs/re/movetask-grammar.md), fully decoded: every one of the 6,225 captured records
+	///     round-trips byte-exact (MoveTaskCodecCorpusTests).
+	/// </summary>
+	/// <remarks>
+	///     A sub-record codec, only ever composed - by <see cref="MoveTaskCodec" /> for the MoveTaskIIR packet and by the
+	///     spawn post-IIR's move-task slot - so it declares no opcode and exposes only the internal read/write pair.
+	///     Four-byte fields are kept as raw u32 bits rather than floats so float values round-trip exactly.
+	/// </remarks>
 	public static class MoveTaskNodeCodec
 	{
 		internal static MoveTaskNode Read(ref SpanReader r)

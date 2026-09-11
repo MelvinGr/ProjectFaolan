@@ -7,8 +7,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Which half of the line-of-sight test rejected a ray, or None when it is clear. The two halves fail for entirely
-	// different reasons, so a diagnostic that cannot tell them apart cannot point at a cause (#577).
+	/// <summary>
+	///     Which half of the line-of-sight test rejected a ray, or <see cref="None" /> when it is clear. The two halves
+	///     fail for entirely different reasons, so a diagnostic that cannot tell them apart cannot point at a cause.
+	/// </summary>
 	public enum LineOfSightBlocker
 	{
 		None,
@@ -16,41 +18,64 @@ namespace Faolan.GameServer.World
 		Collision
 	}
 
-	// Server-side terrain for #284: ground-height snapping (loot bags / corpses sit on the floor, not at a creature's
-	// death-moment Y) and line-of-sight (NPCs don't aggro over a hill / across a drop / through a building wall). The
-	// data is the per-playfield RDB heightmap (type 1066611) + collision mesh (type 1000012), but the game server does
-	// NOT read the ~28 GB client RDB - the importer bakes a small gzipped file per map (`--report terrain-export`,
-	// TerrainFile format) and this service consumes those. Lazily per map, cached. Optional: if the terrain dir isn't
-	// configured / present, Available is false and every query degrades gracefully (GroundHeight -> null, line-of-sight
-	// -> true/open) so the server runs without the baked files. Verified in-play: sampling City of Tortage (4020) at
-	// known ground positions matches the players' Y to <0.5u.
+	/// <summary>
+	///     Server-side terrain: ground-height snapping, so loot bags and corpses sit on the floor rather than at a
+	///     creature's death-moment Y, and line-of-sight, so NPCs do not aggro over a hill, across a drop or through a
+	///     building wall.
+	/// </summary>
+	/// <remarks>
+	///     The data is the per-playfield RDB heightmap (type 1066611) and collision mesh (type 1000012), but the game
+	///     server does not read the client RDB: the importer bakes a small gzipped file per map
+	///     (<c>--report terrain-export</c>, <c>TerrainFile</c> format) and this service consumes those, lazily per map
+	///     and cached.
+	///     <para>
+	///         It is optional. When the terrain directory is not configured or not present, <see cref="Available" /> is
+	///         false and every query degrades gracefully - ground height answers null and line-of-sight answers open -
+	///         so the server runs without the baked files. Sampling City of Tortage (4020) at known ground positions
+	///         matches the players' Y to within 0.5 units.
+	///     </para>
+	/// </remarks>
 	public sealed class TerrainService
 	{
 		public const float EyeHeight = 1.5f; // lift both endpoints off the ground so you can see over small bumps
 
-		// How far around a point GroundHeightNear may look for the surface the entity was standing on. 2 m is the width
-		// of the thing that steals the sample (a rock/wall/trunk footprint is a cell or two) and stays well inside the
-		// distance over which the beach itself moves - the Tortage sand runs ~0.1 m per metre, so a 2 m reach costs at
-		// most ~0.2 m of slope error, against the 50 m it recovers.
+		/// <summary>
+		///     How far around a point <see cref="GroundHeightNear" /> may look for the surface the entity was standing
+		///     on.
+		/// </summary>
+		/// <remarks>
+		///     Two metres is the width of the thing that steals the sample - a rock, wall or trunk footprint is a cell
+		///     or two - and stays well inside the distance over which the beach itself moves: the Tortage sand runs
+		///     about 0.1 m per metre, so a 2 m reach costs at most 0.2 m of slope error against the 50 m it recovers.
+		/// </remarks>
 		private const float GroundSampleRadius = 2f;
-		public const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
 
-		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
-		// the eye-line to actually block (a little slack so a gentle slope or a 1u bump doesn't read as a wall).
+		/// <summary>How far terrain must exceed the eye-line before it occludes.</summary>
+		/// <remarks>
+		///     The slack keeps a gentle slope or a one-unit bump from reading as a wall.
+		/// </remarks>
+		public const float OcclusionMargin = 1.5f;
+
+		/// <summary>How many intermediate ground samples are taken along the sightline.</summary>
 		public const int LineOfSightSamples = 24;
 
-		// The collision half casts THREE parallel rays - eye to eye, and one a shoulder to either side - and only
-		// calls the sightline occluded when all three are. A single ray is defeated by anything thinner than a body:
-		// on City of Tortage (4020) a fifth of the collision actors are posts, barrels and pillars, and one of those
-		// between an NPC and a player is not cover, it is a thing you see past. Half a unit is a human half-shoulder,
-		// so the two outer rays bracket the silhouette a mob would actually be looking at; a wall, a hut or a rock
-		// face is wider than the 1 u the three rays span and still blocks all of them (#577).
+		/// <summary>
+		///     Half the width the collision half's three parallel rays span: one eye to eye, and one a shoulder to
+		///     either side, with the sightline called occluded only when all three are blocked.
+		/// </summary>
+		/// <remarks>
+		///     A single ray is defeated by anything thinner than a body: on City of Tortage (4020) a fifth of the
+		///     collision actors are posts, barrels and pillars, and one of those between an NPC and a player is not
+		///     cover but a thing you see past. Half a unit is a human half-shoulder, so the two outer rays bracket the
+		///     silhouette a mob would be looking at, while a wall, hut or rock face is wider than the unit the three
+		///     rays span and still blocks all of them.
+		/// </remarks>
 		public const float ShoulderHalfWidth = 0.5f;
 		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = [];
 
 		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
 
-		// Maps whose terrain file we've already attempted to load (present or not), so a query never re-reads it.
+		// Maps whose terrain file has already been attempted, present or not, so a query never re-reads it.
 		private readonly ConcurrentDictionary<uint, byte> _loaded = [];
 		private readonly ILogger _logger;
 		private readonly string? _terrainDir;
@@ -72,8 +97,11 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Terrain: baked terrain files from '{Dir}' (ground-snap + line-of-sight on).", terrainDir);
 		}
 
-		// The terrain ground height at world (x, z) on `mapId`, or null when unavailable (no terrain, no heightmap for
-		// that map, or the point is off the grid). Callers fall back to their own default when null.
+		/// <summary>
+		///     The terrain ground height at world (x, z) on <paramref name="mapId" />, or null when it is unavailable:
+		///     no terrain loaded, no heightmap for that map, or a point off the grid. Callers fall back to their own
+		///     default.
+		/// </summary>
 		public float? GroundHeight(uint mapId, float x, float z)
 		{
 			EnsureLoaded(mapId);
@@ -82,9 +110,14 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// The ground height under something that was STANDING at `nearY` - the nearest cell unless a taller neighbour
-		// explains it better (RdbHeightmap.HeightNear). For a drop/placement beside a rock, a wall or a tree, whose
-		// footprint owns the nearest cell at its own height; see that method for the measured Tortage case.
+		/// <summary>
+		///     The ground height under something that was standing at <paramref name="nearY" />: the nearest cell,
+		///     unless a taller neighbour explains it better (<c>RdbHeightmap.HeightNear</c>).
+		/// </summary>
+		/// <remarks>
+		///     For a drop or placement beside a rock, a wall or a tree, whose footprint owns the nearest cell at its own
+		///     height; see that method for the measured Tortage case.
+		/// </remarks>
 		public float? GroundHeightNear(uint mapId, float x, float z, float nearY, float tolerance, float radius = GroundSampleRadius)
 		{
 			EnsureLoaded(mapId);
@@ -93,24 +126,36 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
-		// True if nothing blocks the straight eye-line from `from` to `to` (an NPC to a player): neither the terrain
-		// (a hill / ridge / the far side of a drop) NOR the collision geometry (a building wall). Both endpoints are
-		// lifted to eye height so you can see over small bumps / low sills. Fails OPEN (returns true) whenever the
-		// relevant asset is unavailable, so aggro still works without the baked terrain - this only ever REMOVES aggros
-		// that the range + tier-1 vertical gate would have wrongly allowed. Two things it deliberately does NOT block
-		// on (#577): a post/barrel/pillar narrower than a body (the collision half casts three rays, see
-		// HasCollisionLineOfSight) and the roof over an endpoint the heightmap does not describe (a cave or a cellar;
-		// see HasTerrainLineOfSight). `--report terrain-los` measures what it culls over real spawn positions.
+		/// <summary>
+		///     Whether nothing blocks the straight eye-line from <paramref name="from" /> to <paramref name="to" />,
+		///     typically an NPC to a player: neither the terrain - a hill, a ridge, the far side of a drop - nor the
+		///     collision geometry.
+		/// </summary>
+		/// <remarks>
+		///     Both endpoints are lifted to eye height so a viewer can see over small bumps and low sills. It fails
+		///     open whenever the relevant asset is unavailable, so aggro still works without the baked terrain: this
+		///     only ever removes aggros the range and vertical gates would wrongly have allowed.
+		///     <para>
+		///         Two things it deliberately does not block on: a post, barrel or pillar narrower than a body (see
+		///         <see cref="HasCollisionLineOfSight" />), and the roof over an endpoint the heightmap does not
+		///         describe, such as a cave or a cellar (see <see cref="HasTerrainLineOfSight" />).
+		///         <c>--report terrain-los</c> measures what it culls over real spawn positions.
+		///     </para>
+		/// </remarks>
 		public bool HasLineOfSight(uint mapId, Vector3 from, Vector3 to)
 		{
 			return Trace(mapId, from, to) == LineOfSightBlocker.None;
 		}
 
-		// The same test as <see cref="HasLineOfSight" />, but it says WHICH gate rejected the ray. Aggro that collapses
-		// to melee range looks identical whichever half is doing it, and the two have completely different causes - a
-		// heightmap that reads high, versus a collision mesh that contains the ground it is supposed to sit on - so
-		// "is line-of-sight culling this" is not an answerable question without attribution. `--report terrain-los`
-		// tabulates it over real spawn positions (#577).
+		/// <summary>
+		///     The same test as <see cref="HasLineOfSight" />, but it reports which gate rejected the ray.
+		/// </summary>
+		/// <remarks>
+		///     Aggro that collapses to melee range looks identical whichever half is doing it, and the two have
+		///     entirely different causes - a heightmap that reads high, against a collision mesh that contains the
+		///     ground it is meant to sit on - so "is line-of-sight culling this" is unanswerable without attribution.
+		///     <c>--report terrain-los</c> tabulates it over real spawn positions.
+		/// </remarks>
 		public LineOfSightBlocker Trace(uint mapId, Vector3 from, Vector3 to)
 		{
 			EnsureLoaded(mapId);
@@ -122,15 +167,19 @@ namespace Faolan.GameServer.World
 				: LineOfSightBlocker.Collision;
 		}
 
-		// Pre-load a map's terrain into the cache. Called fire-and-forget from world entry so the first aggro / loot on
-		// a map doesn't pay the file read + parse + grid build synchronously inside the game tick.
+		/// <summary>
+		///     Pre-load a map's terrain into the cache. Called fire-and-forget from world entry, so the first aggro or
+		///     loot drop on a map does not pay the file read, parse and grid build inside the game tick.
+		/// </summary>
 		public void Warm(uint mapId)
 		{
 			EnsureLoaded(mapId);
 		}
 
-		// Load a map's baked terrain file exactly once (present or not). Parses the heightmap + collision bodies with
-		// the same RdbHeightmap / RdbCollisionMesh parsers used against the RDB.
+		/// <summary>
+		///     Load a map's baked terrain file exactly once, present or not, parsing the heightmap and collision bodies
+		///     with the same parsers used against the RDB.
+		/// </summary>
 		private void EnsureLoaded(uint mapId)
 		{
 			if (_terrainDir == null || !_loaded.TryAdd(mapId, 0))
@@ -161,18 +210,18 @@ namespace Faolan.GameServer.World
 					tris = col.TriangleCount;
 				}
 
-				// First-touch cost: file read + gunzip + parse + grid build. One-time per map, then cached.
+				// The first-touch cost: file read, gunzip, parse and grid build. Paid once per map, then cached.
 				_logger.LogInformation("Terrain: loaded map {Map} (heightmap {Heightmap}, collision {Tris} triangles) in {Ms} ms.", mapId, hasHeightmap
 					? "yes"
 					: "no", tris, clock.ElapsedMilliseconds);
 			}
 			catch (Exception ex)
 			{
-				// LOUD, and at Error: a map with no bake at all is a normal, already-handled case (the File.Exists
-				// check above just returns), so everything reaching here is a truncated or corrupt file. The failure is
-				// invisible in its effects - the map simply has no collision, and HasCollisionLineOfSight answers
-				// "clear" for a map it knows nothing about - so line-of-sight silently passes through walls and NPCs
-				// shoot through them. At Debug this looked like a working server.
+				// Logged at Error, deliberately: a map with no bake at all is a normal, already-handled case - the
+				// File.Exists check above simply returns - so everything reaching here is a truncated or corrupt file.
+				// The failure is invisible in its effects, because the map then has no collision and
+				// HasCollisionLineOfSight answers "clear" for a map it knows nothing about, so line-of-sight passes
+				// through walls and NPCs shoot through them while the server looks healthy.
 				_logger.LogError(ex, "Terrain: baked terrain for map {Map} failed to load, so collision and line-of-sight are OFF for it. The file is present but unreadable - re-bake it.",
 					mapId);
 			}
@@ -183,7 +232,7 @@ namespace Faolan.GameServer.World
 			if (!_collision.TryGetValue(mapId, out var col))
 				return true;
 
-			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z); // (`from with {…}` parses as a query)
+			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z); // `from with { ... }` would parse as a query
 			var eyeTo = to with
 			{
 				Y = to.Y + EyeHeight
@@ -198,9 +247,9 @@ namespace Faolan.GameServer.World
 			var dz = to.Z - from.Z;
 			var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 			if (horizontal < 1e-3f)
-				return false; // straight up/down: there is no "beside", the centre ray is the whole answer
+				return false; // straight up or down: there is no "beside", so the centre ray is the whole answer
 
-			// Perpendicular to the sightline in the ground plane, applied to BOTH ends so the three rays run parallel.
+			// Perpendicular to the sightline in the ground plane, applied to both ends so the three rays run parallel.
 			var side = new Vector3(-dz / horizontal, 0, dx / horizontal) * ShoulderHalfWidth;
 			return !col.SegmentBlocked(eyeFrom + side, eyeTo + side) || !col.SegmentBlocked(eyeFrom - side, eyeTo - side);
 		}
@@ -213,14 +262,14 @@ namespace Faolan.GameServer.World
 			var eyeFrom = from.Y + EyeHeight;
 			var eyeTo = to.Y + EyeHeight;
 
-			// An endpoint whose eye is UNDER the surface is somewhere the heightmap does not describe - a cave, a
+			// An endpoint whose eye is under the surface is somewhere the heightmap does not describe - a cave, a
 			// cellar, a floor beneath a roof the bake kept - and from there every sample along the ray reads as rock
-			// overhead, so the terrain half occludes at every range including point-blank. That is the melee-only
-			// aggro of #577 for exactly those NPCs (7 of the 122 City of Tortage spawns sit 1.5-60 u under the grid).
-			// The grid has nothing to say about such a ray, so the terrain half stands aside and the collision mesh,
-			// which does model the cave wall and the building, is the gate. Sampled with the same neighbourhood
-			// search the loot drop uses, so a creature standing BESIDE a rock (whose nearest cell is the rock's top)
-			// is still read as on the ground next to it, not as buried.
+			// overhead, so the terrain half would occlude at every range including point-blank, collapsing those NPCs
+			// to melee-only aggro (7 of the 122 City of Tortage spawns sit 1.5 to 60 units under the grid). The grid
+			// has nothing to say about such a ray, so the terrain half stands aside and the collision mesh, which does
+			// model the cave wall and the building, is the gate. Sampled with the same neighbourhood search the loot
+			// drop uses, so a creature standing beside a rock - whose nearest cell is the rock's top - still reads as
+			// on the ground next to it rather than as buried.
 			if (hm.HeightNear(from.X, from.Z, from.Y, GroundSampleRadius, EyeHeight) is { } groundFrom && groundFrom > eyeFrom)
 				return true;
 			if (hm.HeightNear(to.X, to.Z, to.Y, GroundSampleRadius, EyeHeight) is { } groundTo && groundTo > eyeTo)
@@ -233,11 +282,11 @@ namespace Faolan.GameServer.World
 				var z = from.Z + (to.Z - from.Z) * t;
 				var ground = hm.HeightAt(x, z);
 				if (ground is not { } g)
-					continue; // off-grid sample - don't block on missing data
+					continue; // an off-grid sample: never block on missing data
 
 				var eyeLine = eyeFrom + (eyeTo - eyeFrom) * t;
 				if (g > eyeLine + OcclusionMargin)
-					return false; // terrain rises above the sightline here -> occluded
+					return false; // terrain rises above the sightline here, so the ray is occluded
 			}
 
 			return true;

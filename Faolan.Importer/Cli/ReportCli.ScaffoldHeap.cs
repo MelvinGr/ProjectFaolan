@@ -11,33 +11,33 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report scaffold-heap`: mine the RETAIL SERVER's own heap out of the NPC spawn scaffold (Gitea #604).
+	// `--report scaffold-heap`: mine the retail server's own heap out of the NPC spawn scaffold.
 	//
-	// The FA015807 pre-IIR scaffold is a 53-word STAT BLOCK (#603, `SpawnPreIir.WordStatIds`). On an NPC spawn the
-	// retail server fills only THREE of the 53 words, and sends the other 50 carrying whatever was in that memory -
+	// The FA015807 pre-IIR scaffold is a 53-word stat block (`SpawnPreIir.WordStatIds`). On an NPC spawn the
+	// retail server fills only three of the 53 words, and sends the other 50 carrying whatever was in that memory -
 	// so every captured NPC spawn ships ~200 bytes of retail server-side data that has nothing to do with that NPC.
 	// This is the harvest of it: a window into the retail server that nothing else in the corpus gives.
 	//
-	// ⚠️ It is a DIAGNOSTIC, never a source of content. Nothing here describes the NPC it arrived on, and none of it
+	// It is a DIAGNOSTIC, never a source of content. Nothing here describes the NPC it arrived on, and none of it
 	// may be lifted into a table. What it does give is names: the retail script engine's ScriptGroup catalogue, its
 	// ScriptCommand class inventory (with source file and line), and the odd `remoteformat` fragment.
 	//
-	// ⚠️ WHY THIS IS A REPORT AND NOT A SCRIPT. The numbers in the issue that opened this ("133 ScriptGroups", "121
+	// why this is A report and not A SCRIPT. The numbers in the issue that opened this ("133 ScriptGroups", "121
 	// source files", "26 key= values across categories 100/50000/50002/50050/50200/51000/52000/55000") came from a
-	// scratch probe that ran its regexes over the WHOLE 228-byte buffer, letting a match span the NON-PRINTABLE gaps
+	// scratch probe that ran its regexes over the whole 228-byte buffer, letting a match span the non-PRINTABLE gaps
 	// between one leaked string and the next. That manufactures pairs: `category=` in one string and `000` from the
-	// binary after it reads as category 50000. Every count below is taken per PRINTABLE RUN, which is the only
+	// binary after it reads as category 50000. Every count below is taken per PRINTABLE run, which is the only
 	// boundary a real string can have, and the honest numbers are roughly half the probe's. See ExtractRuns.
 	public static partial class ReportCli
 	{
-		// A leaked string must be a maximal run of printable bytes: a run boundary IS a string boundary, because the
+		// A leaked string must be a maximal run of printable bytes: a run boundary is a string boundary, because the
 		// bytes on either side of it were never part of one C string. Six is the same floor SpawnPreIir.DecodeScriptText
 		// uses - below it, float bytes that happen to be printable start outnumbering text.
 		private const int MinRunLength = 6;
 
 		// The four 4-byte slots of the 0x184..0x267 region the client reader never writes (SpawnPreIir has 53 words
 		// for 57 slots), as offsets into the reassembled buffer. Nothing is sent for them, so they read as zero and
-		// SPLIT any leaked string that spans one. They are a fixed, permanent hole in this view - a string cut by one
+		// split any leaked string that spans one. They are a fixed, permanent hole in this view - a string cut by one
 		// is only recoverable from another block that happened to catch it at a different alignment.
 		private static readonly int[] BufferHoles = [116, 136, 168, 204];
 
@@ -56,7 +56,7 @@ namespace Faolan.Importer.Cli
 					if (!p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn))
 						continue;
 
-					// NPCs only. A player's block is that character's real PvP career (#603) - it is not a leak, and
+					// NPCs only. A player's block is that character's real PvP career - it is not a leak, and
 					// mixing it in would attribute the player's own stats to the retail server's heap.
 					if (spawn.Handle >= EntityHandles.CharacterInstanceBase || spawn.Character?.player_stats != null)
 						continue;
@@ -66,7 +66,7 @@ namespace Faolan.Importer.Cli
 					blocks[key] = blocks.GetValueOrDefault(key) + 1;
 				}
 
-			// run -> how many SPAWNS carried it (not how many distinct blocks), so a string's weight reflects how
+			// run -> how many spawns carried it (not how many distinct blocks), so a string's weight reflects how
 			// often retail actually shipped it.
 			var runs = new Dictionary<string, int>(StringComparer.Ordinal);
 			foreach (var (hex, n) in blocks)
@@ -113,21 +113,21 @@ namespace Faolan.Importer.Cli
 		}
 
 		// The retail script engine's own names, as the server's error formatter wrote them:
-		//   "<file>.cpp(<line>) : Error in \"ScriptFormula defined at <file>.cpp(<line>) in ScriptGroup '<name>'
-		//    (id=<id>) Script '<name>' (id=<n>) Command '<name>' (id=<n>) ...\""
+		//   "<file>.cpp(<line>): Error in \"ScriptFormula defined at <file>.cpp(<line>) in ScriptGroup '<name>'
+		//    (id=<id>) Script '<name>' (id=<n>) Command '<name>' (id=<n>)...\""
 		//
 		// Every pattern below is anchored on its CLOSING delimiter, so a name truncated by the 228-byte window is
 		// dropped rather than half-reported. That is the whole difference between this and the scratch probe.
 		private static void ScaffoldHeapScriptEngine(Dictionary<string, int> runs)
 		{
-			// ⚠️ `id` is a per-parent INDEX for Script and Command (`Script 'main' (id=1)`, and the same command name
+			// `id` is a per-parent index for Script and Command (`Script 'main' (id=1)`, and the same command name
 			// appears with a dozen different ids), and a large sparse key for ScriptGroup. Only the ScriptGroup one
 			// is an identity.
 			var groups = Collect(runs, @"ScriptGroup '([^']+)' \(id=(\d+)\)");
 			var scripts = Collect(runs, @"Script '([^']+)' \(id=(\d+)\)");
 			var commands = Collect(runs, @"Command '([^']+)' \(id=(\d+)\)");
 
-			// ⚠️ A source path is the ONE field here with no closing delimiter to anchor on: `([A-Za-z0-9_/]+\.cpp)`
+			// A source path is the one field here with no closing delimiter to anchor on: `([A-Za-z0-9_/]+\.cpp)`
 			// matches from wherever the run happens to begin, so a run that starts mid-path yields `and.cpp`, `d.cpp`,
 			// `criptcommands/dbprintfscriptcommand.cpp` - which read as 100 distinct files when there are 32. The
 			// anchor is the message's own `defined at ` prefix, which proves the path START was captured.
@@ -148,7 +148,7 @@ namespace Faolan.Importer.Cli
 			foreach (var f in files)
 				Console.WriteLine($"{f.Sum(s => s.Value),6}  {f.Key} ({string.Join(", ", f.Select(s => s.Key.Id).OrderBy(l => l))})");
 
-			// A path seen only WITHOUT the anchor is either a truncation of a confirmed one (accounted for) or a file
+			// A path seen only without the anchor is either a truncation of a confirmed one (accounted for) or a file
 			// we have genuinely seen and cannot name (a lower bound on what is still out there). Reporting the second
 			// group is the honest way to say "there are more" without inventing names for them.
 			var confirmed = files.Select(f => f.Key).ToList();
@@ -179,9 +179,9 @@ namespace Faolan.Importer.Cli
 		// The `remoteformat` XML the server was holding - the same layer `RemoteFormatXml` builds outbound, so its
 		// references are readable with the tooling we already have.
 		//
-		// ⚠️ TWO ESCAPING DEPTHS, and missing the second one costs the whole yield. A `<remoteformat>` element the
+		// two ESCAPING DEPTHS, and missing the second one costs the whole yield. A `<remoteformat>` element the
 		// server holds as a STANDALONE string is escaped once (`key="a&#92;b"`); one nested inside a `<parameter
-		// value="...">` attribute is escaped TWICE (`&lt;localized ... key=&quot;a&amp;#92;b&quot; &gt;`). Matching
+		// value="...">` attribute is escaped twice (`&lt;localized... key=&quot;a&amp;#92;b&quot; &gt;`). Matching
 		// only the double form finds the plaintext categories 100/51000 and concludes there is nothing to decrypt -
 		// which is wrong: the singly-escaped form is where category 50000 turns up.
 		private static void ScaffoldHeapRemoteFormat(Dictionary<string, int> runs, string? rdbDir)
@@ -189,7 +189,7 @@ namespace Faolan.Importer.Cli
 			var categories = Collect(runs, @"category=(?:&quot;|"")(\d+)(?:&quot;|"")");
 			var tokens = Collect(runs, @"token=(?:&quot;|"")([A-Za-z0-9_]+)(?:&quot;|"")");
 
-			// A COMPLETE reference: id, category and key all present in one run, in the element's own field order.
+			// A complete reference: id, category and key all present in one run, in the element's own field order.
 			// Anything less cannot be used to decrypt, so it is counted but not listed as a find.
 			var refs = Collect(runs, @"id=""(\d+)"" category=""(\d+)"" key=""([^""]*)""", 3);
 			var nested = Collect(runs, @"id=&quot;(\d+)&quot; category=&quot;(\d+)&quot; flags=&quot;[^&]*&quot; key=&quot;((?:[^&]|&(?!quot;))*)&quot;", 3);
@@ -205,8 +205,8 @@ namespace Faolan.Importer.Cli
 			foreach (var (r, n) in refs.OrderBy(r => r.Key.Id, StringComparer.Ordinal).ThenBy(r => r.Key.Name, StringComparer.Ordinal))
 				Console.WriteLine($"{n,6}  LDB[{r.Id}][{r.Name}] key=\"{r.Extra}\"");
 
-			// The point of harvesting keys at all: the eleven ENCRYPTED LDB categories (NPC dialogue 50000-50003,
-			// quest text 50300-50306) need one key PER STRING, and a key found here decrypts a string nothing else in
+			// The point of harvesting keys at all: the eleven encrypted LDB categories (NPC dialogue 50000-50003,
+			// quest text 50300-50306) need one key per string, and a key found here decrypts a string nothing else in
 			// the corpus can reach. Everything else in the LDB is plaintext, so a key against it is inert.
 			var usable = refs.Keys.Where(r => int.TryParse(r.Id, out var c) && IsEncryptedLdbCategory(c)).ToList();
 			Console.WriteLine();
@@ -238,14 +238,14 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// The retail server's own CONFIGURATION TREE and DATABASE SCHEMA - two leaks the first pass over this data
+		// The retail server's own CONFIGURATION tree and DATABASE SCHEMA - two leaks the first pass over this data
 		// missed entirely, and the most interesting thing in it after the script engine. Neither is anything we can
 		// import; both are structural facts about how the retail service was deployed.
 		private static void ScaffoldHeapDeployment(Dictionary<string, int> runs)
 		{
 			// e.g. `Universe[1]/Territory[1]/Dimension[2]/GameServer[5]/GMPasswordEnabled`. The bracketed indices are
-			// what make it worth reporting: they say a Dimension (our Realm) ran a DOUBLE-DIGIT number of GameServer
-			// processes, which is the deployment shape #324's multi-realm work is aiming at.
+			// what make it worth reporting: they say a Dimension (our Realm) ran a double-digit number of GameServer
+			// processes, which is the deployment shape the multi-realm work aims at.
 			var config = Collect(runs, @"(Universe(?:\[\d+\])?(?:/[A-Za-z0-9_]+(?:\[\d+\])?)+)");
 			var configPaths = Maximal(config.Keys.Select(c => c.Name));
 			Console.WriteLine();
@@ -264,15 +264,15 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"--- retail server SQL ({tables.Count} table name(s), Oracle bind syntax `:1`) ---");
 			Console.WriteLine(string.Join(", ", tables.OrderBy(t => t, StringComparer.Ordinal)));
 
-			// A statement fragment is cut at BOTH ends by the window, so containment - not the prefix rule the table
+			// A statement fragment is cut at both ends by the window, so containment - not the prefix rule the table
 			// names use - is what folds the partial sightings into the longest one.
 			var statements = sql.Keys.Select(s => s.Name.Trim()).Distinct(StringComparer.Ordinal).ToList();
 			foreach (var st in statements.Where(a => !statements.Any(b => b.Length > a.Length && b.Contains(a, StringComparison.Ordinal))).OrderBy(a => a, StringComparer.Ordinal))
 				Console.WriteLine($"       ...{st}");
 		}
 
-		// The script engine's CALL STACK, the other form its diagnostics take:
-		//   `(0:bccswitchstate(33)|main(1)|DefaultIdleStates`  =  depth : command(index) | script(index) | group
+		// The script engine's call STACK, the other form its diagnostics take:
+		//   `(0:bccswitchstate(33)|main(1)|DefaultIdleStates`  =  depth: command(index) | script(index) | group
 		// A second, independent naming of the same three levels the error text names - and the group name here has no
 		// closing delimiter, so it is reported as a stack shape rather than mined for names.
 		private static void ScaffoldHeapCallStacks(Dictionary<string, int> runs)
@@ -318,7 +318,7 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// The entries of `values` that are not a proper PREFIX of another. A leaked string is cut at the END by the
+		// The entries of `values` that are not a proper PREFIX of another. A leaked string is cut at the end by the
 		// 228-byte window, so `QUEST_RE` beside `QUEST_REWARD` is one table seen twice, not two - the same truncation
 		// trap the source-path list handles with its `defined at ` anchor, in the one form that needs no anchor.
 		private static List<string> Maximal(IEnumerable<string> values)
@@ -328,7 +328,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Every match of `pattern` across every run, keyed by its first `groups` capture groups and weighted by how
-		// many SPAWNS carried the run it came from (not how many distinct blocks) - so a string's weight is how often
+		// many spawns carried the run it came from (not how many distinct blocks) - so a string's weight is how often
 		// retail actually shipped it.
 		private static Dictionary<(string Name, string Id, string Extra), int> Collect(Dictionary<string, int> runs, string pattern, int groups = 2)
 		{

@@ -7,11 +7,16 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Route geometry over a stored patrol tree - the world simulation's route + cycle-length source. Not a codec
-	// (#530 rule 1): it reads the columnarized PatrolNode rows and computes distances; nothing encodes or decodes.
+	/// <summary>
+	///     Route geometry over a stored patrol tree - the world simulation's route and cycle-length source.
+	/// </summary>
+	/// <remarks>
+	///     Not a codec: it reads the columnarized <see cref="PatrolNode" /> rows and computes distances; nothing here
+	///     encodes or decodes.
+	/// </remarks>
 	public static class PatrolRoute
 	{
-		// The patrol's ordered waypoints (every PathMoveTask's waypoint list, walked in tree order).
+		/// <summary>The patrol's ordered waypoints - every PathMoveTask's waypoint list, walked in tree order.</summary>
 		public static IReadOnlyList<Vector3> Waypoints(ICollection<PatrolNode> nodes)
 		{
 			ArgumentNullException.ThrowIfNull(nodes);
@@ -24,11 +29,16 @@ namespace Faolan.Core.Network.Codecs.World
 			return waypoints;
 		}
 
-		// Sum of the segment distances along from -> waypoints (the real walked length). The client uses it for
-		// interpolation TIMING - a too-small value (e.g. the straight-line from->last) makes a winding patrol RUN to
-		// cover the real path in the short time, so a multi-waypoint loop must report its full traversal length to
-		// walk at the right pace. (For a straight path the sum equals from->last, matching the captured ratio-1.000
-		// records; #266.)
+		/// <summary>
+		///     Sum of the segment distances along <paramref name="from" /> through <paramref name="waypoints" /> - the
+		///     real walked length.
+		/// </summary>
+		/// <remarks>
+		///     The client uses this for interpolation timing: a too-small value (the straight line from -> last, say)
+		///     makes a winding patrol run to cover the real path in the short time, so a multi-waypoint loop must report
+		///     its full traversal length to walk at the right pace. For a straight path the sum equals from -> last,
+		///     matching the captured ratio-1.000 records.
+		/// </remarks>
 		public static float TotalLength(Vector3 from, IReadOnlyList<Vector3> waypoints)
 		{
 			if (waypoints.Count == 0)
@@ -41,15 +51,20 @@ namespace Faolan.Core.Network.Codecs.World
 			return length;
 		}
 
-		// The route as it is to be walked FROM WHERE THE NPC NOW STANDS: the waypoints still ahead of it, in the order
-		// it will take them. `index` is the waypoint it is currently heading for, `backwards` which way along the list
-		// it is going, `loops` whether the route's ends meet.
-		//
-		// Why this exists (#716): a patrol body is anchored at a position, and re-issuing one anchored at the entity's
-		// SPAWN tells the client to restart the beat from there - which the player sees as the NPC teleporting back to
-		// the start of its route the moment a lap ends. Anchoring at the live position and handing over only what is
-		// left removes the jump; a CLOSED route continues round through the start rather than stopping at the list end,
-		// so a loop stays a loop.
+		/// <summary>
+		///     The route as it is to be walked from where the NPC now stands: the waypoints still ahead of it, in the
+		///     order it will take them.
+		/// </summary>
+		/// <param name="index">The waypoint the NPC is currently heading for.</param>
+		/// <param name="backwards">Which way along the list it is going.</param>
+		/// <param name="loops">Whether the route's ends meet.</param>
+		/// <remarks>
+		///     A patrol body is anchored at a position, and one anchored at the entity's spawn tells the client to restart
+		///     the beat from there - which the player sees as the NPC teleporting back to the start of its route the
+		///     moment a lap ends. Anchoring at the live position and handing over only what is left removes the jump, and
+		///     a closed route continues round through the start rather than stopping at the list end, so a loop stays a
+		///     loop.
+		/// </remarks>
 		public static IReadOnlyList<Vector3> FromHere(IReadOnlyList<Vector3> waypoints, int index, bool backwards, bool loops)
 		{
 			if (waypoints.Count == 0)
@@ -72,17 +87,23 @@ namespace Faolan.Core.Network.Codecs.World
 			return ahead;
 		}
 
-		// #713: a stable id for the PLACEMENT a route belongs to - equal for two sightings of one patroller, different
-		// for two genuinely different beats. Null when the spawn carries no route, which is the caller's cue that this
-		// placement cannot be identified this way (a stationary NPC needs a different key entirely).
-		//
-		// Over the whole polyline rather than a summary: grouping the 857 stored routes by (length, segments, first
-		// waypoint) and by the full polyline both give 626 groups, so the cheap key happens to be exact here - but it
-		// is the polyline that MEANS "this beat", and a summary that collides would silently merge two placements.
-		// Coordinates are rounded to a millimetre so a float that differs in its last bit cannot split one route in two.
-		//
-		// FNV-1a rather than string hashing: this value is PERSISTED, so it has to be identical across processes and
-		// runs, which `string.GetHashCode` explicitly is not.
+		/// <summary>
+		///     A stable id for the placement a route belongs to - equal for two sightings of one patroller, different for
+		///     two genuinely different beats.
+		/// </summary>
+		/// <returns>
+		///     Null when the spawn carries no route, which is the caller's cue that this placement cannot be identified
+		///     this way; a stationary NPC needs a different key entirely.
+		/// </returns>
+		/// <remarks>
+		///     Hashed over the whole polyline rather than a summary: it is the polyline that means "this beat", and a
+		///     summary that collides would silently merge two placements. Coordinates are rounded to a millimetre so a
+		///     float that differs in its last bit cannot split one route in two.
+		///     <para>
+		///         FNV-1a rather than string hashing, because this value is persisted and so has to be identical across
+		///         processes and runs, which `string.GetHashCode` explicitly is not.
+		///     </para>
+		/// </remarks>
 		public static uint? PlacementKey(ICollection<PatrolNode> nodes, uint templateId)
 		{
 			ArgumentNullException.ThrowIfNull(nodes);

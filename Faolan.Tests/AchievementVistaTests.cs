@@ -9,8 +9,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The achievement VISTA (#740 decoded it, #780 wired it): every record of the one captured scene, byte-exact,
-	// built from what `VistaCatalog` holds. The whole sequence is one 50-second window of
+	// The achievement vista: every record of the one captured scene, byte-exact, built from what `VistaCatalog`
+	// holds. The whole sequence is one 50-second window of
 	// `NecroL80_mage-necromancer_login_gameplay_annotated_2` (frames 4021-4299), on the Old Tarantia Docks viewpoint -
 	// object 0xC878:0xD970, which is `WorldObjects` 1546994545, the map-2000 row at 676.58 / 92.69 / 655.83 whose
 	// display id is the 4998751 keyed below.
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 				Hex(SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(ObjectClass, ObjectHandle, "object_closed"))));
 		}
 
-		// f4029 - the player's five-second gesture at the viewpoint, carrying the feedback remoteformat that NAMES the
+		// f4029 - the player's five-second gesture at the viewpoint, carrying the feedback remoteformat that names the
 		// mechanism. The key is the object's localized action key, which we do not import - the capture's is passed in
 		// here so the golden is the whole record rather than the record minus its longest field (the same treatment
 		// BehaviorAnimationsTests gives the bench sit).
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 				Hex(BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerViewVista(Player, ObjectHandle, remoteformat))));
 		}
 
-		// f4057 17:41:09.221 - the casterless scene buff, and f4299 its END twin. `ApplyNowNoCaster` sources the expiry
+		// f4057 17:41:09.221 - the casterless scene buff, and f4299 its end twin. `ApplyNowNoCaster` sources the expiry
 		// stamp from the live server clock, so the stamp is the one field this compares around rather than to.
 		[Fact]
 		public void TheSceneBuff_MatchesTheCapturedShape()
@@ -77,8 +77,8 @@ namespace Faolan.Tests
 				Hex(MagicBuffCodec.Build(new MagicBuffIIR(Player, 0x00, Docks.BuffSpellBaseId, MagicBuffIds.FormEnd, null, []))));
 		}
 
-		// f4059 - the fly-through itself. The `Object` param is the used object's LIVE handle in decimal, which is why
-		// it is composed per send and never stored: 51320:55664 IS 0xC878:0xD970.
+		// f4059 - the fly-through itself. The `Object` param is the used object's live handle in decimal, which is why
+		// it is composed per send and never stored: 51320:55664 is 0xC878:0xD970.
 		[Fact]
 		public void TheCameraStartAction_MatchesTheCapture()
 		{
@@ -93,7 +93,7 @@ namespace Faolan.Tests
 				Hex(GameActionListCodec.Build(new GameActionListIIR(Player, start.TypeId, 0, VistaScryActionCodec.Build(start)))));
 		}
 
-		// f4295 - and the stop. ⚠️ Its tail is TWO BYTES SHORTER than a start with an empty params string, because
+		// f4295 - and the stop. Its tail is two bytes shorter than a start with an empty params string, because
 		// 53231's descriptor key list is `ScriptID` alone: there is no `ScriptParams` behind it.
 		[Fact]
 		public void TheCameraStopAction_CarriesNoParams()
@@ -119,7 +119,7 @@ namespace Faolan.Tests
 			Assert.Equal(stop, VistaScryActionCodec.Parse(VistaScryActionCodec.Build(stop)));
 		}
 
-		// Strict (#530 rule 4): a params string we cannot account for is a mis-read action, not a defaulted one.
+		// Parsing is strict: a params string we cannot account for is a mis-read action, not a defaulted one.
 		[Fact]
 		public void UnknownOrMissingParams_Throw()
 		{
@@ -146,7 +146,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x004C461Au, Docks.ScryScriptId);
 			Assert.Equal(0x004C45FAu, Docks.BuffSpellBaseId);
 
-			// The lookup demands the CATEGORY as well: an LDB id is only unique inside one.
+			// The lookup demands the category as well: an LDB id is only unique inside one.
 			Assert.Same(Docks, VistaCatalog.VistaFor(VistaCatalog.DisplayCategory, Docks.DisplayId));
 			Assert.Null(VistaCatalog.VistaFor(50200, Docks.DisplayId));
 			Assert.Null(VistaCatalog.VistaFor(VistaCatalog.DisplayCategory, 4998750));

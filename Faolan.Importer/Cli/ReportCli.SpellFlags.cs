@@ -9,28 +9,28 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report spell-flags`: sweeps the spell record's FLAGS word bit by bit against things the DB knows, so
-	// "which bit says X" is a question that can be ASKED rather than argued (#632).
+	// "which bit says X" is a question that can be ASKED rather than argued.
 	//
 	// The word sits five words before the property run (`RdbSpellImporter.ReadFlagsWord`), and two of its bits are
-	// already named: **bit 2** is the mana-cost mode (#629/#630) and **bit 24** the hide-from-tooltip bit (#789).
+	// already named: bit 2 is the mana-cost mode and bit 24 the hide-from-tooltip bit.
 	//
-	// ⭐ Bit 2 is printed FIRST and deliberately, as the CONTROL. It reproduces `Spell.ManaCostIsPercent` exactly -
-	// 1,778 set against 1,778, zero disagreement - which is what a bit that IS a predicate looks like. Every other
+	// Bit 2 is printed first and deliberately, as the control. It reproduces `Spell.ManaCostIsPercent` exactly -
+	// 1,778 set against 1,778, zero disagreement - which is what a bit that is a predicate looks like. Every other
 	// row is read against that yardstick: 99% is a lead, 100% is a definition. Without the control a 99% row reads
 	// as an answer, which is the mistake this report exists to prevent.
 	public static partial class ReportCli
 	{
-		// One record's flags word beside every predicate the sweep scores it against. `Duration` is the record's OWN
-		// field 8 rather than the `DurationMs` column, so a disagreement cannot be a column blend (#632).
+		// One record's flags word beside every predicate the sweep scores it against. `Duration` is the record's own
+		// field 8 rather than the `DurationMs` column, so a disagreement cannot be a column blend.
 		private sealed record FlagsRow(uint Flags, bool Duration, bool Cast, bool Mana, bool ManaPercent, bool Trainable,
 			bool Mount, bool Area, bool Combo, bool Proc, bool Criteria, bool Elements, bool CastNano, uint Id,
 			uint RawField8, string Name);
 
-		// ⭐ NAMED (#632): bit 16 GATES THE CLIENT'S TIMED-EFFECT PATH. `FUN_007ee710`'s bit-set branch is the only
+		// named: bit 16 gates the client's TIMED-effect path. `FUN_007ee710`'s bit-set branch is the only
 		// place that computes a duration at all - it fetches stat 0x1D0 `DurationModifier`, scales by it and by 0.01,
 		// and lands the result in a longlong time. The sweep had it as a 99.07% association with "the record carries
 		// field 8"; the client turns that into a mechanism, and the mechanism explains the residual the association
-		// could not: the 131 records that state a duration with the bit CLEAR store a value that is NEVER APPLIED,
+		// could not: the 131 records that state a duration with the bit CLEAR store a value that is never APPLIED,
 		// because the code that would apply it sits behind the bit. `VisualBuffTest` heading that list is what a
 		// never-applied duration looks like. See docs/rdb/spell-record-fields.md.
 		private const int DurationBit = 16;
@@ -38,33 +38,33 @@ namespace Faolan.Importer.Cli
 		// The spell record's own duration property (`docs/rdb/spell-record-fields.md`).
 		private const uint DurationFieldId = 8;
 
-		// The three PROC GameAction kinds (`docs/re/gameaction-type-ids.tsv`) - a record carrying one of these IS a
-		// proc, which is the "is-a-proc" predicate #632 named and no DB column supplies.
+		// The three proc GameAction kinds (`docs/re/gameaction-type-ids.tsv`) - a record carrying one of these is a
+		// proc. No DB column supplies that predicate.
 		private static readonly HashSet<uint> ProcKinds = [53211, 53212, 53213];
 
 		/// <summary>
 		///     Which of the UNNAMED bits the client reads at all, and where - the census that turns "30 unnamed bits"
-		///     into a short list with addresses (#632).
+		///     into a short list with addresses.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ Produced by `tools/ghidra/DumpFlagBitReads.java` over the whole image:
+		///     Produced by `tools/ghidra/DumpFlagBitReads.java` over the whole image:
 		///     <code>
-		///     OFFSET=c8 WINDOW=12 /opt/ghidra/support/analyzeHeadless &lt;data-repo&gt;/Ghidra aoc \
+		///     OFFSET=c8 window=12 /opt/ghidra/support/analyzeHeadless &lt;data-repo&gt;/Ghidra aoc \
 		///       -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpFlagBitReads.java
 		///     </code>
-		///     ⚠️ **`+0xC8` is a common displacement and the script says so**, so the sites are classified by ADDRESS
+		///     `+0xC8` is a common displacement and the script says so, so the sites are classified by ADDRESS
 		///     RANGE rather than counted. The magic subsystem is ~`0x0075xxxx-0x007Fxxxx` with the combat half around
 		///     `0x0114xxxx` (`FUN_0114efa0` is `DealDamage`, self-named); anything else reading `+0xC8` is a
 		///     different struct wearing the same offset.
 		///     <para />
-		///     ⛔ That reclassifies the sweep's own biggest lead. **Bit 0 is set on 16,229 of 20,847 records - 78%,
-		///     the second most common bit in the word - and NOTHING in the spell subsystem reads it.** Its one hit is
+		///     That reclassifies the sweep's own biggest lead. Bit 0 is set on 16,229 of 20,847 records - 78%,
+		///     the second most common bit in the word - and nothing in the spell subsystem reads it. Its one hit is
 		///     `__tolower_l`, a CRT function. So it is not a decode gap at all, and a predicate score against it can
 		///     only ever be a coincidence. Bit 3 is the same story (`__atof_l`).
 		///     <para />
-		///     ⚠️ Bits 5, 6 and 7 are read ONLY inside `FUN_017594b0/01759690/01759a70/01759e30` - four adjacent
+		///     Bits 5, 6 and 7 are read only inside `FUN_017594b0/01759690/01759a70/01759e30` - four adjacent
 		///     functions reading four adjacent bits, which is a bitfield of its own at the same displacement. Bit 8
-		///     appears there too AND in the magic subsystem, which is what identifies that cluster as the other
+		///     appears there too and in the magic subsystem, which is what identifies that cluster as the other
 		///     struct rather than as more spell reads.
 		/// </remarks>
 		private static readonly string[] UnnamedBitReadSites =
@@ -104,13 +104,13 @@ namespace Faolan.Importer.Cli
 		];
 
 		/// <summary>
-		///     The bits whose meaning came out of the CLIENT rather than out of this sweep, printed in the header so
-		///     the table is read beside them (#632).
+		///     The bits whose meaning came out of the client rather than out of this sweep, printed in the header so
+		///     the table is read beside them.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ A bit named from the disassembly does not need a good predicate score, and a score that disagrees
-		///     with the code is the DATA being described rather than the bit being redefined. Bit 20 is the case that
-		///     makes the point: it scores +9.3 WITH "carries a duration", which reads as a contradiction of
+		///     A bit named from the disassembly does not need a good predicate score, and a score that disagrees
+		///     with the code is the data being described rather than the bit being redefined. Bit 20 is the case that
+		///     makes the point: it scores +9.3 with "carries a duration", which reads as a contradiction of
 		///     "permanent" until you see that the client's three consumers are all about a stated duration being
 		///     neither shown nor counted down - a record has to state one for the bit to have anything to suppress.
 		/// </remarks>
@@ -192,9 +192,9 @@ namespace Faolan.Importer.Cli
 			var trainable = (await db.ClassSpells.AsNoTracking().Select(c => c.SpellId).Distinct().ToListAsync()).ToHashSet();
 			var mounts = (await db.Mounts.AsNoTracking().Select(m => m.Id).ToListAsync()).ToHashSet();
 			var areas = (await db.SpellAreaEffects.AsNoTracking().Select(a => a.SpellId).Distinct().ToListAsync()).ToHashSet();
-			// ⭐ The SHARPER predicates #632 asked for. The first three come from the record itself rather than from a
-			// column, which is what makes them worth adding: a bit that means "this is a proc" has to agree with the
-			// record CARRYING a proc element, and no DB column says that.
+			// The sharper predicates. The first three come from the record itself rather than from a column, which is
+			// what makes them worth having: a bit that means "this is a proc" has to agree with the record carrying a
+			// proc element, and no DB column says that.
 			var combos = (await db.Combos.AsNoTracking().Select(c => c.GameActionId).Distinct().ToListAsync()).ToHashSet();
 
 			var rows = new List<FlagsRow>();
@@ -219,9 +219,9 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				var elements = ItemTemplateStatModifiers.ParseElements(body);
-				// ⭐ The record's OWN duration field, not the `DurationMs` column - that column also takes values from
+				// The record's own duration field, not the `DurationMs` column - that column also takes values from
 				// the wire and the effect catalog, so a disagreement read against it could be a column blend rather
-				// than the bit being wrong (#632).
+				// than the bit being wrong.
 				var fields = RdbSpellImporter.ReadIncreasingFields(body, out _);
 				var rawDuration = fields.GetValueOrDefault(DurationFieldId);
 				var (recordName, _, _) = RdbSpellImporter.ReadStringBlock(body, runEnd);
@@ -246,7 +246,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  agreement = how often the BIT and the predicate say the same thing. Bit 2 is the CONTROL:");
 			Console.WriteLine("  it is a known predicate (ManaCostIsPercent, #630), so every other row is read against it.");
 			Console.WriteLine();
-			// ⭐ What the CLIENT does with a bit, printed beside what the DATA correlates it with. A bit whose meaning
+			// What the client does with a bit, printed beside what the data correlates it with. A bit whose meaning
 			// came out of the disassembly does not need a predicate to score well, and a predicate score that
 			// disagrees with the code is the data being described, not the bit being redefined - which is exactly the
 			// shape of bit 20 below.
@@ -263,7 +263,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  agree on every record that has neither. Read the `set` column first - a bit set on 4 records");
 			Console.WriteLine("  scoring 99% against `mount` (155 records) is the base rate, not a finding.");
 			Console.WriteLine();
-			// ⭐ The base-rate correction the warning above only ASKED for. Two mostly-false columns agree on every
+			// The base-rate correction the warning above only ASKED for. Two mostly-false columns agree on every
 			// record that has neither, so a raw percentage rewards rarity. `expected` is what a bit of this bit's own
 			// rarity would score against this predicate's own prevalence by chance alone; EXCESS is the difference,
 			// and it is the only number in this table that means anything on its own.
@@ -300,21 +300,21 @@ namespace Faolan.Importer.Cli
 			if (only is { } drill)
 				BitMembers(rows, (int)drill);
 
-			// ⭐ The strongest row, examined rather than summarised. A bit that IS a predicate has a residual you can
+			// The strongest row, examined rather than summarised. A bit that is a predicate has a residual you can
 			// characterise; one that merely correlates has a residual that looks like the rest of the catalog.
 			DurationBitResidual(rows);
 			BitContainment(rows);
 		}
 
 
-		// The spells carrying one bit, NAMED, plus the cross-tab against bit 15 (hostile).
+		// The spells carrying one bit, named, plus the cross-tab against bit 15 (hostile).
 		//
-		// ⭐ It exists because the predicate table cannot check a bit the client named. Bits 11 and 26 were read out
-		// of `CoreMagicHolder::CastMagicSpell()` as modifiers of the HOSTILE path (#632), and a claim about the
+		// It exists because the predicate table cannot check a bit the client named. Bits 11 and 26 were read out
+		// of `CoreMagicHolder::CastMagicSpell()` as modifiers of the HOSTILE path, and a claim about the
 		// hostile path is only checkable against which spells are hostile - which is bit 15, not a DB column. So the
 		// cross-tab is the assertion and the names are the sanity check on it.
 		//
-		// ⚠️ The names are a SAMPLE and the counts are not. Reading a mechanism off the first 40 rows is the mistake
+		// The names are a SAMPLE and the counts are not. Reading a mechanism off the first 40 rows is the mistake
 		// the header of this report exists to prevent; the cross-tab above them is the measurement.
 		private static void BitMembers(IReadOnlyList<FlagsRow> rows, int bit)
 		{
@@ -333,8 +333,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    {$"bit {bit} set",14} {Both(true, true),9:N0} {Both(true, false),9:N0}");
 			Console.WriteLine($"    {$"bit {bit} clear",14} {Both(false, true),9:N0} {Both(false, false),9:N0}");
 
-			// ⚠️ The two numbers a name-shaped hypothesis dies on. A bit that marks the "slave" copy of a
-			// duplicated spell has to be BOTH untrainable and twinned; measuring only the sample the listing prints
+			// The two numbers a name-shaped hypothesis dies on. A bit that marks the "slave" copy of a
+			// duplicated spell has to be both untrainable and twinned; measuring only the sample the listing prints
 			// is how a mixed set reads as a clean one - `Aura of Infusion`'s bit-26 twin is untrainable and
 			// `Divine Vigor`'s is not, and eight rows cannot tell those apart from a rule.
 			var byName = rows.GroupBy(r => r.Name).ToDictionary(g => g.Key, g => g.ToList());
@@ -352,14 +352,14 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// ⭐ Which bits are SUBSETS of other bits - the question a bit-vs-predicate table structurally cannot ask.
+		// Which bits are SUBSETS of other bits - the question a bit-vs-predicate table structurally cannot ask.
 		//
 		// It matters because the client's own code pairs bits: bit 20 (a duration that is not counted down) is only
 		// meaningful on a magic the client re-creates, which is bit 16. A containment relation is evidence the two
 		// belong to one mechanism; its absence is evidence they do not, and both readings are unavailable from the
-		// predicate table because a predicate can only compare a bit to the DATA.
+		// predicate table because a predicate can only compare a bit to the data.
 		//
-		// ⚠️ Containment is DIRECTED and the small side is the informative one - every bit is trivially "contained"
+		// Containment is DIRECTED and the small side is the informative one - every bit is trivially "contained"
 		// in a bit that is set almost everywhere. The floor on |A| is what keeps a 4-record bit out of the list.
 		private static void BitContainment(IReadOnlyList<FlagsRow> rows)
 		{
@@ -394,7 +394,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine(line);
 		}
 
-		// ⭐ Bit 16 against the record's own duration field, and what the disagreements ARE (#632).
+		// Bit 16 against the record's own duration field, and what the disagreements are.
 		private static void DurationBitResidual(IReadOnlyList<FlagsRow> rows)
 		{
 			var setNoDuration = rows.Where(r => (r.Flags >> DurationBit & 1) == 1 && !r.Duration).ToList();
@@ -418,7 +418,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"        {r.Id,-9} field8={r.RawField8,-9} {(r.Name.Length > 44 ? r.Name[..44] : r.Name)}");
 			}
 
-			// ⚠️ Does the residual cluster on the duration's VALUE? If the exceptions were "durations of a particular
+			// Does the residual cluster on the duration's value? If the exceptions were "durations of a particular
 			// kind" they would; if they look like the rest of the catalog, the simple reading is just wrong.
 			var agreeing = rows.Where(r => (r.Flags >> DurationBit & 1) == 1 && r.Duration).Select(r => r.RawField8).ToList();
 			foreach (var (label, values) in new[] { ("agreeing", agreeing), ("bit clear", durationNotSet.Select(r => r.RawField8).ToList()) })

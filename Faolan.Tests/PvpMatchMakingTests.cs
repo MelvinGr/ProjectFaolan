@@ -6,14 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The PvP minigame QUEUE (Gitea #882), pinned against every body the corpus carries for it. The oracle is
+	// The PvP minigame queue, pinned against every body the corpus carries for it. The oracle is
 	// `--report method-bodies --report-arg PvPMatchMaking` over the two group-finder captures plus the four login
 	// dumps that carry the empty board.
 	//
-	// ⭐ The point of this file is that the board MOVES. Before #882's capture the corpus only had the empty
-	// `[0x3F1][u32 0]` from four login dumps, and the server shipped that as a constant. These 43 bodies are one
-	// session's worth of the same message tracking the player's own signups second by second - which is what turns
-	// "captured empty" into a three-level map with a live count in it.
+	// The point of this file is that the board moves. The four login dumps carry only the empty `[0x3F1][u32 0]`,
+	// which reads as a constant; these 43 bodies are one session's worth of the same message tracking the player's
+	// own signups second by second - a three-level map with a live count in it.
 	public class PvpMatchMakingTests
 	{
 		// c2s 0x2052 PvPMatchMakingPutIntoMatchMaking - all 5 distinct bodies of the 8 captured signups.
@@ -69,7 +68,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, PvpMatchMakingSignupCodec.Build(parsed));
 		}
 
-		// ⭐ THE ACK IS THE SIGNUP, ECHOED. Building it from the request alone reproduces all five captured replies
+		// The ack is the signup, echoed. Building it from the request alone reproduces all five captured replies
 		// byte for byte, which is what says the server adds only the two flags - and it is the whole of what
 		// `PvpMatchMakingService` has to construct.
 		[Theory]
@@ -109,7 +108,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.FromHexString("000003F100000000"), PvpMatchMakingInfoCodec.Build(PvpMatchMakingInfo.Empty));
 		}
 
-		// ⚠️ `0x7E2` is the ONE-ELEMENT list frame, not a constant. Every innermost frame in the corpus is `0x7E2`
+		// `0x7E2` is the one-element list frame, not a constant. Every innermost frame in the corpus is `0x7E2`
 		// because every captured signup carries queueType 0, so reading it as a constant would have looked right on
 		// all 43 bodies and hard-coded the single-queue case. This asserts the codec writes the frame from the count.
 		[Fact]
@@ -124,9 +123,9 @@ namespace Faolan.Tests
 			Assert.Equal([3u, 4u], round.Types[0].Maps[0].Queues.Select(q => q.Signups));
 		}
 
-		// ⭐ The board CONSTRUCTED from a live registry plus live signups is retail's, byte for byte. This is the one
+		// The board constructed from a live registry plus live signups is retail's, byte for byte. This is the one
 		// that would fail if the sticky registry, the ordering or the count placement were wrong: the capture's
-		// `The Call of Jhebbal Sag` still appears at ZERO here, long after the player dequeued it.
+		// `The Call of Jhebbal Sag` still appears at zero here, long after the player dequeued it.
 		[Fact]
 		public void Board_BuiltFromLiveSignupsIsTheCapturedBody()
 		{
@@ -141,7 +140,7 @@ namespace Faolan.Tests
 				PvpMatchMakingInfoCodec.Build(board));
 		}
 
-		// The "join first available" signups are counted in `i_nNumberOfAnyApplies` and are deliberately NOT listed
+		// The "join first available" signups are counted in `i_nNumberOfAnyApplies` and are deliberately not listed
 		// as a type-0 group: the capture's board grows no such group when the player checks that box, and the
 		// annotations name both edges ("selected join first avaialble instead" / "disabled join first avaialbl").
 		[Fact]
@@ -167,7 +166,7 @@ namespace Faolan.Tests
 			Assert.False(PvpMatchMakingSignupCodec.Parse(Convert.FromHexString("00001451000000050000000000")).IsAnyAvailable);
 		}
 
-		// The four captured removals are each answered by an EMPTY 0x2081 ~0.3 s later, 1:1 with no exceptions -
+		// The four captured removals are each answered by an empty 0x2081 ~0.3 s later, 1:1 with no exceptions -
 		// which is the whole of what that no-arg slot is known to be (see the Reserved0x81 note in Opcodes.cs).
 		[Fact]
 		public void RemoveFromMatchMaking_IsAnsweredByTheEmptyNoArgSlot()

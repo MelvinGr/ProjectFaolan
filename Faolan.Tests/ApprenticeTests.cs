@@ -9,8 +9,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Apprenticeship (#144). No capture performs one, so there is no golden blob to compare against - what these gate
-	// is the two things that CAN be wrong without a capture: the bodies against the client's own method signatures,
+	// Apprenticeship. No capture performs one, so there is no golden blob to compare against - what these gate
+	// is the two things that can be wrong without a capture: the bodies against the client's own method signatures,
 	// and the rules against the client's own strings.
 	public class ApprenticeTests
 	{
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 			Assert.Contains(outbound.Feedback, f => f.Message.Contains("same group"));
 		}
 
-		// The accept binds from the PENDING entry, not from the body - so an accept naming a teacher who never asked
+		// The accept binds from the pending entry, not from the body - so an accept naming a teacher who never asked
 		// cannot conjure a bond. Same rule the trade start and the quest-share accept follow.
 		[Fact]
 		public async Task AcceptWithoutARequestBindsNothing()
@@ -130,7 +130,7 @@ namespace Faolan.Tests
 			Assert.Equal(10u, outbound.Levels_Pushed.Last(l => l.Character == Student).Level);
 		}
 
-		// A bond cannot outlive either connection, and it has to end from the TEACHER's side too - otherwise the
+		// A bond cannot outlive either connection, and it has to end from the teacher's side too - otherwise the
 		// apprentice keeps a pushed level boost with nobody on the other end of it.
 		[Fact]
 		public async Task TheTeacherDisconnectingEndsTheBond()
@@ -178,7 +178,7 @@ namespace Faolan.Tests
 				return members.Contains(characterId) ? members : [];
 			}
 
-			// One fixed team, so its id is a constant - this fake exists for the roster, not for #512's routing.
+			// One fixed team, so its id is a constant - this fake exists for the roster, not for PvP match routing.
 			public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId) => null;
 			public Task<string> ForcePvpMatchStop(uint characterId, string message) => Task.FromResult("");
 			public bool ArePvpMatchOpponents(uint attackerId, uint victimId) => false;

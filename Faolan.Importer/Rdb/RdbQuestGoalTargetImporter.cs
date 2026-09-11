@@ -9,31 +9,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// Fill a quest goal's `TargetName` from the TYPED reference the goal already carries (#521 work item 1).
+	// Fill a quest goal's `TargetName` from the typed reference the goal already carries.
 	//
 	// `TrailingCategory` 51000 is the client's own `npc_template.name` table (docs/rdb/ldb-string-index.md), and its id
-	// space IS the npc template id - so a goal with that category names its target NPC twice over: as an id we can join,
+	// space is the npc template id - so a goal with that category names its target NPC twice over: as an id we can join,
 	// and as a string the client ships in plaintext. Measured with `--report quest-goal-targets` over the whole catalog:
 	// all 1,018 NpcTemplates have an LDB[51000] entry and 991 agree exactly with the name our captures recorded. The 27
-	// that differ are ALL rows whose captured name is the placeholder `Halen van Dummy`, where the LDB carries the real
+	// that differ are all rows whose captured name is the placeholder `Halen van Dummy`, where the LDB carries the real
 	// one - so the two id spaces line up and the string is not a separate "display name" that would break matching.
 	//
-	// ⚠️ Which source wins is nonetheless load-bearing, and it is the CATALOG, not the LDB. `TargetName` is a MATCH key:
+	// Which source wins is nonetheless load-bearing, and it is the catalog, not the LDB. `TargetName` is a match key:
 	// it is compared against a live entity's name, which is `NpcTemplate.Name` (the name retail put on the wire).
 	// Writing `Beggar` where the wire says `Halen van Dummy` would look resolved and silently never match - strictly
 	// worse than the null it replaced. So:
 	//   - template in our catalog -> its stored Name, i.e. exactly the string the runtime will compare against. The
-	//     LDB is used only as the CHECK that the reference really is an npc_template ref.
+	//     LDB is used only as the check that the reference really is an npc_template ref.
 	//   - template not in our catalog -> the LDB string, which is the only name that exists for it. It is inert until
 	//     that map is imported, and harmless: the kill matcher resolves TrailingRefId == templateId first
 	//     (QuestProgress.MatchingKillGoal), so the id branch takes over the moment the template lands.
 	//
-	// Categories 50200 (item), 51100 (categorytree) and 51200 (bounded_areas) are deliberately NOT written here. An item
+	// Categories 50200 (item), 51100 (categorytree) and 51200 (bounded_areas) are deliberately not written here. An item
 	// name in a column the kill matcher reads as an NPC name would make it hunt a mob called `Stolen Goods`; 51100
-	// resolves to editor GROUP names (`Watch`, `Undeads`, `Posha's men`) that match no NPC at all; and 51200 is a region,
+	// resolves to editor group names (`Watch`, `Undeads`, `Posha's men`) that match no NPC at all; and 51200 is a region,
 	// whose geometry already lives in `QuestGoalDefinition.RegionId`.
 	//
-	// BOOTSTRAP-ONLY: a goal that already names a target is skipped, so a Quest-editor edit or a hand seed survives a
+	// BOOTSTRAP-only: a goal that already names a target is skipped, so a Quest-editor edit or a hand seed survives a
 	// re-import.
 	public static class RdbQuestGoalTargetImporter
 	{
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Rdb
 				// already names a target was configured by hand or by a prior run, and a goal typed something other
 				// than a kill is not this rule's business.
 				//
-				// ⚠️ It cannot be the usual "is it still at the default" test any more (#522). A 51000 goal carrying
+				// It cannot be the usual "is it still at the default" test any more. A 51000 goal carrying
 				// the client's kill verb is typed `Kill` before this runs (QuestGoalWiring.TypeKillGoalsFromKind), so a
 				// not-yet-typed test would skip all 24 and the column would never be filled: `Kill` is a decision now
 				// rather than the default. The TargetName test is what protects the two hand-seeded story kills, whose
@@ -105,7 +105,7 @@ namespace Faolan.Importer.Rdb
 			return new Result(goals.Count, fromCatalog, fromLdb, alreadyWired, unresolved, placeholderKept);
 		}
 
-		// `PlaceholderKept` is the interesting one: the goal's template is one whose CAPTURED name is a shared
+		// `PlaceholderKept` is the interesting one: the goal's template is one whose captured name is a shared
 		// placeholder, so the catalog name we wrote deliberately disagrees with the LDB's real name. It matches, which
 		// is what the column is for, but it reads wrong in the editor - so the run says how many.
 		public readonly record struct Result(int Goals, int FromCatalog, int FromLdb, int AlreadyWired, int Unresolved, int PlaceholderKept);

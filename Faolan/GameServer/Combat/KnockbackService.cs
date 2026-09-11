@@ -12,16 +12,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// Knockback (#826): resolve the shove against the victim's resistance, apply retail's immunity buff, and put the
-	// displacement on the wire for the victim and everyone watching.
-	//
-	// It came off `WorldBroadcaster` and took that class's LAST bound seam with it. `Knock` needs to apply a self-buff,
-	// which the broadcaster could only reach through `BindApplySelfBuff` - a `Func<>` bound after construction, because
-	// what answers it (`SpellEffectOutbound` -> `BuffService`) is built ON the broadcaster. Built here instead, after
-	// the port exists, the dependency is an ordinary constructor argument and the cycle is simply gone.
-	//
-	// ⭐ That is the general move when a bound seam looks unavoidable: the cycle is usually between the CLASS the op
-	// sits in and its answer, not between the op and its answer. Move the op to a class built later and it dissolves.
+	/// <summary>
+	///     Knockback: resolve the shove against the victim's resistance, apply retail's immunity buff, and put the
+	///     displacement on the wire for the victim and everyone watching.
+	/// </summary>
+	/// <remarks>
+	///     This is built after <see cref="ISpellEffectOutbound" /> exists, which is what lets the self-buff it applies
+	///     be an ordinary constructor argument. Moving the shove back onto <see cref="WorldBroadcaster" /> - which is
+	///     built below that port - would reintroduce a construction cycle that only a bound seam could break.
+	/// </remarks>
 	public sealed class KnockbackService
 	{
 		private readonly ILogger _logger;
@@ -35,33 +34,27 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
-		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
-		// other player who can already see the caster, so the effect renders on their clients too. This is the EFFECT
-		// analogue of BroadcastBehaviorToViewers, which relays only the cast GESTURE (the BCC animation): retail streams
-		// BOTH to nearby observers. `body` is the same ApplySpell carrier the caster's own client receives - it already
-		// carries the acting player's handle as applyFrom (and, for a self-buff, applyTo); retail relays that exact body
-		// to nearby players, only the frame receiver differs. Ground truth: the other-players-visible capture
-		// (Hoxxling ...other_playersvisible) shows s2c ApplySpell (0x6B87E316) for other-player handles 0x1316xxx framed
-		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
-		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
-		// client hasn't built). No-op solo / when the caster is unseen.
-		// Knockback (#496): shove a PLAYER from where they stand to `to`, and make everyone who can see them watch it.
-		//
-		// KNOCKBACK (#496): the server shoving an entity along a segment it did not walk. Decides WHERE the victim
-		// lands, then hands the pair of records below the job of saying so.
-		//
-		// The wire form is decoded and byte-exact; the GAMEPLAY around it is not, and the split is worth keeping in
-		// mind: the whole corpus has exactly ONE knockback, so distance, direction and how KnockbackResistance scales
-		// it are a single measurement plus a reasonable shape (see Knockback). Nothing here should be quoted as
-		// retail-confirmed except the packets it sends.
-		//
-		// ⚠️ Until #139's combo finisher wired it, nothing TRIGGERED this - a GM command was its only caller. The
-		// captured knockback came from an NPC ability, but the ApplySpell in that batch is the "Knockback immunity"
-		// guard rather than the knocking ability, so the corpus still does not say WHICH NPC abilities knock back;
-		// guessing would put a shove on attacks that never had one.
-		//
-		// Returns false when the geometry is degenerate (source and victim on the same spot) or the victim resists it
-		// outright.
+		/// <summary>
+		///     The server shoving an entity along a segment it did not walk: decides where the victim lands, then
+		///     hands the pair of records below the job of saying so.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The wire form is decoded and byte-exact; the gameplay around it is not. The whole corpus holds
+		///         exactly one knockback, so distance, direction and how KnockbackResistance scales it are a single
+		///         measurement plus a plausible shape (see <see cref="Knockback" />). Nothing here is
+		///         retail-confirmed except the packets it sends.
+		///     </para>
+		///     <para>
+		///         The corpus also does not say which NPC abilities knock back: the captured knockback came from an
+		///         NPC ability, but the ApplySpell in that batch is the "Knockback immunity" guard rather than the
+		///         knocking ability, so attaching a shove to an NPC attack would be a guess.
+		///     </para>
+		/// </remarks>
+		/// <returns>
+		///     False when the geometry is degenerate (source and victim on the same spot) or the victim resists the
+		///     shove outright.
+		/// </returns>
 		public async Task<bool> Knock(WorldEntity victim, Vector3 source, float distance = Knockback.DefaultDistance)
 		{
 			// Read the victim's own resistance rather than assuming none - the stat exists (0x040D) and this is the
@@ -87,7 +80,7 @@ namespace Faolan.GameServer.Combat
 				_logger.LogDebug("Knockback: no ground height at ({X:F1}, {Z:F1}) on map {Map}; leaving the destination unsnapped.", to.X, to.Z, victim.MapId);
 
 			// Retail applies "Knockback immunity" to the victim in the same batch as the displacement. Sent before the
-			// move so a client that acts on it has it in hand when the shove lands. Only a PLAYER victim has a client
+			// move so a client that acts on it has it in hand when the shove lands. Only a player victim has a client
 			// to buff; an NPC is displaced without one.
 			if (victim.Client != null)
 				await _spellEffects.ApplySelfBuff(victim.Client, Knockback.ImmunitySpellId << 8);
@@ -96,18 +89,24 @@ namespace Faolan.GameServer.Combat
 			return true;
 		}
 
-		// Two records, in retail's own order (the annotated dungeon capture, 18:49:54.284 -> 18:49:56.020):
-		//   1. the forced-move MoveTask (mode 0x05) carrying from -> to, which is what the client ANIMATES;
-		//   2. a SetPos pinning the destination ~1.7 s later, which is what makes it authoritative.
-		//
-		// Both go to the victim AND to nearby viewers - the victim's client plays the shove, and a viewer who only got
-		// the SetPos would see the other player teleport. The model position is advanced first so interest, aggro and
-		// the next move all agree with where the player now is; skipping that is how a displaced player ends up
-		// invisible to the NPCs still chasing their old position.
-		//
-		// ⚠️ The caller is expected to have ground-snapped `to`. This does NOT clamp it: a knockback is allowed to put
-		// a player somewhere they could not have walked (off a ledge - which then costs them fall damage, #495), and
-		// clamping here would quietly cancel that.
+		/// <summary>
+		///     Two records, in retail's own order (the annotated dungeon capture, 18:49:54.284 -&gt; 18:49:56.020):
+		///     the forced-move MoveTask (mode 0x05) carrying from -&gt; to, which is what the client animates, then a
+		///     SetPos pinning the destination about 1.7 s later, which is what makes it authoritative.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         Both go to the victim and to nearby viewers: the victim's client plays the shove, and a viewer who
+		///         only got the SetPos would see the other player teleport. The model position is advanced first so
+		///         interest, aggro and the next move agree with where the player now is; otherwise a displaced player
+		///         is invisible to the NPCs still chasing their old position.
+		///     </para>
+		///     <para>
+		///         The caller is expected to have ground-snapped <paramref name="to" />. This does not clamp it: a
+		///         knockback is allowed to put a player somewhere they could not have walked - off a ledge, which then
+		///         costs them fall damage - and clamping here would quietly cancel that.
+		///     </para>
+		/// </remarks>
 		private async Task BroadcastKnockback(WorldEntity victim, Vector3 to)
 		{
 			var from = victim.Position;

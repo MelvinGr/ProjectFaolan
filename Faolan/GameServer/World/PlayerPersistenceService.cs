@@ -11,12 +11,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Player-state persistence, pulled out of the GameServerListener/GMCommands god-class (#200): the periodic
-	// autosave loop plus the one-off flushes (logout, teleport, the .save GM command). Each flush writes a
-	// connected player's authoritative live WorldEntity transform (position/rotation/map) onto their Character row -
-	// movement is otherwise never persisted, so without this a logout loses where the player was. The player
-	// registry is owned by WorldSimulation; this service only reads it and writes to the database, so its dependency
-	// surface is the narrow (Database, Logger, WorldSimulation) - it never reaches back into the listener.
+	/// <summary>
+	///     Player-state persistence: the periodic autosave loop, plus the one-off flushes on logout, teleport and the
+	///     <c>.save</c> GM command.
+	/// </summary>
+	/// <remarks>
+	///     Each flush writes a connected player's authoritative live <see cref="WorldEntity" /> transform - position,
+	///     rotation and map - onto their Character row. Movement is not otherwise persisted, so without this a logout
+	///     loses where the player was. The player registry is owned by <see cref="WorldSimulation" />; this service
+	///     only reads it and writes to the database.
+	/// </remarks>
 	public sealed class PlayerPersistenceService
 	{
 		private static readonly TimeSpan AutoSaveInterval = TimeSpan.FromMinutes(5);
@@ -35,8 +39,11 @@ namespace Faolan.GameServer.World
 			_simulation = simulation;
 		}
 
-		// Flushes every connected player's live world state; returns how many were saved. Used by the autosave loop
-		// and the .save GM command.
+		/// <summary>
+		///     Flushes every connected player's live world state, for the autosave loop and the <c>.save</c> GM
+		///     command.
+		/// </summary>
+		/// <returns>How many were saved.</returns>
 		public async Task<int> FlushAllAsync()
 		{
 			var saved = 0;
@@ -49,24 +56,26 @@ namespace Faolan.GameServer.World
 			return saved;
 		}
 
-		// Flushes one player's authoritative live transform (the WorldEntity) onto their persisted Character and
-		// saves it. Used by the autosave loop, .save, and disconnect. Errors are logged (callers may not await).
+		/// <summary>
+		///     Flushes one player's authoritative live transform onto their persisted Character and saves it, for the
+		///     autosave loop, <c>.save</c> and disconnect. Errors are logged, because callers may not await.
+		/// </summary>
 		public async Task<bool> SavePlayerState(INetworkClient client, WorldEntity entity)
 		{
 			var character = client.Session.Character;
 
 			try
 			{
-				// entity is the live WorldEntity (Vector3 Euler rotation); the DB Character stores a quaternion.
+				// The entity holds the live transform; the persisted Character row stores the same values.
 				character.MapId = entity.MapId;
 				character.Position = entity.Position;
 				character.Rotation = entity.Rotation;
 				await _characters.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
 
-				// Snapshot the live self-buffs with their absolute expiry so a relog restores them with the time left
-				// (#274). Only the buffs no dedicated re-applier owns (shield/mount are excluded) and that haven't
-				// already expired; RestoreBuffs re-sends them at world entry. Replace-all, like the transform above -
-				// the row set always mirrors what's currently active.
+				// Snapshot the live self-buffs with their absolute expiry, so a relog restores them with the time left.
+				// Only the buffs no dedicated re-applier owns - shield and mount are excluded - and that have not
+				// already expired; world entry re-sends them. Replace-all, like the transform above, so the row set
+				// always mirrors what is currently active.
 				var now = DateTimeOffset.UtcNow;
 				var buffs = entity
 					.ActiveBuffs.Values.Where(b => BuffService.ShouldPersistBuff(entity, b) && !b.Expired(now))
@@ -86,8 +95,13 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Starts the periodic crash-safety flush of the live world state. Mirrors WorldSimulation.Start/StopAsync:
-		// the listener owns the lifetime token and awaits StopAsync() on shutdown so a mid-tick save isn't raced.
+		/// <summary>
+		///     Starts the periodic crash-safety flush of the live world state.
+		/// </summary>
+		/// <remarks>
+		///     Mirrors <see cref="WorldSimulation" />'s start and stop: the listener owns the lifetime token and awaits
+		///     <see cref="StopAsync" /> on shutdown, so a mid-tick save is not raced.
+		/// </remarks>
 		public void Start(CancellationToken cancellationToken)
 		{
 			_autoSaveTask = AutoSaveLoop(cancellationToken);

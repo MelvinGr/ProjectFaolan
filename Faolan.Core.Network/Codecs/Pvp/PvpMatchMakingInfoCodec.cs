@@ -7,47 +7,54 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Pvp
 {
-	// s2c DispatchPvPMatchMakingInfoRequestReturn (0x2092): the minigame window's queue board - how many players are
-	// signed up for each minigame right now. The answer to c2s PvPMatchMakingRequestInfo(int i_QueueType), which the
-	// client polls every ~5 s while that window is open and once at login.
-	//
-	// The client's own recovered field list is `(i_cList, i_nNumberOfAnyApplies)`
-	// [V1: docs/re/aoc-client-rpc-methods.json]. `i_cList` is a THREE-LEVEL count-framed map, each level a
-	// `[u32 key]` before its element the way DispatchMassivePvpInfoRequestReturn's list is (MassivePvpInfoCodec):
-	//
-	//   [u32 (types + 1) * 0x3F1]
-	//     types × [u32 minigameType] [u32 (maps + 1) * 0x3F1]
-	//       maps × [u32 mapId] [u32 (queues + 1) * 0x3F1]
-	//         queues × [u32 queueType] [u32 signups]
-	//   [u32 i_nNumberOfAnyApplies]
-	//
-	// ⭐ THE BOARD IS LIVE STATE, AND THE CAPTURE PROVES IT BY MOVING. Until Gitea #882's capture this message was
-	// on record as "captured empty" - `[0x3F1][0]` in every login dump - and the server answered with that constant.
-	// It is not a constant: across 43 bodies in one session every field tracks the player's own signups, second by
-	// second. Each `PvPMatchMakingPutIntoMatchMaking` raises exactly one `signups` by one and lowers the previous
-	// one, because a character holds ONE signup at a time (which is also why `PvPMatchMakingRemoveFromMatchMaking`
-	// needs no argument); each removal lowers it again. A map appears the first time anyone queues for it and STAYS
-	// at 0 afterwards, so the board is a per-server registry seeded by activity, not a catalog - and an empty one is
-	// what a server nobody has queued on sends, which is exactly the four login captures.
-	//
-	// ⚠️ `0x7E2` here is the ONE-ELEMENT list frame, not a constant: the innermost frame is `0x7E2` in all 43 bodies
-	// because every captured signup carries `i_QueueType` 0, so each map has exactly one queue. Reading it as a
-	// constant would have hard-coded the single-queue case (see the `0x3F1`/`0x7E2` trap in CLAUDE.md).
-	//
-	// ⚠️ The innermost KEY is 0 in every captured body, so its identity is inference rather than measurement: it is
-	// read as `queueType` because that is the one field `PvPMatchMakingRequestInfo` and
-	// `PvPMatchMakingPutIntoMatchMaking` both carry and both hold at 0 throughout.
-	// [V0: the innermost map key of the matchmaking board]
-	//
-	// ⭐ `i_nNumberOfAnyApplies` is the "join first available" tally, and the capture's own annotations name it: it
-	// goes 0 -> 1 on the `(map 0, type 0)` signup the player annotated "selected join first avaialble instead", and
-	// back to 0 on the removal annotated "disabled join first avaialbl". Those signups are counted HERE and are
-	// deliberately not listed as a type-0 group.
+	/// <summary>
+	///     s2c <c>DispatchPvPMatchMakingInfoRequestReturn</c> - the minigame window's queue board: how many players are
+	///     signed up for each minigame right now. The answer to c2s <c>PvPMatchMakingRequestInfo(int i_QueueType)</c>,
+	///     which the client polls every ~5 s while that window is open and once at login.
+	/// </summary>
+	/// <remarks>
+	///     The client's recovered field list is <c>(i_cList, i_nNumberOfAnyApplies)</c>
+	///     [V1: docs/re/aoc-client-rpc-methods.json]. <c>i_cList</c> is a three-level count-framed map, each level a
+	///     <c>[u32 key]</c> before its element, the way <see cref="MassivePvpInfoCodec" />'s list is:
+	///     <code>
+	///     [list frame]
+	///       types x [u32 minigameType] [list frame]
+	///         maps x [u32 mapId] [list frame]
+	///           queues x [u32 queueType] [u32 signups]
+	///     [u32 i_nNumberOfAnyApplies]
+	///     </code>
+	///     <para>
+	///         The board is live state, and the capture shows it moving: across 43 bodies in one session every field
+	///         tracks the player's own signups second by second. Each <c>PvPMatchMakingPutIntoMatchMaking</c> raises
+	///         exactly one <c>signups</c> by one and lowers the previous one, because a character holds one signup at a
+	///         time - which is also why <c>PvPMatchMakingRemoveFromMatchMaking</c> needs no argument - and each removal
+	///         lowers it again. A map appears the first time anyone queues for it and stays at 0 afterwards, so the
+	///         board is a per-server registry seeded by activity rather than a catalog, and an empty one is what a
+	///         server nobody has queued on sends.
+	///     </para>
+	///     <para>
+	///         The innermost list frame is the one-element frame in all 43 bodies rather than a constant, because every
+	///         captured signup carries <c>i_QueueType</c> 0 and so each map has exactly one queue. Reading it as a
+	///         constant would hard-code the single-queue case.
+	///     </para>
+	///     <para>
+	///         The innermost key is 0 in every captured body, so its identity is inference rather than measurement: it
+	///         is read as <c>queueType</c> because that is the one field <c>PvPMatchMakingRequestInfo</c> and
+	///         <c>PvPMatchMakingPutIntoMatchMaking</c> both carry and both hold at 0 throughout.
+	///         [V0: the innermost map key of the matchmaking board]
+	///     </para>
+	///     <para>
+	///         <c>i_nNumberOfAnyApplies</c> is the "join first available" tally, which the capture's own annotations
+	///         name: it goes 0 to 1 on the <c>(map 0, type 0)</c> signup annotated "selected join first avaialble
+	///         instead", and back to 0 on the removal annotated "disabled join first avaialbl". Those signups are
+	///         counted here and are deliberately not listed as a type-0 group.
+	///     </para>
+	/// </remarks>
 	public static class PvpMatchMakingInfoCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchPvPMatchMakingInfoRequestReturn;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(PvpMatchMakingInfo value)
 		{
 			ArgumentNullException.ThrowIfNull(value);

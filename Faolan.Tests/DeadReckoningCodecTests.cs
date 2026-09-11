@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for the dead-reckoning movement records (#190, docs/re/chardcmove-grammar.md):
+	// Byte-exact construct + round-trip for the dead-reckoning movement records (docs/re/chardcmove-grammar.md):
 	// CharDCMoveIIR_t (0x4517AA81), StopIIR_c (0xD751EBB4), SetPosIIR_c (0x04B80B24). Oracles are captured records;
-	// their leading 4-byte length belongs to the SENDER (#530 rule 2), so the codec is compared against Record(). Proves the codecs are a faithful inverse of the wire grammar
-	// (construct-don't-replay) across the flag-gated CharDCMove forms.
+	// their leading 4-byte length belongs to the sender, so the codec is compared against Record(). Proves the codecs
+	// are a faithful inverse of the wire grammar (construct-don't-replay) across the flag-gated CharDCMove forms.
 	public class DeadReckoningCodecTests
 	{
 		// hoxxling, bit4-set collapsed-facing form (flag1 0x1a): pos + velocity block.
@@ -37,12 +37,12 @@ namespace Faolan.Tests
 			Assert.Equal(0.173f, r.Param19, 4);
 		}
 
-		// The floats after the position are the entity's rotation QUATERNION, not the decompile's "post-position move
-		// vector" + facing scalars: bit4 SET collapses it to the two components a yaw-only facing needs (qy, qw), bit4
-		// CLEAR carries all four. Both captured forms are unit-length - across the corpus that holds within 1e-4 for
+		// The floats after the position are the entity's rotation quaternion, not the decompile's "post-position move
+		// vector" + facing scalars: bit4 set collapses it to the two components a yaw-only facing needs (qy, qw), bit4
+		// clear carries all four. Both captured forms are unit-length - across the corpus that holds within 1e-4 for
 		// 100% of 19,642 collapsed and 3,250 full records - and the yaw the collapsed pair implies matches the
 		// direction of travel (within 7.5 deg for 90% of sustained straight runs), which is what pins it as an
-		// orientation rather than a heading vector (a heading would be sin/cos, i.e. the FULL angle, not the half).
+		// orientation rather than a heading vector (a heading would be sin/cos, i.e. the full angle, not the half).
 		[Theory, InlineData(CharDcMoveCollapsed, true), InlineData(CharDcMoveFullVector, false)]
 		public void CharDCMove_RotationIsAUnitQuaternion(string hex, bool collapsed)
 		{
@@ -99,7 +99,8 @@ namespace Faolan.Tests
 			Assert.Equal(StopBody[8..], Convert.ToHexStringLower(StopCodec.Build(p)));
 		}
 
-		// The captured record WITHOUT its leading u32 length - what the codec builds and parses (#530 rule 2).
+		// The captured record without its leading u32 length, which belongs to the sender - what the codec builds and
+		// parses.
 		private static byte[] Record(string hex)
 		{
 			return Convert.FromHexString(hex)[4..];

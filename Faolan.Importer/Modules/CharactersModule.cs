@@ -10,16 +10,16 @@ namespace Faolan.Importer.Modules
 	// Captured characters (incl. other players) -> Characters + child tables. Depends on items (worn
 	// equipment references item rows).
 	//
-	// INSERT adds characters the DB does not have and leaves every existing row alone - the safe default, and what
-	// a plain `dotnet run ... --skip characters`-less run does.
+	// Insert adds characters the DB does not have and leaves every existing row alone - the safe default, and what
+	// a plain run without `--skip characters` does.
 	//
-	// OVERWRITE is the #753 refresh: a character whose row carries `Character.ImportedFromCapture` is DELETED and
+	// Overwrite is a refresh: a character whose row carries `Character.ImportedFromCapture` is deleted and
 	// rebuilt from the current corpus, so a re-dumped capture can update an imported bag / worn set / stat sheet
 	// that would otherwise stay frozen at whichever dump first built it. A row without the marker was created
 	// in-game and is never touched, which is what makes this safe where a blanket re-import was not: that is how
 	// `Adada` (level 4, locally created) was lost, and the level threshold below would not have saved it either.
 	//
-	// ⚠️ It DOES discard a player's own rearrangement of an imported character's bag. That is the trade the mode
+	// It does discard a player's own rearrangement of an imported character's bag. That is the trade the mode
 	// asks for, which is why it is opt-in and not the default.
 	public sealed class CharactersModule : IImportModule
 	{
@@ -42,7 +42,7 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var refresh = ctx.ModeFor(Name) == WriteMode.Overwrite;
-			// ⚠️ GUARDED, and this is what `--force` was parsed for (nothing consumed it until now). The marker
+			// GUARDED, and this is what `--force` was parsed for (nothing consumed it until now). The marker
 			// makes the refresh safe for characters the importer did not build, but for the ones it did it still
 			// throws away whatever the player has since done with that character's bag - so it takes a second,
 			// explicit yes rather than riding in on a global `--mode overwrite` meant for some other module.

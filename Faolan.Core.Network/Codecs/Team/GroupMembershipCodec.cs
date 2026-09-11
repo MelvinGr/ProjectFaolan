@@ -5,26 +5,30 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
-	// The group-membership records the GAME server pushes onto the world connection, mirroring what the CS tier does
-	// to the team roster: AddToGroupIIR when someone joins, RemoveFromGroupIIR when they leave or are kicked. Both
-	// were first captured in login_2-clients_group-trade-friend and were name-only entries in Opcodes.cs until then.
-	//
-	// So a join produces BOTH: the CS tier's roster dispatches (TeamRosterCodec and friends) and one AddToGroup per
-	// member on each member's world connection. The capture sends one record per member - the joiner AND the existing
-	// members - to every world connection in the team.
-	//
-	//   AddToGroupIIR      [u32 iir][ProtoID32 member][u8 0][ProtoID32 team][ProtoID32 leader]   25-byte body
-	//   RemoveFromGroupIIR [u32 iir][ProtoID32 member][u8 0][ProtoID32 team]                     17-byte body
-	//
-	// ONE FAMILY, not two messages that share a folder: both name a member and the team it moved in or out of, and the
-	// add form is the remove form plus the leader. So Parse returns the GroupMembershipIIR base and Build dispatches
-	// on the concrete record (#530 rule 5).
-	//
-	// ⚠️ Build returns the body WITHOUT the carrier's [u32 length] - rule 2 - so it goes out through WorldIir.Send,
-	// which writes that prefix. It used to emit the prefix itself and go through WorldIir.SendFramed. Getting that
-	// pairing wrong is expensive in exactly one direction: an UNFRAMED record through the verbatim sender puts the IIR
-	// TYPE where the client reads a length, and it read 0x0DF44B73 as a 234 MB payload and dropped the connection,
-	// killing BOTH clients in the team the instant the roster went out.
+	/// <summary>
+	///     The group-membership records the game server pushes onto the world connection, mirroring what the CS tier does
+	///     to the team roster: AddToGroupIIR when someone joins, RemoveFromGroupIIR when they leave or are kicked.
+	/// </summary>
+	/// <remarks>
+	///     A join therefore produces both the CS tier's roster dispatches and one AddToGroup per member on each member's
+	///     world connection. The capture sends one record per member - the joiner and the existing members - to every
+	///     world connection in the team.
+	///     <code>
+	///     AddToGroupIIR      [u32 iir][ProtoID32 member][u8 0][ProtoID32 team][ProtoID32 leader]   25-byte body
+	///     RemoveFromGroupIIR [u32 iir][ProtoID32 member][u8 0][ProtoID32 team]                     17-byte body
+	///     </code>
+	///     <para>
+	///         They are one family rather than two messages sharing a folder: both name a member and the team it moved in
+	///         or out of, and the add form is the remove form plus the leader. <c>Parse</c> therefore returns the
+	///         <c>GroupMembershipIIR</c> base and <c>Build</c> dispatches on the concrete record.
+	///     </para>
+	///     <para>
+	///         <c>Build</c> returns the body without the carrier's <c>[u32 length]</c>, so it must go out through
+	///         <c>WorldIir.Send</c>, which writes that prefix. Sending an unframed record through the verbatim sender puts
+	///         the IIR type where the client reads a length, which it takes as a multi-hundred-megabyte payload and drops
+	///         the connection on.
+	///     </para>
+	/// </remarks>
 	public static class GroupMembershipCodec
 	{
 		public static readonly IirTypes[] HandledTypes = [IirTypes.AddToGroupIIR, IirTypes.RemoveFromGroupIIR];
@@ -79,7 +83,7 @@ namespace Faolan.Core.Network.Codecs.Team
 		}
 	}
 
-	// What the two forms share: WHO moved, and WHICH team. The add form adds the leader.
+	/// <summary>What the two forms share: who moved, and which team. The add form adds the leader.</summary>
 	public abstract record GroupMembershipIIR(uint MemberId, uint TeamId);
 
 	public sealed record AddToGroupIIR(uint MemberId, uint TeamId, uint LeaderId) : GroupMembershipIIR(MemberId, TeamId);

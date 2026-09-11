@@ -8,15 +8,15 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Importer.Cli
 {
 	// `--report ldb-name-categories`: which LDB name category names each of our catalogs, measured over every row we
-	// hold rather than over a handful of samples (#415).
+	// hold rather than over a handful of samples.
 	//
-	// The question it exists to answer is #415's premise. RDB type 1000020 holds items, feats and abilities in ONE
-	// id space, and the encrypted RDBH header carries no category tag - so an entry's KIND is only knowable by
-	// decrypting it, which needs a key we harvest from captures. That looked like a hard block on ever creating a
-	// row for an un-keyed template: you cannot file a template as an ITEM without knowing it is one.
+	// The question it answers: RDB type 1000020 holds items, feats and abilities in one id space, and the encrypted
+	// RDBH header carries no category tag, so an entry's kind looks knowable only by decrypting it - which needs a
+	// key harvested from a capture. That would block ever creating a row for an un-keyed template, since a template
+	// cannot be filed as an item without knowing it is one.
 	//
-	// ⭐ The LDB knows. Each catalog's rows land in a DIFFERENT name category, so the category is an outside witness
-	// to the kind - available for all 98,048 entries, with no key. This report is that claim's evidence.
+	// The LDB knows. Each catalog's rows land in a different name category, so the category is an outside witness to
+	// the kind, available for every entry and needing no key. This report is that claim's evidence.
 	public static partial class ReportCli
 	{
 		// The client's own name/description categories over the two template types, from `docs/rdb/ldb-string-index.md`.
@@ -65,9 +65,9 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {category,-6} {what,-28} {ids.Count,8}   " + string.Join("  ", cells));
 			}
 
-			// ⭐ The half the report is really about. `docs/rdb/ldb-string-index.md` read 50200 and 50220 as "two
-			// halves of one id space" of ITEM names, on the strength of their ids being disjoint and both keying
-			// 1000020. They key it because feats live in 1000020 too - the split is by KIND, and the rows above say
+			// The half the report is really about. `docs/rdb/ldb-string-index.md` read 50200 and 50220 as "two
+			// halves of one id space" of item names, on the strength of their ids being disjoint and both keying
+			// 1000020. They key it because feats live in 1000020 too - the split is by kind, and the rows above say
 			// which is which.
 			var names200 = byCategory.GetValueOrDefault(50200u, []);
 			var names220 = byCategory.GetValueOrDefault(50220u, []);
@@ -83,7 +83,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  of the {entries.Count:N0} type-{TemplateType} entries: {in200:N0} named by 50200, {in220:N0} by 50220, "
 			                  + $"{entries.Count - in200 - in220 + overlap:N0} by neither.");
 
-			// ⭐ The independent cross-check, from the BYTES rather than from our catalogs: an RDBH entry is
+			// The independent cross-check, from the bytes rather than from our catalogs: an RDBH entry is
 			// TEA-encrypted and needs a per-template key, a non-RDBH one is readable with none. If the name category
 			// really is the kind, the two splits have to line up - and nothing about the LDB pages knows anything
 			// about the RDB's encryption, so agreement is not circular.
@@ -108,8 +108,8 @@ namespace Faolan.Importer.Cli
 					_ = encrypted ? eNone++ : pNone++;
 			}
 
-			// ⭐ #150: the client picks an ALTERNATE-ADVANCEMENT tree by "the first feat tree whose id is > 999999"
-			// (`FUN_01506a60`, log tag `GUI/AAFeatPlanner`). So the reserved range is a thing the LDB can be asked
+			// The client picks an alternate-advancement tree as the first feat tree whose id is above 999,999
+			// (`FUN_01506a60`, log tag `GUI/AAFeatPlanner`), so the reserved range is something the LDB can be asked
 			// about directly: if AA content ships in this build, its names sit above that line in some category.
 			Console.WriteLine();
 			Console.WriteLine($"  ⭐ ids at or above {AaReservedIdFloor:N0} - the AA/perk reserved range (#150):");
@@ -135,12 +135,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"     named by neither:{eNone,7:N0} encrypted   {pNone,7:N0} plaintext");
 		}
 
-		// RDB 1000020 - the ONE type that holds item, feat and ability templates, which is why the kind has to come
+		// RDB 1000020 - the one type that holds item, feat and ability templates, which is why the kind has to come
 		// from outside the record.
 		private const uint TemplateType = 1000020;
 
 		// The client's own AA cut-off: `FUN_01506a60` picks a class's alternate-advancement tree as the first feat
-		// tree whose id is GREATER than 999,999 (#150).
+		// tree whose id is greater than 999,999.
 		private const uint AaReservedIdFloor = 1_000_000;
 	}
 }

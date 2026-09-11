@@ -8,16 +8,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A player's LIVE entity has to carry their level. It did not - `Level` was set for NPCs only, so every player
-	// entity ran at Level 0, and two things read it without anyone noticing:
+	// A player's live entity has to carry their level. With `Level` set for NPCs only, every player entity runs at
+	// Level 0, and two things read it:
 	//
-	//   * BuffStatEffects resolves a RAMPED buff delta off it (#599 - the same buff is +887 health at level 20 and
-	//     +17,500 at level 80), so every ramped buff on a player was resolved at level 0;
-	//   * the attribute REBASE passes it to CharacterMaxStats.ClassBaseHundredths, which THROWS on 0.
+	//   * BuffStatEffects resolves a ramped buff delta off it (the same buff is +887 health at level 20 and +17,500
+	//     at level 80), so every ramped buff on a player resolves at level 0;
+	//   * the attribute rebase passes it to CharacterMaxStats.ClassBaseHundredths, which throws on 0.
 	//
-	// The throw is what surfaced it, and only in one narrow case: the rebase runs only when an equip CHANGES an
-	// attribute, so equipping a piece with an attribute bonus threw out of the packet loop and dropped the player's
-	// connection. Everything else read the level-0 answer quietly.
+	// The throw is the only visible symptom, and only in one narrow case: the rebase runs when an equip changes an
+	// attribute, so equipping a piece with an attribute bonus throws out of the packet loop and drops the player's
+	// connection. Everything else reads the level-0 answer quietly.
 	public class PlayerEntityLevelTests
 	{
 		[Fact]
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(80u, sim.PlayerWorldEntity(client)!.Level);
 		}
 
-		// The end-to-end shape of the crash: a level-80 player whose ATTRIBUTES change (what an equip does) must
+		// The end-to-end shape of the crash: a level-80 player whose attributes change (what an equip does) must
 		// recompute without throwing. At Level 0 this is an ArgumentOutOfRangeException out of ClassBaseHundredths.
 		[Fact]
 		public void RecomputingAfterAnAttributeChange_DoesNotThrow_ForARegisteredPlayer()
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 				[CharacterStatId.Intelligence] = 40
 			};
 
-			// Recompute rather than Sync: Sync's only extra job is loading the catalog from the DB, and an EMPTY catalog
+			// Recompute rather than Sync: Sync's only extra job is loading the catalog from the DB, and an empty catalog
 			// is the right input anyway - this is about the attribute rebase, not about any buff.
 			BuffStatEffects.Recompute(entity, BuffStatEffects.BuildCatalog([]));
 

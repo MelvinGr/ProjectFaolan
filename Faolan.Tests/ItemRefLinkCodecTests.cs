@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #751: the `itemref://` chat link - a THIRD source of an item's per-item TEA key, and the only one that reaches
+	// The `itemref://` chat link - a third source of an item's per-item TEA key, and the only one that reaches
 	// items the capturing character never held (a stranger's trade-channel link).
 	//
 	// The strings below are verbatim from the corpus, one per shape the 43 captured links take. They are literals
-	// rather than a fixture because they ARE the grammar: a link is short, printable, and the thing under test is
+	// rather than a fixture because they are the grammar: a link is short, printable, and the thing under test is
 	// how it is spelled.
 	public class ItemRefLinkCodecTests
 	{
@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		private const string Plain =
 			"<a style=\"text-decoration:none\" href=\"itemref://5077852/5077852/0/80/4062f862:18dd164e:ad6d38cc:364bc05e/4062f862:18dd164e:ad6d38cc:364bc05e/4062f862:18dd164e:ad6d38cc:364bc05e\"><font color=#8d11be>[White Hand Gem of Lightning Cloak]</font></a>";
 
-		// A level-scaled PAIR (#752): template2 is a DIFFERENT template with its own key, and key3 is key1 again.
+		// A level-scaled pair: template2 is a different template with its own key, and key3 is key1 again.
 		private const string Pair =
 			"<a style=\"text-decoration:none\" href=\"itemref://3983088/3983089/0/75/72e2660e:e30229bd:b2019308:dc6aefd/1b3e7a1d:af9866bb:7a736b7:4e022e23/72e2660e:e30229bd:b2019308:dc6aefd\"><font color=#6ea7>[Sanguine Radiant Sapphire]</font></a>";
 
@@ -58,10 +58,10 @@ namespace Faolan.Tests
 
 			Assert.True(link.HasPair);
 			Assert.Equal(3983089u, link.TemplateId2);
-			Assert.NotEqual(link.Key1, link.Key2); // the high endpoint is encrypted under its own key (#752)
+			Assert.NotEqual(link.Key1, link.Key2); // the high endpoint is encrypted under its own key
 		}
 
-		// ⚠️ Read key1, never key3.
+		// Read key1, never key3.
 		[Fact]
 		public void TheNullIdentitySentinel_IsCarriedInKey3AndIsNotAKey()
 		{
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			Assert.NotEqual(ItemRefLink.NullIdentity, link.Key1);
 		}
 
-		// A chat link is PLAYER-TYPED text reaching an importer, so a shape we cannot rebuild is refused outright
+		// A chat link is player-typed text reaching an importer, so a shape we cannot rebuild is refused outright
 		// rather than half-read - half-reading one would put an invented key on an item row.
 		[Theory]
 		[InlineData("")]
@@ -82,12 +82,12 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => ItemRefLinkCodec.Parse(text));
 		}
 
-		// ⭐ The ORACLE for the whole source, and it is non-circular: the key came from the link, never from the
+		// The oracle for the whole source, and it is non-circular: the key came from the link, never from the
 		// database. Every linked item we already hold must agree with the link on its stored quad - if a link could
-		// disagree with a snapshot-sourced row, nothing it says about the twelve items we DON'T hold would be worth
+		// disagree with a snapshot-sourced row, nothing it says about the twelve items we don't hold would be worth
 		// importing.
 		[Theory]
-		[InlineData(Plain, false)] // one of the twelve the link ADDED - present now, so it must agree too
+		[InlineData(Plain, false)] // one of the twelve the link added - present now, so it must agree too
 		[InlineData(Pair, true)]
 		[InlineData(NullIdentityKey3, false)]
 		public async Task ALinkedItemWeHold_AgreesWithTheStoredKeyQuad(string text, bool expectPairStored)
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 		}
 
 		// The twelve templates the corpus's links added, none of which any other source ever saw. A regression on
-		// this is a regression on the whole point of #751 - the breadth a link buys over a snapshot.
+		// this is a regression on the breadth a link buys over a snapshot.
 		[Fact]
 		public async Task TheChatLinkOnlyTemplates_AreInTheCatalogWithARealKey()
 		{
@@ -119,10 +119,10 @@ namespace Faolan.Tests
 			Assert.Equal(linkOnly.Length, rows.Count);
 			Assert.All(rows, r =>
 			{
-				Assert.NotEqual(0u, r.Key.Key1); // without the key the RDB template cannot be decrypted at all (#203)
+				Assert.NotEqual(0u, r.Key.Key1); // without the key the RDB template cannot be decrypted at all
 				Assert.NotEmpty(r.Name);
 				Assert.NotEqual(0, r.Level);
-				// A link carries no hash word, and that is fine: AcgHash.ForWire mints one at send time (#723). The 0
+				// A link carries no hash word, and that is fine: AcgHash.ForWire mints one at send time. The 0
 				// is the provenance record saying this identity came from a link.
 				Assert.Equal(0u, r.Hash);
 			});

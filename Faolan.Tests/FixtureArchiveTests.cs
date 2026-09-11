@@ -5,13 +5,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The fixture archive names a capture only by an OPAQUE ID (#465). The dumps in the private capture repo are named
+	// The fixture archive names a capture only by an opaque ID. The dumps in the private capture repo are named
 	// after the characters that were played, and a manifest of 50k corpus entries carried those names ~39,000 times -
 	// which meant every checkout shipped them. The id is the head of the SHA-256 of the dump's file name: stable
 	// across re-harvests, distinct per capture, and meaningless without the repo.
 	//
 	// These gates keep a re-harvest from putting the names back: the writer hashes at harvest time and the repack
-	// hashes what an older archive stored, and this is what makes both a checked property of the COMMITTED file.
+	// hashes what an older archive stored, and this is what makes both a checked property of the committed file.
 	public class FixtureArchiveTests
 	{
 		[Fact]
@@ -49,8 +49,8 @@ namespace Faolan.Tests
 		}
 	}
 
-	// #465 option B - the tool that substitutes personal names inside the packet BYTES by an equal-length pseudonym.
-	// These gate the substitution PRIMITIVE on synthetic bytes (never a real name in test source): framed-only,
+	// The tool that substitutes personal names inside the packet bytes with an equal-length pseudonym.
+	// These gate the substitution primitive on synthetic bytes (never a real name in test source): framed-only,
 	// equal-length, prefix-safe, case-insensitive. The archive round-trip is covered by the equal-length guarantee
 	// the primitive enforces - a same-length overwrite moves no offset, so a byte-exact golden reading the archive
 	// stays byte-exact by construction.

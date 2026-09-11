@@ -31,9 +31,9 @@ namespace Faolan.Web
 			// appsettings.json FIRST: it is the app's own defaults (logging), and the shared faolan.json is
 			// deployment config, so the shared file has to win over it - not the other way round.
 			//
-			// ⚠️ It used to be the other way round, and appsettings.json shipped `"RdbDir": ""`. An empty value is
-			// still a value, so it OVERRODE a perfectly good RdbDir in faolan.json and the viewer reported the folder
-			// as unconfigured. The empty entry is gone too: absent means unset, "" does not.
+			// An empty value is still a value, so an `"RdbDir": ""` in appsettings.json would override a perfectly good
+			// RdbDir in faolan.json and leave the viewer reporting the folder as unconfigured. Absent means unset; ""
+			// does not.
 			builder.Configuration.Sources.Clear();
 			builder.Configuration.AddJsonFile("appsettings.json", true);
 			builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true);
@@ -51,7 +51,7 @@ namespace Faolan.Web
 			// faolan.db (read-only here, for the character roster) via the shared pooled-factory registration.
 			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
 
-			// The RDB-backed character model builder (#275).
+			// The RDB-backed character model builder.
 			builder.Services.AddSingleton<CharacterModelService>();
 
 			// Cache for the expensive deterministic renders (item glbs, map pngs). Size is counted in bytes; cap the
@@ -73,13 +73,13 @@ namespace Faolan.Web
 			// CheckPasswordAsync auto-rehashes a legacy plaintext password. Cookie sign-in (below) is still ours.
 			builder.Services.AddIdentityCore<Account>(o =>
 			{
-				// The retail client's login box only accepts ALPHANUMERIC usernames - no symbols, not even Identity's
-				// default `-._@+`. So the web registration has to be at least as strict, or you can register an account
-				// here that cannot be typed into the game at all. This was `""`, which disables the check entirely.
+				// The retail client's login box only accepts alphanumeric usernames - no symbols, not even Identity's
+				// default `-._@+` - so the web registration has to be at least as strict, or an account registered here
+				// cannot be typed into the game at all. An empty allowed-character set would disable the check.
 				o.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-				// Passwords are NOT restricted the same way - the client sends whatever you type, so Identity's
-				// complexity defaults would reject passwords that work fine in-game.
+				// Passwords are deliberately not restricted the same way: the client sends whatever is typed, so
+				// Identity's complexity defaults would reject passwords that work in-game.
 				o.Password.RequiredLength = 1;
 				o.Password.RequiredUniqueChars = 1;
 				o.Password.RequireDigit = false;
@@ -179,8 +179,8 @@ namespace Faolan.Web
 				return Results.File(glb, "model/gltf-binary");
 			});
 
-			// ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
-			// ?rig=1 returns the character's BODY as a posable skinned rig instead of the static assembled model.
+			// ?equip=290301,290354 overlays those armour MeshIndexFile ids on the character (the gear preview).
+			// ?rig=1 returns the character's body as a posable skinned rig instead of the static assembled model.
 			app.MapGet("/api/character/{id:long}/model.glb", (long id, string? equip, string? rig, string? hide, CharacterModelService models) =>
 			{
 				// ?hide=Chest,Legs drops those equipment slots from the auto-resolved gear (the viewer's per-slot toggle).
@@ -209,7 +209,7 @@ namespace Faolan.Web
 					: Results.File(glb, "model/gltf-binary");
 			});
 
-			// Appearance-editor LIVE PREVIEW: build a character glb from explicit query params (nothing persisted).
+			// Appearance-editor live preview: builds a character glb from explicit query parameters, persisting nothing.
 			// Strict - a missing asset returns 422 with the reason (no silent fallback), which the editor displays.
 			app.MapGet("/api/character/custom/model.glb", (Sex sex, Race race, uint? hair, uint? head, float? arm, float? chest, float? bosom, float? stomach, float? arse, float? thigh, float? leg,
 				string? tex, CharacterModelService models) =>
@@ -222,16 +222,16 @@ namespace Faolan.Web
 					: Results.File(glb, "model/gltf-binary");
 			});
 
-			// The appearance choices legal for a sex+race (hair / colours / body+face tattoo / heads + morph limits),
-			// from the CHARACTERCREATOR table, for the editor's pickers. (SAVE is a direct server-side service call
-			// from the Blazor component - no open write endpoint.)
+			// The appearance choices legal for a sex and race (hair, colours, body and face tattoo, heads and morph
+			// limits), from the CHARACTERCREATOR table, for the editor's pickers. Saving is a direct server-side
+			// service call from the Blazor component; there is no open write endpoint.
 			app.MapGet("/api/appearance/options", (Sex sex, Race race, CharacterModelService models) => Results.Json(models.GetAppearanceOptions(sex, race)));
 
-			// Authentic ANIMSYS clips for the viewer's animation dropdown (#292). ?skeleton=ID overrides the default
-			// humanoid rig. Returns [{name, rdbname, duration}] sorted by name.
+			// ANIMSYS clips for the viewer's animation dropdown. ?skeleton=ID overrides the default humanoid rig.
+			// Returns [{name, rdbname, duration}] sorted by name.
 			app.MapGet("/api/animations", (uint? skeleton, CharacterModelService models) => Results.Json(models.ListAnimations(skeleton)));
 
-			// One clip's decoded keyframes (by rdbname), for THREE.AnimationClip. CDN-only clips resolve via the mirror.
+			// One clip's decoded keyframes, by rdbname, for THREE.AnimationClip. CDN-only clips resolve via the mirror.
 			app.MapGet("/api/animation/{rdbname:long}.json", (long rdbname, HttpContext ctx, CharacterModelService models) =>
 			{
 				var clip = models.GetAnimation((uint)rdbname);
@@ -254,8 +254,8 @@ namespace Faolan.Web
 					equip = string.Join(',', s.PieceMeshIndexIds)
 				})));
 
-			// ?rig=1 (or rig=true) returns the SKINNED model (body/equipment + character skeleton as a glTF skin,
-			// posable); ?skeleton=ID overrides the default humanoid rig (14853). Without ?rig it's the static mesh.
+			// ?rig=1 (or rig=true) returns the skinned model - body and equipment plus the character skeleton as a
+			// posable glTF skin; ?skeleton=ID overrides the default humanoid rig (14853). Without ?rig it is the static mesh.
 			app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, string? rig, long? skeleton, CharacterModelService models) =>
 			{
 				var wantRig = rig is "1" or "true" or "True";
@@ -330,10 +330,10 @@ namespace Faolan.Web
 			{
 				app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));
 
-				// Body UV mirror diagnostic (#275): is the body's left/right unwrap mirrored?
+				// Body UV mirror diagnostic: is the body's left/right unwrap mirrored?
 				app.MapGet("/api/debug/bodyuv/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DescribeBodyUv((uint)id)));
 
-				// Decode an FCTX texture (type/id) to PNG - for inspecting tattoo decal textures (#275).
+				// Decode an FCTX texture (type and id) to PNG - for inspecting tattoo decal textures.
 				app.MapGet("/api/debug/tex/{type:long}/{id:long}.png", (long type, long id, CharacterModelService models) =>
 				{
 					var png = models.DecodeTexture((uint)type, (uint)id);

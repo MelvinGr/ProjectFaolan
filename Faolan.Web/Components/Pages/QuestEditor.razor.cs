@@ -8,32 +8,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Components.Pages
 {
-	// A purpose-built editor for the quest chain (QuestDefinition + its QuestGoalDefinition goals): the SERVER-trigger
-	// fields (GoalType/TargetName/TrailingRefId/RequiredCount + NextQuestId) that make a quest playable, the same ones
-	// QuestGoalWiring.SeedGoal/Chain set. Sits next to the generic DbEditor but shows a quest and ALL its goals on one screen
-	// with GoalType as a dropdown, so wiring a stage doesn't need raw SQL. Admin-gated. Edits the live DB (restart to
-	// apply). The wire/@609 display fields (markers/keys) are shown but editing them can break byte-exact quests, so
-	// they carry a warning.
+	// A purpose-built editor for the quest chain (QuestDefinition plus its QuestGoalDefinition goals): the
+	// server-trigger fields (GoalType, TargetName, TrailingRefId, RequiredCount, NextQuestId) that make a quest
+	// playable, the same ones QuestGoalWiring.SeedGoal and Chain set. It sits next to the generic DbEditor but shows a
+	// quest and all its goals on one screen with GoalType as a dropdown, so wiring a stage needs no raw SQL.
+	// Admin-gated, and it edits the live database, which takes a restart to apply. The wire display fields (markers,
+	// keys) are shown but editing them can break byte-exact quests, so they carry a warning.
 	//
-	// Three columns are shown but NOT editable, because they are not ours to set. The goal's KIND TAG (#521) is the
-	// client's own word for what the objective asks; the goal's REGION name (#521) is resolved from the typed reference
-	// the row already carries; and the granting/gating CONVERSATIONS (#523) belong to the dialogue graph. They are here
-	// because each one answers a question the editable fields raise - what the goal really is, where its trigger volume
-	// sits, and whether anything grants the quest at all.
+	// Three columns are shown but not editable, because they are not the editor's to set: the goal's kind tag is the
+	// client's own word for what the objective asks; the goal's region name is resolved from the typed reference the
+	// row already carries; and the granting and gating conversations belong to the dialogue graph. Each answers a
+	// question the editable fields raise - what the goal really is, where its trigger volume sits, and whether anything
+	// grants the quest at all.
 	public partial class QuestEditor
 	{
 		private static readonly QuestGoalType[] GoalTypes = Enum.GetValues<QuestGoalType>();
 		private List<QuestDefinition> _quests = [];
 
-		// The dialogue wiring that GRANTS or GATES a quest (#523). Only the quest-linked rows are held, because that is
-		// the whole point of showing them here: a quest nothing grants is unreachable in game, and that is invisible on
-		// the quest row itself. Read-only; the graph is edited in the generic DbEditor.
+		// The dialogue wiring that grants or gates a quest. Only the quest-linked rows are held, because that is the
+		// point of showing them here: a quest nothing grants is unreachable in game, and that is invisible on the quest
+		// row itself. Read-only; the graph is edited in the generic DbEditor.
 		//
-		// Two tables since #642 - a quest is granted or gated by a BRANCH (ConversationEdge) and an NPC's greeting is
-		// gated by a ROOT (ConversationEntry) - so they are projected into one row shape here rather than shown twice.
+		// Two tables are involved - a quest is granted or gated by a branch (ConversationEdge) and an NPC's greeting is
+		// gated by a root (ConversationEntry) - so they are projected into one row shape rather than shown twice.
 		private List<QuestConversation> _questConversations = [];
 
-		// Named trigger volumes, for resolving a goal's RegionId to something readable (#521). 14 rows.
+		// Named trigger volumes, for resolving a goal's RegionId to something readable. 14 rows.
 		private Dictionary<uint, MapRegion> _regions = [];
 		private QuestDefinition? _quest;
 
@@ -55,7 +55,7 @@ namespace Faolan.Web.Components.Pages
 
 			_questConversations = [.. branches.Concat(roots).OrderBy(c => c.NpcName, StringComparer.Ordinal).ThenBy(c => c.Where, StringComparer.Ordinal)];
 			// Open on something worth looking at rather than the lowest quest id, which has no goals at all: the quests
-			// that HAVE goals are the reason this page exists (SpellEditor opens the same way, for the same reason).
+			// that have goals are the reason this page exists (SpellEditor opens the same way, for the same reason).
 			var first = _quests.FirstOrDefault(q => q.Goals.Count > 0) ?? _quests.FirstOrDefault();
 			if (first != null)
 				Select(first);
@@ -75,10 +75,10 @@ namespace Faolan.Web.Components.Pages
 		private sealed record QuestConversation(string NpcName, uint? NpcTemplateId, string Where, uint? GrantQuestId, uint? ConditionQuestId, QuestState? ConditionQuestState,
 			string Trigger, uint? TriggerWorldObjectId);
 
-		// The goal's own KIND TAG as the client states it - the wire's `Separator` word, decoded in QuestGoalKind (#521).
-		// Shown read-only beside the editable GoalType because it is the EVIDENCE the wiring should follow, not a second
-		// place to set it: it is captured data, and the corpus does not cover the client's full enum, so a value outside
-		// the decoded set is rendered raw rather than guessed at.
+		// The goal's own kind tag as the client states it - the wire's `Separator` word, decoded in QuestGoalKind.
+		// Shown read-only beside the editable GoalType because it is the evidence the wiring should follow rather than a
+		// second place to set it: it is captured data, and the corpus does not cover the client's full enum, so a value
+		// outside the decoded set is rendered raw rather than guessed at.
 		private static string KindLabel(uint separator)
 		{
 			return Enum.IsDefined((QuestGoalKind)separator)
@@ -111,8 +111,8 @@ namespace Faolan.Web.Components.Pages
 				QuestDefinitionId = _quest.QuestId,
 				GoalId = nextGoalId,
 				Sequence = nextSeq,
-				// `None` - no trigger - rather than a guess: the editor's whole job is to say what advances this goal, and
-				// defaulting to a real trigger is how a goal ends up wired to something nobody chose (#522).
+				// `None` - no trigger - rather than a guess: the editor's job is to say what advances this goal, and
+				// defaulting to a real trigger is how a goal ends up wired to something nobody chose.
 				GoalType = QuestGoalType.None,
 				RequiredCount = 1
 			});

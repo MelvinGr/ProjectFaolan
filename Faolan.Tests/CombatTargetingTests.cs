@@ -7,10 +7,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Melee cleave target selection (#18): a swing damages "a small area in front of you" (Funcom's quickstart), so
-	// the extras are the hostile, living NPCs inside the ATTACKER's frontal cone - not a ball around the selected
-	// target, which is what this used to model. CombatTargeting.CleaveTargets is the pure selection over the world
-	// model. The attacker below faces +Z (identity rotation) unless a test turns them.
+	// Melee cleave target selection: a swing damages "a small area in front of you" (Funcom's quickstart), so
+	// the extras are the hostile, living NPCs inside the attacker's frontal cone, not a ball around the selected
+	// target. CombatTargeting.CleaveTargets is the pure selection over the world model. The attacker below faces +Z
+	// (identity rotation) unless a test turns them.
 	public class CombatTargetingTests
 	{
 		private const float Reach = 8f;
@@ -67,8 +67,8 @@ namespace Faolan.Tests
 			Assert.Equal(new uint[] { 2, 3 }, targets.Select(t => t.Handle).ToArray()); // nearest-first, no primary, no #4
 		}
 
-		// The whole point of the change: a mob BEHIND the attacker is no longer cleaved just for standing near the
-		// selected target, and a mob beside the attacker but well away from the target now is.
+		// A mob behind the attacker is not cleaved just for standing near the selected target, and a mob beside the
+		// attacker but well away from the target is.
 		[Fact]
 		public void TheConeIsAroundTheATTACKER_NotAroundTheTarget()
 		{

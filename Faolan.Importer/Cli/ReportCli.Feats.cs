@@ -12,17 +12,17 @@ namespace Faolan.Importer.Cli
 	public static partial class ReportCli
 	{
 		// List every (type, id) entry in the RDB index that has the given id, with availability. Used to discover what
-		// id-space a cross-reference lives in (e.g. a character's HeadMesh / *hairmesh resource id) (#275).
+		// id-space a cross-reference lives in (e.g. a character's HeadMesh / *hairmesh resource id).
 		// The feat/ability catalog's RDB type.
 		private const uint FeatTemplateType = 1000020;
 
 		// --report feat-table [--report-arg <value>]
 		//
-		// All TWELVE words of every entry in the client's feat table (RDB 1000042 id 1). The importer reads six of
-		// them - (wire, template), the three prereq columns, the root flag and the base index - and #590 needs to know
-		// what the other six hold, because a feat's modifier record references a target id in a ~20000-45000 space
-		// that resolves against nothing we import. With `--report-arg <value>` it reports which COLUMN, if any, holds
-		// that value - which is the whole question.
+		// All twelve words of every entry in the client's feat table (RDB 1000042 id 1). The importer reads six of
+		// them - (wire, template), the three prereq columns, the root flag and the base index - and the other six are
+		// open, which matters because a feat's modifier record references a target id in a ~20000-45000 space that
+		// resolves against nothing imported. With `--report-arg <value>` it reports which column, if any, holds that
+		// value.
 		private static void FeatTable(string rdbDir, string? arg)
 		{
 			var needle = uint.TryParse(arg, out var v) ? v : 0u;
@@ -88,14 +88,14 @@ namespace Faolan.Importer.Cli
 
 		// --report feat-spell-modifiers [--report-arg <kind>]
 		//
-		// #590/#591. Every feat template's modifier records whose payload's first word is OUTSIDE the stat-id range -
-		// exactly the ones ItemTemplateStatModifiers.Parse drops on `statId >= 0x1000`. That bound is right for a STAT
+		// Every feat template's modifier records whose payload's first word is outside the stat-id range - exactly
+		// the ones ItemTemplateStatModifiers.Parse drops on `statId >= 0x1000`. That bound is right for a stat
 		// modifier and wrong for whatever these are: `Decomposition` rank 5 carries (41000, 3500) under kind 53075,
 		// and 3500 is the +35.00% its in-client tooltip shows.
 		//
-		// The KIND is a GameAction type id and the payload is that type's KEY LIST, one u32 per key
+		// The kind is a GameAction type id and the payload is that type's key list, one u32 per key
 		// (docs/re/gameactionlist-grammar.md), so this prints each row as its named slots rather than as a pair -
-		// `SpellStatModifier` puts the spell first and the STAT second, which read positionally looked like a
+		// `SpellStatModifier` puts the spell first and the stat second, which read positionally looked like a
 		// magnitude that varied for no reason.
 		private static void FeatSpellModifiers(string rdbDir, string? arg)
 		{
@@ -166,7 +166,7 @@ namespace Faolan.Importer.Cli
 					byKind[kind] = byKind.GetValueOrDefault(kind) + 1;
 					refCounts[hit.Values[0]] = refCounts.GetValueOrDefault(hit.Values[0]) + 1;
 					samples.TryAdd(kind, []);
-					// With a kind filter the caller is decoding THAT kind, so print every row and its description -
+					// With a kind filter the caller is decoding that kind, so print every row and its description -
 					// the description names the spell the feat modifies, which is the only handle we have on what the
 					// reference id means. Unfiltered it is a census, so a few samples per kind is enough.
 					if (onlyKind != 0 || samples[kind].Count < 6)
@@ -193,15 +193,14 @@ namespace Faolan.Importer.Cli
 
 		// --report feat-record --report-arg [<rdbType>/]<id>[,<id>...]
 		//
-		// The RAW words of one or more feat templates, side by side. Built for #590: a feat like `Decomposition`
-		// carries "+35% to Flesh to Worms" that the stat-modifier region does not hold, so finding where the client
-		// keeps it means diffing the five RANKS of one feat against each other - the words that MOVE across ranks are
-		// the magnitude, the ones that stay are the target. Passing several ids prints a per-word diff column for
-		// exactly that.
+		// The raw words of one or more feat templates, side by side. A feat like `Decomposition` carries "+35% to
+		// Flesh to Worms" that the stat-modifier region does not hold, so finding where the client keeps it means
+		// diffing the ranks of one feat against each other: the words that move across ranks are the magnitude, the
+		// ones that stay are the target. Passing several ids prints a per-word diff column for exactly that.
 		private static void FeatRecord(string rdbDir, string? arg)
 		{
-			// An optional `<type>/` prefix dumps a record of ANOTHER RDB type with the same machinery - spell
-			// templates (1040005) share the feat/item record layout, and #590 needs to compare the two.
+			// An optional `<type>/` prefix dumps a record of another RDB type with the same machinery - spell
+			// templates (1040005) share the feat and item record layout, so the two can be compared directly.
 			var spec = (arg ?? "").Split('/', 2, StringSplitOptions.TrimEntries);
 			var type = spec.Length == 2 && uint.TryParse(spec[0], out var t) ? t : FeatTemplateType;
 			var ids = spec[^1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -243,7 +242,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    desc: {description}");
 			}
 
-			// A hex dump per record. The text is variable-length, so everything after it is NOT 4-aligned to the
+			// A hex dump per record. The text is variable-length, so everything after it is not 4-aligned to the
 			// record start - the word grid below will straddle the real fields, and this is what lets a reader
 			// re-cut them by eye.
 			foreach (var id in ids.Where(bodies.ContainsKey))
@@ -260,7 +259,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// The word-by-word view. Only the words the records DISAGREE on are interesting when several are given,
+			// The word-by-word view. Only the words the records disagree on are interesting when several are given,
 			// so those are flagged - that is the whole point of passing a feat's five ranks at once.
 			var present = ids.Where(bodies.ContainsKey).ToArray();
 			if (present.Length == 0)
@@ -312,16 +311,16 @@ namespace Faolan.Importer.Cli
 				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != templateType)
 					continue;
 
-				// ---- Measurement 2: TILING (#595) ----
-				// The pass below derives a kind's width from records holding exactly ONE element, where the only
-				// available end marker is the record's, so what it measures is a CEILING - it swallows whatever the
+				// ---- Measurement 2: tiling ----
+				// The pass below derives a kind's width from records holding exactly one element, where the only
+				// available end marker is the record's, so what it measures is a ceiling - it swallows whatever the
 				// record carries after the element list. Elements sit back to back with nothing between them, so a
-				// record holding SEVERAL measures the non-final ones EXACTLY: the distance to the next element's
-				// opening type word IS that element's width. That is an independent measurement, and it is the one
+				// record holding several measures the non-final ones exactly: the distance to the next element's
+				// opening type word is that element's width. That is an independent measurement, and it is the one
 				// that sees the `Swift Pathing` case the ceiling pass is structurally blind to (two elements, both
 				// short, in a record with no single-element sibling).
 				//
-				// The final element is deliberately NOT tallied: its end is the record's, so it is a ceiling like the
+				// The final element is deliberately not tallied: its end is the record's, so it is a ceiling like the
 				// pass below, and mixing the two would let trailing record content masquerade as element bytes.
 				var located = ItemTemplateStatModifiers.ParseElements(body.AsSpan(12));
 				if (located.Count > 0)
@@ -330,7 +329,7 @@ namespace Faolan.Importer.Cli
 
 					// The list frame sits immediately before the first element's type word - the same `0x3F1` count
 					// word every other list in the protocol carries. Reading it here is what turns "the scan found N
-					// signature hits" into "the record SAYS there are N", so a spurious hit shows up as disagreement
+					// signature hits" into "the record says there are N", so a spurious hit shows up as disagreement
 					// instead of quietly widening a histogram.
 					var frameOff = 12 + located[0].Offset - 4;
 					var declared = frameOff >= 0 && ListFrame.TryCountOf(BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(frameOff)), out var c) ? c : -1;
@@ -340,7 +339,7 @@ namespace Faolan.Importer.Cli
 					// Tally only where the record's own count agrees with what the scan found. Where it does not, the
 					// scan has either crossed out of the element region (into trailing record content that happens to
 					// carry the signature) or missed one, and the distance between two "consecutive" elements is then
-					// a GAP, not a width - which is where the non-multiple-of-4 "widths" (43B, 47B, 53B...) come
+					// a gap, not a width - which is where the non-multiple-of-4 "widths" (43B, 47B, 53B...) come
 					// from. Agreement is the cheap, record-supplied proof that a pair really is adjacent.
 					if (declared == located.Count)
 					{
@@ -352,7 +351,7 @@ namespace Faolan.Importer.Cli
 							var seenSoFar = tiled[located[i].Kind];
 							var prior = seenSoFar.GetValueOrDefault(w);
 
-							// The words a measured element carries PAST its key list. Same reason the ceiling pass
+							// The words a measured element carries past its key list. Same reason the ceiling pass
 							// prints them: "ChangeHitPercent disagrees" is a shrug, "ChangeHitPercent is followed by
 							// four 0xFF words - the key list's own terminator value" is a lead.
 							var want = GameActionTypes.Get(located[i].Kind) is { IsFixedWidth: true } ft ? 4 * ft.WidthWords : 0;
@@ -381,9 +380,9 @@ namespace Faolan.Importer.Cli
 				widths.TryAdd(kind, []);
 				widths[kind][width] = widths[kind].GetValueOrDefault(width) + 1;
 
-				// A measured width WIDER than the key list predicts is bytes past the element, and this is what says
-				// WHAT they are rather than only that they exist - the difference between "AddSkinnedMesh disagrees"
-				// and "AddSkinnedMesh is followed by `2 9 207912`". Both surpluses seen so far are trailing RECORD
+				// A measured width wider than the key list predicts is bytes past the element, and this is what says
+				// what they are rather than only that they exist - the difference between "AddSkinnedMesh disagrees"
+				// and "AddSkinnedMesh is followed by `2 9 207912`". Both surpluses seen so far are trailing record
 				// content, not element bytes: `Modify`'s is a pair of list frames (0x7E2, 0x3F1) and
 				// `SetMorphValue`'s is an ASCII mesh name.
 				var fixedWidth = GameActionTypes.Get(kind) is { IsFixedWidth: true } fw ? fw : null;
@@ -421,14 +420,14 @@ namespace Faolan.Importer.Cli
 
 		// --report feat-effect-kinds [--report-arg <kind>]
 		//
-		// Every effect KIND the feat catalog actually carries, with the key list the client registers for it, and -
-		// the point of the report - what the two readings of the same element DISAGREE about (Gitea #597).
+		// Every effect kind the feat catalog actually carries, with the key list the client registers for it, and -
+		// the point of the report - what the two readings of the same element disagree about.
 		//
-		// `ItemTemplateStatModifiers.Modifier` is the PAIR view: payload words 0 and 1, whatever they mean. That is
+		// `ItemTemplateStatModifiers.Modifier` is the pair view: payload words 0 and 1, whatever they mean. That is
 		// (stat, value) for `Modify` and for nothing else in particular - `InterpolatedModify` puts a Substate in word
-		// 1 and its Amount in word 3, `TargetSpellLineStatModifier` puts a spell LINE in word 0 and the stat in word
+		// 1 and its Amount in word 3, `TargetSpellLineStatModifier` puts a spell line in word 0 and the stat in word
 		// 1, `AddPercentSkillModifier` has no stat slot at all. So the report prints, per kind, the pair a positional
-		// read yields beside the values the KEY-addressed read yields for the same element, and flags every kind where
+		// read yields beside the values the key-addressed read yields for the same element, and flags every kind where
 		// they differ. A kind whose stat/amount keys are not in slots 0/1 is one the pair view cannot import.
 		private static void FeatEffectKinds(string rdbDir, string? arg)
 		{
@@ -443,7 +442,7 @@ namespace Faolan.Importer.Cli
 			// Per kind: how many elements carry it, one sample (feat id + name + the whole payload), and whether the
 			// pair view and the key-addressed view agree on that sample.
 			var seen = new Dictionary<uint, (int Count, uint FeatId, string FeatName, ItemTemplateStatModifiers.Element Sample)>();
-			// Every distinct payload of the FILTERED kind, so a single-kind run reads as a census of that kind's
+			// Every distinct payload of the filtered kind, so a single-kind run reads as a census of that kind's
 			// slots rather than one sample - which is what makes "slot 1 tracks the tooltip, slot 3 does not"
 			// checkable instead of asserted.
 			var samples = new List<(uint Id, string Name, ItemTemplateStatModifiers.Element Element, string Raw)>();
@@ -479,7 +478,7 @@ namespace Faolan.Importer.Cli
 					var texts = tt.Keys.Count(k => GameActionTypes.TextKeys.Contains(k));
 					var fixedSlots = tt.Keys.Length - texts;
 					// 32-byte prefix + one u32 per non-text slot + per text slot either [u32 len][len bytes] or
-					// [u16 len][len bytes]. The string BYTES are the same either way, so the two forms differ only by
+					// [u16 len][len bytes]. The string bytes are the same either way, so the two forms differ only by
 					// 2 bytes per text slot - which is exactly what the measured width can tell apart.
 					var bytes = measured - 32 - 4 * fixedSlots;
 					var slotStart = 12 + located[i].Offset + 32 + 4 * tt.Keys.TakeWhile(k => !GameActionTypes.TextKeys.Contains(k)).Count();
@@ -508,9 +507,9 @@ namespace Faolan.Importer.Cli
 						: (prior.Count + 1, prior.FeatId, prior.FeatName, prior.Sample);
 					if (only != 0)
 					{
-						// The payload BYTES, from the four always-present values onward. An UNREGISTERED kind has no
+						// The payload bytes, from the four always-present values onward. An unregistered kind has no
 						// key list, so the key=value rendering below invents two slots for it and shows nothing else -
-						// the bytes are the only way to see what such a record actually holds (Gitea #596).
+						// the bytes are the only way to see what such a record actually holds.
 						var from = 12 + element.Offset + 24;
 						samples.Add((e.Id, name, element,
 							string.Join(" ", Enumerable.Range(0, Math.Clamp(body.Length - from, 0, 48)).Select(k => body[from + k].ToString("x2")))));
@@ -542,8 +541,8 @@ namespace Faolan.Importer.Cli
 					+ $"Value={(hit.Sample.Values.Length > 1 ? hit.Sample.Values[1] : 0)})");
 			}
 
-			// The TEXT-slot audit (#596). A text slot is `[length][bytes]`, and which width that length word is has to
-			// be MEASURED, not assumed: an element's true width is the distance to the next element's type word, so
+			// The text-slot audit. A text slot is `[length][bytes]`, and which width that length word is has to
+			// be measured, not assumed: an element's true width is the distance to the next element's type word, so
 			// the reading whose payload ends exactly there is the right one. Printed as a tally per (kind, width form)
 			// with the raw bytes of the first disagreement, because "some records read as u16" is a shrug and "kind
 			// 53261 reads `12 00 'Hash=WMTW;Level=40'` and tiles at 56B" is a lead.
@@ -557,9 +556,9 @@ namespace Faolan.Importer.Cli
 					foreach (var byKind in hits.GroupBy(h => h.Kind).OrderByDescending(g => g.Count()))
 					{
 						Console.WriteLine($"      kind {byKind.Key} {GameActionTypes.Get(byKind.Key)?.Name ?? "<unregistered>",-36} x{byKind.Count()}");
-						// Up to eight members, not one. A length word is settled by the records that DISAGREE with the
+						// Up to eight members, not one. A length word is settled by the records that disagree with the
 						// rule, and a bucket printed as a single example cannot show whether its members agree with
-						// each other - which is the whole question when a form holds six records (Gitea #596).
+						// each other - which is the whole question when a form holds six records.
 						foreach (var hit in byKind.Take(8))
 							Console.WriteLine($"          {hit.Id,10} \"{hit.Name}\": {hit.Bytes}");
 						if (byKind.Count() > 8)
@@ -582,7 +581,7 @@ namespace Faolan.Importer.Cli
 
 			return;
 
-			// One element as `key=value` pairs, in key order. A TEXT slot prints the STRING rather than its byte
+			// One element as `key=value` pairs, in key order. A text slot prints the string rather than its byte
 			// length, which is what makes a string-aware read visible in the output at all.
 			static string Payload(ItemTemplateStatModifiers.Element element)
 			{
@@ -596,10 +595,10 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Classify the RDB feat/ability catalog (type 1000020) into PLAINTEXT vs TEA-ENCRYPTED records, and dump the
-		// plaintext ones (Gitea #251). A plaintext record opens with its own TYPE word (1000020 = 0x000F4254, which
-		// renders as `TB\x0f\x00` in a dump and is NOT a magic) while an encrypted one opens with `RDBH`.
-		// The plaintext share needs NO key, so it is a feat catalog we can build today.
+		// Classify the RDB feat/ability catalog (type 1000020) into plaintext vs TEA-encrypted records, and dump the
+		// plaintext ones. A plaintext record opens with its own type word (1000020 = 0x000F4254, which
+		// renders as `TB\x0f\x00` in a dump and is not a magic) while an encrypted one opens with `RDBH`.
+		// The plaintext share needs no key, so it is a feat catalog we can build today.
 		// --report-arg <substring>  filters the dumped names   --out <dir>  writes feat-catalog.tsv
 		private static void FeatCatalog(string rdbDir, string? filter, string? outDir)
 		{
@@ -654,9 +653,9 @@ namespace Faolan.Importer.Cli
 			var named = plain.Where(p => p.Name.Length > 0).ToList();
 			Console.WriteLine($"  plaintext WITH a name: {named.Count}");
 
-			// --report-arg <id>[,<id>...]: dump those records' FULL word arrays and then the offsets where they
-			// DIFFER. Handed a rank series (same feat, consecutive ranks) the diff isolates the rank/tier/prereq
-			// fields directly, which is how #251 step 2 cross-correlates same-tree feats.
+			// --report-arg <id>[,<id>...]: dump those records' full word arrays and then the offsets where they
+			// differ. Handed a rank series (same feat, consecutive ranks) the diff isolates the rank, tier and prereq
+			// fields directly, which is how same-tree feats are cross-correlated.
 			if (!string.IsNullOrWhiteSpace(filter) && filter.Split(',').All(x => uint.TryParse(x.Trim(), out _)))
 			{
 				var picked = new List<(uint Id, string Name, byte[] Body)>();
@@ -681,9 +680,9 @@ namespace Faolan.Importer.Cli
 
 				if (picked.Count > 1)
 				{
-					// Two alignments, because the NAME sits in the middle and its length varies: absolute offsets are
+					// Two alignments, because the name sits in the middle and its length varies: absolute offsets are
 					// comparable only for equal-length names, while everything after the name lines up when measured
-					// from the tail's start. Cross-FEAT comparison needs the tail view; a rank series can use either.
+					// from the tail's start. Cross-feat comparison needs the tail view; a rank series can use either.
 					Console.WriteLine("  HEADER diffs (absolute offset, valid while the names are the same length):");
 					var headWords = picked.Min(p => TailStart(p.Body)) / 4;
 					for (var wi = 0; wi < headWords; wi++)
@@ -706,9 +705,9 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// Type 1000020 carries ITEMS and FEATS in one type, so the catalog is only useful with the discriminating
+			// Type 1000020 carries items and feats in one type, so the catalog is only useful with the discriminating
 			// words alongside each name. Two look decisive on inspection - [28] (a category id: 7063 on feats,
-			// 9081/10090 on the item templates checked) and [44] (0x10000005 vs 512) - but the rule is NOT hardcoded
+			// 9081/10090 on the item templates checked) and [44] (0x10000005 vs 512) - but the rule is not hardcoded
 			// here: the words go out as columns and the distribution is printed, so the split is chosen from the whole
 			// catalog rather than from a handful of samples.
 			var byFlags = named.GroupBy(p => Word(p.Body, 44)).OrderByDescending(g => g.Count()).ToList();
@@ -733,7 +732,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"WROTE {path} ({named.Count} rows)");
 		}
 
-		// Where the record's TAIL begins: just past the name. Everything before it is the fixed header, everything
+		// Where the record's tail begins: just past the name. Everything before it is the fixed header, everything
 		// after is the variable part, and only the tail lines up between records whose names differ in length.
 		private static int TailStart(byte[] body)
 		{

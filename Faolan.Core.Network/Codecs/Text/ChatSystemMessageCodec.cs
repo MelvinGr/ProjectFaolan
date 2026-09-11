@@ -4,20 +4,21 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// SystemMessage (0x0023) - the chat tier's server line (the login welcome, GM feedback, the build string):
-	//   [u16 0][u16 len][text][u16 0]
-	// No sender at all, which is what distinguishes it from a CharacterChat carrying server text - the client renders
-	// it in its system colour without needing a ChatSenderInfo first.
-	//
-	// Named `ChatSystemMessage*` rather than `SystemMessage*` because it is the CHAT tier's message; the on-screen
-	// feedback overlay is FormatFeedbackCodec and the two are routinely confused.
-	//
-	// Moved in from `Faolan/ChatServer/Packets.cs` in #530.
+	/// <summary>
+	///     <c>SystemMessage</c> - the chat tier's server line (the login welcome, GM feedback, the build string):
+	///     <c>[u16 0][u16 len][text][u16 0]</c>.
+	/// </summary>
+	/// <remarks>
+	///     There is no sender at all, which is what distinguishes it from a CharacterChat carrying server text: the client
+	///     renders it in its system colour without needing a <c>ChatSenderInfo</c> first. Named
+	///     <c>ChatSystemMessage*</c> rather than <c>SystemMessage*</c> because it is the chat tier's message; the
+	///     on-screen feedback overlay is <see cref="FormatFeedbackCodec" /> and the two are routinely confused.
+	/// </remarks>
 	public static class ChatSystemMessageCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.SystemMessage;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ChatSystemMessage value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -56,6 +57,6 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// SystemMessage (0x0023) on the CHAT tier.
+	/// <summary>The SystemMessage body, on the chat tier.</summary>
 	public sealed record ChatSystemMessage(string Text);
 }

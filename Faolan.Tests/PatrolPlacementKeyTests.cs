@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #713: two sightings of one patroller must resolve to the SAME placement, and two genuinely different beats must
+	// Two sightings of one patroller must resolve to the same placement, and two genuinely different beats must
 	// not. The key is what stops Old Tarantia standing up two Noblemen on one street - and, just as importantly, what
 	// stops a real pair of NPCs being collapsed into one.
 	public class PatrolPlacementKeyTests
@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		public void TwoSightingsOfOneBeat_ShareAPlacement()
 		{
 			// The same route, harvested twice - the NPC was simply somewhere else along it the second time, which is
-			// what made the importer's MapId+XYZ key mint two placements.
+			// what made the importer's MapId+xyz key mint two placements.
 			Assert.Equal(Key(Route(0, 0, 10, 0, 20, 0), 14164), Key(Route(0, 0, 10, 0, 20, 0), 14164));
 		}
 
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ASpawnWithNoRoute_HasNoPlacement()
 		{
-			// A stationary NPC cannot be identified this way, and must NOT collapse with every other routeless spawn
+			// A stationary NPC cannot be identified this way, and must not collapse with every other routeless spawn
 			// into one shared null-ish bucket - the caller renders it verbatim instead.
 			Assert.Null(PatrolRoute.PlacementKey([], 14164));
 		}

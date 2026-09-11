@@ -1,28 +1,27 @@
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     ⭐ The operator of a GameAction element's CRITERION - the third word of the <c>[id][value][operator]</c>
-	///     triple <c>CriteriaItem_t::CheckCriteria</c> evaluates (Gitea #790, <c>docs/re/criteria-grammar.md</c>).
+	///     The operator of a GameAction element's criterion - the third word of the <c>[id][value][operator]</c>
+	///     triple <c>CriteriaItem_t::CheckCriteria</c> evaluates (<c>docs/re/criteria-grammar.md</c>).
 	/// </summary>
 	/// <remarks>
 	///     <para>
-	///         ⚠️ **Every member here is a name the CLIENT states**, taken from that function's own log and assert
+	///         Every member here is a name the client states, taken from that function's own log and assert
 	///         text (<c>" Criteria failed on Operator_HasWornItem: "</c>, <c>"Criteria Operator_True"</c>,
 	///         <c>"Criteria e_Operator_GC_HasQuestJournalSpace failed because pcQuestHolder == NULL!"</c>) or read
 	///         directly out of the branch's code where it is unambiguous - the three logic operators pop and push a
-	///         boolean stack, which is what they are. Nothing is inferred from what a capture happened to contain,
-	///         which is the <c>CharDCMove</c> <c>MovingType</c> mistake this project has already paid for once.
+	///         boolean stack, which is what they are. Nothing is inferred from what a capture happened to contain.
 	///     </para>
 	///     <para>
-	///         ⚠️ **It is deliberately PARTIAL.** The switch has 201 values over 104 branches and about 40 are named;
+	///         It is deliberately partial. The switch has 201 values over 104 branches and about 40 are named;
 	///         the rest have no string of their own and are left as numbers rather than guessed at. So a decoder must
 	///         treat an unnamed value as data, not as an error - <c>Enum.IsDefined</c> is the check, and
 	///         <c>docs/re/criteria-operators.tsv</c> is the full value -> branch table including the unnamed ones.
 	///     </para>
 	///     <para>
-	///         ⚠️ Several branches are reached by TWO values and their log text names the branch rather than either
+	///         Several branches are reached by two values and their log text names the branch rather than either
 	///         value - `OnValidTarget` (27 and 28), `OnValidUser` (29 and 30), `Area` (15, 55 and 56). The pair is
-	///         almost certainly the predicate and its negation, but nothing establishes WHICH, so they stay out of
+	///         almost certainly the predicate and its negation, but nothing establishes which, so they stay out of
 	///         here and live in the TSV with that caveat; naming one of them would be a coin flip wearing a name.
 	///     </para>
 	/// </remarks>
@@ -52,7 +51,7 @@ namespace Faolan.Core.Enums
 		/// <summary>Bitwise `stat | value`, logged as `" | success "` / `" | failed "`.</summary>
 		BitOr = 23,
 
-		// ---- Logic. These take NO operand - id and value are both 0 - and work a boolean stack. ----
+		// ---- Logic. These take no operand - id and value are both 0 - and work a boolean stack. ----
 
 		/// <summary>Pops two, pushes their OR. Under-flowing it logs `Criteria failed on Operator_Or: Too few
 		/// entries!`.</summary>
@@ -92,7 +91,7 @@ namespace Faolan.Core.Enums
 		/// <summary>`Operator_HasNotWieldedItem`.</summary>
 		HasNotWieldedItem = 34,
 
-		/// <summary>`Operator_HasFormula` - a formula is a SPELL the subject knows.</summary>
+		/// <summary>`Operator_HasFormula` - a formula is a spell the subject knows.</summary>
 		HasFormula = 35,
 
 		/// <summary>`Operator_HasNotFormula`; refuses with `YouAlreadyHaveThisSpell`.</summary>
@@ -119,7 +118,7 @@ namespace Faolan.Core.Enums
 		IsAlive = 40,
 
 		/// <summary>`Operator_TargetStat` - the same comparison as <see cref="Equal" /> and friends but read off the
-		/// TARGET rather than the current subject.</summary>
+		/// target rather than the current subject.</summary>
 		TargetStat = 12,
 
 		/// <summary>`Criteria e_Operator_GC_HasQuestJournalSpace`, which also carries `QuestLimitReached`.</summary>

@@ -11,20 +11,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #296: which class may cast which spell comes off the client's own catalog - a `Spell.GuiStackingLine` encoded as
-	// `ConanClass * 1000 + lineIndex` names the class the line belongs to. This replaced an AoC-fandom-wiki scrape
-	// whose importer asserted the opposite ("the client RDB spell record has no class field... so the community wiki
-	// is the source").
-	//
-	// The evidence for the swap was that the two AGREED on 342 of the 343 rows where both spoke. That comparison
-	// cannot be re-run - the wiki TSV is retired - so what is gated here is the property that made it meaningful:
-	// the shipped map and the stacking line do not contradict each other.
+	// Which class may cast which spell comes off the client's own catalog - a `Spell.GuiStackingLine` encoded as
+	// `ConanClass * 1000 + lineIndex` names the class the line belongs to. What is gated here is that the shipped
+	// map and the stacking line do not contradict each other.
 	public class ClassSpellMembershipTests
 	{
 		// The one known exception, kept as data rather than as a tolerance: `Draw Forth The Heart` sits on
-		// Necromancer line 41016 but the retired wiki listed it under Demonologist, and both rows are shipped. It is
-		// exactly the trap the catalog keeps setting - `Spells` holds several rows per display name - so it is named
-		// here instead of being rounded away, and a SECOND such row should fail this test rather than join it.
+		// Necromancer line 41016 while a Demonologist row of the same display name is also shipped. It is exactly the
+		// trap the catalog keeps setting - `Spells` holds several rows per display name - so it is named here instead
+		// of being rounded away, and a second such row should fail this test rather than join it.
 		private const uint KnownDisagreement = 146281;
 
 		// How far into a leading number the shared archetype block runs - the same 8 `RdbSpellImporter` uses.
@@ -50,11 +45,10 @@ namespace Faolan.Tests
 			// A line whose high part is not a class says nothing about membership (50000 and 440061 are real lines
 			// with no class in them - see Spell.GuiStackingLine), so only the class-encoded ones can contradict.
 			//
-			// ...and neither can the ARCHETYPE-SHARED block, 20000-20008, where the leading number is a block rather
+			// ...and neither can the archetype-shared block, 20000-20008, where the leading number is a block rather
 			// than Guardian: three archetypes' combos sit under it, so its spells go to their archetype's three
-			// classes and two of those three necessarily "contradict" the line. That is the whole correction of #581 -
-			// it is exactly what this comparison must NOT reinstate. `ArchetypeSpells_GoToTheirArchetypesThreeClasses`
-			// gates the block instead.
+			// classes and two of those three necessarily "contradict" the line. That is what this comparison must not
+			// reinstate; `ArchetypeSpells_GoToTheirArchetypesThreeClasses` gates the block instead.
 			var real = contradictions
 				.Where(x => System.Enum.IsDefined((ConanClass)(x.GuiStackingLine / 1000)) && x.SpellId != KnownDisagreement
 				            && x.GuiStackingLine % 1000 > ArchetypeBlockWidth)
@@ -84,15 +78,15 @@ namespace Faolan.Tests
 			Assert.All(perClass, p => Assert.True(p.Count >= 25, $"{p.Class} has only {p.Count} spells"));
 		}
 
-		// #298: a COMBO is not a spellbook spell. `ClassSpells` is derived from the class-encoded stacking line and a
+		// A combo is not a spellbook spell. `ClassSpells` is derived from the class-encoded stacking line and a
 		// melee combo's GameAction carries one, so combos are attributed to their class exactly like spells - which is
-		// correct as MEMBERSHIP and wrong as a spellbook.
+		// correct as membership and wrong as a spellbook.
 		//
-		// ⚠️ The ORACLE for that - every captured character's known-spell list - lives in `--report spell-grant-check`
-		// and not here (#849). `faolan.sql` excludes every `Character*` table as per-developer play state, so the
-		// suite's fixture holds zero `CharacterSpells` rows and the gate that used to sit here asserted an empty
-		// intersection against an empty left-hand side. What remains below is the CODE half, which needs no character
-		// rows and can genuinely fail.
+		// The oracle for that - every captured character's known-spell list - lives in `--report spell-grant-check`
+		// and not here: `faolan.sql` excludes every `Character*` table as per-developer play state, so the suite's
+		// fixture holds zero `CharacterSpells` rows and a gate written against them would assert an empty intersection
+		// against an empty left-hand side. What is below is the code half, which needs no character rows and can
+		// genuinely fail.
 		//
 		// So neither level-up path may learn one. Both queries feed `DispatchLearnSpell` + `AddCharacterSpell`; the
 		// combos of the level band travel their own way, as ComboBookIIR right after the NewLevelIIR.
@@ -121,16 +115,16 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #847: an EFFECT is not a spellbook spell either, and it reaches `ClassSpells` by the same route a combo
+		// An effect is not a spellbook spell either, and it reaches `ClassSpells` by the same route a combo
 		// does - the DoT a spell applies carries its caster's class-encoded stacking line. `Infestation` is what
 		// `Flesh to Worms` inflicts, and all five of its ranks sit at Level 2 because an effect's ranks pair with the
-		// CASTER's ranks rather than with a level ladder of their own, so one 1 -> 2 ding taught all five.
+		// caster's ranks rather than with a level ladder of their own, so one 1 -> 2 ding would teach all five.
 		//
 		// Same oracle as the combo rule, and in the same place for the same reason - `--report spell-grant-check`.
 		//
 		// So no grant path may teach one - the ding, the relog re-grant, or the default bar seed. The re-grant matters
 		// as much as the ding: it re-derives the whole book on every world entry, so leaving it out would put back
-		// what the ding no longer teaches.
+		// what the ding does not teach.
 		[Fact]
 		public async Task NoSpellGrantQuery_ReturnsAnEffectOfABookSpell()
 		{
@@ -152,12 +146,12 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⚠️ The trap the rule is shaped around, kept as its own gate because the obvious predicate passes every test
-		// above and is still wrong. `Flesh to Worms (Rank 1)` is ITSELF named as the effect of `Plague Swarm`, so
+		// The trap the rule is shaped around, kept as its own gate because the obvious predicate passes every test
+		// above and is still wrong. `Flesh to Worms (Rank 1)` is itself named as the effect of `Plague Swarm`, so
 		// "anything some spell points at" deletes the very spell the level-2 ding exists to teach. `Plague Swarm` is
 		// Level 0 and therefore grants nothing, which is what makes it not a book spell and its target not an effect.
 		//
-		// So the Necromancer's 1 -> 2 ding must teach `Flesh to Worms (Rank 1)` and NOT the five `Infestation` ranks
+		// So the Necromancer's 1 -> 2 ding must teach `Flesh to Worms (Rank 1)` and not the five `Infestation` ranks
 		// it applies - the exact in-client report this came from.
 		[Fact]
 		public async Task TheNecromancerDing_TeachesFleshToWorms_AndNotTheInfestationItApplies()
@@ -173,12 +167,12 @@ namespace Faolan.Tests
 		}
 
 		// The same shape of in-client report, one rung further along: a level-4 Necromancer's ding taught `Lifestrike`
-		// ranks 3, 4 AND 5 at once, the last of which states its damage for levels 75-80. The cause was the level data
-		// rather than the query - RDB field 125 rated the five ranks 2/3/4/4/4 - and `RdbSpellImporter`'s
+		// ranks 3, 4 and 5 at once, the last of which states its damage for levels 75-80. The cause was the level data
+		// rather than the query - RDB field 125 rates the five ranks 2/3/4/4/4 - and `RdbSpellImporter`'s
 		// `RankLadderFromEffectBands` re-reads such a family's ladder off the effect ramp bands (15/30/45/60/75, which
 		// is where ellatha puts rank 1 too).
 		//
-		// Kept as an id-level gate for the same reason its `Flesh to Worms` neighbour is: a family that teaches SEVERAL
+		// Kept as an id-level gate for the same reason its `Flesh to Worms` neighbour is: a family that teaches several
 		// of its own ranks in one ding passes every population test above, so only naming the family catches it.
 		[Fact]
 		public async Task TheNecromancerDing_TeachesOneLifestrikeRankPerBand_NotThreeAtLevelFour()
@@ -195,12 +189,12 @@ namespace Faolan.Tests
 			Assert.Equal([LifestrikeRank1], atFifteen.Intersect(lifestrikeRanks));
 		}
 
-		// ⭐ The default action bar may only point at spells the character actually HAS. It is seeded once, on first
+		// The default action bar may only point at spells the character actually has. It is seeded once, on first
 		// world entry, from `GetStartingBarSpells`, and the book comes from `GetStartingSpells`; a slot outside that
-		// book is a dead button. The bar used to re-derive its own candidate set - its own copy of the combo and
-		// effect exclusions plus a plain `Level <= level` - and the copy drifted: level 1 is the create KIT's
-		// exclusive domain on the book side and an ordinary level on the bar side, so a level-4 Necromancer's bar was
-		// seeded with `Pestilential Blast (Rank 1)`, which the character had never been taught.
+		// book is a dead button. The bar must not re-derive its own candidate set - a second copy of the combo and
+		// effect exclusions plus a plain `Level <= level` drifts, because level 1 is the create kit's exclusive domain
+		// on the book side and an ordinary level on a bar-side query, which seeds a level-4 Necromancer's bar with
+		// `Pestilential Blast (Rank 1)`, a spell the character has never been taught.
 		[Fact]
 		public async Task TheDefaultBar_OnlySeedsSpellsTheBookHolds()
 		{
@@ -216,13 +210,13 @@ namespace Faolan.Tests
 				}
 		}
 
-		// ⚠️ The guard on `DatabaseRepository.FeatMapCovers`. Gating the level path on "a feat teaches it" is applied
-		// PER CLASS, because the feat map grants five classes (Barbarian, Guardian, Conqueror, Assassin, Ranger)
+		// The guard on `DatabaseRepository.FeatMapCovers`. Gating the level path on "a feat teaches it" is applied
+		// per class, because the feat map grants five classes (Barbarian, Guardian, Conqueror, Assassin, Ranger)
 		// nothing at all. For those the map's silence is missing data, not a statement, and gating on it would hand
 		// out an empty kit with no capture to notice. This is what would fail if the gate were ever made global.
 		//
-		// ⚠️ It asserts on the whole KIT - spells PLUS combos - and not on the spellbook alone, because an empty
-		// spellbook is the correct answer for a pure-combo class. Once the combo-CHAIN exclusion (#852) removed the
+		// It asserts on the whole kit - spells plus combos - and not on the spellbook alone, because an empty
+		// spellbook is the correct answer for a pure-combo class. Once the combo-chain exclusion removed the
 		// debuffs their combos inflict, the Barbarian and the Assassin were left with zero level-granted spells, and
 		// that is the shape of the class rather than a gap: they hold 103 and 75 combos, which travel their own path
 		// (`GetClassCombosUnlockedBetween` -> ComboBookIIR). Asserting on the book alone would have made a correct
@@ -240,7 +234,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ...and the two are not interchangeable: a class the feat map DOES speak for is a caster, and a caster with
+		// ...and the two are not interchangeable: a class the feat map does speak for is a caster, and a caster with
 		// an empty spellbook is a defect however many combos it holds.
 		[Fact]
 		public async Task AClassTheFeatMapCoversStillHasASpellbookAt80()
@@ -261,13 +255,13 @@ namespace Faolan.Tests
 			}
 		}
 
-		// ⭐ The two grant paths answer ONE question between them - what a character of a given level knows - so
+		// The two grant paths answer one question between them - what a character of a given level knows - so
 		// everything the dings taught on the way up has to come back on the relog that re-derives the book. They gate
 		// on the same expression (`ClassSpell.GrantLevel` where a capture caught the grant, `Spells.Level` elsewhere),
-		// and this is what holds them there: the ding path read `Spells.Level` ALONE until the two were reconciled, so
+		// and this is what holds them there: the ding path read `Spells.Level` alone until the two were reconciled, so
 		// every row where the two facts differ was a spell one path placed at a level the other did not.
 		//
-		// From 1, not 0: level 1 is the create KIT's exclusive domain on the relog side (a captured list, not a level
+		// From 1, not 0: level 1 is the create kit's exclusive domain on the relog side (a captured list, not a level
 		// query), which is a difference of intent rather than a drift - see GetStartingSpells.
 		[Fact]
 		public async Task EverythingTheDingsTeach_ComesBackOnTheRelog()
@@ -283,7 +277,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// A spell some OTHER spell applies, where that other spell is itself a real leveled `ClassSpells` entry (i.e.
+		// A spell some other spell applies, where that other spell is itself a real leveled `ClassSpells` entry (i.e.
 		// something a character can actually be taught). The referrer test is the whole point - see the trap gate
 		// above.
 		private static async Task<HashSet<uint>> EffectsOfBookSpells(DatabaseContext db, CancellationToken ct)
@@ -299,7 +293,7 @@ namespace Faolan.Tests
 			return appliers.Where(a => bookSet.Contains(a.Id)).Select(a => a.EffectSpell).ToHashSet();
 		}
 
-		// ...and the five classes that carried NO teaching feat at all (#298) were combos, not a gap: Barbarian,
+		// ...and the five classes that carried no teaching feat at all were combos, not a gap: Barbarian,
 		// Guardian and Assassin are 100% combo, Ranger 44 of 46. They are counted here rather than asserted class by
 		// class so that a catalog refresh that genuinely adds a spell to one of them does not read as a regression.
 		[Fact]
@@ -309,8 +303,8 @@ namespace Faolan.Tests
 			var ct = TestContext.Current.CancellationToken;
 			var comboActions = (await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync(ct)).ToHashSet();
 
-			// The combo SPELL LINES: a weapon variant of a combo whose own Combos row we do not hold (the catalog maps
-			// 304 of 744 - #581) still sits on a line one of the mapped combos owns.
+			// The combo spell lines: a weapon variant of a combo whose own Combos row we do not hold (the catalog maps
+			// 304 of 744) still sits on a line one of the mapped combos owns.
 			var comboLines = await db.Spells.AsNoTracking()
 				.Where(s => comboActions.Contains(s.Id) && s.GuiStackingLine != 0)
 				.Select(s => s.GuiStackingLine)
@@ -334,14 +328,13 @@ namespace Faolan.Tests
 			Assert.True(combos * 100 >= gated.Count * 80, $"only {combos} of {gated.Count} melee level-gated entries are combos");
 		}
 
-		// ⭐ #854: `Colossus of War` (3275545/3275640) is in NO stacking line and chains TWENTY members of line
-		// 22200 - a rank TABLE, the same shape as the `Furious Inspiration` header that #813 found putting all ten
-		// of its ranks on the bar at once. The level path was offering a Conqueror all twenty AS TWENTY SPELLS.
+		// `Colossus of War` (3275545/3275640) is in no stacking line and chains twenty members of line 22200 - a rank
+		// table, the same shape as the `Furious Inspiration` header that puts all ten of its ranks on the bar at once.
+		// Without the exclusion the level path offers a Conqueror all twenty as twenty spells.
 		//
-		// ⛔ The exclusion is STRUCTURAL, not a name match. #854 asks for exactly that and warns against the
-		// alternative: a rule keyed on the `(N)` suffix is the kind of string heuristic this codebase has repeatedly
-		// had to unwind. And it is checked against the same oracle the combo and effect rules use - of the 383 spells
-		// it catches, ZERO appear in any captured spellbook.
+		// The exclusion is structural, not a name match: a rule keyed on the `(N)` suffix is the kind of string
+		// heuristic this codebase has repeatedly had to unwind. And it is checked against the same oracle the combo and
+		// effect rules use - of the 383 spells it catches, zero appear in any captured spellbook.
 		[Fact]
 		public async Task AConqueror_IsNotTaughtTwentyColossusOfWarIncrements()
 		{
@@ -362,15 +355,14 @@ namespace Faolan.Tests
 			Assert.Empty(dinged.Intersect(increments));
 		}
 
-		// ⚠️ The narrowing that makes it safe, gated on the SET itself rather than on its consequences - the combo
+		// The narrowing that makes it safe, gated on the set itself rather than on its consequences - the combo
 		// rules already exclude some of the same spells, so an observable-effect test could not tell this rule's
 		// narrowing from theirs.
 		//
-		// The carrier must be in NO stacking line: a carrier that is itself in a line is a rank LADDER rung, not a
+		// The carrier must be in no stacking line: a carrier that is itself in a line is a rank ladder rung, not a
 		// table header. Without that clause the rule also swallows `Bleeding Puncture I..IV` (Ranger, levels
-		// 5/36/52/64), which read as an ordinary learnable line - and `Flesh to Worms (Rank 1)`, which is the trap
-		// #847 is shaped around: the spell a level-2 Necromancer ding exists to teach must survive "anything some
-		// spell points at".
+		// 5/36/52/64), which read as an ordinary learnable line - and `Flesh to Worms (Rank 1)`, the spell a level-2
+		// Necromancer ding exists to teach, which must survive "anything some spell points at".
 		[Fact]
 		public async Task TheIncrementSet_CatchesTheRankTableAndNothingOrdinary()
 		{
@@ -394,7 +386,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(FleshToWormsRank1, increments);
 		}
 
-		// The spell the Necromancer's 1 -> 2 ding exists to teach - #847's trap, re-checked against this rule.
+		// The spell the Necromancer's 1 -> 2 ding exists to teach, re-checked against this rule.
 		private const uint FleshToWormsRank1 = 1206011;
 
 		// The Colossus increments' shared stacking line - the thing that makes them one mutually-exclusive family.
@@ -413,7 +405,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The twelve playable classes - the same set `ClassSpell`'s own CHECK constraint enumerates.
+		// The twelve playable classes - the same set `ClassSpell`'s own check constraint enumerates.
 		private static readonly ConanClass[] ClassSpellClasses =
 		[
 			ConanClass.Barbarian, ConanClass.Guardian, ConanClass.Conqueror, ConanClass.PriestOfMitra,

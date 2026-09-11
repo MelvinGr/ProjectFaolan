@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
-	// A respawn point a character has DISCOVERED (one row per character+point). Always-known points need no row.
+	// A respawn point a character has discovered (one row per character+point). Always-known points need no row.
 	public class CharacterRespawnPoint : BaseEntity
 	{
 		public uint CharacterId { get; set; }

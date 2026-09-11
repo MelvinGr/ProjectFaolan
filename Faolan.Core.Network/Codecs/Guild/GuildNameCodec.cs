@@ -4,18 +4,20 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildName (0x2041) - the reply to ClientRequestGuildName: [u32 guildId][name s16].
-	//
-	// ⚠️ The reply carries a BARE guild id, not the ID32 the REQUEST used - the pair is capture-verified in
-	// xxx_2clients_jumping (frame 1120 asks for guild 0x00075E9A as `[0000deb7][00075e9a]`, frame 1131 answers
-	// `00075e9a 000b "the chickas"`). [V2: xxx_2clients_jumping.tshark.json frame 1131]
-	//
-	// Moved in from `GuildService.WriteGuildNameBody` in #530 wave 7; byte-exact in GuildPacketTests.
+	/// <summary>
+	///     <c>DispatchGuildName</c> - the reply to <c>ClientRequestGuildName</c>: <c>[u32 guildId][name s16]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The reply carries a bare guild id rather than the ID32 the request used; the pair is capture-verified in
+	///     xxx_2clients_jumping (frame 1120 asks for guild 0x00075E9A as <c>[0000deb7][00075e9a]</c>, frame 1131 answers
+	///     <c>00075e9a 000b "the chickas"</c>). Byte-exact in <c>GuildPacketTests</c>.
+	///     [V2: xxx_2clients_jumping.tshark.json frame 1131]
+	/// </remarks>
 	public static class GuildNameCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildName;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GuildName value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -45,6 +47,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 		}
 	}
 
-	// DispatchGuildName (0x2041).
+	/// <summary>The DispatchGuildName body.</summary>
 	public sealed record GuildName(uint GuildId, string Name);
 }

@@ -20,8 +20,8 @@ namespace Faolan.Tests
 			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
 		}
 
-		// The per-slot REGISTRATION the bank sends before its content is the SAME message with stat 0x17 and the
-		// record id packed into the value - it had its own writer until #530 wave 7 (see SetItemStatCodec).
+		// The per-slot registration the bank sends before its content is the same message with stat 0x17 and the
+		// record id packed into the value, so SetItemStatCodec writes both.
 		[Fact]
 		public void BankSlotRegistration_IsTheSameMessageWithStat0x17()
 		{

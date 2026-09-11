@@ -7,12 +7,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ⭐ A combo's NAME states what it does. The client's catalog names a player combo
+	// A combo's name states what it does. The client's catalog names a player combo
 	// `<Class>_<level>[_<expansion>]_<category>_<Name>`, and the category token is a small closed vocabulary -
 	// `knockback` (30), `snare` (13), `stun` (6), `manaburn` (7), `armorbreak` (7), the taunt and dot families.
 	//
-	// It matters because a combo's own SPELL says nothing: every stagger combo resolves to a `Stagger I..V` /
-	// `Staggering Blow I..IV` record with a zero duration and NO stat effects, so the name is the only place the
+	// It matters because a combo's own spell says nothing: every stagger combo resolves to a `Stagger I..V` /
+	// `Staggering Blow I..IV` record with a zero duration and no stat effects, so the name is the only place the
 	// effect family is stated at all.
 	public class ComboEffectTests
 	{
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			Assert.True(ComboEffect.IsKnockback(name));
 		}
 
-		// ⚠️ The category is NOT at a fixed position: the Khitai combos carry an expansion token that pushes it one
+		// The category is not at a fixed position: the Khitai combos carry an expansion token that pushes it one
 		// slot along. Indexing `parts[2]` would read `khitai` and miss the knockback entirely.
 		[Fact]
 		public void AnExpansionTokenDoesNotHideTheCategory()
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 		}
 
 		// A combo that is not one must not be swept up - `evadedebuff` sits in the same slot on the Barbarian's
-		// `Staggering Blow`, whose NAME contains "Stagger" and which is emphatically not a knockback.
+		// `Staggering Blow`, whose name contains "Stagger" and which is emphatically not a knockback.
 		[Theory]
 		[InlineData("Barbarian_17_evadedebuff_Staggering_Blow_I")]
 		[InlineData("Assassin_20b_dot_Grim_Corruption_II")]
@@ -71,8 +71,8 @@ namespace Faolan.Tests
 			var names = Query("SELECT Name FROM Combos");
 			var knockbacks = names.Where(ComboEffect.IsKnockback).ToList();
 
-			// ⚠️ 30, and the five it would otherwise miss are the point: a census that read `parts[2]` finds 25 and
-			// drops the rank-V Khitai combo of five of the six ladders - the TOP ability of each. This gate exists
+			// 30, and the five it would otherwise miss are the point: a census that read `parts[2]` finds 25 and
+			// drops the rank-V Khitai combo of five of the six ladders - the top ability of each. This gate exists
 			// because 25 is the count I first measured, by exactly that mistake.
 			Assert.Equal(30, knockbacks.Count);
 			Assert.Contains(knockbacks, n => n.Contains("Shield_Sweep"));

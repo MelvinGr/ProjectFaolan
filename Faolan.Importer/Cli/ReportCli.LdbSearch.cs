@@ -6,24 +6,22 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report ldb-search --report-arg [<category>:]<substring>`: which LDB strings the client ships whose TEXT
+	// `--report ldb-search --report-arg [<category>:]<substring>`: which LDB strings the client ships whose text
 	// contains a substring, with the id that names them. `--report-arg id:<n>` goes the other way and prints what
-	// EVERY category holds at one id, which is how an opaque wire id gets a name when its category is not known
+	// every category holds at one id, which is how an opaque wire id gets a name when its category is not known
 	// (a tag, a title, a nameplate label).
 	//
-	// The lookup that was missing. Every other LDB tool answers "what is the string at this id" - which is the
-	// direction the runtime needs, and the wrong one for a content gap: when the question is *"does the client ship an
-	// item called Ironwood, and at what id"*, the name is all there is to go on. `rdb-search` does not help despite
-	// the name; it greps MESH manifest source paths.
+	// Every other LDB tool answers "what is the string at this id", which is the direction the runtime needs and the
+	// wrong one for a content gap: when the question is "does the client ship an item called Ironwood, and at what
+	// id", the name is all there is to go on. `rdb-search` does not help despite its name; it greps mesh manifest
+	// source paths.
 	//
-	// ⚠️ **ENGLISH ONLY.** An LDB category is shipped ONCE PER LANGUAGE, in adjacent pages carrying the same
-	// (category, id) pairs, so an unfiltered search returns each hit once per bundled language. This used to print all
-	// of them - the modal text plus an `(also)` line per translation - which made every result several lines long and,
-	// worse, picked whichever language happened to have the most pages as the headline: `716200` reported as
-	// *"Jatte de Set"* with *"Bowl of Set"* filed underneath it as an also-ran. We only work in English, so the walk
-	// is filtered to the English pages up front (the dev, 2026-08-10).
+	// English only. An LDB category is shipped once per language, in adjacent pages carrying the same (category, id)
+	// pairs, so an unfiltered search returns each hit once per bundled language - several lines per result, with
+	// whichever language has the most pages as the headline. The walk is therefore filtered to the English pages up
+	// front.
 	//
-	// The filter is the CLIENT'S OWN statement of a page's language (`LdbLanguageIndex`, RDB type 1030001), never a
+	// The filter is the client's own statement of a page's language (`LdbLanguageIndex`, RDB type 1030001), never a
 	// sniff of the text - whole pages ship untranslated, so a text sniffer scores the Polish page of a category as
 	// English and silently unions several languages.
 	public static partial class ReportCli
@@ -74,7 +72,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {cat,8}  {id,9}  {text}");
 		}
 
-		// What every category holds at ONE id - the reverse lookup. An id alone does not say which category it belongs
+		// What every category holds at one id - the reverse lookup. An id alone does not say which category it belongs
 		// to, so this prints all of them and lets the reader judge: a tag id landing in a category of achievement names
 		// and nowhere else is the answer, and one landing in six unrelated categories is a collision.
 		private static void LdbById(string rdbDir, uint id)

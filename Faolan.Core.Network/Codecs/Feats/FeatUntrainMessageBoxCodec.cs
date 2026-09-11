@@ -4,13 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Feats
 {
-	// s2c DispatchFeatUntrainMessageBox (GameCharInterfaceMethods 0x2064) - the feat untrain-all CONFIRM DIALOG.
-	// A 16-byte body of 4x u32 BE: [kind][value][0][token]. In the hakotep untrain capture:
-	// [1][0x001A3BDA][0][0x48018760]. `kind`=1 (untrain-all), `value` is likely the gold cost, `token` a transaction
-	// id - the client renders the message box from these and ECHOES all 16 bytes back in FeatUntrainAnswer.
-	//
-	// The matching c2s reply is its own message and its own codec (FeatUntrainAnswerCodec), which composes this one
-	// for the echoed payload. See GameServerListener.Feats.cs / docs/subsystems/feats.md / #251.
+	/// <summary>
+	///     s2c <c>DispatchFeatUntrainMessageBox</c> - the feat untrain-all confirm dialog. A 16-byte body of four
+	///     big-endian u32: <c>[kind][value][0][token]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The hakotep untrain capture carries <c>[1][0x001A3BDA][0][0x48018760]</c>: kind 1 is untrain-all,
+	///     <c>value</c> is most likely the gold cost and <c>token</c> a transaction id. The client renders the message
+	///     box from these and echoes all 16 bytes back in <c>FeatUntrainAnswer</c>, whose codec composes this one for
+	///     the echoed payload. See docs/subsystems/feats.md.
+	/// </remarks>
 	public static class FeatUntrainMessageBoxCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchFeatUntrainMessageBox;

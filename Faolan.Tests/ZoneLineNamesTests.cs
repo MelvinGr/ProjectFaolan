@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #341: a zone-line door names the playfield behind it, so the client's playfield table resolves the doors no
+	// A zone-line door names the playfield behind it, so the client's playfield table resolves the doors no
 	// capture walked through. Locks the three decisions that pass makes - what the name asks for, when it is not a
 	// zone-line at all, and which of several same-named playfields it means.
 	public class ZoneLineNamesTests
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		public void Key_DoesNotJudgeWhetherTheNameIsAPlayfield()
 			=> Assert.Equal("Lever", ZoneLineNames.Key("Lever"));
 
-		// The City of Tortage doors INSIDE City of Tortage (day 4020 and night 4022) relocate the player within the
+		// The City of Tortage doors inside City of Tortage (day 4020 and night 4022) relocate the player within the
 		// playfield they stand in. The night map is a different id, so only the base name catches it.
 		[Theory, InlineData("City of Tortage", "City of Tortage"), InlineData("City of Tortage", "City of Tortage Night"),
 		 InlineData("Old Tarantia", "Old Tarantia Day")]

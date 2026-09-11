@@ -12,19 +12,19 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// LOCAL TRAVEL destinations (#506/#514), harvested rather than hand-authored: which dialogue branch of which NPC
+	// local TRAVEL destinations, harvested rather than hand-authored: which dialogue branch of which NPC
 	// sells which trip, for how much, and where it lands the player. Every field is stated on the wire, which is why
 	// this is an extractor and not a seed table:
 	//
 	//   * the BRANCH - the player's KnubotAnswerIIR names an option of the screen that was on their display, so the
-	//     harvested row joins onto the imported graph by that screen's CONTENT and that option's own LDB id (#642).
+	//     harvested row joins onto the imported graph by that screen's content and that option's own LDB id.
 	//     Content rather than a node id because the ids are assigned by the fold, which has not run yet;
 	//   * the DESTINATION and ARRIVAL - the GameActionListIIR the server sends the instant the destination is picked
 	//     carries "xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1" (TravelActionCodec);
 	//   * the FARE - the wallet DELTA across the conversation. Retail charges through a Knubot trade before the
 	//     destination list is even shown, so the DispatchUpdateCash inside the conversation is the price of the ride.
 	//
-	// ⚠️ Only trips the capture actually TOOK are harvested. A wagoneer offers nine destinations and the capture rides
+	// Only trips the capture actually TOOK are harvested. A wagoneer offers nine destinations and the capture rides
 	// one; the other eight have a name in the LDB and coordinates nowhere, so they stay unharvested rather than being
 	// guessed at.
 	public static class TravelDestinationExtractor
@@ -50,7 +50,7 @@ namespace Faolan.Importer.Extractors
 			uint optionId = 0;
 			var active = false;
 			ulong? balanceNow = null;
-			// NULL until a wallet DROP is actually seen inside the conversation. A 0 would claim a free ride; the
+			// null until a wallet drop is actually seen inside the conversation. A 0 would claim a free ride; the
 			// difference matters, because the first wallet update of a capture has no predecessor to subtract from
 			// (Wagoner Glendon's trip is exactly that) and would otherwise be reported as costing nothing.
 			uint? spentInConversation = null;
@@ -74,17 +74,16 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				// ⚠️ The conversation NPC LEFT THE WORLD. An NPC that despawns is not giving anybody a ride, so the
-				// walk stops treating anything after it as this dialogue's trip (#839).
+				// The conversation NPC LEFT the WORLD. An NPC that despawns is not giving anybody a ride, so the
+				// walk stops treating anything after it as this dialogue's trip.
 				//
 				// This is what told Casilda's farewell apart from a wagoneer's. Her window is opened by the city gate,
-				// the escort ends, she runs off and despawns, and the DOOR's own zone-line then carries the player in -
+				// the escort ends, she runs off and despawns, and the door's own zone-line then carries the player in -
 				// so a teleport followed her conversation and the changemap branch below wrote it up as "travel with
-				// Casilda to Tortage". It even shipped the gate's exact arrival (754/176/673), because it WAS the
-				// gate's. The #821 guard assumed a zone-line door has "no conversation anywhere near it"; a door that
-				// opens one is precisely the case it did not cover. Both beach-to-city captures show her
-				// n3ToClientQuit landing BEFORE the teleport, which is what makes this checkable rather than a
-				// special case.
+				// Casilda to Tortage". It even shipped the gate's exact arrival (754/176/673), because it was the
+				// gate's. A guard that assumes a zone-line door has no conversation anywhere near it does not cover a
+				// door that opens one. Both beach-to-city captures show her n3ToClientQuit landing before the
+				// teleport, which is what makes this checkable rather than a special case.
 				if (p is { IsDownload: true, SubOpcode: N3ToClientQuitCodec.Opcode } && active && npc != 0
 				    && p.TryParse(N3ToClientQuitCodec.Parse, out var quit) && quit.Handle == npc)
 				{
@@ -92,21 +91,17 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				// ⛔ **A DOOR takes the teleport back.** The changemap branch below attributes the next cross-map
-				// teleport to whoever the player last spoke to, and until this guard it did so however long ago that
-				// was and whatever happened in between.
+				// A door takes the teleport back. The changemap branch below attributes the next cross-map teleport to
+				// whoever the player last spoke to, and without this guard it does so however long ago that was and
+				// whatever happened in between: talk to The Architect inside Black Castle, walk away, then use the
+				// exit door, and the door's own changemap is written up as "travel with The Architect to Old
+				// Tarantia", carrying the door's exact arrival.
 				//
-				// The Architect found it: talk to him inside Black Castle (t=199), walk away, then USE THE EXIT DOOR
-				// (t=306) - and the door's own changemap was written up as "travel with The Architect to Old
-				// Tarantia", carrying the door's exact arrival. That is the Casilda bug (guarded below) wearing a
-				// different face: her window ended because she despawned, his because the player simply left.
-				//
-				// ⚠️ The CLOSE of the chat window is NOT the discriminator, however much it looks like one. Retail
-				// closes the window and travels on the very next packet - measured, `NecroL80_..._annotated_5` packet
-				// #3808 CLOSE then #3809 the travel action - so disarming on the close throws away the real trips
-				// (it took the harvest from 20 to 3). What actually distinguishes them is that a door use CLAIMS the
-				// teleport: `WorldTeleportExtractor` harvests that same teleport as a zone-line link, and the two
-				// extractors must not both write it up.
+				// The close of the chat window is not the discriminator, however much it looks like one. Retail
+				// closes the window and travels on the very next packet (`NecroL80_..._annotated_5` closes at packet
+				// #3808 and travels at #3809), so disarming on the close throws away most of the real trips. What
+				// distinguishes them is that a door use claims the teleport: `WorldTeleportExtractor` harvests that
+				// same teleport as a zone-line link, and the two extractors must not both write it up.
 				//
 				// A trip is entered through the NPC (UseCharacter), never through a dynel, so this cannot disarm one.
 				if (!p.IsDownload && p is { IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode } && active
@@ -130,7 +125,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				// The player clicked: the screen we have been accumulating IS the one that offered the option, so name
+				// The player clicked: the screen we have been accumulating is the one that offered the option, so name
 				// both before starting the next screen. An index the screen does not offer means we missed its answer
 				// list, and a trip we cannot name the branch of is not one we can wire up.
 				if (!p.IsDownload && p.TryParse(KnubotCodec.Parse, out var picked) && picked is KnubotAnswerIIR pick)
@@ -151,7 +146,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				// The trip itself. The action rides a GameActionListIIR addressed to the PLAYER, which is what separates
+				// The trip itself. The action rides a GameActionListIIR addressed to the player, which is what separates
 				// it from the hundreds of per-NPC action lists the world stream carries.
 				if (p is { IsDownload: true, SubOpcode: GameActionListCodec.Opcode } && active && npc != 0)
 				{
@@ -175,14 +170,14 @@ namespace Faolan.Importer.Extractors
 					found.Add(new Entry(name, fromContentKey, optionId, trip.DestinationMapId, spentInConversation, trip.X, trip.Y, trip.Z));
 				}
 
-				// The CHANGEMAP-shaped trip (#821). A wagoneer's ride is a `Local=1` GameActionList and stays on the
+				// The CHANGEMAP-shaped trip. A wagoneer's ride is a `Local=1` GameActionList and stays on the
 				// same server; the Destiny day/night switch is not that at all - picking Tina's
 				// "(Night - Single Player)" sends a scry script, an IntendedTeleport, an n3Teleport and a
 				// DispatchRedirectToServer, i.e. a full playfield change. Both are nonetheless "this dialogue branch
 				// moves the player there", which is exactly what a TravelDestination row states, so the same table
 				// carries them and the destination/arrival come off the n3Teleport instead of the travel action.
 				//
-				// ⚠️ Gated on an ACTIVE conversation with a named NPC and a resolved branch, so the ordinary
+				// Gated on an active conversation with a named NPC and a resolved branch, so the ordinary
 				// zone-line door - which also sends an n3Teleport, with no conversation anywhere near it - cannot be
 				// mistaken for a dialogue trip. Those are the `world-teleports` module's, keyed by the door.
 				if (p is { IsDownload: true, SubOpcode: TeleportCodec.N3Opcode } && active && npc != 0 && fromContentKey.Length > 0)
@@ -190,12 +185,12 @@ namespace Faolan.Importer.Extractors
 					if (!p.TryParse(TeleportCodec.Parse, out var teleport) || teleport is not N3TeleportIIR n3)
 						continue;
 
-					// A NAMED spawn point states no coordinates (#814), so there is no arrival to record - the ACG
+					// A named spawn point states no coordinates, so there is no arrival to record - the ACG
 					// rowboat is that shape and stays unharvested rather than being written at the origin.
 					if (n3.ArrivalPosition is not { } arrival)
 						continue;
 
-					// ⚠️ Only a real CHANGEMAP. The same-map relocate form leaves the proxy's map at 0 (it is not
+					// Only a real CHANGEMAP. The same-map relocate form leaves the proxy's map at 0 (it is not
 					// changing playfield, so it names none), and dialogue drives plenty of those - Nadini, Redrik,
 					// Turach and Tina all reposition the player inside one playfield. Those are not trips: writing
 					// them would fill the table with rows whose destination is "map 0", which the wiring step then
@@ -213,7 +208,7 @@ namespace Faolan.Importer.Extractors
 			return Merge(found);
 		}
 
-		// Dedupes across captures by the row's KEY - the same NPC branch ridden twice is one destination. The richer
+		// Dedupes across captures by the row's key - the same NPC branch ridden twice is one destination. The richer
 		// row wins on cost: a capture that shows the wallet move states the fare, one that missed the update reads 0.
 		public static List<Entry> Merge(IEnumerable<Entry> entries)
 		{

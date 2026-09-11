@@ -16,7 +16,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status);
 
 		/// <summary>
-		///     Stamp this realm's heartbeat - "a host is still serving me" (#922). Writes ONLY this realm's row.
+		///     Stamp this realm's heartbeat - "a host is still serving me". Writes only this realm's row.
 		/// </summary>
 		Task<bool> TouchRealm(uint realmId);
 	}
@@ -51,10 +51,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.SaveChangesAsync() > 0;
 		}
 
-		// ⭐ Going ONLINE stamps the heartbeat in the same write. Otherwise there is a window between the flip and the
+		// Going online stamps the heartbeat in the same write. Otherwise there is a window between the flip and the
 		// first timer tick where the row says Online with a stale (or null) LastSeenUtc, which a reader is obliged to
-		// treat as down (#922) - the realm would vanish from the list for up to one interval each time it starts.
-		// Going OFFLINE deliberately does NOT clear the stamp: the flag already says down, and keeping the last-seen
+		// treat as down - the realm would vanish from the list for up to one interval each time it starts.
+		// Going offline deliberately does not clear the stamp: the flag already says down, and keeping the last-seen
 		// time is the more informative record of when it was last up.
 		public async Task<bool> SetRealmOnlineStatus(uint realmId, RealmOnlineStatus status)
 		{

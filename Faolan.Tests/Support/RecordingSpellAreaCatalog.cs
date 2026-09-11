@@ -6,9 +6,9 @@ using Faolan.GameServer.Combat;
 
 namespace Faolan.Tests.Support
 {
-	// The spell-area / chain-edge catalog a TICK test drives by hand. The world simulation reads the catalog directly
-	// (these four lookups used to be IWorldOutbound members and were stubbed on RecordingWorldOutbound), so the seam
-	// moved here with them. Seed `Auras` / `Chains` by spell id; anything unseeded answers empty.
+	// The spell-area / chain-edge catalog a tick test drives by hand. The world simulation reads the catalog directly
+	// rather than through IWorldOutbound, so the seam is here. Seed `Auras` / `Chains` by spell id; anything unseeded
+	// answers empty.
 	//
 	// `base(null!)` is deliberate: every lookup below is overridden and none calls base, so the database handle the
 	// real catalog caches from is never touched.
@@ -31,7 +31,7 @@ namespace Faolan.Tests.Support
 				: []);
 		}
 
-		// The cadence half of the same map (#786) - filtered here rather than held in a second dictionary, so a test
+		// The cadence half of the same map - filtered here rather than held in a second dictionary, so a test
 		// that seeds `Chains` cannot disagree with itself about which of them repeat.
 		public override Task<IReadOnlyList<SpellAreaEffect>> RepeatingChains(uint spellId)
 		{
@@ -40,7 +40,7 @@ namespace Faolan.Tests.Support
 				: []);
 		}
 
-		// #813: no stacking line in the double - these tests drive the chain by id, and a real line map would need the
+		// No stacking line in the double - these tests drive the chain by id, and a real line map would need the
 		// spell catalog behind it. A 0 means "in no line", which is the non-interfering answer.
 		public override Task<uint> StackingLineOf(uint spellId)
 		{

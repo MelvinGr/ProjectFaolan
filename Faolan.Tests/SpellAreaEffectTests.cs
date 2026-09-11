@@ -6,20 +6,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #772: the shipped `SpellAreaEffects` rows against IN-CLIENT TOOLTIPS, which is the only oracle that can say the
+	// The shipped `SpellAreaEffects` rows against in-client tooltips, which is the only oracle that can say the
 	// decode is right rather than merely self-consistent. Every number below was read off a screenshot before the
 	// import existed.
 	//
-	// The distinction these gate is the one the whole ticket turned on: a spell and its EFFECT are different records.
+	// The distinction these gate is the one the whole ticket turned on: a spell and its effect are different records.
 	// `Life Leech` 220979 is the castable (cast time, mana, recast) and 220980 is what lands. Applying the castable is
-	// what made the client answer `ActivateBuff 220979 remaining time 0` and drop the cast (#767).
+	// what made the client answer `ActivateBuff 220979 remaining time 0` and drop the cast.
 	public class SpellAreaEffectTests
 	{
-		// 53051 `CastNano` - the CHAIN edge the same table carries since #783. Not an area, so every shape claim below
+		// 53051 `CastNano` - the chain edge the same table carries. Not an area, so every shape claim below
 		// about a radius is scoped away from it.
 		private const uint CastNanoKind = 53051;
 
-		// `Life Leech` - "Area Of Effect: Life Leech 5.00m radius up to 12 targets", applied ONCE at cast.
+		// `Life Leech` - "Area Of Effect: Life Leech 5.00m radius up to 12 targets", applied once at cast.
 		[Fact]
 		public async Task LifeLeech_AppliesItsEffectRecordOnceInFiveMetres()
 		{
@@ -27,13 +27,13 @@ namespace Faolan.Tests
 			var areas = await db.SpellAreaEffects.AsNoTracking().Where(a => a.SpellId == 220979).OrderBy(a => a.Sequence).ToListAsync(TestContext.Current.CancellationToken);
 
 			var area = Assert.Single(areas);
-			Assert.Equal(220980u, area.EffectSpellId); // the EFFECT record, not the castable
+			Assert.Equal(220980u, area.EffectSpellId); // the effect record, not the castable
 			Assert.Equal(5u, area.RadiusMetres);
 			Assert.Equal(12u, area.MaxTargets);
 			Assert.Equal(0u, area.PeriodCentiseconds); // instant: no aura
 		}
 
-		// `Gangrenous Stench` - "7.00m radius up to 12 targets" TWICE: once as the Area Of Effect, once as an Effect
+		// `Gangrenous Stench` - "7.00m radius up to 12 targets" twice: once as the Area Of Effect, once as an Effect
 		// over time "every 4 seconds". The second row is the aura, and it is the row a design that put these on the
 		// parent spell would have had to drop.
 		[Fact]
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 			Assert.Equal(400u, areas[1].PeriodCentiseconds); // "every 4 seconds"
 		}
 
-		// The chain continues one level down, which is what makes it an AURA rather than a one-shot: the effect
+		// The chain continues one level down, which is what makes it an aura rather than a one-shot: the effect
 		// 221069 applies 221068 in a 4.00m radius every 3 seconds ("Effect over time: Gangrenous Stench 4.00m radius
 		// every 3 seconds", the second tooltip block).
 		[Fact]
@@ -69,10 +69,10 @@ namespace Faolan.Tests
 			Assert.Equal(300u, area.PeriodCentiseconds);
 		}
 
-		// #783: the OTHER edge out of 221069, and the one the import used to drop on the floor. `CastNano` is not an
-		// area - it says "also run 3963058", whose four -1000 rows are the "-10% Slashing / Piercing / Crushing /
-		// Poison" the in-client tooltip shows. Before this, 3963058 was imported and unreachable: nothing in the
-		// database got from `Gangrenous Stench` to it, so the spell's headline effect did nothing.
+		// The other edge out of 221069, and the one an area-only import drops on the floor. `CastNano` is not an area -
+		// it says "also run 3963058", whose four -1000 rows are the "-10% Slashing / Piercing / Crushing / Poison" the
+		// in-client tooltip shows. Without the edge, 3963058 is imported and unreachable: nothing in the database gets
+		// from `Gangrenous Stench` to it, so the spell's headline effect does nothing.
 		[Fact]
 		public async Task TheEffectRecord_AlsoChainsToTheResistanceDebuff()
 		{
@@ -117,7 +117,7 @@ namespace Faolan.Tests
 		}
 
 		// A period is a real cadence, not a flag: anything under a tick of the world loop would be a busy-apply, and a
-		// zero radius would make the area unhittable. Both are shape claims about the DECODE - if either breaks, the
+		// zero radius would make the area unhittable. Both are shape claims about the decode - if either breaks, the
 		// slot being read as the period or the radius is the wrong one.
 		[Fact]
 		public async Task EveryAura_HasAPlausiblePeriodAndRadius()
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 			Assert.All(rows.Where(a => a.PeriodCentiseconds > 0), a => Assert.InRange(a.PeriodCentiseconds, 10u, 360000u));
 		}
 
-		// ⭐ #786: an INTERVAL alone cannot say whether a chain edge is a cadence or a delay - `Repeats` can, and the
+		// An interval alone cannot say whether a chain edge is a cadence or a delay - `Repeats` can, and the
 		// shipped rows split cleanly on it. The client names both words in one line: "Fixing broken gameaction data,
 		// Duration was 0 while Interval was N. Setting Duration to 1" (FUN_0089b390).
 		[Fact]
@@ -156,7 +156,7 @@ namespace Faolan.Tests
 			// name would otherwise suggest.
 			Assert.All(edges, a => Assert.InRange(a.Repeats, -1, 64));
 
-			// And an edge with NO interval always runs once, so the two columns cannot disagree.
+			// And an edge with no interval always runs once, so the two columns cannot disagree.
 			var oneShot = await db.SpellAreaEffects.AsNoTracking()
 				.Where(a => a.Kind == CastNanoKind && a.PeriodCentiseconds == 0)
 				.ToListAsync(TestContext.Current.CancellationToken);

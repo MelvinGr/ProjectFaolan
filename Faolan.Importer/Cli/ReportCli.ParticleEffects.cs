@@ -7,37 +7,37 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report particle-effects [--report-arg <substring>|xml:<id>]`: every RDB 1010207 particle effect, NAMED (#880).
+	// `--report particle-effects [--report-arg <substring>|xml:<id>]`: every RDB 1010207 particle effect, named.
 	//
 	// The server never renders a particle effect - it sends an id on `SimpleDynelVisualChangeIIR
 	// e_StartParticleEffect` and the client does the rest - so the only question it ever asks of this type is
-	// **"which id is the one I want"**. This report answers it two ways, and the second one is the good one.
+	// "which id is the one I want". This report answers it two ways, and the second one is the good one.
 	//
-	// ⚠️ **The catalog page recorded this payload as "an undecoded zlib blob (a binary effect graph, no strings)".**
+	// The catalog page recorded this payload as "an undecoded zlib blob (a binary effect graph, no strings)".
 	// Both halves were wrong, and each for its own reason.
 	//
-	// 1. "no strings" was the `pack_grep_lies` trap: the record IS zlib, so a grep over the pack file finds nothing
+	// 1. "no strings" was the `pack_grep_lies` trap: the record is zlib, so a grep over the pack file finds nothing
 	//    and the text only appears once it is inflated. Inflated, 559 records carry the build machine's own paths
 	//    for the textures they draw with (`W:\achardb\conan\particles\smoke\gradient_ab.png`).
 	//
-	// 2. ⭐ **"undecoded" was the `some_rdb_text_xml` trap: 189 of the 8,163 records are not the binary form at all -
-	//    they are the ARTIST'S AUTHORED XML, shipped verbatim.** `<particlesystem>` with a 192-tag schema: systems,
+	// 2. "undecoded" was the `some_rdb_text_xml` trap: 189 of the 8,163 records are not the binary form at all -
+	//    they are the ARTIST'S AUTHORED XML, shipped verbatim. `<particlesystem>` with a 192-tag schema: systems,
 	//    emitters, particles, textures, lights, animated curves with control points, and an `<exportpath>` carrying
 	//    the original source file name. So the effect graph's schema is not a reverse-engineering problem - the
 	//    client ships the documentation. Same shape as RDB 1010203 being plain-text XML while its 1010501 twin is
 	//    the merged binary.
 	//
-	// ⭐⭐ **AND THE NAME TABLE INDEXES THIS TYPE, so 7,779 of the 8,163 (95.3%) have a name - not just the 189.**
+	// and the name table INDEXES this type, so 7,779 of the 8,163 (95.3%) have a name - not just the 189.
 	// This report shipped naming only the authored ones until chasing RDB 1010031 (attractor-FX placements, which
 	// reference an effect by name) showed the name table resolves those names to real 1010207 ids: of the 69 names
-	// those placements use, 64 resolve and ALL 64 land on an existing record, with no ambiguity. So the name table
+	// those placements use, 64 resolve and all 64 land on an existing record, with no ambiguity. So the name table
 	// is the primary name source here and the authored path is extra context, not the other way round.
 	//
 	// A name beats a texture list at the "which id" question by a mile: `spell_demonologist_summonpet_gather35`,
-	// `combo_generic_pbaoe_knockback_bright2`, `environ_water_jump_splash` say what the effect IS. And the id a name
-	// resolves to IS the wire value - `SimpleDynelVisualChangeIIR e_StartParticleEffect` carries it.
+	// `combo_generic_pbaoe_knockback_bright2`, `environ_water_jump_splash` say what the effect is. And the id a name
+	// resolves to is the wire value - `SimpleDynelVisualChangeIIR e_StartParticleEffect` carries it.
 	//
-	// ⚠️ The two populations are DISJOINT - a record is either the XML or the compiled binary, never both - so the
+	// The two populations are DISJOINT - a record is either the XML or the compiled binary, never both - so the
 	// XML ones cannot be used as a Rosetta stone to decode their own binary twins (there are none). Zero of the
 	// 7,974 binary records carry a source path. Decoding the binary form still needs the client's reader; what the
 	// XML gives is the field list to expect when someone does that.
@@ -51,7 +51,7 @@ namespace Faolan.Importer.Cli
 		// The authored source's own name for the effect. Only the 189 XML-form records carry it.
 		private static readonly Regex ExportPath = new(@"<exportpath>(.*?)</exportpath>", RegexOptions.Singleline | RegexOptions.Compiled);
 
-		// `loopcountmax` is the one field here the SERVER can act on: a one-shot ends by itself, a looping one runs
+		// `loopcountmax` is the one field here the server can act on: a one-shot ends by itself, a looping one runs
 		// until something stops it. Retail's authoring tool writes "forever" as a saturated int rather than a flag.
 		private static readonly Regex LoopCountMax = new(@"<loopcountmax>(.*?)</loopcountmax>", RegexOptions.Singleline | RegexOptions.Compiled);
 		private static readonly Regex DurationMax = new(@"<durationmax>(.*?)</durationmax>", RegexOptions.Singleline | RegexOptions.Compiled);
@@ -72,8 +72,8 @@ namespace Faolan.Importer.Cli
 			using var reader = OpenRdb(rdb);
 			var entries = reader.EntriesOfType(ParticleEffectType).ToList();
 
-			// ⭐ The NAME TABLE is the primary name source and covers 95.3% of the type - far more than the 189
-			// authored-XML records do. This report shipped naming only those 189 until the attractor chase (#880)
+			// The name table is the primary name source and covers 95.3% of the type - far more than the 189
+			// authored-XML records do. This report shipped naming only those 189 until the attractor chase
 			// showed the name table indexes 1010207 too.
 			var names = RdbNameTable.Load(reader);
 
@@ -199,7 +199,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// The build path's tail is what names the effect; the `W:\achardb\conan\` prefix is the same on all of them.
-		// ⚠️ These are WINDOWS paths being read on Linux, so `Path.GetFileName` does not split them - it treats the
+		// These are WINDOWS paths being read on Linux, so `Path.GetFileName` does not split them - it treats the
 		// whole thing as one name. Trim to the tail after `particles\` by hand, which also keeps the authoring
 		// FOLDER (`roberth\Character\Spells\combos\`), and that folder is half of what names the effect.
 		private static string ShortAsset(string path)

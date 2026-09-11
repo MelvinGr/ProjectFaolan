@@ -18,21 +18,26 @@ using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
-	// Read-only diagnostics (the old --dump-*/--burst-coverage flags), routed through `--report <name>`.
-	// These inspect captures or the DB and print; they never write, so they bypass the import runner entirely.
+	/// <summary>
+	///     Read-only diagnostics, routed through <c>--report &lt;name&gt;</c>. These inspect captures, the client RDB
+	///     or the database and print; they never write, so they bypass the import runner entirely.
+	/// </summary>
 	public static partial class ReportCli
 	{
 		private static (FaolanDbProvider Provider, string Connection)? _db;
 
-		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
-		// capture/RDB-only reports (fixtures, coverage-of-captures, ...) need no DB config at all. Same source
-		// and precedence as the import path (env > cmdline(--Database:ConnectionString) > faolan.json) - see CliConfig.
+		/// <remarks>
+		///     Database config (provider and connection) for the DB-backed reports, resolved lazily on the first
+		///     <c>OpenDb</c> so the capture- and RDB-only reports need no database config at all. Same source and
+		///     precedence as the import path (environment, then command line, then faolan.json) - see CliConfig.
+		/// </remarks>
 		private static ImporterOptions _options = null!;
 
-		// One entry per report: its name, what it is for (the comment its `case` used to carry), whether it needs the
-		// capture corpus, and the body. The table IS the index - `--report list` prints it, an unknown name answers
-		// with the nearest ones, and nothing else has to be kept in step (#928 item 4; the old `default:` named 12
-		// of ~166 reports and had drifted).
+		/// <remarks>
+		///     One entry per report: its name, what it is for, whether it needs the capture corpus, and the body. The
+		///     table is the index - <c>--report list</c> prints it and an unknown name answers with the nearest
+		///     matches, so nothing else has to be kept in step.
+		/// </remarks>
 		internal enum Needs
 		{
 			None,
@@ -41,16 +46,17 @@ namespace Faolan.Importer.Cli
 
 		internal sealed record ReportSpec(string Name, string Description, Needs Needs, Func<ReportContext, Task<int>> Run);
 
-		// What a report body reads. `Captures` loads the corpus once, on first use - the 76 `NamedCapture.LoadAll`
-		// calls the cases used to make each became this one property.
+		/// <summary>
+		///     What a report body reads. <see cref="Captures" /> loads the corpus once, on first use.
+		/// </summary>
 		internal sealed class ReportContext(ImporterOptions options)
 		{
 			private IReadOnlyList<NamedCapture>? _captures;
 			public ImporterOptions Options { get; } = options;
 			public string? Arg => Options.ReportArg;
 			public string? Out => Options.Out;
-			// Only a Needs.Captures report reads these, and RunAsync has checked the directory exists by then - so a
-			// report that asks without one is a table entry filed under the wrong Needs, which is what the throw says.
+			// Only a Needs.Captures report reads these, and RunAsync has checked the directory exists by then, so a
+			// report that asks without one is a table entry filed under the wrong Needs - which is what the throw says.
 			public string CapturesDir => Options.Captures ?? throw new InvalidOperationException("this report needs --captures (its ReportSpec should say Needs.Captures)");
 			public IReadOnlyList<NamedCapture> Captures => _captures ??= NamedCapture.LoadAll(CapturesDir);
 		}
@@ -278,9 +284,9 @@ namespace Faolan.Importer.Cli
 				var archive = Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
 				var source = ctx.Arg![(split + 1)..];
 
-				// An empty source REMOVES the fixture - the path by which retail bytes leave the archive once a gate's
-				// expectation has become a digest (#555). Spelled as the same flag rather than a second report so the
-				// two halves of "what is in the archive" stay in one place.
+				// An empty source removes the fixture - the path by which retail bytes leave the archive once a gate's
+				// expectation has become a digest. Spelled as the same flag rather than a second report so the two
+				// halves of "what is in the archive" stay in one place.
 				if (source.Length == 0)
 					FixtureArchiveWriter.RemoveNamed(archive, ctx.Arg[..split]);
 				else
@@ -292,16 +298,16 @@ namespace Faolan.Importer.Cli
 			{
 				// The single file holding every byte the test suite reads: the corpus slice (rebuilt here) plus the
 				// hand-carved named fixtures (carried over from the existing archive). See FixtureArchiveWriter.
-				// Default paths here are CWD-relative: the importer runs from the repo root (see CLAUDE.md).
+				// Default paths here are relative to the working directory: the importer runs from the repo root.
 				var target = ctx.Arg ?? Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
 				FixtureArchiveWriter.Write(ctx.CapturesDir, target);
 				return 0;
 			}),
 			new("fixture-source", "", Needs.Captures, async ctx =>
 			{
-				// The archive names a capture only by an opaque id (#465); this is the way back from a failure's
-				// "<id>#<index>" to the dump, by hashing every dump's name. Comma-separated ids, or every archived
-				// id when none is given.
+				// The archive names a capture only by an opaque id; this is the way back from a failure's
+				// "<id>#<index>" to the dump, by hashing every dump's name. Comma-separated ids, or every archived id
+				// when none is given.
 				var ids = (ctx.Arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 				return FixtureArchiveWriter.ResolveCaptureIds(ctx.CapturesDir, Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), ids);
 			}),
@@ -393,7 +399,7 @@ namespace Faolan.Importer.Cli
 			}),
 			new("player-actions", "", Needs.Captures, async ctx =>
 			{
-				// The ability catalog names the selectors: a selector IS an ability's Slot (#505).
+				// The ability catalog names the selectors: a selector is an ability's Slot.
 				await using (var db = OpenDb())
 					PlayerActions(ctx.Captures, await db.Abilities.Where(a => a.Slot != 0).ToDictionaryAsync(a => a.Slot, a => a.Name), ctx.Arg);
 
@@ -966,8 +972,8 @@ namespace Faolan.Importer.Cli
 					}
 
 					var b = rdb.ReadDecompressed(e);
-					// The [2][9] stat-modifier region - SAME parser as item templates. Body = the span after the
-					// 12-byte RDB-Id header.
+					// The [2][9] stat-modifier region, read by the same parser as item templates. The body is the span
+					// after the 12-byte RDB id header.
 					var mods = ItemTemplateStatModifiers.Parse(b.AsSpan(12));
 					var mag = 0u;
 					var w = new uint[b.Length / 4];
@@ -981,9 +987,9 @@ namespace Faolan.Importer.Cli
 					var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
 					Console.WriteLine($"  {id}: mag(551)={mag}  region[{mods.Count}]: {modStr}");
 
-					// The same region read as GAME ACTION ELEMENTS, addressed BY KEY. The pair view above is the
-					// stat-modifier lens; several kinds carry no stat at all and are invisible through it - the
-					// AoE radius (key 11 on the Area* kinds), the recast setters, the particle/script actions. A
+					// The same region read as game action elements, addressed by key. The pair view above is the
+					// stat-modifier lens; several kinds carry no stat at all and are invisible through it - the AoE
+					// radius (key 11 on the Area* kinds), the recast setters, the particle and script actions. A
 					// spell's mechanics live here, so print every element with its kind name and named keys.
 					foreach (var el in ItemTemplateStatModifiers.ParseElements(b.AsSpan(12)))
 					{
@@ -994,11 +1000,10 @@ namespace Faolan.Importer.Cli
 						var texts = string.Join(" ", el.Texts.Where(t => !string.IsNullOrEmpty(t)).Select(t => $"\"{t}\""));
 						Console.WriteLine($"      {el.Kind} {type?.Name ?? "?"}  {keys} {texts}".TrimEnd());
 
-						// ⭐ The element's own CONDITION run (#790/#791). Printed here because an element read
-						// without its criteria is only half of what the record states - two elements with the
-						// same decoded slots are routinely the same effect under different conditions, and a
-						// list of them with EMPTY criteria is itself a finding (Gitea #861 turned on exactly
-						// that: the rank tables condition nothing).
+						// The element's own condition run. Printed here because an element read without its criteria
+						// is only half of what the record states: two elements with the same decoded slots are
+						// routinely the same effect under different conditions, and a list of them with empty criteria
+						// is itself a finding.
 						foreach (var criterion in el.Criteria)
 						{
 							var opName = Enum.IsDefined(typeof(CriteriaOperator), criterion.Operator)
@@ -1061,13 +1066,12 @@ namespace Faolan.Importer.Cli
 			{
 				if ((ctx.Arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase))
 				{
-					// `id:<text>` searches by VALUE; `id:#<number>` searches by the id itself. The second is what tells
-					// a "this id is gone" story from a "this id was never an LDB id" one.
+					// `id:<text>` searches by value; `id:#<number>` searches by the id itself. The second is what
+					// separates "this id is gone" from "this id was never an LDB id".
 					//
-					// ⭐ `id:#a,b,c` resolves SEVERAL ids in ONE pass. The scan reads every LDB page - about a minute -
-					// so asking for a table's worth of ids one at a time costs that minute per id. A decoded table
-					// whose column IS an LDB id (the guild renown ladder's 57 rows, #469) is the normal case, not an
-					// exception.
+					// `id:#a,b,c` resolves several ids in one pass. The scan reads every LDB page - about a minute -
+					// so asking for a table's worth of ids one at a time costs that minute per id, and a decoded table
+					// whose column is an LDB id is the normal case rather than an exception.
 					var wanted = ctx.Arg![3..].Trim();
 					var wantedIds = new HashSet<uint>();
 					var byNumber = wanted.StartsWith('#');
@@ -1089,8 +1093,8 @@ namespace Faolan.Importer.Cli
 					using var rdb = OpenRdb(RdbDir());
 					var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
 					var hits = 0;
-					// A "not found" is only as strong as the coverage behind it, so the skips are COUNTED and printed.
-					// An id missing from a search that silently skipped 300 encrypted pages is not missing.
+					// A "not found" is only as strong as the coverage behind it, so the skips are counted and printed:
+					// an id missing from a search that silently skipped hundreds of encrypted pages is not missing.
 					int searched = 0, unreadable = 0, notTdc2 = 0, encrypted = 0, entries = 0;
 					var encryptedCategories = new SortedSet<uint>();
 					foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType))
@@ -1120,9 +1124,9 @@ namespace Faolan.Importer.Cli
 	
 						if (LdbStringIndex.FlagsOf(body) == 1)
 						{
-							// The HEADER is plaintext even on an encrypted page, so the category is readable and the
+							// The header is plaintext even on an encrypted page, so the category is readable and the
 							// skip can be reported per category - which is what says whether a miss in the category
-							// you care about is conclusive.
+							// being searched is conclusive.
 							encrypted++;
 							encryptedCategories.Add(LdbStringIndex.CategoryOf(body));
 							continue;
@@ -1197,24 +1201,24 @@ namespace Faolan.Importer.Cli
 			}),
 			new("ldb-resolve", "", Needs.Captures, async ctx =>
 			{
-				// #291: walk the LDB's TDC2 pages (LdbStringIndex owns that grammar) and build a global id -> string
-				// map, then print lookups for the pins + any --report-ctx.Arg ids, to verify offline.
+				// Walk the LDB's TDC2 pages (LdbStringIndex owns that grammar), build a global id -> string map, then
+				// print lookups for the pinned ids plus any passed in --report-arg, to verify offline.
 				var rdbDir = RdbDir();
 				using var rdb = OpenRdb(rdbDir);
 				var map = new Dictionary<uint, string>();
 				var byCat = new Dictionary<(uint cat, uint id), string>();
 				var perCategory = new Dictionary<uint, int>();
-				// Per-page id->string for name categories, so we can crib-identify the ENGLISH page(s) against the
-				// names our catalog already carries (#291/#300): 50210 spell names, 50200/50220 item names.
+				// Per-page id -> string for the name categories, so the English page(s) can be crib-identified against
+				// the names the catalog already carries: 50210 spell names, 50200 and 50220 item names.
 				var spellNamePages = new List<(uint page, Dictionary<uint, string> ids)>();
 				var itemNamePages = new List<(uint cat, uint page, Dictionary<uint, string> ids)>();
 
-				// The lookups: `--report-ctx.Arg` takes a comma-separated list of raw ids AND/OR literal TOKEN NAMES.
-				// A token is hashed with the client's own key function (LdbStringIndex.TokenId), which is what turns
-				// a `FUN_0061f640(<cat>, "<Token>")` call found in the exe into the string it prints - statically,
-				// with no live client. Resolved per PAGE rather than off `byCat`, because every category is shipped
-				// once per language and the last page to write a slot wins: an unqualified lookup silently answers
-				// in Korean.
+				// The lookups: --report-arg takes a comma-separated list of raw ids and/or literal token names. A token
+				// is hashed with the client's own key function (LdbStringIndex.TokenId), which is what turns a
+				// `FUN_0061f640(<cat>, "<Token>")` call found in the exe into the string it prints, statically and with
+				// no live client. Resolved per page rather than off `byCat`, because every category is shipped once per
+				// language and the last page to write a slot wins, so an unqualified lookup answers in whichever
+				// language sorted last.
 				var wanted = (ctx.Arg ?? "")
 					.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
 					.ToDictionary(needle => uint.TryParse(needle, out var raw)
@@ -1281,9 +1285,9 @@ namespace Faolan.Importer.Cli
 					}
 				}
 
-				// (No language histogram: language is per-PAGE, not per-entry - the index entry's 2nd u32 is
-				// langOrFlags and the shared parser deliberately ignores it. The crib below is how a page's language
-				// is actually determined.)
+				// No language histogram: language is per page, not per entry - the index entry's second u32 is
+				// langOrFlags and the shared parser deliberately ignores it. The crib below is how a page's language is
+				// determined.
 				await using (var db = OpenDb())
 				{
 					var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
@@ -1323,8 +1327,8 @@ namespace Faolan.Importer.Cli
 					foreach (var id in fillable.Take(20))
 						Console.WriteLine($"  spell {id}: '{englishNames[id]}'");
 
-					// Items: same crib, per candidate category (50200 dev-names, 50220). Which category is keyed by
-					// item id AND English is what this tells us.
+					// Items: the same crib, per candidate category (50200 developer names, 50220). What it answers is
+					// which category is both keyed by item id and English.
 					var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 					foreach (var cat in new uint[] { 50200, 50220 })
 					{
@@ -1367,9 +1371,9 @@ namespace Faolan.Importer.Cli
 
 				return 0;
 
-				// #291/#300 crib: identify the ENGLISH spell-name page(s) by scoring each cat-50210 page against the
-				// English names our Spells catalog already carries (from the template ExtractName). The page whose
-				// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
+				// Identify the English spell-name page(s) by scoring each category-50210 page against the English names
+				// the Spells catalog already carries (from the template ExtractName). The page whose strings match
+				// those names is the English one; the other languages' copies of the same ids will not.
 				static string Norm(string s)
 				{
 					return s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
@@ -1385,9 +1389,14 @@ namespace Faolan.Importer.Cli
 				: "(none)";
 		}
 
-		// Every LDB page (RDB 1030002) in the client, as (page id, category, id -> string). Thin wrapper over the shared
-		// LdbStringIndex grammar that adds only the per-PAGE grouping the crib reports need - language is a property of
-		// the page, so a report that merges every page of a category ends up with whichever language sorted last.
+		/// <summary>
+		///     Every LDB page (RDB 1030002) in the client, as (page id, category, id -> string).
+		/// </summary>
+		/// <remarks>
+		///     A thin wrapper over the shared LdbStringIndex grammar that adds only the per-page grouping the crib
+		///     reports need: language is a property of the page, so a report that merges every page of a category ends
+		///     up with whichever language sorted last.
+		/// </remarks>
 		private static IEnumerable<(uint PageId, uint Category, Dictionary<uint, string> Strings)> LdbPagesOf(RdbReader rdb)
 		{
 			foreach (var e in rdb.EntriesOfType(1030002).Where(rdb.CanRead))
@@ -1417,36 +1426,43 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Reports read the DB from the shared config (faolan.db by default, --Database:ConnectionString to override); one short-lived context.
+		/// <summary>
+		///     Opens one short-lived context on the database the shared config names (faolan.db by default,
+		///     <c>--Database:ConnectionString</c> to override).
+		/// </summary>
 		private static DatabaseContext OpenDb()
 		{
 			_db ??= CliConfig.ResolveDatabase(_options.Configuration);
 			return DatabaseExtensions.CreateContext(_db.Value.Provider, _db.Value.Connection);
 		}
 
-		// The client's RDB folder is part of the game install, not this repo, so it comes from config like every
-		// other setting - ONE name across all three input methods (#412). RDB-backed reports fail with a clear
-		// message if it is not set anywhere.
-		// The RDB is OPTIONAL for a report that only enriches its output with it (scaffold-heap decrypts the LDB
-		// strings it finds when it can, and names them when it cannot). RdbDir() throws, which is right for a report
-		// that cannot run without it and wrong for one that degrades.
+		/// <remarks>
+		///     The client's RDB folder is part of the game install, not this repo, so it comes from config like every
+		///     other setting, under one name across all three input methods. <c>RdbDir()</c> throws with a clear
+		///     message when it is not set anywhere, which is right for a report that cannot run without it; a report
+		///     that only enriches its output with the RDB uses the optional form instead and degrades.
+		/// </remarks>
 		private static string? RdbDirOrNull()
 		{
 			return _options.Configuration[Keys.ContentRdbDir];
 		}
 
-		// Every report opens the RDB THROUGH the CDN mirror. A reader built without a proxy base silently degrades to
-		// the LOCAL records only, and for several types that is a minority of the game: 577 of the 817 NPC spawn
-		// layouts (1010506), 580 of 653 in-game map tiles (1010013) and 276 of 520 tilemaps (1070003) are CDN-only.
-		// Honours `--rdb-proxy`, which the reports used to ignore in favour of the hardcoded default.
+		/// <remarks>
+		///     Every report opens the RDB through the CDN mirror, honouring <c>--rdb-proxy</c>. A reader built without a
+		///     proxy base silently degrades to the local records only, and for several types that is a minority of the
+		///     game: most NPC spawn layouts (1010506), in-game map tiles (1010013) and tilemaps (1070003) are CDN-only.
+		/// </remarks>
 		private static RdbReader OpenRdb(string? rdbDir = null)
 		{
 			return new RdbReader(rdbDir ?? RdbDir(), ReportRdbProxy());
 		}
 
-		// The CDN base a REPORT run reads through. ⚠️ Resolving it touches `_options`, which only the `--report` entry
-		// point assigns - so anything shared with the IMPORT path must take the base as a parameter instead of calling
-		// this (#819). It is a separate method rather than inline so that dependency is visible at each call site.
+		/// <remarks>
+		///     The CDN base a report run reads through. Resolving it touches <c>_options</c>, which only the
+		///     <c>--report</c> entry point assigns, so anything shared with the import path must take the base as a
+		///     parameter instead of calling this. A separate method rather than inline so that dependency is visible at
+		///     each call site.
+		/// </remarks>
 		private static string? ReportRdbProxy()
 		{
 			return _options.RdbProxy ?? _options.Configuration.CdnPublicAddress;
@@ -1459,21 +1475,26 @@ namespace Faolan.Importer.Cli
 					"The client's RDB folder is not configured - set Content:RdbDir in faolan.json, the Content__RdbDir environment variable, or pass --Content:RdbDir <dir>.");
 		}
 
-		// RDB 1040005 - the spell template type (feats/spells/items share one record layout).
+		/// <remarks>RDB 1040005 - the spell template type; feats, spells and items share one record layout.</remarks>
 		private const uint SpellTemplateType = 1040005;
 
-		// How much of a spell record's fixed head SpellManaMode sweeps. The ascending property run starts around word
-		// 15 of the body and is only ~16 fields wide, so everything before it is struct rather than property table.
+		/// <remarks>
+		///     How much of a spell record's fixed head SpellManaMode sweeps. The ascending property run starts around
+		///     word 15 of the body and is only some sixteen fields wide, so everything before it is struct rather than
+		///     property table.
+		/// </remarks>
 		private const int HeadWords = 20;
 
-		// One little-endian u32 of a record, or 0 past its end.
+		/// <summary>One little-endian u32 of a record, or 0 past its end.</summary>
 		private static uint Word(byte[] body, int offset)
 		{
 			return offset + 4 <= body.Length ? BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(offset)) : 0;
 		}
 
 
-		// type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.
+		/// <summary>
+		///     Type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.
+		/// </summary>
 		private static void RdbTypes(string rdbDir)
 		{
 			using var rdb = OpenRdb(rdbDir);
@@ -1490,7 +1511,10 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"type {kv.Key,-10} total={kv.Value.total,-8} local={kv.Value.local}");
 		}
 
-		// Mirror of RdbSpellImporter.ReadIncreasingFields (kept private there); used only by the spell-fields report.
+		/// <remarks>
+		///     Mirror of RdbSpellImporter.ReadIncreasingFields, which is private there; used only by the spell-fields
+		///     report.
+		/// </remarks>
 		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;

@@ -4,31 +4,34 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// SEND-TIME in-place patches to an already-built spawn RECORD's transform. Not a codec - the encoding lives in
-	// SimpleCharFullUpdateCodec; these are the two values that are only known at the moment of sending and are
-	// therefore stamped over a record built earlier:
-	//
-	//   - the PLAYFIELD INSTANCE token, which is per-recipient-session (SendWorldSpawn stamps the entering player's
-	//     LIVE token; it is not known until they actually enter), and
-	//   - the entity's CURRENT POSITION, because a cached NPC record holds the position it was built with at map load.
-	//
-	// ⚠️ The offsets here are PATCH offsets into a record whose head is fixed-width, not parse offsets (#530 §7):
-	//   [u32 subop][u32 class][u32 handle][u32 fieldA][u8 transformLen][0x0A][u8 len][vec3][0x12][u8 len][quat]...
-	// Every field ahead of them is decoded by the codec; nothing here reads a body it has not accounted for. The pure
-	// "construct" endgame is to rebuild the record per-send with the live values, which needs the source row/handle
-	// carried on WorldEntity; until then this targeted patch is the seam.
+	/// <summary>
+	///     Send-time in-place patches to an already-built spawn record's transform. Not a codec - the encoding lives in
+	///     <see cref="SimpleCharFullUpdateCodec" /> - but the two values that are only known at the moment of sending, and
+	///     are therefore stamped over a record built earlier: the playfield instance token, which is per recipient session
+	///     and not known until the player actually enters, and the entity's current position, since a cached NPC record
+	///     holds the position it was built with at map load.
+	/// </summary>
+	/// <remarks>
+	///     The offsets here are patch offsets into a record whose head is fixed-width, not parse offsets:
+	///     <c>[u32 subop][u32 class][u32 handle][u32 fieldA][u8 transformLen][0x0A][u8 len][vec3][0x12][u8 len][quat]...</c>.
+	///     Every field ahead of them is decoded by the codec, so nothing here reads a body it has not accounted for.
+	/// </remarks>
 	public static class SpawnTransformPatch
 	{
-		// Where the position's three little-endian fixed32 live in the record, and the stride between them (each is
-		// preceded by its own protobuf field tag). The head is [subop][class][handle][fieldA][transformLen][0x0A]
-		// [vec3 len][0x0D] = 20 bytes.
+		/// <summary>
+		///     Where the position's three little-endian fixed32 live in the record, and the stride between them, each being
+		///     preceded by its own protobuf field tag. The head -
+		///     <c>[subop][class][handle][fieldA][transformLen][0x0A][vec3 len][0x0D]</c> - is 20 bytes.
+		/// </summary>
 		private const int PosXOffset = 20;
 		private const int PosStride = 5;
 
-		// Overwrites the transform's playfield-instance varint in `record` (the [u32 iirType][record] form the codec
-		// builds) with `value`, in place. Returns false (leaving the record untouched) if the value is out of the
-		// 4-byte-varint range, the transform can't be located, or the existing token isn't a 4-byte varint. Session
-		// tokens are 4-byte LEB128 varints, so the rewrite is splice-free (no length field shifts).
+		/// <summary>
+		///     Overwrites the transform's playfield-instance varint in the record - the [u32 iirType][record] form the codec
+		///     builds - in place. Returns false, leaving the record untouched, if the value is outside the 4-byte varint
+		///     range, the transform cannot be located, or the existing token is not a 4-byte varint. Session tokens are
+		///     4-byte varints, so the rewrite shifts no length field.
+		/// </summary>
 		public static bool TryRewritePlayfield(byte[] record, uint value)
 		{
 			if (value is < 1u << 21 or >= 1u << 28 || record == null || record.Length <= 4)
@@ -51,8 +54,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
-		// Overwrites the transform's position with the entity's live one, in place. No-op on a record too short to
-		// hold one.
+		/// <summary>
+		///     Overwrites the transform's position with the entity's live one, in place. A no-op on a record too short to
+		///     hold one.
+		/// </summary>
 		public static void WritePosition(byte[] record, Vector3 position)
 		{
 			if (record == null || record.Length < PosXOffset + 2 * PosStride + 4)
@@ -63,9 +68,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			record.WriteF32Le(PosXOffset + 2 * PosStride, position.Z);
 		}
 
-		// Offset (within the record body, past the iirType) of the playfield-instance varint that follows the 0x18
-		// tag at the end of the transform group: skip the 12-byte header ([class][handle][fieldA]), the transform's
-		// own length byte, the 0A vec3, the 12 quat, an optional 25 scale, then the 0x18 tag.
+		/// <summary>
+		///     The offset, within the record body past the iirType, of the playfield-instance varint that follows the 0x18
+		///     tag at the end of the transform group: skip the 12-byte header, the transform's own length byte, the vec3, the
+		///     quaternion, an optional scale, then the tag.
+		/// </summary>
 		private static bool TryPlayfieldVarintStart(ReadOnlySpan<byte> b, out int start)
 		{
 			start = 0;

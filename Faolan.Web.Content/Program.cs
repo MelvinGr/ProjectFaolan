@@ -62,11 +62,11 @@ namespace Faolan.Web.Content
 			var storeDir = Path.GetFullPath(builder.Configuration.CdnStore);
 			Directory.CreateDirectory(storeDir);
 
-			// The address the CLIENT dials, from configuration and nowhere else. It used to fall back to the inbound
-			// request's Host header, which reads as "by definition what the client dialled" and is a GUESS: it is
-			// whatever the last hop put there, so a proxy, a container port mapping or a plain `curl -H Host:` writes
-			// that value into the LocalConfig.xml a patch run then pins itself to - a wrong patch address that looks
-			// like it worked. Only the operator knows the answer, so an unset key is an error, not a derivation.
+			// The address the client dials, from configuration and nowhere else. The inbound request's Host header is
+			// not a substitute: it is whatever the last hop put there, so a proxy, a container port mapping or a plain
+			// `curl -H Host:` would write that value into the LocalConfig.xml a patch run then pins itself to - a wrong
+			// patch address that looks like it worked. Only the operator knows the answer, so an unset key is an error
+			// rather than a derivation.
 			var publicBase = builder.Configuration.CdnPublicAddress;
 			if (string.IsNullOrWhiteSpace(publicBase))
 			{
@@ -81,8 +81,8 @@ namespace Faolan.Web.Content
 			publicBase = PublicBase(publicBase);
 
 			builder.WebHost.UseUrls($"http://{listenAddress}:{port}");
-			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
-			// own decompressor expects. Requesting identity upstream keeps HTTP out of the picture entirely.
+			// HttpClient must not transparently gunzip: the store keeps and re-serves the exact payload bytes the
+			// client's own decompressor expects, and requesting identity upstream keeps HTTP out of the picture.
 			builder
 				.Services.AddHttpClient("cdn")
 				.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
@@ -95,9 +95,9 @@ namespace Faolan.Web.Content
 			long hits = 0, misses = 0, bytes = 0;
 			var inflight = new ConcurrentDictionary<string, SemaphoreSlim>();
 
-			// What the store already HOLDS per upstream tag - blob count and total size. Walked ONCE here (a fully
-			// mirrored store is ~100k files, so /_stats must not re-walk it per request) and then kept live by the
-			// store path below - every miss that lands a blob adds it to its tag's tally.
+			// What the store already holds per upstream tag - blob count and total size. Walked once here, because a
+			// fully mirrored store is ~100k files and /_stats must not re-walk it per request, then kept live by the
+			// store path below: every miss that lands a blob adds it to its tag's tally.
 			var store = new ConcurrentDictionary<string, StoreTally>(StringComparer.Ordinal);
 			foreach (var tag in Upstreams.Keys)
 				store[tag] = ScanStore(Path.Combine(storeDir, tag, "upm"));
@@ -110,10 +110,10 @@ namespace Faolan.Web.Content
 				var query = ctx.Request.QueryString.Value ?? "";
 				var localPath = Path.Combine(storeDir, tag, "upm", rest.Replace('/', Path.DirectorySeparatorChar));
 
-				// The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and OVERWRITES the local copy
-				// with it - which would revert our redirect to the real CDN. So for that file we archive the real
-				// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
-				// sticky across a patch run.
+				// The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and overwrites the local copy
+				// with it, which would revert the redirect to the real CDN. So for that file the real bytes are
+				// archived but the copy served has its three patch-addr keys pointing back at this mirror, keeping the
+				// redirect sticky across a patch run.
 				if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
 					return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), publicBase), "application/octet-stream");
 
@@ -123,7 +123,7 @@ namespace Faolan.Web.Content
 					return Results.File(localPath, "application/octet-stream");
 				}
 
-				// Single-flight per path so 5 patcher connections don't all fetch the same blob.
+				// Single-flight per path, so several patcher connections do not all fetch the same blob.
 				var gate = inflight.GetOrAdd(localPath, _ => new SemaphoreSlim(1, 1));
 				await gate.WaitAsync();
 
@@ -156,7 +156,6 @@ namespace Faolan.Web.Content
 						File.Move(tmp, localPath, true);
 						// The blob is new to the store unconditionally: the only way past the two hit checks with no
 						// query string is File.Exists having said no, under the single-flight gate for this exact path.
-						// (It cost a third File.Exists to ask, and the answer was always the same.)
 						store[tag].Add(body.Length);
 					}
 
@@ -174,7 +173,7 @@ namespace Faolan.Web.Content
 				}
 			});
 
-			// `stored`/`mb` count what THIS run fetched; `files`/`storeMb` are the whole store, startup scan included.
+			// `stored`/`mb` count what this run fetched; `files`/`storeMb` are the whole store, startup scan included.
 			app.MapGet("/_stats", () =>
 			{
 				var byTag = new SortedDictionary<string, object>(StringComparer.Ordinal);
@@ -193,7 +192,6 @@ namespace Faolan.Web.Content
 				});
 			});
 
-			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
 			log.LogInformation("Faolan.Web.Content on http://{ListenAddress}:{Port} store={Store} ({Files} files, {MB:F1} MB: {ByTag}) patch-addr={PatchAddr}",
 				listenAddress, port, storeDir, store.Values.Sum(t => t.Files), store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
@@ -223,14 +221,13 @@ namespace Faolan.Web.Content
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
 		// overwrites its local config from the control server stays pointed at us.
 		// Rewrite the three upstream patch addresses to point back at this mirror. `publicBase` is the address the
-		// CLIENT will dial - see PublicBase.
+		// client dials - see PublicBase. The <UniverseAddr> key is not touched here; the launcher's
+		// --patch-universeaddr sets that.
 		internal static byte[] RewriteConfig(byte[] body, string publicBase)
 		{
 			var text = Encoding.UTF8.GetString(body);
 			foreach (var (tag, host) in Upstreams)
 				text = text.Replace($"{host}/upm", $"{publicBase}/{tag}/upm");
-
-			// TODO: Also replace UniverseAddr with Config.ServerUniverseAddress
 
 			return Encoding.UTF8.GetBytes(text);
 		}

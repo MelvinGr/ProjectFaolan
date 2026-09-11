@@ -5,17 +5,19 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// DispatchGuildMemberLeft (0x202E) - the roster fan-out when someone leaves or is kicked:
-	// `[ID32 member][string memberName]`.
-	//
-	// ⚠️ It is NOT the mirror of DispatchGuildMemberJoined, which carries the whole member ELEMENT after the id
-	// (GuildMemberJoinedCodec, byte-exact against the capture). The client's two readers disagree on purpose:
-	// `CSPlayerInterfaceDispatch_t::DispatchGuildMemberJoined` (FUN_01340aa0) calls the element deserializer
-	// (FUN_00566740) for its second field, while `…MemberLeft` (FUN_013408f0) calls the STRING primitive
-	// (FUN_0048f840). Which makes sense - a departure only has to name the row to remove and the toast to print.
-	// So the catalog's field name `i_cMemberName` is accurate here and misleading on the joined twin.
-	//
-	// ⚠️ No capture performs a guild departure. [V0]
+	/// <summary>
+	///     <c>DispatchGuildMemberLeft</c> - the roster fan-out when someone leaves or is kicked:
+	///     <c>[ID32 member][string memberName]</c>.
+	/// </summary>
+	/// <remarks>
+	///     It is not the mirror of <c>DispatchGuildMemberJoined</c>, which carries the whole member element after the id.
+	///     The client's two readers differ deliberately:
+	///     <c>CSPlayerInterfaceDispatch_t::DispatchGuildMemberJoined</c> (FUN_01340aa0) calls the element deserializer
+	///     (FUN_00566740) for its second field, while <c>DispatchGuildMemberLeft</c> (FUN_013408f0) calls the string
+	///     primitive (FUN_0048f840) - a departure only has to name the row to remove and the toast to print. The
+	///     catalog's field name <c>i_cMemberName</c> is accurate here and misleading on the joined twin.
+	///     <para>No capture performs a guild departure. [V0]</para>
+	/// </remarks>
 	public static class GuildMemberLeftCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildMemberLeft;

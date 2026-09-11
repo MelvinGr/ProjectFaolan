@@ -7,22 +7,22 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report data-table --report-arg <type>[:<id>]`: one of the client's `DataTable_c<T>` tables, as ROWS.
+	// `--report data-table --report-arg <type>[:<id>]`: one of the client's `DataTable_c<T>` tables, as rows.
 	//
-	// #469's method is *"do NOT start from the bytes - start from the class name, then find the consumers"*, and that
-	// is still right for naming a COLUMN. But it left every table needing a fresh hex read before the question could
-	// even be asked, and most of them share one shape:
+	// Naming a column means starting from the class name and finding its consumers, never from the bytes. But that
+	// leaves every table needing a fresh hex read before the question can even be asked, and most of them share one
+	// shape:
 	//
 	//     [type u32][a u32][version u32][count u32]  then  count x stride bytes
 	//
-	// with a handful carrying the count in the FIFTH word instead (1000509, 1000511). So the count word and the
-	// stride are SOLVED here rather than assumed - the stride has to divide the body exactly for the chosen count,
-	// and a table where neither candidate divides is REPORTED as such instead of being rendered against a guess.
+	// with a handful carrying the count in the fifth word instead (1000509, 1000511). So the count word and the
+	// stride are solved here rather than assumed - the stride has to divide the body exactly for the chosen count,
+	// and a table where neither candidate divides is reported as such instead of being rendered against a guess.
 	// That refusal matters: 1000505 does not divide because it is variable-width (it carries strings), and printing
 	// it as fixed-width rows would have produced a plausible table of nonsense.
 	//
-	// ⚠️ It prints u32s because that is what these tables are made of, but a column that never exceeds a small value
-	// is not necessarily a u32 field - `CoreTokenHolder` (1000520) carries its count as a BYTE. Read the loader's
+	// It prints u32s because that is what these tables are made of, but a column that never exceeds a small value
+	// is not necessarily a u32 field - `CoreTokenHolder` (1000520) carries its count as a byte. Read the loader's
 	// parse callback before trusting a wide read on a table this refuses.
 	public static partial class ReportCli
 	{
@@ -41,7 +41,7 @@ namespace Faolan.Importer.Cli
 		// means. Both are variable-width `[id][len][name]` tables (1000505 carries a trailing tier word), which is
 		// exactly the shape the fixed-width renderer below refuses - they are read here by a dedicated reader for
 		// that reason rather than being forced through it.
-		// Columns that are SIGNED. Everything in these tables reads as a u32 by default and almost all of them are
+		// Columns that are signed. Everything in these tables reads as a u32 by default and almost all of them are
 		// ids or counts, so a signed column is the exception and is listed rather than guessed - 1000071's group is
 		// -1..-5 and printing it as 4294967292 is technically true and completely unreadable.
 		private static readonly HashSet<string> SignedColumns = ["groupValue"];
@@ -124,7 +124,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			Console.WriteLine($"type={type} id={entryId} {body.Length} B  head=[{string.Join(", ", head)}]");
 
-			// ⭐ The count word and the HEADER LENGTH are both solved, not assumed, and they vary independently: most
+			// The count word and the header length are both solved, not assumed, and they vary independently: most
 			// tables are count-in-word-3 with a 16-byte header, 1000511 is count-in-word-4 with 20, and 1000071 is
 			// count-in-word-3 with 20. Pairing them off as "word 3 means 16 bytes" silently refuses that last shape.
 			foreach (var (countWord, headerBytes) in new[] { (3, 16), (3, 20), (4, 20) })
@@ -162,7 +162,7 @@ namespace Faolan.Importer.Cli
 				header.Append($"{(names is not null && c < names.Length ? names[c] : $"w{c}"),20}");
 			Console.WriteLine(header.ToString());
 
-			// ⚠️ Capped, and it SAYS it is. A silent top-N over a 9,916-row table reads as "this is the table".
+			// Capped, and it says it is. A silent top-N over a 9,916-row table reads as "this is the table".
 			const int Cap = 40;
 			for (var r = 0; r < Math.Min(count, Cap); r++)
 			{
@@ -170,7 +170,7 @@ namespace Faolan.Importer.Cli
 				for (var c = 0; c < columns; c++)
 				{
 					var v = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(headerBytes + r * stride + c * 4, 4));
-					// ⚠️ An id the registry does not carry prints as the NUMBER, never as a blank or a guess - the
+					// An id the registry does not carry prints as the number, never as a blank or a guess - the
 					// second 1000507 entry is full of class ids that 1000505 does not list, and that absence is a
 					// finding about the table rather than a rendering gap to paper over.
 					var name = names is null || c >= names.Length ? null

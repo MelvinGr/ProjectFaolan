@@ -9,12 +9,12 @@ namespace Faolan.Core.Network.Codecs.World
 	// SetPosIIR_c (0x04B80B24) - the teleport/snap record: position(3) + rotation(4) floats + a trailing bool
 	// (FUN_00a33770; the client finite-checks the pos & rot).
 	//
-	// The u32 length prefix belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it.
+	// The u32 length prefix belongs to the sender - WorldIir.Send writes it.
 	public static class SetPosCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SetPosIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(SetPosIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -53,6 +53,5 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// SetPosIIR (0x04B80B24).
 	public sealed record SetPosIIR(uint Handle, byte Env, Vector3 Position, Quaternion Rotation, byte Flag);
 }

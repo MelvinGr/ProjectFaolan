@@ -7,12 +7,14 @@ using Faolan.GameServer.Wire;
 
 namespace Faolan.GameServer.Combat
 {
-	// ISpellweaveOutbound: the spellweaving FSM's wire + world-state surface, one explicit forward per member to the
-	// service that owns the act - the energy loop, the buff registry, the world model, the chat dispatcher.
-	//
-	// It replaced SEVEN optional Func<>/Action<> constructor seams on SpellweaveService (see ISpellweaveOutbound for
-	// why seven was where per-op delegates stopped paying), and it is a class rather than a facade on the listener
-	// for the same reason every other *Outbound is: none of these members needs anything the listener owns.
+	/// <summary>
+	///     The spellweaving FSM's wire and world-state surface: one explicit forward per member to the service that
+	///     owns the act - the energy loop, the buff registry, the world model and the chat dispatcher.
+	/// </summary>
+	/// <remarks>
+	///     A class rather than a facade on the listener, for the same reason as every other outbound port: none of
+	///     these members needs anything the listener owns.
+	/// </remarks>
 	public sealed class SpellweaveOutbound : ISpellweaveOutbound
 	{
 		private readonly BuffService _buffs;

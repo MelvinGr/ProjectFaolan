@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The summonable-mount protocol (#27) and the shipped mount catalog (#627). The catalog used to be two
-	// hand-built rows in MountCatalog; it is now the `Mounts` table, lifted whole from the client's own data (RDB
-	// spell field 186), so the identity half of this gate reads the committed faolan.db.
+	// The summonable-mount protocol and the shipped mount catalog. The catalog is the `Mounts` table, lifted whole
+	// from the client's own data (RDB spell field 186), so the identity half of this gate reads the committed
+	// faolan.db.
 	public class MountCatalogTests
 	{
 		[Fact]
@@ -32,11 +32,11 @@ namespace Faolan.Tests
 		{
 			var mounts = ShippedMounts();
 
-			// 155 records of RDB type 1040005 carry field 186. All of them are here: a mount id IS its summon
+			// 155 records of RDB type 1040005 carry field 186. All of them are here: a mount id is its summon
 			// spell's record id, so nothing is dropped for want of a key.
 			Assert.Equal(155, mounts.Count);
 
-			// The creature id is NOT unique and must never be used as the key - two "Killer Rhino" summons name one
+			// The creature id is not unique and must never be used as the key - two "Killer Rhino" summons name one
 			// creature, and three "Ridden Death" summons name three different ones.
 			Assert.True(mounts.Count > new HashSet<uint>(mounts.Values.Select(m => m.CreatureId)).Count);
 		}
@@ -44,8 +44,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Quality_IsTheOnlyVariantDiscriminator_AndIsARarityLadder()
 		{
-			// #627 asked whether a speed field distinguishes "Swift <horse>" from "<horse>". It does not: field 499
-			// is the only field that differs, and it is the same 0-indexed ItemQuality ladder an item template
+			// No speed field distinguishes "Swift <horse>" from "<horse>": field 499 is the only field that differs,
+			// and it is the same 0-indexed ItemQuality ladder an item template
 			// carries. A Swift horse is Enchanted; its plain and Azure-barded twins carry no tier at all.
 			var quality = ShippedQuality();
 			Assert.Null(quality[0x3E34F1u]); // Fading Black Horse
@@ -63,10 +63,10 @@ namespace Faolan.Tests
 		{
 			// The verbatim 54-byte ride-buff payload from the mount capture (frame 520): duration@8 = 8_640_000 cs
 			// (24 h), spell base 0x31EB15 @22, casting level 80, and the @46 u64 expiry stamp 0x1560F9BB. Now
-			// CONSTRUCTED via MagicBuffDatas.Apply instead of a verbatim blob.
+			// constructed via MagicBuffDatas.Apply instead of a verbatim blob.
 			//
-			// That stamp is SESSION state, not a catalog constant: 0x1560F9BB ms = 4.15 days of that retail server's
-			// uptime, which is when the 24 h buff would have ended (#480). It is passed in here because this test
+			// That stamp is session state, not a catalog constant: 0x1560F9BB ms = 4.15 days of that retail server's
+			// uptime, which is when the 24 h buff would have ended. It is passed in here because this test
 			// reproduces one captured send; the live sender takes it from ServerUptimeClock.
 			byte[] captured =
 			[
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
 			];
 
-			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80, 0x1560F9BB))); // the mount capture is a level-80 character (#438)
+			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80, 0x1560F9BB))); // the mount capture is a level-80 character
 		}
 
 		// (mount id -> name + creature id) straight out of the committed faolan.db.

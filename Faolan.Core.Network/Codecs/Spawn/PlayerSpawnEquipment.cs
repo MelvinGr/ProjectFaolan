@@ -7,11 +7,12 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Builds the worn-equipment InventoryEntries for a player's SimpleCharFullUpdate spawn from the character's
-	// EQUIPPED item instances. Each worn item becomes a ProtoCoreCharacterIIR.InventoryEntry { pos = the equip slot id,
-	// item = ProtoAcgItem(visual) } - the same Item -> ProtoAcgItem encoding the inventory snapshot uses
-	// (SnapshotItems): keys = the item's Data1..4 quad, templates = Item.Id, hash = hash. Replaces the
-	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / SpawnBodyReader).
+	/// <summary>
+	///     Builds the worn-equipment InventoryEntries for a player's SimpleCharFullUpdate spawn from the character's
+	///     equipped item instances. Each worn item becomes an InventoryEntry whose <c>pos</c> is the equip slot id and
+	///     whose item is a ProtoAcgItem - the same Item-to-ProtoAcgItem encoding the inventory snapshot uses: the keys are
+	///     the item's key quad, both templates its id, and the hash its hash.
+	/// </summary>
 	public static class PlayerSpawnEquipment
 	{
 		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(CharacterEquipmentSlot pos, Item item)
@@ -28,37 +29,32 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Key3 = key,
 					Template1 = item.Id,
 					Template2 = item.Id,
-					// The item's own level, exactly as the snapshot entry carries it. Measured over the DUMPS (#755,
-					// `--report spawn-item-level`): 125,721 of 125,722 captured worn-item entries across 23,478
-					// character spawns carry EXACTLY their template's `Items.Level`, with zero disagreements and
-					// zero templates carrying two different levels; the one exception is an entry whose template is
-					// not in our catalog at all.
-					//
-					// It was hardcoded `1` until then, and the snapshot entry's identical 8,479/8,479 result was
-					// deliberately NOT assumed to transfer - this is a different message written by a different part
-					// of retail's server. It had to be measured, and the reason nobody noticed is in the histogram:
-					// level 1 is 108,819 of the 125,722 entries, so the constant was right 87% of the time.
+					// The item's own level, exactly as the snapshot entry carries it. Measured over the dumps
+					// (--report spawn-item-level): 125,721 of 125,722 captured worn-item entries across 23,478
+					// character spawns carry exactly their template's Items.Level, with no disagreements and no
+					// template carrying two different levels; the one exception is an entry whose template is not in
+					// our catalog at all. It is not a constant - level 1 accounts for 108,819 of those entries, so a
+					// hardcoded 1 is right 87% of the time and wrong the rest.
 					Level = item.Level,
 					Hash = AcgHash.ForWire(item.Id, item.Hash)
 				}
 			};
 		}
 
-		// `worn` is the character's Equipped container as slot -> instance (IDatabaseRepository.GetEquippedItems). The
-		// 17 worn slots and the 7 vanity slots are treated alike, so vanity items ride the spawn at their equip-slot
-		// pos (1002+). The slot id IS the enum value (pos in the capture: MainWeapon = main_hand_left 6, the ranged
-		// pair 20/21, vanity 1002+).
+		/// <summary>
+		///     Builds every worn entry. <paramref name="worn" /> is the character's Equipped container as slot to instance
+		///     (IDatabaseRepository.GetEquippedItems). The 17 worn slots and the 7 vanity slots are treated alike, so vanity
+		///     items ride the spawn at their equip-slot position. The slot id is the enum value: in the capture the main
+		///     weapon is main_hand_left 6, the ranged pair 20 and 21, and vanity 1002 and up.
+		/// </summary>
 		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildInventoryEntries(IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>? worn)
 		{
-			// This used to REFUSE an item with no harvested hash, on the reasoning that a hash is harvested content so
-			// a worn item lacking one is a gap in Items rather than a state to render around. The refusal was right
-			// while the token could only be harvested; #723 removed that premise - the token carries no information and
-			// the client validates nothing, so BuildEntry mints one and the wearer and everybody else now see the same
-			// piece either way.
+			// An item with no harvested hash still ships: the token carries no information and the client validates
+			// nothing, so BuildEntry mints one and the wearer and everybody else see the same piece.
 			//
-			// Every worn + vanity item ships - NOTHING is withheld for the vanity filter. Show/hide is driven purely by
-			// the bitmask in the spawn header (Character.VanityShownMask, emitted by PlayerSpawnScaffoldRows); the
-			// client renders it off that mask (#336).
+			// Every worn and vanity item ships; nothing is withheld for the vanity filter. Show and hide are driven
+			// purely by the bitmask in the spawn header (Character.VanityShownMask, emitted by
+			// PlayerSpawnScaffoldRows), which is what the client renders off.
 			return (worn ?? new Dictionary<CharacterEquipmentSlot, ItemInstance>())
 				.OrderBy(kv => (uint)kv.Key)
 				.Select(kv => BuildEntry(kv.Key, kv.Value.Template))

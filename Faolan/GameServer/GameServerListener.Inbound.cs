@@ -41,18 +41,16 @@ namespace Faolan.GameServer
 	{
 		private async Task HandleIirCarrier(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			// Snapshot the entire 0x2000 sub-payload before consuming it, so every
-			// case below can dump the raw bytes for offline reverse-engineering.
-			// This is the data starting at the 4-byte iirLength header. ToArray() returns the whole body window
-			// regardless of the cursor, so it is safe to take after the shared reader arrives positioned at 0.
+			// Snapshot the whole 0x2000 sub-payload before consuming it, so every case below can read the raw bytes.
+			// This starts at the 4-byte iirLength header; ToArray() returns the whole body window regardless of the
+			// cursor, so it is safe to take after the shared reader arrives positioned at 0.
 			var rawPayload = body.ToArray();
 
 			var iirLength = body.ReadUInt32();
 			var iirType = body.ReadUInt32<IirTypes>();
 
-			// /char (#914): retail's per-character packet trace. One flagged character is logged at information
-			// level while everyone else stays at debug, which is what makes it usable on a populated server - the
-			// alternative is raising the whole log and drowning in it.
+			// The .char per-character packet trace. One flagged character logs at information level while everyone
+			// else stays at debug, which is what keeps it usable on a populated server.
 			if (client.Session.LogAllIirs)
 				Logger.LogInformation("GameServer [.char] {Character:X8} <- {Iir} ({Length} bytes) raw={Raw}",
 					client.Session.Character?.Id ?? 0, iirType, rawPayload.Length, Convert.ToHexString(rawPayload));
@@ -61,7 +59,7 @@ namespace Faolan.GameServer
 			{
 				case IirTypes.CombatReactiveIIR:
 				{
-					// Spellweave ADD-COMPONENT (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier
+					// Spellweave add-component (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier
 					// carrying the componentIndex in the element list, and a 0x02-tagged ack twin whose list is empty.
 					// CombatReactiveCodec reads both - the c2s add and the s2c element list are one grammar.
 					var reactive = CombatReactiveCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
@@ -103,11 +101,9 @@ namespace Faolan.GameServer
 
 				case IirTypes.CharInPlayIIR: //peer0_160
 				{
-					// CharInPlayIIR ("ReadyForPlayScreen") means something different per connection ROLE, so it routes on
-					// EntryMode - the role decided once at Authenticate2 - and handles every mode explicitly (#432).
-					// It used to be an if/else chain over derived booleans whose final `else` was the login path, so a
-					// mode nobody thought about became a login: that is how a create-world connection ended up being
-					// told it was a "changemap/teleport reconnect" in the middle of character creation.
+					// CharInPlayIIR ("ReadyForPlayScreen") means something different per connection role, so it routes on
+					// EntryMode - the role decided once at Authenticate2 - and every mode is handled explicitly. A mode
+					// with no branch must be reported, never silently treated as a login.
 					switch (client.Session.EntryMode)
 					{
 						case WorldEntryMode.CreateEditor:
@@ -122,7 +118,7 @@ namespace Faolan.GameServer
 
 						case WorldEntryMode.CreateWorld:
 						{
-							// The post-creation world connection. Retail answers THIS CharInPlayIIR with the ready
+							// The post-creation world connection. Retail answers this CharInPlayIIR with the ready
 							// burst and then the intro (c2s fr317 -> s2c 0x2024 fr324 -> s2c cutscene fr325); earlier
 							// than this - e.g. off a 0x2020 poll while the intro runs - and the player gets a blue
 							// screen instead of a cutscene.
@@ -136,7 +132,7 @@ namespace Faolan.GameServer
 						case WorldEntryMode.TeleportReentry:
 						case WorldEntryMode.Login:
 						{
-							// A changemap/teleport reconnect carries NO 0x205F, so the client uses CharInPlayIIR as its
+							// A changemap/teleport reconnect carries no 0x205F, so the client uses CharInPlayIIR as its
 							// ready signal instead of the 0x2020 poll a normal login flushes on. Flushing the armed
 							// follow-up here is what drops the loading screen into the world; Login shares the branch
 							// because the flush no-ops unless something armed it.
@@ -147,8 +143,8 @@ namespace Faolan.GameServer
 
 						default:
 						{
-							// A mode added without deciding what this signal means for it. Say so - the old `else`
-							// silently treated it as a login, which is exactly how this handler kept regressing.
+							// A mode added without deciding what this signal means for it. Report it rather than
+							// guessing a ready sequence.
 							Logger.LogError("CharInPlayIIR on an unhandled entry mode {Mode}: no ready sequence was sent, so this client will sit on its loading screen.", client.Session.EntryMode);
 							break;
 						}
@@ -159,9 +155,9 @@ namespace Faolan.GameServer
 
 				case IirTypes.KnubotAnswerIIR:
 				{
-					// The player picked a dialogue option. The pick is an ordinary Knubot record - KnubotBase header
-					// then the chosen option INDEX (#534) - and the index selects the branch, so route to the child
-					// screen at the extended answer-path (AdvanceConversation). No active conversation -> no-op.
+					// The player picked a dialogue option. The pick is an ordinary Knubot record - KnubotBase header then
+					// the chosen option index - and the index selects the branch, so route to the child screen at the
+					// extended answer path (AdvanceConversation). No active conversation means no-op.
 					if (KnubotCodec.Parse(rawPayload.AsSpan(sizeof(uint))) is KnubotAnswerIIR pick)
 						await _conversation.AdvanceConversation(client, pick.Index);
 
@@ -170,11 +166,10 @@ namespace Faolan.GameServer
 
 				case IirTypes.KnubotCloseChatWindowIIR:
 				{
-					// The player closed the NPC chat window (ESC/X). The client signals this with its OWN
-					// KnubotCloseChatWindow (the client double-sends it); retail just accepts it. We must tear down the
-					// conversation session state so the dialogue stays closed - leaving it set let the next interaction
-					// re-enter a stale conversation, and the unknown-opcode default path also spammed a system message
-					// on every close (#217). No reply: the window is already closed on the client.
+					// The player closed the NPC chat window (ESC/X). The client signals this with its own
+					// KnubotCloseChatWindow, which it double-sends; retail just accepts it. The conversation session state
+					// must be torn down here so the dialogue stays closed - left set, the next interaction re-enters a
+					// stale conversation. No reply: the window is already closed on the client.
 					ConversationService.EndConversation(client);
 					break;
 				}
@@ -185,7 +180,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case IirTypes.CharacterActionIIR: // Also received when Activating feat point ??
+				case IirTypes.CharacterActionIIR:
 				{
 					// Standard IIR carrier head: [u32 entity class][u32 handle]. Corpus (21 c2s CharacterActionIIRs,
 					// every one on quit) continues [u32 0][u8 0x21][24 zero bytes] - the same [u32 0][u8 code] slot
@@ -195,8 +190,7 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("GameServer close request for character {CharacterId}", clientInst.ToHex());
 
-					// is handled in ClientDisconnected
-					//account.Character.SaveDataToDatabase(Database);
+					// The character is persisted in ClientDisconnected, not here.
 					break;
 				}
 
@@ -208,12 +202,12 @@ namespace Faolan.GameServer
 					// On deselect the target tag+handle are zeroed. Decoded from
 					// Hoxxling_mage-heraldofxotli_login_gameplay (frames 259 select / 362 deselect).
 					// LookAtCodec reads the whole 29-byte record, so the deselect (both target words zeroed) and a live
-					// select come off the same reader instead of a `>= 17` guard plus a fixed offset 13.
+					// select come off the same reader.
 					var lookAt = LookAtCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
 
 					var targetHandle = lookAt.Target;
 					client.Session.SelectedTargetHandle = targetHandle;
-					// #217: a (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
+					// A (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
 					// deliberate re-talk opens (the reflexive post-close greeting carries no SelectDeselect).
 					client.Session.ConversationEndedNpcHandle = null;
 
@@ -224,9 +218,9 @@ namespace Faolan.GameServer
 
 				case IirTypes.DeleteItemIIR:
 				{
-					// ProtoDeleteItemIIR, NOT the sibling move message: { container_id, item_pos, template_id }. The
-					// two alias on the wire for fields 1-3, so this parsed as a move for a long time and quietly read
-					// the item TEMPLATE id as a destination container - see DeleteItemCodec.
+					// ProtoDeleteItemIIR, not the sibling move message: { container_id, item_pos, template_id }. The two
+					// alias on the wire for fields 1-3, so reading this record as a move silently takes the item template
+					// id for a destination container. See DeleteItemCodec.
 					var drop = DeleteItemCodec.Parse(body.ReadRemainingArray()).Delete;
 
 					Logger.LogInformation($"DropItem: {drop}");
@@ -234,9 +228,9 @@ namespace Faolan.GameServer
 					// Remove the dropped item from the persisted bag so it doesn't reappear on relog.
 					await _equipment.PersistDropItem(client, drop);
 
-					// Push the LIVE remove so the open bag updates without a relog (#230): the DropItem opcode has no
-					// implicit client-side removal, so without this the dropped item stays visible until next login.
-					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
+					// Push the live remove so the open bag updates without a relog: the DropItem opcode has no implicit
+					// client-side removal, so without this the dropped item stays visible until the next login. Same
+					// DispatchRemoveItem (0x201F) the .removeitem GM path and RemoveItemFromBackpack use.
 					if (drop?.ContainerId?.Type == (uint)ContainerKind.Bag)
 						await EconomyOutbound.SendRemoveItem(client, (ContainerKind)drop.ContainerId.Type, (uint)drop.ItemPos);
 
@@ -247,18 +241,16 @@ namespace Faolan.GameServer
 				{
 					// The recovered client schema names this message ProtoMoveInventoryItemIIR:
 					//   { source_container_id, source_item_pos, destination_container_id, destination_item_pos }
-					// where each container id is a ProtoID32 { type, instance }. This resolves the old research note
-					// that the reference's second value (reused across sibling container blocks 101/104/112/113 in
-					// the 0x737A6DF9 field-6 chain) "behaves like a container-owner handle" - it is the container's
-					// ProtoID32.instance, not a per-item id. No server->client packet follows these moves.
+					// where each container id is a ProtoID32 { type, instance }; the instance is the container's owner
+					// handle, not a per-item id. No server->client packet follows these moves.
 
 					var move = MoveInventoryItemCodec.Parse(body.ReadRemainingArray()).Move;
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 
-					// A move with the GUILD BANK vault (kind 109) on either end is the same drag, but it changes the
-					// item's OWNER rather than its cell - so it cannot go through PersistInventoryMove, whose every
-					// query is scoped to this character (#654). It also has a reply, which no ordinary move does.
+					// A move with the guild bank vault (kind 109) on either end is the same drag, but it changes the
+					// item's owner rather than its cell - so it cannot go through PersistInventoryMove, whose every query
+					// is scoped to this character. It also has a reply, which no ordinary move does.
 					if (GuildBankService.IsVaultMove(move))
 					{
 						await _guildBank.Move(client, move);
@@ -279,21 +271,16 @@ namespace Faolan.GameServer
 
 				case IirTypes.QuestIIR:
 				{
-					// The client's OWN copy of the record the server sends as QuestIIR (QuestCodec.Build) - same
-					// grammar, other direction: [u32 entity class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0].
-					// The client names this method "DeleteQuest" (QuestIIR_c, docs/protocol/gen/iir-types.md) and sends it
-					// with state = QuestCodec.StateCompleted when the player drops a quest from the journal. THREE corpus
+					// The client's own copy of the record the server sends as QuestIIR (QuestCodec.Build) - same grammar,
+					// other direction: [u32 entity class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0]. The
+					// client names this method "DeleteQuest" (QuestIIR_c, docs/protocol/gen/iir-types.md) and sends it with
+					// state = QuestCodec.StateCompleted when the player drops a quest from the journal. Three corpus
 					// instances: two in the Hakotep "delete-quests" capture (quest 0x388F and 0x3919) and one in
-					// chat-annotated-4, where the player deletes quest 15051 to make journal room for a group-finder
-					// signup that had just been refused for having too many quests.
+					// chat-annotated-4, where the player deletes quest 15051 to make journal room for a group-finder signup
+					// that had just been refused for holding too many quests.
 					//
-					// ⚠️ State 4 c2s is NOT a completion, and the corpus is unambiguous about it: c2s carries state 4
-					// and nothing else, while s2c carries 2 (x47) and 4 (x50). The code is the slot; the direction is
-					// the meaning.
-					//
-					// NB the old read was [u32][u32][u8][u32][u32] - one byte early from the [u32 0][u8 01] pair onward. It
-					// still landed on the right questId (the misalignment is self-cancelling across those five bytes), which
-					// is exactly why it went unnoticed.
+					// State 4 c2s is not a completion: c2s carries state 4 and nothing else, while s2c carries 2 (x47) and
+					// 4 (x50). The code is the slot; the direction is the meaning.
 					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var clientInst = body.ReadUInt32();
 					body.ReadUInt32(); // [12..16] = 0, as in BuildQuestIir
@@ -302,26 +289,25 @@ namespace Faolan.GameServer
 					var questId = body.ReadUInt32();
 					body.ReadUInt32(); // trailing 0
 
-					// Retail's answer is the SAME record echoed back, byte for byte, one frame later - both captured
+					// Retail's answer is the same record echoed back, byte for byte, one frame later - both captured
 					// deletes show c2s -> s2c with an identical body (frames 3937/3938 and 3975/3976). So the drop is
-					// confirmed by the echo, not by a bespoke reply. Send it BEFORE the delete so the client is answered
+					// confirmed by the echo, not by a bespoke reply. Send it before the delete so the client is answered
 					// even if persistence throws.
 					await QuestBroadcaster.SendQuestIir(client, questId, state);
 					await Database.RemoveCharacterQuest(client.Session.Character!.Id, questId); // a QuestIIR only arrives from a character in the world
-					_questBroadcaster.ForgetMarkerContext(client.Session.Character.Id); // #939
+					_questBroadcaster.ForgetMarkerContext(client.Session.Character.Id);
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
 
-					// ⭐ Retail's THIRD packet in the same frame: a MainQuestUpdateIIR (0x504B7924) refreshing the
-					// J-panel (#482). It is NOT the "shorter variant we cannot build" it was read as from two samples -
-					// it is the ordinary record with `Operation = Remove` and an empty list, which
-					// `MainQuestUpdateCodec` already writes byte-for-byte (see `SendQuestLogRemove`).
+					// Retail's third packet in the same frame: a MainQuestUpdateIIR (0x504B7924) refreshing the J-panel.
+					// It is the ordinary record with `Operation = Remove` and an empty list, which `MainQuestUpdateCodec`
+					// writes byte-for-byte (see `SendQuestLogRemove`).
 					//
-					// ⚠️ Sent only when the dropped quest was the LAST active one in its line. Every one of the six
-					// captured Removes names a line whose section is going away - two are these deletes, and the rest
-					// are a zone change out of the area - so "the line still has quests" is a case the corpus does not
-					// cover. Guessing there risks hiding entries that should still show, which is worse than the stale
-					// panel this replaces; the journal is correct on the next login either way.
+					// Sent only when the dropped quest was the last active one in its line. Every one of the six captured
+					// Removes names a line whose section is going away - two are these deletes, the rest a zone change out
+					// of the area - so "the line still has quests" is a case the corpus does not cover, and widening the
+					// condition risks hiding entries that should still show. The journal is correct on the next login
+					// either way.
 					var droppedDef = await Database.GetQuestDefinition(questId);
 					if (droppedDef != null)
 					{
@@ -336,7 +322,7 @@ namespace Faolan.GameServer
 				case IirTypes.CoreClaimIIR:
 				{
 					// The Claims/Redeem window: sub 0x0007 requests the list, sub 0x0003 redeems a claim. See
-					// GameServerListener.Claims.cs / docs/subsystems/item-claims.md.
+					// Economy/ClaimService.cs and docs/subsystems/item-claims.md.
 					await _claims.HandleCoreClaim(client, body);
 
 					break;
@@ -344,9 +330,9 @@ namespace Faolan.GameServer
 
 				case IirTypes.QuestRewardSelectionIIR:
 				{
-					// The player picked one of the rewards a completing quest offered (#815). The body names its own
-					// quest, so QuestRewardService re-checks that this character actually completed it and has not
-					// already been rewarded - the packet is not evidence of either.
+					// The player picked one of the rewards a completing quest offered. The body names its own quest, so
+					// QuestRewardService re-checks that this character actually completed it and has not already been
+					// rewarded - the packet is not evidence of either.
 					var pick = QuestRewardSelectionCodec.Parse(body.ToArray());
 					await _questRewards.TryGrant(client, pick.QuestId, pick.Index);
 
@@ -355,8 +341,8 @@ namespace Faolan.GameServer
 
 				case IirTypes.FeatIIR:
 				{
-					// Feat TRAIN: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See
-					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
+					// Feat train: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See
+					// Feats/FeatService.cs and docs/subsystems/feats.md.
 					await _feats.HandleFeatTrain(client, rawPayload);
 
 					break;
@@ -364,9 +350,8 @@ namespace Faolan.GameServer
 
 				case IirTypes.SkillIIR:
 				{
-					// Skillpoint SPEND (#739): a (statId, delta) list moving points out of the SkillPoints pool into
-					// a skill. Answered with the two ordinary StatIIR records retail sends - see
-					// Progression/SkillPointService.cs.
+					// Skillpoint spend: a (statId, delta) list moving points out of the SkillPoints pool into a skill.
+					// Answered with the two ordinary StatIIR records retail sends - see Progression/SkillPointService.cs.
 					await _skillPoints.HandleAdjustSkill(client, SkillCodec.Parse(rawPayload.AsSpan(sizeof(uint))));
 
 					break;
@@ -378,8 +363,8 @@ namespace Faolan.GameServer
 					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
 					// TradeskillRecipeCodec / docs/subsystems/tradeskill-recipes.md.
 					//
-					// The request carries a handle, an env byte and a version, and NOTHING else - parsed rather than
-					// discarded so a request that ever did carry a recipe id would fail loudly here (#148).
+					// The request carries a handle, an env byte and a version, and nothing else - parsed rather than
+					// discarded so a request that ever did carry a recipe id would fail loudly here.
 					var tradeskill = TradeskillRequestCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
 
 					Logger.LogDebug("TradeskillRequestIIR from handle 0x{Handle:X8} (env {Env}) - sending the recipe book.", tradeskill.Handle, tradeskill.Env);
@@ -391,24 +376,24 @@ namespace Faolan.GameServer
 
 				case IirTypes.UpdateInventoryIIR:
 				{
-					// c2s UpdateInventoryIIR is a PROBE, not a request that wants an answer: as an entity streams in
+					// c2s UpdateInventoryIIR is a probe, not a request that wants an answer: as an entity streams in
 					// the client fires a pair asking for that entity's Equipped(101) then Bag(104) container -
 					//   [handle][env 00][u32 pbLen][ProtoInventoryGame { 1: { 1: kind, 2: handle } }]
 					// where the protobuf's inner id is the carrier handle again. It rides the same streaming burst as
 					// UpdateQuestMarkerNPC + RequestAggroStatus on that handle.
-					// Retail NEVER answers it: across all 104 captures there are 34 c2s and 2 s2c, and the 2 s2c are an
-					// UNSOLICITED push of the player's OWN containers after an equip change (a RemoveItem, in
+					// Retail never answers it: across all 104 captures there are 34 c2s and 2 s2c, and the 2 s2c are an
+					// unsolicited push of the player's own containers after an equip change (a RemoveItem, in
 					// Hoxxling_mage-heraldofxotli_login_gameplay2 frame 5118) - zero of the 34 requests draw a reply.
 					// Visible gear already arrives with the spawn snapshot, so drop it quietly like the teleport acks
 					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
 					// UpdateInventory, currently emitted nowhere).
 
-					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), probe.Length);
+					Logger.LogDebug("GameServer 0x2000 inventory probe");
 
 					break;
 				}
 
-				// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes the
+				// After the player is relocated on resurrect (IntendedTeleport + n3Teleport) the client echoes the
 				// teleport records back. Benign acks with no reply owed - handled here purely so they do not reach the
 				// default branch's "Unknown 0x2000 Opcode" system message.
 				case IirTypes.N3TeleportIIR:
@@ -418,7 +403,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// The client REPORTS how much shadow it is standing in - only it can compute that, since it owns the
+				// The client reports how much shadow it is standing in - only it can compute that, since it owns the
 				// lighting and the geometry, and its own `GameCode/Hiding` channel logs the same number as
 				// `ShadowCoverage = <n>`. Retail echoes the record straight back with the env byte cleared, which is
 				// what both captured exchanges show (client env 0x01 -> server env 0x00), so that is what we do.
@@ -428,21 +413,21 @@ namespace Faolan.GameServer
 					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
 					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
 					await WorldIir.Send(client, SetShadowCoverageCodec.Build(shadow.Handle, shadow.Percent));
-					// Remembered for the hide stance (#505): retail carries this number in the hide-enter behaviour's
-					// tail, and the client reports it BEFORE pressing hide, so the two are separate arrivals.
+					// Remembered for the hide stance: retail carries this number in the hide-enter behaviour's
+					// tail, and the client reports it before pressing hide, so the two are separate arrivals.
 					if (_simulation.PlayerWorldEntity(client) is { } shadowed)
 						shadowed.ShadowCoverage = shadow.Percent;
 					break;
 				}
 
-				// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
-				// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains one -
-				// so report the parsed command rather than inventing a reply (#448/#449).
+				// A GM command in the client sends FanaticCommandIIR ("Fanatic" is the client's own name for the GM
+				// subsystem). What it asked for is readable, but the reply is not decoded - no corpus capture contains
+				// one - so the parsed command is reported rather than answered with an invented record.
 				case IirTypes.FanaticCommandIIR:
 				{
-					// The codec's Parse is strict (#530 rule 4); on an undecoded inbound path that means reporting the
-					// failure to the GM rather than acting on a half-read record. `rawPayload` is the framed record, so
-					// the body starts past its u32 length.
+					// The codec's Parse is strict; on an undecoded inbound path that means reporting the failure to the GM
+					// rather than acting on a half-read record. `rawPayload` is the framed record, so the body starts past
+					// its u32 length.
 					FanaticCommandIIR f;
 					try
 					{
@@ -461,14 +446,13 @@ namespace Faolan.GameServer
 					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA:X8},{TargetB:X8}) ({RawLength} bytes) raw={Raw}",
 						f.Text, f.Word0, f.TargetA, f.TargetB, rawPayload.Length, Convert.ToHexString(rawPayload));
 
-					// The client's own GM commands run through the SAME table as our `.` ones: the command is entirely
-					// in the text (`word0` is a constant 2), and it arrives as "/verb args" - the exact shape
-					// HandleGmCommand already parses. So `/teleport` reaches the same implementation as `.teleport`,
-					// and every command we add is reachable both ways (#448).
+					// The client's own GM commands run through the same table as the `.` ones: the command is entirely in
+					// the text (`word0` is a constant 2) and arrives as "/verb args", the shape the GM command table
+					// parses, so `/teleport` reaches the same implementation as `.teleport`.
 					//
-					// Still gated server-side on the account: the client only OFFERS these when gm_level is non-zero,
-					// but that is a value we send it, so it cannot be the authority on who may run them.
-					// ⚠️ The account's GM state, NOT its WebAccountType - that governs the admin site and nothing here.
+					// Still gated server-side on the account: the client only offers these when gm_level is non-zero, but
+					// that is a value the server sends it, so it cannot be the authority on who may run them. The gate is
+					// the account's GM state, not its WebAccountType - that governs the admin site and nothing here.
 					if (!client.Session.Account!.IsGm)
 					{
 						Logger.LogWarning("FanaticCommandIIR '{Text}' from non-GM account {Account} ignored.", f.Text, client.Session.Account.Id);
@@ -487,10 +471,10 @@ namespace Faolan.GameServer
 				{
 					var data = body.ReadRemainingArray();
 
-					// The ONE sub-opcode that cannot be a case label: in-world the client streams 0x2000 packets whose
-					// sub-opcode is its OWN instance id (the client-instance ack/keepalive stream). Since the create flow
-					// started using the real character id that value is DYNAMIC, not a constant, so it can only be
-					// matched here. Treat it as a benign ping: log quietly, don't spam system messages.
+					// The one sub-opcode that cannot be a case label: in-world the client streams 0x2000 packets whose
+					// sub-opcode is its own instance id (the client-instance ack/keepalive stream). That value is the live
+					// character id, so it can only be matched here. Treat it as a benign ping: log quietly rather than
+					// answering with a system message.
 					if (client.Session.Character is { } self && (uint)iirType == self.Id)
 					{
 						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), rawPayload.Length);
@@ -506,7 +490,9 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// GameAgent (connection-class) dispatch: auth / chat / ping / server-stats. Routed here by receiver class.
+		/// <summary>
+		///     GameAgent (connection-class) dispatch: auth, chat, ping and server stats. Routed here by receiver class.
+		/// </summary>
 		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var method = (GameAgentMethods)packet.Method;
@@ -539,13 +525,13 @@ namespace Faolan.GameServer
 
 				case GameAgentMethods.ChatVicinity:
 				{
-					// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
-					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
+					// 0x2002 = GameAgent.ChatVicinity (typed chat, and the carrier for GM commands). The
+					// GameCharAgent.RequestBindLocation collision on this opcode is resolved by the class-first route.
 					LogPacketBodyDebug("GameServer ChatCommand body", body.ToArray());
 
 					// GameAgent.ChatVicinity(const ID32& cSenderID, int nMode, BinaryStream& cMsg) - the client's own
 					// signature (docs/re/aoc-client-rpc-methods.json), matched against the corpus:
-					//   [u32 senderClass][u32 senderHandle]   the ID32; USUALLY {0,0} (the client leaves the sender for
+					//   [u32 senderClass][u32 senderHandle]   the ID32; usually {0,0} (the client leaves the sender for
 					//                                         the server to fill), occasionally {0xC350, ownHandle}
 					//   [u32 nMode]                           chat mode; 0 for plain /say in every captured packet
 					//   [u32 msgLen][ string text ][u8 0]     the BinaryStream, u32-length-framed, holding the wire
@@ -576,8 +562,10 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// GameCharAgent dispatch: the 0x2002/0x2003 collision forms (bind/tutorial) + every per-character method
-		// (loot / shop / respawn / shortcut / latency / ...). Routed here by receiver class from ReceivedPacket.
+		/// <summary>
+		///     GameCharAgent dispatch: the 0x2002/0x2003 collision forms (bind and tutorial) plus every per-character
+		///     method (loot, shop, respawn, shortcut, latency, ...). Routed here by receiver class from ReceivedPacket.
+		/// </summary>
 		private async Task HandleGameCharAgentPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var method = (GameCharAgentMethods)packet.Method;
@@ -586,8 +574,8 @@ namespace Faolan.GameServer
 
 			switch (method)
 			{
-				// --- player trade (#101). The request itself arrives as a BCC (UseCharacter 0x16 at a PLAYER), handled above;
-				// everything from the window opening onward is these five methods. ------------------------------------
+				// Player trade. The request itself arrives as a BCC (UseCharacter 0x16 at a player), handled elsewhere;
+				// everything from the window opening onward is these five methods.
 				case GameCharAgentMethods.StartTrade: // 0x2065 - the TARGET opens the window, creating the session
 				{
 					await _trade.Start(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
@@ -600,7 +588,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x2068 - the SAME method index as the s2c DispatchRequestTrade, on the other interface.
+				// 0x2068 - the same method index as the s2c DispatchRequestTrade, on the other interface.
 				case GameCharAgentMethods.AddTradeItem:
 				{
 					var request = AddTradeItemCodec.Parse(body.ReadRemainingArray());
@@ -623,7 +611,8 @@ namespace Faolan.GameServer
 
 				// 0x206C AbortTrade (empty) and 0x2066 DeclineTrade([ID32]) - the cancel, and refusing the request before
 				// the window opens. Both end the session; neither has moved anything, since the exchange only happens on
-				// the double accept. What the server owes the PARTNER to close THEIR window is not known - see #427.
+				// the double accept. What the server owes the partner to close their window is not decoded.
+				// Open work tracked in Gitea #427.
 				case GameCharAgentMethods.AbortTrade:
 				{
 					_trade.Abandon(client.Session.Character.Id);
@@ -637,20 +626,20 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x2011 GuildTransferMoney([u64 guildInstance][u64 amount]): a member pays money INTO the guild bank
-				// (#654). It arrives HERE rather than on the CS tier because the wallet lives here; `Guild.Cash` lives
-				// on the CS tier, so the guild is credited across the dispatcher seam.
+				// 0x2011 GuildTransferMoney([u64 guildInstance][u64 amount]): a member pays money into the guild bank.
+				// It arrives on this tier rather than the CS tier because the wallet lives here; `Guild.Cash` lives on
+				// the CS tier, so the guild is credited across the dispatcher seam.
 				//
-				// The wallet is debited FIRST and refunded if the credit fails, which is the same pessimistic order
-				// the withdrawal uses in the other direction: whoever holds the money moves it first, so a failure
-				// between the two steps loses the transfer rather than duplicating it (#368).
+				// The wallet is debited first and refunded if the credit fails, which is the same pessimistic order the
+				// withdrawal uses in the other direction: whoever holds the money moves it first, so a failure between
+				// the two steps loses the transfer rather than duplicating it.
 				case GameCharAgentMethods.GuildTransferMoney:
 				{
 					await _guildBank.HandleGuildDeposit(client, GuildTransferMoneyCodec.Parse(body.ReadRemainingArray()));
 					break;
 				}
 
-				// 0x2008 LeaveTeam (no body): a DIFFERENT interface's method 0x2008 than the CS tier's AcceptTeamInvite -
+				// 0x2008 LeaveTeam (no body): a different interface's method 0x2008 than the CS tier's AcceptTeamInvite -
 				// method indices are per interface, so the number collision is expected and must not be unified.
 				case GameCharAgentMethods.LeaveTeam:
 				{
@@ -674,15 +663,14 @@ namespace Faolan.GameServer
 					if (await Database.GetCharacter(subject.CharacterId) is { } character)
 						// Two things about the header, both of which cost an invite window when missed:
 						//
-						// The SENDER is the GameCharAgent object (f683: class GameCharAgent, instance 0x10), not the
+						// The sender is the GameCharAgent object (f683: class GameCharAgent, instance 0x10), not the
 						// world sender this file usually replies from - a reply belongs to the interface pair its
 						// request arrived on.
 						//
 						// And it carries the trailing headerData 0x01, as KeepAliveService's DispatchPong on this same
 						// interface does. Retail puts it on this reply (f682 and f683 both carry it) while the CS-tier
-						// invite dispatches carry none, and the client DISCARDS the reply without it: it accepted our
-						// invite record, echoed it back in RequestTeamInvite, and then never raised the window - and
-						// still did not when fed retail's own captured bytes, because the bytes were never the problem.
+						// invite dispatches carry none; without it the client discards the reply and never raises the
+						// invite window, whatever the body says.
 						await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 							GameCharInterfaceMethods.DispatchReplyTeamInvite,
 							ReplyTeamInviteCodec.Build(TeamMemberRecord.FromCharacter(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
@@ -698,16 +686,15 @@ namespace Faolan.GameServer
 
 				// 0x2003 SetTutorialStats(int nValue): the client naming a Tortage tutorial hint it has just shown.
 				//
-				// It is a hint ID, not a progress ordinal (#461). Filtered to the GameCharAgent receiver class - 0x2003
-				// collides with a GameAgent method that carries a character id, which is what made the values look
-				// bimodal - the captures give 22 distinct values, all in 0..47, and they are NOT monotone: each session
-				// reports only the hints newly seen in it. Faolanx sends {45,15,16,46}, then {29,30,31,13}, then
-				// {10,28} across three logins. So the client keeps its own cumulative set and tells us the deltas.
+				// The value is a hint id, not a progress ordinal, and the case must stay filtered to the GameCharAgent
+				// receiver class - 0x2003 collides with a GameAgent method that carries a character id. The captures
+				// give 22 distinct values, all in 0..47, and they are not monotone: each session reports only the hints
+				// newly seen in it (one character sends {45,15,16,46}, then {29,30,31,13}, then {10,28} across three
+				// logins), so the client keeps its own cumulative set and sends the deltas.
 				//
-				// We accumulate them into Character.TutorialStepsSeen, a bitmask. NO reply: the client's own method
-				// catalog has no s2c counterpart, so this is a one-way notification and there is nothing to answer
-				// with - which is also why storing it cannot fix "lost on a fresh client" on its own. See the column's
-				// comment.
+				// They accumulate into Character.TutorialStepsSeen, a bitmask. No reply: the client's method catalog
+				// has no s2c counterpart, so this is a one-way notification - which is also why storing it cannot on
+				// its own restore the hints on a fresh client. See the column's comment.
 				case GameCharAgentMethods.SetTutorialStats:
 				{
 					var tutorialStep = body.ReadUInt32();
@@ -715,8 +702,8 @@ namespace Faolan.GameServer
 
 					if (tutorialStep >= 64)
 					{
-						// Every observed id is in 0..47. A wider one would silently shift out of the mask, so say so
-						// rather than drop it: it means the id space is bigger than the captures showed.
+						// Every observed id is in 0..47. A wider one would silently shift out of the mask, so it is
+						// reported rather than dropped: it means the id space is bigger than the captures showed.
 						Logger.LogWarning("SetTutorialStats id {Step} is outside the 0..63 the bitmask holds; not recorded (#461).", tutorialStep);
 						return;
 					}
@@ -732,14 +719,15 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				// --- #463: opcodes that used to fall through to the unhandled default. Each one's grammar is the
-				// client's own signature (docs/re/aoc-client-rpc-methods.json), confirmed against the corpus. ------
+				// Each opcode below takes its grammar from the client's own signature
+				// (docs/re/aoc-client-rpc-methods.json), confirmed against the corpus.
 
-				// 0x2001 RequestCharName(ID32::InstanceType nCharID): resolve a bare character INSTANCE (no class word -
+				// 0x2001 RequestCharName(ID32::InstanceType nCharID): resolve a bare character instance (no class word -
 				// that is what `ID32::InstanceType` means, and the captured body is 4 bytes) to a display name. Reply is
 				// DispatchCharacterNameReply(i_cCharID, i_cName); the `i_c` prefix makes cCharID a full ID32, so it goes
-				// back out as [class][instance]. No capture of the reply - built from the signature, NEEDS in-client
-				// verification. Silence for an unknown id, rather than a placeholder name that would look real.
+				// back out as [class][instance]. No capture of the reply - it is built from the signature and still
+				// needs in-client verification. Silence for an unknown id, rather than a placeholder name that would
+				// look real.
 				case GameCharAgentMethods.RequestCharName:
 				{
 					var subjectId = body.ReadUInt32();
@@ -753,19 +741,8 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x203B ScryMessageBoxAnswer(int nAnswer, int nScriptThreadCtxId, uint64 nCtxCookie): the player
-				// answered a scry-script message box. Capture-verified as a pure ECHO pair - in all nine captures the
-				// answer repeats the DispatchScryShowMessageBox (0x205E) context word-for-word and adds the button
-				// index, e.g. show `...0024f5f7 0000 000000005a4db7a0` -> answer `00000001 0024f5f7 000000005a4db7a0`.
-				// Every captured answer is 1 (confirm) - no capture declines one.
-				//
-				// ⚠️ NOT local travel (#514). The captured box that reads "Do you want to travel to Ymir's Pass?"
-				// belongs to the ZONE-LINE DOOR the player selects, not to the wagoneer they rode half a minute
-				// earlier - the wagoner trip teleports straight off the destination pick with no box at all. So the
-				// only box we raise is the zone-line one (#637), and the echo is what resumes its trip: no server-side
-				// script thread is involved, here or in retail.
-				// #821: the player accepted the ACG instance bind box. There is no decline - sending this IS the yes -
-				// so the only thing to check is that we actually offered it. The body carries the destination proxy and
+				// The player accepted the ACG instance bind box. There is no decline - sending this is the yes - so the
+				// only thing to check is that the box was actually offered. The body carries the destination proxy and
 				// nothing else: no character, no door, so without the pending offer any client could name any map.
 				case GameCharAgentMethods.RequestACGTeleport:
 				{
@@ -787,6 +764,17 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// 0x203B ScryMessageBoxAnswer(int nAnswer, int nScriptThreadCtxId, uint64 nCtxCookie): the player
+				// answered a scry-script message box. Capture-verified as a pure echo pair - in all nine captures the
+				// answer repeats the DispatchScryShowMessageBox (0x205E) context word-for-word and adds the button
+				// index, e.g. show `...0024f5f7 0000 000000005a4db7a0` -> answer `00000001 0024f5f7 000000005a4db7a0`.
+				// Every captured answer is 1 (confirm); no capture declines one.
+				//
+				// This is not the local-travel confirmation. The captured box that reads "Do you want to travel to
+				// Ymir's Pass?" belongs to the zone-line door the player selects, not to the wagoneer they rode half a
+				// minute earlier - a wagoner trip teleports straight off the destination pick with no box at all. The
+				// only box raised here is the zone-line one, and the echo is what resumes its trip: no server-side
+				// script thread is involved, here or in retail.
 				case GameCharAgentMethods.ScryMessageBoxAnswer:
 				{
 					var reply = ScryMessageBoxAnswerCodec.Parse(body.ReadRemainingArray());
@@ -801,11 +789,10 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					// ⚠️ ZERO is the decline, not "anything but 1". `Answer` is the OPTION INDEX (#511): the corpus
-					// carries a `2` on the same box a `1` appears on, and it is a CONFIRM of the second button -
-					// retail's difficulty picker, "energed normal instance" against "enered epic instance", both
-					// followed by the redirect that enters the zone. Our boxes offer one destination and no
-					// difficulty, so any non-zero option means the same trip; testing `!= 1` would have dropped it.
+					// Zero is the decline, not "anything but 1": `Answer` is the option index. The corpus carries a
+					// `2` on the same box a `1` appears on, and it is a confirm of the second button - retail's
+					// difficulty picker, "energed normal instance" against "enered epic instance", both followed by
+					// the redirect that enters the zone. Every non-zero option therefore means the trip is accepted.
 					if (reply.Answer == ScryMessageBoxAnswerCodec.Decline)
 					{
 						Logger.LogInformation("Character {CharacterId} declined the trip to map {MapId}.", client.Session.Character.Id, pending.DestinationMapId);
@@ -813,10 +800,10 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					// #309: the SECOND button of the client's own difficulty picker is EPIC - the client renders the
+					// The second button of the client's own difficulty picker is epic - the client renders the
 					// normal/epic buttons itself on a destination that has an epic mode (the captured Spider Caverns
 					// shows are byte-identical in shape to every plain travel box), so honouring the index is all the
-					// server does. Any option past 2 still travels (normal), logged so an unmodelled picker shows up.
+					// server does. Any option past 2 still travels as normal, logged so an unmodelled picker shows up.
 					var epic = reply.Answer == ScryMessageBoxAnswerCodec.ConfirmSecondOption;
 					if (reply.Answer != ScryMessageBoxAnswerCodec.Confirm)
 						Logger.LogInformation("ScryMessageBoxAnswer chose option {Answer} for the trip to map {MapId}{Epic}.", reply.Answer,
@@ -848,7 +835,7 @@ namespace Faolan.GameServer
 				}
 
 				// 0x2050 ShareQuestDeclined / 0x2052 ShareQuestBusy ([ID32 requester]): the target pressed No, or their
-				// client would not raise the window. The body names the REQUESTER, but who gets told is taken from our
+				// client would not raise the window. The body names the requester, but who gets told is taken from our
 				// own pending map - the same rule the team accept and the trade start follow - so the echo is read only
 				// to keep the body accounted for.
 				case GameCharAgentMethods.ShareQuestDeclined:
@@ -859,7 +846,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x2051 ShareQuestAccepted(InstanceID_t): the target pressed Yes. `InstanceID_t` is ONE u32 on the wire
+				// 0x2051 ShareQuestAccepted(InstanceID_t): the target pressed Yes. `InstanceID_t` is one u32 on the wire
 				// (the client's proxy byte-swaps a single dword out of it), and the number is the `i_nStartTaskTemplate`
 				// we sent in DispatchQuestShareRequest, echoed back.
 				case GameCharAgentMethods.ShareQuestAccepted:
@@ -869,7 +856,7 @@ namespace Faolan.GameServer
 				}
 
 				// 0x2054 RequestTeamQuestList(): no arguments (the captured body is empty). Retail's answer when there
-				// is no list to send is NOT the list method - it is DispatchCancelTeamQuestList (0x204C) carrying
+				// is no list to send is not the list method - it is DispatchCancelTeamQuestList (0x204C) carrying
 				// share code 2, twice in `login_2-clients_group-trade-friend` (frames 1978->1979, 2851->2853), the
 				// only two occurrences of 0x204C in the corpus and one per request. We model no shared team quests,
 				// so that is always our answer too - replayed byte-exact rather than left silent.
@@ -881,7 +868,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x208D RequestMassivePvPScoreData(): no arguments, and retail answers NOTHING - all six occurrences
+				// 0x208D RequestMassivePvPScoreData(): no arguments, and retail answers nothing - all six occurrences
 				// across four captures are followed only by the client's other login polls, never by a MassivePvPScore
 				// dispatch. So silence here is retail's own behaviour for a character outside a Massive-PvP battle,
 				// not a gap. Consume so it is not logged as unknown.
@@ -893,14 +880,14 @@ namespace Faolan.GameServer
 				}
 
 				// 0x2092 RequestNewJoinHasHostileInFriends(const GroupElement_c& i_cWho): before a team join, the
-				// client asks whether the joiner has a HOSTILE on their friends list. `GroupElement_c` is the bare
-				// member record and NOTHING ELSE - the client's own signature carries no message, unlike
-				// RequestTeamInvite's `(i_cWho, i_cMessage)`. This used to parse with TeamInviteCodec (record +
-				// message), which threw on the first live invite ever made in a minigame instance (2026-08-26: a
-				// 98-byte record consumed the whole body and the codec demanded a message that was never there),
-				// and the parse exception dropped the connection. The reply DispatchReplyNewJoinHasHostileInFriends
-				// carries only the subject and no boolean, i.e. sending it IS the "yes" - so answering nothing is
-				// the correct "no", which is also the only answer we can give: we model no hostility between players.
+				// client asks whether the joiner has a hostile on their friends list. `GroupElement_c` is the bare
+				// member record and nothing else - unlike RequestTeamInvite's `(i_cWho, i_cMessage)` the signature
+				// carries no message, so it must be read with TeamMemberRecordCodec: a codec that demands a trailing
+				// message throws on a record that fills the body, and the parse exception drops the connection.
+				//
+				// The reply DispatchReplyNewJoinHasHostileInFriends carries only the subject and no boolean, i.e.
+				// sending it is the "yes" - so silence is the "no", and the only answer available here: no hostility
+				// between players is modelled.
 				case GameCharAgentMethods.RequestNewJoinHasHostileInFriends:
 				{
 					var who = TeamMemberRecordCodec.Parse(body.ReadRemainingArray());
@@ -931,10 +918,10 @@ namespace Faolan.GameServer
 					var characterId = body.ReadUInt32();
 					var entering = body.ReadByte() != 0;
 
-					// #780: an in-world achievement VISTA is the one case where this opcode really is what its name
-					// says - the client bracketing a cinematic it is running itself - and the bool is the whole
-					// discriminator. Handled first, and it consumes the packet: a mid-session cinematic must not also
-					// re-arm the login handshake's follow-up.
+					// An in-world achievement vista is the one case where this opcode really is what its name says -
+					// the client bracketing a cinematic it is running itself - and the bool is the whole discriminator.
+					// Handled first, and it consumes the packet: a mid-session cinematic must not also re-arm the login
+					// handshake's follow-up.
 					if (client.Session.ActiveVista is { } scene)
 					{
 						if (entering)
@@ -945,15 +932,15 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end); the LOGIN flow happens to use
-					// it as its ready trigger, which makes "should this arm the follow-up?" a per-mode question rather
-					// than a property of the packet (#432).
+					// 0x205F is the cinematic transition (its trailing byte is begin/end); the login flow happens to use it
+					// as its ready trigger, which makes "should this arm the follow-up?" a per-mode question rather than a
+					// property of the packet.
 					switch (client.Session.EntryMode)
 					{
 						case WorldEntryMode.CreateWorld:
 						{
 							// This connection is running an actual cinematic - the beach/Kalanthes intro - so it sends a
-							// stream of these. Arming here meant the next 0x2020 poll fired ReadyForPlayScreen into the
+							// stream of these. Arming here would let the next 0x2020 poll fire ReadyForPlayScreen into the
 							// middle of the cutscene; its ready sequence is the create burst's own.
 							Logger.LogInformation("0x205F (cinematic transition) on the create-world connection: the intro drives its own ready sequence; not arming the login follow-up.");
 							break;
@@ -989,19 +976,19 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.UpdateQuestMarkerNPC:
 				{
-					// wire 0x2020 on the GameCharAgent class = method-index slot 0x20, whose RPC catalog LABEL is
-					// UpdateQuestMarkerNPC - but the world-entry handshake REUSES it as the client's spawn-poll +
-					// ready-trigger. Owned by HandleWorldEntrySpawnPoll (WorldEntry partial), not decoded inline here.
+					// Wire 0x2020 on the GameCharAgent class is method-index slot 0x20, whose RPC catalog label is
+					// UpdateQuestMarkerNPC - but the world-entry handshake reuses it as the client's spawn poll and ready
+					// trigger. Owned by WorldEntryService.HandleWorldEntrySpawnPoll, not decoded inline here.
 					await _worldEntry.HandleWorldEntrySpawnPoll(client, packet, body);
 					break;
 				}
 
 				case GameCharAgentMethods.DoSkillSellback:
 				{
-					// The inverse of a skillpoint spend (#739), and the one half of the feature that stays
-					// unimplemented: there is ZERO sellback traffic in the corpus and `DoSkillSellback(int i_eStat)`
-					// carries no amount, so the refund is unrecoverable. Guessing "refund everything" would let a
-					// client cash out the base value every character starts with. Logged until a capture settles it.
+					// The inverse of a skillpoint spend, and the half of the feature that stays unimplemented: there is
+					// no sellback traffic in the corpus and `DoSkillSellback(int i_eStat)` carries no amount, so the
+					// refund is unrecoverable. Refunding everything would let a client cash out the base value every
+					// character starts with. Logged until a capture settles it.
 					LogPacketBodyDebug("GameServer 0x205C body", body.ToArray());
 
 					break;
@@ -1009,15 +996,15 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.PlayStockphraseAsSubtitle:
 				{
-					// #234 create-cutscene speech: the client is asking us to resolve a stock phrase
-					// ({stock_N}) and BLOCKS up to 60 s for the 0x205D reply. Answer it (Kalanthes's beach
-					// lines) instead of silently timing out. See Dialogue/StockConversationService.cs.
+					// Create-cutscene speech: the client is asking the server to resolve a stock phrase ({stock_N})
+					// and blocks up to 60 s for the 0x205D reply, so it must be answered (Kalanthes's beach lines)
+					// rather than left to time out. See Dialogue/StockConversationService.cs.
 					await _stockConversation.HandlePlayStockphraseAsSubtitle(client, body.ToArray());
 
 					break;
 				}
 
-				case GameCharAgentMethods.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
+				case GameCharAgentMethods.RequestShortcutBar: // the client asks for its saved hotbar at login; reply with the restored bar
 				{
 					await _shortcutBar.SendRestoredBar(client);
 
@@ -1045,13 +1032,13 @@ namespace Faolan.GameServer
 					var pos = body.ReadUInt32();
 
 					// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
-					// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
+					// (DispatchAddItem).
 					await _shop.HandleBuyItemFromShop(client, shopId, pos);
 
 					break;
 				}
 
-				// 0x2032 CloseShop(const ID32& i_cShopID): the player closed the vendor window. The ID32 is the VENDOR
+				// 0x2032 CloseShop(const ID32& i_cShopID): the player closed the vendor window. The ID32 is the vendor
 				// (class 0xC350 - a shop's owner is a character, not the 0xC75B shop-content class), but we close
 				// whatever shop this session has open, so it is read for the log only.
 				case GameCharAgentMethods.CloseShop:
@@ -1061,8 +1048,8 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("Shop {Vendor:X8} closed by {Character}.", vendorHandle, client.Session.Character?.Name);
 
-					// #792: retail ACKS it - `DispatchAbortTrade` (0x6A), zero-length, on 152 of the 153 frames the
-					// corpus holds. We used to answer nothing.
+					// Retail acks the close with `DispatchAbortTrade` (0x6A), zero-length, on 152 of the 153 frames the
+					// corpus holds.
 					await GameWire.SendTradeAbort(client);
 
 					break;
@@ -1110,12 +1097,12 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// The two answers to DispatchResurrectRequest (#890). The client holds the offer from the moment the
+				// The two answers to DispatchResurrectRequest. The client holds the offer from the moment the
 				// consumable is used and replies here when the player dies - which is why neither appears in the
 				// corpus: the one captured session used its potion and never died.
 
-				// 0x2022 ResurrectMe(uint32 resurrectSpellID): the offer is taken. The spell id is the token we sent,
-				// echoed back, and it MUST match - it is what distinguishes this offer from another one.
+				// 0x2022 ResurrectMe(uint32 resurrectSpellID): the offer is taken. The spell id is the token the server
+				// sent, echoed back, and it must match - it is what distinguishes this offer from another one.
 				case GameCharAgentMethods.ResurrectMe:
 				{
 					var resurrectSpell = body.Length >= sizeof(uint)
@@ -1125,16 +1112,16 @@ namespace Faolan.GameServer
 					if (await _playerDeaths.ResurrectFromOffer(client, resurrectSpell))
 						Logger.LogInformation("ResurrectMe (spell {Spell}): self-resurrection taken.", resurrectSpell);
 					else
-						// Not an error: a resurrect offered by another PLAYER arrives the same way and we make none,
-						// and a client that answers twice sends the second after the offer is gone.
+						// Not an error: a resurrect offered by another player arrives the same way and none are made
+						// here, and a client that answers twice sends the second after the offer is gone.
 						Logger.LogInformation("ResurrectMe (spell {Spell}) with no matching armed offer, or the player is not dead; ignored.", resurrectSpell);
 
 					break;
 				}
 
 				// 0x2023 CancelResurrectionRequest(const ID32& resurrectRequesterID, uint32 resurrectSpellID): the
-				// offer is declined. Both fields are echoes of what we sent; the SPELL is what the drop keys on, so a
-				// decline cannot take away an offer it does not name.
+				// offer is declined. Both fields echo what the server sent; the drop keys on the spell, so a decline
+				// cannot take away an offer it does not name.
 				case GameCharAgentMethods.CancelResurrectionRequest:
 				{
 					var requester = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
@@ -1175,8 +1162,8 @@ namespace Faolan.GameServer
 					var self = client.Session.Character.Id;
 					var entity = _simulation.PlayerWorldEntity(client);
 
-					// The client sends the buff's BASE id (rank byte stripped, e.g. 0x0037F38C); our registry keys are
-					// the APPLIED wire id ((base<<8)|rank). Match by base so the removal twin carries the exact id.
+					// The client sends the buff's base id (rank byte stripped, e.g. 0x0037F38C); our registry keys are
+					// the applied wire id ((base<<8)|rank). Match by base so the removal twin carries the exact id.
 					var appliedId = buffId << 8;
 					if (entity != null)
 					{
@@ -1190,15 +1177,15 @@ namespace Faolan.GameServer
 						}
 					}
 
-					// The client does NOT self-remove the icon on right-click (verified in-client: the icon stayed up
-					// with only the registry drop) - the server has to drive it. Send retail's rank-1 end twin, which
-					// clears the icon live (byte-exact vs the captured buff-end twin, NecroL80_..._castle-exit rec#735).
-					// No capture oracle for the cancel reply exists, so this is the in-client-proven behaviour.
+					// The client does not self-remove the icon on right-click (confirmed in-client), so the server has to
+					// drive it. Retail's rank-1 end twin clears the icon live and is byte-exact against the captured
+					// buff-end twin (NecroL80_..._castle-exit rec#735). There is no capture of the cancel reply itself, so
+					// this is the in-client-proven behaviour rather than a replayed one.
 					await _buffs.SendBuffRemoval(client, self, self, appliedId);
 
 					if (entity != null && entity.ActiveBuffs.TryRemove(appliedId, out _))
 					{
-						await _buffs.SyncBuffStats(client); // #367: drop whatever stats the cancelled buff was granting
+						await _buffs.SyncBuffStats(client); // drop whatever stats the cancelled buff was granting
 						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", appliedId, charId);
 					}
 					else
@@ -1220,8 +1207,7 @@ namespace Faolan.GameServer
 				}
 
 				// 0x206A MoveTradeItemInternal([int pos1][int pos2]): the player drags an offered item to another slot
-				// of the trade window (#101). Signature from the client's own catalog. This case had sat here since the
-				// C++-era port with a commented-out N3Teleport block under it that had nothing to do with trade.
+				// of the trade window. Signature from the client's own catalog.
 				case GameCharAgentMethods.MoveTradeItemInternal:
 				{
 					_trade.MoveItem(client.Session.Character.Id, body.ReadUInt32(), body.ReadUInt32());
@@ -1230,14 +1216,14 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 				{
-					// The click asks "which copies of this playfield may I pick between" with an EMPTY body, and retail
+					// The click asks "which copies of this playfield may I pick between" with an empty body, and retail
 					// answers DispatchInstanceSelectionForCurrentPlayfield: a plain-u32-counted list of PlayfieldProxy
-					// records. Unanswered, the window opens on nothing (#309).
+					// records. Unanswered, the window opens on nothing.
 					//
-					// We host ONE copy of each playfield, so the honest answer is the one the player is standing in -
+					// One copy of each playfield is hosted, so the answer is the instance the player is standing in -
 					// which is also the only shape a capture pins: retail's single captured reply is a one-element list
-					// naming the live instance of the player's current map, pinned to the token the world-entry burst
-					// already told this client. A player not yet in a zone gets the empty list rather than a made-up one.
+					// naming the live instance of the player's current map, on the token the world-entry burst already
+					// gave this client. A player not yet in a zone gets the empty list rather than a made-up one.
 					var here = _simulation.PlayerWorldEntity(client);
 					var selection = here != null
 						? InstanceSelections.Current(here.MapId, _simulation.World.ZoneFor(here.MapId, here.InstanceId).PlayfieldToken)
@@ -1251,17 +1237,17 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.PerformSpecialAction:
 				{
-					// 0x205A PerformSpecialAction is a GENERIC action opcode multiplexed by its body word, NOT a
+					// 0x205A PerformSpecialAction is a generic action opcode multiplexed by its body word, not a
 					// spellweave-only toggle. The selector catalog is docs/subsystems/player-actions.md; the ones routed
-					// here are the spellweave toggle (0xFC necro / 0x10C demonologist - PER CLASS, see
-					// StartingData.SpellweaveToggleAction) and the Path of Asura recall. 0xFF = open the Crafting ->
-					// Recipes book and 0x6C/0x6D/0x70/0xF0 = melee combo inputs, so neither may reach the trance -
-					// blindly routing every 0x205A to spellweave made opening the recipe book start a weave on a necro.
+					// here are the spellweave toggle (0xFC necromancer / 0x10C demonologist - per class, see
+					// StartingData.SpellweaveToggleAction) and the Path of Asura recall. 0xFF opens the Crafting ->
+					// Recipes book and 0x6C/0x6D/0x70/0xF0 are melee combo inputs, so the selector must be matched
+					// exactly: routing every 0x205A to spellweave starts a weave on the recipe book.
 					var action = body.ReadUInt32();
 
 					Logger.LogInformation("0x205A (PerformSpecialAction) param={Action:X4}", action);
 
-					// The spellweave selector is the CLASS's own, so a demonologist's 0x10C opens a trance while a
+					// The spellweave selector is the class's own, so a demonologist's 0x10C opens a trance while a
 					// necromancer's 0x10C does not (and vice-versa for 0xFC) - matching retail, where each class only
 					// ever sends its own id.
 					if (StartingData.SpellweaveToggleAction.TryGetValue(client.Session.Character.Class, out var weaveAction) && action == weaveAction)
@@ -1273,44 +1259,44 @@ namespace Faolan.GameServer
 					switch (action)
 					{
 
-						// Path of Asura: a recall to the BOUND location (#206). NOT the same destination as the Totem of
-						// Origins, which returns to the racial home city. The client double-sends the action (capture
-						// F303+F307), so gate on IsTeleportingOut - the first recall arms the handoff, the duplicate is
-						// absorbed.
+						// Path of Asura: a recall to the bound location, which is not the Totem of Origins destination
+						// (that returns to the racial home city). The client double-sends the action (capture F303+F307),
+						// so the gate on IsTeleportingOut is required - the first recall arms the handoff, the duplicate
+						// is absorbed.
 						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
 						{
 							await _teleport.RecallToBindCommand(client);
 							break;
 						}
 
-						// The SEARCH stance (#505). Retail answers with the player's own BehaviorControlCenterIIR at
-						// slot BehaviorId.Search - the client waits for it before the stance visibly takes, so the
-						// press does nothing at all without this. There is no server-side search state yet: the record
-						// is the whole of retail's observed answer.
+						// The search stance. Retail answers with the player's own BehaviorControlCenterIIR at slot
+						// BehaviorId.Search - the client waits for it before the stance visibly takes, so the press
+						// does nothing at all without it. There is no server-side search state: the record is the
+						// whole of retail's observed answer.
 						case SearchSpecialAction:
 						{
 							await _stances.PerformSearchStance(client);
 							break;
 						}
 
-						// The HIDE stance (#505) - a toggle, like the mount.
+						// The hide stance - a toggle, like the mount.
 						case SneakHideSpecialAction:
 						{
 							await _stances.ToggleSneakHide(client);
 							break;
 						}
 
-						// REST (#505) - not a stance record at all, a self-cast of the `Resting` spell.
+						// Rest - not a stance record at all, a self-cast of the `Resting` spell.
 						case RestSpecialAction:
 						{
 							await _stances.PerformRestCast(client);
 							break;
 						}
 
-						// The COMBAT TOGGLE (#505). Retail answers with a `Transition` record AND the rating quad; we
-						// send only the quad, because the record's animation action is per WEAPON and none of the five
-						// captured ids is an RDB record, a spell or an ability - so a per-class map would be a borrowed
-						// id playing the wrong sheathe. Sending a subset of what retail sends beats inventing the rest.
+						// The combat toggle. Retail answers with a `Transition` record and the rating quad; only the
+						// quad is sent, because the record's animation action is per weapon and none of the five
+						// captured ids is an RDB record, a spell or an ability - a per-class map would be a borrowed id
+						// playing the wrong sheathe. A subset of retail's answer is preferred to an invented record.
 						case CombatToggleSpecialAction:
 						{
 							await GameWire.SendCombatRatings(client);
@@ -1321,7 +1307,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameCharAgentMethods.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
+				case GameCharAgentMethods.StackInventoryItemIfPossible:
 				{
 					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", body.ToArray());
 
@@ -1331,7 +1317,7 @@ namespace Faolan.GameServer
 				case GameCharAgentMethods.SplitInventoryItem:
 				{
 					// GameCharAgent.SplitInventoryItem(const ID32& i_cInventory, int i_nSrcPos, int i_nSplitSize,
-					// int i_nDstPos) - the client's own signature. The leading ID32 is the CONTAINER being split in:
+					// int i_nDstPos) - the client's own signature. The leading ID32 is the container being split in:
 					// {type = the container kind (0x68 backpack, same value as CharacterInventory.Container), instance =
 					// the owning character's handle}. Both captured splits are backpack-internal, which is why
 					// PersistSplitStack assumes the bag.
@@ -1342,14 +1328,6 @@ namespace Faolan.GameServer
 					var targetSlot = body.ReadUInt32();
 
 					Logger.LogDebug("SplitInventoryItem in container {{{Kind:X2}, {Owner:X8}}}: slot {Source} -> {Target}, {Size} units.", containerKind, containerOwner, sourceSlot, targetSlot, targetStackSize);
-
-					// 0x00, 0x00, 0x00, 0x68,					// 0x11, 0x01, 0xB4, 0xF5, 					// 0x00, 0x00, 0x00, 0x09, // source slot
-					// 0x00, 0x00, 0x00, 0x29, // 41 (target stack size)
-					// 0x00, 0x00, 0x00, 0x13  // target Slot
-
-					// 0x00, 0x00, 0x00, 0x68, 					// 0x11, 0x01, 0xB4, 0xF5, 					// 0x00, 0x00, 0x00, 0x03, // source slot
-					// 0x00, 0x00, 0x00, 0x1C, // 28 (target stack size)
-					// 0x00, 0x00, 0x00, 0x04  // target Slot
 
 					// Persist the split so both stacks survive logout (bag container; the packet carries no kind).
 					await _equipment.PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
@@ -1373,17 +1351,17 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.AddShortcut:
 				{
-					// 0x206E = MoveItemToBar: ALWAYS a bar drag ([u32 type][u32 slot][u32 id][u32 unk]). During create
-					// the client populates the NEW character's starting bar with it right after CharCreationFinished
-					// (verified in the Blablatest/Hoxxling create captures: the starting abilities + spells at slots
-					// 0x64.. / 0x4E20..), BEFORE entering the world - so persist it on the editor connection too, or a
-					// fresh character loses its retail starting bar and falls back to our seeded default.
+					// 0x206E = MoveItemToBar: always a bar drag ([u32 type][u32 slot][u32 id][u32 unk]). During create the
+					// client populates the new character's starting bar with it right after CharCreationFinished (the
+					// Blablatest/Hoxxling create captures show the starting abilities and spells at slots 0x64.. /
+					// 0x4E20..), before entering the world - so it must be persisted on the editor connection too, or a
+					// fresh character loses its retail starting bar and falls back to the seeded default.
 					await _shortcutBar.HandleAddShortcut(client, packet, body);
 
-					// This 0x206E used to ALSO trigger the enter-world handoff on the editor connection. It no longer
-					// does (#433): the client barring something is not a statement about being ready for the world, and
-					// keying on it stranded creation whenever the starting kit was empty. The handoff is now armed on a
-					// retail-measured timer at CharCreationFinished - CreateFlowService.ScheduleEnterWorldHandoff.
+					// This must not arm the enter-world handoff: the client barring something is not a statement about
+					// being ready for the world, and keying on it strands creation whenever the starting kit is empty.
+					// The handoff is armed on a retail-measured timer at CharCreationFinished -
+					// CreateFlowService.ScheduleEnterWorldHandoff.
 					break;
 				}
 
@@ -1393,25 +1371,25 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				// The three c2s methods the corpus carries that nothing here answered (#873). None of them had a
-				// handler, so the client sent them and the packet fell through to LogUnknownPacket.
+				// Three c2s methods the corpus carries. Each is consumed here so it does not fall through to
+				// LogUnknownPacket.
 
 				case GameCharAgentMethods.CloseBank: // 0x201C - no arguments
 				{
-					// The bank's other half. There is no server-side bank SESSION to tear down - the bank is opened by
-					// a BankIIR and its contents are the character's own container rows - so this records the close
-					// and does not invent state to clear. It stops the client's goodbye reading as an unknown packet,
-					// and it is the hook for whatever the close should do once there is something to do.
+					// The bank's other half. There is no server-side bank session to tear down - the bank is opened by
+					// a BankIIR and its contents are the character's own container rows - so the close is recorded and
+					// no state is invented to clear. It is the hook for whatever the close should do once there is
+					// something to do.
 					Logger.LogInformation("Bank: {Char} closed the bank.", client.Session.Character.Name);
 					break;
 				}
 
 				case GameCharAgentMethods.SetSelectedTag: // 0x20A2 - body = [u32 tagId]
 				{
-					// The client telling the server which TAG it has selected. #748 is trying to work out what selects
-					// a tag from the s2c side; this is the client stating it outright. Remembered on the session so a
-					// tag-driven feature can read it - nothing consumes it yet, and it is deliberately not persisted:
-					// a selection is a UI state, and no capture shows it surviving a relog.
+					// The client telling the server which tag it has selected. Remembered on the session so a
+					// tag-driven feature can read it; nothing consumes it yet, and it is deliberately not persisted -
+					// a selection is UI state, and no capture shows it surviving a relog.
+					// Open work tracked in Gitea #748.
 					var tagId = body.ReadUInt32();
 					client.Session.SelectedTagId = tagId;
 					Logger.LogInformation("Tags: {Char} selected tag {Tag}.", client.Session.Character.Name, tagId);
@@ -1420,10 +1398,9 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.RequestRecipeInfo: // 0x2090 - the tradeskill recipe query
 				{
-					// ⚠️ Parsed and LOGGED, not answered: no capture carries the reply, so what the server sends back
-					// is unknown and would have to be invented. What the request itself says is worth having - it
-					// carries two 16-byte DecryptionKey_c, so the CLIENT holds catalog keys and hands them over here
-					// (see #877, where the feat-category keys are missing entirely).
+					// Parsed and logged, not answered: no capture carries the reply, so the response would have to be
+					// invented. The request itself is worth recording - it carries two 16-byte DecryptionKey_c, so the
+					// client holds catalog keys and hands them over here.
 					var request = RecipeInfoRequestCodec.Parse(body.ReadArray((uint)(body.Length - body.Position)));
 					Logger.LogInformation("Tradeskill: {Char} requested recipe info for level {Level}, templates {T1}/{T2} (keys {K1}/{K2}). No reply is captured, so none is sent.",
 						client.Session.Character.Name, request.LevelId, request.TemplateId1, request.TemplateId2,
@@ -1439,27 +1416,32 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Inbound RPCs on the GameCharAgentProject endpoint (0x5B9756FC). Routed here by class id from
-		// ReceivedPacket because its method ids (0x2000, ...) collide with ordinary GameServer opcodes.
-		//
-		// The one that matters for world entry is RequestAggroStatus (client_to_server[0] => opcode 0x2000): once
-		// the playfield is built the client polls the server for the aggro state between the player and each nearby
-		// hostile NPC, and will NOT finish the loading screen until each poll is answered. Retail answers every one
-		// (~17 over a login); we answered none, so the live client retried the same poll 450+ times and sat on the
-		// loading screen forever - which is why it never opened the ChatServer/CommunityServer (chat) connection.
-		// Decoded from the kalantes_chat retail capture (port 7015):
-		//   req  C->S: recv=GameCharAgentProject, send=GameCharInterfaceProject/<player>, op 0x2000,
-		//               body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
-		//   resp S->C: send=GameCharAgentProject/<zone handle 0x58>, recv=GameCharInterfaceProject/<player>, op 0x2000,
-		//               body [u32 0xC350][u32 targetInstance][u32 cCategory]
-		// The 3rd field is the target's overhead NAME-COLOUR category (0 friendly / 1 hostile / 2 neutral), the SOLE
-		// driver of the red/green/yellow name (proven by live gdb, #256) - not a live-aggro flag. We answer every
-		// poll (still unblocks the load) and now set 1 for hostile NPCs so their names render red like retail.
+		/// <summary>
+		///     Inbound RPCs on the GameCharAgentProject endpoint (0x5B9756FC). Routed here by class id from
+		///     ReceivedPacket because its method ids (0x2000, ...) collide with ordinary GameServer opcodes.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         Every RequestAggroStatus poll must be answered: once the playfield is built the client polls for the
+		///         aggro state between the player and each nearby hostile NPC (~17 over a login) and will not leave the
+		///         loading screen until each poll has a reply. An unanswered poll is retried indefinitely, so the client
+		///         never reaches the chat connection either.
+		///     </para>
+		///     <para>
+		///         Grammar, from the kalantes_chat retail capture (port 7015):
+		///     </para>
+		///     <code>
+		///     req  C-&gt;S: recv=GameCharAgentProject, send=GameCharInterfaceProject/&lt;player&gt;, op 0x2000,
+		///                body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
+		///     resp S-&gt;C: send=GameCharAgentProject/&lt;zone handle 0x58&gt;, recv=GameCharInterfaceProject/&lt;player&gt;,
+		///                op 0x2000, body [u32 0xC350][u32 targetInstance][u32 cCategory]
+		///     </code>
+		/// </remarks>
 		private async Task HandleGameCharAgentProject(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			switch ((GameCharAgentProjectMethods)packet.Method)
 			{
-				case GameCharAgentProjectMethods.RequestAggroStatus: // 0x2000 - GATES the loading screen (must reply)
+				case GameCharAgentProjectMethods.RequestAggroStatus: // 0x2000 - gates the loading screen, so it must be answered
 				{
 					await HandleRequestAggroStatus(client, packet, body);
 					break;
@@ -1471,10 +1453,10 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// APPRENTICESHIP (#144). Three of the four name one party as an ID32 and carry nothing else; the fourth
-				// is no-arg. The client filters on its own rules before sending, so what arrives here is normally
-				// already legal - ApprenticeService still checks, and answers when it is not.
-				case GameCharAgentProjectMethods.RequestApprenticeStudent: // 0x2004 - the TEACHER names a student
+				// Apprenticeship. Three of the four name one party as an ID32 and carry nothing else; the fourth is
+				// no-arg. The client filters on its own rules before sending, so what arrives here is normally already
+				// legal - ApprenticeService still checks, and answers when it is not.
+				case GameCharAgentProjectMethods.RequestApprenticeStudent: // 0x2004 - the teacher names a student
 				{
 					await _apprentice.Request(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
 					break;
@@ -1500,14 +1482,14 @@ namespace Faolan.GameServer
 
 				case GameCharAgentProjectMethods.SetSprintInputState: // 0x200C, the sprint key
 				{
-					// ⚠️ The body is `(bool sprintInput, bool clientCheck)` - TWO bytes, the client's own signature -
-					// and all four combinations occur in the corpus. This used to read it as one u16 and test `== 1`,
-					// which selects `00 01`: sprintInput FALSE with the client's check set, the single most common
-					// frame at 3,714. So the drain ran while the player stood still and the pool REFILLED while they
-					// sprinted, and every one of the 2,661 genuinely-sprinting frames was missed (#867).
+					// The body is `(bool sprintInput, bool clientCheck)` - two bytes, the client's own signature - and
+					// all four combinations occur in the corpus, so only the first byte decides whether the player is
+					// sprinting. Reading the pair as one u16 and testing `== 1` selects `00 01`, which is sprintInput
+					// false with the client's check set: the most common frame of all, and the exact inverse of the
+					// intended condition.
 					//
-					// Retail does answer this - `DispatchSetIsSprinting`, once per change of the request - which is
-					// what TrackSprintEnergy now does. The energy pool it drives is what Exhausted fires from at 0
+					// Retail answers this with `DispatchSetIsSprinting`, once per change of the request, which is what
+					// TrackSprintEnergy sends. The energy pool it drives is what Exhausted fires from at 0
 					// (docs/subsystems/combos.md).
 					var input = SprintInputStateCodec.Parse(body.ReadArray(2));
 					await _energy.TrackSprintEnergy(client, input.SprintInput);
@@ -1522,17 +1504,25 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// #620: the player moved one of their three guards. Unlike an NPC's rose - which the tick rolls and shifts - a
-		// player's rose is the PLAYER'S: the client owns stat 0xA5 and the shield keybinds write it locally
-		// (Ctrl-1 left / Ctrl-2 top / Ctrl-3 right moves one shield, double-tapping stacks all three on that arc), then
-		// it uploads the new spread through `n3EngineClient::SendIIRToServer`. So this is the one direction the
-		// CombatShieldIIR travels for a player, and the server's job is to believe it (within the client's own clamp),
-		// remember it, and relay it to the opponents who need to draw it.
-		//
-		// RE: `AgeOfConan.exe` FUN_01117a20 (the keybind handler, called from the five command stubs at 0x00455cb0..
-		// 0x004562b0) -> FUN_00595f90, whose failure string names it
-		// "n3EngineClient::SendIIRToServer(): Unable to write the IIR to the stream". The handle in the record is the
-		// client's claim; we key off the SESSION like every other c2s that names its own subject.
+		/// <summary>
+		///     The player moved one of their three shield guards.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         Unlike an NPC's rose - which the tick rolls and shifts - a player's rose belongs to the client: it owns
+		///         stat 0xA5 and the shield keybinds write it locally (Ctrl-1 left / Ctrl-2 top / Ctrl-3 right moves one
+		///         shield, double-tapping stacks all three on that arc), then it uploads the new spread through
+		///         <c>n3EngineClient::SendIIRToServer</c>. This is the one direction a CombatShieldIIR travels for a
+		///         player: the server accepts the spread within the client's own clamp, remembers it, and relays it to the
+		///         opponents who need to draw it.
+		///     </para>
+		///     <para>
+		///         Client side: <c>AgeOfConan.exe</c> FUN_01117a20 (the keybind handler, called from the five command
+		///         stubs at 0x00455cb0..0x004562b0) -&gt; FUN_00595f90, whose failure string names it
+		///         "n3EngineClient::SendIIRToServer(): Unable to write the IIR to the stream". The handle in the record is
+		///         the client's claim, so the subject is taken from the session like every other c2s that names itself.
+		///     </para>
+		/// </remarks>
 		private async Task HandlePlayerShieldRose(INetworkClient client, byte[] rawPayload)
 		{
 			var player = _simulation.PlayerWorldEntity(client);
@@ -1546,10 +1536,10 @@ namespace Faolan.GameServer
 			}
 			catch (CodecParseException e)
 			{
-				// The codec is STRICT (#530 rule 4) and every captured record is a DOWNLOAD, so the c2s form of this
-				// message is proven from the client's writer rather than from bytes we have seen. Logged loudly with the
-				// body, because a mismatch here is a decode gap worth reading - but not a reason to drop a player
-				// mid-fight over a keypress.
+				// The codec is strict and every captured record is a download, so the c2s form of this message is
+				// proven from the client's writer rather than from captured bytes. Logged with the body, because a
+				// mismatch here is a decode gap worth reading - but not a reason to drop a player mid-fight over a
+				// keypress.
 				Logger.LogError("Unparseable c2s CombatShieldIIR from {Player} ({Length} bytes, {Body}): {Reason}", player.Name, rawPayload.Length,
 					rawPayload.ToHex(), e.Message);
 				return;
@@ -1573,24 +1563,24 @@ namespace Faolan.GameServer
 
 			var instance = client.Session.Character.Id;
 
-			// The reply's third field (cCategory) is the client's overhead NAME-COLOUR category for this target, 			// NOT a live-aggro toggle: 0 = friendly (green), 1 = hostile (red), 2 = neutral (yellow). Proven by live
-			// gdb (#256): DispatchUpdateAggroStatus -> FUN_0115eb10 emits the disposition signal that writes the
-			// nameplate colour index (color_friendly_npc/color_hostile_npc/color_neutral_npc); retail's cCategory is
-			// exactly 0/1/2. We always sent 0, so every NPC rendered green - including hostile mobs. Send 1 for a
-			// hostile NPC so its name renders red like retail. (The NpcStats.community we put in the spawn is correct
-			// but the client ignores it for the name colour - this RPC is the sole driver.)
-			// cCategory is the target's captured retail disposition (0 friendly / 1 hostile / 2 neutral), the SAME
-			// source that gates aggro (#256/aggro). Sending target.Disposition directly (not Hostile ? 1 : 0) means a
-			// neutral NPC renders yellow, not just red/green - and a friendly civilian in a non-zero faction community
-			// no longer wrongly renders red.
+			// The reply's third field (cCategory) is the client's overhead name-colour category for this target, not
+			// a live-aggro toggle: 0 = friendly (green), 1 = hostile (red), 2 = neutral (yellow). Live gdb shows
+			// DispatchUpdateAggroStatus -> FUN_0115eb10 emitting the disposition signal that writes the nameplate
+			// colour index (color_friendly_npc/color_hostile_npc/color_neutral_npc), and retail's cCategory is
+			// exactly 0/1/2. This RPC is the sole driver of that colour: the NpcStats.community carried in the spawn
+			// is correct but the client ignores it here.
+			//
+			// The value sent is the target's captured retail disposition, the same source that gates aggro. Passing
+			// the disposition through (rather than `Hostile ? 1 : 0`) is what lets a neutral NPC render yellow and
+			// keeps a friendly civilian in a non-zero faction community from rendering red.
 			var category = WorldEntity.DispositionFriendly;
-			// Resolve the target in the player's OWN instance (copy) of the map (#268), not the default shared zone.
+			// Resolve the target in the player's own instance (copy) of the map, not the default shared zone.
 			var player = _simulation.PlayerWorldEntity(client);
 			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))
 				category = target.Disposition;
 			else if (CreateEditorBursts.EditorSceneDispositions.TryGetValue(targetInstance, out var editorCategory))
 				// The create-editor scene is a scripted burst, not a simulated zone, so its five characters are in no
-				// zone to resolve - their retail categories are carried with the burst instead (#564).
+				// zone to resolve - their retail categories are carried with the burst instead.
 				category = editorCategory;
 
 			await client.SendAsync(new Rpc(GameEndpoints.ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
@@ -1601,10 +1591,10 @@ namespace Faolan.GameServer
 
 		private async Task HandleRequestBindLocation(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			// body = [u32 ID32 type][u32 requesterId]; tolerate a SHORT/empty poll (the client sends a bare-header
-			// variant) - the reply is derived from the character, not the body, and requesterId is only for the log.
-			// Reading past a short body threw EndOfStreamException, which propagated out of ReceivedPacket and CLOSED
-			// the connection (the client dropped at world entry).
+			// body = [u32 ID32 type][u32 requesterId]. A short or empty poll must be tolerated - the client sends a
+			// bare-header variant - because the reply is derived from the character, not the body, and requesterId
+			// is only for the log. Reading past a short body throws EndOfStreamException, which propagates out of
+			// ReceivedPacket and closes the connection.
 			uint requesterId = 0;
 			if (body.Length >= 8)
 			{
@@ -1620,18 +1610,23 @@ namespace Faolan.GameServer
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
 			// Reply framing: sender/receiver swapped from the request, because retail answers a request on the
-			// conversation it arrived on. (An UNSOLICITED bind push - the shape a bindstone use would need, framed on
+			// conversation it arrived on. (An unsolicited bind push - the shape a bindstone use would need, framed on
 			// the login-world conversation instead - has no sender left: the bind is set once at character creation,
 			// and nothing else moves it yet.)
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceMethods.DispatchUpdateBindLocation, s => s.WriteUInt32(bindMapId)));
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}
 
-		// ToggleVanityArmorFilter(int slot, uint32 removeditemOccupySlots, bool toggleState): the appearance panel's
-		// per-slot (and master) "hide this vanity piece" toggle. Fire-and-forget like sprint - retail sends no reply and
-		// the client renders the show/hide itself. Body = [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. We
-		// PERSIST it (CharacterEquipment vanity flags) so it survives relog: a withheld vanity item then drops out of
-		// the character snapshot equipment (PlayerSpawnEquipment), which is how the client restores the toggle on login.
+		/// <summary>
+		///     ToggleVanityArmorFilter(int slot, uint32 removeditemOccupySlots, bool toggleState): the appearance
+		///     panel's per-slot (and master) "hide this vanity piece" toggle.
+		/// </summary>
+		/// <remarks>
+		///     Fire-and-forget like sprint - retail sends no reply and the client renders the show/hide itself. Body is
+		///     [u32 slot][u32 removedItemOccupySlots][u8 toggleState]. The flag is persisted (CharacterEquipment vanity
+		///     flags) so it survives a relog: a withheld vanity item then drops out of the character snapshot equipment
+		///     (PlayerSpawnEquipment), which is how the client restores the toggle on login.
+		/// </remarks>
 		private async Task HandleToggleVanityArmorFilter(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
@@ -1640,9 +1635,9 @@ namespace Faolan.GameServer
 
 			var slot = body.ReadUInt32();
 			body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-			// Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
-			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+			// Polarity, confirmed in-client and against the retail vanity-head-selected capture (checkbox on ->
+			// bit 2 set): a checked box means the slot's vanity item is shown, sends toggleState=1 and sets the
+			// slot's mask bit. The mask bit is "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);

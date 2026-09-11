@@ -15,9 +15,8 @@ namespace Faolan
 	// The server's command line. One real flag - `--role` - plus the configuration keys, declared so `--help` lists
 	// them and a misspelling is an error rather than a setting that silently stays on its default.
 	//
-	// `--role` is REPEATABLE (`--role login --role realm=2` co-hosts both in one process), which the parser handles
-	// natively; it used to be a hand-rolled scan over argv precisely because the configuration binder keeps only the
-	// LAST value of a repeated key.
+	// `--role` is repeatable (`--role login --role realm=2` co-hosts both in one process), which the parser handles
+	// natively. It cannot be an ordinary configuration key: the binder keeps only the last value of a repeated key.
 	public static class ServerCommand
 	{
 		private static readonly Option<string[]> Role = BuildRoleOption();
@@ -30,11 +29,9 @@ namespace Faolan
 				AllowMultipleArgumentsPerToken = false
 			};
 
-			// A bad role set is a COMMAND-LINE error, reported like any other bad option (usage + a non-zero exit),
-			// not an unhandled exception. It used to be two bare `throw new Exception`s in Program, so mistyping a
-			// role - or the one thing the rule below exists to forbid - answered with a stack trace and a SIGABRT
-			// (#324). The validator and the reader share `TryParseRoles`, so what --help promises and what the process
-			// runs cannot drift apart.
+			// A bad role set is a command-line error, reported like any other bad option (usage plus a non-zero exit)
+			// rather than as an unhandled exception. The validator and the reader share `TryParseRoles`, so what
+			// --help promises and what the process runs cannot drift apart.
 			option.Validators.Add(result =>
 			{
 				if (!TryParseRoles(result.GetValueOrDefault<string[]>() ?? [], out _, out _, out _, out var error))
@@ -45,19 +42,19 @@ namespace Faolan
 		}
 
 		/// <summary>
-		///     Reads the process ROLE set (multi-realm / process-per-realm, #324). <c>--role</c> is REPEATABLE, so one
-		///     process can compose roles (<c>--role login --role realm=2</c> = login + realm 2 in one process):
+		///     Reads the process role set (multi-realm, process-per-realm). <c>--role</c> is repeatable, so one process
+		///     can compose roles (<c>--role login --role realm=2</c> is login plus realm 2 in one process):
 		///     <list type="bullet">
 		///         <item><description><c>--role login</c> - the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.</description></item>
-		///         <item><description><c>--role realm=&lt;id&gt;</c> - a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that realm's ports; the login tier routes players to it.</description></item>
+		///         <item><description><c>--role realm=&lt;id&gt;</c> - a game host for one realm (GameServer + realm-local chat + guilds), bound to that realm's ports; the login tier routes players to it.</description></item>
 		///         <item><description><c>--role realm</c> - the same, for the first realm (id omitted).</description></item>
-		///         <item><description>no <c>--role</c> - all-in-one: login + a game host for the first realm (the historical dev run).</description></item>
+		///         <item><description>no <c>--role</c> - all-in-one: login plus a game host for the first realm, which is the usual development run.</description></item>
 		///     </list>
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ At most ONE realm role per process: co-hosting several realms in one process would share the
-		///     chat/world dispatchers and the session aggregation across realms - a cross-realm leak, and one that
-		///     fails QUIETLY, which is why it is refused at the command line before anything is constructed or bound.
+		///     At most one realm role per process: co-hosting several realms in one process would share the chat and
+		///     world dispatchers and the session aggregation across realms - a cross-realm leak that fails quietly,
+		///     which is why it is refused at the command line before anything is constructed or bound.
 		/// </remarks>
 		internal static bool TryParseRoles(IReadOnlyList<string> roles, out bool runLogin, out bool runRealm, out uint? realmId, out string? error)
 		{
@@ -67,7 +64,7 @@ namespace Faolan
 
 			if (roles.Count == 0)
 			{
-				runLogin = runRealm = true; // default: all-in-one (dev)
+				runLogin = runRealm = true; // default: all-in-one
 
 				return true;
 			}
@@ -110,13 +107,13 @@ namespace Faolan
 			return true;
 		}
 
-		// Configuration keys - the option name IS the config path, so it is spelled the same here, in faolan.json
-		// and (with __) in the environment. The description and the DEFAULT come from FaolanSettings, the one catalog,
-		// so `--help` cannot describe a default the code does not use.
+		// Configuration keys - the option name is the config path, so it is spelled the same here, in faolan.json and
+		// (with __) in the environment. The description and the default come from FaolanSettings, the one catalog, so
+		// `--help` cannot describe a default the code does not use.
 		//
-		// This is a VIEW of that catalog, not the whole of it: Server:PublicKey is launcher-side and stays off the
-		// server's line, and the Cdn keys belong to another executable. They still get their defaults here, because
-		// the defaults layer is built from the catalog rather than from this list.
+		// This is a view of that catalog rather than the whole of it: Server:PublicKey is launcher-side and stays off
+		// the server's line, and the Cdn keys belong to another executable. They still get their defaults, because the
+		// defaults layer is built from the catalog rather than from this list.
 		//
 		// Each one is typed as the setting is (Option<ushort> for a port, Option<FaolanDbProvider> for the engine), so
 		// `--Mcp:Port banana` is a parse error here rather than a crash at whatever startup first reads it - hence the
@@ -127,18 +124,18 @@ namespace Faolan
 			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
 			Keys.AccountPremium, Keys.AccountPremiumCharSlots, Keys.AccountFreeCharSlots);
 
-		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as a file you can
-		// edit. It OVERWRITES what is there, which is why it is an explicit flag and nothing calls it on startup.
+		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as an editable
+		// file. It overwrites what is there, which is why it is an explicit flag that nothing calls on startup.
 		private static readonly Option<string> WriteDefaultConfig = new Option<string>("--write-default-config")
 		{
 			Description = "Write a faolan.json containing every setting at its default (to the given path, or the one in use) and exit. OVERWRITES.",
 			Arity = ArgumentArity.ZeroOrOne
 		};
 
-		// It used to write that file itself, which cost a 140-line JSON-with-comments text editor: a JsonNode
-		// round-trip would have dropped every comment in the user file, so the writer edited it with regexes and then
-		// re-read the result to prove the edit was valid. That is a lot of machinery, and a lot of ways to damage a
-		// file, for one key going into a file the operator already has open.
+		// Prints the keypair and writes nothing. Editing faolan.user.json here would need a JSON-with-comments text
+		// editor: a JsonNode round-trip drops every comment in the user file, so the edit would have to be made with
+		// regexes and re-read to prove it valid - a lot of machinery, and a lot of ways to damage a file, for one key
+		// going into a file the operator already has open.
 		private static readonly Option<bool> GenerateLoginKey = new Option<bool>("--generate-login-key")
 		{
 			Description = "Print a new login DH keypair to paste into faolan.user.json, and exit. Every client must then be re-patched (Faolan.ClientLauncher --patch-login)."
@@ -155,11 +152,10 @@ namespace Faolan
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
 
-			// ⚠️ Both flags ask whether they were GIVEN, and `GetResult(...) != null` is not that question: an
-			// Option<bool> the user never mentioned still has a result - an IMPLICIT one carrying false. Asking it that
-			// way meant --generate-login-key fired on EVERY run, so `dotnet run --project Faolan` printed a keypair
-			// and exited instead of starting the server. A flag reads as its VALUE; --write-default-config takes an
-			// optional value, so it asks for a non-implicit result (present, with or without a path).
+			// Both flags ask whether they were given, and `GetResult(...) != null` is not that question: an
+			// Option<bool> the user never mentioned still has a result - an implicit one carrying false, which would
+			// make --generate-login-key fire on every run. A flag reads as its value; --write-default-config takes an
+			// optional value, so it asks for a non-implicit result, present with or without a path.
 			if (result.GetResult(WriteDefaultConfig) is { Implicit: false })
 			{
 				var path = result.GetValue(WriteDefaultConfig) is { Length: > 0 } given ? given : Global.ConfigPath;
@@ -176,7 +172,7 @@ namespace Faolan
 				return null;
 			}
 
-			// The roles are already VALIDATED by the option's own validator, which is what turned a bad set into a
+			// The roles are already validated by the option's own validator, which is what turned a bad set into a
 			// parse error above - so this cannot fail, and the parse lives in one place rather than being repeated
 			// by the caller.
 			TryParseRoles(result.GetValue(Role) ?? [], out var runLogin, out var runRealm, out var realmId, out _);
@@ -184,13 +180,11 @@ namespace Faolan
 			return new ServerOptions(runLogin, runRealm, realmId, FaolanCommandLine.Build(result, ConfigOptions));
 		}
 
-		// BOTH halves are printed, the private one included. That reverses the old rule here ("a secret does not
-		// belong in a terminal scrollback"), and it has to: nothing writes the key any more, so the operator cannot
-		// paste a value they are not shown. What the old rule was protecting is also smaller than it sounds - the
-		// value is one deployment's DH exponent for a private emulator, and the pair it belongs to is regenerated by
-		// running this again.
+		// Both halves are printed, the private one included: nothing writes the key, so the operator cannot paste a
+		// value they are not shown. The exposure is small - the value is one deployment's DH exponent for a private
+		// emulator, and the pair it belongs to is regenerated by running this again.
 		//
-		// The public half is DERIVED, not stored: `ClientLoginEncryption.PublicHexFor` computes `g^serverPrivate mod N`
+		// The public half is derived, not stored: `ClientLoginEncryption.PublicHexFor` computes `g^serverPrivate mod N`
 		// from the private key it is handed, so the two cannot drift. Printing it is not decoration - it is the value
 		// every client has to be patched with.
 		private static void GenerateKey()
@@ -213,7 +207,7 @@ namespace Faolan
 		}
 	}
 
-	// The command line, resolved: the roles this process runs, and the CONFIGURATION its options contributed to - built
+	// The command line, resolved: the roles this process runs, and the configuration its options contributed to - built
 	// once here rather than handed on as an override layer for each consumer to re-resolve.
 	public sealed record ServerOptions(bool RunLogin, bool RunRealm, uint? RealmId, IConfiguration Configuration);
 }

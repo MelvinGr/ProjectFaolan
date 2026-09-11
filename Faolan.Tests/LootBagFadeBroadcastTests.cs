@@ -8,18 +8,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A loot bag leaving the world is a WORLD event, and it used to be sent to one player (#698).
+	// A loot bag leaving the world is a world event, not a message to one player.
 	//
 	// Retail's captured completion is `DispatchCloseLootBag -> looter resets -> n3ToClientFade -> UpdateSimpleDynel`.
-	// The first three are the LOOTER's - their window closes, their looter rights reset - but the last two are the
-	// bag going away, and `AfterLootTake` sent all five to the looter alone. Every other player in range kept the bag
-	// on screen, and a client that keeps the object keeps everything hanging off it, which is what a lingering
-	// lootable sparkle is.
+	// The first three are the looter's - their window closes, their looter rights reset - but the last two are the
+	// bag going away. Sending all five to the looter alone leaves every other player in range with the bag on screen,
+	// and a client that keeps the object keeps everything hanging off it, which is what a lingering lootable sparkle
+	// is.
 	//
-	// The expiry path had the complementary half of the same bug: it broadcast the FADE and not the consumed visual.
+	// The expiry path had the complementary half of the same bug: it broadcast the fade and not the consumed visual.
 	public class LootBagFadeBroadcastTests
 	{
-		// The two bodies as retail sends them (hoxxling gameplay, bag 0x000021fe). Spelled as HEX rather than built
+		// The two bodies as retail sends them (hoxxling gameplay, bag 0x000021fe). Spelled as hex rather than built
 		// through the codecs on purpose: the byte-exact goldens for these live in `WorldLootTakeTests` and `LootTests`,
 		// and `docs/protocol/gen/messages.md` cites whichever test names a codec - so calling `Build` here would
 		// quietly demote the page's citation from a capture golden to this behaviour test.
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		private const uint MapId = 4010; // Tortage Beach
 		private const uint BagHandle = 0x000021FE; // the hoxxling capture's bag
 
-		// Both halves of the sequence reach EVERY player in range, in the captured order.
+		// Both halves of the sequence reach every player in range, in the captured order.
 		[Fact]
 		public async Task Fade_ReachesEveryViewerInRange_WithTheConsumedVisual()
 		{
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			Assert.Empty(farAway.Sent); // interest still bounds it - this is a broadcast, not a shout
 		}
 
-		// The consumed visual is the SECOND message, not the first: retail's order is fade then update, and a client
+		// The consumed visual is the second message, not the first: retail's order is fade then update, and a client
 		// told the bag is spent before it is told to fade it is a different sequence.
 		[Fact]
 		public async Task TheConsumedVisual_FollowsTheFade()

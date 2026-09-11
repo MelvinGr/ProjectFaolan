@@ -15,19 +15,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report combo-swings`: every melee-combo swing in the corpus, resolved against the `Combos` catalog (#139).
+	// `--report combo-swings`: every melee-combo swing in the corpus, resolved against the `Combos` catalog.
 	//
 	// This is the scan that settles what a combo swing says. A `Combat:Melee` (BehaviorId 0x0F) BehaviorControlCenter
 	// record carries a `CommandMessage` in its args, and three of its fields are the combo:
 	//
 	//     field 7  combo_id           the `Combos` catalog id, verbatim
-	//     field 8  combo_attack_num   the 0-based step, ABSENT on the opener (protobuf omits a zero)
+	//     field 8  combo_attack_num   the 0-based step, absent on the opener (protobuf omits a zero)
 	//     field 9  combo_attack_hits  the hit count (never set in the corpus)
 	//
-	// ⚠️ It exists because those fields were once read as raw bytes - "[08][animByte][2B marker][u32 counter][u32
-	// cid = 0x300038XX]" - which put the combo id in the middle of a made-up field and left the conclusion that the
-	// combo could not be recovered from packets at all. The "0x300038XX" was `[30 00]` (execution_status = 0) then
-	// `[38 <combo_id varint>]`. Re-derive the numbers here rather than trusting that history.
+	// Read the args as protobuf, never as raw bytes: a byte-wise reading of the same region puts the combo id in the
+	// middle of a made-up field, because what looks like a `0x300038XX` word is `[30 00]` (execution_status = 0)
+	// followed by `[38 <combo_id varint>]`.
 	//
 	// `--report-arg <file>` additionally writes the matched packets, whole and in capture order, so they can be
 	// installed as a test fixture with `--report fixture-set`.
@@ -40,15 +39,15 @@ namespace Faolan.Importer.Cli
 
 			var swings = new List<Swing>();
 			var packets = new List<byte[]>();
-			// Every s2c combat behaviour whose ACTOR is an NPC we can name, combo or not - the denominator for
+			// Every s2c combat behaviour whose actor is an NPC we can name, combo or not - the denominator for
 			// "how often does retail put a combo on an NPC's swing".
 			var npcActs = new List<(uint BehaviorId, bool HasCombo)>();
 
 			foreach (var c in captures)
 			{
-				// The actor handle alone says nothing, so resolve it against the capture's OWN spawns: an FA015807
+				// The actor handle alone says nothing, so resolve it against the capture's own spawns: an FA015807
 				// carries the entity's name and its worn f23 inventory, which is what the `combo_npc_<weapon>` naming
-				// is about. Built per capture because a handle is only unique within one session (#611's recycling).
+				// is about. Built per capture because a handle is only unique within one session.
 				var actors = new Dictionary<uint, NpcSpawnEntry>();
 				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
 					actors[e.Handle] = e;
@@ -97,9 +96,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {name,-32} {g.Count(),5} records, c2s {g.Count(s => !s.IsDownload)}, distinct actors {g.Select(s => s.Actor).Distinct().Count()}");
 			}
 
-			// `bcc_action_id` is the swing ANIMATION, and per class+weapon it maps one-to-one onto the step's own
-			// direction - which is what the old raw-byte read was reaching for with "animByte". Grouping it by the
-			// catalog step it lands on shows that directly.
+			// `bcc_action_id` is the swing animation, and per class and weapon it maps one-to-one onto the step's own
+			// direction. Grouping it by the catalog step it lands on shows that directly.
 			Console.WriteLine();
 			Console.WriteLine("bcc_action_id by the catalog direction it lands on (name prefix = class/weapon family):");
 			foreach (var g in swings.Where(s => s.Direction is not null).GroupBy(s => s.Combo!.Name.Split('_')[0]).OrderBy(g => g.Key))
@@ -117,7 +115,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {g.Key.Id,8}  {g.Key.Name,-56} [{g.Key.Actions,-16}] steps={steps} num={{{nums}}} x{g.Count()}");
 			}
 
-			// The RATE: retail does not put a combo on every NPC swing, and the runtime has to match the share or the
+			// The rate: retail does not put a combo on every NPC swing, and the runtime has to match the share or the
 			// mobs read as combo-spamming. Denominator = the s2c combat behaviours whose actor is a named NPC.
 			Console.WriteLine();
 			Console.WriteLine("NPC combat behaviours, combo vs plain:");
@@ -127,9 +125,9 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {(BehaviorId)g.Key,-18} {g.Count(),5} acks, {with,5} carry a combo ({(g.Any() ? 100.0 * with / g.Count() : 0):F1}%)");
 			}
 
-			// #623 part 2: WHICH NPC swings WHICH combo. The `combo_npc_*` names read as `<class-archetype>_<weapon>`
+			// Which NPC swings which combo. The `combo_npc_*` names read as `<class-archetype>_<weapon>`
 			// or `generic_<weapon>`, so the question the runtime has to answer is whether the choice follows the
-			// NPC TYPE or the NPC's WEAPON. Resolved against the actor's own spawn: its name, its template id (the
+			// NPC type or the NPC's weapon. Resolved against the actor's own spawn: its name, its template id (the
 			// stable per-type identity) and the item templates it wears.
 			var items = await db.Items.ToDictionaryAsync(i => i.Id, i => i.Name);
 			var professions = await db.NpcStatCores.ToDictionaryAsync(n => n.NpcTemplateId, n => n.ProfessionType?.ToString() ?? "-");
@@ -145,7 +143,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// The other direction: does one combo belong to one type, or does a type pick per swing? A combo used by
-			// many types is a WEAPON/archetype selection; a combo used by exactly one type is a type property.
+			// many types is a weapon/archetype selection; a combo used by exactly one type is a type property.
 			Console.WriteLine();
 			Console.WriteLine("NPC combo -> the distinct actor types that swing it:");
 			foreach (var g in npcSwings.Where(s => s.ActorSpawn is not null).GroupBy(s => s.Combo!.Name).OrderBy(g => g.Key))
@@ -155,7 +153,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// The class-specific families are named `<archetype>_<weapon>_<N>_<name>` where N runs 1/30/50/70 - which
-			// reads as a LEVEL gate. Print the actor levels behind each so that either holds up or does not.
+			// reads as a level gate. Print the actor levels behind each so that either holds up or does not.
 			Console.WriteLine();
 			Console.WriteLine("class-family NPC combos: the actor LEVELs and profession types behind each:");
 			foreach (var g in npcSwings.Where(s => s.ActorSpawn is not null && !s.Combo!.Name.StartsWith("combo_npc_generic_", StringComparison.Ordinal))
@@ -171,7 +169,7 @@ namespace Faolan.Importer.Cli
 			foreach (var g in npcSwings.Where(s => s.ActorSpawn is not null).SelectMany(s => s.ActorSpawn!.Equipment).GroupBy(e => e.Pos).OrderBy(g => g.Key))
 				Console.WriteLine($"  {g.Key,3}  x{g.Count(),-5} {string.Join(", ", g.Select(e => items.GetValueOrDefault(e.Template) ?? $"item {e.Template}").Distinct().Take(6))}");
 
-			// The decisive cut: ONE physical NPC (one handle in one capture) has ONE weapon loadout, so grouping the
+			// The decisive cut: one physical NPC (one handle in one capture) has one weapon loadout, so grouping the
 			// combos it swung against the items in its weapon slots is what separates "the combo follows the type"
 			// from "the combo follows the weapon".
 			Console.WriteLine();
@@ -203,7 +201,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"wrote {packets.Count} packets ({packets.Sum(b => b.Length)} bytes) to {fixtureOut}");
 		}
 
-		// The equip slots a WEAPON can sit in, so a combo can be grouped by what the actor is holding. Sourced from
+		// The equip slots a weapon can sit in, so a combo can be grouped by what the actor is holding. Sourced from
 		// the slot census this report prints above it rather than assumed.
 		private static readonly uint[] NpcWeaponSlots = [6, 7, 8, 9];
 

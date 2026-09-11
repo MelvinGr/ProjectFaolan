@@ -5,21 +5,23 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// SimpleCharKilledByUpdateIIR (0xB066AFC2) - the explicit "this entity died" trigger. A health=0 StatUpdate alone
-	// does NOT drive the client's death animation / dead (release-screen) state (docs/subsystems/combat.md, #204/#214);
-	// the client only reacts when it also gets this kill record. Decoded from AssassinL23_..._resurect: the player-death
-	// sequence right before the 0x2024 release screen carries this for the dying handle.
-	//
-	//   [subop][class][dying][u8 env=0][u8 flag=1][class][killerEndpoint]     (22 B)
-	//
-	// `killerEndpoint` is the slayer (ProtoEndpoint-style type<<16|instance); 0 when unknown/self.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     SimpleCharKilledByUpdateIIR - the explicit "this entity died" trigger, 22 bytes:
+	///     <c>[subop][class][dying][u8 env=0][u8 flag=1][class][killerEndpoint]</c>.
+	/// </summary>
+	/// <remarks>
+	///     A health-zero StatUpdate alone does not drive the client's death animation or its dead, release-screen state -
+	///     see docs/subsystems/combat.md - and the client only reacts once it also receives this kill record. Decoded from
+	///     AssassinL23_..._resurect, where the player-death sequence right before the release screen carries it for the dying
+	///     handle. <c>killerEndpoint</c> is the slayer, in the ProtoEndpoint form type &lt;&lt; 16 | instance, and 0 when
+	///     unknown or self-inflicted.
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class SimpleCharKilledByUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SimpleCharKilledByUpdateIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SimpleCharKilledByUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -65,6 +67,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// SimpleCharKilledByUpdateIIR (0xB066AFC2). `Flag` is 1 in every captured record.
+	/// <summary>The SimpleCharKilledByUpdateIIR body. <c>Flag</c> is 1 in every captured record.</summary>
 	public sealed record SimpleCharKilledByUpdateIIR(uint DyingHandle, byte Env, byte Flag, uint KillerEndpoint);
 }

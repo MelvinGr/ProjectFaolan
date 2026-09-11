@@ -8,18 +8,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spawn-item-level` (#755): what LEVEL a character SPAWN puts on each worn item, measured against the
-	// `Items.Level` column, over the capture DUMPS.
+	// `--report spawn-item-level`: what level a character spawn puts on each worn item, measured against the
+	// `Items.Level` column, over the capture dumps.
 	//
 	// `PlayerSpawnEquipment.BuildEntry` hardcodes `Level = 1` on every worn item it emits. The snapshot entry's
 	// `level` was measured and turned out to be exactly `Items.Level` (8,479 of 8,479), which is why that emitter now
-	// reads the column - but that result does NOT transfer here: the spawn's worn equipment is a different message
+	// reads the column - but that result does not transfer here: the spawn's worn equipment is a different message
 	// (`ProtoCoreCharacterIIR.InventoryEntry` inside FA015807, not `ProtoInventoryGameEntry`), written by a different
-	// part of retail's server, and assuming the two agree is exactly the kind of unmeasured carry-over #755 exists to
-	// avoid.
+	// part of retail's server, and assuming the two agree would be an unmeasured carry-over.
 	//
-	// ⚠️ The importer already HARVESTS this field (`ItemHashHarvester.ExtractFromSpawnEquipment` records
-	// `acg.Level`), so it looks measured - but `Record` only ever fills a MISSING level and never overwrites one, so
+	// The importer already HARVESTS this field (`ItemHashHarvester.ExtractFromSpawnEquipment` records
+	// `acg.Level`), so it looks measured - but `Record` only ever fills a missing level and never overwrites one, so
 	// a spawn that disagreed with the snapshot would be silently discarded rather than reported. That is why the
 	// number has to come from a sweep rather than from the column.
 	public static partial class ReportCli
@@ -67,7 +66,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"spawn-item-level: {spawns} character spawns, {entries} worn-item entries, {seen.Keys.Select(k => k.Template).Distinct().Count()} distinct templates.");
 			Console.WriteLine();
 
-			// Is the spawn's level even a property of the TEMPLATE? If one template ships two different levels the
+			// Is the spawn's level even a property of the template? If one template ships two different levels the
 			// question "what should we emit" has no answer from data, and that has to be said before any comparison.
 			var varying = seen.Keys.GroupBy(k => k.Template).Where(g => g.Count() > 1).ToList();
 			Console.WriteLine($"  templates carrying more than one spawn level: {varying.Count}");

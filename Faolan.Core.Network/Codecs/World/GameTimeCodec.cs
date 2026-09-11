@@ -4,23 +4,28 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// GameTimeIIR (0x4F57DC08) - the world clock that drives the day/night cycle; it resyncs the client's GameTime_t.
-	// 33 bytes:
-	//   [u32 subop][u32 class][u32 handle][u8 isToBePassed][f32 dayTime][u32 unapplied][u32 gameDay][u32 unix][f32 rate]
-	// The class/handle carrier is 0 on every record we send (the clock is not addressed to an entity).
-	//
-	// The time MODEL - what dayTime and the resync anchor mean, and why both are generated rather than replayed - is
-	// GameClock next door.
+	/// <summary>
+	///     GameTimeIIR - the world clock that drives the day/night cycle, resyncing the client's GameTime_t. 33 bytes:
+	///     <c>[u32 subop][u32 class][u32 handle][u8 isToBePassed][f32 dayTime][u32 unapplied][u32 gameDay][u32 unix][f32
+	///     rate]</c>. The class and handle carrier is 0 on every record we send, the clock not being addressed to an
+	///     entity.
+	/// </summary>
+	/// <remarks>
+	///     The time model - what dayTime and the resync anchor mean, and why both are generated rather than replayed -
+	///     lives in <see cref="GameClock" />.
+	/// </remarks>
 	public static class GameTimeCodec
 	{
 		public const uint Opcode = (uint)IirTypes.GameTimeIIR;
 
-		// The u32 that sits between dayTime and the anchor. The client's ReadSubClass loads it but the apply never
-		// forwards it to the clock; it holds 0..3 across the corpus (n = 11/37/16/77 for 0/1/2/3). We send the captured
-		// world-entry value. NB this is the byte the old decode mislabelled as a "flag" at the END of dayTime.
+		/// <summary>
+		///     The u32 between dayTime and the anchor. The client's ReadSubClass loads it but the apply never forwards it to
+		///     the clock; it holds 0 to 3 across the corpus (11, 37, 16 and 77 records respectively). We send the captured
+		///     world-entry value.
+		/// </summary>
 		private const uint UnappliedWord = 1;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(GameTimeIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -29,11 +34,16 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// dayTime is passed in rather than read from the clock so a golden test can rebuild a captured record exactly:
-		// the time of day is server state (like a position), while the record's LAYOUT is what the capture pins.
-		// `rate` is the trailing f32 the client feeds straight into its own clock multiplier (GameTime_t +0xD4), so a
-		// GM speeding the day up is a WIRE change the client follows rather than a server-side fudge it drifts against.
-		// Defaulted, so every existing caller - and the golden test that rebuilds a captured record - is unaffected.
+		/// <summary>
+		///     Builds the record from an explicit time of day. It is passed in rather than read from the clock so a golden
+		///     test can rebuild a captured record exactly: the time of day is server state, like a position, while the
+		///     record's layout is what the capture pins.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="rate" /> is the trailing f32 the client feeds straight into its own clock multiplier
+		///     (GameTime_t +0xD4), so a GM speeding the day up is a wire change the client follows rather than a server-side
+		///     fudge it drifts against.
+		/// </remarks>
 		public static byte[] Build(float dayTimeSeconds, DateTimeOffset now, float rate = 1.0f)
 		{
 			var (gameDay, unixSeconds) = GameClock.ResyncAnchor(now);
@@ -80,6 +90,6 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// GameTimeIIR (0x4F57DC08).
+	/// <summary>The GameTimeIIR body.</summary>
 	public sealed record GameTimeIIR(float DayTimeSeconds, uint UnappliedWord, uint GameDay, uint UnixSeconds, bool IsToBePassed = true, float Rate = 1.0f, uint ClassWord = 0, uint Handle = 0);
 }

@@ -8,38 +8,43 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// The client's `IOBuffer` as it rides the PlayerAgent settings methods - the payload of UpdateSubscriptionSettings,
-	// UpdateCharacterSettings, UpdateCharacterPreview and their s2c twins (SendCharacterSettings / SendCharacterPreview).
-	// Decoded in Gitea #611 from the three captured mid-session uploads.
-	//
-	//   [u32 byteLength][ "IOz1" ][u32 inflatedSize, LITTLE-endian][zlib stream]
-	//
-	// `byteLength` counts everything after it, so a length of 0 is a legitimately EMPTY buffer and no marker follows -
-	// which is what retail sends for a character that has never uploaded anything (`SendCharacterSettings` is 12 bytes:
-	// the ID32 plus a zero length, x118 in the corpus). `IOz1` is the client's compressed-buffer marker and the size
-	// after it is the inflated length; both are little-endian because this is a client-side file format that happens to
-	// be shipped over a big-endian wire, not a wire record.
-	//
-	// Inflated, the buffer is a FILE ARCHIVE - the client's own settings files, concatenated:
-	//
-	//   repeated [u32 nameLength][name, LATIN1][u32 dataLength][data]      (both lengths little-endian)
-	//
-	// Observed members: `hotkeys.xml`, `Prefs_2.xml` (subscription = account-wide), `Chat\Windows.xml`,
-	// `DockAreas\SideBarLeft.xml`, `DockAreas\SideBarRight.xml`, `Prefs_2.xml` (per character) and `preview.bin` (the
-	// character-select preview - a binary appearance record, not decoded here).
-	//
-	// ⚠️ The value carries the COMPRESSED payload verbatim, and `Build` writes those bytes back rather than
-	// recompressing. That is not laziness: a deflate stream is not a function of its contents (level, window and
-	// implementation all move it), so re-deflating would change the bytes - and the checksum the client sends alongside
-	// is an MD5 over exactly these bytes (`CheckSum`), so the server can only reproduce it by storing them. `Files` is
-	// therefore a decoded VIEW of `Payload`, not its source.
+	/// <summary>
+	///     The client's <c>IOBuffer</c> as it rides the PlayerAgent settings methods - the payload of
+	///     <c>UpdateSubscriptionSettings</c>, <c>UpdateCharacterSettings</c>, <c>UpdateCharacterPreview</c> and their s2c
+	///     twins (<c>SendCharacterSettings</c> / <c>SendCharacterPreview</c>).
+	/// </summary>
+	/// <remarks>
+	///     <code>
+	///     [u32 byteLength][ "IOz1" ][u32 inflatedSize, little-endian][zlib stream]
+	///     </code>
+	///     <para>
+	///         <c>byteLength</c> counts everything after it, so a length of 0 is a legitimately empty buffer with no
+	///         marker following - which is what retail sends for a character that has never uploaded anything
+	///         (<c>SendCharacterSettings</c> is then 12 bytes: the ID32 plus a zero length, 118 times in the corpus).
+	///         <c>IOz1</c> is the client's compressed-buffer marker and the size after it is the inflated length; both are
+	///         little-endian, because this is a client-side file format that happens to be shipped over a big-endian wire.
+	///     </para>
+	///     <para>
+	///         Inflated, the buffer is a file archive - the client's own settings files, concatenated as
+	///         <c>repeated [u32 nameLength][name, Latin1][u32 dataLength][data]</c>, both lengths little-endian. Observed
+	///         members: <c>hotkeys.xml</c>, an account-wide <c>Prefs_2.xml</c>, <c>Chat\Windows.xml</c>,
+	///         <c>DockAreas\SideBarLeft.xml</c>, <c>DockAreas\SideBarRight.xml</c>, a per-character <c>Prefs_2.xml</c>
+	///         and <c>preview.bin</c>.
+	///     </para>
+	///     <para>
+	///         The value carries the compressed payload verbatim, and <c>Build</c> writes those bytes back rather than
+	///         recompressing. A deflate stream is not a function of its contents - level, window and implementation all
+	///         move it - so re-deflating would change the bytes, and the checksum the client sends alongside is an MD5
+	///         over exactly these bytes. <c>Files</c> is therefore a decoded view of <c>Payload</c>, not its source.
+	///     </para>
+	/// </remarks>
 	public static class ClientSettingsBufferCodec
 	{
 		// The compressed-buffer marker "IOz1", ASCII, immediately before the inflated size.
 		private const uint Marker = 0x494F7A31;
 
-		// CANONICAL - the only method here that writes bytes. The u32 length belongs to the composing message, so this
-		// is the payload alone: exactly what the server stores, and what `Parse` takes back.
+		// Canonical: the only method here that writes bytes. The u32 length belongs to the composing message, so this is
+		// the payload alone - exactly what the server stores, and what `Parse` takes back.
 		public static byte[] Build(ClientSettingsBuffer value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -47,12 +52,12 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			return value.Payload;
 		}
 
-		// The archive AUTHORING form: pack the members and deflate them into a fresh buffer. Retail never needs this -
-		// the client authors every archive the server holds - but a preview constructed here (#788) has to become one.
-		// ⚠️ The bytes are NOT retail's: a deflate stream is not a function of its contents, so the checksum of a
-		// packed buffer will not match the one the client would have computed for the same files. That is fine for a
-		// buffer we author and would be wrong for one we merely relay, which is why Build(ClientSettingsBuffer) still
-		// carries the payload verbatim.
+		// The archive authoring form: pack the members and deflate them into a fresh buffer. Retail never needs this, since
+		// the client authors every archive the server holds, but a preview constructed here has to become one.
+		//
+		// The bytes are not retail's: a deflate stream is not a function of its contents, so the checksum of a packed buffer
+		// will not match the one the client would have computed for the same files. That is fine for a buffer authored here
+		// and would be wrong for one merely relayed, which is why Build(ClientSettingsBuffer) carries the payload verbatim.
 		public static byte[] Build(IReadOnlyList<ClientFile> files)
 		{
 			ArgumentNullException.ThrowIfNull(files);
@@ -75,8 +80,8 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			s.WriteArrayUInt32Length(Build(v));
 		}
 
-		// The archive INSIDE the buffer: inflate, then walk the name/data pairs. Strict like any Parse - a truncated
-		// entry or a trailing byte is a decode failure, not a shorter file list.
+		// The archive inside the buffer: inflate, then walk the name/data pairs. Strict like any Parse - a truncated entry
+		// or a trailing byte is a decode failure, not a shorter file list.
 		private static IReadOnlyList<ClientFile> Unpack(in ReadOnlySpan<byte> payload)
 		{
 			var r = new SpanReader(payload, nameof(ClientSettingsBufferCodec));
@@ -96,9 +101,9 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			return files;
 		}
 
-		// The inverse of Unpack + Inflate: concatenate the name/data pairs, deflate them, and put the marker and the
-		// INFLATED size in front. Private because it is not an encoding of the value type - Build(ClientSettingsBuffer)
-		// stays the one method that turns a buffer into bytes, and this is what gives that buffer its payload.
+		// The inverse of Unpack and Inflate: concatenate the name/data pairs, deflate them, and put the marker and the
+		// inflated size in front. Private because it is not an encoding of the value type - Build(ClientSettingsBuffer) stays
+		// the one method that turns a buffer into bytes, and this is what gives that buffer its payload.
 		private static byte[] Pack(IReadOnlyList<ClientFile> files)
 		{
 			using var contents = new FaolanStream();
@@ -134,19 +139,21 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// One IOBuffer: the payload exactly as it went over the wire, plus the files it inflates to.
+	/// <summary>One IOBuffer: the payload exactly as it went over the wire, plus the files it inflates to.</summary>
 	public sealed record ClientSettingsBuffer(byte[] Payload, IReadOnlyList<ClientFile> Files)
 	{
 		public static readonly ClientSettingsBuffer Empty = new ClientSettingsBuffer([], []);
 
 		public bool IsEmpty => Payload.Length == 0;
 
-		// The MD5 the client sends alongside an upload and the server hands back in SendCharacterSettingsCheckSumMap:
-		// 32 lowercase hex chars over the COMPRESSED payload (marker and size included). Verified against all three
-		// captured uploads that carry one.
+		/// <summary>
+		///     The MD5 the client sends alongside an upload and the server hands back in
+		///     <c>SendCharacterSettingsCheckSumMap</c>: 32 lowercase hex characters over the compressed payload, marker and
+		///     size included. Verified against all three captured uploads that carry one.
+		/// </summary>
 		public string CheckSum => IsEmpty ? "" : Convert.ToHexStringLower(MD5.HashData(Payload));
 	}
 
-	// One file in the archive. `Name` is a client-relative path and uses BACKSLASHES (`Chat\Windows.xml`).
+	/// <summary>One file in the archive. <c>Name</c> is a client-relative path and uses backslashes.</summary>
 	public readonly record struct ClientFile(string Name, byte[] Data);
 }

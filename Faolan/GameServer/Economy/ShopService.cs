@@ -20,28 +20,36 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
 {
-	// NPC vendor / shop flow (TODO §9b), decoded from the NecroL80 sell_items_to_trader capture:
-	//   DL 0x2033 DispatchShopData   [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
-	//   UL 0x2034 SellItem           [shop ID32][u32 container][u32 charId][u32 slot]
-	//   DL 0x2035 DispatchItemSoldToShop [u32 container][u32 charId][u32 slot]  (the client clears the bag slot)
-	//   DL 0x2005 money update (the wallet credit - via the injected money-update seam)
-	//   UL 0x2033 BuyItem            [shop ID32][u32 pos]
-	//   UL 0x2032 CloseShop, UL 0x2035 UndoLastSoldItem
-	// The wire container 0x68 (104) IS the DB CharacterInventory.Container bag value - no mapping needed.
-	// Extracted out of GameServerListener as a composed collaborator: it owns the open-shop/last-sale session
-	// state and the sell/buy/undo logic. The two cross-cutting OUTBOUND ops it needs - the wallet update and the
-	// live item grant - are reached through the IEconomyOutbound port (the listener implements it; the ops stay
-	// on the listener because they're shared by many subsystems).
+	/// <summary>
+	///     The NPC vendor and shop flow: the open-shop and last-sale session state, and the sell, buy and undo logic.
+	/// </summary>
+	/// <remarks>
+	///     <para>
+	///         Decoded from the NecroL80 sell_items_to_trader capture:
+	///     </para>
+	///     <code>
+	///     DL 0x2033 DispatchShopData        [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
+	///     UL 0x2034 SellItem                [shop ID32][u32 container][u32 charId][u32 slot]
+	///     DL 0x2035 DispatchItemSoldToShop  [u32 container][u32 charId][u32 slot]  (the client clears the bag slot)
+	///     DL 0x2005 money update            the wallet credit
+	///     UL 0x2033 BuyItem                 [shop ID32][u32 pos]
+	///     UL 0x2032 CloseShop, UL 0x2035 UndoLastSoldItem
+	///     </code>
+	///     <para>
+	///         The wire container 0x68 (104) is the database's own bag container value, so there is no mapping. The
+	///         two cross-cutting outbound ops - the wallet update and the live item grant - are reached through the
+	///         <see cref="IEconomyOutbound" /> port, since they are shared by many subsystems.
+	///     </para>
+	/// </remarks>
 	public sealed class ShopService
 	{
-		// Vendor BUY price in tin (what the player pays): a flat markup over the SAME item's sell value so wares
-		// can't be flipped for free (buy > sell). Grounded in the real value when known; the markup itself has no
-		// captured anchor and stays the open part (#137). A value-less ware still costs at least the markup (min 1
-		// per-unit) so the shop never gives it away free.
+		// The vendor buy markup: a flat multiple over the same item's sell value, so wares cannot be flipped for free.
+		// The sell value is grounded in the item's real value; the markup itself has no captured anchor. A valueless
+		// ware still costs at least the markup, at a minimum of 1 per unit, so the shop never gives it away.
 		public const uint VendorBuyMarkup = 4;
 
-		// Session-volatile shop instance ids we hand the client in DispatchShopData (the value the BuyItem echoes
-		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
+		// Session-volatile shop instance ids handed to the client in DispatchShopData, and echoed back by BuyItem.
+		// Uniqueness only needs to hold within a session, so a process-wide counter is enough.
 		private static int _shopInstanceSeq;
 
 		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new ConcurrentDictionary<INetworkClient, LastShopSale>();
@@ -60,9 +68,13 @@ namespace Faolan.GameServer.Economy
 			_outbound = outbound;
 		}
 
-		// UL 0x2033 BuyItem [shop ID32 type][shop instance][slot]: resolve the clicked slot against the open shop,
-		// price it, debit the wallet (DispatchUpdateCash) and grant the item live (DispatchAddItem via
-		// GrantItemToBackpack). Refuses on no-open-shop, unknown slot, insufficient funds or a full bag.
+		/// <summary>
+		///     UL 0x2033 BuyItem [shop ID32 type][shop instance][slot]: resolves the clicked slot against the open
+		///     shop, prices it, debits the wallet (DispatchUpdateCash) and grants the item live (DispatchAddItem).
+		/// </summary>
+		/// <remarks>
+		///     Refuses on no open shop, an unknown slot, insufficient funds or a full bag.
+		/// </remarks>
 		public async Task HandleBuyItemFromShop(INetworkClient client, uint shopInstance, uint pos)
 		{
 			var character = client.Session.Character;
@@ -79,18 +91,18 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			// The trade-open gate above already refuses a criminal, so reaching here means the player went criminal
-			// with the window already open. Re-checked rather than assumed: the open shop is remembered per session, so
-			// without this a buy would still go through on a stale window (#503).
+			// The trade-open gate already refuses a criminal, so reaching here means the player went criminal with the
+			// window already open. Re-checked rather than assumed: the open shop is remembered per session, so without
+			// this a buy would still go through on a stale window.
 			if (character.IsCriminal && !CriminalStatus.TradesWithCriminals(shop.VendorName))
 			{
 				_logger.LogInformation("BuyItem: \"{Vendor}\" refuses {Character} - criminal until {Until:u} (#503).", shop.VendorName, character.Name, character.CriminalUntil);
 				return;
 			}
 
-			// No `?? 0` on the price: a ware pointing at an item row we do not have is a broken shop, and pricing it at
-			// zero would sell it for free. The grant below happens to fail for the same missing row today, so this only
-			// ever showed up as an aborted purchase - one refactor away from being a free-item exploit.
+			// No `?? 0` on the price: a ware pointing at an absent item row is a broken shop, and pricing it at zero
+			// would sell it for free. The grant below fails on the same missing row, so the purchase aborts either way,
+			// but relying on that would leave a free-item exploit one refactor away.
 			var wareItem = await _catalog.GetItem(ware.ItemTemplateId);
 			if (wareItem == null)
 			{
@@ -107,7 +119,7 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			// Grant first so a full bag (null slot) aborts the purchase before any money moves.
+			// Grant first, so a full bag - a null slot - aborts the purchase before any money moves.
 			var slot = await _outbound.GrantItemToBackpack(client, ware.ItemTemplateId, ware.Count);
 			if (slot == null)
 			{
@@ -123,9 +135,14 @@ namespace Faolan.GameServer.Economy
 				ware.ItemTemplateId, ware.Count, pos, shop.VendorName, price, slot, character.Money);
 		}
 
-		// UL 0x2034 SellItem: validate the bag slot, price the item, remove it, credit the wallet, and confirm
-		// with DispatchItemSoldToShop + the 0x2005 balance update (retail's exact reply trio minus the 0x201C
-		// record-stream entry, which is bookkeeping we don't model).
+		/// <summary>
+		///     UL 0x2034 SellItem: validates the bag slot, prices the item, removes it, credits the wallet and confirms
+		///     with DispatchItemSoldToShop plus the 0x2005 balance update.
+		/// </summary>
+		/// <remarks>
+		///     That is retail's reply trio minus the 0x201C record-stream entry, which is bookkeeping this server does
+		///     not model.
+		/// </remarks>
 		public async Task HandleSellItemToShop(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // shop ID32 type (0xC75B)
@@ -136,8 +153,8 @@ namespace Faolan.GameServer.Economy
 
 			var character = client.Session.Character;
 
-			// "Normal vendors will not trade with you" cuts both ways - a criminal cannot sell either (#503). The open
-			// shop is per-session, so like BuyItem this must be re-checked rather than left to the trade-open gate.
+			// "Normal vendors will not trade with you" cuts both ways: a criminal cannot sell either. The open shop is
+			// per-session, so like BuyItem this must be re-checked rather than left to the trade-open gate.
 			if (character.IsCriminal && _openShop.TryGetValue(client, out var openShop))
 				if (!CriminalStatus.TradesWithCriminals(openShop.VendorName))
 				{
@@ -155,8 +172,8 @@ namespace Faolan.GameServer.Economy
 			var price = VendorPriceTin(sold.Template.Value, sold.Count);
 			if (price == 0)
 			{
-				// A valueless item (RDB value 0, e.g. the Totem of Origins) is no-sell - refuse rather than invent
-				// a price. The client keeps the item in the slot since we send no DispatchItemSoldToShop.
+				// A valueless item (RDB value 0, such as the Totem of Origins) is no-sell, so refuse rather than
+				// invent a price. The client keeps the item in the slot, because no DispatchItemSoldToShop is sent.
 				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", sold.Template.Name, sold.TemplateId, character.Name);
 				return;
 			}
@@ -164,10 +181,10 @@ namespace Faolan.GameServer.Economy
 			await _inventory.SetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot, null);
 			character.Money += price;
 			await _inventory.SetCharacterMoney(character.Id, character.Money);
-			// ⚠️ The undo re-MINTS the item from its template, so anything per-instance about the sold one is gone: a
+			// The undo re-mints the item from its template, so anything per-instance about the sold one is gone: a
 			// crafted item comes back without its crafter and a gemmed one without its gems. The sold instance is
-			// deleted outright rather than parked, which is what makes that unavoidable here - see #750 for the shape
-			// an undo buffer would want (move it to a holding container instead of deleting it).
+			// deleted outright rather than parked, which is what makes that unavoidable; an undo buffer would have to
+			// move it to a holding container instead of deleting it.
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, sold.TemplateId, sold.Count, price);
 
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceMethods.DispatchItemSoldToShop, b => WriteItemSoldBody(b, container, sellerId, slot)));
@@ -177,7 +194,9 @@ namespace Faolan.GameServer.Economy
 				container, slot, price, character.Money);
 		}
 
-		// UL 0x2035 UndoLastSoldItem: restore the last sale (item back to its slot, price debited).
+		/// <summary>
+		///     UL 0x2035 UndoLastSoldItem: restores the last sale - the item back to its slot, the price debited.
+		/// </summary>
 		public async Task HandleUndoLastSoldItem(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -198,22 +217,27 @@ namespace Faolan.GameServer.Economy
 				character.Money);
 		}
 
-		// The real shop-OPEN trigger (#134): the client clicked a vendor NPC (a TalkToNpc BCC Interact whose
-		// SpellTarget is the vendor handle), and the shop window is gated on the reply riding THAT conversation -
-		// a cold DispatchShopData never pops it. Retail's reply sequence (sell_items_to_trader frames 1189/1193,
-		// see ShopOpenBuilder): the 0x0D155695 trade-select echo, the bare (unpadded) BCC echo-ack, then the shop
-		// content. `rawPayload` is the inbound Interact exactly as received (the echo re-frames it).
+		/// <summary>
+		///     The shop-open trigger: the client clicked a vendor NPC - a TalkToNpc BCC Interact whose target is the
+		///     vendor handle - and the shop window is gated on the reply riding that conversation, so a cold
+		///     DispatchShopData never pops it.
+		/// </summary>
+		/// <param name="rawPayload">The inbound Interact exactly as received; the echo re-frames it.</param>
+		/// <remarks>
+		///     Retail's reply sequence (sell_items_to_trader frames 1189/1193) is the 0x0D155695 trade-select echo, the
+		///     bare unpadded BCC echo-ack, then the shop content.
+		/// </remarks>
 		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Shop shop, uint npcHandle)
 		{
-			// A CRIMINAL is refused by normal vendors (#503) - the annotated `npc refued to deal with me because of
-			// ciminal`, followed by `now it works (debuf gone)` once the debuff expired. Not our rule: the captured
-			// "Criminal" spell's own description says "normal vendors will not trade with you... you can seek out
-			// smugglers at outlaw camps instead", so the smuggler exception is part of the same sentence.
+			// A criminal is refused by normal vendors, as the capture's annotations record. It is retail's rule, not
+			// this server's: the captured "Criminal" spell's own description says "normal vendors will not trade with
+			// you... you can seek out smugglers at outlaw camps instead", so the smuggler exception is part of the same
+			// sentence.
 			//
-			// Refused at the trade-OPEN rather than at the buy: the annotation is about the NPC not dealing at all.
-			// ⚠️ No refusal message is sent because none is decoded - retail evidently shows the player something, but
-			// the capture's refusal was on a travel NPC and the packet is not identified. Logged so a silent no-op is
-			// still explicable from the server side.
+			// Refused at the trade-open rather than at the buy, because the NPC does not deal at all. No refusal
+			// message is sent, because none is decoded - retail evidently shows the player something, but the capture's
+			// refusal was on a travel NPC and the packet is unidentified. Logged so a silent no-op is still explicable
+			// from the server side.
 			if (client.Session.Character.IsCriminal && !CriminalStatus.TradesWithCriminals(shop.VendorName))
 			{
 				_logger.LogInformation("Shop: \"{Vendor}\" refuses {Character} - criminal until {Until:u} (#503).",
@@ -229,21 +253,26 @@ namespace Faolan.GameServer.Economy
 			_logger.LogInformation("Shop: vendor trade-open for \"{Vendor}\" (npc 0x{Handle:X8}) by {Character}.", shop.VendorName, npcHandle, client.Session.Character?.Name);
 		}
 
-		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
-		// resolve a clicked slot. `npcHandle` is the vendor's world-entity handle (the client renders the window
-		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is
-		// KnubotStartTrade-gated, same family as the mid-session-spawn blocker); a cold push doesn't pop the
-		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
+		/// <summary>
+		///     DL 0x2033 DispatchShopData: serves a vendor's window and remembers it for this session so BuyItem can
+		///     resolve a clicked slot.
+		/// </summary>
+		/// <param name="npcHandle">The vendor's world-entity handle; the client renders the window against it.</param>
+		/// <remarks>
+		///     The window only opens in-client off the client's own NPC trade-initiation, because the shop is
+		///     KnubotStartTrade-gated - a cold push does not pop it. This sets up the server-side state so the buy
+		///     round-trip is complete and exercisable.
+		/// </remarks>
 		public async Task SendShopData(INetworkClient client, Shop shop, uint npcHandle)
 		{
-			// The codec's item resolver is synchronous; pre-resolve every ware's Items row up front, in ONE read rather
-			// than a query per ware (a stocked vendor is dozens of them, paid on every window open).
+			// The codec's item resolver is synchronous, so every ware's Items row is pre-resolved in one read rather
+			// than a query per ware - a stocked vendor is dozens of them, paid on every window open.
 			var resolved = (await _catalog.GetItems([.. shop.Items.Select(w => w.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
 
 			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
 			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id)!);
 
-			// Track only the wares that actually resolved (the codec skips the rest, so their slots aren't on the wire).
+			// Track only the wares that resolved: the codec skips the rest, so their slots are not on the wire.
 			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
@@ -257,25 +286,32 @@ namespace Faolan.GameServer.Economy
 			return Math.Max(1u, PerUnitValueTin(value)) * Math.Max(1u, count) * VendorBuyMarkup;
 		}
 
-		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Returns 0
-		// for a valueless item (Item.Value == 0) - HandleSellItemToShop refuses to sell those (they are no-value /
-		// no-sell, like the Totem of Origins), rather than inventing a level-based price.
+		/// <summary>
+		///     The vendor sell price in tin - what the player gets selling to the vendor - which is round(value / 10)
+		///     per unit.
+		/// </summary>
+		/// <returns>
+		///     0 for a valueless item (<c>Item.Value == 0</c>). <see cref="HandleSellItemToShop" /> refuses to sell
+		///     those rather than inventing a level-based price.
+		/// </returns>
 		public static uint VendorPriceTin(uint value, uint count)
 		{
 			return PerUnitValueTin(value) * Math.Max(1u, count);
 		}
 
-		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
-		// Body golden-tested against the captured slot-5 sale (ShopTests).
+		/// <summary>
+		///     DL 0x2035 - tells the client the bag slot was sold; it clears the slot itself. The body is
+		///     golden-tested against the captured slot-5 sale.
+		/// </summary>
 		public static void WriteItemSoldBody(FaolanStream s, uint container, uint characterId, uint slot)
 		{
 			s.WriteUInt32(container).WriteUInt32(characterId).WriteUInt32(slot);
 		}
 
-		// The per-unit value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the RDB
-		// item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). Value 0 is a
-		// genuinely valueless item (the template carries field 74 == 0, e.g. the unsellable Totem of Origins) -> 0,
-		// NOT a price; SELL treats that as unsellable and BUY adds its markup on top.
+		// The per-unit value in tin, the wallet's wire unit: round(Item.Value / 10), where Item.Value is the RDB item
+		// template's field 74. Proven by the captured sales (190 to 19, 920 to 92, 560 to 56 tin). Value 0 is a
+		// genuinely valueless item - the template carries field 74 == 0, as the unsellable Totem of Origins does - and
+		// is not a price: sell treats it as unsellable, and buy adds its markup on top.
 		private static uint PerUnitValueTin(uint value)
 		{
 			return value > 0
@@ -283,19 +319,19 @@ namespace Faolan.GameServer.Economy
 				: 0;
 		}
 
-		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
+		// The world-conversation IIR carrier, with the framing every world IIR uses.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
 
-		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
+		// The last sale per connection, so UndoLastSoldItem can restore it. Retail's undo is single-step too.
 		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceTin);
 
-		// The shop window the client currently has open, recorded when we send DispatchShopData. BuyItem only
-		// carries the session-volatile shop instance + a slot position, so we need the open window's wares to
-		// resolve the position back to a template id and price it. Keyed by Pos (the shop-window slot).
+		// The shop window the client currently has open, recorded when DispatchShopData is sent. BuyItem carries only
+		// the session-volatile shop instance and a slot position, so the open window's wares are what resolve that
+		// position back to a template id and price it. Keyed by Pos, the shop-window slot.
 		private sealed record OpenShop(uint Instance, string VendorName, IReadOnlyDictionary<uint, ShopItem> WaresByPos);
 	}
 }

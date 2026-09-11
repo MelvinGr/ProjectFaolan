@@ -5,36 +5,42 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// SetShadowCoverageIIR (0xD6C1F0CC) - how much SHADOW the character is standing in, as a percentage.
-	//
-	// It belongs to the HIDING/stealth system, not to lighting: the client's per-frame player update logs it as
-	// `ShadowCoverage = <n>` on the `GameCode/Hiding` debug channel (Ghidra FUN_01100230, reading the player field at
-	// +0x390). Only the client can compute it - it owns the lighting and the geometry - so the CLIENT is the sender
-	// and the server is told, which is the opposite direction to most IIRs.
-	//
-	// Grammar from the client reader (ReadSubClass = vtable slot 8, FUN_007a8910): one u32 into obj+0x2C. That matches
-	// the four captured bodies exactly:
-	//
-	//   00000011 d6c1f0cc 0000c350 1101b4f5 01 00000064   c2s, Hakotep
-	//   00000011 d6c1f0cc 0000c350 1101b4f5 00 00000064   s2c echo
-	//   [u32 len=17][u32 subop][u32 class][u32 handle][u8 env][u32 percent]
-	//
-	// ⚠️ The ENV byte carries the direction: the client sends 0x01 and the server echoes 0x00 - the same convention
-	// ChainKillIIR and CrimeIIR use. Build() defaults to the SERVER value.
-	//
-	// Both captures carry 100, from two different characters on two different maps, so the scale is a percentage and
-	// 100 is "fully in shadow" (or the value a character out in the open reports - the corpus has no second value to
-	// tell those apart). It is an INTEGER: 0x00000064 read as a float is a denormal.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     SetShadowCoverageIIR - how much shadow the character is standing in, as a percentage.
+	/// </summary>
+	/// <remarks>
+	///     It belongs to the hiding/stealth system rather than to lighting: the client's per-frame player update logs it as
+	///     <c>ShadowCoverage = &lt;n&gt;</c> on the GameCode/Hiding debug channel (FUN_01100230, reading the player field at
+	///     +0x390). Only the client can compute it, since it owns the lighting and the geometry, so the client is the sender
+	///     and the server is told - the opposite direction to most IIRs.
+	///     <para>
+	///         Grammar from the client reader (ReadSubClass, vtable slot 8, FUN_007a8910): one u32 into obj+0x2C, matching
+	///         the four captured bodies exactly:
+	///         <code>
+	///         00000011 d6c1f0cc 0000c350 1101b4f5 01 00000064   c2s, Hakotep
+	///         00000011 d6c1f0cc 0000c350 1101b4f5 00 00000064   s2c echo
+	///         [u32 len=17][u32 subop][u32 class][u32 handle][u8 env][u32 percent]
+	///         </code>
+	///     </para>
+	///     <para>
+	///         The env byte carries the direction - the client sends 1 and the server echoes 0, the convention ChainKillIIR
+	///         and CrimeIIR also use - so Build defaults to the server value.
+	///     </para>
+	///     <para>
+	///         Both captures carry 100, from two different characters on two different maps, so the scale is a percentage
+	///         and 100 is fully in shadow, or whatever a character out in the open reports; the corpus has no second value to
+	///         tell those apart. It is an integer: read as a float, 0x00000064 is a denormal.
+	///     </para>
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class SetShadowCoverageCodec
 	{
 		public const uint Opcode = (uint)IirTypes.SetShadowCoverageIIR;
 
-		/// <summary>The env byte the CLIENT sends with; the server's echo carries 0.</summary>
+		/// <summary>The env byte the client sends with; the server's echo carries 0.</summary>
 		public const byte ClientEnv = 0x01;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(SetShadowCoverageIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -71,6 +77,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// SetShadowCoverageIIR (0xD6C1F0CC).
+	/// <summary>The SetShadowCoverageIIR body.</summary>
 	public sealed record SetShadowCoverageIIR(uint Handle, byte Env, uint Percent);
 }

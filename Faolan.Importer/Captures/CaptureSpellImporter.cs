@@ -15,28 +15,30 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Harvests spell ids the character actually cast, from ApplySpell packets (0x2000 / 0x6B87E316; spell id at
-	// inner[12..16]) and catalogs any not already in the Spell table (id-only; names/params are client-side / from
-	// the archive `spelldata`). This is the thin capture-side spell signal - the full spellbook is class/level
-	// derived and not in the pcaps (see docs/tooling/importer.md). Takes raw on-wire packet bytes.
+	/// <summary>
+	///     Harvests spell ids the character actually cast, from ApplySpell packets (0x2000 / 0x6B87E316; spell id at
+	///     inner[12..16]) and catalogs any not already in the Spell table (id-only; names/params are client-side / from
+	///     the archive <c>spelldata</c>). This is the thin capture-side spell signal - the full spellbook is
+	///     class/level derived and not in the pcaps (see docs/tooling/importer.md). Takes raw on-wire packet bytes.
+	/// </summary>
 	public static class CaptureSpellImporter
 	{
-		// How many packets after its ding a grant may still be attributed to that level (#376). Real ones land in the
-		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
+		// How many packets after its ding a grant may still be attributed to that level. Real ones land in the same
+		// packet or a few later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
 		private const int GrantWindow = 40;
 
-		// How many packets after a cast may still carry its effect buff (#434). The answer lands within a handful of
-		// packets (Frozen Hatred: cast fr5393 -> ApplySpell fr5400); the window only has to outlast the acks between.
+		// How many packets after a cast may still carry its effect buff. The answer lands within a handful of packets
+		// (Frozen Hatred: cast fr5393 -> ApplySpell fr5400); the window only has to outlast the acks between.
 		private const int CastEffectWindow = 40;
 		private const uint ApplySpellSubOpcode = MagicBuffCodec.Opcode;
 		private const uint BehaviorSubOpcode = BehaviorControlCenterCodec.Opcode;
 		private const uint MaxLevel = 80;
 
 		// A `Spells.DurationMs` this low is the RDB record carrying no duration, not a 10 ms buff: property field 8
-		// is centiseconds, so the whole population here is a field-8 of 0 or 1 (#659, ImportBuffDurationsAsync).
+		// is centiseconds, so the population here is a field-8 of 0 or 1 (see ImportBuffDurationsAsync).
 		private const uint EmptyDurationMs = 10;
 
-		// How many DISTINCT captures must state the same duration before it is taken as a spell's base rather than
+		// How many distinct captures must state the same duration before it is taken as a spell's base rather than
 		// one restore's remaining time.
 		private const int MinCapturesForADuration = 2;
 
@@ -45,7 +47,7 @@ namespace Faolan.Importer.Captures
 		private const uint AddShortcut = (uint)GameCharAgentMethods.AddShortcut;
 
 		// The DispatchLearnSpell grant: sender = GameCharAgent, receiver = GameCharInterface (the character),
-		// body = [u32 spellId] (#73). A method is a per-interface INDEX, so the class pair is what disambiguates it
+		// body = [u32 spellId]. A method is a per-interface index, so the class pair is what disambiguates it
 		// from the methods that share index 0x0A on other conversations (CharacterSearch etc.); the
 		// receiver-instance == character-id is the s2c-direction filter.
 		private const uint LearnSpell = (uint)GameCharInterfaceMethods.DispatchLearnSpell;
@@ -83,20 +85,28 @@ namespace Faolan.Importer.Captures
 			return (ids.Count, inserted);
 		}
 
-		// A cast whose EFFECT lives on a DIFFERENT spell record (#434). Some castables carry nothing themselves: the
-		// necro's Frozen Hatred (4377207) has no duration, no damage, no stat effects - casting it applied a record the
-		// client renders as nothing. Retail answers that cast with an ApplySpell for 4377209: same NAME, its own 27.7h
-		// duration and the cold-effect resource (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell fr5400).
-		//
-		// The pairing needs BOTH halves of the evidence, because either alone is noise:
-		//   * ADJACENCY - the first self-ApplySpell after the cast, within the same capture. On its own this pairs a
-		//     cast with whatever happened next: the corpus offers "Ice Strike -> Fatality" (x19), "-> Successful
-		//     Knockback", "-> Sidestep", "-> Crouching" - all unrelated events that merely followed.
-		//   * The applied spell carrying the SAME NAME as the cast. On its own this is worse: the RDB groups spells in
-		//     coarse buckets (field 0x4F), and the "Frozen Hatred" bucket alone holds THREE durationed records with
-		//     that exact name (3666099, 3666100, 4377209) plus Frozen Aura 1-5 and Altar of Hatred, so a name match
-		//     inside a bucket picks one of three at random.
-		// Together they are specific: the cast is answered, on the wire, by a buff that names itself the same spell.
+		/// <summary>
+		///     Links a cast whose effect lives on a different spell record. Some castables carry nothing themselves
+		///     (the necromancer's Frozen Hatred, 4377207, has no duration, damage or stat effects); retail answers the
+		///     cast with an ApplySpell for a record of the same name that carries the duration and effect resource
+		///     (4377209; xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell fr5400).
+		/// </summary>
+		/// <remarks>
+		///     The pairing needs both halves of the evidence, because either alone is noise:
+		///     <list type="bullet">
+		///         <item>
+		///             Adjacency - the first self-ApplySpell after the cast, within the same capture. On its own this
+		///             pairs a cast with whatever happened next (a fatality, a knockback, a stance change).
+		///         </item>
+		///         <item>
+		///             The applied spell carrying the same name as the cast. On its own this is worse: the RDB groups
+		///             spells in coarse buckets (field 0x4F), and one bucket can hold several durationed records with
+		///             the exact same name, so a name match inside a bucket picks one at random.
+		///         </item>
+		///     </list>
+		///     Together they are specific: the cast is answered, on the wire, by a buff that names itself the same
+		///     spell.
+		/// </remarks>
 		public static async Task<(int Pairs, int Linked)> ImportCastEffectsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> captures, ILogger? logger = null)
 		{
 			var pairs = new Dictionary<uint, uint>();
@@ -147,25 +157,29 @@ namespace Faolan.Importer.Captures
 			return (pairs.Count, linked);
 		}
 
-		// The buff duration retail STATES, for the rows whose RDB record does not carry one (#659).
-		//
-		// `RdbSpellImporter` sources `Spells.DurationMs` from property field 8, and a family of records leaves that
-		// field at 0 or 1 centisecond - the whole 0x003B3C88..0x003B3CAA crowd-control immunity family does, and
-		// `Stagger Immunity` (0x00485DE6) carries no field 8 at all. Retail's own `MagicBuffIIR` apply states a real
-		// duration for them: 40 s for `Root Immunity` and `Knockback immunity`, 15 s for `Stagger Immunity`. A row of
-		// 0 or 1 ms is not cosmetic - such a buff expires on the world tick that applied it.
-		//
-		// ⚠️ The wire value is NOT unconditionally the base duration: retail re-sends a long buff carrying its
-		// REMAINING time (`Contract of Protection`: 1,434,700 -> 1,180,241 cs against a 1,440,000 cs row - #601), and
-		// a single restore looks exactly like a fresh apply. Two gates keep those out:
-		//   * the row must be EMPTY (<= 1 cs) - a row the RDB filled always wins, because the RDB states the base and
-		//     the wire may state a remainder;
-		//   * the adopted value must be the most frequent one AND seen in at least two DISTINCT captures. A remainder
-		//     is a different number every time, so it never repeats across captures; a base duration always does.
-		// Measured over the corpus that is exactly three spells - and it correctly REFUSES `XP Boost (4h)`, whose only
-		// two applies are one restore (1,268,055 cs) duplicated to the two clients of one capture.
-		//
-		// `--report buff-durations` prints the input: every captured apply per spell, with its capture and offset.
+		/// <summary>
+		///     Adopts the buff duration retail states on the wire, for the rows whose RDB record does not carry one.
+		/// </summary>
+		/// <remarks>
+		///     <see cref="Rdb.RdbSpellImporter" /> sources <c>Spells.DurationMs</c> from property field 8, and a family
+		///     of records leaves that field at 0 or 1 centisecond (the 0x003B3C88..0x003B3CAA crowd-control immunity
+		///     family; <c>Stagger Immunity</c>, 0x00485DE6, carries no field 8 at all) while retail's <c>MagicBuffIIR</c>
+		///     apply states a real duration for them. A row of 0 or 1 ms is not cosmetic - such a buff expires on the
+		///     world tick that applied it.
+		///     <para>
+		///         The wire value is not unconditionally the base duration: retail re-sends a long buff carrying its
+		///         remaining time (<c>Contract of Protection</c>), and a single restore looks exactly like a fresh
+		///         apply. Two gates keep those out: the row must be empty (a row the RDB filled always wins, because
+		///         the RDB states the base and the wire may state a remainder), and the adopted value must be the most
+		///         frequent one and seen in at least <see cref="MinCapturesForADuration" /> distinct captures. A
+		///         remainder is a different number every time, so it never repeats across captures; a base duration
+		///         always does.
+		///     </para>
+		///     <para>
+		///         <c>--report buff-durations</c> prints the input: every captured apply per spell, with its capture
+		///         and offset.
+		///     </para>
+		/// </remarks>
 		public static async Task<(int Seen, int Adopted)> ImportBuffDurationsAsync(IDatabaseContext db, IReadOnlyList<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
 			// spell -> duration in centiseconds -> the distinct captures that stated it.
@@ -227,23 +241,28 @@ namespace Faolan.Importer.Captures
 			return (rows.Count, adopted);
 		}
 
-		// Harvests each CLASS's spell ACCESS from the create-flow captures into ClassSpell (#74) - the spell analogue of
-		// CaptureAbilityImporter's class-aware ability extraction. A freshly-created caster receives its level-1 spells
-		// via DispatchLearnSpell (0x200A) on the beach (Necromancer 0x125D9B/0x42CA77, Herald of Xotli 0x3006FF;
-		// physical classes get none, correctly). Each create capture is attributed to its class via the same ChangeClass
-		// editor command CaptureAbilityImporter uses (value/2). A spell granted under >= 2 distinct classes is GENERIC
-		// (Class 0); under exactly one it is class-specific. Upserts on (Class, SpellId), so it is safe to re-run. This
-		// is pure membership (the spell's unlock LEVEL lives on Spells.Level); coverage is only the classes present in
-		// the captures - the class-encoded GuiStackingLine fills the full per-class membership (RdbSpellImporter, #296).
+		/// <summary>
+		///     Harvests each class's spell access from the create-flow captures into <see cref="ClassSpell" /> - the
+		///     spell analogue of <see cref="CaptureAbilityImporter" />'s class-aware ability extraction. A
+		///     freshly-created caster receives its level-1 spells via DispatchLearnSpell (0x200A) on the beach
+		///     (Necromancer 0x125D9B/0x42CA77, Herald of Xotli 0x3006FF; physical classes get none).
+		/// </summary>
+		/// <remarks>
+		///     Each create capture is attributed to its class via the same ChangeClass editor command
+		///     <see cref="CaptureAbilityImporter.DetectClass" /> uses (value/2). A spell granted under two or more
+		///     distinct classes is generic (Class 0); under exactly one it is class-specific. Upserts on
+		///     (Class, SpellId), so it is safe to re-run. This is pure membership (the spell's unlock level lives on
+		///     <c>Spells.Level</c>); coverage is only the classes present in the captures - the class-encoded
+		///     GuiStackingLine fills the full per-class membership (<see cref="Rdb.RdbSpellImporter" />).
+		/// </remarks>
 		public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			// spellId -> the distinct classes whose create capture granted it (null class = unattributed capture).
 			//
-			// One class per capture is CORRECT here, and it was worth checking rather than assuming: retail sends a
-			// clicked class's book so the editor can display it, so a player browsing the class list would put several
-			// books in one capture and this would merge them onto the first. `--report create-classes` (#581) says
-			// 0 of the 21 create captures select more than one class, so no capture in the corpus can be wrong this
-			// way. Re-run that report before trusting this on a new corpus.
+			// One class per capture is assumed: retail sends a clicked class's book so the editor can display it, so a
+			// player browsing the class list would put several books in one capture and this would merge them onto
+			// the first. `--report create-classes` counts the create captures that select more than one class; re-run
+			// it before trusting this on a new corpus.
 			var idToClasses = new Dictionary<uint, HashSet<uint>>();
 			foreach (var capture in createCaptures)
 			{
@@ -265,9 +284,9 @@ namespace Faolan.Importer.Captures
 			if (idToClasses.Count == 0)
 				return (0, 0);
 
-			// Ensure the Spell catalog has a row for every starting spell id (the 0x200A learn grants are NOT cataloged
+			// Ensure the Spell catalog has a row for every starting spell id (the 0x200A learn grants are not cataloged
 			// by ImportAsync, which only sees ApplySpell casts) - ClassSpell.SpellId is a FK into Spells. Save the
-			// catalog rows FIRST so the FK target exists before the ClassSpell inserts (the dependent only
+			// catalog rows first so the FK target exists before the ClassSpell inserts (the dependent only
 			// carries the scalar SpellId, so EF won't order the principal ahead of it on its own).
 			var cataloged = (await db.Spells.Select(s => s.Id).ToListAsync()).ToHashSet();
 			var newCatalog = false;
@@ -303,14 +322,12 @@ namespace Faolan.Importer.Captures
 				inserted++;
 			}
 
-			// Saves the new catalog rows (Spells) and the new ClassSpell rows together; EF orders the inserts so the
-			// FK target exists first.
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation("CaptureSpellImporter: {Spells} class spells harvested ({Inserted} new ClassSpell rows).", idToClasses.Count, inserted);
 			return (idToClasses.Count, inserted);
 
-			// A spell seen under exactly one class is specific to it; under >= 2 (or none we could attribute) it is generic.
+			// A spell seen under exactly one class is specific to it; under two or more (or none attributable) it is generic.
 			uint ClassFor(uint id)
 			{
 				return idToClasses[id].Count == 1
@@ -319,50 +336,40 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Seeds each captured character's LEARNED spell set (CharacterSpell rows) from the DispatchLearnSpell grants
-		// in the captures, so GrantCharacterSpells re-grants them on login (#74). Retail re-sends a caster's whole
-		// learned set on every world entry, so a capture's grants ARE that character's spellbook. Attributed to the
-		// character via the grant's RpcHeader receiver instance (= character id). Only characters already in the DB
-		// are touched (CaptureCharacterImporter materializes them first); idempotent (skips spells already recorded).
 		/// <summary>
-		///     Class↔spell MEMBERSHIP derived from what captured characters demonstrably KNOW (#851): every
+		///     Class-to-spell membership derived from what captured characters demonstrably know: every
 		///     <c>CharacterSpell</c> row is a statement that a character of that class held that spell, which is a
 		///     membership fact the client catalog cannot always reach.
 		/// </summary>
 		/// <remarks>
-		///     The catalog source is <c>Spell.GuiStackingLine</c> encoded as <c>ConanClass * 1000 + lineIndex</c>
-		///     (#296), and it is structurally blind to a record that carries no line at all - which is most of the
-		///     catalog (3,158 of 21,502 templates carry one). That is the whole of the gap this closes: of the 18
-		///     spells the level-80 Necromancer knows and the class map had never heard of, <b>16 carry
-		///     <c>GuiStackingLine = 0</c></b>, including the entire <c>Undead Minion:</c> /
-		///     <c>Deathless Acolyte:</c> / <c>Dread Archmage:</c> pet ladder (35/35/40/55/65/65/70/80), every rank of
-		///     which is taught by a <c>Spell Unlocking</c> feat and so belongs on the level path.
+		///     The catalog source is <c>Spell.GuiStackingLine</c> encoded as <c>ConanClass * 1000 + lineIndex</c>, and
+		///     it is structurally blind to a record that carries no line at all - which is most of the catalog,
+		///     including the feat-taught pet ladders that belong on the level path.
 		///     <para>
-		///         ⭐ It cannot invent a false positive: the row says a character of this class HAD this spell, and
-		///         one did. What it may add that is not class CONTENT - a mount summon, a companion, a
-		///         <c>Dance:</c> emote - carries <c>Level 0</c> and is therefore never level-granted; those are owned
-		///         or earned, and the level gate already declines them.
+		///         It cannot invent a false positive: the row says a character of this class had this spell, and one
+		///         did. What it may add that is not class content - a mount summon, a companion, a <c>Dance:</c>
+		///         emote - carries <c>Level 0</c> and is therefore never level-granted; those are owned or earned, and
+		///         the level gate already declines them.
 		///     </para>
 		///     <para>
-		///         ⚠️ ADDITIVE, like every other writer of this table. An existing row keeps its
+		///         Additive, like every other writer of this table. An existing row keeps its
 		///         <see cref="ClassSpell.IsStarter" /> and <see cref="ClassSpell.GrantLevel" />, which are facts only
 		///         a create/ding capture can state.
 		///     </para>
 		///     <para>
-		///         ⚠️ Sound only while a captured character is ONE class, which every imported character is. A
+		///         Sound only while a captured character is one class, which every imported character is. A
 		///         character that had changed class would attribute its whole book to whichever class the row records.
 		///     </para>
 		/// </remarks>
 		public static async Task<(int Pairs, int Inserted)> ImportClassSpellsFromKnownAsync(IDatabaseContext db, ILogger? logger = null)
 		{
-			// ⚠️ LEVELED spells only. A character's book also holds what it OWNS or EARNED - mounts, pets and
+			// Leveled spells only. A character's book also holds what it owns or earned - mounts, pets and
 			// companions, `Dance:` / `Social Ability:` emotes, `Path:` travel unlocks, veteran rewards - and those
 			// carry `Level 0`, are never level-granted, and come back on login from the character's own rows
-			// (`GrantCharacterSpells`) rather than from the class. Adding them would claim class MEMBERSHIP for
-			// something whose gate is ownership, and it contradicts the catalog where the two speak: the captured
-			// Necromancer's `Blue Snow Mammoth` and `Fading Black Horse` sit on stacking line 44224, i.e. filed under
-			// Demonologist, because a mount belongs to no class and its line is not a class statement at all
-			// (`NoClassSpellRow_ContradictsItsSpellsStackingLine` is what says so).
+			// (`GrantCharacterSpells`) rather than from the class. Adding them would claim class membership for
+			// something whose gate is ownership, and it contradicts the catalog where the two speak: a mount belongs
+			// to no class, so its stacking line is not a class statement at all
+			// (`NoClassSpellRow_ContradictsItsSpellsStackingLine` is the gate).
 			var proven = await (from known in db.CharacterSpells
 				join character in db.Characters on known.CharacterId equals character.Id
 				join spell in db.Spells on known.SpellId equals spell.Id
@@ -406,6 +413,17 @@ namespace Faolan.Importer.Captures
 			return (proven.Count, inserted);
 		}
 
+		/// <summary>
+		///     Seeds each captured character's learned spell set (<see cref="CharacterSpell" /> rows) from the
+		///     DispatchLearnSpell grants in the captures, so GrantCharacterSpells re-grants them on login. Retail
+		///     re-sends a caster's whole learned set on every world entry, so a capture's grants are that character's
+		///     spellbook.
+		/// </summary>
+		/// <remarks>
+		///     Attributed to the character via the grant's RpcHeader receiver instance (= character id). Only
+		///     characters already in the DB are touched (<see cref="CaptureCharacterImporter" /> materializes them
+		///     first); idempotent (skips spells already recorded).
+		/// </remarks>
 		public static async Task<(int Characters, int Inserted)> ImportLearnedSpellsAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var byCharacter = new Dictionary<uint, HashSet<uint>>();
@@ -467,26 +485,28 @@ namespace Faolan.Importer.Captures
 			return (charactersSeeded, inserted);
 		}
 
-		// A create-capture DispatchLearnSpell grant id (s2c 0x200A, GameCharAgent -> GameCharInterface, [u32 spellId]).
-		// #376: the (class, spell, LEVEL) map, from capture truth. A NewLevelIIR (0x6D314743) carries the level just
-		// reached; every 0x200A grant that follows it in the same capture is a grant AT that level. That is a direct
-		// observation of what retail hands out and when, which no catalog field can be a substitute for.
-		//
-		// The class comes from the PLAYER's own spawn: body[136] on the pre-IIR frame is the class byte
-		// (CaptureCharacterImporter, "verified 10/10"), and a player's spawn handle == its character id
-		// (player_handle_equals_character_id), so the spawn whose handle matches the ding's receiver instance IS the
-		// dinging character. Matching on the handle matters: NPC spawns carry a class byte too, and it is usually a
-		// VALID class enum (Kalanthes reads 24, Pillager 20), so "any spawn with a plausible class" would attribute a
-		// player's grants to whatever NPC was streamed first. This also works on LOGIN captures, where
-		// CaptureAbilityImporter.DetectClass cannot help (there is no create-editor callback) and where the character
-		// is usually absent from our own Characters table (Hoxxling, Blablatest, ... were never imported).
-		//
-		// Only grants AFTER a ding are attributed, which is what excludes the login re-grant burst (#74 re-grants the
-		// whole spellbook on every login - 201 such grants across the capture set, none of them level-attributable).
-		// GrantWindow additionally bounds how far a grant may sit from its ding: observed real ones land in the SAME
-		// packet or ~3-4 later, so a tight window keeps an unrelated later grant (a quest/claim reward) from being
-		// blamed on the last ding. Replace-all is deliberately NOT used - a capture that never dings must not retract
-		// what another capture proved.
+		/// <summary>
+		///     The (class, spell, level) map, from capture truth. A NewLevelIIR (0x6D314743) carries the level just
+		///     reached; every DispatchLearnSpell (0x200A) grant that follows it in the same capture is a grant at that
+		///     level - a direct observation of what retail hands out and when, which no catalog field can substitute
+		///     for.
+		/// </summary>
+		/// <remarks>
+		///     The class comes from the player's own spawn: body[136] on the pre-IIR frame is the class byte, and a
+		///     player's spawn handle equals its character id, so the spawn whose handle matches the ding's receiver
+		///     instance is the dinging character. Matching on the handle matters: NPC spawns carry a class byte too,
+		///     and it is usually a valid class enum, so "any spawn with a plausible class" would attribute a player's
+		///     grants to whatever NPC was streamed first. This also works on login captures, where
+		///     <see cref="CaptureAbilityImporter.DetectClass" /> cannot help (there is no create-editor callback) and
+		///     where the character is usually absent from the Characters table.
+		///     <para>
+		///         Only grants after a ding are attributed, which excludes the login re-grant burst (retail re-grants
+		///         the whole spellbook on every login). <see cref="GrantWindow" /> additionally bounds how far a grant
+		///         may sit from its ding, so an unrelated later grant (a quest/claim reward) is not blamed on the last
+		///         ding. Replace-all is deliberately not used - a capture that never dings must not retract what
+		///         another capture proved.
+		///     </para>
+		/// </remarks>
 		public static async Task<(int Access, int Levels)> MarkLevelGrantsAsync(IDatabaseContext db, IReadOnlyList<NamedCapture> captures, ILogger? logger = null)
 		{
 			var proven = new Dictionary<(uint Class, uint SpellId), byte>();
@@ -532,18 +552,17 @@ namespace Faolan.Importer.Captures
 			return (access, levels);
 		}
 
-		// Marks each captured class's create-granted spells as its STARTER KIT (ClassSpell.IsStarter), from the 0x200A
-		// grants a create capture actually shows. So a level-1 create yields EXACTLY the capture's grant
-		// (necro = Ice Strike R1 + Frozen Hatred).
-		//
-		// This used to write LEVELS instead: it pinned every granted spell to Level 1 and pushed every other level-1
-		// access row of that class to 2, so that the level-gated "Level <= charLevel" starter query happened to return
-		// the captured set. That conflated two independent facts and corrupted a correct one - retail grants the necro
-		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (an older comment here blamed a
-		// scrape mis-tag for the 7; the client's own record says the same). The starter kit is a fixed
-		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
-		// level data (verified 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
-		// touched, and it no longer has to run after the level modules.
+		/// <summary>
+		///     Marks each captured class's create-granted spells as its starter kit (<see cref="ClassSpell.IsStarter" />),
+		///     from the 0x200A grants a create capture actually shows, so a level-1 create yields exactly the capture's
+		///     grant (necromancer = Ice Strike R1 + Frozen Hatred).
+		/// </summary>
+		/// <remarks>
+		///     The starter kit is a fixed list, not a level query: retail grants the necromancer Ice Strike (Rank 1) at
+		///     create even though its level requirement is 7, so the flag is stated outright and <c>Spells.Level</c>
+		///     is left to the RDB, which leads on level data. Idempotent; only classes whose create capture actually
+		///     reached a grant are touched, and it does not depend on the level modules having run.
+		/// </remarks>
 		public static async Task<(int Starters, int Cleared)> MarkStarterSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			var startersByClass = new Dictionary<uint, HashSet<uint>>();
@@ -556,7 +575,7 @@ namespace Faolan.Importer.Captures
 				foreach (var packet in capture)
 				{
 					if (IsBarDrag(packet))
-						break; // create starters are granted BEFORE the client's first bar drag; later 0x200A = leveling
+						break; // create starters are granted before the client's first bar drag; later 0x200A = leveling
 
 					TryReadLearnSpellId(packet, ids);
 				}
@@ -572,7 +591,7 @@ namespace Faolan.Importer.Captures
 			if (startersByClass.Count == 0)
 				return (0, 0);
 
-			// Replace-all per captured class: a spell this class's create capture granted IS a starter, anything else
+			// Replace-all per captured class: a spell this class's create capture granted is a starter, anything else
 			// on that class is not (so a re-import after a better capture can retract a stale flag).
 			var starters = 0;
 			var cleared = 0;
@@ -599,7 +618,7 @@ namespace Faolan.Importer.Captures
 			return (starters, cleared);
 		}
 
-		// Walks ONE capture in packet order, tracking each character's level from its NewLevelIIR dings and
+		// Walks one capture in packet order, tracking each character's level from its NewLevelIIR dings and
 		// attributing the grants that follow. See MarkLevelGrantsAsync for why the handle match is required.
 		private static void CollectLevelGrants(IReadOnlyList<CapturedPacket> packets, IDictionary<(uint, uint), byte> proven)
 		{
@@ -609,10 +628,9 @@ namespace Faolan.Importer.Captures
 				if (!p.IsIirCarrier)
 					continue;
 
-				// Only PLAYER spawns parse with the scaffold codec - an NPC's FA015807 body has a different shape - so
-				// this filters the NPCs out for free. That matters: an NPC spawn's body[136] is usually a VALID class
-				// enum too (Kalanthes reads 24, Pillager 20), so a looser filter would hand a player's grants to
-				// whichever NPC streamed first.
+				// Only player spawns parse with the scaffold codec - an NPC's FA015807 body has a different shape - so
+				// this filters the NPCs out for free. That matters: an NPC spawn's body[136] is usually a valid class
+				// enum too, so a looser filter would hand a player's grants to whichever NPC streamed first.
 				var body = PacketBody(p.Bytes);
 				if (body.Length < 138 || !SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold) || scaffold.PreIir.Sublist.Count == 0)
 					continue;
@@ -710,7 +728,7 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// How many LEARN grants one packet carries - the `create-classes` report's counter, reading the same reader
+		// How many learn grants one packet carries - the `create-classes` report's counter, reading the same reader
 		// the import does.
 		internal static int CountLearnGrants(byte[] packet)
 		{
@@ -780,7 +798,7 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// The c2s cast: a BehaviorControlCenter (0x642CD3D6) with actionType 4, whose real spell id rides the TRAILER
+		// The c2s cast: a BehaviorControlCenter (0x642CD3D6) with actionType 4, whose real spell id rides the trailer
 		// after the protobuf args as [u32 from][u32 spellId] - not the args message (docs/subsystems/combat.md).
 		// inner: [subop 4][c350 4][instance 4][u16 seq][u32 actionType][u32 argsLen][args][trailer].
 		private static bool TryReadCastSpellId(byte[] packetBytes, out uint spellId)
@@ -813,7 +831,7 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// The s2c answer: an ApplySpell applied to the caster BY the caster (a self buff). Returns the BASE spell id.
+		// The s2c answer: an ApplySpell applied to the caster by the caster (a self buff). Returns the base spell id.
 		// inner: [subop 4][c350 4][applyTo 4][u16 0][spellId 4][c350 4][applyFrom 4][payload].
 		private static bool TryReadSelfBuffSpellId(byte[] packetBytes, out uint spellBaseId)
 		{
@@ -831,7 +849,7 @@ namespace Faolan.Importer.Captures
 				if (inner.ReadU32Be(8) != inner.ReadU32Be(22))
 					return false; // applyTo != applyFrom: a cast ON something, not a self buff
 
-				// Reading at 13 lands on the id's high zero byte + its three significant bytes, i.e. the BASE id
+				// Reading at 13 lands on the id's high zero byte + its three significant bytes, i.e. the base id
 				// ((base<<8)|rank >> 8) - the same trick TryReadSpellId uses.
 				spellBaseId = inner.ReadU32Be(13);
 				return spellBaseId != 0;

@@ -10,12 +10,12 @@ namespace Faolan.Importer.Cli
 	// its endpoints and its body - plus the per-offset stability census that is what actually decodes one.
 	//
 	// It is the companion to `--report method-census`. The census answers "does the corpus carry this?"; this answers
-	// the next question every one of those tickets asks, which is "what is IN it?". Written once rather than as a
+	// the next question every one of those tickets asks, which is "what is in it?". Written once rather than as a
 	// report per message, because the work is identical every time: the client's own signature names the fields
 	// (docs/re/aoc-client-rpc-methods.json), the body length says whether the field widths add up, and the offsets
-	// that VARY across frames say which named field is which.
+	// that vary across frames say which named field is which.
 	//
-	// ⚠️ A method with a handful of frames cannot have its grammar settled by variance alone - an offset that is
+	// A method with a handful of frames cannot have its grammar settled by variance alone - an offset that is
 	// constant over 6 frames is not a constant. The census column is there to be read against the signature, not
 	// instead of it.
 	public static partial class ReportCli
@@ -50,7 +50,7 @@ namespace Faolan.Importer.Cli
 				}
 				catch (Exception ex)
 				{
-					// The BODY does not need the header parsed - `CapturedPacket.Body` slices it by the frame's own
+					// The body does not need the header parsed - `CapturedPacket.Body` slices it by the frame's own
 					// declared header length - so the frame is still shown, with its endpoints reported as unknown.
 					// Dropping it would say "the corpus does not carry this message", which is false and is the one
 					// conclusion this report exists to make reliable. See `--report frame-health`.

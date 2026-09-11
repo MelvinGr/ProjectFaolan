@@ -5,14 +5,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gitea #834: `RdbReader.TryGet` used to resolve a duplicate `(type, id)` with `GroupBy(...).First()` - the FIRST
-	// index entry won, nothing said a choice had been made, and nothing said which order "first" even was. Harmless
-	// on this client (its `le.idx` has zero collisions), but the failure it sets up is nasty: a patch/override layer
-	// adds a second entry for a resource we read, every consumer silently gets the OLDER copy, and the symptom reads
-	// as wrong CONTENT rather than a wrong pick.
+	// `RdbReader.TryGet` must resolve a duplicate `(type, id)` deliberately, not with `GroupBy(...).First()`: that
+	// lets the first index entry win with nothing saying a choice was made, or in which order "first" was taken. It is
+	// harmless on this client (its `le.idx` has zero collisions), but the failure it sets up is nasty: a patch/override layer
+	// adds a second entry for a resource we read, every consumer silently gets the older copy, and the symptom reads
+	// as wrong content rather than a wrong pick.
 	//
 	// Both halves of the fix are pinned here, and neither can be checked against the real client - a client with no
-	// duplicates cannot demonstrate a duplicate rule. So the index is SYNTHESISED: `le.idx` is a plain flat format
+	// duplicates cannot demonstrate a duplicate rule. So the index is synthesised: `le.idx` is a plain flat format
 	// (28-byte header, an 8-byte (type,id) per entry, then a fixed-stride detail record each), which makes a
 	// two-entry index with a deliberate collision a few lines of code.
 	public class RdbDuplicateKeyTests
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			return dir;
 		}
 
-		// The rule: the LAST entry for a key wins, because a later index entry is an override of the earlier one.
+		// The rule: the last entry for a key wins, because a later index entry is an override of the earlier one.
 		[Fact]
 		public void TryGet_OnADuplicateKey_ServesTheLastEntry()
 		{
@@ -87,8 +87,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The uncollided case has to be visibly empty rather than merely untested - "0 duplicates" is the answer
-		// #832's audit needed and had to hand-write an index parser to get.
+		// The uncollided case has to be visibly empty rather than merely untested - "0 duplicates" is the answer an
+		// audit needs, and without this it takes a hand-written index parser to get.
 		[Fact]
 		public void DuplicateKeys_IsEmpty_WhenEveryKeyIsDistinct()
 		{

@@ -9,8 +9,8 @@ namespace Faolan.Tests
 {
 	// The LDB language records (RDB 1030001 "TDL1") - the client's own statement of which localized page belongs to
 	// which language. These pin the parse against synthetic records shaped like the shipped ones, including the two
-	// properties that made the earlier text-sniffing approach fail in-client (#367):
-	//   - a language's page table is NOT word-aligned in every record (the leading name strings differ in length);
+	// properties that made the earlier text-sniffing approach fail in-client:
+	//   - a language's page table is not word-aligned in every record (the leading name strings differ in length);
 	//   - an untranslated page still contains English text, so language can only come from the declaration.
 	public class LdbLanguageIndexTests
 	{
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			return [.. body];
 		}
 
-		// The parse: name + page list, for a record whose table IS word-aligned and one whose table is NOT.
+		// The parse: name + page list, for a record whose table is word-aligned and one whose table is not.
 		[Theory]
 		[InlineData(0)]
 		[InlineData(1)]
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			Assert.Equal(pages.OrderBy(p => p), found.OrderBy(p => p));
 		}
 
-		// The failure this replaced: a page whose TEXT is English but which a language record claims for another
+		// The failure this replaced: a page whose text is English but which a language record claims for another
 		// language must be attributed to that language, not to English.
 		[Fact]
 		public void AnUntranslatedPage_BelongsToTheLanguageThatClaimsIt()
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 			}
 
 			Assert.Equal(LdbLanguageIndex.English, byPage[271969]);
-			Assert.Equal("Polish", byPage[3874779]); // NOT English, however English its strings read
+			Assert.Equal("Polish", byPage[3874779]); // Not English, however English its strings read
 		}
 
 	}

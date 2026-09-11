@@ -6,30 +6,43 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// The per-playfield NPC spawn layout (RDB type 1010506 = "NPC roam/movement data") - the capture-INDEPENDENT
-	// authoritative open-world spawn source (#332). Decoded + validated byte-exact against the live client: all 238
-	// LOCAL playfield records parse to EOF; 119 carry spawn groups (2,664 groups / 23,782 primary points), 119 are
-	// empty (`groupCount == 0`) = scripted/instanced maps like the castle and the Tortage interiors, whose NPCs are
-	// server-scripted and never appear here. The RDB record id == the playfield id (== Map.Id).
-	//
-	// Grammar (little-endian throughout; strings are [u16 len][latin1 bytes], floats are LE):
-	//   record = [u32 version=1][u32 groupCount] groupCount*group
-	//   group  = [str name][str category][str id]
-	//            [u32 pointCount][vec3]*pointCount          <- the PRIMARY spawn points (what a placement sits on)
-	//            [vec3 boundsMin][vec3 boundsMax]           <- the group's roam AREA (AABB; max.Y padded to min.Y + 10)
-	//            [u32 pathCount] pathCount*([u32 n][vec3]*n) <- wander-SAMPLES that fill the roam area, NOT distinct routes
-	//   vec3   = [f32 x][f32 y][f32 z]
-	//
-	// The bounds pair is the roam AREA and the pathCount sub-lists are space-filling wander samples of that same box
-	// (pathLength/span ~= 5 for every group incl. Picts; all a group's sub-lists share the decoded AABB to within a few
-	// units). Groups differ only in area SIZE, not structure - see docs/rdb/npc-spawn-layout-1010506.md.
-	// There is NO 12-byte RDB-Id header on this type: the payload begins at the [u32 version] word.
-	//
-	// The `category` selects what the `id` string means: "Community"/"Race"/"Superfamily" -> a numeric faction/family
-	// id; "Name" -> the creature's display name + a 4-char tag (e.g. "Shark (H8AV)"); "no category" -> the literal
-	// "no category value". So the id is a spawn-GROUP/community key, NOT (except for "Name" groups) the creature
-	// TEMPLATE - the creature type still has to be correlated from captures (the #332 match/snap follow-up). We keep
-	// the raw id string plus a parsed numeric CommunityId when it is numeric.
+	/// <summary>
+	///     The per-playfield NPC spawn layout (RDB type 1010506, "NPC roam/movement data"): the capture-independent,
+	///     authoritative open-world spawn source. The RDB record id is the playfield id (Map.Id). See
+	///     docs/rdb/npc-spawn-layout-1010506.md.
+	/// </summary>
+	/// <remarks>
+	///     All 238 local playfield records parse to EOF. 119 carry spawn groups (2,664 groups over 23,782 primary
+	///     points) and 119 are empty (<c>groupCount == 0</c>) — the scripted and instanced maps such as the castle and
+	///     the Tortage interiors, whose NPCs are server-scripted and never appear here.
+	///     <para>
+	///         The grammar is little-endian throughout; strings are [u16 len][latin1 bytes] and floats are
+	///         little-endian:
+	///         <code>
+	///         record = [u32 version=1][u32 groupCount] groupCount*group
+	///         group  = [str name][str category][str id]
+	///                  [u32 pointCount][vec3]*pointCount           the primary spawn points a placement sits on
+	///                  [vec3 boundsMin][vec3 boundsMax]            the group's roam area (AABB; max.Y padded to
+	///                                                              min.Y + 10)
+	///                  [u32 pathCount] pathCount*([u32 n][vec3]*n) wander samples filling the roam area, not
+	///                                                              distinct routes
+	///         vec3   = [f32 x][f32 y][f32 z]
+	///         </code>
+	///         There is no 12-byte RDB-Id header on this type: the payload begins at the [u32 version] word.
+	///     </para>
+	///     <para>
+	///         The bounds pair is the roam area and the pathCount sub-lists are space-filling wander samples of that
+	///         same box: path length over span is about 5 for every group, and all of a group's sub-lists share the
+	///         decoded AABB to within a few units. Groups differ only in area size, not in structure.
+	///     </para>
+	///     <para>
+	///         The category selects what the id string means. "Community", "Race" and "Superfamily" give a numeric
+	///         faction or family id; "Name" gives the creature's display name plus a 4-character tag, such as
+	///         "Shark (H8AV)"; "no category" gives the literal "no category value". So except on "Name" groups the id
+	///         is a spawn-group or community key rather than the creature template. Both the raw id string and a
+	///         parsed numeric <c>CommunityId</c> are kept.
+	///     </para>
+	/// </remarks>
 	public sealed class NpcSpawnLayout
 	{
 		public const uint ResourceType = 1010506;
@@ -41,9 +54,15 @@ namespace Faolan.Core.Rdb.Assets
 			Groups = groups;
 		}
 
-		// Parses a decompressed 1010506 payload (the bytes RdbReader.ReadDecompressed returns for this type). Returns
-		// false on any malformed field or if the parse doesn't consume the record EXACTLY to its end - the trailing
-		// EOF check is what makes a mis-sized field surface as a clean failure instead of silently mis-reading.
+		/// <summary>
+		///     Parses a decompressed 1010506 payload, the bytes <see cref="RdbReader.ReadDecompressed" /> returns for
+		///     this type.
+		/// </summary>
+		/// <returns>
+		///     False on any malformed field, or when the parse does not consume the record exactly to its end. That
+		///     trailing EOF check is what makes a mis-sized field surface as a clean failure instead of a silent
+		///     mis-read.
+		/// </returns>
 		public static bool TryParse(ReadOnlySpan<byte> data, out NpcSpawnLayout? layout)
 		{
 			layout = null;
@@ -100,7 +119,7 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			if (o != data.Length)
-				return false; // the grammar must consume the record exactly - a leftover tail means a mis-decode
+				return false; // The grammar must consume the record exactly: a leftover tail means a mis-decode.
 
 			layout = new NpcSpawnLayout(groups);
 			return true;
@@ -149,8 +168,11 @@ namespace Faolan.Core.Rdb.Assets
 			return true;
 		}
 
-		// One named spawn group: its primary spawn points, its roam AREA (BoundsMin/BoundsMax AABB), and the
-		// wander-sample sub-lists (RoamPaths) that fill that area - samples of the region, not distinct routes.
+		/// <summary>
+		///     One named spawn group: its primary spawn points, its roam area as the BoundsMin/BoundsMax AABB, and the
+		///     wander-sample sub-lists in <c>RoamPaths</c> that fill that area — samples of the region, not distinct
+		///     routes.
+		/// </summary>
 		public sealed record SpawnGroup(
 			string Name,
 			string Category,

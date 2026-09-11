@@ -7,34 +7,34 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Importer.Cli
 {
-	// The three-way stat-name reconciliation (#625 item 4), printed by `--report ldb-stat-names`.
+	// The three-way stat-name reconciliation, printed by `--report ldb-stat-names`.
 	//
-	// A stat id can be named by THREE things and they do not agree:
+	// A stat id can be named by three things and they do not agree:
 	//
 	//   ours   `CharacterStatId`                       - seeded years ago, partly from an Anarchy Online stat list
-	//   LDB    category 615                            - the client's DISPLAY names, spaced and localisable
+	//   LDB    category 615                            - the client's display names, spaced and localisable
 	//   EXE    the descriptor registry `FUN_01db2740`  - compiled with this build, recovered into
 	//                                                    docs/re/aoc-client-stat-names.tsv
 	//
-	// ⭐ **The EXE wins when the two client sources disagree.** It is compiled with the build, it names ids the LDB
+	// The exe wins when the two client sources disagree. It is compiled with the build, it names ids the LDB
 	// never reaches at all (the whole 1000000+ range), and a display string is exactly what goes stale when a stat
 	// slot is repurposed. `0x0A9` is the worked example: LDB says `ChosenGod`, the exe says `HeroicMode`, and
 	// `player_stats.heroic_mode` is a real field of the client's own protobuf schema while nothing named for a deity
 	// is - Age of Conan has no player-choosable religion at all.
 	//
-	// #625 item 4 asks which of our disagreements are "a real decode bug worth finding" rather than the same thing
-	// under a different word. This splits them:
+	// A disagreement is either a real decode bug worth finding or the same thing under a different word. This splits
+	// them:
 	//
-	//   NEAR   one is a rewording of the other (`PvpExp`/`PvPXP`, `Money`/`Cash`, `ProtectionCold`/`FrostResist`)
-	//   FAR    they name DIFFERENT THINGS, and ours is the one to distrust
+	//   near   one is a rewording of the other (`PvpExp`/`PvPXP`, `Money`/`Cash`, `ProtectionCold`/`FrostResist`)
+	//   far    they name different things, and ours is the one to distrust
 	//
-	// ⚠️ The split is heuristic and is printed for a human to read, not acted on. What makes the FAR list worth
+	// The split is heuristic and is printed for a human to read, not acted on. What makes the far list worth
 	// reading is its shape: several are unmistakably Anarchy Online terms - `AwardedOmniTekTokens` (OmniTek is an AO
 	// faction) and `NanoInterval` (nano is AO's magic) - sitting on ids Age of Conan uses for something else. That
 	// identifies the class: the enum was seeded from an AO stat list, and where AoC repurposed a slot our name stayed
 	// behind.
 	//
-	// ⭐ And the same is true of LDB 615 itself, which is why the client-vs-client column is the more useful one: it
+	// And the same is true of LDB 615 itself, which is why the client-vs-client column is the more useful one: it
 	// still says `Organization rank` (AO's word for a guild), `AMS`, `Bandolier Slots` and `Map Flags` on ids the
 	// compiled registry calls `ClanLevel`, `SpellCategory`, `ItemSource` and `MaxConsciousness`. The display table
 	// was never fully re-authored; the registry was. That is the reason the exe wins, rather than a preference.
@@ -42,7 +42,7 @@ namespace Faolan.Importer.Cli
 	public static partial class ReportCli
 	{
 		// Word pairs that are the same concept spelled differently, plus qualifiers whose presence or absence does not
-		// change what the stat IS. Applied both ways round.
+		// change what the stat is. Applied both ways round.
 		private static readonly (string A, string B)[] StatNameSynonyms =
 		[
 			("exp", "xp"), ("money", "cash"), ("pct", "percent"), ("regen", "regeneration"), ("dmg", "damage"),
@@ -72,7 +72,7 @@ namespace Faolan.Importer.Cli
 				if (!tsv.TryGetValue((uint)id, out var exe))
 					continue;
 
-				// The two CLIENT sources disagreeing is its own finding, and the more interesting one: it says the id
+				// The two client sources disagreeing is its own finding, and the more interesting one: it says the id
 				// was repurposed and only the compiled name kept up.
 				if (ldbNames.TryGetValue((uint)id, out var ldb) && StatKey(ldb) != StatKey(exe))
 					clientSplit.Add($"  0x{(uint)id:X4}  LDB '{ldb}'  vs  EXE '{exe}'   (ours: {member})");
@@ -152,7 +152,7 @@ namespace Faolan.Importer.Cli
 			return names;
 		}
 
-		// The repo-relative path, found by walking UP from the working directory and then from the executable - the
+		// The repo-relative path, found by walking up from the working directory and then from the executable - the
 		// same rule `Global.ConfigPath` uses for faolan.json, so the report works from anywhere in the tree rather
 		// than only from the repo root.
 		private static string? FindUp(string relative)

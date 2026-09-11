@@ -5,27 +5,29 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// DispatchACGTeleportChoice (GameCharInterface 0x56) - the confirmation box retail puts up before it moves the
-	// player into an INSTANCED playfield (#821). Decoded byte-exact from xxx_mage-necromancer_login_play3 frame 4555,
-	// the Tortage harbour rowboat to White Sands Night, which is the only capture of the ACG flow in the corpus.
-	//
-	//   [u32 destMapId][u32 0xC350 Character][u32 clientInstance][PlayfieldProxy][u8 trailing]
-	//
-	// The player's own annotation names what the box says: "there is a confirmation to enter (saying bound to
-	// <charname>)" - it is the "this instance will be bound to you" prompt, and the arrival is followed by an
-	// `InstanceOwnerAndResetTime` feedback token. So the proxy here is the DESTINATION's instance, and its owner slots
-	// are what make the instance personal.
-	//
-	// ⚠️ The destination map is stated TWICE - once as the leading word and once inside the proxy - and both read
-	// 10803 in the capture. Parse checks they agree rather than reading one and trusting it, because a disagreement
-	// would mean the record is not what this codec thinks it is.
-	//
-	// The client answers with `AcgTeleportRequestCodec`, which echoes the proxy back verbatim.
+	/// <summary>
+	///     DispatchACGTeleportChoice - the confirmation box retail puts up before it moves the player into an instanced
+	///     playfield: <c>[u32 destMapId][u32 class][u32 clientInstance][PlayfieldProxy][u8 trailing]</c>. Decoded
+	///     byte-exact from xxx_mage-necromancer_login_play3 frame 4555, the Tortage harbour rowboat to White Sands Night,
+	///     which is the only capture of the flow in the corpus.
+	/// </summary>
+	/// <remarks>
+	///     The capture's own annotation names what the box says - a confirmation to enter, bound to the character - so it
+	///     is the "this instance will be bound to you" prompt, and the arrival is followed by an InstanceOwnerAndResetTime
+	///     feedback token. The proxy is therefore the destination's instance, and its owner slots are what make the
+	///     instance personal.
+	///     <para>
+	///         The destination map is stated twice, once as the leading word and once inside the proxy. Parse checks they
+	///         agree rather than reading one and trusting it, because a disagreement means the record is not what this codec
+	///         thinks it is.
+	///     </para>
+	///     <para>The client answers with <see cref="AcgTeleportRequestCodec" />, which echoes the proxy back verbatim.</para>
+	/// </remarks>
 	public static class AcgTeleportChoiceCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchACGTeleportChoice;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(AcgTeleportChoice value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -70,8 +72,10 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// DispatchACGTeleportChoice - "do you want to enter this instance?". The destination lives in the proxy; MapId is
-	// exposed for the caller that only wants to know where the boat goes.
+	/// <summary>
+	///     The DispatchACGTeleportChoice body - "do you want to enter this instance?". The destination lives in the proxy;
+	///     <see cref="MapId" /> is exposed for the caller that only wants to know where the boat goes.
+	/// </summary>
 	public sealed record AcgTeleportChoice(uint ClientInstance, PlayfieldProxy Proxy, byte Trailing = 0)
 	{
 		public uint MapId => Proxy.MapId;

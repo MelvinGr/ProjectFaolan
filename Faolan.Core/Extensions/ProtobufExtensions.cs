@@ -38,22 +38,29 @@ namespace Faolan.Core.Extensions
 			return RepackSingleElementFields(obj, ms.ToArray());
 		}
 
-		// ⚠️ protobuf-net writes a repeated primitive holding EXACTLY ONE element UNPACKED (`08 <v>`) even when the
-		// member is declared `[packed=true]` and the runtime model reports `IsPacked = True` - the writer optimises
-		// past it, and there is no schema or model knob that turns it off. Retail always packs, so a captured message
-		// whose packed field carries one element re-encoded exactly ONE byte short: `<tag|0><v>` where the wire has
-		// `<tag|2><len><v>` (Gitea #538 - 7 of the 151 captured FullChar snapshot roots, and precisely the 7 that
-		// carry a single `character_tag`; the 82 with two or more pack correctly and the 62 with none are unaffected).
-		//
-		// So the packing decision is taken back here, after the fact. Both forms are valid protobuf and the client
-		// reads either - this is about reproducing a CAPTURED message byte-for-byte, which is what the codec
-		// round-trip gates ask for.
-		//
-		// TOP-LEVEL only, and that is exact rather than partial: `character_tag` (ProtoFullCharacterIIR field 1) is the
-		// ONLY `[packed=true]` field in `aoc-client-protos.proto`, and it sits at the root of its message. The other
-		// two repeated scalars (`child_id`, `generic_stats`) are deliberately NOT marked packed - they are populated in
-		// zero captures, so nothing proves their form (see the `protobuf_net_packing_and_corpus_gates` memory). If one
-		// of them is ever marked, check whether it is nested before trusting this.
+		/// <summary>
+		///     Re-encodes any top-level packed repeated field that holds exactly one element in its length-delimited
+		///     form, which is what retail puts on the wire.
+		/// </summary>
+		/// <remarks>
+		///     protobuf-net writes a repeated primitive holding exactly one element unpacked (<c>08 &lt;v&gt;</c>) even
+		///     when the member is declared <c>[packed=true]</c> and the runtime model reports <c>IsPacked = True</c> -
+		///     the writer optimises past it, and there is no schema or model knob that turns it off. Retail always
+		///     packs, so a captured message whose packed field carries one element re-encodes exactly one byte short:
+		///     <c>&lt;tag|0&gt;&lt;v&gt;</c> where the wire has <c>&lt;tag|2&gt;&lt;len&gt;&lt;v&gt;</c>. That is 7 of
+		///     the 151 captured FullChar snapshot roots, precisely the 7 that carry a single <c>character_tag</c>; the
+		///     82 with two or more pack correctly and the 62 with none are unaffected.
+		///     <para />
+		///     The packing decision is therefore taken back here, after the fact. Both forms are valid protobuf and the
+		///     client reads either - this is about reproducing a captured message byte-for-byte, which is what the
+		///     codec round-trip gates ask for.
+		///     <para />
+		///     Top-level only, and that is exact rather than partial: <c>character_tag</c> (ProtoFullCharacterIIR field
+		///     1) is the only <c>[packed=true]</c> field in <c>aoc-client-protos.proto</c>, and it sits at the root of
+		///     its message. The other two repeated scalars (<c>child_id</c>, <c>generic_stats</c>) are deliberately not
+		///     marked packed - they are populated in zero captures, so nothing proves their form. If one of them is
+		///     ever marked, check whether it is nested before trusting this.
+		/// </remarks>
 		private static byte[] RepackSingleElementFields(IExtensible obj, byte[] encoded)
 		{
 			var packed = PackedMembers.GetOrAdd(obj.GetType(), static t => RuntimeTypeModel.Default[t].GetFields().Where(f => f.IsPacked).ToArray());
@@ -101,8 +108,8 @@ namespace Faolan.Core.Extensions
 
 					case 2:
 					{
-						// NB the length is read FIRST: `i += ReadVarint(encoded, ref i)` evaluates `i` before the
-						// call, so it would discard the varint's own advance and desync the walk.
+							// The length is read first: `i += ReadVarint(encoded, ref i)` would evaluate `i` before the
+							// call, discarding the varint's own advance and desyncing the walk.
 						var length = (int)ReadVarint(encoded, ref i);
 						i += length;
 						break;

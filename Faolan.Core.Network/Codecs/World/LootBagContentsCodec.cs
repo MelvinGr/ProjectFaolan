@@ -6,23 +6,24 @@ using ProtoBuf;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// The loot bag's CONTENTS message - cash + looter handles + item inventory (#187). A loot bag's body is a plain
-	// dynel plus a SECOND length-prefixed blob at the very end:
-	//   [u32 len][ProtoSimpleDynelIIR identity][kd-tree/bounds struct][u32 len][ProtoLootBagIIR contents]
-	// (reader decoded by vtable-xref, docs/re/iir-subclass-readers.md, FUN_007a3db0). This codec is that trailing
-	// blob, rebuilt BYTE-EXACT - protobuf-net round-trips the captured wire bytes losslessly, including the nested
-	// ProtoInventoryGame (LootBagMessageTests).
-	//
-	// It is what makes a loot bag's contents CONSTRUCTIBLE from the live drop (cash + looter + the killed entity's
-	// items) instead of replaying a captured template's contents. NB: flipping MakeCorpseLootable to send constructed
-	// contents is in-client-gated - changing a loot bag's on-wire contents mid-session is the substitution risk noted
-	// in the spawn-render memory; this codec is the proven building block for when that's verified.
-	//
-	// A class-(c) SUB-RECORD codec (#530 rule 5c): composed by WorldObjectCodec (the LootBagFullUpdateIIR body), so it
-	// declares no opcode of its own - the opcode is that parent's.
+	/// <summary>
+	///     The loot bag's contents message - cash, looter handles and item inventory. A loot bag's body is a plain dynel
+	///     plus a second length-prefixed blob at the very end:
+	///     <c>[u32 len][ProtoSimpleDynelIIR identity][kd-tree/bounds struct][u32 len][ProtoLootBagIIR contents]</c>; the
+	///     reader is FUN_007a3db0, see docs/re/iir-subclass-readers.md. This codec is that trailing blob.
+	/// </summary>
+	/// <remarks>
+	///     It is rebuilt byte-exact: protobuf-net round-trips the captured wire bytes losslessly, including the nested
+	///     ProtoInventoryGame (LootBagMessageTests), which is what makes a loot bag's contents constructible from the live
+	///     drop rather than replayed from a captured template.
+	///     <para>
+	///         A sub-record codec: composed by <see cref="WorldObjectCodec" /> as the LootBagFullUpdateIIR body, so it
+	///         declares no opcode of its own - the opcode is that parent's.
+	///     </para>
+	/// </remarks>
 	public static class LootBagContentsCodec
 	{
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(ProtoLootBagIIR contents)
 		{
 			ArgumentNullException.ThrowIfNull(contents);
@@ -46,7 +47,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		internal static ProtoLootBagIIR Read(ref SpanReader r)
 		{
-			// [u32 BE blobLen][protobuf] - a BIG-ENDIAN word, not the varint length protobuf itself would use.
+			// [u32 blobLen][protobuf] - a big-endian word, not the varint length protobuf itself would use.
 			return Serializer.Deserialize<ProtoLootBagIIR>(r.ReadBytesU32Length().ToArray().AsMemory());
 		}
 	}

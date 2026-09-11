@@ -10,14 +10,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spell-effect-gap [--report-arg <kind or stat id>]`: the imported-vs-APPLIED census of
-	// `SpellStatEffects` (#701) - how many of the shipped rows reach a live engine, and for the rest, which of the
+	// `--report spell-effect-gap [--report-arg <kind or stat id>]`: the imported-vs-applied census of
+	// `SpellStatEffects` - how many of the shipped rows reach a live engine, and for the rest, which of the
 	// two gates stopped them.
 	//
-	// It exists because that gap was counted BY HAND once and the number outlived the code by a wide margin. #701 was
-	// filed on "2,015 rows dropped by KIND across 48 kinds", with the conclusion that a general spell-effect
-	// dispatcher was the missing piece. By the time anyone read it the by-key element fix (#591/#701) and the pool
-	// engine (#702) had reshaped the table underneath it: 15 kinds, not 48, and the kind gate had stopped being where
+	// It exists because a gap counted by hand outlives the code that produced it. A count of "rows dropped by kind"
+	// drifts the moment the element reader or the pool engine changes shape underneath it, and the kind gate stops
+	// being where
 	// the rows go. A hand-census cannot notice that; this asks the ENGINES, so it cannot say anything they do not.
 	//
 	// Db-sourced - no captures, no RDB - so it answers from whatever `faolan.db` a clone actually has.
@@ -60,10 +59,10 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    a stat delta on an unmodelled stat      {byStat.Count,5}");
 			Console.WriteLine();
 
-			// The KIND table's load-bearing column is the last one. A kind's ROW COUNT says how much of the table it
-			// is; how many of those rows land on a stat the engine ALREADY models says what admitting the kind would
-			// be worth today - and those two numbers have almost nothing to do with each other, which is the whole
-			// reason #701's ranking by count pointed at the wrong work.
+			// The kind table's load-bearing column is the last one. A kind's row count says how much of the table it
+			// is; how many of those rows land on a stat the engine already models says what admitting the kind would
+			// be worth today - and those two numbers have almost nothing to do with each other, so a ranking by row
+			// count points at the wrong work.
 			Console.WriteLine("  dropped by KIND - the record is not a stat delta (a flag write, a spell modifier, a particle effect)");
 			Console.WriteLine($"    {"kind",-6} {"name",-28} {"rows",5} {"spells",6}  on an already-modelled stat");
 			foreach (var g in byKind.GroupBy(v => v.Row.EffectKind).OrderByDescending(g => g.Count()))
@@ -86,7 +85,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// One line's rows, with the spell that carries them - the form that turns a count into something you can read
-		// a description off. The argument is matched against BOTH id spaces because they do not overlap in practice
+		// a description off. The argument is matched against both id spaces because they do not overlap in practice
 		// (kinds are ~53000, stats are under 1400) and making the caller say which would be ceremony.
 		private static void Detail(
 			List<(SpellStatEffect Row, bool Pool, BuffStatEffects.Gate Stat)> verdicts,

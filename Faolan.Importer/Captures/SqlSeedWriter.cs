@@ -10,60 +10,61 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Faolan.Importer.Captures
 {
-	// Writes the game DATA as a dialect-neutral SQL seed (#411): one file that loads into BOTH SQLite and Postgres,
-	// so the schema (EF migrations) + this file can eventually replace the committed binary faolan.db (#379).
-	//
-	// `sqlite3 <db> .dump` cannot do this. Measured against the pre-#411 dump, all of it breaks Postgres:
-	//   - identifiers unquoted -> `INSERT INTO Items` folds to `items`, but EF creates `"Items"` case-preserved
-	//   - POSITIONAL inserts -> the column ORDER has to match, which it does not across providers (and did not even
-	//     across two SQLite schemas until the migrations were squashed)
-	//   - booleans as 0/1 -> Postgres rejects those for a `boolean` column (60 of them)
-	//   - `PRAGMA`/`sqlite_sequence` statements -> SQLite-only
-	// So the seed is GENERATED from the EF model instead: quoted identifiers, an explicit column list per row, and
-	// literals rendered from each property's CLR type rather than from SQLite's storage affinity.
-	//
-	// Tables are emitted in FOREIGN-KEY DEPENDENCY ORDER, so the file loads with constraints ON rather than needing
-	// a disable-checks prologue - which is itself the least portable part of a dump (`PRAGMA foreign_keys=OFF` vs
-	// `SET session_replication_role = replica`, the latter needing superuser).
-	//
-	// The only genuinely per-dialect part left is resyncing the auto-increment counters after inserting explicit
-	// ids, so that goes in a small SIDECAR file per dialect and the big body stays 100% common.
+	/// <summary>
+	///     Writes the game data as a dialect-neutral SQL seed: one file that loads into both SQLite and Postgres, so
+	///     the schema (EF migrations) plus this file can replace the committed binary faolan.db.
+	/// </summary>
+	/// <remarks>
+	///     The seed is generated from the EF model rather than by <c>sqlite3 &lt;db&gt;.dump</c>, because a dump is
+	///     SQLite-only in four ways that each break Postgres: identifiers are unquoted, so <c>insert into Items</c>
+	///     folds to <c>items</c> while EF creates a case-preserved <c>"Items"</c>; inserts are positional, so the
+	///     column order has to match across providers; booleans are emitted as 0/1, which Postgres rejects for a
+	///     <c>boolean</c> column; and PRAGMA / sqlite_sequence statements have no Postgres equivalent. So this writer
+	///     quotes identifiers, emits an explicit column list per row, and renders literals from each property's CLR
+	///     type rather than from SQLite's storage affinity.
+	///     Tables are emitted in foreign-key dependency order, so the file loads with constraints on rather than
+	///     needing a disable-checks prologue - itself the least portable part of a dump (<c>PRAGMA foreign_keys=off</c>
+	///     versus <c>set session_replication_role = replica</c>, the latter needing superuser).
+	///     The result is one file with no per-dialect sidecar: no game-content table may have a store-generated key,
+	///     so there are no auto-increment counters left to resync after the seed's explicit ids.
+	/// </remarks>
 	public static class SqlSeedWriter
 	{
-		// The seed carries GAME CONTENT. Everything below is PLAYER or DEPLOYMENT state - per install, not shipped -
-		// and so is every table that hangs off one of them (the closure is derived from the model's foreign keys, so
-		// it cannot go stale the way a hardcoded list would; these roots pull in 20 more, the CharacterX tables and
-		// MailAttachments).
-		//
-		// `Characters` was the only root until #412: the character-FK closure was standing in for "player state" and
-		// missed everything that is not FK-linked to a character, so a fresh clone came up carrying 243 live auction
-		// listings, 19 account claims, someone's mail and a chat message. Accounts and Realms are deployment state -
-		// DatabaseInitializer creates the defaults for a new database, which is why they do not belong in the data.
-		//
-		// This boundary is also what makes a content UPGRADE tractable: with player state out, every seeded table
-		// referenced from OUTSIDE the seed has a natural, stable key (Items, Spells, QuestDefinitions,
-		// QuestGoalDefinitions, RespawnPoints, Maps), so a live character's references survive a refresh by
-		// construction. The generated-id tables that remain (WorldObjects, ConversationNodes, ...) are internal to
-		// the seed - nothing outside points into them, so renumbering them on a regeneration is harmless.
+		/// <remarks>
+		///     The seed carries game content. These roots are player or deployment state - per install, not shipped -
+		///     and so is every table that hangs off one of them; the closure is derived from the model's foreign keys,
+		///     so it cannot go stale the way a hardcoded list would. Accounts and Realms are deployment state:
+		///     DatabaseInitializer creates the defaults for a new database.
+		///     This boundary is what makes a content upgrade tractable. With player state out, every seeded table
+		///     referenced from outside the seed has a natural, stable key (Items, Spells, QuestDefinitions,
+		///     QuestGoalDefinitions, RespawnPoints, Maps), so a live character's references survive a refresh by
+		///     construction. The generated-id tables that remain (WorldObjects, ConversationNodes,...) are internal to
+		///     the seed - nothing outside points into them, so renumbering them on a regeneration is harmless.
+		/// </remarks>
 		private static readonly string[] ExcludedRoots =
 		[
 			"Characters", "Accounts", "Realms", "Guilds", "Mails", "ChatMessages", "TradepostListings", "AccountClaims"
 		];
 
-		// Rows per multi-row INSERT. The column list is the expensive part of this format - repeating it per row cost
-		// 16 MB of the 24 (68%), more than the values themselves for narrow tables - so it is paid once per BATCH
-		// instead. Both dialects accept `VALUES (..),(..)`; SQLite swallows 100k rows in one statement, but batching
-		// keeps any parser's memory bounded. Each row still gets its OWN LINE: faolan.sql is a reviewed artifact and
-		// a multi-megabyte single line would make its diffs useless.
+		/// <remarks>
+		///     Rows per multi-row insert. The column list is the expensive part of this format - for narrow tables it
+		///     outweighs the values themselves - so it is paid once per batch. Both dialects accept
+		///     <c>values (..),(..)</c>; batching keeps any parser's memory bounded. Each row still gets its own line:
+		///     faolan.sql is a reviewed artifact and a multi-megabyte single line would make its diffs useless.
+		/// </remarks>
 		private const int BatchRows = 1000;
 
-		// The content tables the seed covers, in FOREIGN-KEY DEPENDENCY ORDER (principals first) with the player and
-		// deployment state excluded. Shared with SqlSeedApplier so the writer and the merge cannot disagree about
-		// what "the seed" is - the exclusion set especially.
-		//
-		// GROUPED BY TABLE, not per entity type: two entity types can share one table (EF table splitting - here
-		// Items and Abilities each split their Key1..Key4 off into a second type). Treating them separately would
-		// see each row TWICE, each time with only that type's share of the columns.
+		/// <summary>
+		///     The content tables the seed covers, in foreign-key dependency order (principals first) with player and
+		///     deployment state excluded.
+		/// </summary>
+		/// <remarks>
+		///     Shared with <see cref="SqlSeedApplier" /> so the writer and the merge cannot disagree about what "the
+		///     seed" is, the exclusion set especially.
+		///     Grouped by table, not per entity type: two entity types can share one table (EF table splitting - Items
+		///     and Abilities each split their Key1..Key4 off into a second type). Treating them separately would see
+		///     each row twice, each time with only that type's share of the columns.
+		/// </remarks>
 		public static List<IGrouping<string, IEntityType>> ContentTables(DatabaseContext db)
 		{
 			var tables = OrderByDependency(db.Model.GetEntityTypes()
@@ -74,7 +75,9 @@ namespace Faolan.Importer.Captures
 			return tables.Where(g => !excluded.Contains(g.Key) && g.Key != "__EFMigrationsHistory").ToList();
 		}
 
-		// The columns of a table, unioned across the entity types that share it, and their CLR types.
+		/// <summary>
+		///     The columns of a table, unioned across the entity types that share it, and their CLR types.
+		/// </summary>
 		public static (List<string> Columns, Type[] ClrTypes) ColumnsOf(IGrouping<string, IEntityType> group)
 		{
 			var storeObject = StoreObjectIdentifier.Table(group.Key, group.First().GetSchema());
@@ -87,7 +90,9 @@ namespace Faolan.Importer.Captures
 			return (properties.Select(p => p.GetColumnName(storeObject)!).ToList(), properties.Select(p => p.ClrType).ToArray());
 		}
 
-		// The primary-key columns, which the merge keys rows on.
+		/// <summary>
+		///     The primary-key columns, which the merge keys rows on.
+		/// </summary>
 		public static List<string> KeyOf(IGrouping<string, IEntityType> group)
 		{
 			var entity = group.First();
@@ -132,12 +137,10 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// The seed inserts every id EXPLICITLY, so a store-generated key would need its counter moved past
-				// them afterwards - which is what the faolan.seq.{sqlite,postgres}.sql sidecars used to carry. They
-				// are gone, because no game-content table may have such a key any more (every one is keyed by its
-				// identity - see the model conventions), and DatabaseConventionTests.NoGameContentTable_HasAStoreGeneratedKey
-				// is the gate. Both were empty for exactly that reason. So this is the generator's half of the same
-				// invariant: if one ever reappears, say so HERE rather than emit a seed whose next INSERT collides.
+				// The seed inserts every id explicitly and there is no counter-resync file, so no game-content table
+				// may key on a store-generated column (every one is keyed by its identity - see the model conventions
+				// in CLAUDE.md). This is the generator's half of that invariant: if one reappears, throw naming the
+				// table rather than emit a seed whose next insert collides.
 				var identity = entity.FindPrimaryKey()?.Properties.FirstOrDefault(p => p.ValueGenerated != ValueGenerated.Never);
 				if (identity != null && rows.Count > 0)
 				{
@@ -153,15 +156,14 @@ namespace Faolan.Importer.Captures
 			return (written, rowTotal);
 		}
 
-		// `orderBy` (the table's primary-key columns) makes the emit DETERMINISTIC, and the seed is worthless as a
-		// reviewable mirror without it. An unordered SELECT returns rows in whatever order the storage engine happens
-		// to hold them, which is stable only until something rewrites a page: a single UPDATE to one QuestGoalDefinition
-		// moved 8 unrelated WorldObjectWords rows to the front of their table, churning 25 lines of faolan.sql for zero
-		// semantic change - and that is the benign version. The damaging one is the same noise hiding a REAL row change
-		// in a diff nobody can read.
-		//
-		// Ordering by the PK (not by rowid, which Postgres does not have) also means the two providers emit the same
-		// file, which the "loads into both" promise needs.
+		/// <param name="orderBy">
+		///     The table's primary-key columns. Passing them makes the emit deterministic, without which the seed is
+		///     worthless as a reviewable mirror: an unordered SELECT returns rows in whatever order the storage engine
+		///     happens to hold them, which is stable only until something rewrites a page, so unrelated rows move and
+		///     churn faolan.sql - or worse, hide a real row change in a diff nobody can read. Ordering by the primary
+		///     key (not by rowid, which Postgres does not have) also means the two providers emit the same file, which
+		///     the "loads into both" promise needs.
+		/// </param>
 		public static List<object?[]> ReadRows(DatabaseContext db, string table, List<string> columns, List<string>? orderBy = null)
 		{
 			var connection = db.Database.GetDbConnection();
@@ -192,12 +194,15 @@ namespace Faolan.Importer.Captures
 			return rows;
 		}
 
-		// Literals a Postgres parser and a SQLite parser read IDENTICALLY.
-		//
-		// ⚠️ Rendered from the MODEL's CLR type, never from the value the reader hands back. SQLite has no boolean
-		// storage class, so its provider returns a `long` 0/1 for a bool property - switching on the runtime type
-		// therefore emits `0`, which Postgres rejects outright ("column is of type boolean but expression is of type
-		// integer"). Same trap for floats, which come back as `double`.
+		/// <summary>
+		///     Renders a literal that a Postgres parser and a SQLite parser read identically.
+		/// </summary>
+		/// <remarks>
+		///     Rendered from the model's CLR type, never from the value the reader hands back. SQLite has no boolean
+		///     storage class, so its provider returns a <c>long</c> 0/1 for a bool property; switching on the runtime
+		///     type would emit <c>0</c>, which Postgres rejects ("column is of type boolean but expression is of type
+		///     integer"). Floats have the same trap - they come back as <c>double</c>.
+		/// </remarks>
 		private static string Literal(object? value, Type clrType)
 		{
 			if (value is null or DBNull)
@@ -216,14 +221,11 @@ namespace Faolan.Importer.Captures
 				throw new InvalidOperationException(
 					"A byte[] column reached the SQL seed. There is no blob literal both dialects accept (SQLite x'..' vs Postgres '\\x..'), which is why #410 columnized every blob away - decode the new one or store it as text.");
 
-			// Round-trip ("R") so re-loading is bit-identical rather than merely close - and note this widens a
-			// `float` property to DOUBLE rather than narrowing to single.
-			//
-			// ⚠️ Narrowing loses data. A float column holds the double widening of its float (0.3f is stored as
-			// 0.30000001192092896); rendering it as single gives "0.3", which reloads as the DOUBLE 0.3 - a
-			// different value. It shifted 41731 rows by ~1e-8 and was invisible to a tolerance-based check.
-			// Emitting the stored double reproduces the exact bits on SQLite, and Postgres rounds it back to the
-			// same float4 on the way into a `real` column.
+			// Round-trip ("R") so re-loading is bit-identical rather than merely close, and widen a float property to
+			// double rather than narrowing to single. A float column holds the double widening of its float (0.3f is
+			// stored as 0.30000001192092896); rendering it as single gives "0.3", which reloads as the double 0.3 - a
+			// different value, and one a tolerance-based check cannot see. Emitting the stored double reproduces the
+			// exact bits on SQLite, and Postgres rounds it back to the same float4 on the way into a `real` column.
 			if (type == typeof(float) || type == typeof(double))
 				return Convert.ToDouble(value, CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture);
 
@@ -252,14 +254,18 @@ namespace Faolan.Importer.Captures
 			};
 		}
 
-		// Double quotes are the SQL standard for identifiers and mean the same thing in both dialects - without them
-		// Postgres folds to lower case and stops finding EF's case-preserved tables.
+		/// <remarks>
+		///     Double quotes are the SQL standard for identifiers and mean the same thing in both dialects - without
+		///     them Postgres folds to lower case and stops finding EF's case-preserved tables.
+		/// </remarks>
 		public static string Quote(string identifier)
 		{
 			return $"\"{identifier}\"";
 		}
 
-		// The excluded ROOTS plus everything that reaches one of them through foreign keys.
+		/// <summary>
+		///     The excluded roots plus everything that reaches one of them through foreign keys.
+		/// </summary>
 		private static HashSet<string> PlayerStateTables(List<IGrouping<string, IEntityType>> tables)
 		{
 			var excluded = new HashSet<string>(ExcludedRoots);
@@ -280,7 +286,9 @@ namespace Faolan.Importer.Captures
 			return excluded;
 		}
 
-		// The tables this one points AT through foreign keys, self-references dropped.
+		/// <summary>
+		///     The tables this one points at through foreign keys, self-references dropped.
+		/// </summary>
 		private static IEnumerable<string> Principals(IGrouping<string, IEntityType> group)
 		{
 			return group
@@ -290,9 +298,13 @@ namespace Faolan.Importer.Captures
 				.Distinct();
 		}
 
-		// Principals before dependents, so the file loads with foreign keys ENFORCED. Self-references are skipped -
-		// they order rows, not tables, and the two self-referencing tables here (PatrolNode, ConversationNode) are
-		// inserted in id order which is also insertion order.
+		/// <summary>
+		///     Orders tables principals-before-dependents, so the file loads with foreign keys enforced.
+		/// </summary>
+		/// <remarks>
+		///     Self-references are skipped: they order rows, not tables, and the two self-referencing tables here
+		///     (PatrolNode, ConversationNode) are inserted in id order, which is also insertion order.
+		/// </remarks>
 		private static List<IGrouping<string, IEntityType>> OrderByDependency(List<IGrouping<string, IEntityType>> tables)
 		{
 			var ordered = new List<IGrouping<string, IEntityType>>();

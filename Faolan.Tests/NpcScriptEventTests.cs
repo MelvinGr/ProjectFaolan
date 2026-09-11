@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The scry events an NPC's dialogue fires (#839) and, more to the point, the ACTION each is mapped to.
+	// The scry events an NPC's dialogue fires and, more to the point, the action each is mapped to.
 	//
-	// The event STRING is retail's and is harvested; the action is ours, and it is the seam that lets a future quest's
+	// The event string is retail's and is harvested; the action is ours, and it is the seam that lets a future quest's
 	// script be plugged in by stamping a column instead of adding a branch to the dialogue runtime. These gates are
 	// about that seam staying honest: the three we act on stay mapped, and everything else stays visibly UNmapped
 	// rather than drifting into a behaviour nobody chose.
@@ -32,11 +32,11 @@ namespace Faolan.Tests
 			Assert.Equal(expected, row!.Action);
 		}
 
-		// ⚠️ The other half, and the one that actually protects the seam: an event nobody has mapped must stay `None`.
+		// The other half, and the one that actually protects the seam: an event nobody has mapped must stay `None`.
 		//
 		// `None` is load-bearing exactly as `QuestGoalType.None` is - it means "harvested, stored, and logged when it
-		// fires", not "do the nearest thing". `SpawnSheep` is the case that makes it concrete: it LOOKS like
-		// `SpawnScavenger` and is not, because RevealQuestTargets reveals what a QUEST asks for and Ulfheoinn grants
+		// fires", not "do the nearest thing". `SpawnSheep` is the case that makes it concrete: it looks like
+		// `SpawnScavenger` and is not, because RevealQuestTargets reveals what a quest asks for and Ulfheoinn grants
 		// no quest we hold and no goal gates a Sheep. Mapping it by name-similarity would fire a reveal that reveals
 		// nothing and read as wired.
 		[Fact]
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 				new[] { NpcScriptAction.TurnHostile, NpcScriptAction.LeaveWorld, NpcScriptAction.RevealQuestTargets }));
 		}
 
-		// `RevealQuestTargets` says WHEN, and the quest says WHO - so an NPC that fires it must have a quest with a
+		// `RevealQuestTargets` says when, and the quest says who - so an NPC that fires it must have a quest with a
 		// gated target to reveal, or the event is a no-op that looks wired. Casilda grants 13479, whose goal 5744
 		// gates Scavenger Tuut; that chain is what the action actually depends on.
 		[Fact]
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			var gated = await db.QuestGoalDefinitions.AsNoTracking().Where(g => g.GatesTargetVisibility).ToListAsync(ct);
 			foreach (var npc in revealers)
 			{
-				// The grant rides the EDGE the player takes, so the NPC is reached through the edge's From node.
+				// The grant rides the edge the player takes, so the NPC is reached through the edge's From node.
 				var grants = await db.ConversationEdges.AsNoTracking()
 					.Where(e => e.GrantQuestId != null && e.From.NpcTemplateId == npc)
 					.Select(e => e.GrantQuestId!.Value)

@@ -9,11 +9,11 @@ using Faolan.Importer.Captures;
 namespace Faolan.Importer.Cli
 {
 	// `--report sprint`: the whole sprint/regen message family in one place - what the client sends, what retail
-	// answers, which entity each answer is addressed to, and what the bodies hold (#867).
+	// answers, which entity each answer is addressed to, and what the bodies hold.
 	//
 	// It exists because the census says the family is the busiest thing we do not implement (`SetSprintInputState` is
 	// 9,329 c2s frames, the third-busiest client message in the corpus) while our inbound handler carries the claim
-	// that retail "does NOT reply to" it. Both cannot be true, and the question is not answerable from counts: a
+	// that retail "does not reply to" it. Both cannot be true, and the question is not answerable from counts: a
 	// 1-byte `DispatchSetIsSprinting` body carries no entity, so whether it is a REPLY about you or a BROADCAST about
 	// somebody else is decided by the RECEIVER ENDPOINT - which is header, not body, and therefore invisible to a
 	// count-only census.
@@ -24,7 +24,7 @@ namespace Faolan.Importer.Cli
 	//   3. the c2s -> s2c pairing - whether an input state change is answered, how fast, and with what value.
 	public static partial class ReportCli
 	{
-		// The family, by (receiver class, method). The two directions live on different interfaces: the sprint KEY
+		// The family, by (receiver class, method). The two directions live on different interfaces: the sprint key
 		// goes to GameCharAgentProject, every answer comes back on GameCharInterfaceProject.
 		private static readonly (uint Class, Enum Method, string Name)[] SprintFamily =
 		[
@@ -113,9 +113,9 @@ namespace Faolan.Importer.Cli
 		}
 
 		// The client's own signature is `SetSprintInputState(bool sprintInput, bool clientCheck)` and
-		// `DispatchSetIsSprinting(isSprinting)`, so the c2s body is TWO bytes and only the first is the key state.
+		// `DispatchSetIsSprinting(isSprinting)`, so the c2s body is two bytes and only the first is the key state.
 		// The question this answers: retail sends a third as many answers as it gets inputs, so it is not answering
-		// every frame - is it answering every CHANGE?
+		// every frame - is it answering every change?
 		private static void PairSprintInput(List<SprintEvent> events)
 		{
 			var inputPairs = new SortedDictionary<string, int>();
@@ -129,7 +129,7 @@ namespace Faolan.Importer.Cli
 					inputPairs[$"sprintInput={input.Body[0]} clientCheck={input.Body[1]}"] =
 						inputPairs.GetValueOrDefault($"sprintInput={input.Body[0]} clientCheck={input.Body[1]}") + 1;
 
-				// A CHANGE is a frame whose sprintInput differs from the previous one on this capture.
+				// A change is a frame whose sprintInput differs from the previous one on this capture.
 				int changes = 0, agreeing = 0;
 				int? previous = null;
 				int? lastInput = null;
@@ -171,7 +171,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// What SyncRegenDelayed follows: it is always 0x00 in the corpus, so the interesting question is not its
-		// value but its TRIGGER - which message precedes it, and how closely.
+		// value but its trigger - which message precedes it, and how closely.
 		private static void RegenDelayedTriggers(List<SprintEvent> events)
 		{
 			var precedingWithin = new SortedDictionary<string, int>();

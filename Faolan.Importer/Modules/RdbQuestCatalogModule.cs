@@ -10,8 +10,10 @@ namespace Faolan.Importer.Modules
 {
 	public sealed class RdbQuestCatalogModule : IImportModule
 	{
-		// Lines must exist before the quests that FK them, and quests before their goals - the importer orders those
-		// three passes itself. It depends on no other module: the catalog is self-contained client data.
+		/// <remarks>
+		///     No dependency: the catalog is self-contained client data. Lines must exist before the quests that
+		///     reference them and quests before their goals, and the importer orders those three passes itself.
+		/// </remarks>
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>

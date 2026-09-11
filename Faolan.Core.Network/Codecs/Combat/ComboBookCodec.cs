@@ -5,25 +5,29 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// ComboBookIIR (0xA8BBEB7F) - grants ONE combo into the client's combo book. Sent as part of the create-flow
-	// world-prep burst (the starting combos) AND on a level-up ding (the combos unlocked at the new level - #209). The
-	// level-up combos are level-keyed and class-INDEPENDENT (Guardian/Conqueror/Assassin/Mage all get the same set at L2).
-	//
-	// Carried as an IIR on the WORLD conversation (opcode 0x2000; receiver = the player's GameInterface). Wire grammar
-	// (big-endian), decoded from the create + combat-levelup captures (golden-tested in ComboBookCodecTests):
-	//   [u32 0xA8BBEB7F]   ComboBookIIR sub-opcode
-	//   [u32 0x0000C350]   Character marker (EntityClass.Character)
-	//   [u32 instance]     the target entity object (= the receiver endpoint instance / ClientInstance)
-	//   [u16 0x0001]       constant (an add/type flag)
-	//   [u32 comboId]      the combo id granted
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2) - it was 0x12 (18) on every captured record.
+	/// <summary>
+	///     ComboBookIIR - grants one combo into the client's combo book. Sent as part of the create-flow world-prep burst
+	///     (the starting combos) and on a level-up ding (the combos unlocked at the new level). The level-up combos are
+	///     level-keyed and class-independent: Guardian, Conqueror, Assassin and Mage all get the same set at level 2.
+	/// </summary>
+	/// <remarks>
+	///     Carried as an IIR on the world conversation, the receiver being the player's GameInterface. Big-endian grammar,
+	///     decoded from the create and combat-levelup captures and golden-tested in ComboBookCodecTests:
+	///     <code>
+	///     [u32 subop]        the ComboBookIIR sub-opcode
+	///     [u32 class]        the Character marker
+	///     [u32 instance]     the target entity object, i.e. the receiver endpoint instance
+	///     [u16 0x0001]       an add/type flag, constant in every capture
+	///     [u32 comboId]      the combo id granted
+	///     </code>
+	///     The u32 carrier length belongs to the framing sender; it is 18 on every captured record.
+	/// </remarks>
 	public static class ComboBookCodec
 	{
 		public const uint Opcode = (uint)IirTypes.ComboBookIIR;
 		private const ushort AddFlag = 0x0001;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(ComboBookIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -60,6 +64,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// ComboBookIIR (0xA8BBEB7F).
+	/// <summary>The ComboBookIIR body.</summary>
 	public sealed record ComboBookIIR(uint Instance, uint ComboId);
 }

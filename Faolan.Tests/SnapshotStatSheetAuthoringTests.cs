@@ -9,28 +9,25 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The acceptance test #447 asks for: a modelled stat's value REACHES THE WIRE, whichever baseline the character
-	// landed on. The bug behind that issue was silent - editing `(CharacterStatId.GmLevel, 0x5)` in the static
-	// StatList2Half changed nothing for a real login, because an imported character's sheet comes from its capture
-	// and the static list only ever fed the fresh path.
+	// A modelled stat's value reaches the wire, whichever baseline the character landed on. The failure this
+	// guards is silent: editing a value in the static StatList2Half changes nothing for a real login, because an
+	// imported character's sheet comes from its capture and the static list only feeds the fresh path.
 	public class SnapshotStatSheetAuthoringTests
 	{
-		// Stats the CORPUS shows varying between captured characters, which we nonetheless carry at a fixed value.
+		// Stats the corpus shows varying between captured characters, which we nonetheless carry at a fixed value.
 		// Each needs a reason, and the reason may not be "we did not get to it" without an issue behind it - a stat
 		// that varies in retail and is constant in our emit is a character wearing someone else's number.
 		private static readonly Dictionary<CharacterStatId, string> NotModelledYet = new Dictionary<CharacterStatId, string>
 		{
 			// Progression/statistics we do not track yet: play time, money, the PvP and kill/death counters, the
 			// skill ratings. All read as character state we simply have no source for, not as protocol unknowns.
-			// NB the list holds only what actually VARIES: MinigamesAbandoned, SiegeWins/Losses and Fatalities are 0
+			// NB the list holds only what actually varies: MinigamesAbandoned, SiegeWins/Losses and Fatalities are 0
 			// on every captured character, so carrying them as 0 is a fact, not a shortcut - and the anti-rot half of
-			// the gate below rejects them if listed. (MurderPoints used to be in that group; it is now AUTHORED from
-			// Character.MurderPoints - #503 - since the criminal system needs it to move.)
+			// the gate below rejects them if listed.
 			[CharacterStatId.Played] = "play time not tracked",
-			// #625: the client's own table calls 0x06A `PowerSessionRemaining` and 0x069 `NextPowersessionReset`, which
-			// retires the "per-kill sequence number, semantics unknown" reading. The captured snapshot's 0x14 is a
-			// FULL power session (20), and the live observation behind #656 - it counting 20/19/18 down while
-			// `DailyPvPKills` counts 0/1/2 up - is a session being spent by kills. Still not tracked.
+			// The client's own table calls 0x06A `PowerSessionRemaining` and 0x069 `NextPowersessionReset`. The captured
+			// snapshot's 0x14 is a full power session (20), and the live observation - it counting 20/19/18 down while
+			// `DailyPvPKills` counts 0/1/2 up - is a session being spent by kills. Not tracked.
 			[CharacterStatId.PowerSessionRemaining] = "the power session is not modelled",
 			[CharacterStatId.PreviousHealth] = "derived from combat history we do not keep",
 			[CharacterStatId.DeathEffectXp] = "death-penalty XP not tracked",
@@ -45,21 +42,20 @@ namespace Faolan.Tests
 			[CharacterStatId.AnnihilationWins] = "PvP minigame counters not tracked",
 			[CharacterStatId.AnnihilationLosses] = "PvP minigame counters not tracked",
 
-			// Skills: real character stats, but ours are not derived yet. (The rating QUAD used to sit here too -
-			// AttackRating / DefenseRating / MagicRating / MagicalResist are now derived from level, #685.)
+			// Skills: real character stats, but ours are not derived yet.
 			[CharacterStatId.Perception] = "skills not derived",
 			[CharacterStatId.Climbing] = "skills not derived",
 			[CharacterStatId.Hiding] = "skills not derived",
 			[CharacterStatId.Skulk] = "skills not derived",
 			[CharacterStatId.RunSpeed] = "movement stats not derived",
 
-			// Named-unknown slots that vary: undecoded, so there is nothing to derive them FROM yet (#464).
+			// Named-unknown slots that vary: undecoded, so there is nothing to derive them from yet.
 			[CharacterStatId.Unknown15] = "undecoded slot (#464)",
 			[CharacterStatId.Unknown46] = "undecoded slot (#464)",
 			[CharacterStatId.ElderFrostSpecialization] = "undecoded slot (#464)"
 		};
 
-		// Stats authored on the BLOCK rather than in the sheet: SubClassPostAccessBlock.ApplyClassVitals writes these
+		// Stats authored on the block rather than in the sheet: SubClassPostAccessBlock.ApplyClassVitals writes these
 		// from the character's class curve after the sheet is built.
 		private static readonly CharacterStatId[] AuthoredByVitals =
 		[
@@ -67,7 +63,7 @@ namespace Faolan.Tests
 			CharacterStatId.ManaMax, CharacterStatId.StaminaCurrent, CharacterStatId.StaminaMax
 		];
 
-		// THE ACCEPTANCE TEST. Two different characters must produce two different sheets, in every slot the snapshot
+		// The acceptance test. Two different characters must produce two different sheets, in every slot the snapshot
 		// claims to derive - and identically so whether the baseline was the fresh skeleton or a captured sheet.
 		[Fact]
 		public void AModelledStat_ReachesTheSheet_FromEitherBaseline()
@@ -83,7 +79,7 @@ namespace Faolan.Tests
 
 				Assert.Equal(12u, Value(a, CharacterStatId.Level));
 				Assert.Equal(40u, Value(b, CharacterStatId.Level));
-				// Exp is a RUNNING TOTAL on the wire (#297), so the row's within-level progress rides on the level's
+				// Exp is a running total on the wire, so the row's within-level progress rides on the level's
 				// own threshold - which is also what makes it a per-character value rather than a baseline one.
 				Assert.Equal(LevelingResolver.CumulativeXpForLevel(12) + 345u, Value(a, CharacterStatId.Exp));
 				Assert.Equal(LevelingResolver.CumulativeXpForLevel(40) + 999u, Value(b, CharacterStatId.Exp));
@@ -109,7 +105,7 @@ namespace Faolan.Tests
 			Assert.Equal(uint.MaxValue, Value(SnapshotStatSheet.For(rich, null, null), CharacterStatId.Money));
 		}
 
-		// The kill/death counters reach the sheet. They were listed as "not tracked", which was true of the COLUMNS,
+		// The kill/death counters reach the sheet. They were listed as "not tracked", which was true of the columns,
 		// not of the events - the server already knew at the XP award and at the death persist.
 		[Fact]
 		public void TheKillAndDeathCounters_ReachTheSheet()
@@ -124,10 +120,9 @@ namespace Faolan.Tests
 			Assert.Equal(37u, Value(sheet, CharacterStatId.PvPTotalDeaths));
 		}
 
-		// The LOGIN snapshot and the LIVE stat packet must put the same wire number on the same stat. They are built
-		// by different classes (SubClassPostAccessBlock vs CharacterStatBlock) and the snapshot side used to spell
-		// the vital scale as a literal `* 100` in six places; if the two ever disagreed the client would show one
-		// value at world entry and jump to another on the first stat update.
+		// The login snapshot and the live stat packet must put the same wire number on the same stat. They are built
+		// by different classes (SubClassPostAccessBlock vs CharacterStatBlock), so if the two ever disagreed the client
+		// would show one value at world entry and jump to another on the first stat update.
 		[Fact]
 		public void TheSnapshotAndTheLiveStatPacket_AgreeOnTheVitalScale()
 		{
@@ -151,7 +146,7 @@ namespace Faolan.Tests
 			Assert.Equal(217u, block.CurrentStamina);
 		}
 
-		// PlayerId is the ACCOUNT's (#478): scanned over the whole capture corpus the three observed ids group by
+		// PlayerId is the account's: scanned over the whole capture corpus the three observed ids group by
 		// account, not by character - so two characters on one account share it, which is the assertion that would
 		// have caught the old "derive it from the character id" guess.
 		[Fact]
@@ -160,7 +155,7 @@ namespace Faolan.Tests
 			var first = Character(level: 1, exp: 0, Sex.Male);
 			var second = Character(level: 40, exp: 5, Sex.Female);
 			first.Id = 0x0200000B;
-			second.Id = 0x0200000C; // a DIFFERENT character...
+			second.Id = 0x0200000C; // a different character...
 			first.AccountId = 77;
 			second.AccountId = 77; // ...on the same account
 
@@ -168,7 +163,7 @@ namespace Faolan.Tests
 			Assert.Equal(77u, Value(SnapshotStatSheet.For(second, null, null), CharacterStatId.PlayerId));
 		}
 
-		// A derived stat is written at EVERY occurrence: a stat can appear in both lists and twice within StatList#2,
+		// A derived stat is written at every occurrence: a stat can appear in both lists and twice within StatList#2,
 		// and a half-written sheet is what makes the client's view internally inconsistent.
 		[Fact]
 		public void ADerivedStat_IsWrittenAtEveryOccurrence()
@@ -180,10 +175,10 @@ namespace Faolan.Tests
 			Assert.All(levels, p => Assert.Equal(33u, p.Value));
 		}
 
-		// ⚠️ THE GATE. Every stat the CORPUS shows varying between captured characters must be authored from the
+		// The gate. Every stat the corpus shows varying between captured characters must be authored from the
 		// character, or listed above with a reason. Without this, a stat that varies in retail can sit in the static
-		// baseline at one captured character's value and be shipped to everyone - which is exactly #447's complaint,
-		// and is invisible until someone reads the sheet in-client.
+		// baseline at one captured character's value and be shipped to everyone - which is invisible until someone
+		// reads the sheet in-client.
 		[Fact]
 		public void EveryStatThatVariesInTheCorpus_IsAuthoredOrExplicitlyNotModelled()
 		{
@@ -211,13 +206,13 @@ namespace Faolan.Tests
 				$"{unexplained.Count} stat(s) vary between captured characters but are neither authored nor listed as not-modelled:\n  "
 				+ string.Join("\n  ", unexplained));
 
-			// And the allowlist may not rot: an entry that no longer varies is a claim about retail that the corpus
-			// stopped supporting.
+			// And the allowlist may not rot: an entry that does not vary is a claim about retail the corpus does not
+			// support.
 			var stale = NotModelledYet.Keys.Where(id => !varying.Contains((uint)id)).Select(id => id.ToString()).ToList();
 			Assert.True(stale.Count == 0, "not-modelled entries that do not vary in the corpus (drop them):\n  " + string.Join("\n  ", stale));
 		}
 
-		// The distinct stat ids whose VALUE differs between captured characters.
+		// The distinct stat ids whose value differs between captured characters.
 		private static HashSet<uint> VaryingStatsInCorpus()
 		{
 			var byStat = new Dictionary<uint, HashSet<uint>>();

@@ -4,11 +4,15 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Feats
 {
-	// c2s FeatUntrainAnswer (GameCharAgentMethods 0x203E) - the player's reply to the untrain-all confirm dialog:
-	//   [u8 answer][the 16-byte DispatchFeatUntrainMessageBox payload, echoed verbatim]
-	// answer 0x01 = confirmed. The server matches the echoed token (the echo's 4th u32) to the outstanding request
-	// (INetworkClientSession.PendingFeatUntrainToken) before resetting, which is what stops a stray or replayed
-	// answer from wiping a feat sheet. See GameServerListener.Feats.cs / docs/subsystems/feats.md / #251.
+	/// <summary>
+	///     c2s <c>FeatUntrainAnswer</c> - the player's reply to the untrain-all confirm dialog:
+	///     <c>[u8 answer][the 16-byte DispatchFeatUntrainMessageBox payload, echoed verbatim]</c>.
+	/// </summary>
+	/// <remarks>
+	///     Answer 0x01 is confirmed. The server matches the echoed token against the outstanding request
+	///     (<c>INetworkClientSession.PendingFeatUntrainToken</c>) before resetting, which is what stops a stray or
+	///     replayed answer from wiping a feat sheet. See docs/subsystems/feats.md.
+	/// </remarks>
 	public static class FeatUntrainAnswerCodec
 	{
 		public const uint Method = (uint)GameCharAgentMethods.FeatUntrainAnswer;

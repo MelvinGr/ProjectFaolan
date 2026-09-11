@@ -5,26 +5,35 @@ using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderRemoved (0x20C5): "you are out of the finder", with a localized REASON. The client's own
-	// argument list is `(reason, silent)`, and the captured body is exactly that:
-	//
-	//   [u16 len][reason - a <remoteformat> token, Latin1][u8 silent]
-	//
-	// It is the most-sent group-finder message in the corpus (140 frames over 133 captures) and it carries two
-	// different tokens, both category 100:
-	//
-	//   * `GroupFinderCharacterLeftPlayfield` - pushed on the CsPlayerAgent Authenticate handshake at every login,
-	//     and again on leaving an activity's instance. 141 bytes.
-	//   * `GroupFinderLeaderDequeued` - the answer to c2s `LeaveGroupFinder`, ~0.3 s later, 1:1 in all three captured
-	//     withdrawals (Gitea #882's two captures). 130 bytes. THIS IS NEW: the flow shipped with "no captured s2c
-	//     answer" recorded against it, on the strength of a corpus that had no dequeue in it.
-	//
-	// The `key` attribute is the LDB entry's DETERMINISTIC content hash, not a nonce (see QuestTextTokens) - identical
-	// across characters, sessions and captures - so the captured spelling of each token is harvested data and is what
-	// goes back out, entity escapes and all.
-	//
-	// `silent` is 1 on the first login push and 0 on every other captured frame, including all three dequeues. What
-	// makes the login one different is not recoverable from three values. [V0: DispatchGroupFinderRemoved's silent flag]
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderRemoved</c> - "you are out of the finder", with a localized reason. The client's
+	///     argument list is <c>(reason, silent)</c>, and the captured body is exactly that:
+	///     <c>[u16 len][reason - a remoteformat token, Latin1][u8 silent]</c>.
+	/// </summary>
+	/// <remarks>
+	///     It is the most-sent group-finder message in the corpus (140 frames over 133 captures) and carries two
+	///     different tokens, both category 100:
+	///     <list type="bullet">
+	///         <item>
+	///             <c>GroupFinderCharacterLeftPlayfield</c>, pushed on the CsPlayerAgent Authenticate handshake at
+	///             every login and again on leaving an activity's instance. 141 bytes.
+	///         </item>
+	///         <item>
+	///             <c>GroupFinderLeaderDequeued</c>, the answer to c2s <c>LeaveGroupFinder</c> ~0.3 s later, 1:1 in all
+	///             three captured withdrawals. 130 bytes.
+	///         </item>
+	///     </list>
+	///     <para>
+	///         The <c>key</c> attribute is the LDB entry's deterministic content hash rather than a nonce (see
+	///         <c>QuestTextTokens</c>) - identical across characters, sessions and captures - so the captured spelling
+	///         of each token is harvested data and is what goes back out, entity escapes and all.
+	///     </para>
+	///     <para>
+	///         <c>silent</c> is 1 on the first login push and 0 on every other captured frame, including all three
+	///         dequeues. What makes the login one different is not recoverable from three values.
+	///         [V0: DispatchGroupFinderRemoved's silent flag]
+	///     </para>
+	/// </remarks>
 	public static class GroupFinderRemovedCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderRemoved;
@@ -41,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.GroupFinder
 		internal const string CharacterLeftPlayfieldKey = "nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0";
 		internal const string LeaderDequeuedKey = "8g0uI&quot;(1.i*&#92;0#7aTqx3";
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(GroupFinderRemoved value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -68,8 +77,8 @@ namespace Faolan.Core.Network.Codecs.GroupFinder
 
 	/// <summary>
 	///     The two reasons the corpus carries, spelled the way retail spells them. Value factories beside the codec
-	///     rather than <c>Build</c> overloads: both take the same (nothing much) argument list, so choosing between
-	///     them by signature is exactly the ambiguity the one-canonical-Build rule removes.
+	///     rather than <c>Build</c> overloads: both take the same argument list, so choosing between them by signature
+	///     would be ambiguous.
 	/// </summary>
 	public static class GroupFinderRemovalReasons
 	{
@@ -81,7 +90,7 @@ namespace Faolan.Core.Network.Codecs.GroupFinder
 				false);
 		}
 
-		/// <summary>The login / instance-exit push. `silent` is 1 on the login one, which is where retail sends it.</summary>
+		/// <summary>The login / instance-exit push. <c>silent</c> is 1 on the login one, which is where retail sends it.</summary>
 		public static GroupFinderRemoved CharacterLeftPlayfield(bool silent)
 		{
 			return new GroupFinderRemoved(

@@ -67,7 +67,7 @@ namespace Faolan.Web.Components.Pages
 			if (!m.IsRead)
 			{
 				await Mails.MarkReadAsync(m.MailId);
-				_mailbox = await Mails.GetMailboxAsync(_active); // refresh read flag
+				_mailbox = await Mails.GetMailboxAsync(_active); // Refresh the read flag.
 			}
 		}
 
@@ -98,7 +98,7 @@ namespace Faolan.Web.Components.Pages
 				_to = _body = "";
 				_money = _itemId = "";
 				_qty = "1";
-				// If you mailed yourself, refresh the inbox.
+				// Refresh the inbox, in case the mail went to the mailbox being viewed.
 				_mailbox = await Mails.GetMailboxAsync(_active);
 			}
 

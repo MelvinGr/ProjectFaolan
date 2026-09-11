@@ -17,22 +17,22 @@ namespace Faolan.Tests
 	// suite uses a DB: a writable throwaway DB the test seeds (Options), and the committed faolan.db read read-only
 	// (ReadOnly - the real-data golden fixture: NPC spawns, quest journal, snapshots build from the committed rows).
 	//
-	// THE TEST DB IS INDEPENDENT OF THE PRODUCTION PROVIDER. The DatabaseContext is code-first / provider-agnostic,
-	// and the golden tests assert that OUR CODE builds the right bytes from the DATA - the storage engine underneath
+	// The test DB is independent of the production provider. The DatabaseContext is code-first / provider-agnostic,
+	// and the golden tests assert that our code builds the right bytes from the data - the storage engine underneath
 	// is irrelevant to that. So even if production moves off SQLite (e.g. Postgres for the Docker multi-realm shared
-	// DB, #324), the plan for the tests is:
-	//   1. (recommended) Keep an EMBEDDED SQLITE fixture for the golden tests - `faolan.db` stays SQLite and these
+	// DB), the plan for the tests is:
+	//   1. (recommended) Keep an embedded SQLite fixture for the golden tests - `faolan.db` stays SQLite and these
 	//      methods stay on SQLite, regardless of prod. Fast, no Docker in CI, no data export. The importer keeps a
 	//      SQLite output path purely to regenerate the fixture (a `--provider sqlite` run) while emitting Postgres for
 	//      prod. None of the ~10 real-data tests change.
-	//   2. (only for provider FIDELITY) A SMALL, separate Testcontainers-Postgres integration suite to catch
-	//      provider-specific issues (ulong -> signed bigint, `INSERT OR IGNORE` -> `ON CONFLICT`, ORDER BY on ulong).
-	//      NOT the whole golden suite - that stays on SQLite per (1).
-	// THIS CLASS IS THE SINGLE SEAM: to change the strategy, edit only these two methods; the tests don't change.
+	//   2. (only for provider fidelity) A small, separate Testcontainers-Postgres integration suite to catch
+	//      provider-specific issues (ulong -> signed bigint, `INSERT OR IGNORE` -> `ON CONFLICT`, order by on ulong).
+	//      Not the whole golden suite - that stays on SQLite per (1).
+	// This class is the single seam: to change the strategy, edit only these two methods; the tests don't change.
 	public static class TestDb
 	{
 		// An IDbContextFactory over a fixed options object, so a test can build a real DatabaseRepository against a
-		// throwaway file DB. It existed as a byte-identical PRIVATE copy in two test classes and was about to become a
+		// throwaway file DB. It existed as a byte-identical private copy in two test classes and was about to become a
 		// third; the repository takes a factory, so every repository-level test needs one, and that makes it part of
 		// this seam rather than a detail of whichever test needed it first.
 		public sealed class ContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
@@ -48,16 +48,16 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The real-data fixture, BUILT rather than checked in (#412): migrations + faolan.sql, through the very same
+		// The real-data fixture, built rather than checked in: migrations + faolan.sql, through the very same
 		// DatabaseInitializer the server runs at startup. So the golden tests keep asserting against the shipped
-		// game DATA without depending on a shipped BINARY - and if seeding ever breaks, these tests break with it.
+		// game data without depending on a shipped binary - and if seeding ever breaks, these tests break with it.
 		//
 		// Cached by the seed's content hash under the temp dir: a repeat run reuses it (the build is ~150ms of seed
 		// load plus a migrate, but free is better), and editing faolan.sql changes the hash so a stale fixture can
-		// never be picked up. Built to a unique temp name and MOVED into place, so two concurrent test runs racing on
+		// never be picked up. Built to a unique temp name and moved into place, so two concurrent test runs racing on
 		// the same hash cannot observe a half-written database.
 		//
-		// NB it carries no CHARACTER rows - the seed excludes them as per-developer play state. No test needs them
+		// NB it carries no character rows - the seed excludes them as per-developer play state. No test needs them
 		// (verified: the whole suite passes against this fixture); one that does should create its own.
 		public static string GameDatabase => Fixture.Value;
 
@@ -67,10 +67,10 @@ namespace Faolan.Tests
 		{
 			var seed = TestPaths.Repo("faolan.sql");
 
-			// Keyed on the seed AND on the assembly that builds from it. Seed content alone is not enough: the fixture
+			// Keyed on the seed and on the assembly that builds from it. Seed content alone is not enough: the fixture
 			// is migrations + faolan.sql + DatabaseInitializer's non-seed rows (the default account and realm), and
-			// those come from CODE. Changing the default account's password left every cached fixture stale while the
-			// key stayed identical, so the suite kept asserting against the old row and passed.
+			// those come from code. A change to the default account's password would leave every cached fixture stale
+			// while a seed-only key stayed identical, and the suite would keep asserting against the stale row.
 			var initializer = typeof(DatabaseInitializer).Assembly.Location;
 			var key = SHA256.HashData([.. File.ReadAllBytes(seed), .. File.ReadAllBytes(initializer)]);
 			var hash = Convert.ToHexStringLower(key)[..16];
@@ -96,15 +96,15 @@ namespace Faolan.Tests
 				DatabaseInitializer.InitializeAsync(db).GetAwaiter().GetResult();
 
 				// Fold the write-ahead log back into the database file. Without this the move below takes the main
-				// file and LEAVES ITS -wal BEHIND - i.e. potentially an incomplete database - because the seed's
+				// file and leaves its -wal behind - i.e. potentially an incomplete database - because the seed's
 				// writes are still sitting in the log.
 				db.Database.ExecuteSqlRaw("PRAGMA wal_checkpoint(TRUNCATE);");
 			}
 
 			// The context above is disposed by its `using`, and `Options` opens these databases with `Pooling=False`, so
-			// that really closes the connection and the move below sees an unlocked, checkpointed file. This used to
-			// call `SqliteConnection.ClearAllPools()` for the same effect - see Delete for why reaching into a
-			// process-global pool from a parallel test run was the wrong tool.
+			// that really closes the connection and the move below sees an unlocked, checkpointed file. Reaching into
+			// the process-global pool with `SqliteConnection.ClearAllPools()` has the same effect - see Delete for why
+			// that is the wrong tool in a parallel test run.
 			try
 			{
 				File.Move(building, path);
@@ -126,14 +126,14 @@ namespace Faolan.Tests
 			return path;
 		}
 
-		// Evicts fixtures nobody is using. The cache above had NONE, and /tmp is a RAMDISK on the dev machine: 625
+		// Evicts fixtures nobody is using. The cache above had none, and /tmp is a ramdisk on the dev machine: 625
 		// fixtures at 17 MB accumulated to 6.6 GB, filled it, and the whole suite then failed with ENOSPC - 104 tests
 		// at once, with nothing in the diff to explain it. Same failure the orphaned `-wal` files caused before
 		// `Delete` was written, and a cache that never evicts is that bug wearing a useful face.
 		//
-		// ⚠️ It leaked per BUILD, not per change. The key has to include the initializer assembly (see above), and this
-		// build is NOT byte-deterministic (Gitea #551) - two consecutive `dotnet build`s with no source change produce
-		// two different hashes - so EVERY build mints a fixture. The window has to be short enough that a working day of
+		// It leaked per build, not per change. The key has to include the initializer assembly (see above), and this
+		// build is not byte-deterministic - two consecutive `dotnet build`s with no source change produce
+		// two different hashes - so every build mints a fixture. The window has to be short enough that a working day of
 		// building cannot fill the disk. An hour keeps the cache useful for the case it actually serves (repeated test
 		// runs against one build) while bounding the leak to one hour's worth.
 		//
@@ -169,13 +169,13 @@ namespace Faolan.Tests
 		// UseFaolanDatabase (SQLite - the test fixture is always SQLite, see above) so it inherits the right migrations
 		// assembly + settings. Opt into lazy-loading proxies for the few tests that need them.
 		//
-		// ⚠️ `Pooling=False`, and that is not a performance detail. Disposing a context otherwise RETURNS its connection
+		// `Pooling=False`, and that is not a performance detail. Disposing a context otherwise returns its connection
 		// to Microsoft.Data.Sqlite's pool rather than closing it, so the file stays open and `Delete` below cannot
-		// remove it - which is why Delete used to reach for `SqliteConnection.ClearAllPools()`. That call is
-		// PROCESS-GLOBAL, and xUnit runs test classes in PARALLEL: one class finishing its cleanup disposed the pooled
-		// connection another class was mid-query on, and the suite failed intermittently with
-		// `ObjectDisposedException: SQLitePCL.sqlite3` in whichever test happened to be running. Not pooling in the
-		// first place removes both the leak and the cross-test reach.
+		// remove it - which invites `SqliteConnection.ClearAllPools()` in Delete. That call is process-global, and
+		// xUnit runs test classes in parallel: one class finishing its cleanup disposes the pooled connection another
+		// class is mid-query on, and the suite fails intermittently with `ObjectDisposedException: SQLitePCL.sqlite3`
+		// in whichever test happens to be running. Not pooling in the first place removes both the leak and the
+		// cross-test reach.
 		public static DbContextOptions<DatabaseContext> Options(string path, bool lazyLoadingProxies = false)
 		{
 			var builder = new DbContextOptionsBuilder<DatabaseContext>();
@@ -193,15 +193,15 @@ namespace Faolan.Tests
 			return DatabaseExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
 		}
 
-		// Deletes a throwaway test database AND its sidecars.
+		// Deletes a throwaway test database and its sidecars.
 		//
-		// ⚠️ `File.Delete(path)` alone LEAKS. These databases run in WAL mode, so SQLite writes `<path>-wal` and
+		// `File.Delete(path)` alone leaks. These databases run in WAL mode, so SQLite writes `<path>-wal` and
 		// `<path>-shm` beside the main file, and deleting only the file leaves those behind - 3,856 orphaned `-wal`
-		// files totalling 2.0 GB had accumulated in /tmp, which is a RAMDISK here, and filled it until the whole
+		// files totalling 2.0 GB had accumulated in /tmp, which is a ramdisk here, and filled it until the whole
 		// suite failed with ENOSPC. Deleting all three is what closes that.
 		//
-		// ⚠️ It does NOT clear the connection pool any more. `SqliteConnection.ClearAllPools()` is process-global and
-		// xUnit runs test classes in PARALLEL, so one class's cleanup disposed the pooled connection another class was
+		// It does not clear the connection pool any more. `SqliteConnection.ClearAllPools()` is process-global and
+		// xUnit runs test classes in parallel, so one class's cleanup disposed the pooled connection another class was
 		// mid-query on - an intermittent `ObjectDisposedException: SQLitePCL.sqlite3` landing on whichever test was
 		// unlucky. `Options` opens these databases with `Pooling=False` instead, so a disposed context really closes its
 		// connection and there is no pool to reach into.
@@ -221,8 +221,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// Seeds the world rows a Character depends on - Account, Realm, Map - and SAVES. Character has non-null FKs to
-		// all three, plus NOT NULL columns on Realm, so nothing character-shaped inserts without them. Six tests had
+		// Seeds the world rows a Character depends on - Account, Realm, Map - and saves. Character has non-null FKs to
+		// all three, plus not null columns on Realm, so nothing character-shaped inserts without them. Six tests had
 		// each hand-rolled this same trio.
 		//
 		// The map defaults to TortageBeachId because that is what every one of them used; pass another where the map
@@ -250,10 +250,10 @@ namespace Faolan.Tests
 			ctx.SaveChanges();
 		}
 
-		// SeedWorld plus a character on it, saved. For tests that need to reach a character-OWNED table
+		// SeedWorld plus a character on it, saved. For tests that need to reach a character-owned table
 		// (CharacterFeat, CharacterSkill, CharacterQuest, ...) and do not care what the character is.
 		//
-		// Deliberately MINIMAL - it exists to get a test to the table it actually cares about. A test that asserts on
+		// Deliberately minimal - it exists to get a test to the table it actually cares about. A test that asserts on
 		// the character itself should build its own, and one that needs several should call SeedWorld and add them.
 		public static Character SeedCharacter(DatabaseContext ctx, uint characterId = 0x01000001, ConanClass characterClass = ConanClass.Barbarian, string name = "Testchar")
 		{

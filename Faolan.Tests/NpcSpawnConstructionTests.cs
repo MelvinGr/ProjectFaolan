@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			Assert.Equal(3f, built.ReadF32Le(SpawnPacketBuilder.PosZOffset));
 		}
 
-		// The full construction oracle: rebuilding the whole NPC body from its own transform AND its own decoded
+		// The full construction oracle: rebuilding the whole NPC body from its own transform and its own decoded
 		// CharacterIIR (transform via BuildSpawnBody, identity/equipment via the now-generic SetCharacterMessage)
 		// reproduces the captured bytes exactly. This is the gate for driving an NPC spawn from structured data -
 		// swap any field and the body stays valid.

@@ -12,15 +12,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Golden regression guard for the REAL 0x737A6DF9 root framing, recovered from AgeOfConan.exe (Ghidra,
-	// 2026-06-13): n3InfoItemRemote::Construct -> FUN_00cbfb80 reads the protobuf root as a 4-byte BIG-ENDIAN
+	// Golden regression guard for the real 0x737A6DF9 root framing, recovered from AgeOfConan.exe (Ghidra,
+	// 2026-06-13): n3InfoItemRemote::Construct -> FUN_00cbfb80 reads the protobuf root as a 4-byte big-endian
 	// length-prefixed blob (then ReadSubClass reads the 0x18 version immediately after). The body layout is
-	// [u32 KEY][u32 type=50000][u32 instance][u8 flag][u32 BE blobLen][blob = blobLen bytes][u32 BE 0x18][tails],
-	// where the blob IS the whole FullCharacterIIR root. So blobLen == rootLen and the prefix is exactly 5 bytes.
+	// [u32 key][u32 type=50000][u32 instance][u8 flag][u32 BE blobLen][blob = blobLen bytes][u32 BE 0x18][tails],
+	// where the blob is the whole FullCharacterIIR root. So blobLen == rootLen and the prefix is exactly 5 bytes.
 	// The old varint model (AdjustSnapshotPrefixRootLength) was byte-misaligned and corrupted this length on resize.
 	public class SnapshotBlobLengthTests
 	{
-		// BuildSnapshotPrefix writes the correct BE32 length for ANY root length, keeping the flag byte, and at the
+		// BuildSnapshotPrefix writes the correct BE32 length for any root length, keeping the flag byte, and at the
 		// captured root's own length reproduces the captured prefix byte-for-byte.
 		[Fact]
 		public void BuildSnapshotPrefix_WritesBe32_ForAnyRootLength()
@@ -52,10 +52,9 @@ namespace Faolan.Tests
 			Assert.Equal(0x18u, tails.ReadU32Be(0));
 		}
 
-		// End-to-end: a DB-generated root with a DIFFERENT length than the capture, reassembled with the
-		// SetSnapshotBlobLength-corrected prefix, re-splits cleanly (tails byte-identical, root re-splits) AND the
-		// prefix BE32 blob length stays consistent with the new root. (Migrated from the retired SnapshotPrefixLengthTests,
-		// which exercised the byte-misaligned varint model AdjustSnapshotPrefixRootLength.)
+		// End-to-end: a DB-generated root with a different length than the capture, reassembled with the
+		// rebuilt prefix, re-splits cleanly (tails byte-identical, root re-splits) and the
+		// prefix BE32 blob length stays consistent with the new root.
 		[Fact]
 		public void GeneratedSnapshot_ReassemblesConsistently()
 		{
@@ -74,10 +73,10 @@ namespace Faolan.Tests
 			foreach (var c in FullCharacterRoots.Containers(instance, held))
 				typed.Inventories.Add(c);
 			var genRoot = typed.ToProtobuf();
-			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
+			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix must be corrected
 
-			// BuildSnapshotPrefix is the production path (the old SetSnapshotBlobLength patched a CAPTURED prefix and
-			// was retired when the prefix started being built from scratch).
+			// SnapshotPackets.BuildPrefix is the production path: the prefix is built from scratch rather than patched
+			// into a captured one.
 			var newPrefix = SnapshotPackets.BuildPrefix(genRoot.Length);
 			Assert.Equal((uint)genRoot.Length, newPrefix.ReadU32Be(1));
 
@@ -116,7 +115,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// A held item, as the container builder takes it since #750: the instance's own id is what the wire's item_id
+		// A held item, as the container builder takes it: the instance's own id is what the wire's item_id
 		// carries, so the test states it explicitly rather than deriving it from the cell.
 		private static ItemInstance Held(uint id, ContainerKind container, int slot, Item template)
 		{

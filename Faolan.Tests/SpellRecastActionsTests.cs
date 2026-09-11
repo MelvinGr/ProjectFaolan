@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-layout proof for the recast GameAction elements (#271/#767). There is no capture of one - retail sends no
+	// Byte-layout proof for the recast GameAction elements. There is no capture of one - retail sends no
 	// recast GameAction at all (0 across all 132 dumps, sub-records included) - so these assert the element against
-	// the RE'd POSITIONAL grammar (FUN_00899a60) plus the type/key catalogs in docs/re/gameaction-type-ids.tsv and
+	// the RE'd positional grammar (FUN_00899a60) plus the type/key catalogs in docs/re/gameaction-type-ids.tsv and
 	// docs/re/gameaction-keylists.tsv, not against a golden capture.
 	public class SpellRecastActionsTests
 	{
-		// ⚠️ The regression that matters most here. The type ids MUST come from the contiguous enum
+		// The regression that matters most here. The type ids must come from the contiguous enum
 		// (gameaction-type-ids.tsv), not from gameaction_types.json, whose `typeId` column is a step-4 sequence that
 		// is not the wire value. Under the json, ChangeRecastTime read 0xCF81 - which the real catalog names
 		// `Feared`. Pinning the four ids here is what stops a recast turning back into a fear on the wire.
@@ -33,8 +33,8 @@ namespace Faolan.Tests
 			});
 		}
 
-		// The two SETTERS, in their own keyList order: SetSpellRecastTime is keyed on the SPELL (0x463), its line twin
-		// on the LINE (0x2d3). Both put the recast centiseconds in 0x2f9, second.
+		// The two setters, in their own keyList order: SetSpellRecastTime is keyed on the spell (0x463), its line twin
+		// on the line (0x2d3). Both put the recast centiseconds in 0x2f9, second.
 		[Fact]
 		public void SetSpellRecastTimeElement_MatchesPositionalGrammar()
 		{
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(element));
 		}
 
-		// What actually goes on the wire: the element wrapped in a GameActionListIIR, WITH the ReadSubClass trailer.
+		// What actually goes on the wire: the element wrapped in a GameActionListIIR, with the ReadSubClass trailer.
 		// The codec's `trailer` defaults to false for the construct-only builder that predates this, so a sender that
 		// forgets it emits a body the client reads past the end of.
 		[Fact]
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(GameActionDataCodec.Build(SpellRecastActions.ChangeRecastTime(spellId, recastCs))), Convert.ToHexString(rebuilt));
 		}
 
-		// The MODIFIER twin - same grammar, different type id, and its 0x2f9 is a delta rather than the value.
+		// The modifier twin - same grammar, different type id, and its 0x2f9 is a delta rather than the value.
 		[Fact]
 		public void ChangeRecastTimeElement_MatchesPositionalGrammar()
 		{

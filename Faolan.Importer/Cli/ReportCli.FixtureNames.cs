@@ -7,22 +7,20 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report fixture-names --report-arg <name>[,<name>...]`: where a personal name still sits INSIDE the
-	// committed fixture archive's packet bytes (Gitea #465).
+	// `--report fixture-names --report-arg <name>[,<name>...]`: where a personal name still sits inside the
+	// committed fixture archive's packet bytes.
 	//
-	// #465's text sweep removed every occurrence from source, tests and docs, and the manifest half removed the
-	// dump FILE NAMES; what it could not reach is the names carried in the packets themselves, as ordinary
-	// `[u16 len][latin1]` wire strings. This report is the measurement of that residue - which fixtures, which
-	// IIRs, how many - because the ticket's own figure was written before the manifest work and nothing has
-	// re-counted since.
+	// A text sweep can remove every occurrence from source, tests and docs, and the manifest can carry opaque capture
+	// ids instead of dump file names; what neither reaches is the names carried in the packets themselves. This
+	// report is the measurement of that residue - which fixtures, which IIRs, how many.
 	//
-	// ⭐ **The framing is PROTOBUF, not the `[u16 len][latin1]` the ticket assumed**, and that changes what option B
-	// costs. Every hit in both carrying IIRs is a length-delimited protobuf field - `2a 06 <6-char name>` on
-	// FullPlayerCharacterIIR (field 5) and `0a 08 <8-char name>` on SimpleCharFullUpdateIIR (field 1). So the length is
-	// a single varint byte, not a u16, and nothing outside the field is addressed by offset: an EQUAL-LENGTH
-	// substitution changes exactly the name's own bytes and ripples nowhere - no nested message length moves, no
-	// following field shifts. The report prints, per hit, whether it is framed that way, because that is what says a
-	// hit is a real wire string rather than bytes that happen to spell a name.
+	// The framing is protobuf rather than the `[u16 len][latin1]` a wire string uses: every hit in both carrying IIRs
+	// is a length-delimited protobuf field - `2a 06 <6-char name>` on FullPlayerCharacterIIR (field 5) and
+	// `0a 08 <8-char name>` on SimpleCharFullUpdateIIR (field 1). So the length is a single varint byte, not a u16,
+	// and nothing outside the field is addressed by offset: an equal-length substitution changes exactly the name's
+	// own bytes and ripples nowhere - no nested message length moves, no following field shifts. The report prints,
+	// per hit, whether it is framed that way, because that is what says a hit is a real wire string rather than bytes
+	// that happen to spell a name.
 	//
 	// Read-only. Substituting is a separate, deliberate operation - this only says what is there.
 	public static partial class ReportCli
@@ -102,7 +100,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine();
 			}
 
-			// A WINDOW around the first few hits, because the counts alone cannot say how the name is framed - and
+			// A window around the first few hits, because the counts alone cannot say how the name is framed - and
 			// the framing is the whole question for option B. Printed for the corpus and the named half alike.
 			Console.WriteLine("FRAMING (first 4 hits, 12 bytes either side)");
 			var shown = 0;
@@ -156,11 +154,10 @@ namespace Faolan.Importer.Cli
 			return -1;
 		}
 
-		// ⚠️ The match is CASE-INSENSITIVE, and it has to be. The blocked list `.githooks/personal-names.py`
-		// enforces is kept lower-case - it is a substring rule over source text, where casing is arbitrary -
-		// while the wire carries the name capitalised, as the player typed it. A case-sensitive scan therefore
-		// answers CLEAN against the very list the commit hook blocks on, which is the most misleading possible
-		// answer; the archive holds 102 of them.
+		// The match is case-insensitive, and it has to be. The blocked list `.githooks/personal-names.py` enforces is
+		// kept lower-case - it is a substring rule over source text, where casing is arbitrary - while the wire
+		// carries the name capitalised, as the player typed it. A case-sensitive scan therefore answers clean against
+		// the very list the commit hook blocks on, which is the most misleading possible answer.
 		private static byte Fold(byte b)
 		{
 			return b >= (byte)'A' && b <= (byte)'Z' ? (byte)(b + 32) : b;
@@ -195,7 +192,7 @@ namespace Faolan.Importer.Cli
 
 				hits++;
 
-				// PROTOBUF framing: `[tag][len][bytes]`, where the tag's low three bits are wire type 2
+				// Protobuf framing: `[tag][len][bytes]`, where the tag's low three bits are wire type 2
 				// (length-delimited) and the len varint is a single byte for anything under 128 characters - which
 				// every character name is. This is the form both carrying IIRs use.
 				if (i >= 2 && haystack[i - 1] == pattern.Length && (haystack[i - 2] & 0x07) == 2)

@@ -16,7 +16,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Observed live character state: wallet balances + hotbar slots. Needs the characters to exist.
+	/// <summary>
+	///     Observed live character state: wallet balances and hotbar slots. Needs the characters to exist.
+	/// </summary>
 	public sealed class CharacterStateModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule)];

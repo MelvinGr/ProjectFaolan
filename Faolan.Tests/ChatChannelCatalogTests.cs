@@ -8,7 +8,7 @@ namespace Faolan.Tests
 {
 	// Every chat channel the server offers, gated against the bytes retail sent for it.
 	//
-	// The point is that `ChatChannels` is the ONE place a channel's (type, name, flag) is written down - the login
+	// The point is that `ChatChannels` is the one place a channel's (type, name, flag) is written down - the login
 	// burst, the mid-session moves and the drops all read it - so re-deriving each captured body from its descriptor
 	// is what makes that catalog the wire fact rather than a set of literals somebody re-typed.
 	public class ChatChannelCatalogTests
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.FromHexString(hex), ChannelSubscriptionCodec.Build(channel.Type, id, channel.Name, channel.Flag));
 		}
 
-		// The standing half of the login burst IS the catalog's own list, ids included - so the burst cannot quietly
+		// The standing half of the login burst is the catalog's own list, ids included - so the burst cannot quietly
 		// gain or lose a channel, and the ids stay attached to the descriptors they belong to.
 		[Fact]
 		public void TheLoginBurst_IsExactlyTheCapturedStandingChannels()
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The assistant channel is ours, not retail's, so there is no captured body to hold it to - what IS worth
+		// The assistant channel is ours, not retail's, so there is no captured body to hold it to - what is worth
 		// gating is that it stays out of the way of a real one: its id sits far outside the retail range, and it
 		// appears only when the MCP host that answers it is running.
 		[Fact]

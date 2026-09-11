@@ -13,9 +13,9 @@ namespace Faolan.ChatServer
 	{
 		public async Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
-			// "say" is proximity chat: the GameServer (which holds the live positions) passes the in-range character
-			// ids in `recipientCharacterIds`; we deliver the CharacterChat (0x0022) only to those clients. A null list
-			// means server-wide (kept for any non-proximity caller). The sender is included by the GameServer, so they
+			// "say" is proximity chat: the GameServer, which holds the live positions, passes the in-range character
+			// ids in `recipientCharacterIds`, and the CharacterChat (0x0022) is delivered only to those clients. A null
+			// list means server-wide, for a non-proximity caller. The sender is included by the GameServer, so they
 			// always see their own message.
 			foreach (var client in NetworkClients)
 			{
@@ -28,11 +28,11 @@ namespace Faolan.ChatServer
 		}
 
 		// An NPC bark: the same CharacterChat (0x0022) delivery as a say, with CharacterChatCodec composing the bark's
-		// remoteformat (#539) instead of the world layer pre-rendering it.
+		// remoteformat rather than the world layer pre-rendering it.
 		//
-		// The body is built PER RECIPIENT, because a bark that addresses the player carries their name in a session
-		// slot (#691) - see NpcChatterBarks.Addressed. For a bark without one that is the same body every time, so
-		// the only cost is the composition.
+		// The body is built per recipient, because a bark that addresses the player carries their name in a session
+		// slot - see NpcChatterBarks.Addressed. For a bark without one that is the same body every time, so the only
+		// cost is the composition.
 		public async Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			foreach (var client in NetworkClients)
@@ -117,9 +117,9 @@ namespace Faolan.ChatServer
 			}
 		}
 
-		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the SENDER's
-		// id on delivery (and the target's id in the client's request, same shape both ways). Byte-exact against
-		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
+		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the sender's id on
+		// delivery, and the target's id in the client's request, the same shape both ways. Byte-exact against the
+		// whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
 		internal static ChatServerMessage BuildWhisper(uint peerCharacterId, string message)
 		{
 			return new ChatServerMessage(WhisperCodec.Opcode, WhisperCodec.Build(peerCharacterId, message));
@@ -132,19 +132,19 @@ namespace Faolan.ChatServer
 			return client.SendAsync(new ChatServerMessage(ChannelSubscriptionCodec.Opcode, ChannelSubscriptionCodec.Build(channel.Type, id, channel.Name, channel.Flag)));
 		}
 
-		// The subscription's twin (0x003D): [type][id] - the channel this client is no longer on. It names no channel
-		// NAME, which is exactly what identifies it as the subscription's leading pair (#532).
+		// The subscription's twin (0x003D): [type][id] - the channel this client is no longer on. It carries no channel
+		// name, which is what identifies it as the subscription's leading pair.
 		private static Task SendChannelUnsubscribe(INetworkClient client, ChatChannel channel, uint id)
 		{
 			return client.SendAsync(new ChatServerMessage(ChannelUnsubscribeCodec.Opcode, ChannelUnsubscribeCodec.Build(channel.Type, id)));
 		}
 
 		// The channels that follow something the character belongs to, brought in line with what they belong to right
-		// now. This IS the login burst's second half - it calls the same refreshes a mid-session change does, so there
-		// is no second code path that can drift from them. Each is a no-op when there is nothing to belong to.
+		// now. This is the login burst's second half, and it calls the same refreshes a mid-session change does, so
+		// there is no second code path to drift from them. Each is a no-op when there is nothing to belong to.
 		//
-		// ~Team is deliberately NOT here: retail's login burst carries ~Playfield and ~Guild, but every captured ~Team
-		// subscription follows a team FORMING, never a login. A team is live CS-tier state that does not survive the
+		// ~Team is deliberately not here: retail's login burst carries ~Playfield and ~Guild, but every captured ~Team
+		// subscription follows a team forming, never a login. A team is live CS-tier state that does not survive the
 		// character's disconnect anyway, so there would be nothing to restore.
 		private async Task SubscribeMembershipChannels(INetworkClient client)
 		{
@@ -159,10 +159,10 @@ namespace Faolan.ChatServer
 		// Moves the client's ~Playfield channel to the map they are now on. Retail does exactly this on a zone change:
 		// 0x003D on the old channel, then 0x003C on the new one.
 		//
-		// IDEMPOTENT by design, so the world tier can call it after ANY map change without remembering what it last
-		// sent - a map change funnels through one place (the MapChange packet) but a character's MapId is assigned from
-		// several, and a "refresh" that has to be paired with the right previous value would be wrong the first time
-		// somebody assigned it somewhere new. The session carries what was last subscribed, so a repeat is a no-op.
+		// Idempotent by design, so the world tier can call it after any map change without remembering what it last
+		// sent: a map change funnels through one place (the MapChange packet), but a character's MapId is assigned from
+		// several, and a refresh that had to be paired with the right previous value would be wrong the first time it
+		// was assigned somewhere new. The session carries what was last subscribed, so a repeat is a no-op.
 		public async Task RefreshPlayfieldChannel(uint characterId, uint mapId)
 		{
 			var client = ClientForCharacter(characterId);
@@ -179,8 +179,8 @@ namespace Faolan.ChatServer
 		// RefreshPlayfieldChannel, and idempotent for the same reason: a guild id is assigned from several places
 		// (create, invite accept, kick, leave) and this is called from all of them.
 		//
-		// ⚠️ The SUBSCRIBE side is captured (create frame 369, and the login burst of a guilded character). The
-		// UNSUBSCRIBE on leaving a guild is not: no capture in the corpus ever leaves one. It is the same 0x003D
+		// The subscribe side is captured (create frame 369, and the login burst of a guilded character). The
+		// unsubscribe on leaving a guild is not: no capture in the corpus ever leaves one. It is the same 0x003D
 		// (type, id) the corpus does show retiring a ~Team when the group dissolves and a ~Playfield on a zone change,
 		// so it is that message applied to this channel, not a new one - but the guild case itself is inferred.
 		// [V0: retail's 0x003D on a guild leave/kick]
@@ -197,10 +197,10 @@ namespace Faolan.ChatServer
 		}
 
 		// Moves the client's ~Team channel to the team they are now in - the third instance of the same mechanism, and
-		// the one the corpus pins on BOTH sides (#668): `login_2-clients_group-trade-friend` subscribes every member on
+		// the one the corpus pins on both sides: `login_2-clients_group-trade-friend` subscribes every member on
 		// the accept and unsubscribes them all on the dissolve, three teams in a row.
 		//
-		// Like the guild channel, the id IS the team id - the one DispatchYouJoinedTeam carries as an ID32 of type
+		// Like the guild channel, the id is the team id - the one DispatchYouJoinedTeam carries as an ID32 of type
 		// 0xDEA9 (accept frame 691 -> `0000dea9 0051dd9a` at 693 -> `82 0051dd9a "~Team"` at 701/702).
 		// [V2: login_2-clients_group-trade-friend.tshark.json]
 		public async Task RefreshTeamChannel(uint characterId, uint? teamId)
@@ -221,7 +221,7 @@ namespace Faolan.ChatServer
 		// subscription, a move, and a plain drop are the same three lines.
 		//
 		// Comparing against the session slot rather than against the character's own state is what makes every caller
-		// idempotent: the slot is what we last TOLD the client, which is a different fact from where the character is.
+		// idempotent: the slot is what we last told the client, which is a different fact from where the character is.
 		private static async Task<uint> MoveChannel(INetworkClient client, uint current, uint wanted, ChatChannel channel)
 		{
 			if (current == wanted)

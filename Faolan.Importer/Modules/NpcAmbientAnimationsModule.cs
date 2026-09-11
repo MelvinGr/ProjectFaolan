@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Per-creature AMBIENT ANIMATIONS - the idle behaviours a standing NPC performs (#766), harvested from the
+	// Per-creature ambient ANIMATIONS - the idle behaviours a standing NPC performs, harvested from the
 	// captured `BehaviorId.Emote` records. Keyed by template (like npc-chatter), so an un-captured creature simply
 	// has none and stands still rather than being handed a guessed animation.
 	public sealed class NpcAmbientAnimationsModule : IImportModule

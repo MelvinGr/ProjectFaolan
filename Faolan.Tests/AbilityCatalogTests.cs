@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ability catalog (#303). It has two tiers and the distinction is load-bearing:
+	// The ability catalog. It has two tiers and the distinction is load-bearing:
 	//
 	//  - **grantable** rows, harvested from captured 0x2052 grants, which carry the ability's 128-bit TEA key;
 	//  - **identity-only** rows, catalogued from the client's own data (an RDB 1000020 template named in LDB cat 50210
 	//    and not item-named), which have a name and nothing else.
 	//
-	// The keys are random, so an ability nobody was ever seen being granted CANNOT be granted - the 0x2052 body is
+	// The keys are random, so an ability nobody was ever seen being granted cannot be granted - the 0x2052 body is
 	// built around that key. `Ability.IsGrantable` is what the grant path checks; these tests pin that a key-less row
 	// reads as not-grantable and that the shipped data still carries every captured ability's key.
 	public class AbilityCatalogTests

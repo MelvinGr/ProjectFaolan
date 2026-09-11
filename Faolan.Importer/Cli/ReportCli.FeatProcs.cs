@@ -8,28 +8,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report feat-procs`: the shape of `FeatProcs`, the last of #697's four feat-modifier tables with no reader.
+	// `--report feat-procs`: the shape of `FeatProcs`, a feat-modifier table nothing consumes yet.
 	//
-	// 876 rows nothing consumes. Before any of it can fire, two columns have to mean something: `Amount` and
-	// `Trigger`. This report is the measurement for both, and it is a REPORT rather than a test because it compares
-	// shipped data against the client's own DESCRIPTIONS - a shipped-data check belongs in a report (#729), and both
-	// populations move as the importer covers more of the catalog.
+	// Before any of those rows can fire, two columns have to mean something: `Amount` and `Trigger`. This report is
+	// the measurement for both, and it is a report rather than a test because it compares shipped data against the
+	// client's own descriptions - a shipped-data check belongs in a report, and both populations move as the importer
+	// covers more of the catalog.
 	//
-	// ⭐ **What it establishes: `Amount` is a percent CHANCE, and values above 100 mean "always".**
+	// What it establishes: `Amount` is a percent chance, and values above 100 mean "always".
 	//
 	// The evidence is a controlled association, not a reading of four rows. A feat whose proc really rolls says so in
 	// its own description ("a chance of reducing the target"), and one that always fires states the effect flatly
 	// ("Adds a fizzle debuff to the Lethargy combo"). So: does the word "chance" track the Amount bucket, against the
 	// base rate of that word among proc-carrying feats?
 	//
-	// ⚠️ The control is the point. "Amount > 100 rows mostly do not say chance" is worthless on its own - most feat
-	// text does not say "chance" either. What matters is the LIFT over the base rate in both directions, which is
+	// The control is the point. "Amount > 100 rows mostly do not say chance" is worthless on its own - most feat
+	// text does not say "chance" either. What matters is the lift over the base rate in both directions, which is
 	// what this prints.
 	//
-	// ⛔ **`Trigger` is NOT pinned by any of this** and the report says so rather than implying a decode. What is
-	// measured is that it is not free: 0/1 occur only with EffectKind 53212 (a proc on a COMBO) and 2/3 only with
-	// 53070 (a proc on a SPELL LINE), and within each pair one value carries the chance-bearing rows while the other
-	// carries only always-fire amounts. That narrows it; it does not name it. See Gitea #697 / #593.
+	// `Trigger` is not pinned by any of this and the report says so rather than implying a decode. What is
+	// measured is that it is not free: 0/1 occur only with EffectKind 53212 (a proc on a combo) and 2/3 only with
+	// 53070 (a proc on a spell line), and within each pair one value carries the chance-bearing rows while the other
+	// carries only always-fire amounts. That narrows it; it does not name it.
+	//
+	// Open work tracked in Gitea #697.
 	public static partial class ReportCli
 	{
 		private static async Task FeatProcs(string? rdbDir = null)
@@ -66,7 +68,7 @@ namespace Faolan.Importer.Cli
 				return d != null && d.Contains("chance", StringComparison.OrdinalIgnoreCase);
 			}
 
-			// Per FEAT, not per row: a feat repeats once per combo it modifies, which would weight big feats heavily.
+			// Per feat, not per row: a feat repeats once per combo it modifies, which would weight big feats heavily.
 			var perFeat = rows.GroupBy(r => r.FeatId)
 				.Select(g => (Bucket: g.Max(r => r.Amount) <= 100 ? "Amount <= 100" : "Amount > 100", Chance: SaysChance(g.First().Description)))
 				.ToList();
@@ -100,8 +102,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("   and key 73 `Flags` (0 on all 320 occurrences).");
 		}
 
-		// The slots the IMPORTER drops. `AddSpellLineProc` (53070) carries key 73, which the client names `Flags` on
-		// nine other types - the only NAMED slot anywhere in the proc family - and `ParseProcs` does not read it. A
+		// The slots the importer drops. `AddSpellLineProc` (53070) carries key 73, which the client names `Flags` on
+		// nine other types - the only named slot anywhere in the proc family - and `ParseProcs` does not read it. A
 		// named flag word is a better trigger candidate than an unnamed one, so it is worth knowing whether it varies
 		// at all before anyone goes looking in the client.
 		private static void RawProcSlots(string? rdbDir)

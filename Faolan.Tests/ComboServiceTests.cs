@@ -14,12 +14,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The combo RUNTIME (#139): the session-side tracking that turns the combo fields on each swing into an attempt
+	// The combo runtime: the session-side tracking that turns the combo fields on each swing into an attempt
 	// with a finisher. The wire claims those fields rest on are locked separately, in ComboWireTests.
 	//
 	// The combos used here are real shipped rows, addressed by id, because the whole point is that the ids on the
-	// wire index this catalog: 161078 `Assassin_20b_poisondebuff_Grim_Corruption_II` [UP,UL] is a two-step combo and
-	// 3095883 `Rogue_19_damagedetaunt_Cunning_Strike_VI_dagger` [UL,UR,UP] a three-step one, both taken from the
+	// wire index this catalog: 161078 `Assassin_20b_poisondebuff_Grim_Corruption_II` [up,UL] is a two-step combo and
+	// 3095883 `Rogue_19_damagedetaunt_Cunning_Strike_VI_dagger` [UL,ur,up] a three-step one, both taken from the
 	// assassin combo capture.
 	public class ComboServiceTests
 	{
@@ -109,8 +109,8 @@ namespace Faolan.Tests
 			Assert.True(swing.IsFinisher);
 		}
 
-		// #673: a combo step IS a directional swing - the player reached it by pressing that key - and the corpus
-		// agrees: word 5 (the direction ABILITY) is absent on 107 of the 515 captured player swings, yet every one of
+		// A combo step is a directional swing - the player reached it by pressing that key - and the corpus
+		// agrees: word 5 (the direction ability) is absent on 107 of the 515 captured player swings, yet every one of
 		// those result records still carries a direction code. So the direction has to come from the catalog, which
 		// is the only place a combo step states it. `Assassin_20b_..._Grim_Corruption_II` is `UP,UL` and
 		// `Rogue_19_..._Cunning_Strike_VI_dagger` is `UL,UR,UP`, both read straight off `Combo.Actions`.
@@ -148,8 +148,8 @@ namespace Faolan.Tests
 			Assert.Null(await service.TrackSwing(client, Swing(0xDEADBEEF)));
 		}
 
-		// #623: the reuse gate. `Cunning Strike VI` carries a 14 s `Combo.Cooldown`, so once its finisher lands the
-		// next OPENER of the same combo resolves as a plain white swing instead of starting a fresh attempt.
+		// The reuse gate. `Cunning Strike VI` carries a 14 s `Combo.Cooldown`, so once its finisher lands the
+		// next opener of the same combo resolves as a plain white swing instead of starting a fresh attempt.
 		[Fact]
 		public async Task ACompletedCombo_RefusesItsNextOpenerForTheCatalogCooldown()
 		{
@@ -161,7 +161,7 @@ namespace Faolan.Tests
 
 			Assert.Null(await service.TrackSwing(client, Swing(ThreeStep)));
 
-			// The refusal leaves NO half-open attempt behind: a step-1 swing after it is a fresh opener's worth of
+			// The refusal leaves no half-open attempt behind: a step-1 swing after it is a fresh opener's worth of
 			// state, not step 2 of a combo that never started.
 			Assert.Null(client.Session.ActiveComboId);
 			Assert.Equal(0, client.Session.ActiveComboStep);
@@ -194,7 +194,7 @@ namespace Faolan.Tests
 			Assert.NotNull(await service.TrackSwing(client, Swing(TwoStep)));
 		}
 
-		// Only the OPENER is gated: a sequence already under way runs to its finisher. Arranged by arming the timer
+		// Only the opener is gated: a sequence already under way runs to its finisher. Arranged by arming the timer
 		// directly, because the only way to get mid-attempt with the combo on cooldown is a client that ignored it.
 		[Fact]
 		public async Task AnAttemptAlreadyUnderWay_IsNotCutOffByTheCooldown()
@@ -235,7 +235,7 @@ namespace Faolan.Tests
 				ActivationTime = activation
 			};
 
-			// Step 0 is how the CLIENT sends an opener: protobuf omits the zero, so the field is genuinely absent.
+			// Step 0 is how the client sends an opener: protobuf omits the zero, so the field is genuinely absent.
 			if (step != 0)
 				message.ComboAttackNum = step;
 

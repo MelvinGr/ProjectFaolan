@@ -4,23 +4,25 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// ChannelChat (0x0041) - a post on a chat CHANNEL:
-	//   [u8 channelType][u32 channelId][u32 senderId][u16 len][text][u16 0]
-	//
-	// The channel (type + id) from the original post is relayed VERBATIM: the client only displays a channel it is
-	// subscribed to, so the per-channel routing is the client's own subscription filter (a global channel reaches
-	// everyone; ~Playfield's id is a map id, so only same-map clients are subscribed and the rest ignore it).
-	// A ChatSenderInfo (0x0014) precedes it so the speaker's name can be shown.
-	//
-	// ⚠️ The c2s post carries the same three leading fields WITHOUT the sender id - the server stamps that - which is
-	// why `Opcode` is the s2c method and the inbound form is read by the listener's own dispatch.
-	//
-	// Moved in from `Faolan/ChatServer/Packets.cs` in #530.
+	/// <summary>
+	///     s2c <c>ChannelChat</c> - a post on a chat channel:
+	///     <c>[u8 channelType][u32 channelId][u32 senderId][u16 len][text][u16 0]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The channel (type plus id) from the original post is relayed verbatim: the client only displays a channel it is
+	///     subscribed to, so the per-channel routing is the client's own subscription filter - a global channel reaches
+	///     everyone, while ~Playfield's id is a map id, so only same-map clients are subscribed and the rest ignore it. A
+	///     <c>ChatSenderInfo</c> precedes it so the speaker's name can be shown.
+	///     <para>
+	///         The c2s post carries the same three leading fields without the sender id, which the server stamps, which is
+	///         why the declared opcode is the s2c method and the inbound form is read by the listener's own dispatch.
+	///     </para>
+	/// </remarks>
 	public static class ChannelChatCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.ChannelChat;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ChannelChat value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -61,6 +63,6 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// s2c ChannelChat (0x0041).
+	/// <summary>The s2c ChannelChat body.</summary>
 	public sealed record ChannelChat(byte ChannelType, uint ChannelId, uint SenderId, string Text);
 }

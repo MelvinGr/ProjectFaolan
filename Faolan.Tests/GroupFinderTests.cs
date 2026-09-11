@@ -18,10 +18,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The group-finder signup flow (#511), gated against the one capture that walks it end to end
+	// The group-finder signup flow, gated against the one capture that walks it end to end
 	// (NecroL80_..._chat-annotated-4, t=1061..1104): every codec round-trips the captured body byte-exact, and the
 	// service reproduces the captured decision - the refusal at the quest cap, the accept below it, and the
-	// solo confirm forming the private team that owns the entered instance (#512).
+	// solo confirm forming the private team that owns the entered instance.
 	public class GroupFinderTests : IDisposable
 	{
 		private const uint Queuer = 0x01000001;
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		private const string ReadyCheckBody = "0000002600000000";
 		private const string ReadyCheckStatusBody = "000000010000000000000001";
 		private const string LookingForGroupStatusBody = "000000";
-		// #882: the rotating-activity pair. Byte-identical in all five captured exchanges across two captures, which
+		// The rotating-activity pair. Byte-identical in all five captured exchanges across two captures, which
 		// is why the field split comes from the client's own recovered field list rather than from variance.
 		private const string RotatingActivityRequestBody = "00000001";
 		private const string RotatingActivityChildInfoBody = "000000010000000200000003";
@@ -56,8 +56,8 @@ namespace Faolan.Tests
 
 		// --- Codecs: the captured body parses, and re-building the parse is the identical bytes -------------------
 
-		// ⭐ DispatchGroupFinderRemoved carries TWO tokens, and the second one is the answer this flow shipped without:
-		// #882's captures answer all three `LeaveGroupFinder` withdrawals with `GroupFinderLeaderDequeued`. Both
+		// DispatchGroupFinderRemoved carries two tokens, and the second one is the answer this flow shipped without:
+		// the captures answer all three `LeaveGroupFinder` withdrawals with `GroupFinderLeaderDequeued`. Both
 		// builders are compared against the captured bytes whole - the remoteformat spelling, its LDB key's entity
 		// escapes and the trailing `silent` byte included.
 		[Fact]
@@ -213,7 +213,7 @@ namespace Faolan.Tests
 			Assert.Contains(ReadyCheckStatusBody, h.Client.SentHex());
 			Assert.Contains(LookingForGroupStatusBody, h.Client.SentHex());
 
-			// The private team formed (#512: the entered instance is keyed to this id) and the world tier was told
+			// The private team formed (the entered instance is keyed to this id) and the world tier was told
 			// to enter the captured activity's playfield at the captured arrival.
 			Assert.NotNull(h.Teams.TeamOf(Queuer));
 			var teleport = Assert.Single(h.Teleports);
@@ -242,7 +242,7 @@ namespace Faolan.Tests
 			var database = new DatabaseRepository(new TestDb.ContextFactory(options));
 			await using (var ctx = new DatabaseContext(options))
 			{
-				// The gate counts ACTIVE journal rows; the definitions behind them are irrelevant to it.
+				// The gate counts active journal rows; the definitions behind them are irrelevant to it.
 				for (var i = 0; i < heldQuests; i++)
 					ctx.CharacterQuests.Add(new CharacterQuest { CharacterId = Queuer, QuestId = 80000u + (uint)i, State = QuestState.Active });
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);

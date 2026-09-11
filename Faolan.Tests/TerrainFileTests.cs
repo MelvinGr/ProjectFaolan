@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Round-trip for the baked per-map terrain file (#284): the importer writes one FTR1 file per map (heightmap +
+	// Round-trip for the baked per-map terrain file: the importer writes one FTR1 file per map (heightmap +
 	// collision RDB bodies, gzipped) and the game server's TerrainService reads it - the game server never touches the
 	// client RDB. Proves Write/Read are a faithful inverse (including the both-empty and one-empty cases) so a
 	// regenerated file always decodes back to the exact resource bodies the parsers expect.

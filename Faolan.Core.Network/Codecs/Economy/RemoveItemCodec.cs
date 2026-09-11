@@ -4,15 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchRemoveItem (s2c 0x201F) - the inverse of DispatchAddItem:
-	//   [u32 containerKind][u32 charId][u32 itemPos][u32 amountToRemove]
-	// `amountToRemove` 0 removes the whole stack. Byte-exact in DispatchRemoveItemTests; was
-	// `RemoveItemBody.WriteRemoveItemBody(FaolanStream, …)` (#530 wave 7).
+	/// <summary>
+	///     <c>DispatchRemoveItem</c> - the inverse of <see cref="AddItemCodec" />:
+	///     <c>[u32 containerKind][u32 charId][u32 itemPos][u32 amountToRemove]</c>. An <c>amountToRemove</c> of 0 removes
+	///     the whole stack. Byte-exact in <c>DispatchRemoveItemTests</c>.
+	/// </summary>
 	public static class RemoveItemCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchRemoveItem;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(RemoveItem value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -42,6 +43,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// DispatchRemoveItem (0x201F).
+	/// <summary>The DispatchRemoveItem body.</summary>
 	public sealed record RemoveItem(ContainerKind Container, uint CharId, uint ItemPos, uint AmountToRemove = 0);
 }

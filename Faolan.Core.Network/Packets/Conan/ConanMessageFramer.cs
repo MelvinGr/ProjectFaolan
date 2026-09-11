@@ -11,22 +11,21 @@ namespace Faolan.Core.Network.Packets.Conan
 	{
 		private const int CompressionMarkerLength = 9;
 
-		// The u32 big-endian LENGTH PREFIX every frame opens with - not the Conan header, which is 12 bytes
+		// The u32 big-endian length prefix every frame opens with - not the Conan header, which is 12 bytes
 		// ([u32 length][u32 crc32][u32 headerLen]) and is none of this class's business. The prefix counts everything
-		// AFTER itself (Rpc.Serialize writes it that way), so a whole frame is this + that count.
+		// after itself, so a whole frame is this plus that count.
 		private const int LengthPrefixSize = sizeof(uint);
 		private const int MaxPacketSize = 16 * 1024 * 1024;
 
-		// The compression-stream marker: a 9-byte control frame that is just an ordinary [u32 length][u32 crc32][body]
-		// packet - length 0x80000005 (high bit = control-frame marker, low bits 5 = crc(4)+body(1)), then crc32(body),
-		// then a 1-byte flag body (0 = open a zlib stream). The "4 trailing bytes" before the flag are the standard
-		// CRC32 field = crc32(body), decoded #318 (tools/capture/decode_compression_frame.py), not a stream param.
-		// Retail only ever sends it SERVER->CLIENT to open the download compression stream; our server does not
-		// compress, and our client emits a standalone 9-byte marker with NO compressed payload (plaintext packets
-		// surround it). We do not decompress inbound, so we SKIP the whole marker and keep parsing. This is deliberate:
-		// the old code decoded/decompressed on this tag (and the NetworkClient read loop dropped the whole recv buffer
-		// on it), which - when TCP coalesced the marker with the packets behind it - silently ate them, giving the
-		// non-deterministic loss of the post-ready 0x205f grant-arm packet (abilities/spellbar intermittently empty).
+		// The compression-stream marker: a 9-byte control frame that is an ordinary [u32 length][u32 crc32][body]
+		// packet - length 0x80000005 (high bit marks a control frame, low bits 5 = crc(4) + body(1)), then crc32(body),
+		// then a 1-byte flag body (0 opens a zlib stream). The four bytes before the flag are the standard CRC32 field,
+		// not a stream parameter (tools/capture/decode_compression_frame.py).
+		//
+		// Retail sends it server-to-client only, to open the download compression stream. This server does not
+		// compress, and the client emits a standalone marker with no compressed payload, surrounded by plaintext
+		// packets. Inbound is never decompressed, so the whole marker is skipped and parsing continues. Dropping the
+		// rest of the recv buffer on this tag instead would silently eat any packets TCP coalesced behind it.
 		private const uint CompressionMarkerTag = 0x80000005u;
 
 		private readonly byte[] _lengthBuffer = new byte[LengthPrefixSize];
@@ -110,7 +109,7 @@ namespace Faolan.Core.Network.Packets.Conan
 					continue;
 
 				// Allocate the whole frame ([length][payload]) once and stamp the header, so the completed packet is
-				// emitted directly - no per-packet Concat/copy.
+				// emitted directly with no per-packet copy.
 				_frame = new byte[LengthPrefixSize + (int)raw];
 				_frame.WriteU32Be(0, raw);
 				_payloadBytesRead = 0;

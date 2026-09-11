@@ -5,23 +5,24 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// PlayerInterface.SendCharacterSettings - the s2c half of UpdateCharacterSettings: the stored per-character UI
-	// archive handed back once the player has picked a character (retail sends it immediately after LoginCharacter, and
-	// the client answers `ReceivedCharacterSettings` when it has applied them). Gitea #611.
-	//
-	//   [u32 0xC350 (character class)][u32 characterId][ClientSettingsBuffer]
-	//
-	// No md5: the client already learned that from SendCharacterSettingsCheckSumMap before it chose. All 118 captured
-	// sightings are the 12-byte EMPTY form - every character logged in during the captures had nothing stored - which is
-	// exactly what an empty buffer encodes, so the empty case is byte-exact against retail.
+	/// <summary>
+	///     <c>PlayerInterface.SendCharacterSettings</c> - the s2c half of <c>UpdateCharacterSettings</c>: the stored
+	///     per-character UI archive handed back once the player has picked a character. Retail sends it immediately after
+	///     LoginCharacter, and the client answers <c>ReceivedCharacterSettings</c> when it has applied them. The body is
+	///     <c>[u32 characterClass][u32 characterId][ClientSettingsBuffer]</c>.
+	/// </summary>
+	/// <remarks>
+	///     There is no md5: the client already learned that from <c>SendCharacterSettingsCheckSumMap</c> before it chose.
+	///     All 118 captured sightings are the 12-byte empty form, since every character logged in during the captures had
+	///     nothing stored, which is exactly what an empty buffer encodes.
+	/// </remarks>
 	public static class SendCharacterSettingsCodec
 	{
-		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
-		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
-		// against (#613).
+		// The message identity. On PlayerAgent/PlayerInterface that is the method constant rather than an opcode: the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare against.
 		public const uint Method = (uint)PlayerInterfaceMethods.SendCharacterSettings;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterSettings value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -43,6 +44,6 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// A character's stored settings archive, as served back to the client.
+	/// <summary>A character's stored settings archive, as served back to the client.</summary>
 	public sealed record CharacterSettings(uint CharacterId, ClientSettingsBuffer Buffer);
 }

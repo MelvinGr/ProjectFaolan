@@ -17,20 +17,15 @@ using Faolan.GameServer.Wire;
 namespace Faolan.GameServer.World
 {
 	/// <summary>
-	///     Everything the world TICK sends or triggers, in one place (#826). This used to be 42 members on
-	///     <c>GameServerListener</c> - <c>GameServerListener.World.cs</c> was 135 lines of nothing but
-	///     <c>return _broadcaster.X(...)</c> - because the listener was the only object that existed late enough to
-	///     hold every collaborator. It was never the listener's behaviour.
+	///     Everything the world tick sends or triggers, in one place.
 	/// </summary>
 	/// <remarks>
-	///     Built AFTER the services and handed to the simulation at <c>WorldSimulation.Start</c>, which is what keeps
-	///     the ctor graph acyclic: <c>WorldBroadcaster</c> takes the simulation, so nothing that reaches through here
-	///     can be a constructor argument of the thing that uses it.
+	///     Built after the services and handed to the simulation at <c>WorldSimulation.Start</c>, which is what keeps
+	///     the construction graph acyclic: <see cref="WorldBroadcaster" /> takes the simulation, so nothing reached
+	///     through here can be a constructor argument of the thing that uses it.
 	///     <para>
-	///         The five <c>GameServerListener.Send*</c> calls below are <c>internal static</c> wire builders that still
-	///         live in <c>GameServerListener.Outbound.cs</c> with the rest of the listener's senders. They are called
-	///         statically - no listener INSTANCE is referenced - and moving them out belongs with the wider
-	///         <c>.Outbound</c> extraction rather than this change.
+	///         The <c>GameServerListener.Send*</c> calls below are <c>internal static</c> wire builders that live with
+	///         the rest of the listener's senders. They are called statically, with no listener instance referenced.
 	///     </para>
 	/// </remarks>
 	public sealed class WorldOutbound : IWorldOutbound
@@ -43,9 +38,9 @@ namespace Faolan.GameServer.World
 		private readonly CombatService _combat;
 		private readonly TradeskillService _tradeskill;
 
-		// The one op that genuinely stays on the listener: dismounting persists the mount to the DB and pushes the
-		// stat + viewer broadcast, so it spans the listener's own state. A single-op Func seam, which is the shape the
-		// codebase already sanctions for exactly this case.
+		// The one op that genuinely stays on the listener: dismounting persists the mount and pushes both the stat and
+		// the viewer broadcast, so it spans the listener's own state. A single-op delegate seam, which is the shape
+		// this codebase uses for exactly that case.
 		private readonly Func<INetworkClient, Task> _sendDismount;
 
 		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster loot, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
@@ -65,11 +60,11 @@ namespace Faolan.GameServer.World
 			return _combat.ApplyNpcDotTick(client, npcHandle, casterHandle, delta, spellId);
 		}
 
-		// Same op, third port: the world tick applies the death penalty at the moment of death (#504).
+		// The same op on a third port: the world tick applies the death penalty at the moment of death.
 		public Task ApplySelfBuff(INetworkClient client, uint wireSpellId)
 		{
-			// The IWorldOutbound form has always taken the ISpellEffectOutbound default (walkChain: true),
-			// which passes a null chain so BuffService starts a fresh walk.
+			// The IWorldOutbound form takes the ISpellEffectOutbound default (walkChain: true), which passes a null
+			// chain so BuffService starts a fresh walk.
 			var self = client.Session.Character.Id;
 			return _buffs.ApplySpell(client, self, self, wireSpellId);
 		}
@@ -129,8 +124,8 @@ namespace Faolan.GameServer.World
 			return _npcs.BroadcastNpcPatrol(npc);
 		}
 
-		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
-		// send + the world-entry replay) -----------------------------------------------------------------------------
+		// IWorldOutbound: the wire side of the simulation tick. The broadcaster builds the packets; the listener owns
+		// the vitals send and the world-entry replay.
 		public Task BroadcastNpcRespawn(WorldEntity npc)
 		{
 			return _npcs.BroadcastNpcRespawn(npc);
@@ -173,12 +168,11 @@ namespace Faolan.GameServer.World
 
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
-			// #586: every caller of this - the regen tick, fall damage, lava, drowning - moves a CURRENT and nothing
-			// else. #902: and only the ones that MOVED go on the wire, which is both what #586's title said and the
-			// own-handle shape retail actually uses (single-stat blocks x1,503 against x12 for the three-current form,
-			// which is what it says about OTHER entities). An empty block means nothing moved and there is nothing to
-			// announce - sending one would restate a health that did not change, which is what the regen tick did on
-			// every second of every fight because stamina kept it alive.
+			// Every caller of this - the regen tick, fall damage, lava, drowning - moves a current and nothing else,
+			// and only the currents that actually moved go on the wire, which is the own-handle shape retail uses:
+			// single-stat blocks x1,503 against x12 for the three-current form, which is what it says about other
+			// entities. An empty block means nothing moved and there is nothing to announce; sending one would restate
+			// a health that did not change, once a second for as long as the stamina tick keeps running.
 			var moved = vitals.ToChangedCurrentsBlock();
 
 			return moved.Records.Count == 0
@@ -196,15 +190,14 @@ namespace Faolan.GameServer.World
 			return _broadcaster.RestoreEncounterLure(boss);
 		}
 
-		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
+		// The sub-area crossing banner the world tick fires; forwards to the listener's own sender.
 		public Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
 			return GameWire.SendAreaNameBanner(client, areaNameId);
 		}
 
-		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
-		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
-		// share one builder.
+		// The buff-removal end-twin: the same ApplySpell carrier as the apply, with the rank byte set to 1 and an empty
+		// payload. It routes the same builder the GM cancel uses, so the world-tick expiry and the command agree.
 		public Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
 			return _buffs.SendBuffRemoval(client, applyTo, applyFrom, appliedSpellId);
@@ -263,9 +256,8 @@ namespace Faolan.GameServer.World
 			return GameWire.SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
 		}
 
-		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a
-		// combat concern: the world tick sends it to a LIVE player to announce a newly-discovered point (#372), and
-		// the death path is only its other caller.
+		// The player's resurrection spots. Not a combat concern: the world tick sends the list to a live player to
+		// announce a newly discovered point, and the death path is only its other caller.
 		public Task SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return GameWire.SendValidResurrectionSpots(client, referencePosition, spots);
@@ -273,32 +265,34 @@ namespace Faolan.GameServer.World
 
 		public Task SendRevive(INetworkClient client, uint handle, uint respawnPointId)
 		{
-			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
+			// The same GameAgent 0x59 sender and receiver framing as the death sequence.
 			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Revive(handle, respawnPointId)))));
 		}
 
 		public Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, Quaternion rotation)
 		{
-			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
-			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
+			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the resurrection point; retail sends it
+			// right after the revive IntendedTeleport. It carries the destination position, and is same-map, so there
+			// is no loading screen.
 			return client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, rotation))));
 		}
 
 		public async Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
 		{
-			// #792: the zero-length 0x1B goes first - retail precedes EVERY IntendedTeleport with it, 102 of 102.
+			// The zero-length 0x1B goes first: retail precedes every IntendedTeleport with it, 102 of 102.
 			await GameWire.SendTeleportPending(client);
-			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
-			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
+			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen resurrection point on the same
+			// map, with no loading screen. The caller passes the live playfield token so the client repositions in
+			// place.
 			await client.SendAsync(new Rpc(GameEndpoints.PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, playfieldToken))));
 		}
 
-		// #776: the apply carrier for a buff landing on someone else. Goes through SendMagicBuffIir like every other
-		// ApplySpell we send - so the viewers around the target get it too - and because applyTo != applyFrom that
-		// path registers nothing, which is right: the world tick owns a mob's buff registry.
+		// The apply carrier for a buff landing on someone else. It goes through SendMagicBuffIir like every other
+		// ApplySpell, so the viewers around the target get it too, and because applyTo differs from applyFrom that path
+		// registers nothing - which is right, since the world tick owns a mob's buff registry.
 		public Task SendSpellApplication(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId, uint durationCentiseconds)
 		{
 			return _buffs.SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, BuffService.CasterLevel(client), _buffs.CasterIsPlayer(client, applyFrom)));
@@ -314,7 +308,8 @@ namespace Faolan.GameServer.World
 			return _broadcaster.SwapEncounterLureForBoss(lure);
 		}
 
-		// #367: the tick's seam onto the buff stat engine (expiry / death clear), same body as the listener's own calls.
+		// The tick's seam onto the buff stat engine (expiry and death clear), with the same body as the listener's own
+		// calls.
 		public Task SyncBuffStats(INetworkClient client)
 		{
 			return _buffs.SyncBuffStats(client);

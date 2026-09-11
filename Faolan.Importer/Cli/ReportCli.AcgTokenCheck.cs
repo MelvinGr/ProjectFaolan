@@ -7,31 +7,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report acg-token-check`: do the ACGHash tokens we would put on the wire keep retail's one-token-per-template
-	// property? (Gitea #729's rule, applied to `AcgHashTests.MintedTokens_NeverCollideWithAHarvestedOne`.)
+	// `--report acg-token-check`: do the ACGHash tokens this server would put on the wire keep retail's
+	// one-token-per-template property?
 	//
-	// `Items.Hash` is the HARVESTED token, 0 when no capture ever showed that template entering an inventory;
-	// `AcgHash.Mint` supplies the rest. Retail keeps one token per template - 0 templates carrying two across 107,929
-	// sightings - so a minted token must not land on a harvested one, or on another minted one.
+	// `Items.Hash` is the harvested token, 0 when no capture ever showed that template entering an inventory,
+	// and `AcgHash.Mint` supplies the rest. Retail keeps one token per template - no template carries two
+	// anywhere in the corpus - so a minted token must not land on a harvested one, or on another minted one.
 	//
-	// ⭐ **Why it is a REPORT and not a test**, the same argument as `--report item-level-check` and
-	// `--report npc-pose-check`: it scores SHIPPED DATA, and it fails as that data GROWS rather than as the code
-	// breaks. The collision count is a birthday problem in the item population, and its only sanctioned fix - re-roll
-	// the salt - is a coin flip, so as a test it would be a gate that fires on data which is MORE correct than before.
+	// It is a report rather than a test, like `--report item-level-check` and `--report npc-pose-check`,
+	// because it scores shipped data and fails as that data grows rather than as the code breaks: the collision
+	// count is a birthday problem in the item population, and its only sanctioned fix - re-rolling the salt - is a
+	// coin flip.
 	//
-	// ⭐ **The dominant half of that lottery is GONE since #899**, and the arithmetic below says so. Minted tokens now
-	// all carry a '_' and no harvested token does (0 of 4,615), so minted-vs-harvested is not unlikely - it is
-	// IMPOSSIBLE, and the 1.45 term that used to grow with every harvest went with it. What is left is minted vs
-	// minted in the 186,624-token '_'-bearing space, a term that SHRINKS as harvests cover more templates, because
-	// each newly harvested one stops being minted for.
+	// Minted tokens all carry a '_' and no harvested token does, so a minted-versus-harvested collision is
+	// impossible rather than merely unlikely. What remains is minted versus minted in the '_'-bearing space, a
+	// term that shrinks as harvests cover more templates, because each newly harvested one stops being minted for.
 	//
-	// ⚠️ What stays a TEST is the part that is a property of the CODE: minting is deterministic, lands in the charset
-	// the client accepts, and never overrides a harvested token (`AcgHashTests`). And `EveryShippedToken_IsWellFormed`
-	// stays a test too - a malformed `Items.Hash` can only ever be a bad import, never data that has outgrown the
-	// gate, which is the line #729 draws.
+	// What stays a test is the part that is a property of the code: minting is deterministic, lands in the charset
+	// the client accepts, and never overrides a harvested token (AcgHashTests). A malformed `Items.Hash`
+	// likewise stays a test - it can only ever be a bad import, never data that has outgrown the gate.
 	//
-	// Exit code: non-zero only when a collision actually exists, because that is the half that can only be a defect.
-	// The next clean salt is printed alongside so the fix is mechanical rather than a search.
+	// The exit code is non-zero only when a collision actually exists, because that is the half that can only be a
+	// defect. The next clean salt is printed alongside so the fix is mechanical rather than a search.
 	public static partial class ReportCli
 	{
 		// How far to sweep for a clean salt before giving up. At ~22% per salt, 64 is a 1-in-3-million miss.
@@ -59,7 +56,7 @@ namespace Faolan.Importer.Cli
 			// The expectation this population produces, so the count below reads as "about what chance predicts" or
 			// "something is wrong with the mixer" rather than as a bare number.
 			//
-			// ⚠️ ONE term, not two. The minted-vs-harvested term is structurally zero (#899) - the two populations are
+			// one term, not two. The minted-vs-harvested term is structurally zero - the two populations are
 			// disjoint by charset - so including it would overstate the expectation and make a clean run look lucky
 			// when it is guaranteed. What remains is the minted-vs-minted birthday term in the '_'-bearing space.
 			var expected = hashless.Count * (double)hashless.Count / (2 * AcgHash.MintSpace);

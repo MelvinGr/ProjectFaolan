@@ -7,9 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Auth
 {
-	// Minimal Identity store over the game's Accounts table: just enough for UserManager to create accounts and
-	// check passwords (IUserStore + IUserPasswordStore). There's no normalized-name column, so it's computed on the
-	// fly; the rest of Identity's surface (lockout, 2FA, claims, …) is intentionally not implemented.
+	/// <summary>
+	///     A minimal Identity store over the game's Accounts table: just enough for UserManager to create accounts and
+	///     check passwords. There is no normalized-name column, so the normalized name is computed on the fly, and the
+	///     rest of Identity's surface — lockout, two-factor, claims and so on — is deliberately not implemented.
+	/// </summary>
 	public sealed class AccountUserStore : IUserStore<Account>, IUserPasswordStore<Account>
 	{
 		private readonly IDbContextFactory<DatabaseContext> _dbf;
@@ -33,14 +35,12 @@ namespace Faolan.Web.Auth
 			return Task.FromResult(!string.IsNullOrEmpty(user.Password));
 		}
 
-		// --- passwords -------------------------------------------------------------------------------------------
 		public Task SetPasswordHashAsync(Account user, string? passwordHash, CancellationToken ct)
 		{
 			user.Password = passwordHash ?? "";
 			return Task.CompletedTask;
 		}
 
-		// --- create / update / delete ----------------------------------------------------------------------------
 		public async Task<IdentityResult> CreateAsync(Account user, CancellationToken ct)
 		{
 			await using var db = await _dbf.CreateDbContextAsync(ct);
@@ -87,7 +87,6 @@ namespace Faolan.Web.Auth
 			return Task.FromResult(user.UserName?.ToUpperInvariant());
 		}
 
-		// --- identity / lookup -----------------------------------------------------------------------------------
 		public Task<string> GetUserIdAsync(Account user, CancellationToken ct)
 		{
 			return Task.FromResult(user.Id.ToString());
@@ -98,10 +97,13 @@ namespace Faolan.Web.Auth
 			return Task.FromResult<string?>(user.UserName);
 		}
 
+		/// <summary>
+		///     A no-op: there is no normalized-name column, so <see cref="GetNormalizedUserNameAsync" /> computes the
+		///     value instead of storing it.
+		/// </summary>
 		public Task SetNormalizedUserNameAsync(Account user, string? normalizedName, CancellationToken ct)
 		{
 			return Task.CompletedTask;
-			// not stored
 		}
 
 		public Task SetUserNameAsync(Account user, string? userName, CancellationToken ct)
@@ -123,7 +125,8 @@ namespace Faolan.Web.Auth
 				});
 			}
 
-			// Only the fields this store owns (password migration is the live use; username for completeness).
+			// Only the fields this store owns: the password, which is what the live password migration updates, and
+			// the username for completeness.
 			tracked.Password = user.Password;
 			tracked.UserName = user.UserName;
 			await db.SaveChangesAsync(ct);

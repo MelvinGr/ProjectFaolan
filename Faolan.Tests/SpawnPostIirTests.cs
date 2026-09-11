@@ -18,9 +18,9 @@ namespace Faolan.Tests
 		{
 			var post = Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeWalk));
 
-			Assert.Equal(0u, post.ReadU32Be(0)); // the head-word LIST'S count, 0 - not the constant it read as
+			Assert.Equal(0u, post.ReadU32Be(0)); // the head-word list's count, 0 - not a constant
 			Assert.Equal(5u, post.ReadU32Be(4)); // the first record: the empty move-task slot + the buff list's frame
-			Assert.Equal(SpawnPostIirs.MovementModeWalk, post.ReadU32Be(8)); // the third word IS the movement mode (#605)
+			Assert.Equal(SpawnPostIirs.MovementModeWalk, post.ReadU32Be(8)); // the third word is the movement mode
 			Assert.Equal(ListFrame.Empty, post.ReadU32Be(post.Length - 4)); // the closing pair list, empty
 		}
 
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			var captured = CapturedPostIir("SpawnNpcCrocodile");
 
 			Assert.Equal(SpawnPostIirs.MinimalNpcLength, captured.Length);
-			// The mode is passed EXPLICITLY rather than defaulted: it is this Crocodile's own movement mode (1), and
+			// The mode is passed explicitly rather than defaulted: it is this Crocodile's own movement mode (1), and
 			// the builder's fallback (2) is what we send for a type that has none - not a claim about any capture.
 			Assert.Equal(captured, Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeWalk)));
 		}
@@ -41,9 +41,9 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedPostIir("SpawnNpcMinimalPanther"), Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeWalk)));
 		}
 
-		// No head words. That leading u32 is the head-word LIST'S COUNT, not a constant - it is 0 on 11,627 captured
-		// streams and 1 on the 5 that carry a word, and it was written up as "constant 0 (the player spawn has 2)",
-		// which is wrong on both halves (#475).
+		// No head words. That leading u32 is the head-word list's count, not a constant - it is 0 on 11,627 captured
+		// streams and 1 on the 5 that carry a word, so reading it as "constant 0 (the player spawn has 2)" is wrong on
+		// both halves.
 		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
 		public void DecodeEncode_IsByteIdentical(string golden)
 		{
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedPostIir(golden), Rebuild(spawn.Post));
 		}
 
-		// #243: TryReadNoMorphWord2 reads the fresh word2 off a no-morph body (minimal OR runtime-bearing) and
+		// TryReadNoMorphWord2 reads the fresh word2 off a no-morph body (minimal or runtime-bearing) and
 		// declines an appearance-bearing body (which builds from morph rows). The animal minimal golden is word2==1;
 		// Casilda (a morph table) is declined.
 		[Fact]
@@ -65,13 +65,12 @@ namespace Faolan.Tests
 			Assert.False(NpcSpawnAppearance.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCasilda"), out _));
 		}
 
-		// A RUNTIME-BEARING no-morph stream (a first record carrying the entity's current MOVE TASK, no morph table)
+		// A runtime-bearing no-morph stream (a first record carrying the entity's current move task, no morph table)
 		// still yields its header word2 - the key to building the runtime tail from columns.
 		//
-		// ⚠️ The runtime record used to be 40 RANDOM BYTES behind a `firstRecordLen` that said so. That parsed only
-		// because the old reader took word2 off a fixed offset without walking the stream; it is a fixture shaped
-		// like its parser, which proves only that the file agrees with itself (the wave-3 lesson). The slot is a
-		// MoveTaskNode (#477), so this builds one.
+		// 40 random bytes behind a `firstRecordLen` that says so would parse only for a reader that takes word2 off a
+		// fixed offset without walking the stream - a fixture shaped like its parser, which proves only that the file
+		// agrees with itself. The slot is a MoveTaskNode, so this builds one.
 		[Fact]
 		public void TryReadNoMorphWord2_ReadsRuntimeBearingForm()
 		{

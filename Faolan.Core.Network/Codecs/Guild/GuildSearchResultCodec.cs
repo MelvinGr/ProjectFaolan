@@ -5,12 +5,20 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// Byte-exact codec for the 0x205C DispatchGuildSearchResult body - the guild-finder browse list the client
-	// requests with 0x2043 SearchForGuilds. Decoded from the hoxxling login capture (GuildSearchResultTests):
-	//   [u32 (guildCount+1)*0x3F1][ guild records... ][u8 0x01]
-	//   record = [u32 guildId][s16 name][s16 leaderName][u16 memberCount][u32 renown][u8 flag]
-	// The leading word is the shared 0x3F1 count-framing (ListFrame). The trailing 0x01 closes the list (a "more
-	// results" / end marker - constant in the capture). We ignore the 0x2043 filter and return the realm's guilds.
+	/// <summary>
+	///     The <c>DispatchGuildSearchResult</c> body - the guild-finder browse list the client requests with
+	///     <c>SearchForGuilds</c>.
+	/// </summary>
+	/// <remarks>
+	///     Decoded from the hoxxling login capture (<c>GuildSearchResultTests</c>):
+	///     <code>
+	///     [list frame][ guild records... ][u8 0x01]
+	///     record = [u32 guildId][s16 name][s16 leaderName][u16 memberCount][u32 renown][u8 flag]
+	///     </code>
+	///     The leading word is the shared count framing (<c>ListFrame</c>), and the trailing 0x01 closes the list - a
+	///     "more results" or end marker, constant in the capture. The request's filter is ignored and the realm's guilds
+	///     are returned.
+	/// </remarks>
 	public static class GuildSearchResultCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildSearchResult;
@@ -47,7 +55,9 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 	public sealed record GuildSearchResult(IReadOnlyList<GuildSearchEntry> Guilds);
 
-	// One guild row. Renown is the guild's total renown; flag is an unclassified per-guild byte (0/1 in the
-	// capture - likely a recruiting flag), emitted as 0 for our guilds.
+	/// <summary>
+	///     One guild row. <c>Renown</c> is the guild's total renown; <c>Flag</c> is an unclassified per-guild byte (0 or 1
+	///     in the capture, most likely a recruiting flag), emitted as 0 for guilds built here.
+	/// </summary>
 	public readonly record struct GuildSearchEntry(uint Id, string Name, string LeaderName, ushort MemberCount, uint Renown, byte Flag);
 }

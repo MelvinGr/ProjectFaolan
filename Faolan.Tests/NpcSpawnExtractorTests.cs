@@ -24,7 +24,7 @@ namespace Faolan.Tests
 			Assert.Empty(entries); // no current map yet
 		}
 
-		// Against a REAL captured body, the extractor lifts the dissected identity from the CharacterIIR: a humanoid
+		// Against a real captured body, the extractor lifts the dissected identity from the CharacterIIR: a humanoid
 		// (Casilda) with worn equipment and an animal (Crocodile, no equipment), each with its NpcStats.template_id.
 		[Theory, InlineData("SpawnNpcCasilda", "Casilda", 9411u, 83u, 3u, true), InlineData("SpawnNpcCrocodile", "Crocodile", 14049u, 64u, 0u, false)]
 		public void Extract_LiftsIdentityFromCapturedIir(string golden, string name, uint templateId, uint race, uint sex, bool hasEquipment)
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
-		// #309: an EPIC-mode window is not evidence for the normal stat columns. Epic re-tunes the SAME templates -
+		// An epic-mode window is not evidence for the normal stat columns. Epic re-tunes the same templates -
 		// measured on chat-annotated-3's back-to-back Spider Caverns entries, Cavecrawler/Cavehunter carry ~8x the
 		// health at the same name, template and level - so everything under an epic PlayfieldF is skipped until a
 		// normal MapChange arrives.
@@ -81,17 +81,17 @@ namespace Faolan.Tests
 
 			var entry = Assert.Single(NpcSpawnExtractor.Extract(packets));
 
-			Assert.Equal(0x0004DE8Bu, entry.Handle); // only the NORMAL window's spawn survives
+			Assert.Equal(0x0004DE8Bu, entry.Handle); // only the normal window's spawn survives
 		}
 
-		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
-		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
+		// A real PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte, so a
+		// synthetic body with the map id at the right offset is not a MapChange.
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			return Packet(PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0));
 		}
 
-		// The same record with the EPIC class word in its proxy - what retail sent on the 19:57:15 Spider Caverns
+		// The same record with the epic class word in its proxy - what retail sent on the 19:57:15 Spider Caverns
 		// epic entry (0xCABC against the normal 0xC79C).
 		private static CapturedPacket EpicMapChange(uint mapId)
 		{
@@ -123,10 +123,9 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, true, 0x2000, body.Length >= 8 ? body.ReadU32Be(4) : 0, full);
 		}
 
-		// ⚠️ The name rides a REAL length-prefixed CoreCharacter message, serialized by the generated type (#541).
-		// This used to lay down a bare `0x0A <len> <name>` at a fixed offset, which is not a spawn - it only ever
-		// satisfied the lenient byte scan the extractor has stopped using. `SpawnBodyReader.TryReadCharacterMessage`
-		// verifies the u32 length ahead of field 1 and re-decodes the message, so the fixture has to carry one.
+		// The name rides a real length-prefixed CoreCharacter message, serialized by the generated type.
+		// `SpawnBodyReader.TryReadCharacterMessage` verifies the u32 length ahead of field 1 and re-decodes the message,
+		// so a bare `0x0A <len> <name>` at a fixed offset is not a spawn and the fixture has to carry the real thing.
 		private static CapturedPacket Spawn(uint handle, float x, float y, float z, string name)
 		{
 			var message = new ProtoCoreCharacterIIR

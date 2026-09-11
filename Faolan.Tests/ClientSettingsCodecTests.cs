@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The mid-session settings/preview upload family (Gitea #611), against the captured bodies.
+	// The mid-session settings/preview upload family, against the captured bodies.
 	//
 	// Oracles, all RPC bodies lifted straight out of the corpus:
 	//   assets/playeragent-update-character-settings.bin      Strie_rogue-assassin_login_randomActions frame 7031
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	//   assets/playeragent-update-subscription-settings.bin   AssassinL23_..._randomActions-resurect frame 5439
 	//   assets/playeragent-send-character-preview.bin         Faolanx_mage-necromancer_login frame 8 (s2c)
 	//
-	// What makes these binding is the ROUND TRIP: the buffer is a zlib stream, and a deflate stream is not a function
+	// What makes these binding is the round trip: the buffer is a zlib stream, and a deflate stream is not a function
 	// of its contents, so the only way Build can reproduce retail's bytes is by carrying the payload verbatim - which
 	// is the same reason the md5 below can be recomputed at all.
 	public class ClientSettingsCodecTests
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			Assert.Equal(32571, value.Buffer.Files.Sum(f => f.Data.Length + f.Name.Length + 8));
 			Assert.StartsWith("<Archive>", Encoding.Latin1.GetString(value.Buffer.Files[0].Data));
 
-			// The client's own md5 is over the COMPRESSED payload - marker and inflated-size word included.
+			// The client's own md5 is over the compressed payload - marker and inflated-size word included.
 			Assert.Equal("78d5cd1bc7fc9820df6cc6a94281e42c", value.CheckSum);
 			Assert.Equal(value.CheckSum, value.Buffer.CheckSum);
 
@@ -68,19 +68,19 @@ namespace Faolan.Tests
 			Assert.Equal(["preview.bin"], uploaded.Buffer.Files.Select(f => f.Name));
 			Assert.Equal(upload, UpdateCharacterPreviewCodec.Build(uploaded));
 
-			// The s2c body is the SAME layout - which is what lets the server keep the upload verbatim and serve it
+			// The s2c body is the same layout - which is what lets the server keep the upload verbatim and serve it
 			// straight back rather than re-authoring an appearance record it cannot yet decode.
 			var sent = SendCharacterPreviewCodec.Parse(served);
 			Assert.Equal(0x110099BDu, sent.CharacterId);
 			Assert.Equal(["preview.bin"], sent.Buffer.Files.Select(f => f.Name));
 			Assert.Equal(served, SendCharacterPreviewCodec.Build(sent));
 
-			// ... and the two codecs really do agree on it: serving the UPLOADED buffer under the s2c method reproduces
+			// ... and the two codecs really do agree on it: serving the uploaded buffer under the s2c method reproduces
 			// the upload's bytes exactly, which is what the store-and-echo path does at login.
 			Assert.Equal(upload, SendCharacterPreviewCodec.Build(new CharacterPreview(uploaded.CharacterId, uploaded.Buffer)));
 		}
 
-		// #788: the archive member itself. The grammar was derived over all FOUR corpus payloads (408 / 527 / 606 /
+		// The archive member itself. The grammar was derived over all four corpus payloads (408 / 527 / 606 /
 		// 618 bytes, three characters); the two that ride committed fixtures are the 408-byte upload and the 527-byte
 		// served one, and both re-encode byte-exact - which is what a count-prefixed grammar buys. Nothing is skipped:
 		// Parse ends at the last byte or throws.
@@ -115,8 +115,8 @@ namespace Faolan.Tests
 			Assert.Equal("*beardmesh_3181884", other.Morphs[^1].Name);
 		}
 
-		// #788: the other direction - a preview AUTHORED here, packed into a fresh IOz1 archive and served under the
-		// s2c method. The bytes are deliberately NOT retail's (a deflate stream is not a function of its contents), so
+		// The other direction - a preview authored here, packed into a fresh IOz1 archive and served under the
+		// s2c method. The bytes are deliberately not retail's (a deflate stream is not a function of its contents), so
 		// what is asserted is that the record survives the round trip intact.
 		[Fact]
 		public void ConstructedPreview_SurvivesTheArchiveRoundTrip()
@@ -131,7 +131,7 @@ namespace Faolan.Tests
 		}
 
 		// Retail's empty forms, which are what a character with nothing stored gets: a 12-byte SendCharacterSettings
-		// (`0000C350 <id> 00000000`) and a one-entry checksum map with an EMPTY md5 (`000007E2 <id> 0000`). Both are
+		// (`0000C350 <id> 00000000`) and a one-entry checksum map with an empty md5 (`000007E2 <id> 0000`). Both are
 		// verbatim from the corpus - Barbarian-login frames 51 and 24 - and both are the case our server hits today.
 		[Fact]
 		public void EmptySettingsAndCheckSumMap_MatchRetailBytes()
@@ -143,7 +143,7 @@ namespace Faolan.Tests
 			var map = SendCharacterSettingsCheckSumMapCodec.Build(new CharacterSettingsCheckSumMap([new CharacterSettingsCheckSum(0x021664F8, "")]));
 			Assert.Equal(Convert.FromHexString("000007e2021664f80000"), map);
 
-			// And the populated form retail sends for an account whose characters DO have settings (NecroL80_..._login
+			// And the populated form retail sends for an account whose characters do have settings (NecroL80_..._login
 			// frame 8): five entries, the first empty, framed by the ordinary 0x3F1 list word (0x17A6 = 6 * 0x3F1).
 			var populated = Convert.FromHexString(
 				"000017a601317cf8000008006f3100203866353861386133636436366562356335653230633135643465633666393738" +

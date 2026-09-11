@@ -10,7 +10,7 @@ using Faolan.GameServer.World;
 
 namespace Faolan.Tests.Support
 {
-	// A no-op IWorldOutbound that RECORDS the handful of ops the world tick's buff jobs use, so a tick pass can be
+	// A no-op IWorldOutbound that records the handful of ops the world tick's buff jobs use, so a tick pass can be
 	// driven in a test without a listener, a socket or a database behind it. Everything else answers "nothing
 	// happened" - a tick that reaches one of those is not what these gates are about.
 	public sealed class RecordingWorldOutbound : IWorldOutbound
@@ -23,7 +23,7 @@ namespace Faolan.Tests.Support
 		public List<(uint Handle, Vector3 Position)> Snaps { get; } = [];
 		public List<(uint Handle, CorpseStage Stage)> CorpseEvents { get; } = [];
 
-		// What ApplySpellArea answers with, and what a spell's aura areas / #784 chain edges are - set by the test that
+		// What ApplySpellArea answers with, and what a spell's aura areas and chain edges are - set by the test that
 		// needs them.
 		public IReadOnlyList<uint> AreaVictims { get; set; } = [];
 

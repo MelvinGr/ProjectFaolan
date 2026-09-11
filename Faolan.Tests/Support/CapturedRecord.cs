@@ -3,9 +3,8 @@ using System;
 namespace Faolan.Tests.Support
 {
 	// A captured IIR body as a dump spells it: the carrier's [u32 len] and then the record itself. That length is the
-	// SENDER's (#530 rule 2 - Build returns the body WITHOUT it), so a codec test has to drop it before handing the
-	// bytes to Parse, and drop it again before comparing a Build against the capture. Four test files had their own
-	// copy of `capturedHex[8..]`.
+	// sender's - Build returns the body without it - so a codec test has to drop it before handing the bytes to
+	// Parse, and drop it again before comparing a Build against the capture.
 	public static class CapturedRecord
 	{
 		// The record's own bytes.

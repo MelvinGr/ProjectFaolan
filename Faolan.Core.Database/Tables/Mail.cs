@@ -8,27 +8,27 @@ namespace Faolan.Core.Database.Tables
 	// One in-game mail (the Tradepost agent carries mail alongside the auction house). Decoded byte-exact from the
 	// NecroL80 buy_from_autionhouse_get_mail capture (docs/subsystems/tradepost-protocol.md "Buy -> mail delivery"); the on-wire
 	// DispatchMailMessage (S->C 0x2002) is built byte-exact by MailMessageCodec. An auction-house delivery is a
-	// SYSTEM mail: the recipient is the buyer, the sender NAME is empty. The bought item rides as an attachment
+	// system mail: the recipient is the buyer, the sender name is empty. The bought item rides as an attachment
 	// (MailAttachment) fetched on demand.
 	//
-	// PRIMARY KEY = MailId, the wire id itself. Deliberately NOT a BaseEntity: carrying a surrogate uint Id
-	// ALONGSIDE the ulong wire MailId meant two different numbers lived in two same-named properties (Mail.MailId =
+	// Primary key = MailId, the wire id itself. Deliberately not a BaseEntity: carrying a surrogate uint Id
+	// alongside the ulong wire MailId meant two different numbers lived in two same-named properties (Mail.MailId =
 	// the wire id, MailAttachment.MailId = the FK to Mail.Id), and comparing one to the other silently widened the
-	// uint and matched nothing. That shipped an item dupe (#368). One id, one meaning: the FK is the wire id.
+	// uint and matched nothing. That shipped an item dupe. One id, one meaning: the FK is the wire id.
 	[Index(nameof(RecipientName))]
 	public class Mail
 	{
-		// The unique wire mail id (the client's GetMailByID / GetMailItem target) AND this row's primary key.
-		// Allocated by AllocateMailId - RANDOM, not monotonic, so it is not an ordering proxy (see
+		// The unique wire mail id (the client's GetMailByID / GetMailItem target) and this row's primary key.
+		// Allocated by AllocateMailId - random, not monotonic, so it is not an ordering proxy (see
 		// GetMailsForRecipient, which orders by Timestamp1).
 		//
-		// DatabaseGeneratedOption.None is REQUIRED: EF's convention makes an integer key store-generated, which on
-		// SQLite scaffolds the key as AUTOINCREMENT and lets the store overwrite the id we allocated. The wire id is
+		// DatabaseGeneratedOption.None is required: EF's convention makes an integer key store-generated, which on
+		// SQLite scaffolds the key as autoincrement and lets the store overwrite the id we allocated. The wire id is
 		// assigned in code and the client addresses mail by it, so the DB must never mint one.
 		[Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
 		public ulong MailId { get; set; }
 
-		// The realm this mail belongs to (#324) - the recipient's realm; no cross-realm mail, so a realm process only
+		// The realm this mail belongs to - the recipient's realm; no cross-realm mail, so a realm process only
 		// reads its own inbox rows. Backfilled from the recipient character on migration.
 		public uint RealmId { get; set; }
 
@@ -42,7 +42,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The mail body, a remoteformat XML string (length-prefixed u16 on the wire). For an AH delivery it is the
 		// TradePostGUI_MailItemBought token with the buyer + item parameters.
-		[MaxLength(4096)] // TODO: Columnize?
+		[MaxLength(4096)]
 		public string BodyXml { get; set; } = null!;
 
 		[MaxLength(64)]
@@ -59,12 +59,12 @@ namespace Faolan.Core.Database.Tables
 		// (the TradepostInterface object id), name = the buyer.
 		public uint RecipientClass { get; set; }
 
-		// DB-only: for a PLAYER-composed mail with an attachment, the sender's origin BANK slot. The attached item
+		// DB-only: for a player-composed mail with an attachment, the sender's origin bank slot. The attached item
 		// stays in the sender's bank with a "mail-pending" overlay until the recipient takes it (then it leaves the
 		// sender's bank) or the sender cancels (overlay cleared). 0 / no attachment for AH system mail (escrowed).
 		public uint SenderBankSlot { get; set; }
 
-		// Sender endpoint, same shape. For an AH/system mail the NAME is empty (the class constant is still present).
+		// Sender endpoint, same shape. For an AH/system mail the name is empty (the class constant is still present).
 		public uint SenderClass { get; set; }
 
 		// Two timestamp-like u32s (sent / expiry, undecoded exact meaning - preserved).
@@ -72,7 +72,7 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Timestamp2 { get; set; }
 
-		// Attached cash (COD) in the wallet wire unit (tin). u64 on the wire; 0 in the capture.
+		// Attached cash (cod) in the wallet wire unit (tin). u64 on the wire; 0 in the capture.
 		public ulong Money { get; set; }
 	}
 }

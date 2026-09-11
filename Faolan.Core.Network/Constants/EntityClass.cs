@@ -1,19 +1,26 @@
 namespace Faolan.Core.Network.Constants
 {
-	// In-world ENTITY object-class ids (the `type` half of an entity id `{type, instance}` = `ProtoID32` / the
-	// type field of a `ProtoEndpoint`). Every IIR record that targets an entity starts `[u32 type][u32 handle]`,
-	// where `type` is one of these and `handle` is the live instance. This is a SEPARATE id namespace from the RPC
-	// *conversation* class ids in `Faolan.Core.Network.Constants.Endpoints` (those are BKDR-31 hashes like
-	// 0xA9ECB95D = hash("GameCharAgent")); these object-class ids are a small ENUMERATED registry based at 50000.
-	//
-	// The world-object cluster is READ OFF THE CORPUS, not guessed: `--report entity-classes` prints the class word
-	// each dynel-family IIR actually carries, and every name below is the pairing it shows. TombStone (51323) was the
-	// last hole in that cluster and was named from its 15 `TombStoneFullUpdateIIR` records over 6 captures (#868).
-	//
-	// CHARACTER (0xC350 = 50000) is by far the most common - players, NPCs and creatures are all "Characters", which
-	// is why 0xC350 is all over the wire. Confirmed by Ghidra (MoveTaskIIR_c::PollStatus checks `id.type != 50000`
-	// and logs "id is not of a character!"). The world-object classes cluster just above it (51016, 51320-51325).
-	// See docs/entity-class-ids.md.
+	/// <summary>
+	///     In-world entity object-class ids: the <c>type</c> half of an entity id <c>{type, instance}</c>
+	///     (<c>ProtoID32</c>, or the type field of a <c>ProtoEndpoint</c>). Every IIR record that targets an entity
+	///     starts <c>[u32 type][u32 handle]</c>, where <c>type</c> is one of these and <c>handle</c> is the live
+	///     instance.
+	/// </summary>
+	/// <remarks>
+	///     This is a separate id namespace from the RPC <i>conversation</i> class ids in <see cref="Endpoints" />,
+	///     which are BKDR-31 hashes (0xA9ECB95D = hash("GameCharAgent")). These object-class ids are a small
+	///     enumerated registry based at 50000.
+	///     <para>
+	///         Each name below is the pairing <c>--report entity-classes</c> shows: it prints the class word each
+	///         dynel-family IIR actually carries in the capture corpus.
+	///     </para>
+	///     <para>
+	///         <see cref="Character" /> (50000) is by far the most common - players, NPCs and creatures are all
+	///         "Characters". Confirmed in the client: <c>MoveTaskIIR_c::PollStatus</c> checks
+	///         <c>id.type != 50000</c> and logs "id is not of a character!". The world-object classes cluster just
+	///         above it (51016, 51320-51325). See docs/entity-class-ids.md.
+	///     </para>
+	/// </remarks>
 	public static class EntityClass
 	{
 		public const uint Character = 0x0000C350; // 50000 - players / NPCs / creatures (the n3Char/creature class)
@@ -27,10 +34,9 @@ namespace Faolan.Core.Network.Constants
 		public const uint TombStone = 0x0000C87B; // 51323 - a dead player's corpse marker (0D80E7C9)
 		public const uint ZoneLabel = 0x0000C748; // 51016 - zone/city label objects (33A56FB0)
 
-		// NOT entity classes, despite sitting numerically nearby - listed so the next reader does not add them:
-		// 0xC79C/0xC79E/0xC7A0 are the resurrection-spot + playfield-proxy type words, which are per-PACKET rather
-		// than per-entity (the same spawn point appears under two of them in different frames - see
-		// ResurrectionSpotsBody), and 0x9C50 = 40016 is below the 50000 base entirely. All three stay local to their
-		// codec until they are decoded.
+		// Not entity classes, despite sitting numerically nearby: 0xC79C/0xC79E/0xC7A0 are the resurrection-spot and
+		// playfield-proxy type words, which are per-packet rather than per-entity (the same spawn point appears under
+		// two of them in different frames - see ResurrectionSpotsBody), and 0x9C50 = 40016 is below the 50000 base
+		// entirely. All three stay local to their codec until they are decoded.
 	}
 }

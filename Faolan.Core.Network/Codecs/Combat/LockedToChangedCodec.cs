@@ -5,21 +5,23 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// LockedToChangedIIR (0x6B0AEC58) - a target-lock change (265 captured). ReadSubClass (FUN_007a0630) reads two u32 =
-	// the locked-to entity ref [class][instance] (0xC350 = Character + the target handle, or (0, 0) for "locked to
-	// nobody"). Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// ⚠️ The CARRIER's class was asserted to be Character until #811, which refused the 4 records carrying 0xC879
-	// (`EntityClass.Destructible`) - a breakable that is itself locked onto the player. The reader does not look at
-	// the carrier's class at all, and the codec beside it (StatDamage) turned out to have the same 13 destructible
-	// records from the same capture, so this is one phenomenon seen through two codecs, not two bugs.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     LockedToChangedIIR - a target-lock change, 265 records captured. The client reader (FUN_007a0630) reads two u32,
+	///     the locked-to entity reference [class][instance]: Character plus the target handle, or (0, 0) for locked to
+	///     nobody. Grammar from that reader; see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>
+	///     The carrier's class must not be asserted to be Character: four captured records carry
+	///     <see cref="Constants.EntityClass.Destructible" />, a breakable that is itself locked onto the player, and the
+	///     client's reader does not look at the carrier's class at all. StatDamage carries destructible records from the same
+	///     capture for the same reason.
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class LockedToChangedCodec
 	{
 		public const uint Opcode = (uint)IirTypes.LockedToChangedIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(LockedToChangedIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -57,7 +59,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// LockedToChangedIIR (0x6B0AEC58). `EntityClass` is the CARRIER's - the entity whose lock changed - and is
-	// Character on 261 of the 265 captured records and Destructible on the other 4.
+	/// <summary>
+	///     The LockedToChangedIIR body. <c>EntityClass</c> is the carrier's - the entity whose lock changed - and is
+	///     Character on 261 of the 265 captured records and Destructible on the other four.
+	/// </summary>
 	public sealed record LockedToChangedIIR(uint Handle, byte Env, uint TargetClass, uint TargetInstance, uint EntityClass = Constants.EntityClass.Character);
 }

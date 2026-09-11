@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ~Guild chat channel (#663): the 0x003C subscription that makes the guild chat TAB appear.
+	// The ~Guild chat channel: the 0x003C subscription that makes the guild chat tab appear.
 	//
 	// The point of these is not that a subscription encodes - ChannelSubscriptionCodec is already gated - but that the
-	// channel's IDENTITY is the guild id, which is what let the server construct one at all. Two captures state it
+	// channel's identity is the guild id, which is what let the server construct one at all. Two captures state it
 	// independently, one on a create and one on a login, and in both the id is the same word the guild's own header
 	// carries.
 	public class GuildChatChannelTests
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		// DispatchGuildCreated (0x2044) for the guild it just made, 0x00086C47.
 		private const string CreatedGuildBody = "0300086c4700067e4775696c64000080040000";
 
-		// `Hoxxling_..._login` frame 114: the same channel in the LOGIN burst of a character already in guild
+		// `Hoxxling_..._login` frame 114: the same channel in the login burst of a character already in guild
 		// 0x0007585B ("Sepulchra Invictus"), whose 0x203F full update opens `03 0007585b`.
 		private const string LoginGuildBody = "030007585b00067e4775696c64000080040000";
 
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			Assert.Equal(guildId, parsed.Id);
 			Assert.Equal("~Guild", parsed.Name);
 
-			// NOT the 0x00008044 the standing channels (~Global / ~LFG / ~Playfield / ~NewbieHelp) carry - the same
+			// Not the 0x00008044 the standing channels (~Global / ~lfg / ~Playfield / ~NewbieHelp) carry - the same
 			// 0x00008004 the captured ~Team subscription uses, i.e. the per-membership channels share their own flag.
 			Assert.Equal(0x00008004u, parsed.Flag);
 		}
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 		}
 
 		// Leaving is the subscription's twin on the same channel - the shape the corpus shows retiring a ~Team and a
-		// ~Playfield. The guild LEAVE itself is uncaptured (nothing in the corpus ever leaves a guild), so this pins
+		// ~Playfield. The guild leave itself is uncaptured (nothing in the corpus ever leaves a guild), so this pins
 		// what we send, not what retail was seen sending. [V0: retail's 0x003D on a guild leave/kick]
 		[Fact]
 		public void Unsubscribe_IsTheSubscriptionsLeadingChannelPair()

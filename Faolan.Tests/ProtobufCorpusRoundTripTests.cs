@@ -10,13 +10,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Whole-corpus re-encode oracles for the two big protobuf messages - Gitea #385.
+	// Whole-corpus re-encode oracles for the two big protobuf messages.
 	//
-	// Both messages already had a round-trip test, and both were pinned on LEVEL-1 STRIE fixtures:
-	// FullCharIirRoundTripTests skips *.tshark.json outright, and PlayerCharacterMessage_RoundTripsByteIdentically
-	// asserts on the single SpawnAssassinTemplate golden. A level-1 beach character carries no character_tag and no
-	// generic_stats, so the one field whose PACKING we had wrong was absent from every fixture either test could
-	// see, and "round-trips byte-identically" held while the live wire form did not.
+	// A round-trip pinned on level-1 strie fixtures cannot see the difference: FullCharIirRoundTripTests skips
+	// *.tshark.json outright, and PlayerCharacterMessage_RoundTripsByteIdentically asserts on the single
+	// SpawnAssassinTemplate golden. A level-1 beach character carries no character_tag and no generic_stats, so the
+	// one field whose packing is easy to get wrong is absent from both fixtures, and "round-trips byte-identically"
+	// holds while the live wire form does not.
 	//
 	// These read the tshark corpus directly (like ProgressedJournalSnapshotTests) so the progressed characters are
 	// actually covered, and they assert the populated case is present - a corpus gate that silently degrades to
@@ -31,14 +31,13 @@ namespace Faolan.Tests
 		}
 
 		// ProtoFullCharacterIIR (the 0x737A6DF9 snapshot root) must re-encode byte-identically. character_tag
-		// (repeated uint32, field 1) is PACKED on the wire in all 81 captured roots that carry it - never repeated
-		// varints - so the schema marks it [packed=true] (#385).
+		// (repeated uint32, field 1) is packed on the wire in all 81 captured roots that carry it - never repeated
+		// varints - so the schema marks it [packed=true].
 		//
-		// It used to tolerate ONE residual divergence, asserted narrowly: protobuf-net writes a repeated primitive
-		// holding EXACTLY ONE element as an unpacked varint (`08 <v>`, 1 byte shorter) even when IsPacked is set -
-		// the library's own optimization, not reachable from the schema, so 7 of the 151 roots came back a byte
-		// short (#538). `ProtobufExtensions.ToProtobuf` re-packs those fields after the fact now, so the tolerance
-		// is GONE and this is a plain byte-for-byte equality over every captured root.
+		// protobuf-net writes a repeated primitive holding exactly one element as an unpacked varint (`08 <v>`, 1 byte
+		// shorter) even when IsPacked is set - the library's own optimization, not reachable from the schema, which
+		// leaves 7 of the 151 roots a byte short. `ProtobufExtensions.ToProtobuf` re-packs those fields after the fact,
+		// so this is a plain byte-for-byte equality over every captured root.
 		[Fact]
 		public void EveryCapturedSnapshotRoot_ReEncodesByteIdentically()
 		{
@@ -75,7 +74,7 @@ namespace Faolan.Tests
 			Assert.True(checkedRoots > 0, "no snapshot roots found in the capture corpus");
 			// The whole point of this gate: without tag-carrying roots it proves nothing the L1 fixtures didn't.
 			Assert.True(withCharacterTags > 0, "corpus has no character_tag-carrying root - this gate would be vacuous");
-			// And specifically the SINGLE-tag case, which is the one protobuf-net writes unpacked (#538). A corpus
+			// And specifically the single-tag case, which is the one protobuf-net writes unpacked. A corpus
 			// without it would pass this gate while the re-pack was broken.
 			Assert.True(singleTag > 0, "corpus has no single-character_tag root - the #538 packing case would go untested");
 		}
@@ -110,11 +109,11 @@ namespace Faolan.Tests
 		// `iirType`, across the tshark corpus.
 		private static IEnumerable<(string Source, byte[] Body)> CapturedBodies(uint iirType)
 		{
-			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
+			// Reads the committed corpus extract rather than the capture repo, so the suite runs from a plain clone.
 			// Bodies are byte-identical to the corpus' BodyHex and keep their "<capture id>#<index>" provenance.
 			foreach (var (source, body) in CorpusExtract.OfType(iirType))
 			{
-				// BodyHex is the body WITH its leading u32 length; callers want everything after it.
+				// BodyHex is the body with its leading u32 length; callers want everything after it.
 				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)
 					continue; // truncated capture - the TCP-reassembly gap on compressed downloads

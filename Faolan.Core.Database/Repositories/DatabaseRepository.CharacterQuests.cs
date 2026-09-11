@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// What the character is ON: its quest rows, goal progress and reward picks. One of the five character slices
-	// (Gitea #928 item 9); the row itself is ICharacterRepository.
+	// What the character is on: its quest rows, goal progress and reward picks. One of the five character slices;
+	// the row itself is ICharacterRepository.
 	public interface ICharacterQuestRepository
 	{
 		/// <summary>
 		///     A character's secondary-goal progress rows. <paramref name="questId" /> filters to one quest; null (the
-		///     default) returns every held quest's rows in ONE query, which is what the world-entry journal wants - it
+		///     default) returns every held quest's rows in one query, which is what the world-entry journal wants - it
 		///     needs the progress of every active quest's goals and would otherwise issue one call per quest.
 		/// </summary>
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint? questId = null);
@@ -20,7 +20,7 @@ namespace Faolan.Core.Database.Repositories
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
 
-		// Record the pick-one-of-N reward `characterId` took for `questId` (#815) - the idempotence guard for the grant.
+		// Record the pick-one-of-N reward `characterId` took for `questId` - the idempotence guard for the grant.
 		Task SetCharacterQuestReward(uint characterId, uint questId, uint chosenPos);
 		Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress);
 	}
@@ -35,7 +35,7 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		// `state` filters in SQL rather than in the caller: the goal-matching paths want only the ACTIVE quests, and a
+		// `state` filters in SQL rather than in the caller: the goal-matching paths want only the active quests, and a
 		// level-80 character holds 1500+ completed ones they would otherwise materialise and discard on every call.
 		// Null (the default) returns every held quest, which is what the journal and the escort lookup want.
 		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId, QuestState? state = null)
@@ -50,7 +50,7 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.CharacterQuests.Where(q => q.CharacterId == characterId && q.QuestId == questId).ExecuteDeleteAsync();
 		}
 
-		// Record which pick-one-of-N reward the character took for a quest (#815). Writing it is what makes the grant
+		// Record which pick-one-of-N reward the character took for a quest. Writing it is what makes the grant
 		// idempotent - the selection is an ordinary c2s packet and can arrive any number of times.
 		public async Task SetCharacterQuestReward(uint characterId, uint questId, uint chosenPos)
 		{

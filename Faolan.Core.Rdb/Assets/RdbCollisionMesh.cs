@@ -6,21 +6,27 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// The per-playfield collision geometry (RDB type 1000012 = `NXUSTREAM`, NovodeX/Ageia PhysX cooked triangle
-	// meshes) decoded into WORLD-space triangles for server-side line-of-sight (#284 tier-3: buildings/walls that the
-	// terrain heightmap can't represent). The stream is a back-to-back run of `NXS\x01MESH` cooked-mesh actors; each:
-	//   [NXS\x01][MESH][u32 ver][u32 flags][f32][u32][u32][u32 nVerts][u32 nTris][nVerts * vec3 f32][nTris * 3 index]
-	// then a per-mesh Ice/RTree BVH we skip (we build our own grid). Index width follows the vertex count (1B if
-	// nVerts<=256, else 2B, else 4B). The vertices are already in world coordinates (per-mesh centroids span the whole
-	// playfield - no actor transform to apply), so a triangle can be tested directly against a world-space segment.
-	// Validated: beach 4010 = 666 actors / 116,178 tris, city 4020 = 1,518 / 195,763, 0 bad-parse.
+	/// <summary>
+	///     The per-playfield collision geometry (RDB type 1000012, <c>NXUSTREAM</c>: NovodeX/Ageia PhysX cooked
+	///     triangle meshes) decoded into world-space triangles for server-side line-of-sight against the buildings and
+	///     walls the terrain heightmap cannot represent.
+	/// </summary>
+	/// <remarks>
+	///     The stream is a back-to-back run of <c>NXS\x01MESH</c> cooked-mesh actors, each
+	///     <c>[NXS\x01][MESH][u32 ver][u32 flags][f32][u32][u32][u32 nVerts][u32 nTris][nVerts * vec3 f32][nTris * 3
+	///     index]</c> followed by a per-mesh Ice/RTree BVH, which is skipped in favour of the spatial grid built here.
+	///     Index width follows the vertex count: one byte up to 256 vertices, then two, then four. The vertices are
+	///     already in world coordinates — per-mesh centroids span the whole playfield and there is no actor transform
+	///     to apply — so a triangle can be tested directly against a world-space segment. Tortage beach (4010) parses
+	///     to 666 actors and 116,178 triangles and the city (4020) to 1,518 and 195,763, with no bad parses.
+	/// </remarks>
 	public sealed class RdbCollisionMesh
 	{
 		public const uint ResourceType = 1000012;
-		private const float CellSize = 16f; // world units per spatial-grid cell (X/Z); ~a few tris per short segment
+		private const float CellSize = 16f; // World units per spatial-grid cell in X/Z: a few triangles per segment.
 
 		private static readonly byte[] MeshMagic = [0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]; // NXS\x01 + MESH
-		private readonly Dictionary<long, List<int>> _grid; // (cellX,cellZ) packed -> triangle numbers overlapping it
+		private readonly Dictionary<long, List<int>> _grid; // Packed (cellX, cellZ) to the triangles overlapping it.
 
 		private readonly float[] _verts; // flat x,y,z
 		private readonly int[] _tris; // flat vertex indices (3 per triangle)
@@ -34,8 +40,11 @@ namespace Faolan.Core.Rdb.Assets
 			_grid = grid;
 		}
 
-		// True if collision geometry blocks the straight segment a->b (an NPC's eye to a player). Tests the triangles in
-		// the grid cells the segment's X/Z footprint touches.
+		/// <summary>
+		///     Whether collision geometry blocks the straight segment from <paramref name="a" /> to
+		///     <paramref name="b" />, such as an NPC's eye to a player. Only the triangles in the grid cells the
+		///     segment's X/Z footprint touches are tested.
+		/// </summary>
 		public bool SegmentBlocked(Vector3 a, Vector3 b)
 		{
 			var minGx = Cell(MathF.Min(a.X, b.X));
@@ -67,8 +76,10 @@ namespace Faolan.Core.Rdb.Assets
 			return false;
 		}
 
-		// Parse an NXUSTREAM (type 1000012) body into world triangles + a 2D X/Z grid index. Returns false only on an
-		// empty/garbage stream (a map with no collision).
+		/// <summary>
+		///     Parses an NXUSTREAM (type 1000012) body into world triangles plus a 2D X/Z grid index.
+		/// </summary>
+		/// <returns>False only on an empty or unreadable stream, which is a map with no collision.</returns>
 		public static bool TryParse(ReadOnlySpan<byte> body, [NotNullWhen(true)] out RdbCollisionMesh? mesh)
 		{
 			mesh = null;
@@ -84,7 +95,7 @@ namespace Faolan.Core.Rdb.Assets
 
 				pos = at + MeshMagic.Length;
 				if (!TryReadMesh(body, at, verts, tris))
-					continue; // a spurious magic in the BVH bytes - skip, the next real header still parses
+					continue; // A spurious magic inside the BVH bytes; the next real header still parses.
 			}
 
 			if (tris.Count == 0)
@@ -141,7 +152,10 @@ namespace Faolan.Core.Rdb.Assets
 			return ((long)gx << 32) ^ (uint)gz;
 		}
 
-		// Möller-Trumbore, clamped to the segment (0 <= t <= 1 along `dir` = b - a).
+		/// <summary>
+		///     Möller-Trumbore intersection, clamped to the segment: 0 &lt;= t &lt;= 1 along <paramref name="dir" />,
+		///     which is b - a.
+		/// </summary>
 		private static bool SegmentHitsTriangle(Vector3 origin, Vector3 dir, Vector3 v0, Vector3 v1, Vector3 v2)
 		{
 			const float eps = 1e-6f;

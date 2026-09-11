@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The acceptance rule for a measured DoT tick interval (#437). These are the shapes the corpus actually produces,
+	// The acceptance rule for a measured DoT tick interval. These are the shapes the corpus actually produces,
 	// asserted as a pure function so the judgement is pinned without needing the capture corpus: the estimator is the
 	// one place that decides whether observed gaps establish a spell's cadence, and its failure mode is silent (a
 	// wrong interval misprices every tick of that spell for the rest of the spell's life).
@@ -27,8 +27,8 @@ namespace Faolan.Tests
 			Assert.Equal(1500u, DotIntervalEstimator.Estimate([1.47, 1.54, 1.51, 1.63]));
 		}
 
-		// The asymmetry that motivates using the MEDIAN rather than the mean: a tick that was dropped, delayed or
-		// simply not captured merges two periods into one long gap. It can never produce a SHORT one, so the tail is
+		// The asymmetry that motivates using the median rather than the mean: a tick that was dropped, delayed or
+		// simply not captured merges two periods into one long gap. It can never produce a short one, so the tail is
 		// one-sided and a handful of doubled gaps must not drag the estimate upwards.
 		[Fact]
 		public void AMissedTickDoesNotDragTheEstimateUp()
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 		}
 
 		// The case that a spread-based rule gets wrong, kept as its own gate because it is why the rule measures
-		// CONCENTRATION instead. These are Fires of Gehenna's real corpus quartiles (p25 2.15 / median 2.20 /
+		// concentration instead. These are Fires of Gehenna's real corpus quartiles (p25 2.15 / median 2.20 /
 		// p75 3.09): a quarter of its gaps are doubled periods, which blows out any quartile-ratio bound while the
 		// spell is unmistakably a 2 s tick.
 		[Fact]
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 		// Gaps spread across the whole range are not a periodic tick being observed - they are re-applications, a
 		// second caster landing the same spell, or combat pausing. Rejected rather than averaged into a number.
 		//
-		// ⚠️ This shape is exactly what the second rule (#657) must NOT accept, and it would without its
+		// This shape is exactly what the second rule must not accept, and it would without its
 		// contains-the-shortest-gap condition: {4.0, 4.2, 4.4} is a tight cluster of three, and 4000 ms is wrong.
 		[Fact]
 		public void RaggedGapsAreRejected()
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			Assert.Null(DotIntervalEstimator.Estimate(ragged));
 		}
 
-		// #657: the median is the wrong pivot once MORE than half the gaps are stretched, because it lands in the
+		// The median is the wrong pivot once more than half the gaps are stretched, because it lands in the
 		// tail itself. Ice Strike (Rank 6) as the corpus actually shows it - 38 gaps whose median is 4.20 s while
 		// 13 of them sit inside 3.5% of each other at ~2.15 s, which is what every rank sibling measures at.
 		//
@@ -88,7 +88,7 @@ namespace Faolan.Tests
 			Assert.Equal(2000u, DotIntervalEstimator.Estimate(iceStrike));
 		}
 
-		// The condition that makes the second rule safe, on its own: the same cluster, with a handful of SHORTER
+		// The condition that makes the second rule safe, on its own: the same cluster, with a handful of shorter
 		// gaps under it, is a harmonic rather than the period - nothing can shorten a gap below the true interval,
 		// so a gap below the cluster says the cluster is not the bottom of the distribution.
 		[Fact]
@@ -98,7 +98,7 @@ namespace Faolan.Tests
 			Assert.Null(DotIntervalEstimator.Estimate(harmonic));
 		}
 
-		// Where both rules speak they normally CORROBORATE - which is what makes letting the cluster lead safe. Fires
+		// Where both rules speak they normally corroborate - which is what makes letting the cluster lead safe. Fires
 		// of Gehenna's real shape, with its doubled-period tail: the bottom cluster and the median both say 2000, and
 		// the tail cluster at 4.3 gets no vote from either.
 		[Fact]
@@ -108,12 +108,12 @@ namespace Faolan.Tests
 			Assert.Equal(2000u, DotIntervalEstimator.Estimate(gaps));
 		}
 
-		// #660: and where they DISAGREE, the tight cluster is the one to believe. Ice Strike (Rank 1) as the corpus
+		// And where they disagree, the tight cluster is the one to believe. Ice Strike (Rank 1) as the corpus
 		// shows it - 42 of 93 gaps inside 3% of each other at ~2.15 s, the same cluster its rank-6 sibling has, but a
 		// median of 2.365 s. The median is only 10% above the cluster, yet it falls the wrong side of the 2.25 s
 		// midpoint, so the half-second snap converts that 10% into a reported 2500 ms.
 		//
-		// This is the one spell in the corpus where the two rules differ, and it is why the cluster LEADS rather than
+		// This is the one spell in the corpus where the two rules differ, and it is why the cluster leads rather than
 		// merely filling in after a rejection.
 		[Fact]
 		public void ATightClusterBeatsAMedianDraggedUpByAStretchedTail()
@@ -126,7 +126,7 @@ namespace Faolan.Tests
 			Assert.Equal(2000u, DotIntervalEstimator.Estimate(gaps));
 		}
 
-		// Out-of-range gaps are dropped BEFORE the count and spread tests, so a train padded with a long pause is
+		// Out-of-range gaps are dropped before the count and spread tests, so a train padded with a long pause is
 		// still measurable from the real ticks inside it - and a train that is only pauses is not.
 		[Fact]
 		public void OutOfRangeGapsAreDiscardedNotClamped()

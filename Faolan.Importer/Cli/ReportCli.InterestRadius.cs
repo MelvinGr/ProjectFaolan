@@ -10,47 +10,42 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report interest-radius`: how far from the player does retail DESPAWN an entity? (Gitea #856.)
+	// `--report interest-radius`: how far from the player does retail despawn an entity?
 	//
 	// `WorldSimulation.PlayerInterestRange = 150 u` is invented, and every viewer-set decision in `WorldBroadcaster`
-	// and `InterestManager` turns on it. The previous attempt measured the SPAWN side and got a distribution that is
-	// not a radius at all (median 104 u, p99 1343 u, max 1914 u), for two structural reasons this report is built to
-	// avoid rather than to repeat:
+	// and `InterestManager` turns on it. The spawn side cannot answer it - it yields a distribution that is not a
+	// radius at all (median 104 u, p99 1343 u, max 1914 u) - for two structural reasons:
 	//
-	//   * ⛔ **the login burst is the map's whole population**, not what is in range, so those distances measure the
+	//   * the login burst is the map's whole population, not what is in range, so those distances measure the
 	//     playfield;
-	//   * ⛔ **a teleport moves the player with no `CharDCMove`**, so the carried-forward position is stale across
+	//   * a teleport moves the player with no `CharDCMove`, so the carried-forward position is stale across
 	//     every zone line and door in Tortage.
 	//
-	// ⭐ **Measuring the DESPAWN side removes the first contaminant outright**: nothing bulk-despawns at login, so
-	// there is no burst to exclude. The second is removed by asking the WIRE where the zone changes are - the client
+	// Measuring the despawn side removes the first contaminant outright: nothing bulk-despawns at login, so
+	// there is no burst to exclude. The second is removed by asking the wire where the zone changes are - the client
 	// is told, by `PlayfieldFIIR` - rather than by inferring one from a burst of despawns. See
 	// ZoneChangeWindowPackets for why that distinction is the whole report.
 	//
-	// ⭐⭐ **The answer: ~60 u, and 150 u is refuted** - 76% of the surviving despawns arrive inside 150, which a
+	// The answer: ~60 u, and 150 u is refuted - three quarters of the surviving despawns arrive inside 150, which a
 	// 150 u boundary forbids. The distribution has a hard floor (zero below 20 u), a mode at 45-55 u and a decaying
-	// tail, and the speed table separates the two halves of that: the MEDIAN rises with the player's speed (68 -> 391
+	// tail, and the speed table separates the two halves of that: the median rises with the player's speed (68 -> 391
 	// u from 2-4 u/s to 12-20 u/s) while the p10 does not move at all, which is what "radius + sweep overshoot"
 	// predicts and what a smear of mixed causes does not.
 	//
-	// ⚠️ What this can and cannot say. A despawn radius is a CEILING on the distance at which the player still had
+	// What this can and cannot say. A despawn radius is a ceiling on the distance at which the player still had
 	// the entity: the server despawns when the player crosses it, so the measured distance is at-or-just-past it. The
 	// tightest observations therefore bound it from above, and the spread below them is how far a player travelled
 	// between the crossing and the sweep that noticed - which is why the report prints the low percentiles, not the
 	// mean.
 	public static partial class ReportCli
 	{
-		// ⛔ How far from a MapChange a despawn is disqualified as a zone change.
+		// How far from a MapChange a despawn is disqualified as a zone change.
 		//
-		// This replaced a COUNT - "fewer than 3 other despawns within 40 packets" - and the replacement is the whole
-		// reason this report has an answer. A zone change does despawn everything at once, but so does walking away
-		// from a camp: five mobs recede together and the count filter threw every one of them out. It kept 19 of
-		// 23,971 despawns, and 19 samples cannot show a distribution, which is why the report used to conclude that
-		// the corpus could not state the radius. Naming the zone change directly - the client is TOLD it is changing
-		// playfield, by `PlayfieldFIIR` - keeps ~750, and the shape is immediately there.
-		//
-		// ⭐ The general lesson: a filter that infers a CAUSE from a symptom's count silently discards the signal
-		// whenever the signal shares the symptom. The cause was on the wire the whole time.
+		// Naming the zone change directly is what gives this report an answer: the client is told it is changing
+		// playfield, by `PlayfieldFIIR`. Inferring one from a despawn count instead - "several despawns close
+		// together" - discards the signal, because walking away from a camp also despawns five mobs at once, and a
+		// count filter throws every one of them out. A filter that infers a cause from a symptom's count silently
+		// discards the signal whenever the signal shares the symptom.
 		private const int ZoneChangeWindowPackets = 400;
 
 		// Speed bands for the overshoot model. Walking in AoC is ~4 u/s, running ~7, mounted ~12+; the top band is
@@ -66,17 +61,15 @@ namespace Faolan.Importer.Cli
 		// contaminant. Movement uploads are frequent, so this is generous and still excludes a teleport gap.
 		private const int MaxStalePackets = 20;
 
-		// ⛔ How much FURTHER from the entity the player must have got over the recent window for the despawn to be
+		// How much further from the entity the player must have got over the recent window for the despawn to be
 		// attributable to interest at all.
 		//
-		// This is the filter the first run of this report was missing, and its absence produced a confident wrong
-		// answer: the ten tightest samples all came in at ~2 u, from captures named
-		// `..._all-necro-summons_dismiss-all`, `..._summon_pet` and `..._mount-horse`. A despawn has plenty of causes
-		// that are not leaving range - a pet dismissed, a summon expiring, a corpse fading, a mount put away - and
-		// every one fires wherever the entity happens to be, which is usually right beside the player.
+		// Without it the tightest samples are all ~2 u, from captures of pets being dismissed, summons expiring and
+		// mounts being put away: a despawn has plenty of causes that are not leaving range, and every one of them
+		// fires wherever the entity happens to be, which is usually right beside the player.
 		//
-		// ⚠️ Filtering those by DISTANCE would be circular: it would assume the answer in order to decide what counts
-		// as evidence for it. RECEDING is not - an interest despawn is CAUSED by the player crossing outward, so they
+		// Filtering those by distance would be circular - it would assume the answer in order to decide what counts
+		// as evidence for it. Receding is not: an interest despawn is caused by the player crossing outward, so they
 		// must have been moving away from that entity however far away the boundary sits. A dismissed pet beside a
 		// standing player fails it with no radius assumed anywhere.
 		private const float MinRecedingUnits = 10f;
@@ -90,8 +83,8 @@ namespace Faolan.Importer.Cli
 		// How far apart two spawns of one handle must sit before the entity counts as pool-managed rather than placed.
 		private const float PoolDriftUnits = 5f;
 
-		// ⛔ A handle that DIED is excluded outright, and this is the contaminant that survives every filter above.
-		// A corpse fades on a TIMER, and the shape of a kill is: fight it, loot it, walk on - so the fade lands while
+		// A handle that died is excluded outright, and this is the contaminant that survives every filter above.
+		// A corpse fades on a timer, and the shape of a kill is: fight it, loot it, walk on - so the fade lands while
 		// the player is genuinely receding, at whatever distance they have reached by then. It passes isolation, it
 		// passes staleness, and it passes receding, while measuring the corpse timer rather than any radius.
 		//
@@ -119,17 +112,17 @@ namespace Faolan.Importer.Cli
 				var player = Vector3.Zero;
 				var playerAt = int.MinValue;
 
-				// The player's recent track, so "were they moving away from THIS entity" is asked per despawn rather
+				// The player's recent track, so "were they moving away from this entity" is asked per despawn rather
 				// than answered once by a scalar speed.
 				var track = new List<(int At, Vector3 Position)>();
 
-				// Deaths are collected in the SAME forward walk - a corpse's fade always follows its death, so a set
+				// Deaths are collected in the same forward walk - a corpse's fade always follows its death, so a set
 				// filled as we go is complete by the time any fade is judged.
 				var died = new HashSet<uint>();
 
 				// Pass 1: where every despawn sits in the packet stream, so isolation can be judged without
 				// re-walking. A despawn's own index is included, so a lone one counts 1. The same walk records where
-				// every SPAWN of a handle sits, which is what the re-stream filter below needs to look forwards.
+				// every spawn of a handle sits, which is what the re-stream filter below needs to look forwards.
 				var quitAt = new List<int>();
 				var mapChangeAt = new List<int>();
 				var spawnAt = new Dictionary<uint, List<int>>();
@@ -184,10 +177,9 @@ namespace Faolan.Importer.Cli
 					if (!p.IsDownload)
 						continue;
 
-					// ⚠️ An entity MOVES. Judging a despawn against where it SPAWNED measures the player's distance
-					// from a stale point, and the walkers - the very population #703 made travel their whole beat -
-					// are the ones it is most wrong about. Keep each handle's position current from its own
-					// downloaded moves.
+					// An entity moves. Judging a despawn against where it spawned measures the player's distance from
+					// a stale point, and the walkers - the creatures that travel their whole beat - are the ones it is
+					// most wrong about. Keep each handle's position current from its own downloaded moves.
 					if (p.SubOpcode == CharDCMoveCodec.Opcode && p.TryParse(CharDCMoveCodec.Parse, out var npcMove)
 					    && known.TryGetValue(npcMove.Handle, out var tracked))
 					{
@@ -195,7 +187,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// A spawn body: remember where the entity STANDS. ⚠️ The position offsets are relative to `.Body`
+					// A spawn body: remember where the entity stands. The position offsets are relative to `.Body`
 					// (which keeps the leading length word), never `.Record` - read off the wrong one they yield a
 					// plausible, self-consistent, wrong answer.
 					if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode && p.Body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -229,7 +221,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⭐ ZONE CHANGE - named directly instead of inferred from a despawn count.
+					// Zone change - named directly instead of inferred from a despawn count.
 					if (mapChangeAt.Any(at => Math.Abs(at - i) <= ZoneChangeWindowPackets))
 					{
 						notIsolated++;
@@ -248,9 +240,9 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⛔ AMBIENT population, not interest. The two NPC populations behave differently here: a PLACED
-					// creature returns to its own spawn point every time, while an AMBIENT one is put back wherever
-					// its pool decides. So a handle this capture spawns at two DIFFERENT places is pool-managed, and
+					// ambient population, not interest. The two NPC populations behave differently here: a placed
+					// creature returns to its own spawn point every time, while an ambient one is put back wherever
+					// its pool decides. So a handle this capture spawns at two different places is pool-managed, and
 					// its despawns are the pool's decisions rather than a radius the player crossed.
 					//
 					// `Oilskin Scorpion 0x0002DC7B` is the case in point - three spawns at 579.5, 608.1 and 610.3 on
@@ -262,13 +254,12 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⛔ The ENTITY's position can be stale too, and the report applied this test only to the player.
-					// A WANDERER walks while the client is not being told - `Oilskin Scorpion 0x0002DC7B` despawns,
-					// and when it comes back 85 s later it stands 29 u from where it was last seen, so the distance
-					// measured at its despawn was against a point it had already left. That is the whole of its
-					// 24.6 u, the tightest sample the report had.
+					// The entity's position can be stale too, so the same test applies to it and not only to the
+					// player. A wanderer walks while the client is not being told - `Oilskin Scorpion 0x0002DC7B`
+					// despawns, and when it comes back 85 s later it stands 29 u from where it was last seen, so a
+					// distance measured at its despawn is against a point it had already left.
 					//
-					// A creature that has NEVER moved is exempt: its spawn position is as good on the last packet as
+					// A creature that has never moved is exempt: its spawn position is as good on the last packet as
 					// on the first, and those are precisely the samples this measurement wants.
 					if (entity.Moved && i - entity.At > MaxStalePackets)
 					{
@@ -276,16 +267,15 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// HORIZONTAL distance: the interest test the server runs is a radius on the ground, and a tall
+					// Horizontal distance: the interest test the server runs is a radius on the ground, and a tall
 					// city or a cliff would otherwise add height that no radius is measuring.
 					var now = Flat(entity.Position, player);
 
-					// ⛔ A RE-STREAM, not a range crossing. An entity the server hands back almost immediately never
-					// left the client's interest set in any meaningful sense: `Oilskin Scorpion 0x0002DC7B` is
-					// despawned and re-spawned AT THE SAME POSITION 0.4 s later, and no player crosses a radius twice
-					// in 0.4 s. Its 24.6 u was the tightest sample in the whole report and it is not a radius at all.
+					// A re-stream, not a range crossing. An entity the server hands back almost immediately never left
+					// the client's interest set in any meaningful sense: `Oilskin Scorpion 0x0002DC7B` is despawned
+					// and re-spawned at the same position 0.4 s later, and no player crosses a radius twice in 0.4 s.
 					//
-					// The window is in PACKETS for the same reason the others are - it is the stream's own clock -
+					// The window is in packets for the same reason the others are - it is the stream's own clock -
 					// and it is deliberately short, so a genuine despawn the player walks back into is still counted.
 					if (spawnAt.TryGetValue(quit.Handle, out var spawns) && spawns.Any(at => at > i && at - i <= RestreamWindowPackets))
 					{
@@ -293,7 +283,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⛔ RECEDING, or this is a lifecycle despawn wearing an interest despawn's clothes.
+					// Receding, or this is a lifecycle despawn wearing an interest despawn's clothes.
 					var earlier = track.FindLast(t => i - t.At >= RecedeWindowPackets);
 					if (earlier.Position == Vector3.Zero || now - Flat(entity.Position, earlier.Position) < MinRecedingUnits)
 					{
@@ -301,7 +291,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// The player's SPEED over the last second of wall-clock, for the overshoot model below. A server
+					// The player's speed over the last second of wall-clock, for the overshoot model below. A server
 					// that sweeps its interest sets periodically lets a fast player travel past the boundary before
 					// the sweep notices, so the measured distance is `radius + speed x lag` and the speed is the term
 					// that separates the two.
@@ -316,7 +306,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine("=== how far away does retail DESPAWN an entity? (#856) ===");
 			Console.WriteLine();
-			// ⚠️ Counted at ARRIVAL, before every filter, because "no despawn carried this opcode" and "every one was
+			// Counted at arrival, before every filter, because "no despawn carried this opcode" and "every one was
 			// filtered out" would otherwise print the same empty answer - and an empty answer is what this report
 			// exists to give.
 			Console.WriteLine($"  control - n3ToClientQuit: {quitArrivals,6} arrived, {quitParsed,6} parsed");
@@ -350,13 +340,13 @@ namespace Faolan.Importer.Cli
 			foreach (var s in samples.OrderBy(s => s.Distance).Take(10))
 				Console.WriteLine($"    {s.Distance,7:F1} u   {s.Name}   {s.Capture}");
 
-			// ⭐ THE OVERSHOOT MODEL. A server that sweeps its interest sets on a tick does not despawn AT the
-			// boundary - it despawns at the first sweep AFTER the player crossed it, so the measured distance is
+			// the OVERSHOOT MODEL. A server that sweeps its interest sets on a tick does not despawn at the
+			// boundary - it despawns at the first sweep after the player crossed it, so the measured distance is
 			// `radius + speed x lag`. Speed is the term that separates the two, and the intercept as speed -> 0 is
 			// the radius itself. Bucketing by speed is what turns "a smear from 21 to 780 u" into a testable claim:
 			// if the smear is overshoot, the median rises with speed and the slowest bucket sits at the radius; if it
 			// is contamination, the buckets do not separate.
-			// ⭐ The HISTOGRAM, because a floor is a claim about SHAPE and percentiles cannot express one. A hard
+			// The histogram, because a floor is a claim about shape and percentiles cannot express one. A hard
 			// radius R predicts near-zero density below R and a sharp rise at it; a smear of mixed causes predicts
 			// density all the way down.
 			Console.WriteLine("  distance histogram (5 u bins to 120 u, then the tail):");
@@ -388,10 +378,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("     every sample sits at-or-just-past it and the SMALLEST ones are the informative end.");
 			Console.WriteLine();
 
-			// ⭐ THE VERDICT. This used to read "does NOT exhibit a radius", on 19 usable samples out of 23,971
-			// despawns - and it was the ZONE-CHANGE FILTER that produced that, not the data. See the note on
-			// ZoneChangeWindowPackets: counting despawns in a window threw away every genuine multi-mob recede.
-			// With the zone change NAMED instead of inferred the sample is ~750, and the shape is there.
+			// The verdict. It rests on the zone change being named rather than inferred: see the note on
+			// ZoneChangeWindowPackets, where counting despawns in a window throws away every genuine multi-mob recede
+			// and leaves too few samples to show a distribution at all.
 			var below150 = sorted.Count(d => d < 150);
 			Console.WriteLine($"  ⭐ 150 u is REFUTED: {below150} of {sorted.Count} despawns ({100.0 * below150 / sorted.Count:F0}%) arrive INSIDE it.");
 			Console.WriteLine("     An interest despawn cannot fire inside the boundary, so a 150 u radius predicts none of them.");

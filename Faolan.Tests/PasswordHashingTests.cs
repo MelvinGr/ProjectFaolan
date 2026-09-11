@@ -3,10 +3,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Unit tests for the shared password hashing used by BOTH the web login and the game-server UniverseAgent login
+	// Unit tests for the shared password hashing used by both the web login and the game-server UniverseAgent login
 	// (Faolan.Core.Crypt.PasswordHashing). Covers the PBKDF2 round-trip, the seeded default account, and
-	// - since both the legacy plaintext path and the "no password set" sentinels were removed - that a stored value
-	// which is not a real hash authenticates NOTHING, which are the cases that used to pass.
+	// and that a stored value which is not a real hash authenticates nothing.
 	public class PasswordHashingTests
 	{
 		[Fact]
@@ -36,16 +35,15 @@ namespace Faolan.Tests
 			Assert.False(PasswordHashing.Verify("nope", hash));
 		}
 
-		// The plaintext path is GONE, and this is the test that would have passed before and must fail now: a stored
-		// value equal to the supplied password used to authenticate on a string compare.
+		// There is no plaintext path: a stored value equal to the supplied password must not authenticate on a string
+		// compare.
 		[Theory, InlineData("oldpw", "oldpw"), InlineData("oldpw", "other"), InlineData("letmein", "letmein")]
 		public void Matches_PlaintextStoredValue_NeverAuthenticates(string stored, string supplied)
 		{
 			Assert.False(PasswordHashing.Verify(supplied, stored));
 		}
 
-		// The "no password set" sentinels are GONE too: empty / null / "-" used to accept ANY password, which is how
-		// the default account worked before it seeded a real hash. They now authenticate nothing, like any other
+		// There are no "no password set" sentinels either: empty / null / "-" authenticate nothing, like any other
 		// non-hash value.
 		[Theory, InlineData(null), InlineData(""), InlineData("-")]
 		public void Matches_NoPasswordSentinels_NoLongerAcceptAnything(string? stored)

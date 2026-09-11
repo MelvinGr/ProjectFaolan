@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The AH listings importer maps a captured DispatchTradepostSearchResults row to a TradepostListing whose
-	// fields rebuild the captured bytes byte-exact (construct-don't-replay). Validates CaptureListingImporter.ToListing
-	// is a faithful inverse of TradepostListingCodec.BuildEntry against the NecroL80 auctionhouse capture (#1029:
-	// seller "Jocko", item 0x755D, price 1,000,000).
+	// The auction-house listings importer maps a captured DispatchTradepostSearchResults row to a TradepostListing
+	// whose fields rebuild the captured bytes byte-exact (construct, don't replay). CaptureListingImporter.ToListing
+	// must be a faithful inverse of TradepostListingCodec's entry builder; the oracle is the NecroL80 auctionhouse
+	// capture (seller "Jocko", item 0x755D, price 1,000,000).
 	public class CaptureListingImporterTests
 	{
 		// The captured single-row search-results body (bytes after the 0x2005 opcode).

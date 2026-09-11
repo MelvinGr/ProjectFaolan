@@ -8,7 +8,12 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
 {
-	// Decrypts each keyed item's RDB template. Under --dry-run the --dump-templates disk write is suppressed.
+	/// <summary>
+	///     Decrypts each keyed item's RDB template.
+	/// </summary>
+	/// <remarks>
+	///     Under --dry-run the --dump-templates disk write is suppressed.
+	/// </remarks>
 	public sealed class RdbItemsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [];

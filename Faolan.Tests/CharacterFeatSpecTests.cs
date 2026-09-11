@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Saved feat SPECS survive the round trip through the database rows (Gitea #474).
+	// Saved feat specs survive the round trip through the database rows.
 	//
 	// The gate that matters is the multi-spec one: a character with four named specs has to come back out as four
 	// named specs with their own feat lists, and the pre-IIR frame regenerated from those rows has to be the frame
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 				PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 				checkedSpawns++;
 
-				// Extraction is EXACT, the create-editor frame included: it has no sublist at all, so it yields no
+				// Extraction is exact, the create-editor frame included: it has no sublist at all, so it yields no
 				// spec rows.
 				Assert.Equal(frame.Sublist.Count, character.FeatSpecs.Count);
 				if (frame.Sublist.Count > 1)
@@ -76,7 +76,7 @@ namespace Faolan.Tests
 			Assert.Equal(21, editorFrames);
 			Assert.Equal(10, multiSpec);
 
-			// The named specs reach the rows, not just the codec - the half that used to be dropped entirely.
+			// The named specs reach the rows, not just the codec.
 			// Ordinal, not the culture's collation: "PvP" sorts before "PvP - ..." only under an ordinal comparison,
 			// and a culture-dependent gate would pass or fail depending on the machine that ran it.
 			Assert.Equal([
@@ -104,10 +104,10 @@ namespace Faolan.Tests
 			Assert.Equal(["PvE", "PvP"], character.FeatSpecs.OrderBy(s => s.Index).Select(s => s.Name).ToArray());
 		}
 
-		// A character with NO spec rows THROWS rather than being handed a synthesized one. Every character carries at
-		// least the one unnamed spec - TrySeedFreshRows writes it and the #474 migration backfilled every existing
-		// character - so an empty set means the rows are incomplete, most likely loaded without
-		// Include(c => c.FeatSpecs). Synthesizing one would spawn the character with an EMPTY feat list, which renders
+		// A character with no spec rows throws rather than being handed a synthesized one. Every character carries at
+		// least the one unnamed spec, which TrySeedFreshRows writes, so an empty set means the rows are incomplete,
+		// most likely loaded without
+		// Include(c => c.FeatSpecs). Synthesizing one would spawn the character with an empty feat list, which renders
 		// as "you have trained nothing" and is indistinguishable from the truth.
 		[Fact]
 		public void ACharacterWithNoSpecRows_Throws()
@@ -148,7 +148,7 @@ namespace Faolan.Tests
 			Assert.Single(specs);
 			Assert.Equal("", specs[0].Name);
 			Assert.Equal([200000u, 200100u], specs[0].FeatIds);
-			// Compared as WIRE BYTES: the frame is a typed object now, so equality here has to be the thing that
+			// Compared as wire bytes: the frame is a typed object now, so equality here has to be the thing that
 			// matters - that both construction paths put the same bytes on the wire.
 			Assert.Equal(PreIirBytes(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, [200000u, 200100u])),
 				PreIirBytes(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, specs)));
@@ -172,8 +172,8 @@ namespace Faolan.Tests
 			Assert.Equal(["", "PvP"], parsed.Sublist.Select(s => s.Name).ToArray());
 		}
 
-		// The scaffold composes into a spawn record rather than standing alone (#530 rule 5c), so its bytes are
-		// reached through the composition pair rather than a Build of its own.
+		// The scaffold composes into a spawn record rather than standing alone, so its bytes are reached through the
+		// composition pair rather than a Build of its own.
 		private static byte[] PreIirBytes(SpawnPreIir frame)
 		{
 			using var s = new FaolanStream();

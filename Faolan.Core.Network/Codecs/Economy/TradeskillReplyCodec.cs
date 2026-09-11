@@ -8,32 +8,44 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// The recipe-book list carried in TradeskillReplyIIR_c (0x9062D559), the server's answer to the client's
-	// TradeskillRequestIIR_c (0x06B9CD94) when the Crafting -> Recipes window opens. Grammar recovered from
-	// AgeOfConan.exe (client readers FUN_007aab30 -> FUN_007abb30 -> per-record FUN_0077be70; the 4-byte reader is
-	// FUN_0048f900, big-endian) and validated byte-exact against NecroL80_..._open-crrafting-receipies frame 2926
-	// (603 recipes, 209309 bytes consumed exactly). See docs/subsystems/tradeskill-recipes.md.
-	//
-	// The record is fully DECODED into typed fields (RecipeRecord) - no verbatim blob. Every wire word is either a
-	// per-recipe column (RecipeRecord), a per-element field carried by the item (RecipeItem + its Items row's TEA key
-	// + hash), or one of the fixed constants below. ParseReplyBody (capture -> records) and BuildReplyBody
-	// (records -> wire) round-trip byte-for-byte (TradeskillRecipeCodecTests), so the record CAN be rebuilt entirely
-	// from the DB columns (ToRecord) - which is how the live server answers the request.
-	//
-	// Reply IIR body (after the [subop][0xC350][handle] carrier prefix):
-	//   [u8 env=0][u32 version=1][u8 type][u32 c]  then, when type==3, c is 0x3F1-framed (c=(recipes+1)*0x3F1):
-	//   recipes x record. type 1 = a single RecipeLearnt (not modelled here); type 3 = the full book list.
-	// Each record:
-	//   [u32 listKey]                                  # the recipe id (== the map key, and == header word 0)
-	//   [u32 id=listKey][u32 header1][u32 rdbType]      # header (the tradeskill RDB type - 0xf4241/0xf4242/0xf4244)
-	//   0x3F1-list of 18-u32 elements                   # ingredients (see element layout below)
-	//   [u32 0][u32 0x1F4][u32 midFlag][u32 0]          # mid header (0x1F4 = the craft duration in centiseconds)
-	//   0x3F1-list of u32                               # ref-id list (1-2 opaque ids)
-	//   0x3F1-list of 17-u32 elements                   # results
-	//   [u32 tail]                                      # @50
-	//   [u8 trailingFlag]                               # @0x5c (0/1)
-	// Element (18 u32 ingredient / 17 u32 result):
-	//   [0]=[1]=itemId, [2]=0, [3]=flag, [4]=hash, [5..8]=[9..12]=item TEA key, [13..16]=const, ([17]=trailing, ing only)
+	/// <summary>
+	///     The recipe-book list carried in <c>TradeskillReplyIIR_c</c>, the server's answer to the client's
+	///     <c>TradeskillRequestIIR_c</c> when the Crafting - Recipes window opens.
+	/// </summary>
+	/// <remarks>
+	///     Grammar recovered from AgeOfConan.exe (client readers FUN_007aab30 into FUN_007abb30 into the per-record
+	///     FUN_0077be70; the 4-byte reader is FUN_0048f900, big-endian) and validated byte-exact against
+	///     NecroL80_..._open-crrafting-receipies frame 2926 (603 recipes, 209309 bytes consumed exactly). See
+	///     docs/subsystems/tradeskill-recipes.md.
+	///     <para>
+	///         The record is fully decoded into typed fields (<c>RecipeRecord</c>) with no verbatim blob: every wire word
+	///         is either a per-recipe column, a per-element field carried by the item (<c>RecipeItem</c> plus its
+	///         <c>Items</c> row's TEA key and hash), or one of the fixed constants below. <c>ParseReplyBody</c> and
+	///         <c>BuildReplyBody</c> round-trip byte-for-byte (<c>TradeskillRecipeCodecTests</c>), so the record can be
+	///         rebuilt entirely from the DB columns (<c>ToRecord</c>), which is how the live server answers the request.
+	///     </para>
+	///     <para>
+	///         The reply IIR body, after the <c>[subop][entityClass][handle]</c> carrier prefix:
+	///         <code>
+	///         [u8 env=0][u32 version=1][u8 type][u32 c]   # for type 3, c is the list frame over the recipe count
+	///         recipes x record                            # type 1 = a single RecipeLearnt (not modelled here)
+	///
+	///         record:
+	///           [u32 listKey]                             # the recipe id (the map key, and header word 0)
+	///           [u32 id=listKey][u32 header1][u32 rdbType]# header (the tradeskill RDB type)
+	///           list of 18-u32 elements                   # ingredients
+	///           [u32 0][u32 duration][u32 midFlag][u32 0] # mid header (duration in centiseconds)
+	///           list of u32                               # ref-id list (1-2 opaque ids)
+	///           list of 17-u32 elements                   # results
+	///           [u32 tail]                                # @50
+	///           [u8 trailingFlag]                         # @0x5c (0/1)
+	///
+	///         element (18 u32 ingredient / 17 u32 result):
+	///           [0]=[1]=itemId, [2]=0, [3]=flag, [4]=hash, [5..8]=[9..12]=item TEA key, [13..16]=const,
+	///           ([17]=trailing, ingredients only)
+	///         </code>
+	///     </para>
+	/// </remarks>
 	public static class TradeskillReplyCodec
 	{
 		public const byte ListType = 3; // full recipe-book list (vs 1 = single RecipeLearnt)
@@ -43,31 +55,30 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		public const uint Opcode = (uint)IirTypes.TradeskillReplyIIR;
 		public const uint Version = 1;
-		// ⚠️ There is no fixed set of rdbType values, and asserting one refused retail traffic (#811). It was
-		// {0xF4241, 0xF4242} because those are what NecroL80's two captures carry (297 + 1512 and 99 + 504); the
-		// DemoL80 capture uses 0xF4244 (1000004) for all 45 of its records - one type per capture, not a shared
-		// vocabulary. The word is CARRIED on the record and round-trips either way, so the gate only ever cost
-		// coverage: it could not have caught a mis-parse, because a wrong split would not have landed on a plausible
-		// RDB type by luck.
+		// There is no fixed set of rdbType values, and asserting one refuses retail traffic: NecroL80's two captures carry
+		// {0xF4241, 0xF4242} while the DemoL80 capture uses 0xF4244 (1000004) for all 45 of its records - one type per
+		// capture, not a shared vocabulary. The word is carried on the record and round-trips either way, so a gate on it
+		// would only cost coverage: it could not catch a mis-parse, because a wrong split would not land on a plausible RDB
+		// type by luck.
 
-		// Fixed record/element constants (invariant across all 603 captured records; validated on parse so a capture
+		// Fixed record and element constants (invariant across all 603 captured records; validated on parse so a capture
 		// that breaks the assumption throws rather than silently mis-building).
 		//
-		// ⭐ mid[1] is the recipe's own CRAFT DURATION in centiseconds (#793) - not a filler constant. It lands on
-		// `GameData::ClientTradeskillRecipe_c` at `+0x24` (record reader `FUN_0077be70`), and the client's
-		// command-queue duration getter for `TradeskillCommand_c` (`FUN_0114bf50`) returns exactly that member for a
-		// CRAFT - the value that sizes its `TradeskillProgressBarDesc` bar. The same getter hardcodes 500 for a gem
-		// ADD, 0 for a gem REMOVE and 100 for anything else, so the unit is shared with the BCC's
-		// `activation_time`/`recharge_time`: centiseconds. `0x1F4` = 5.00 s.
+		// mid[1] is the recipe's own craft duration in centiseconds rather than a filler constant. It lands on
+		// `GameData::ClientTradeskillRecipe_c` at `+0x24` (record reader `FUN_0077be70`), and the client's command-queue
+		// duration getter for `TradeskillCommand_c` (`FUN_0114bf50`) returns exactly that member for a craft - the value that
+		// sizes its `TradeskillProgressBarDesc` bar. The same getter hardcodes 500 for a gem add, 0 for a gem remove and 100
+		// for anything else, so the unit is shared with the BCC's `activation_time`/`recharge_time`: centiseconds. 0x1F4 is
+		// 5.00 s.
 		//
-		// It stays a folded constant rather than a `Recipe` column because all 603 captured recipes carry the one
-		// value - there is no second value to store. Columnize it the day a capture shows one; `Parse` throws on
-		// anything else, so that day cannot pass unnoticed.
+		// It stays a folded constant rather than a `Recipe` column because all 603 captured recipes carry the one value -
+		// there is no second value to store. Columnize it the day a capture shows one; `Parse` throws on anything else, so
+		// that day cannot pass unnoticed.
 		public const uint CraftDurationCentiseconds = 0x1F4; // mid[1]
 
 		// Elements [13..16]: two unset identity slots (NullIdentity.Pair).
 
-		// CANONICAL - the only method here that writes bytes. The whole record: [subop][0xC350][handle][env][version]
+		// Canonical: the only method here that writes bytes. The whole record - [subop][entityClass][handle][env][version]
 		// [type=3][count][records] - the create/craft window's recipe list.
 		public static byte[] Build(TradeskillReplyIIR value)
 		{
@@ -83,8 +94,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return Build(new TradeskillReplyIIR(handle, recipes));
 		}
 
-		// Throws on a malformed stream or a broken layout invariant so a bad decode surfaces rather than silently
-		// truncating / mis-building.
+		// Throws on a malformed stream or a broken layout invariant so a bad decode surfaces rather than silently truncating
+		// or mis-building.
 		public static TradeskillReplyIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(TradeskillReplyCodec));
@@ -109,8 +120,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 			WriteRecords(s, v.Recipes);
 		}
 
-		// The reply BODY alone (from the [u8 env] byte on) - what the importer's captured slices carry, because the
-		// harvest cuts the packet at the carrier prefix rather than at the record.
+		// The reply body alone, from the [u8 env] byte on - what the importer's captured slices carry, because the harvest
+		// cuts the packet at the carrier prefix rather than at the record.
 		internal static List<RecipeRecord> ReadRecords(ref SpanReader r)
 		{
 			r.ExpectU8(0x00, "env");
@@ -243,11 +254,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 	}
 
-	// TradeskillReplyIIR (0x9062D559) - the whole recipe book for one character handle.
+	/// <summary>The whole recipe book for one character handle.</summary>
 	public sealed record TradeskillReplyIIR(uint Handle, IReadOnlyCollection<RecipeRecord> Recipes);
 
-	// A fully-decoded recipe: the per-recipe header/mid/tail fields, the opaque ref-id list, and the typed
-	// ingredient/result elements. The list-key (== Id == header word 0) is written twice on the wire from Id.
+	/// <summary>
+	///     A fully decoded recipe: the per-recipe header, mid and tail fields, the opaque ref-id list, and the typed
+	///     ingredient and result elements. The list key (the Id, and header word 0) is written twice on the wire from Id.
+	/// </summary>
 	public sealed record RecipeRecord(
 		uint Id,
 		uint Header1,
@@ -259,22 +272,30 @@ namespace Faolan.Core.Network.Codecs.Economy
 		IReadOnlyList<RecipeElement> Ingredients,
 		IReadOnlyList<RecipeElement> Results);
 
-	// One ingredient (input) or result (output) item: the item id + its per-template TEA key (K1..K4) and hash,
-	// plus the element Flag and (ingredients only) Trailing word. Role/position are implied by list membership.
-	// ⚠️ `ItemId`/`ItemId2` are the ACG TEMPLATE PAIR (`ACGItemTemplateID` / `ACGItemTemplateID2`), not an id and a
-	// redundant copy of it - see the ProtoAcgItem notes. They agree on 2411 of the 2412 captured elements, which is
-	// why [1] was asserted to mirror [0] and why the one that does not (0x3CAE32 / 0x3CAE33, consecutive as a pair's
-	// two variants are) refused the whole recipe book it was in (#811). `ItemId2` is 0 for a row built from the DB,
-	// where only one template is stored; the writer then mirrors [0], which is what every other element does anyway.
-	//
-	// The two 4-word TEA keys are one per TEMPLATE (`keyN <-> templateN`), which is why the second stops mirroring the
-	// first on exactly the element whose templates differ. `Item2Key1 == 0` means "the same key", the only shape a
-	// DB-built row can have and what 2411 of 2412 captured elements carry.
+	/// <summary>
+	///     One ingredient (input) or result (output) item: the item id plus its per-template TEA key (K1..K4) and hash,
+	///     plus the element Flag and, for ingredients only, the Trailing word. Role and position are implied by list
+	///     membership.
+	/// </summary>
+	/// <remarks>
+	///     <c>ItemId</c> and <c>ItemId2</c> are the ACG template pair (<c>ACGItemTemplateID</c> /
+	///     <c>ACGItemTemplateID2</c>), not an id and a redundant copy of it - see the <c>ProtoAcgItem</c> notes. They
+	///     agree on 2411 of the 2412 captured elements, and the one that does not (0x3CAE32 / 0x3CAE33, consecutive as a
+	///     pair's two variants are) is why the second must not be asserted to mirror the first. <c>ItemId2</c> is 0 for a
+	///     row built from the DB, where only one template is stored, and the writer then mirrors the first.
+	///     <para>
+	///         The two 4-word TEA keys are one per template (<c>keyN</c> to <c>templateN</c>), which is why the second
+	///         stops mirroring the first on exactly the element whose templates differ. <c>Item2Key1 == 0</c> means "the
+	///         same key", the only shape a DB-built row can have and what 2411 of 2412 captured elements carry.
+	///     </para>
+	/// </remarks>
 	public readonly record struct RecipeElement(uint ItemId, uint Flag, uint Hash, uint Key1, uint Key2, uint Key3, uint Key4, uint Trailing, uint ItemId2 = 0,
 		uint Item2Key1 = 0, uint Item2Key2 = 0, uint Item2Key3 = 0, uint Item2Key4 = 0);
 
-	// The stored `Recipe` row -> wire record projection. A MAPPER, not a codec (#533): the per-element TEA key + hash
-	// live once on the referenced `Items` row (RecipeItem carries only id/flag/trailing).
+	/// <summary>
+	///     The stored <c>Recipe</c> row to wire record projection. A mapper, not a codec: the per-element TEA key and hash
+	///     live once on the referenced <c>Items</c> row, <c>RecipeItem</c> carrying only id, flag and trailing.
+	/// </summary>
 	public static class RecipeRecords
 	{
 		public static RecipeRecord FromRow(Recipe row)

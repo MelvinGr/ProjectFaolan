@@ -13,17 +13,15 @@ namespace Faolan.Importer.Cli
 {
 	// `--report magicbuff-descriptor`: where do the MagicBuff apply payload's `descriptor[0]` and `bool2` come from?
 	//
-	// Gitea #658. `MagicBuffDatas.Apply` writes both as constants generalised from four hand-picked capture rows, and
-	// the whole-corpus gate says they are not constants: over 2,929 captured applies `descriptor[0]` is 1×2606,
-	// 2×321, 3×2 and `bool2` is 1×1806, 0×1123.
+	// `MagicBuffDatas.Apply` writes both as constants, and the corpus says they are not constants: both take several
+	// values across the captured applies.
 	//
-	// ⭐ That ticket's own measurement points at the answer: both are nearly a property of the SPELL rather than of
-	// the cast (`descriptor[0]` varies within a spell on 7 of 256 spells, `bool2` on 3 of 256). A per-spell value
-	// comes off the spell's own RDB record, so this cross-tabs each against the record's FLAGS word - bit by bit,
-	// with the same base-rate correction `--report spell-flags` uses, because two mostly-false columns agree for
-	// free.
+	// Both are nearly a property of the spell rather than of the cast - each varies within a spell on only a handful
+	// of spells. A per-spell value comes off the spell's own RDB record, so this cross-tabs each against the record's
+	// flags word - bit by bit, with the same base-rate correction `--report spell-flags` uses, because two
+	// mostly-false columns agree for free.
 	//
-	// ⚠️ It scores per SPELL, not per apply. A spell cast 400 times would otherwise carry its own answer 400 times
+	// It scores per spell, not per apply. A spell cast 400 times would otherwise carry its own answer 400 times
 	// and drown the other 255.
 	public static partial class ReportCli
 	{
@@ -31,32 +29,32 @@ namespace Faolan.Importer.Cli
 		private const int Bool2Offset = 13;
 		private const int Descriptor0Offset = 14;
 
-		// The two slots `MagicBuffDatas.Apply` fills from ONE `casterLevel` argument, and which disagree on 728 of
-		// 2,929 captured applies - so they are demonstrably two numbers (#658).
+		// The two slots `MagicBuffDatas.Apply` fills from one `casterLevel` argument. They disagree on a quarter of
+		// the captured applies, so they are demonstrably two numbers.
 		private const int Descriptor3Offset = 26;
 		private const int CastingLevelOffset = 42;
 		private const int ApplyPayloadLength = 54;
-		private const byte ApplyForm = 0; // ⚠️ ZERO, not 1 - the value MagicBuffCorpusTests filters on
+		private const byte ApplyForm = 0; // ⚠️ zero, not 1 - the form word an apply carries
 
 		private static async Task<int> MagicBuffDescriptor(IReadOnlyList<NamedCapture> captures, string rdbDir)
 		{
 			// spell -> the descriptor[0] / bool2 values its captured applies carried.
 			var perSpell = new Dictionary<uint, (List<uint> Descriptor0, List<byte> Bool2)>();
 
-			// The level pair, per apply rather than per spell: the question is whether either slot is the SPELL's own
+			// The level pair, per apply rather than per spell: the question is whether either slot is the spell's own
 			// level, which is a per-spell constant, so a slot that tracks it must do so on every cast.
 			var levelPairs = new List<(uint SpellId, uint Descriptor3, uint CastingLevel)>();
 
-			// ⭐ The CONTEXT hypotheses, per apply rather than per spell (#658). The record's own fields are
+			// The CONTEXT hypotheses, per apply rather than per spell. The record's own fields are
 			// exhausted - neither value is a flags bit nor a property field - so the next place to look is the cast
 			// itself. `applyTo == applyFrom` is the leading candidate for a boolean: a self-buff is always self and a
 			// targeted debuff always other, which reproduces "nearly per-spell" without being a property of the
-			// spell at all, and the handful of spells that VARY would be exactly the ones cast both ways.
+			// spell at all, and the handful of spells that vary would be exactly the ones cast both ways.
 			var context = new List<(byte Bool2, uint Descriptor0, bool SelfCast, bool NoCaster)>();
 
-			// ⭐ The SEPARATING population for the level pair (the per-apply cross-tab above is confounded: the
+			// The SEPARATING population for the level pair (the per-apply cross-tab above is confounded: the
 			// corpus is a handful of characters, so a caster level barely varies within one spell). An apply whose
-			// CASTER and TARGET are at DIFFERENT levels can tell the two slots apart - and the levels come from the
+			// caster and target are at different levels can tell the two slots apart - and the levels come from the
 			// same capture's own spawn bodies, which state every entity's level next to its handle.
 			var separated = new List<(uint SpellId, uint Descriptor3, uint CastingLevel, uint CasterLevel, uint TargetLevel)>();
 			var arrivals = 0;
@@ -105,7 +103,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine("=== where do the MagicBuff apply's descriptor[0] and bool2 come from? (#658) ===");
 			Console.WriteLine();
-			// ⚠️ Arrivals ahead of the parse: "no capture carried one" and "every parse failed" are the same zero.
+			// Arrivals ahead of the parse: "no capture carried one" and "every parse failed" are the same zero.
 			Console.WriteLine($"  control - MagicBuffIIR: {arrivals,6} arrived, {applies,6} are APPLY payloads over {perSpell.Count} distinct spell(s)");
 
 			if (perSpell.Count == 0)
@@ -183,17 +181,17 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐⭐ Is the record a CASTABLE or an EFFECT-ONLY one? (#658.)
+		///     Is the record a castable spell or an effect-only one?
 		/// </summary>
 		/// <remarks>
-		///     The hypothesis the NAME listing below produced, tested structurally rather than by reading it off the
+		///     The hypothesis the name listing below produced, tested structurally rather than by reading it off the
 		///     names. Both groups read as records a player never casts directly - <c>Racer</c>, <c>Chicken Buff</c>,
 		///     <c>Knockback immunity</c>, <c>Deathless Acolyte: Arcanist</c>, <c>Wrath</c>, <c>Furious
-		///     Inspiration</c> - i.e. the thing that LANDS rather than the thing that was cast.
+		///     Inspiration</c> - i.e. the thing that lands rather than the thing that was cast.
 		///     <para />
 		///     Four independent predicates for "a player can cast this", because no single one of them is clean: a
 		///     class-catalog row, a cast time, a mana cost, and being the target of a chain edge (which says the
-		///     opposite - it is reached BY something). A hypothesis that is right will move all four the same way.
+		///     opposite - it is reached by something). A hypothesis that is right will move all four the same way.
 		/// </remarks>
 		private static async Task CastableOrDerived(Dictionary<uint, uint> descriptor0, Dictionary<uint, byte> bool2)
 		{
@@ -232,7 +230,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐ The two groups, BY NAME - the oracle of last resort when a numeric sweep has come up empty.
+		///     The two groups, by name - the oracle of last resort when a numeric sweep has come up empty.
 		/// </summary>
 		/// <remarks>
 		///     Neither value is a flags bit, a property field, or a property of the cast's target. What is left is to
@@ -268,16 +266,16 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     ⭐ Is either value a property of the CAST rather than of the spell? (#658.)
+		///     Is either value a property of the cast rather than of the spell?
 		/// </summary>
 		/// <remarks>
 		///     The spell record is exhausted - the flags word scores nothing above base rate and no property field
 		///     carries either value - so what is left is the apply's own context. The candidate this scores is
 		///     <c>applyTo == applyFrom</c>: it would look "nearly per-spell" for free, because a self-buff is always
-		///     self and a targeted debuff always other, and the spells that VARY under it would be precisely the ones
+		///     self and a targeted debuff always other, and the spells that vary under it would be precisely the ones
 		///     cast both ways (a heal on yourself or on a team-mate).
 		///     <para />
-		///     ⚠️ Scored per APPLY here, deliberately, and the opposite of what the per-spell scoring above needs: a
+		///     Scored per apply here, deliberately, and the opposite of what the per-spell scoring above needs: a
 		///     context value has to agree on every individual cast, so collapsing to the modal value per spell would
 		///     hide the disagreements that refute it.
 		/// </remarks>
@@ -310,17 +308,17 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The SHARPER test, and the one that would actually settle it: is there a PROPERTY FIELD whose value
-		///     simply IS the descriptor? (#633's half of #658.)
+		///     The sharper test, and the one that would settle it: is there a property field whose value simply is
+		///     the descriptor?
 		/// </summary>
 		/// <remarks>
-		///     ⭐ A correlation is what you measure when you cannot compare the thing itself. Here we can: if
+		///     A correlation is what you measure when you cannot compare the thing itself. Here we can: if
 		///     `descriptor[0]` is carried by a property field then that field's value EQUALS it, per spell, and a
 		///     field matching on 278 of 278 is a definition rather than a lead. Nothing weaker than near-total
 		///     agreement is worth reporting for a test this direct.
 		///     <para />
-		///     ⚠️ A field present on only a handful of records can match all of them by accident, so the count of
-		///     records that CARRY the field is printed beside the agreement - a 3/3 is not a finding.
+		///     A field present on only a handful of records can match all of them by accident, so the count of
+		///     records that carry the field is printed beside the agreement - a 3/3 is not a finding.
 		/// </remarks>
 		private static void MatchField(string label, Dictionary<uint, Dictionary<uint, uint>> fieldsOf, Dictionary<uint, uint> value)
 		{
@@ -343,9 +341,9 @@ namespace Faolan.Importer.Cli
 					candidates.Add((field, match, carrying));
 			}
 
-			// ⛔ The base-rate correction, and for THIS test it is the whole thing. `descriptor[0]` is 1 on 83% of
+			// The base-rate correction, and for this test it is the whole thing. `descriptor[0]` is 1 on 83% of
 			// spells, so any field that is also mostly 1 agrees ~80% of the time for free. What separates a real
-			// carrier from a coincidence is whether it tracks the value on the records where the value is NOT the
+			// carrier from a coincidence is whether it tracks the value on the records where the value is not the
 			// modal one - the informative minority.
 			var modal = value.Values.GroupBy(v => v).OrderByDescending(g => g.Count()).First().Key;
 			var informative = value.Where(kv => kv.Value != modal).Select(kv => kv.Key).ToHashSet();
@@ -383,17 +381,17 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The other half of #658: two slots we fill from one `casterLevel` argument are demonstrably two
-		///     numbers. Is either of them the SPELL's own level?
+		///     Two slots filled from one `casterLevel` argument are demonstrably two numbers. Is either of them the
+		///     spell's own level?
 		/// </summary>
 		/// <remarks>
-		///     ⭐ A cheap decisive test, because the spell's level is a per-spell CONSTANT: a slot that carries it
-		///     agrees on every cast of that spell, and a slot that carries the CASTER's level does not, since the
+		///     A cheap decisive test, because the spell's level is a per-spell CONSTANT: a slot that carries it
+		///     agrees on every cast of that spell, and a slot that carries the caster's level does not, since the
 		///     same spell is cast by characters of different levels. So the two hypotheses make opposite predictions
 		///     about within-spell variance, and no caster-level oracle is needed to tell them apart.
 		/// </remarks>
 		// The level pair, scored on the population that can actually SEPARATE the two slots: applies whose caster
-		// and target are at DIFFERENT levels, both read off the same capture's own spawn bodies (#658).
+		// and target are at different levels, both read off the same capture's own spawn bodies.
 		private static void LevelPairSeparated(List<(uint SpellId, uint Descriptor3, uint CastingLevel, uint CasterLevel, uint TargetLevel)> rows)
 		{
 			Console.WriteLine();

@@ -13,15 +13,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Seeds captured characters' live STATE from their session traffic - the pieces that aren't part of the
-	// character's identity but were observed on the wire:
-	//  - wallet: the LAST 0x2005 money update ([u64 balance][u32 reason], 12-byte body; absolute balance).
-	//  - hotbar: the FULL saved bar from DispatchShortcutBarReply (0x2076, s2c) - the authoritative bar retail
-	//    sends at login. We take the LATEST one in the capture (a character's final saved bar) and use it wholesale;
-	//    the incremental AddShortcut/RemoveShortcut (0x206E/0x2071) events are NOT read - they only carry the
-	//    player's mid-session re-drags, not the actual saved bar, so an imported char must copy the 0x2076 snapshot.
-	// Packets attribute to a character via the RpcHeader GameCharInterface endpoint instance (= the character id):
-	// the DOWNLOAD's receiver. Only characters already in the DB are touched (CaptureCharacterImporter first).
+	/// <summary>
+	///     Seeds captured characters' live state from their session traffic - the pieces that are not part of the
+	///     character's identity but were observed on the wire.
+	/// </summary>
+	/// <remarks>
+	///     Wallet: the last DispatchUpdateCash money update ([u64 balance][u32 reason], 12-byte body; absolute balance).
+	///     Hotbar: the full saved bar from DispatchShortcutBarReply (s2c) - the authoritative bar retail sends at login.
+	///     The latest one in the capture (a character's final saved bar) is used wholesale; the incremental
+	///     AddShortcut/RemoveShortcut events are not read - they only carry the player's mid-session re-drags, not the
+	///     actual saved bar.
+	///     Packets attribute to a character via the RpcHeader GameCharInterface endpoint instance (the character id):
+	///     the download's receiver. Only characters already in the DB are touched (CaptureCharacterImporter first).
+	/// </remarks>
 	public static class CaptureCharacterStateImporter
 	{
 		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
@@ -56,15 +60,10 @@ namespace Faolan.Importer.Captures
 
 				var character = packet.Receiver.Instance;
 
-				// The wallet (DispatchUpdateCash) is a 12-byte body. Anything else under that method is NOT a wallet
-				// and NOT a shortcut bar - it must never reach the bar parser below. A method is a per-interface
-				// INDEX, so index 0x05 on this conversation also carries auction/trader traffic, and the
-				// `Body.Length: 12` test used to be the only thing separating the two: a longer one fell straight
-				// through into the bar branch,
-				// where a first word that happened to divide by 0x3F1 read as a list count and the strict codec threw
-				// on the first non-zero "padding" word. That exception was unhandled, so ONE such packet aborted the
-				// whole import run - which is why captured characters had no hotbar AND no quests: the quest module
-				// never got to run.
+				// The wallet (DispatchUpdateCash) is a 12-byte body. Anything else under that method is neither a wallet
+				// nor a shortcut bar and must never reach the bar parser below: a method is a per-interface index, so
+				// index 0x05 on this conversation also carries auction/trader traffic, whose first word can happen to
+				// read as a list count and make the strict bar codec throw.
 				if (packet.Method == (uint)GameCharInterfaceMethods.DispatchUpdateCash)
 				{
 					if (packet.Body.Length == 12)
@@ -73,17 +72,15 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				// DispatchShortcutBarReply: the whole saved bar - the SAME body ShortcutBarReplyCodec builds,
-				// so parse it with that codec instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
-				// The codec is STRICT, which is what surfaced the type-1 record tail the old tolerant reader silently
-				// discarded (three ReadUInt32s into nothing) - see that codec.
+				// DispatchShortcutBarReply: the whole saved bar - the same body ShortcutBarReplyCodec builds, so it is
+				// parsed with that codec. Latest in the capture wins.
 				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length < 4)
 					continue;
 
 				var framing = body.ReadU32Be(0);
 				if (framing < ListFrame.Unit || framing % ListFrame.Unit != 0)
-					continue; // not a shortcut-bar reply (0x2076 collides across classes; the framing disambiguates)
+					continue; // not a shortcut-bar reply (the method index collides across classes; the framing disambiguates)
 
 				// The codec reads all `count` records unconditionally, so only hand it a body that carries them (a
 				// truncated reply is skipped rather than seeding a partial bar over a good one).
@@ -101,8 +98,8 @@ namespace Faolan.Importer.Captures
 
 		public static async Task<(int MoneySeeded, int ShortcutsSeeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures)
 		{
-			// Replay ALL captures' state as one stream ordered by real capture time (CapturedPacket.Ticks = epoch
-			// microseconds), so a character seen in several captures ends on its LATEST-in-time wallet + saved bar.
+			// Replay all captures' state as one stream ordered by real capture time (CapturedPacket.Ticks = epoch
+			// microseconds), so a character seen in several captures ends on its latest-in-time wallet and saved bar.
 			var state = Extract(captures.SelectMany(c => c).ToList());
 
 			var moneySeeded = 0;
@@ -124,7 +121,7 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				// The captured bar is the whole bar: replace the character's shortcuts with it. Flush the deletes
-				// before the inserts so a re-run doesn't hit the UNIQUE (CharacterId, Slot) index (EF doesn't order
+				// before the inserts so a re-run does not hit the unique (CharacterId, Slot) index (EF does not order
 				// delete-before-insert for a non-PK unique key).
 				var old = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToListAsync();
 				if (old.Count > 0)

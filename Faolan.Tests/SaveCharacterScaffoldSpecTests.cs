@@ -9,14 +9,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// SaveCharacterScaffold has to persist the character's feat SPECS, and has to do it without touching the feats
+	// SaveCharacterScaffold has to persist the character's feat specs, and has to do it without touching the feats
 	// trained in them.
 	//
-	// It used to write only Skills + ScaffoldPairs. TrySeedFreshRows builds a fresh character's single unnamed spec in
-	// memory, so that spec was discarded when the create session ended; the next connection re-loaded the character
-	// with zero spec rows, PlayerSpawnScaffoldRows.SpecsOf threw ("has no CharacterFeatSpec rows"), and the client sat
-	// on a loading screen that never progressed. Every imported character carries exactly one spec, so a character
-	// with none is a shape nothing downstream expects.
+	// TrySeedFreshRows builds a fresh character's single unnamed spec in memory, so a save that writes only Skills +
+	// ScaffoldPairs discards it when the create session ends. The next connection re-loads the character with zero
+	// spec rows, PlayerSpawnScaffoldRows.SpecsOf throws ("has no CharacterFeatSpec rows"), and the client sits on a
+	// loading screen that never progresses. Every imported character carries exactly one spec, so a character with
+	// none is a shape nothing downstream expects.
 	public class SaveCharacterScaffoldSpecTests
 	{
 		private const uint CharacterId = 0x01000001;

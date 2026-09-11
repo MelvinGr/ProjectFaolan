@@ -5,16 +5,17 @@ using System.Linq;
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     The UNIT a stat's value is drawn with - <c>%</c>, <c>m</c>, or nothing - transcribed from
-	///     <c>AgeOfConan.exe</c>'s own suffix helper (#775).
+	///     The unit a stat's value is drawn with - <c>%</c>, <c>m</c>, or nothing - transcribed from
+	///     <c>AgeOfConan.exe</c>'s own suffix helper.
 	/// </summary>
 	/// <remarks>
 	///     <para>
-	///         <b>The twin of <see cref="StatDisplayScale" />, and NOT derivable from it.</b> That one answers "what
+	///         <b>The twin of <see cref="StatDisplayScale" />, and not derivable from it.</b> That one answers "what
 	///         does the client divide the wire value by"; this one answers "what does it write after the result", and
-	///         the two sets genuinely differ: <c>0x001 HealthMax</c> is a ÷100 with no suffix (a vital, not a
-	///         percentage) while <c>0x348 DamageMultiplier</c> is a ÷1 that draws <c>%</c>. Rendering a modifier needs
-	///         both, so guessing one from the other reports <c>-5</c> as <c>-5</c> and <c>-1000</c> as <c>-1000%</c>.
+	///         the two sets genuinely differ: <c>0x001 HealthMax</c> is a divide-by-100 with no suffix (a vital, not a
+	///         percentage) while <c>0x348 DamageMultiplier</c> is a divide-by-1 that draws <c>%</c>. Rendering a
+	///         modifier needs both, so guessing one from the other reports <c>-5</c> as <c>-5</c> and <c>-1000</c> as
+	///         <c>-1000%</c>.
 	///     </para>
 	///     <para>
 	///         <b>Where it comes from.</b> <c>FUN_01119f20(text, statId)</c> appends one of three literals: the
@@ -24,13 +25,13 @@ namespace Faolan.Core.Enums
 	///         plain compares. The id sets below are those tables read out, literally.
 	///     </para>
 	///     <para>
-	///         ⚠️ <b>Only two ids take the metre suffix</b> - <c>0x0DE SpellColumnRadius</c> and <c>0x11F
-	///         AttackRange</c> - and both are on the spell record's property run, which is what makes the third unit
-	///         worth carrying at all: without it a spell's range renders as a bare number.
+	///         Only two ids take the metre suffix - <c>0x0DE SpellColumnRadius</c> and <c>0x11F AttackRange</c> - and
+	///         both are on the spell record's property run, which is what makes the third unit worth carrying at all:
+	///         without it a spell's range renders as a bare number.
 	///     </para>
 	///     <para>
-	///         ⚠️ This says how a value is DRAWN, not what it means. A stat can be a ratio the client happens to show
-	///         raw (<c>0x177 FatalityChance</c> takes no suffix), and an id absent from every set below is drawn bare
+	///         This says how a value is drawn, not what it means. A stat can be a ratio the client happens to show raw
+	///         (<c>0x177 FatalityChance</c> takes no suffix), and an id absent from every set below is drawn bare
 	///         because the client's formatter appends the empty string - an answer, not a gap.
 	///     </para>
 	/// </remarks>

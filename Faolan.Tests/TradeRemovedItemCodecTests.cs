@@ -5,13 +5,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The trade REMOVE pair (#427). No capture carries it - the captured session never took an item back off the
+	// The trade remove pair. No capture carries it - the captured session never took an item back off the
 	// table - so what these gate is that the recovered shape stays the shape, and that it stays the exact mirror of
-	// the captured ADD pair, which is the whole argument for building it at all.
+	// the captured add pair, which is the whole argument for building it at all.
 	public class TradeRemovedItemCodecTests
 	{
 		// One scalar, big-endian, no header: the client's method entry is `DispatchTradeRemovedItem(i_nItemPos)`, and
-		// every sibling scalar-parameter method on this interface writes its argument bare (the #132 rule).
+		// every sibling scalar-parameter method on this interface writes its argument bare.
 		[Theory]
 		[InlineData(0u, "00000000")]
 		[InlineData(3u, "00000003")]
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.ThrowsAny<Exception>(() => TradeRemovedItemCodec.Parse(new byte[5]));
 		}
 
-		// The pair mirrors the captured ADD pair exactly: partner-facing opcode first, own-facing second, one body for
+		// The pair mirrors the captured add pair exactly: partner-facing opcode first, own-facing second, one body for
 		// both. If that ever stops holding, the reasoning that let us build this without a capture has stopped holding.
 		[Fact]
 		public void ThePair_MirrorsTheCapturedAddPair()

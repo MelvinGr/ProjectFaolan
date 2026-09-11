@@ -3,7 +3,7 @@ using System;
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     The retail client's GM privileges. <b><c>gm_level</c> is a BITMASK, not a level</b> - character stat
+	///     The retail client's GM privileges. <c>gm_level</c> is a bitmask, not a level - character stat
 	///     <c>0x0D7</c> (<see cref="CharacterStatId.GmLevel" />) and protobuf <c>player_stats.gm_level</c> carry the set
 	///     of privileges the account holds, and a GM command is offered when
 	///     <c>(gmLevel &amp; command.requiredMask) != 0</c> (a command whose mask is 0 is unrestricted).
@@ -11,14 +11,13 @@ namespace Faolan.Core.Enums
 	/// <remarks>
 	///     Both halves are recovered from the client. The names and bit values are registered by
 	///     <c>FanaticGMLevelCommand_c</c>'s constructor (Ghidra <c>FUN_006336d0</c>) - the object behind the <c>/gm</c>
-	///     command - as a literal name→bit table. The AND is the filter in the <c>/help</c> renderer
+	///     command - as a literal name-to-bit table. The AND is the filter in the <c>/help</c> renderer
 	///     (<c>FUN_006c86b0</c>), which reads <c>GetStat(0xD7, 0)</c> once and tests it against each registered command's
 	///     mask word before listing it.
 	///     <para>
-	///         This retires the earlier "the command surface is tiered, /kill needs a higher level than 5" reading, which
-	///         was an artefact of reading a mask as a magnitude: at <c>gm_level = 10</c> (<c>PlayerResurrect |
-	///         TeleportDynels</c>) <c>/kill</c> is refused not because 10 is too low but because 10 does not contain
-	///         <see cref="NpcCommands" />, which is what <c>/kill</c> requires.
+	///         The command surface is not tiered, so do not read the mask as a magnitude: at <c>gm_level = 10</c>
+	///         (<c>PlayerResurrect | TeleportDynels</c>) <c>/kill</c> is refused not because 10 is too low but because
+	///         10 does not contain <see cref="NpcCommands" />, which is what <c>/kill</c> requires.
 	///     </para>
 	///     Seven bits are used by the shipped roles but never named by the client
 	///     (<c>0x00040000, 0x00200000, 0x00800000, 0x08000000, 0x20000000, 0x40000000, 0x80000000</c>); they are

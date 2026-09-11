@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the tradepost server->client replies to the retail wire format, driving the LIVE send path
+	// Locks the tradepost server->client replies to the retail wire format, driving the live send path
 	// (TradepostResponses.SendOpenTradepost / SendSearchResults) and asserting the framed packet the client
 	// actually receives. Sender GameCharAgent{0xA9ECB95D,0x59}, receiver TradepostInterface{0xF2C2D5B5,
 	// inst=0x08006F31}, opcode 0x2000. See docs/subsystems/tradepost-protocol.md + tools/capture/decode_tradepost.py.
@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	{
 		private const uint InterfaceInstance = 0x08006F31;
 
-		// The captured DispatchOpenTradepost (auctionhouse pkt#935): the auctioneer access point = the Tortage
+		// The captured DispatchOpenTradepost (auctionhouse packet 935): the auctioneer access point = the Tortage
 		// position + 15.0 radius. The live open builds the body from that position, so passing it reproduces the packet.
 		[Fact]
 		public async Task SendOpenTradepost_MatchesCapture()
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(Assert.Single(client.Sent)));
 		}
 
-		// The captured single-row DispatchTradepostSearchResults (NecroL80 auctionhouse pkt#1028: seller "Jocko",
+		// The captured single-row DispatchTradepostSearchResults (NecroL80 auctionhouse packet 1028: seller "Jocko",
 		// item 0x755D, price 1,000,000). The live search builds the grid from DB listings via TradepostListingCodec,
 		// so one Jocko listing reproduces the captured packet (head = (1+1)*0x3F1 = 0x7E2 + the row).
 		[Fact]
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(Assert.Single(client.Sent)));
 		}
 
-		// The single captured auctionhouse row (pkt#1028) as a DB listing - shared with TradepostListingCodecTests.
+		// The single captured auctionhouse row (packet 1028) as a DB listing - shared with TradepostListingCodecTests.
 		private static TradepostListing JockoListing()
 		{
 			return new TradepostListing
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 						Key3 = 0xe2fd8092,
 						Key4 = 0xf17b5c5a
 					},
-					// #749: the wire's `Level` comes off the joined TEMPLATE now, not a per-listing column.
+					// The wire's `Level` comes off the joined template now, not a per-listing column.
 					Level = 1
 				},
 				Template = 0x3e0a97,

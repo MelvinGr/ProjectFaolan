@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The skill-point pool (stat 0x0F3) is a pure function of LEVEL (#507) - identical for every character at a given
+	// The skill-point pool (stat 0x0F3) is a pure function of level - identical for every character at a given
 	// level regardless of class. That is the claim the ticket asked to establish before modelling the value as an
 	// event, and it is what these gates hold in place.
 	//
-	// The table is deliberately SPARSE: five of eighty levels are measured and the curve has no formula to fill the
+	// The table is deliberately sparse: five of eighty levels are measured and the curve has no formula to fill the
 	// rest with (level 23 -> 24 jumps 240 in one level, while 5 -> 23 averages under 14). The pressure on a sparse
 	// table is always to "complete" it by interpolating, so the second test states outright that an unmeasured level
 	// must return null - a filled-in value would be invented retail data the client then displays as authoritative.
@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		[Theory]
 		[InlineData(1u, 0u)] // Strie (assassin), Stihetfv (conqueror), xxx (necromancer)
 		[InlineData(5u, 154u)] // Hoxxling (herald of xotli)
-		[InlineData(23u, 402u)] // NecroL80 (necromancer) AND AssassinL23 (rogue-assassin) - two classes, same value
+		[InlineData(23u, 402u)] // NecroL80 (necromancer) and AssassinL23 (rogue-assassin) - two classes, same value
 		[InlineData(24u, 642u)] // Hakotep and Hoxxling
 		[InlineData(80u, 1892u)] // NecroL80, across ten captures - the annotated "gained 1892 skillpoints"
 		public void AMeasuredLevel_YieldsItsCapturedPool(uint level, uint expected)

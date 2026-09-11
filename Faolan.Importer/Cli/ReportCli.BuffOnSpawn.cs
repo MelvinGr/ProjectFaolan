@@ -9,18 +9,17 @@ namespace Faolan.Importer.Cli
 {
 	// `--report buff-on-spawn`
 	//
-	// The capture question #677 is blocked on, asked of the corpus rather than guessed: **when an already-buffed
-	// entity streams into a player's view, does retail tell them about its buffs?** The ticket names two candidate
-	// shapes - attached to the spawn body, or a `MagicBuffIIR` fan-out right after it - and says the corpus must
-	// settle which before anything is built.
+	// When an already-buffed entity streams into a player's view, does retail tell them about its buffs? Two
+	// candidate shapes - attached to the spawn body, or a `MagicBuffIIR` fan-out right after it - and only the corpus
+	// can settle which.
 	//
-	// The measurement is a JOIN on the entity handle: for every captured `MagicBuffIIR` apply, whether the target
+	// The measurement is a join on the entity handle: for every captured `MagicBuffIIR` apply, whether the target
 	// handle was spawned earlier in the same capture (`SimpleCharFullUpdateIIR`), and how long before. A fan-out
 	// would show as a tight cluster of applies within a second or so of a spawn, on entities that are not the
 	// local player, carrying a REMAINING duration rather than the catalogue one - the same shortfall signature the
 	// login restore has.
 	//
-	// ⚠️ A handle is session-scoped, so everything is keyed by (capture, handle). Comparing handles across captures
+	// A handle is session-scoped, so everything is keyed by (capture, handle). Comparing handles across captures
 	// merges unrelated entities.
 	public static partial class ReportCli
 	{
@@ -61,7 +60,7 @@ namespace Faolan.Importer.Cli
 						spawnBodies++;
 						spawnAt.TryAdd(spawn.Handle, at);
 
-						// The OTHER candidate shape the ticket names: the buff riding the spawn body itself. The
+						// The other candidate shape the ticket names: the buff riding the spawn body itself. The
 						// decoded spawn has no buff list - if it ever grows one, this counter is where it shows up.
 						continue;
 					}
@@ -76,13 +75,13 @@ namespace Faolan.Importer.Cli
 				{
 					totalApplies++;
 
-					// ⭐ A ZERO-HANDLE caster is the tell. Every ordinary apply names who cast it; a buff the server
-					// is merely RE-ASSERTING has no live caster to name, so it writes the Character class word with a
+					// A zero-handle caster is the tell. Every ordinary apply names who cast it; a buff the server is
+					// merely re-asserting has no live caster to name, so it writes the Character class word with a
 					// zero instance behind it.
 					//
-					// ⚠️ NOT the same as `ApplyFrom == null`, which is the class-0 "no caster reference at all" form
-					// (11 in the corpus - the Racer buff, #636). `MagicBuffIIR.ApplyFrom` is nullable and `null == 0`
-					// is false, so this test picks out the zero-handle form alone, which is what it wants.
+					// Not the same as `ApplyFrom == null`, which is the class-0 "no caster reference at all" form.
+					// `MagicBuffIIR.ApplyFrom` is nullable and `null == 0` is false, so this test picks out the
+					// zero-handle form alone, which is what it wants.
 					if (buff.ApplyFrom == 0)
 					{
 						var d = spawnAt.TryGetValue(buff.ApplyTo, out var s0) && s0 <= at ? at - s0 : double.NaN;
@@ -122,8 +121,8 @@ namespace Faolan.Importer.Cli
 					var expected = row.DurationMs / 10;
 					var partial = expected > 0 && payload.Duration < expected;
 
-					// ⭐ The signature to look for is not proximity alone - a fresh cast on a mob that just spawned
-					// looks identical in time - it is proximity PLUS a partial duration. A buff already running when
+					// The signature to look for is not proximity alone - a fresh cast on a mob that just spawned
+					// looks identical in time - it is proximity plus a partial duration. A buff already running when
 					// the entity streamed in cannot state its full length.
 					if (partial)
 						partialRestores.Add($"{capture.Name} +{at:0.0}s  to 0x{buff.ApplyTo:X8} from 0x{buff.ApplyFrom:X8}  spawned {delta:0.00}s earlier  "

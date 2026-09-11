@@ -10,19 +10,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report area-banner-names` - every area-banner string the CLIENT knows, recovered by inverting the token hash,
-	// and what the `rdb-regions` import makes of it (#513/#348/#679).
+	// `--report area-banner-names` - every area-banner string the client knows, recovered by inverting the token hash,
+	// and what the `rdb-regions` import makes of it.
 	//
-	// The recovery itself lives in AreaBannerNames, because it is not a report: it BUILDS the MapArea rows. This
+	// The recovery itself lives in AreaBannerNames, because it is not a report: it builds the MapArea rows. This
 	// prints the same computation with its working shown - the collision expectation, the cross-check against the
 	// captured ids, and the per-playfield blocks - so a change in the numbers can be read rather than inferred from a
 	// row count.
 	public static partial class ReportCli
 	{
-		// The banners the WIRE was seen carrying, harvested from the captures on the spot. Not read from the database:
-		// since #680 a banner lives as a column on the region that fires it, so the raw sightings are a derivation
-		// input rather than stored state, and a report that wants them has to harvest them the same way the importer
-		// does.
+		// The banners the wire was seen carrying, harvested from the captures on the spot. Not read from the database:
+		// a banner lives as a column on the region that fires it, so the raw sightings are a derivation input rather
+		// than stored state, and a report that wants them has to harvest them the same way the importer does.
 		private static List<CapturedBanner> CapturedBanners(string capturesDir)
 		{
 			return AreaNameExtractor.Merge(NamedCapture.LoadAll(capturesDir).SelectMany(c => AreaNameExtractor.Extract(c.Packets)));

@@ -8,28 +8,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report item-effect-kinds [--report-arg <kind>]` (Gitea #806): every effect KIND the ITEM catalog's
+	// `--report item-effect-kinds [--report-arg <kind>]`: every effect kind the item catalog's
 	// GameAction region carries, and what the import does with it.
 	//
-	// The twin of `--report feat-effect-kinds`, which cannot answer this: feat and spell templates are PLAINTEXT
+	// The twin of `--report feat-effect-kinds`, which cannot answer this: feat and spell templates are plaintext
 	// under `EntriesOfType`, while an item template is TEA-encrypted under the item's own ProtoDecryptionKey, so the
 	// item census has to walk the keyed `Items` rows and decrypt each one the way `region-stat-census` does. And
-	// `region-stat-census` cannot answer it either - it censuses by STAT, which is the one axis that says nothing
+	// `region-stat-census` cannot answer it either - it censuses by stat, which is the one axis that says nothing
 	// about how to read the amount.
 	//
 	// ## The question
 	//
 	// `ItemTemplateStatModifiers`' own remarks state that "item templates use one kind throughout" and
-	// `RdbItemImporter` relies on it: it takes `Parse` (the POSITIONAL pair view - payload words 0 and 1) and stores
+	// `RdbItemImporter` relies on it: it takes `Parse` (the positional pair view - payload words 0 and 1) and stores
 	// word 1 as a flat `ItemStatModifier.Amount`, with no kind test and no kind column. Two ways that goes wrong,
 	// and this report measures both:
 	//
-	//   1. **A non-flat KIND.** 53067 `ModifyAsRating` is a percent stored x100, so reading it flat turns "+2%
-	//      Critical Rating" into "+200" - the same bug class #805 fixed on the spell side and #597 on the feat side.
-	//   2. **A kind whose stat is not payload word 0.** The pair view is only (stat, magnitude) for the kinds whose
-	//      key list opens with key 0; for the rest it files another slot's value as a stat id. That is what #701
-	//      fixed for spells by moving them onto `ParseSpellStatEffects` (key-addressed), and the item path never
-	//      moved.
+	//   1. A non-flat kind. 53067 `ModifyAsRating` is a percent stored x100, so reading it flat turns "+2%
+	//      Critical Rating" into "+200" - the same failure the spell and feat sides have already been corrected for.
+	//   2. A kind whose stat is not payload word 0. The pair view is only (stat, magnitude) for the kinds whose key
+	//      list opens with key 0; for the rest it files another slot's value as a stat id. Spells avoid that by
+	//      reading through `ParseSpellStatEffects`, which is key-addressed; the item path does not.
 	//
 	// So the report prints the kind census, and then re-runs the import's own selection under the key-addressed
 	// reader and diffs the two - which turns "would this change anything?" from an argument into a row count.
@@ -40,7 +39,7 @@ namespace Faolan.Importer.Cli
 			var only = uint.TryParse(arg, out var k) ? k : 0u;
 
 			using var db = OpenDb();
-			// AsNoTracking: `Item.Key` is an OWNED type, and a tracking query cannot project one without its owner.
+			// AsNoTracking: `Item.Key` is an owned type, and a tracking query cannot project one without its owner.
 			var items = db.Items.AsNoTracking().Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0)
 				.OrderBy(i => i.Id).Select(i => new { i.Id, i.Name, i.Key }).ToList();
 			using var rdb = OpenRdb(rdbDir);
@@ -98,7 +97,7 @@ namespace Faolan.Importer.Cli
 						samples.Add((item.Id, item.Name ?? "", element));
 				}
 
-				// The import's OWN selection, both ways. Same whitelist, same last-write-wins, so the only difference
+				// The import's own selection, both ways. Same whitelist, same last-write-wins, so the only difference
 				// between the two dictionaries is which reader produced the (stat, amount) pair.
 				foreach (var m in ItemTemplateStatModifiers.Parse(body))
 					if (RdbItemImporter.ApplicableStatIds.Contains(m.StatId))
@@ -128,7 +127,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {"",-7} {"",-34} {"",7} {"",7}  e.g. item {hit.ItemId} \"{hit.ItemName}\": {Payload(hit.Sample)}");
 			}
 
-			// The kinds the SERVER would have to branch on if it stored them. Anything outside this set is either not
+			// The kinds the server would have to branch on if it stored them. Anything outside this set is either not
 			// a stat modifier at all or is one the aggregator cannot sum flat.
 			var flat = new HashSet<uint> { 53045, 53189, 53220, 53221 };
 			var nonFlat = seen.Keys.Where(kind => !flat.Contains(kind)).OrderBy(kind => kind).ToList();

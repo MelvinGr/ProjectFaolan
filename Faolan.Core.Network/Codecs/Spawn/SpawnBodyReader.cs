@@ -4,24 +4,27 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Reads what a CAPTURED FA015807 (SimpleCharFullUpdate) body carries. Not a codec - the encoding lives in
-	// SimpleCharFullUpdateCodec; this is the boundary where a raw captured body (which still carries the u32 carrier
-	// length the codec does not own, #530 rule 2) becomes a question the importer/tests can ask.
-	//
-	// TWO readers, deliberately, because they answer different questions:
-	//   - TryParse       decodes the WHOLE record through the codec. Strict: a body it cannot account for is a
-	//                    `false`, not a partial value.
-	//   - TryReadCharacterMessage SCANS for the embedded ProtoCoreCharacterIIR alone. It works on a body the codec
-	//                    cannot parse - a fragment, a foreign layout, a 66AEDD50 dynel - which is why the importer's
-	//                    identity/equipment sweeps still use it. The message is a length-delimited block: a 4-byte
-	//                    big-endian length immediately precedes its first protobuf field, field 1 (name) =
-	//                    0x0A <len> <utf8>. We scan for that signature (the character name is the first printable
-	//                    string in the body), verify the preceding length decodes, and return it.
+	/// <summary>
+	///     Reads what a captured spawn body carries. Not a codec - the encoding lives in
+	///     <see cref="SimpleCharFullUpdateCodec" /> - but the boundary where a raw captured body, which still carries the
+	///     u32 carrier length the codec does not own, becomes a question the importer and the tests can ask.
+	/// </summary>
+	/// <remarks>
+	///     There are deliberately two readers, answering different questions. <see cref="TryParse" /> decodes the whole
+	///     record through the codec and is strict: a body it cannot account for is a false rather than a partial value.
+	///     <see cref="TryReadCharacterMessage" /> scans for the embedded ProtoCoreCharacterIIR alone and works on a body the
+	///     codec cannot parse - a fragment, a foreign layout, a dynel - which is why the importer's identity and equipment
+	///     sweeps use it. The message is a length-delimited block whose 4-byte big-endian length immediately precedes its
+	///     first protobuf field, field 1 (name), so the scan looks for that signature - the character name being the first
+	///     printable string in the body - verifies the preceding length decodes, and returns it.
+	/// </remarks>
 	public static class SpawnBodyReader
 	{
-		// Decodes a captured body's whole record. `body` INCLUDES the leading u32 carrier length, which is stripped
-		// here. False when the body is not a spawn this codec can account for - which is an ordinary outcome for a
-		// caller sweeping a mixed capture, and is why this is a Try rather than a bare Parse.
+		/// <summary>
+		///     Decodes a captured body's whole record. <paramref name="body" /> includes the leading u32 carrier length,
+		///     which is stripped here. False when the body is not a spawn this codec can account for, which is an ordinary
+		///     outcome for a caller sweeping a mixed capture and why this is a Try rather than a bare Parse.
+		/// </summary>
 		public static bool TryParse(byte[] body, out SimpleCharFullUpdateIIR spawn)
 		{
 			spawn = null!;
@@ -39,10 +42,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 		}
 
-		// Whether a decoded spawn is a PLAYER's: no move-task slot in its first record (a player's first record IS
-		// the buff list's framing word, length 4) and the player's own word2. Both were bare literals in the old
-		// player-only codec, which is how they came to read as protocol constants - an NPC carries 5 and 1/2/3.
-		// The entry slot is ONE grammar for both families (#466), so it no longer discriminates.
+		/// <summary>
+		///     Whether a decoded spawn is a player's: no move-task slot in its first record - a player's first record is the
+		///     buff list's framing word, four bytes long - and the player's own movement mode, where an NPC carries 1, 2 or
+		///     3. The entry slot is one grammar for both families, so it does not discriminate.
+		/// </summary>
 		public static bool IsPlayer(SimpleCharFullUpdateIIR spawn)
 		{
 			return spawn.Post is { HasMoveTaskSlot: false, MovementMode: SpawnPostIirs.PlayerMovementMode };

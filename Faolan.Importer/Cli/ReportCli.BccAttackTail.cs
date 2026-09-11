@@ -10,15 +10,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report bcc-attack-tail`: the MIDDLE block of every captured attack tail, word by word (Gitea #661).
+	// `--report bcc-attack-tail`: the middle block of every captured attack tail, word by word.
 	//
-	// The tail's shape has been settled since #536 - `[targets][middle][results]` accounts for every captured body -
-	// but the middle block's MEANING was not. The client's reader is what says where each word goes
-	// (`FUN_0084d5f0` then `FUN_01151170`, the shared Combat:Melee / :Unarmed reader; Ranged wraps it), so this
+	// The tail is `[targets][middle][results]`, which accounts for every captured body. The client's reader is what
+	// says where each word goes
+	// (`FUN_0084d5f0` then `FUN_01151170`, the shared Combat:Melee /:Unarmed reader; Ranged wraps it), so this
 	// report prints each word under the Command-object slot the client stores it in, and its whole value
 	// distribution beside it. A slot plus a distribution is what turns "eight opaque words" into a field.
 	//
-	// It reads the tail with the SAME arithmetic BehaviorAcks documents, so a change to that grammar breaks this
+	// It reads the tail with the same arithmetic BehaviorAcks documents, so a change to that grammar breaks this
 	// report rather than quietly making it print nonsense.
 	public static partial class ReportCli
 	{
@@ -38,14 +38,14 @@ namespace Faolan.Importer.Cli
 			"Command+0x18C /"
 		];
 
-		// The client's own five-zone direction alphabet, in ITS order (#673). Recovered from the exe, not assigned:
+		// The client's own five-zone direction alphabet, in its order. Recovered from the exe, not assigned:
 		//   * `FUN_005e3b30` is `switch (dir) { 1 -> 0xC9, 2 -> 0xCA, default -> 0xCB, 4 -> 0xCC, 5 -> 0xCD }` over an
-		//     internal 1..5 enum (`10` means "random": `rand() % 6 + 1`, so overhead - case 3 AND 6 - draws double);
+		//     internal 1..5 enum (`10` means "random": `rand() % 6 + 1`, so overhead - case 3 and 6 - draws double);
 		//   * the config keys it registers are `attack_dir_bm_upper_left`, `_upper_right`, `_head`, `_lower_left`,
 		//     `_lower_right`, in that block order (`FUN_0152f740`), which is the same 1..5;
 		//   * `FUN_005edd90`, the combo step-list parser, rewrites `0xCC -> 0xC9` and `0xCD -> 0xCA` below level 40 -
-		//     the lower zones folding onto the UPPER ONE ON THE SAME SIDE, which pins the two sides independently.
-		// The first three are pinned to `Abilities` rows by the corpus with zero exceptions (#661).
+		//     the lower zones folding onto the UPPER one on the same SIDE, which pins the two sides independently.
+		// The first three are pinned to `Abilities` rows by the corpus with zero exceptions.
 		private static readonly (uint Code, string Name, string Arc)[] Directions =
 		[
 			(0xC9, "Upper Left", "Left"),
@@ -70,28 +70,28 @@ namespace Faolan.Importer.Cli
 			var tails = 0;
 			var extended = 0;
 			var unexplained = 0;
-			// The rows where a middle word is NON-ZERO, so the report can show what such a hit looked like rather
+			// The rows where a middle word is non-zero, so the report can show what such a hit looked like rather
 			// than only that one exists.
 			var interesting = new List<(string Capture, int Frame, uint[] Middle, int Targets, int Results)>();
 			var joint = new Dictionary<(uint W4, uint W5), int>();
-			// #661: word 2's flag bits are the only middle slot left that could carry a per-hit OUTCOME - a crit, a
+			// word 2's flag bits are the only middle slot left that could carry a per-hit outcome - a crit, a
 			// block, an evade - which is what that ticket says the block is worth decoding for. Cross-tab it against
 			// everything the tail already knows about the swing, because a flag that is a function of one of those is
 			// not an outcome at all.
 			var word2Versus = new Dictionary<(string Field, string Value, uint Flags), int>();
 			var versusResult = new Dictionary<(uint W4, uint ResultType), int>();
 			var versusDirection = new Dictionary<(uint W5, uint ResultType), int>();
-			// #673: the CombatShieldRose comment said an NPC's swing carries no direction word. Word 5 is an ability id and a
-			// mob has none, so that is true of word 5 - the question is whether the per-victim RESULT type, which
-			// turned out to be the same direction, is present on a mob's swing too. Split by ACTOR to answer it.
+			// An NPC's swing carries no direction ability: word 5 is an ability id and a mob has none. The open
+			// question is whether the per-victim result type - which is the same direction - is present on a mob's
+			// swing too, so the tally is split by actor.
 			var byActor = new Dictionary<(bool Player, string Field, uint Value), int>();
-			// #673 part 2: the mob alphabet is FIVE codes where our rose has three arcs. Two questions the actor
-			// split cannot answer - does the five-code alphabet collapse onto the three arcs uniformly, and is the
-			// five-vs-three split a property of the TEMPLATE (some mobs swinging only the three a low-level player
-			// has) rather than of every mob. Keyed by template, never by name (#244).
+			// The mob alphabet is five codes where our rose has three arcs. Two questions the actor split cannot
+			// answer - does the five-code alphabet collapse onto the three arcs uniformly, and is the five-vs-three
+			// split a property of the template (some mobs swinging only the three a low-level player has) rather than
+			// of every mob. Keyed by template, never by name.
 			var byTemplate = new Dictionary<uint, Dictionary<uint, int>>();
 			var templateNames = new Dictionary<uint, string>();
-			// A PLAYER swing that names no direction ability is a combo step or a spell. It still carries a result
+			// A player swing that names no direction ability is a combo step or a spell. It still carries a result
 			// type, and whether that type is a spread or a constant decides whether our ack may keep writing 0xCB on
 			// the undirected path or has to source the direction some other way (the combo catalog states one).
 			var playerUndirected = new Dictionary<(bool Directed, uint ResultType), int>();
@@ -103,7 +103,7 @@ namespace Faolan.Importer.Cli
 
 			foreach (var c in captures)
 			{
-				// Who is an NPC, per capture. A retail character id is ~0x0131xxxx, i.e. BELOW
+				// Who is an NPC, per capture. A retail character id is ~0x0131xxxx, i.e. below
 				// EntityHandles.CharacterInstanceBase, so the handle number line cannot answer this on a capture -
 				// the only reliable test is the spawn itself, and `player_stats` is what distinguishes the two.
 				var npcHandles = new HashSet<uint>();
@@ -176,8 +176,8 @@ namespace Faolan.Importer.Cli
 					versusDirection[dkey] = versusDirection.GetValueOrDefault(dkey) + 1;
 				}
 
-				// #661: word 2 against the swing's own shape. `middle[2]` is the flags word in both forms - the extra
-				// word the selector inserts sits at wire position 2 and pushes the rest along, so read it from the END
+				// word 2 against the swing's own shape. `middle[2]` is the flags word in both forms - the extra
+				// word the selector inserts sits at wire position 2 and pushes the rest along, so read it from the end
 				// like the word4/word5 keys above do.
 				var flags = middle[^6];
 				void W2(string field, string value)
@@ -194,9 +194,9 @@ namespace Faolan.Importer.Cli
 				foreach (var rt in resultTypes)
 					W2("result type", $"0x{rt:X2}");
 
-				// #661 word 4: WHOSE property is it? The scope test that separated the MagicBuff level slots - group
-				// the value by attacker and by defender, and see which grouping it is stable within. A defender's
-				// guard arc is stable per DEFENDER; a second attacker property is stable per ATTACKER.
+				// Word 4: whose property is it? The scope test is to group the value by attacker and by defender and
+				// see which grouping it is stable within. A defender's guard arc is stable per defender; a second
+				// attacker property is stable per attacker.
 				if (middle[^4] != 0)
 				{
 					var w4 = middle[^4];
@@ -208,7 +208,7 @@ namespace Faolan.Importer.Cli
 						perTargetWord4[(c.Name, target)].Add(w4);
 					}
 
-					// ...and the same for word 5, the KNOWN attacker-side direction, as the control. A test that
+					// ...and the same for word 5, the known attacker-side direction, as the control. A test that
 					// cannot tell word 5 apart is measuring nothing.
 					perActorWord5.TryAdd((c.Name, bcc.Actor), []);
 					perActorWord5[(c.Name, bcc.Actor)].Add(middle[^3]);
@@ -225,11 +225,11 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine();
-			// ⚠️ MEASURED AND INAPPLICABLE - printed so the next attempt does not rebuild it (#661). The scope test
+			// measured and INAPPLICABLE - printed so the next attempt does not rebuild it. The scope test
 			// that settled the MagicBuff payload's two level slots (whose field is it? group by each candidate owner
-			// and see which grouping it is stable within) does NOT work on the attack tail, and the CONTROL is what
+			// and see which grouping it is stable within) does not work on the attack tail, and the control is what
 			// says so: word 5 is a known attacker-side direction, and it comes out just as unstable per attacker as
-			// per defender. Both words are rolled per SWING, so neither is a property of an entity at all - and the
+			// per defender. Both words are rolled per swing, so neither is a property of an entity at all - and the
 			// populations (19 attackers / 18 defenders) are far too small either way.
 			Console.WriteLine("word 4 SCOPE (#661) - is it the ATTACKER's or the DEFENDER's? A value is 'unstable' in a");
 			Console.WriteLine("grouping when that entity was seen with more than one of them. Word 5, the known");
@@ -281,7 +281,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			// The three words that turned out to be ENUMS take a handful of values each, so print the whole set and
-			// resolve what the ids are: word 5 is an Abilities row (the swing DIRECTION), which is the finding this
+			// resolve what the ids are: word 5 is an Abilities row (the swing direction), which is the finding this
 			// report exists to make re-derivable.
 			using var db = OpenDb();
 			var abilities = db.Abilities.AsNoTracking().ToDictionary(a => a.Id, a => a.Name);
@@ -297,7 +297,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			// Two histograms cannot say whether two fields VARY TOGETHER, and that is the whole question for the
+			// Two histograms cannot say whether two fields vary together, and that is the whole question for the
 			// 0xC9..0xCB word beside the direction ability - so cross-tabulate them.
 			Console.WriteLine();
 			Console.WriteLine("word 4 x word 5 (does the 0xC9..0xCB alphabet track the direction?):");
@@ -333,9 +333,9 @@ namespace Faolan.Importer.Cli
 			foreach (var ((directed, rt), n) in playerUndirected.OrderByDescending(kv => kv.Key.Directed).ThenByDescending(kv => kv.Value))
 				Console.WriteLine($"      {(directed ? "ability named" : "NO ability   "),-14} result type 0x{rt:X2}  x{n}");
 
-			// #673 part 2. The rose has three arcs and the wire has five zones, so the question that decides whether
-			// the swing pick is a placeholder or a measurement is what the five collapse to. The collapse
-			// itself is the CLIENT's (see `Directions`): a lower zone folds onto the upper one on the same side.
+			// The rose has three arcs and the wire has five zones, so the question that decides whether the swing pick
+			// is a placeholder or a measurement is what the five collapse to. The collapse itself is the client's
+			// (see `Directions`): a lower zone folds onto the upper one on the same side.
 			var npcByCode = Directions.ToDictionary(d => d.Code, d => byActor.GetValueOrDefault((false, "result type", d.Code)));
 			var npcTotal = npcByCode.Values.Sum();
 			Console.WriteLine();
@@ -360,7 +360,7 @@ namespace Faolan.Importer.Cli
 			var lower = npcByCode[0xCCu] + npcByCode[0xCDu];
 			Console.WriteLine($"      within the two SIDE arcs, upper x{upper} / lower x{lower} = {Share(upper, upper + lower)} upper");
 
-			// Is the five-vs-three split a property of the TEMPLATE? If some mobs only ever swing the three a
+			// Is the five-vs-three split a property of the template? If some mobs only ever swing the three a
 			// low-level player has, that is a per-archetype rule rather than a global distribution.
 			var templatesWithEnough = byTemplate.Where(kv => kv.Value.Values.Sum() >= 8).OrderByDescending(kv => kv.Value.Values.Sum()).ToList();
 			Console.WriteLine();
@@ -397,7 +397,7 @@ namespace Faolan.Importer.Cli
 
 		private static string Share(int part, int whole) => whole == 0 ? "-" : $"{100.0 * part / whole:0.0}%";
 
-		// A word as the reader sees it plus, when it could plausibly BE one, its float reading - the ticket's
+		// A word as the reader sees it plus, when it could plausibly be one, its float reading - the ticket's
 		// standing hypothesis is that one of these is a charge fraction, and a float is unrecognisable in decimal.
 		private static string Describe(uint value)
 		{
@@ -435,12 +435,12 @@ namespace Faolan.Importer.Cli
 			if (targets < 0 || at + 8 > tail.Length)
 				return false;
 
-			// Each target is a [class][handle] pair; only the handle is wanted, for the per-DEFENDER scope test (#661).
+			// Each target is a [class][handle] pair; only the handle is wanted, for the per-defender scope test.
 			for (var i = 0; i < targets; i++)
 				targetHandles.Add(tail.ReadU32Be(4 + i * 8 + 4));
 
-			// The selector is the middle's SECOND word and decides its own length - miss it and the result count
-			// lands one word out, which is what left 11 bodies unexplained before #536 found it.
+			// The selector is the middle's second word and decides its own length - miss it and the result count lands
+			// one word out, leaving the body unparseable.
 			var count = tail.ReadU32Be(at + 4) > 1 ? MiddleSlots.Length + 1 : MiddleSlots.Length;
 			if (at + count * 4 + 4 > tail.Length)
 				return false;

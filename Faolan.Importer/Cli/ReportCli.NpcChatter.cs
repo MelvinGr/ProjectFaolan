@@ -7,25 +7,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report npc-chatter` - how far the ambient-bark catalog (#331) reaches, measured rather than assumed.
+	// `--report npc-chatter` - how far the ambient-bark catalog reaches, measured rather than assumed.
 	//
-	// The open half of #331 was written as "a dedicated extraction pass: map each NPC type to its ambient conversation
-	// GROUP and pull the group's line set out of the RDB". This report is the answer to whether that pass can exist.
-	// It can - `BarkCatalog` is it, and the two facts it turns on are documented there.
+	// The catalog is built by a dedicated extraction pass that maps each NPC type to its ambient conversation group
+	// and pulls the group's line set out of the RDB. `BarkCatalog` is that pass, and the two facts it turns on are
+	// documented there.
 	//
 	// What this prints:
 	//   1. the page census for category 50015 - pages, flags, distinct ids;
-	//   2. every stored NpcChatter row resolved to its TEXT, the end-to-end proof that the token hash is right;
+	//   2. every stored NpcChatter row resolved to its text, the end-to-end proof that the token hash is right;
 	//   3. per (group, channel) a SWEEP of N listing every line the client ships, with the ones the DB lacks marked
 	//      and split by whether they carry a {Slot} the server would have to fill;
 	//   4. the coverage line.
 	//
-	// ⚠️ What it deliberately does NOT do is DISCOVER group names. The obvious route - pull identifiers out of the
+	// What it deliberately does not do is DISCOVER group names. The obvious route - pull identifiers out of the
 	// client's SCRIPTGROUP2 (1010028) records and hash-test each - was built and thrown away, because it does not
 	// work and fails in a way that looks like success. None of the five groups the corpus already proves
-	// (`RenownBystanderLovers`, `RenownCrier`, ...) appears anywhere in those 11,118 identifiers, so the route finds
+	// (`RenownBystanderLovers`, `RenownCrier`,...) appears anywhere in those 11,118 identifiers, so the route finds
 	// no real group at all; what it does return is hash noise, and plenty of it. The id is 28 bits and each candidate
-	// is probed thousands of times, but the probes are NOT independent - names differing only in a digit cluster in
+	// is probed thousands of times, but the probes are not independent - names differing only in a digit cluster in
 	// ELF-hash space - so a "3+ hits" threshold that looks safe under a Poisson estimate still let ten confident
 	// non-groups through (`CoyoteFactor`, `seagull_01_1shot`, `texscript_196962`). Group names live somewhere else.
 	public static partial class ReportCli

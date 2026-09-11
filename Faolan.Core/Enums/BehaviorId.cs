@@ -1,37 +1,35 @@
 namespace Faolan.Core.Enums
 {
 	/// <summary>
-	///     The BehaviorControlCenterIIR's <c>behaviorId</c> - the COMMAND a behaviour record carries (#536).
+	///     The BehaviorControlCenterIIR's <c>behaviorId</c> - the command a behaviour record carries.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ These are the CLIENT'S OWN NAMES, not ours. The id is a key into <c>InstantiateCommand::classmap</c>
+	///     These are the client's own names, not ours. The id is a key into <c>InstantiateCommand::classmap</c>
 	///     (the lookup <c>FUN_007dcd60</c> does before constructing the command object that reads the record's tail),
-	///     and that map is populated by two registration functions which push each command's NAME STRING next to its
+	///     and that map is populated by two registration functions which push each command's name string next to its
 	///     id: <c>FUN_007375b0</c> (22 commands - the interaction/animation set) and <c>FUN_01134510</c> (12 - the
 	///     combat/movement set). So this catalog is read off the binary rather than inferred from behaviour, the same
 	///     way the opcode catalogs in <see cref="Opcodes" /> are.
 	///     <para>
 	///         The client's string is quoted per member wherever the C# identifier had to drop punctuation
-	///         (<c>Combat:Melee</c>, <c>Sneak/Hide</c>, ...). One member is registered under a CLASS name rather than a
+	///         (<c>Combat:Melee</c>, <c>Sneak/Hide</c>, ...). One member is registered under a class name rather than a
 	///         display name - <c>SwapAlternateEquipmentCommand_c</c> - and is kept verbatim.
 	///     </para>
 	///     <para>
-	///         ⚠️ These 34 are ALL of them (#549). Decompiling every caller of the Command base ctor
-	///         (<c>FUN_007dc7a0</c>) enumerates every Command class the binary can construct, and none passes an id
-	///         above <c>0x2F</c>; the one class that is built but never registered is <c>LockPickingCommand_c</c>
-	///         (<c>0x2D</c>), which the wire therefore cannot reach, so it is deliberately absent here. An id outside
-	///         this enum arriving off the wire means the record was SPLIT wrong, not that the catalog is short - that
-	///         is exactly what the ten phase-0x0E records turned out to be (see <c>BehaviorControlCenterIIR</c>, whose
-	///         delay word was being read as a command id).
+	///         These 34 are all of them. Decompiling every caller of the Command base ctor (<c>FUN_007dc7a0</c>)
+	///         enumerates every Command class the binary can construct, and none passes an id above <c>0x2F</c>; the
+	///         one class that is built but never registered is <c>LockPickingCommand_c</c> (<c>0x2D</c>), which the
+	///         wire therefore cannot reach, so it is deliberately absent here. An id outside this enum arriving off the
+	///         wire means the record was split wrong (a delay word read as a command id, see
+	///         <c>BehaviorControlCenterIIR</c>), not that the catalog is short.
 	///     </para>
 	///     <para>
 	///         The names corroborate the corpus independently, which is what makes them trustworthy: over 67307
 	///         captured records <see cref="UseDynel" /> carries a 12-byte tail (a class+handle reference),
-	///         <see cref="UseCharacter" /> 4 (a handle), <see cref="PlayAnimation" /> a VARIABLE 10-39 (an animation
+	///         <see cref="UseCharacter" /> 4 (a handle), <see cref="PlayAnimation" /> a variable 10-39 (an animation
 	///         name), <see cref="Emote" /> and <see cref="LimboDeath" /> none - and the three attack commands
 	///         (<see cref="CombatMelee" />, <see cref="CombatRanged" />, <see cref="CombatUnarmed" />) share one tail
-	///         family, which is why <c>BehaviorAcks</c> had already noticed 0x0F and 0x11 behaving alike without
-	///         knowing why.
+	///         family, which is why <c>BehaviorAcks</c> treats 0x0F and 0x11 alike.
 	///     </para>
 	/// </remarks>
 	public enum BehaviorId : uint
@@ -46,12 +44,12 @@ namespace Faolan.Core.Enums
 		/// <summary>
 		///     The generic action channel, and the busiest record in the corpus (35852 of 67307, no tail).
 		///     <para>
-		///         ⚠️ This codebase called it <c>PlayAnimation</c>, which is a DIFFERENT command (<see cref="PlayAnimation" />,
-		///         0x1D). One thing genuinely rides this channel: the MOUNTED jump (#428). A standing jump moves the
-		///         character nowhere, so there is no CharDCMove for the viewer relay to carry and the client asks for the
-		///         animation here instead - the animation itself named by the args' <c>bcc_action_id</c> (live 2026-07-25:
-		///         f1 249528 mounted, 249527 off a bridge, 249555 elsewhere, all one id cluster). A plain unmounted jump
-		///         does NOT use it: that is pure CharDCMove with MoveFlag.Airborne.
+		///         Not to be confused with <see cref="PlayAnimation" /> (0x1D), a different command. One thing genuinely
+		///         rides this channel: the mounted jump. A standing jump moves the character nowhere, so there is no
+		///         CharDCMove for the viewer relay to carry and the client asks for the animation here instead - the
+		///         animation itself named by the args' <c>bcc_action_id</c> (live: f1 249528 mounted, 249527 off a
+		///         bridge, 249555 elsewhere, all one id cluster). A plain unmounted jump does not use it: that is pure
+		///         CharDCMove with MoveFlag.Airborne.
 		///     </para>
 		/// </summary>
 		BccAction = 0x07,
@@ -60,7 +58,7 @@ namespace Faolan.Core.Enums
 		/// <summary>Moving an item between an equipment slot and the inventory.</summary>
 		Equip = 0x09,
 
-		/// <summary>Summoning a mount; the args' <c>from</c> is the mount id - a <c>Mount</c> row's key, which is its summon spell's id (#627).</summary>
+		/// <summary>Summoning a mount; the args' <c>from</c> is the mount id - a <c>Mount</c> row's key, which is its summon spell's id.</summary>
 		Mount = 0x0A,
 		Dance = 0x0B,
 		DisarmTrap = 0x0C,
@@ -69,20 +67,20 @@ namespace Faolan.Core.Enums
 		/// <summary>Using an inventory item - what a right-click on it sends.</summary>
 		UseItem = 0x0E,
 
-		/// <summary>The ordinary weapon swing - what this codebase used to call "NormalAttack".</summary>
+		/// <summary>The ordinary weapon swing.</summary>
 		CombatMelee = 0x0F, // "Combat:Melee"
 		CombatRanged = 0x10, // "Combat:Ranged"
 
-		/// <summary>The empty-main-hand swing - what this codebase used to call "UnarmedAttack".</summary>
+		/// <summary>The empty-main-hand swing.</summary>
 		CombatUnarmed = 0x11, // "Combat:Unarmed"
 
-		/// <summary>Acting on a world OBJECT - <c>startobjectaction(18)</c>, e.g. opening a loot bag, chest or door.</summary>
+		/// <summary>Acting on a world object - <c>startobjectaction(18)</c>, e.g. opening a loot bag, chest or door.</summary>
 		UseDynel = 0x12,
 		CombatEvasiveManeuver = 0x15, // "Combat:Evasive Maneuver"
 
 		/// <summary>
-		///     Interacting with a CHARACTER, and the target decides what it means: an NPC opens its conversation (or its
-		///     shop window), a PLAYER is a trade request (#101 - capture login_2-clients_group-trade-friend f1251 -> f1260,
+		///     Interacting with a character, and the target decides what it means: an NPC opens its conversation (or its
+		///     shop window), a player is a trade request (capture login_2-clients_group-trade-friend f1251 -> f1260,
 		///     where the same id at another player produces DispatchRequestTrade).
 		/// </summary>
 		UseCharacter = 0x16,
@@ -103,7 +101,7 @@ namespace Faolan.Core.Enums
 		ObjectInteraction = 0x2A,
 		PickPocket = 0x2B,
 
-		/// <summary>The weapon-set switch button (melee set ↔ ranged set).</summary>
+		/// <summary>The weapon-set switch button (melee set to ranged set and back).</summary>
 		SwapAlternateEquipmentCommand = 0x2E, // registered as "SwapAlternateEquipmentCommand_c"
 		CombatReactive = 0x2F // "Combat:Reactive"
 	}

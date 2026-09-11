@@ -4,12 +4,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The quest-state-gated dialogue building block (issue #37): both ends of the dialogue graph carry a
-	// (ConditionQuestId, ConditionQuestState) gate - a ConversationEntry decides WHICH greeting an NPC gives, a
-	// ConversationEdge decides WHERE an option leads - and the runtime takes the one whose gate matches the player's
+	// The quest-state-gated dialogue building block: both ends of the dialogue graph carry a
+	// (ConditionQuestId, ConditionQuestState) gate - a ConversationEntry decides which greeting an NPC gives, a
+	// ConversationEdge decides where an option leads - and the runtime takes the one whose gate matches the player's
 	// quest state (unconditional = fallback). This locks the gate evaluation that picks Casilda's pre- vs
-	// post-first-quest dialogue. Replaced the old Lua-interpreter conditions - the two shapes retail's dialogue Lua
-	// used map exactly onto (X, Completed) and (X, Active), so the gate is a plain state match, no interpreter.
+	// post-first-quest dialogue. The two shapes retail's dialogue Lua uses map exactly onto (X, Completed) and
+	// (X, Active), so the gate is a plain state match rather than an interpreter.
 	public class ConversationConditionTests
 	{
 		[Fact]
@@ -37,13 +37,13 @@ namespace Faolan.Tests
 		{
 			var gate = Gate(13480, QuestState.Completed);
 
-			// Completing a DIFFERENT quest must not satisfy this gate.
+			// Completing a different quest must not satisfy this gate.
 			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)]));
 		}
 
-		// Gates OVERLAP by construction since #639: the importer derives them from the quest state each variant was
+		// Gates overlap by construction: the importer derives them from the quest state each variant was
 		// captured in, and a player deep in a chain still holds every earlier quest of it. Casilda's escort greeting is
-		// gated on 12407 Active and the two greetings after it sit on top of a 12407 that is STILL active, so all three
+		// gated on 12407 Active and the two greetings after it sit on top of a 12407 that is still active, so all three
 		// pass at once. The beat the player is on is the quest they accepted most recently.
 		[Fact]
 		public void OverlappingGates_ServeTheMostRecentlyAcceptedQuest()

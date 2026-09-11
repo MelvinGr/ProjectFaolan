@@ -4,9 +4,9 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// n3ToClientFadeIIR (0x66180B20) - the graceful fade-out despawn (the loot-consumed / loot-expired variant of
-	// n3ToClientQuit). 17 B: [subop][typeTag][handle][u8 0 marker][f32 fadeSeconds, big-endian]. Marker 0x00 + a FLOAT
-	// distinguishes it from n3ToClientQuit's 0x01 marker + u32 playfield token.
+	// n3ToClientFadeIIR - the graceful fade-out despawn (the loot-consumed / loot-expired variant of n3ToClientQuit).
+	// 17 B: [subop][typeTag][handle][u8 0 marker][f32 fadeSeconds, big-endian]. Marker 0x00 plus a float distinguishes
+	// it from n3ToClientQuit's 0x01 marker plus u32 playfield token.
 	public static class N3ToClientFadeCodec
 	{
 		public const float DefaultFadeSeconds = 3.0f;
@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		private const byte RecordMarker = 0x00;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(N3ToClientFadeIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -52,6 +52,5 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// n3ToClientFadeIIR (0x66180B20).
 	public sealed record N3ToClientFadeIIR(uint TypeTag, uint Handle, float FadeSeconds);
 }

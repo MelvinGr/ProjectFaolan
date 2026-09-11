@@ -8,22 +8,28 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
-	// DispatchMailMessage (S->C 0x2002) - one in-game mail, optionally with the bought item appended as an attachment.
-	// Decoded byte-exact 2026-06-13 from the NecroL80 buy_from_autionhouse_get_mail capture (629 B base #1604/#1611,
-	// 754 B with attachment #1607; docs/subsystems/tradepost-protocol.md). Wire grammar (integers BE):
-	//   [mailId:u64]
-	//   [recipientClass:u32][nameLen:u16][recipient ascii]
-	//   [senderClass:u32][nameLen:u16][sender ascii]        # name EMPTY for an AH/system mail
-	//   [xmlLen:u16][remoteformat XML]
-	//   [footerWord:u32][money:u64][ts1:u32][ts2:u32]
-	//   [attachCount:u32]
-	//   attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trailer:u32 word,u32 class,u32 0] }
-	// The attachment entry is the SAME ProtoInventoryGameEntry shape the snapshot / shop / AH-search / live-add use,
-	// so the one item codec serves them all (the base mail just carries attachCount=0).
-	//
-	// `Parse` used to return the `Mail` DB ROW, which meant the codec's value was an EF entity and a decoded attachment
-	// had to be handed a transient `Item` just so it could be re-encoded. The value is now a plain record and the row
-	// mapping is `MailColumns` next door (#530 wave 7 / #533).
+	/// <summary>
+	///     <c>DispatchMailMessage</c> - one in-game mail, optionally with the bought item appended as an attachment.
+	/// </summary>
+	/// <remarks>
+	///     Decoded byte-exact from the NecroL80 buy_from_autionhouse_get_mail capture (629 B base, 754 B with attachment;
+	///     docs/subsystems/tradepost-protocol.md). The wire grammar, integers big-endian:
+	///     <code>
+	///     [mailId:u64]
+	///     [recipientClass:u32][nameLen:u16][recipient ascii]
+	///     [senderClass:u32][nameLen:u16][sender ascii]        # name empty for an AH or system mail
+	///     [xmlLen:u16][remoteformat XML]
+	///     [footerWord:u32][money:u64][ts1:u32][ts2:u32]
+	///     [attachCount:u32]
+	///     attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trailer:u32 word,u32 class,u32 0] }
+	///     </code>
+	///     The attachment entry is the same <c>ProtoInventoryGameEntry</c> shape the snapshot, shop, AH search and live
+	///     add use, so the one item codec serves them all; the base mail simply carries <c>attachCount</c> = 0.
+	///     <para>
+	///         <c>Parse</c> returns a plain record rather than the <c>Mail</c> DB row; the row mapping is
+	///         <c>MailColumns</c> next door.
+	///     </para>
+	/// </remarks>
 	public static class MailMessageCodec
 	{
 		public const uint Method = (uint)TradepostInterfaceMethods.DispatchMailMessage;
@@ -31,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// The attachment entry's only stat (matches the capture).
 		public const uint StatQuantity = 26;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(MailMessage value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -41,9 +47,9 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return s.ToArray();
 		}
 
-		// A stored mail. `includeAttachments` mirrors retail: the base mail (GetAllMails / poll) carries no items
-		// (attachCount=0); the client then fetches the item with GetMailItem and the server replies with the same mail
-		// PLUS the attachment appended (629 B -> 754 B in the capture).
+		// A stored mail. `includeAttachments` mirrors retail: the base mail (GetAllMails or a poll) carries no items
+		// (attachCount = 0); the client then fetches the item with GetMailItem and the server replies with the same mail plus
+		// the attachment appended (629 B to 754 B in the capture).
 		public static byte[] Build(Mail mail, bool includeAttachments)
 		{
 			return Build(MailColumns.ToMessage(mail, includeAttachments));
@@ -110,7 +116,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 	}
 
-	// DispatchMailMessage (0x2002).
+	/// <summary>The DispatchMailMessage body.</summary>
 	public sealed record MailMessage(
 		ulong MailId,
 		uint RecipientClass,
@@ -124,17 +130,22 @@ namespace Faolan.Core.Network.Codecs.Economy
 		uint Timestamp2,
 		IReadOnlyList<MailAttachmentEntry> Attachments);
 
-	// One attached item: the escrowed instance id, the wire entry, and the three trailing words the capture carries.
+	/// <summary>
+	///     One attached item: the escrowed instance id, the wire entry, and the three trailing words the capture carries.
+	/// </summary>
 	public sealed record MailAttachmentEntry(ulong ItemInstanceId, ProtoInventoryGameEntry Entry, uint TrailerWord, uint TrailerClass, uint TrailerTail);
 
-	// The `Mail` / `MailAttachment` row <-> `MailMessage` mapping. A MAPPER, not a codec (#533): the wire has one item
-	// shape while the DB splits it across the attachment row and the per-TEMPLATE `Items` row that holds the TEA key.
+	/// <summary>
+	///     The <c>Mail</c> / <c>MailAttachment</c> row to <c>MailMessage</c> mapping. A mapper, not a codec: the wire has
+	///     one item shape while the DB splits it across the attachment row and the per-template <c>Items</c> row that
+	///     holds the TEA key.
+	/// </summary>
 	public static class MailColumns
 	{
-		// The AH-buy system mail's BODY. The listener should not know that a TradePostGUI_MailItemBought template
-		// exists - it asks for "the item-bought body" and the mail layer composes it (#539). `itemNameEscaped` is left
-		// empty for a live buy: the per-item RDB name key is unsynthesizable (see TradepostMailBodyCodec), so the item
-		// still delivers and only its NAME in the mail text degrades.
+		// The AH-buy system mail's body. The listener should not know that a TradePostGUI_MailItemBought template exists - it
+		// asks for "the item-bought body" and the mail layer composes it. `itemNameEscaped` is left empty for a live buy: the
+		// per-item RDB name key is unsynthesizable (see TradepostMailBodyCodec), so the item still delivers and only its name
+		// in the mail text degrades.
 		public static string ItemBoughtBody(string buyer, ulong saleId, string seller, string priceDisplay, string itemNameEscaped = "")
 		{
 			return TradepostMailBodyCodec.Build(new TradepostMailBody(buyer, saleId, itemNameEscaped, seller, priceDisplay));
@@ -152,10 +163,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 				mail.Timestamp1, mail.Timestamp2, attachments);
 		}
 
-		// The attachment as the wire ProtoInventoryGameEntry (item_id = the instance id, stat_list = {26: qty},
-		// item_data = the instance's ProtoAcgItem). The item's TEA key is per-TEMPLATE and lives in Items, reached
-		// through the Item nav (FK on Template) - Include it before building, which #749 makes load-bearing for a second
-		// reason: `Level` now comes off that joined row too, since it is per-TEMPLATE and never per-attachment.
+		// The attachment as the wire ProtoInventoryGameEntry (item_id = the instance id, stat_list = {26: qty}, item_data =
+		// the instance's ProtoAcgItem). The item's TEA key is per-template and lives in Items, reached through the Item nav
+		// (FK on Template), so Include it before building - `Level` comes off that joined row too, being per-template and
+		// never per-attachment.
 		public static MailAttachmentEntry ToEntry(MailAttachment a)
 		{
 			ArgumentNullException.ThrowIfNull(a);
@@ -171,7 +182,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 					Key3 = key,
 					Template1 = a.Template,
 					Template2 = a.Template,
-					Level = a.Item!.Level, // #749: per-TEMPLATE, off the joined row (thrown for above) - never a per-attachment copy
+					Level = a.Item!.Level, // Per-template, off the joined row (thrown for above) - never a per-attachment copy
 					Hash = a.ItemHash
 				}
 			};
@@ -184,10 +195,9 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return new MailAttachmentEntry(a.ItemInstanceId, entry, a.TrailerWord, a.TrailerClass, a.TrailerTail);
 		}
 
-		// A decoded mail back into rows - the importer/oracle direction. The per-template key is attached as a
-		// TRANSIENT `Item` so a decoded attachment round-trips through ToEntry without a DB; it is never tracked or
-		// saved (callers that persist a mail set only the Template FK column, and the row resolves its real Items row
-		// on reload).
+		// A decoded mail back into rows - the importer and oracle direction. The per-template key is attached as a transient
+		// `Item` so a decoded attachment round-trips through ToEntry without a DB; it is never tracked or saved, since
+		// callers that persist a mail set only the Template FK column and the row resolves its real Items row on reload.
 		public static Mail ToRow(MailMessage message)
 		{
 			ArgumentNullException.ThrowIfNull(message);
@@ -228,11 +238,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 			{
 				ItemInstanceId = a.ItemInstanceId,
 				Quantity = qty,
-				// #749: the wire's `Level` is a per-TEMPLATE fact (no template in 8,644 captured sightings carries two),
-				// so it rides the TRANSIENT Item nav rather than a column on the attachment - the same shape
-				// CaptureListingImporter uses to carry a listing's level into `Items`. That also keeps the row
-				// round-trip byte-exact: the build reads `Item.Level`, and a parse that dropped it would rebuild a
-				// level-0 attachment.
+				// The wire's `Level` is a per-template fact - no template in 8,644 captured sightings carries two - so it rides the
+				// transient Item nav rather than a column on the attachment, the same shape CaptureListingImporter uses to carry a
+				// listing's level into `Items`. That also keeps the row round-trip byte-exact: the build reads `Item.Level`, and a
+				// parse that dropped it would rebuild a level-0 attachment.
 				Item = new Item
 				{
 					Key = key,

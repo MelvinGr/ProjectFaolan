@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The feat-name parser (Gitea #251). The client encodes tree / group / rank in the catalog NAME
+	// The feat-name parser. The client encodes tree / group / rank in the catalog name
 	// ("Soldier: Optional Training: Thrown Weapons 5"), so these columns are only as good as this split.
 	//
 	// Pure by design: it takes strings, not the RDB, so it runs from a plain clone. The RDB read itself is covered by
@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		[Theory]
 		// Three-part: class, group, base + bare rank.
 		[InlineData("Soldier: Optional Training: Thrown Weapons 5", "Soldier", "Optional Training", "Thrown Weapons", 5)]
-		// Three-part with a PARENTHESISED rank - the other spelling the catalog uses.
+		// Three-part with a parenthesised rank - the other spelling the catalog uses.
 		[InlineData("Guardian: Optional Training: 2HE (3)", "Guardian", "Optional Training", "2HE", 3)]
 		// Two-part: the tree is the leading segment, no group.
 		[InlineData("Core Training: Poison Magic Rating 6", "Core Training", null, "Poison Magic Rating", 6)]
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Assert.Equal(rank, parsed.Rank);
 		}
 
-		// A name the pattern does not fit must keep its FULL text in BaseName. The columns are a convenience over
+		// A name the pattern does not fit must keep its full text in BaseName. The columns are a convenience over
 		// Name, so a parse that does not apply has to lose nothing - the failure mode to avoid is a feat silently
 		// reduced to a fragment of its own name.
 		[Theory]
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			Assert.Equal(0, parsed.Rank);
 		}
 
-		// The RECORD's effect tail, against the real bytes of RDB 1000020 id 115338 ("Soldier: 1HB and 1HE 1") - the
+		// The record's effect tail, against the real bytes of RDB 1000020 id 115338 ("Soldier: 1HB and 1HE 1") - the
 		// two-effect record that proved the list is count-framed rather than a single fixed slot. Kept as inline hex
 		// because it is one small record: a fixture file would need the client install to regenerate.
 		private const string TwoEffectRecordHex =
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			"35CF000000000000040000000000000001000000000000000200000009000000AC030000D0020000";
 
 		// Feats share the template stat-modifier region with items and spells, so they share its parser. The two
-		// modifiers of "Soldier: 1HB and 1HE 1" come back with their KIND as well - 53045 is a FLAT modifier, and a
+		// modifiers of "Soldier: 1HB and 1HE 1" come back with their kind as well - 53045 is a flat modifier, and a
 		// consumer must branch on that (53067 would be a percent stored x100).
 		[Fact]
 		public void ParseEffects_ReadsBothModifiersWithTheirKind()
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			Assert.All(effects, m => Assert.Equal(53045u, m.Kind));
 		}
 
-		// A record whose tail is not the effect shape must yield an EMPTY list rather than a garbage pair - the
+		// A record whose tail is not the effect shape must yield an empty list rather than a garbage pair - the
 		// importer writes what this returns straight into FeatEffect rows.
 		[Fact]
 		public void ParseEffects_YieldsNothing_WhenTheTailIsNotAnEffectList()
@@ -91,7 +91,7 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseEffects(new byte[64]));
 		}
 
-		// The wire-id -> template-id map (#467), built from a synthetic resource in the real layout: a 20-byte header
+		// The wire-id -> template-id map, built from a synthetic resource in the real layout: a 20-byte header
 		// [type][id][1][count][version] then 48-byte entries whose first two words are the pair and whose 11th is the
 		// base index. Synthetic rather than captured because the real resource is 316 KB.
 		[Fact]
@@ -105,7 +105,7 @@ namespace Faolan.Tests
 			BitConverter.GetBytes(2u).CopyTo(body, 16); // version
 			BitConverter.GetBytes(100u).CopyTo(body, 20);
 			BitConverter.GetBytes(7336u).CopyTo(body, 24);
-			BitConverter.GetBytes(1u).CopyTo(body, 20 + 32); // word 8 = the ROOT marker
+			BitConverter.GetBytes(1u).CopyTo(body, 20 + 32); // word 8 = the root marker
 			BitConverter.GetBytes(1u).CopyTo(body, 20 + 40);
 			BitConverter.GetBytes(1800u).CopyTo(body, 68);
 			BitConverter.GetBytes(7353u).CopyTo(body, 72);
@@ -114,13 +114,13 @@ namespace Faolan.Tests
 			var map = RdbFeatImporter.ParseIdMap(body);
 
 			Assert.Equal(2, map.Count);
-			// (wire, template, baseIndex, rootFlag) - 100 is "Core Soldier Knowledge", an archetype ROOT, so its word 8
+			// (wire, template, baseIndex, rootFlag) - 100 is "Core Soldier Knowledge", an archetype root, so its word 8
 			// is 1; 1800 "Barbarian" here is left 0 to prove the flag is read per-entry and not assumed.
 			Assert.Equal((100u, 7336u, 1u, 1u), map[0]);
 			Assert.Equal((1800u, 7353u, 18u, 0u), map[1]);
 
 			// The wire id splits into (BaseIndex, Rank) as base*100 + rank - the same split the client's own loader
-			// computes as its fallback. Both of these are rank 0, which is the FIRST rank, not "unranked".
+			// computes as its fallback. Both of these are rank 0, which is the first rank, not "unranked".
 			Assert.Equal(0u, map[0].Wire % 100);
 			Assert.Equal(0u, map[1].Wire % 100);
 		}
@@ -151,7 +151,7 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseIdMap(overrun));
 		}
 
-		// The PREREQUISITE edges (#251): columns 2/3/4 of the same 48-byte entry, zero where unused. Two feats, one
+		// The prerequisite edges: columns 2/3/4 of the same 48-byte entry, zero where unused. Two feats, one
 		// with a single prerequisite and one with three, so both the "skip the zeros" and the ordering are covered.
 		[Fact]
 		public void ParsePrereqs_ReadsUpToThreeEdgesPerFeat_InColumnOrder()
@@ -177,7 +177,7 @@ namespace Faolan.Tests
 			Assert.Equal((300000u, 2, 80u), edges[3]);
 		}
 
-		// A feat with no prerequisites must produce NO rows - a 0 edge would claim "requires feat 0", which is a
+		// A feat with no prerequisites must produce no rows - a 0 edge would claim "requires feat 0", which is a
 		// dependency on a feat that does not exist.
 		[Fact]
 		public void ParsePrereqs_EmitsNothing_ForAFeatWithNoPrerequisites()
@@ -191,7 +191,7 @@ namespace Faolan.Tests
 		}
 
 		// The u16 record shape, against the real bytes of template 3187268 - the Hellfire feat Hakotep unlocks on tape.
-		// This shape carries a name AND a description behind a [u16 nameLen][u16 descLen] pair; knowing only the u32
+		// This shape carries a name and a description behind a [u16 nameLen][u16 descLen] pair; knowing only the u32
 		// shape left 3,633 plaintext records looking nameless, and every feat the three captured characters hold was
 		// among them. Getting this wrong does not fail loudly - it silently drops feats from the catalog.
 		private const string HellfireRecordHex =
@@ -209,7 +209,7 @@ namespace Faolan.Tests
 			Assert.Equal("Reduces the casting time of Hellfire Breath, but increases the re-use time.", description);
 		}
 
-		// The u32 shape still reads, and yields NO description - an empty string there means the record carried none,
+		// The u32 shape still reads, and yields no description - an empty string there means the record carried none,
 		// not that the parse failed.
 		[Fact]
 		public void ReadNameAndDescription_StillReadsTheU32Shape()

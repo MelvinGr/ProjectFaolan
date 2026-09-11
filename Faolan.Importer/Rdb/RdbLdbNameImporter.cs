@@ -10,31 +10,30 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Rdb
 {
-	// #291/#300: backfills EMPTY spell + item names from the localized-string DB (LDB, RDB 1030002).
+	// backfills empty spell + item names from the localized-string DB (LDB, RDB 1030002).
 	//
 	// The LDB grammar (LdbStringIndex) gives id->string keyed by an EXPLICIT id. For both categories the id == the
 	// record id (verified: spell 222675 -> "Set's Cold Hatred"; item names in cat 50200 crib 99% against our catalog).
 	//
-	// LANGUAGE is per-PAGE and this client bundles seven (EN/FR/DE/ES/PL/RU/KO). The page's language is DECLARED by the
+	// LANGUAGE is per-page and this client bundles seven (EN/FR/DE/ES/PL/RU/KO). The page's language is DECLARED by the
 	// client - `LdbLanguageIndex` reads the language records (RDB 1030001) that list each language's pages - so this
-	// reads English pages and nothing else. The name crib (EnglishNames) is kept on top as a CHECK, not as the way the
-	// language is chosen; only EMPTY names are filled, so nothing can overwrite a good value either way.
+	// reads English pages and nothing else. The name crib (EnglishNames) is kept on top as a check, not as the way the
+	// language is chosen; only empty names are filled, so nothing can overwrite a good value either way.
 	//
-	// It used to sniff the language from the text, which is wrong on this data and was caught in-client: whole pages
-	// ship UNTRANSLATED (the Polish and Korean 50211 pages are English sentences), so a prose test scores them as
-	// English, the pages get unioned, and the last write per id wins - which is how 1991 of 3380 spell descriptions
-	// came out Spanish ("Aumenta en 1 la Fuerza"). We only support English; take the client's word for which page that
-	// is.
+	// Sniffing the language from the text does not work on this data: whole pages ship untranslated (the Polish and
+	// Korean 50211 pages are English sentences), so a prose test scores them as English, the pages get unioned, and
+	// the last write per id wins - which puts Spanish descriptions on English spells. Only English is supported; take
+	// the client's word for which page that is.
 	//
 	// Categories:
 	//   50210 = spell names (id == spell id).
-	//   50200 = item "dev" names (id == item id) - the SAME string source our ExtractName already pulls for the named
+	//   50200 = item "dev" names (id == item id) - the same string source our ExtractName already pulls for the named
 	//           items, so this recovers a catalog-CONSISTENT name for items whose own template yielded none. (The
 	//           polished localized item names in cat 50220 are keyed by a SEPARATE name-id, not the item id, so they
 	//           need the item record's name-id field decoded first - a follow-up, see docs/rdb/ldb-string-index.md.)
-	//   50201 = item descriptions (id == item id, #414).
-	//   50211 = SPELL descriptions (id == spell id, #367) - the client's own tooltip text for a spell or buff. The one
-	//           source that says what an effect DOES in words, so it is what an effect implementation is written and
+	//   50201 = item descriptions (id == item id).
+	//   50211 = spell descriptions (id == spell id) - the client's own tooltip text for a spell or buff. The one
+	//           source that says what an effect does in words, so it is what an effect implementation is written and
 	//           checked against; ~3.6k of the 20k spells carry one.
 	public static class RdbLdbNameImporter
 	{
@@ -50,7 +49,7 @@ namespace Faolan.Importer.Rdb
 			var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 
 			// Which page is in which language - stated by the client's own language records (LdbLanguageIndex), not
-			// guessed from the text. Everything below reads ENGLISH pages only.
+			// guessed from the text. Everything below reads english pages only.
 			var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
 			var englishPages = languageByPage.Count(kv => kv.Value == LdbLanguageIndex.English);
 			if (englishPages == 0)
@@ -98,7 +97,7 @@ namespace Faolan.Importer.Rdb
 				bucket.Add(ids);
 			}
 
-			// The pages are already English-only, so the crib is now a CHECK rather than the selection mechanism: it
+			// The pages are already English-only, so the crib is now a check rather than the selection mechanism: it
 			// verifies each page still matches the names our catalog carries (97-99% on a real English page), and a
 			// page that fails contributes nothing. Belt and braces - if the language index ever mis-attributes a page,
 			// names still cannot be filled from the wrong language.
@@ -108,7 +107,7 @@ namespace Faolan.Importer.Rdb
 			var spellsFilled = await BackfillAsync(db.Spells, s => s.Id, (s, n) => s.Name = n, spellEnglish);
 			var itemsFilled = await BackfillAsync(db.Items, i => i.Id, (i, n) => i.Name = n, itemEnglish);
 
-			// Descriptions (#414 items, #367 spells) cannot use the name crib - we hold no descriptions to crib against -
+			// Descriptions (items and spells) cannot use the name crib - we hold no descriptions to crib against -
 			// which is exactly why they need the language index: they are taken from the English pages, full stop.
 			var descriptionEnglish = Merge(descriptionPages);
 			var descriptionsFilled = await BackfillDescriptionsAsync(await db.Items.ToListAsync(), i => i.Id, i => i.Description, (i, d) => i.Description = d, descriptionEnglish, logger);
@@ -173,7 +172,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// The union of the (already English-only) pages of a category. A category is split across several pages per
-		// language, so a category's English strings are the union of ITS pages - there is no winner to pick.
+		// language, so a category's English strings are the union of its pages - there is no winner to pick.
 		private static Dictionary<uint, string> Merge(List<Dictionary<uint, string>> pages)
 		{
 			var merged = new Dictionary<uint, string>();

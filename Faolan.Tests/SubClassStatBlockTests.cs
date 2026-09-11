@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The relocated fresh-character stat skeleton (SubClassStatBlock) reproduces the beach template's PostAccessBlock
-	// byte-exact - so the stat region can be authored without BeachTailsTemplate.bin (#186, decode_statblock.py).
+	// byte-exact - so the stat region can be authored without BeachTailsTemplate.bin (decode_statblock.py).
 	public class SubClassStatBlockTests
 	{
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
@@ -20,7 +20,7 @@ namespace Faolan.Tests
 
 			var fresh = SubClassStatBlock.CreateFreshBlock();
 
-			// Field by field, so a mismatch says WHICH part of the block drifted, then byte-exact so nothing the
+			// Field by field, so a mismatch says which part of the block drifted, then byte-exact so nothing the
 			// model does not compare can drift silently.
 			Assert.True(parsed.Displayed.Pairs.SequenceEqual(fresh.Displayed.Pairs), "StatList#1 must equal the template's displayed stats");
 			Assert.True(parsed.Sheet.Pairs.SequenceEqual(fresh.Sheet.Pairs), "StatList#2 must equal the template's sheet");

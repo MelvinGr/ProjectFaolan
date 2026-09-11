@@ -8,20 +8,20 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report rdb-quest-catalog` - the client's own quest catalog, RDB type 1000104 (#569).
+	// `--report rdb-quest-catalog` - the client's own quest catalog, RDB type 1000104.
 	//
 	// This is the `RDBQUESTGIVERS` data table the client prints at startup: a 12-byte RDB header followed by a raw
 	// `QuestGiverList` protobuf, whose schema this repo already carried in `Faolan.Core/Protobuf` but had never read.
 	// It is the DEFINITION side of the quest system - the wire only ever shows the quests a captured character
-	// happened to hold, while this ships every quest in the game, with the designers' names in PLAINTEXT (no LDB
+	// happened to hold, while this ships every quest in the game, with the designers' names in plaintext (no LDB
 	// page, no captured decryption key).
 	//
-	// The client's model is MainQuest (a quest LINE) -> Quest (a step) -> QuestGoal, and it maps onto our tables
-	// one-for-one: `QuestLine.QuestLineId` IS `MainQuest.template_id`, `QuestDefinition.QuestId` IS `Quest.template_id`,
-	// and `QuestLine.Magic` IS `MainQuest.hash` (the ACGHash line token). That last one is what VERIFIES this
+	// The client's model is MainQuest (a quest line) -> Quest (a step) -> QuestGoal, and it maps onto our tables
+	// one-for-one: `QuestLine.QuestLineId` is `MainQuest.template_id`, `QuestDefinition.QuestId` is `Quest.template_id`,
+	// and `QuestLine.Magic` is `MainQuest.hash` (the ACGHash line token). That last one is what VERIFIES this
 	// report rather than merely asserting it - see the `hash` cross-check the summary prints.
 	//
-	// ⚠️ Several right-shaped fields in the schema are DEAD in the shipped data, and the census below prints the
+	// Several right-shaped fields in the schema are dead in the shipped data, and the census below prints the
 	// populated count for every one of them precisely so nobody plans a decode around a column of zeroes. Known
 	// empties: `MainQuest.type`, `Quest.tier`, `Quest.start_new_tier`, and both quest-giver lists.
 	public static partial class ReportCli
@@ -31,7 +31,7 @@ namespace Faolan.Importer.Cli
 		private const uint QuestCatalogRdbType = 1000104;
 		private const int QuestCatalogHeaderBytes = 12;
 
-		// The four line tokens `docs/re/questc-region-decode.md` recovered from CAPTURES, kept here as an
+		// The four line tokens `docs/re/questc-region-decode.md` recovered from captures, kept here as an
 		// independent check on the table: they were read off the wire, the hashes below come out of the client's
 		// data file, and nothing connects the two but the claim that our QuestLineId is the client's MainQuest id.
 		private static readonly (uint LineId, string Token)[] CapturedLineTokens =
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"goals    (QuestGoal) {catalog.QuestGoals.Count} rows");
 			Console.WriteLine($"quest givers {catalog.QuestGivers.Count}, giver positions {catalog.quest_giver_pos.Count}");
 
-			// A repeated id is NOT noise to be deduped away silently: 2 chapters and 15 goals have duplicate ids whose
+			// A repeated id is not noise to be deduped away silently: 2 chapters and 15 goals have duplicate ids whose
 			// rows DIFFER, so "first record wins" would drop real data (the same trap as the repeated wire records).
 			// Count them here, and the tree below prints every distinct variant rather than picking one.
 			Console.WriteLine();
@@ -108,7 +108,7 @@ namespace Faolan.Importer.Cli
 			Census("Quest.start_new_tier", catalog.Quests.Count(q => q.StartNewTier), quests.Count);
 			Census("QuestGoal.phase", catalog.QuestGoals.Count(g => g.Phase != 0), catalog.QuestGoals.Count);
 
-			// The census above counts NON-DEFAULT values, which cannot tell a field retail never emits from one it
+			// The census above counts non-default values, which cannot tell a field retail never emits from one it
 			// emits as zero - a generated getter reads both back as 0. The raw walk below can, and it also answers the
 			// question the schema cannot: is there anything in this record we do not parse?
 			RawFieldCensus(rdbDir);
@@ -151,7 +151,7 @@ namespace Faolan.Importer.Cli
 					if (m.OptionalRewards.Count > 0)
 						Console.WriteLine($"  optional rewards {string.Join(", ", m.OptionalRewards.Select(r => $"{r.TemplateId}:{r.Type}"))}");
 
-					// Distinct ROWS, not distinct ids: an id repeated with identical content is one definition listed
+					// Distinct rows, not distinct ids: an id repeated with identical content is one definition listed
 					// twice and printing it twice is just noise, while an id repeated with DIFFERING content is two
 					// definitions and dropping either would be a silent loss.
 					foreach (var q in questsByChapter[m.TemplateId].DistinctBy(QuestRow).OrderBy(q => q.TemplateId))
@@ -206,35 +206,35 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Does the catalog's own ROW ORDER give the step order within a quest line?
+		// Does the catalog's own row order give the step order within a quest line?
 		//
-		// #759: is `Quest_c` @+0xf0/@+0xf8 the LINE's reward? The catalog is the only place that can answer it - it
-		// gives a quest LINE exactly one `xp_reward`/`cash_reward` pair, keyed by `MainQuest.template_id`, which IS our
+		// is `Quest_c` @+0xf0/@+0xf8 the line's reward? The catalog is the only place that can answer it - it
+		// gives a quest line exactly one `xp_reward`/`cash_reward` pair, keyed by `MainQuest.template_id`, which is our
 		// `QuestLineId` (the hash cross-check above is what establishes that identity).
 		//
 		// Three things are printed, because the question has three parts and only the middle one had been asked:
 		//
-		//   1. does the carrier's @+0xf0 EQUAL its line's catalog xp_reward, and @+0xf8 the cash_reward;
+		//   1. does the carrier's @+0xf0 equal its line's catalog xp_reward, and @+0xf8 the cash_reward;
 		//   2. is a line's value repeated on its other captured steps (the constancy the line reading predicts);
-		//   3. WHERE in the line the carrier sits, against the captured `JournalSequence`.
+		//   3. where in the line the carrier sits, against the captured `JournalSequence`.
 		//
-		// ⚠️ Part 2 needs a sibling that was actually CAPTURED. A step with `HasSnapshotRecord = 0` carries 0 because
+		// Part 2 needs a sibling that was actually captured. A step with `HasSnapshotRecord = 0` carries 0 because
 		// no snapshot ever held it, which says nothing - counting those as disagreement would falsify the reading with
 		// missing data.
 		// `MainQuest.first_main_quest_template_id` / `last_main_quest_template_id` (fields 11 and 12) - populated on
-		// 1791 of 2181 chapters and, until this block, read by NOTHING: not the census above, not the importer, not
-		// the model. They went unnoticed because the census listed every OTHER field, which is exactly the shape a
+		// 1791 of 2181 chapters and, until this block, read by nothing: not the census above, not the importer, not
+		// the model. They went unnoticed because the census listed every other field, which is exactly the shape a
 		// missing row hides in.
 		//
-		// They LOOK like the chapter-level twin of `first_quest_template_id`/`last_quest_template_id`: those bound a
-		// chapter's STEPS, so these should bound a GROUP OF CHAPTERS.
+		// They look like the chapter-level twin of `first_quest_template_id`/`last_quest_template_id`: those bound a
+		// chapter's STEPS, so these should bound a group of CHAPTERS.
 		//
-		// ⛔ MEASURED, and the reading does not survive: the pair is DEGENERATE. Both ends resolve to a real chapter
+		// measured, and the reading does not survive: the pair is DEGENERATE. Both ends resolve to a real chapter
 		// on all 1791 rows, but 1788 have `first` == the row's own id and 1786 have `first` == `last`, i.e. a group of
-		// exactly one. Only THREE genuine multi-chapter groups exist in the whole table - {2495, 2496} -> 2549,
+		// exactly one. Only three genuine multi-chapter groups exist in the whole table - {2495, 2496} -> 2549,
 		// {1741, 2908}, and 3279 (which is one of the two duplicated ids). So the field carries a self-echo on 99.7%
 		// of rows and there is nothing here worth a column; `tier` does separate members where a group is real, but
-		// three groups is not a feature. Kept as a REPORT line rather than an import so the next reader sees the
+		// three groups is not a feature. Kept as a report line rather than an import so the next reader sees the
 		// measurement instead of re-deriving it.
 		private static void ChapterGroupCheck(QuestGiverList catalog, Dictionary<uint, QuestGiverList.MainQuest> chapters)
 		{
@@ -312,8 +312,8 @@ namespace Faolan.Importer.Cli
 				// below drops 17 of the 31 lines for want of a full order, which is most of the evidence - and a
 				// sequence of 0 is a real captured value on this table, not a missing one. Counted separately rather
 				// than by loosening the strict one, so the two can be compared.
-				// ⚠️ Gated on min != max, not merely on more than one step. 14 of the 31 lines have every captured
-				// step at the SAME sequence, and on those "at the lowest" and "at the highest" are both trivially
+				// Gated on min != max, not merely on more than one step. 14 of the 31 lines have every captured
+				// step at the same sequence, and on those "at the lowest" and "at the highest" are both trivially
 				// true - counting them inflates both columns and makes the finding look like a wash.
 				var all = byLine[carrier.QuestLineId];
 				var lo = all.Min(q => q.JournalSequence);
@@ -369,7 +369,7 @@ namespace Faolan.Importer.Cli
 			foreach (var r in rows)
 				Console.WriteLine(r);
 
-			// WHERE the catalog's reward field actually lives. It is populated on 23 of 2,181 lines, so "the carrier's
+			// where the catalog's reward field actually lives. It is populated on 23 of 2,181 lines, so "the carrier's
 			// line has no catalog reward" could be a coverage artefact rather than a disagreement - printing the whole
 			// populated set is what tells the two apart, and it is short enough to print in full.
 			var paying = catalog.MainQuests.Where(m => m.XpReward != 0 || m.CashReward != 0).DistinctBy(m => m.TemplateId).OrderBy(m => m.TemplateId).ToList();
@@ -385,14 +385,14 @@ namespace Faolan.Importer.Cli
 			TwoPairExclusion(quests.Select(q => (q.QuestId, q.QuestLineId, q.XpReward, q.MoneyReward, q.FieldF0, q.FieldF8, q.HasSnapshotRecord)));
 		}
 
-		// ⭐ Are the two reward pairs the SAME quantity in two slots? (#802.)
+		// Are the two reward pairs the same quantity in two slots?
 		//
-		// The standing reading is that they are two DIFFERENT rewards at opposite ends of a line - `@+0xf0`/`@+0xf8`
+		// The standing reading is that they are two different rewards at opposite ends of a line - `@+0xf0`/`@+0xf8`
 		// on the step you are offered, `@+0x28`/`@+0x20` on the step that pays - and that reading predicts a line
-		// carrying BOTH. Measured over the captured lines, that is not what the corpus holds: a line carries one pair
-		// or the other, essentially never both, and on the single line that does carry both the XP values are EQUAL.
+		// carrying both. Measured over the captured lines, that is not what the corpus holds: a line carries one pair
+		// or the other, essentially never both, and on the single line that does carry both the XP values are equal.
 		//
-		// ⚠️ Read the exclusion against CHANCE, not against zero. 31 quests carry the `@+0xf0` pair and 21 the
+		// Read the exclusion against CHANCE, not against zero. 31 quests carry the `@+0xf0` pair and 21 the
 		// journal's, over 100 captured quests, so ~6.5 overlaps is what independence predicts - which is why the
 		// expected count is printed beside the observed one. A single overlap is a real anti-correlation; calling it
 		// "almost none" without the base rate would be the same mistake as reading a purity sweep without one.
@@ -413,8 +413,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  per QUEST over the {captured.Count} captured: @+0xf0 only {f0Only}, @+0x28 only {xpOnly}, BOTH {bothQ}" +
 			                  $"  (chance predicts {expected:0.0} overlaps)");
 
-			// Per LINE, which is the measure the "opposite ends of one line" reading actually makes a claim about:
-			// two rewards at the two ends of a line would put BOTH on almost every reward-bearing line.
+			// Per line, which is the measure the "opposite ends of one line" reading actually makes a claim about:
+			// two rewards at the two ends of a line would put both on almost every reward-bearing line.
 			var lines = all.GroupBy(q => q.LineId)
 				.Where(g => g.Any(q => q.Captured))
 				.Select(g => (Line: g.Key, HasF0: g.Any(q => q.F0 != 0), HasXp: g.Any(q => q.Xp != 0)))
@@ -432,16 +432,16 @@ namespace Faolan.Importer.Cli
 				                  $" | @+0xf8 {q.F8} vs @+0x20 {q.Money} {(q.F8 == q.Money ? "EQUAL" : "differ")}");
 		}
 
-		// No FIELD does: `Quest.tier` and `Quest.start_new_tier` are zero on all 5042 rows. But a protobuf's repeated
-		// field preserves the order it was written in, and the journal has to get its order from SOMEWHERE the client
+		// No field does: `Quest.tier` and `Quest.start_new_tier` are zero on all 5042 rows. But a protobuf's repeated
+		// field preserves the order it was written in, and the journal has to get its order from somewhere the client
 		// can read offline - the completed-quest journal renders the steps of a line in order with no server input
 		// beyond the ids. So the hypothesis is positional: the Nth `Quest` row of a chapter is its Nth step.
 		//
         // The captured `JournalSequence` is the ground truth to score it against (harvested from the FullChar
 		// snapshot's completed-quest journal, which ships an explicit `[seq][questId]` pair per step). Only lines
-		// where EVERY step carries a captured sequence are scored - a partially-covered line cannot falsify anything.
+		// where every step carries a captured sequence are scored - a partially-covered line cannot falsify anything.
 		//
-		// ⚠️ Two CONTROLS run beside it, because a hypothesis that cannot fail is not evidence. Ascending template id
+		// Two CONTROLS run beside it, because a hypothesis that cannot fail is not evidence. Ascending template id
 		// is the null hypothesis (if it scored the same, row order would be telling us nothing that sorting already
 		// does), and reversed row order catches a corpus so degenerate that any total order fits it.
 		private static async Task StepOrderCheck(QuestGiverList catalog)
@@ -454,7 +454,7 @@ namespace Faolan.Importer.Cli
 				.GroupBy(q => q.QuestLineId)
 				.ToDictionary(g => g.Key, g => g.ToDictionary(q => q.QuestId, q => q.JournalSequence));
 
-			// First occurrence wins, so a step listed twice keeps the position of its FIRST row - the same rule the
+			// First occurrence wins, so a step listed twice keeps the position of its first row - the same rule the
 			// tree print uses, and the only one under which "the Nth row" is well defined.
 			var byChapter = catalog.Quests
 				.Where(q => q.MainQuestTemplateId != 0)
@@ -531,7 +531,7 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// One TSV line per record. These double as the IDENTITY used to tell a harmlessly-repeated id from one that
+		// One TSV line per record. These double as the identity used to tell a harmlessly-repeated id from one that
 		// carries two different definitions, so they must cover every field the report reads - a projection that
 		// dropped a column would make two differing rows look identical.
 		private static string ChapterRow(QuestGiverList.MainQuest m)
@@ -552,18 +552,18 @@ namespace Faolan.Importer.Cli
 			return $"{g.TemplateId}\t{g.Hash}\t{g.QuestTemplateId}\t{g.Phase}\t{Flatten(g.Name ?? "")}";
 		}
 
-		// The record walked as RAW protobuf - `(field number, wire type)` tallied per submessage - rather than read
+		// The record walked as raw protobuf - `(field number, wire type)` tallied per submessage - rather than read
 		// through the schema. Two things only this can answer:
 		//
-		//  1. **Absent vs zero.** protobuf-net generates `get => __pbn__X.GetValueOrDefault()`, so an unset optional
+		//  1. Absent vs zero. protobuf-net generates `get => __pbn__X.GetValueOrDefault()`, so an unset optional
 		//     and a zero are indistinguishable through the parsed object. Counting the bytes separates them:
 		//     `MainQuest.condition_script_id` and `Quest.start_scry_script_id` are never EMITTED, while
-		//     `MainQuest.type` / `Quest.tier` / `Quest.start_new_tier` ride on every row carrying zero. Same trap as
-		//     the `spawn_animation` misreading in #607, on the reading side.
-		//  2. **Whether anything here goes unparsed.** A schema-driven read silently skips a field number it does not
+		//     `MainQuest.type` / `Quest.tier` / `Quest.start_new_tier` ride on every row carrying zero. Reading an
+		//     absent field as a zero is how a flag gets a meaning it does not have.
+		//  2. Whether anything here goes unparsed. A schema-driven read silently skips a field number it does not
 		//     declare; this cross-checks every observed tag against the tags the generated classes declare, and
 		//     reports the leftover bytes. That is what makes "the layout is fully known" a measurement rather than an
-		//     assumption - and what says the catalog CANNOT supply a quest goal's missing verb/target/count (#527):
+		//     assumption - and what says the catalog cannot supply a quest goal's missing verb/target/count:
 		//     a QuestGoal is fields 1-5 with no unaccounted space for them to hide in.
 		private static void RawFieldCensus(string rdbDir)
 		{
@@ -717,7 +717,7 @@ namespace Faolan.Importer.Cli
 		// The record's protobuf payload - everything after the 12-byte RDB-Id header. Null when the client's RDB has
 		// no such entry.
 		//
-		// ⚠️ Takes the CDN base EXPLICITLY rather than reaching for it through OpenRdb (#819). OpenRdb resolves the
+		// Takes the CDN base EXPLICITLY rather than reaching for it through OpenRdb. OpenRdb resolves the
 		// proxy off ReportCli's static `_options`, which only the `--report` entry point ever assigns - so this
 		// function, which is deliberately shared with the import module, threw a NullReferenceException on every
 		// import run and took the whole `rdb-quest-catalog` module (and everything sequenced after it) down with it.

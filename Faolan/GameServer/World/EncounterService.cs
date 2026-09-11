@@ -12,20 +12,28 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Scripted encounters (#502) and quest ambushes (#708) - the entities a trigger puts into the world, and takes
-	// back out. Three shapes, all of them a SPAWN into a zone:
-	//
-	//   * a LURE springs into its BOSS when a player closes on it (an entity swap, not a re-template - the capture
-	//     shows different handles in the same second);
-	//   * the boss's corpse RESTORES the lure, so the encounter can be run again;
-	//   * a quest goal springs an AMBUSHER in front of the player after its own delay.
-	//
-	// It spawns into the zone and stops there - the interest pass streams the new entity to everyone in range on its
-	// next tick, and the sim's aggro pass puts the player on its hate list, so neither is authored here. The ONE thing
-	// that genuinely has to go out immediately is the lure's despawn, because the swap removes an entity clients are
-	// already rendering; that arrives as a `Func<WorldEntity, Task>` rather than a WorldBroadcaster reference - the
-	// single-op delegate seam CLAUDE.md prescribes, and the same shape the broadcaster's own `_applySelfBuff` uses.
-	// Holding the broadcaster would re-close the cycle #826 opened.
+	/// <summary>
+	///     Scripted encounters and quest ambushes: the entities a trigger puts into the world, and takes back out.
+	/// </summary>
+	/// <remarks>
+	///     Three shapes, each of them a spawn into a zone:
+	///     <list type="bullet">
+	///         <item>
+	///             a lure springs into its boss when a player closes on it - an entity swap rather than a re-template,
+	///             which is what the capture shows: different handles in the same second;
+	///         </item>
+	///         <item>the boss's corpse restores the lure, so the encounter can be run again;</item>
+	///         <item>a quest goal springs an ambusher in front of the player after its own delay.</item>
+	///     </list>
+	///     <para>
+	///         Each spawns into the zone and stops there: the interest pass streams the new entity to everyone in range
+	///         on its next tick, and the simulation's aggro pass puts the player on its hate list, so neither is
+	///         authored here. The one thing that has to go out immediately is the lure's despawn, because the swap
+	///         removes an entity clients are already rendering. It arrives as a <c>Func&lt;WorldEntity, Task&gt;</c>
+	///         rather than a <see cref="WorldBroadcaster" /> reference: holding the broadcaster would close a
+	///         construction cycle.
+	///     </para>
+	/// </remarks>
 	public sealed class EncounterService
 	{
 		private readonly Func<WorldEntity, Task> _broadcastDespawn;
@@ -34,8 +42,7 @@ namespace Faolan.GameServer.World
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		// #837: which combos a TYPE-built encounter NPC swings. The placed-spawn loader has derived these since
-		// #623/#675; this path never did, so a boss or an ambusher fought with none.
+		// Which combos a type-built encounter NPC swings; see StampCombatKit.
 		private readonly ComboService _combos;
 
 		public EncounterService(WorldSimulation sim, INpcRepository database, RuntimeHandleAllocator handles, ComboService combos, Func<WorldEntity, Task> broadcastDespawn,
@@ -49,12 +56,15 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// #502 scripted encounter: replace a LURE with its BOSS, on the lure's exact spot. An entity SWAP, not a
-		// re-template - which is what the capture shows (Damsel handle 0x0002db79 out, Eerika 0x0002ddd1 in, same
-		// second). The boss carries the lure's type so its corpse can restore it (EncounterReset).
-		//
-		// The boss is spawned FROM ITS TYPE: she has no NpcSpawn row and must not have one, existing only inside a
-		// triggered encounter (#501).
+		/// <summary>Replace a lure with its boss, on the lure's exact spot.</summary>
+		/// <remarks>
+		///     An entity swap rather than a re-template, which is what the capture shows: Damsel handle 0x0002db79 out,
+		///     Eerika 0x0002ddd1 in, in the same second. The boss carries the lure's type so its corpse can restore it.
+		///     <para>
+		///         The boss is spawned from its type: it has no <c>NpcSpawn</c> row and must not have one, existing
+		///         only inside a triggered encounter.
+		///     </para>
+		/// </remarks>
 		public async Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)
 		{
 			ArgumentNullException.ThrowIfNull(lure);
@@ -64,8 +74,8 @@ namespace Faolan.GameServer.World
 			var boss = await _database.GetNpcByTemplateId(bossTemplateId);
 			if (boss?.StatCore?.Health is not { } bossHealth || boss.StatCore.Level is not { } bossLevel)
 			{
-				// Loudly, not silently: an encounter whose boss type never got harvested would otherwise delete its
-				// lure and put nothing in its place, leaving an empty encounter no player could ever trigger again.
+				// Warn rather than fail silently: an encounter whose boss type was never harvested would otherwise
+				// delete its lure and put nothing in its place, leaving an encounter no player could trigger again.
 				_logger.LogWarning("Encounter: lure {Lure} on map {Map} has no usable boss type {Boss} - leaving the lure in place.", lure.Name, lure.MapId, bossTemplateId);
 				return null;
 			}
@@ -85,25 +95,30 @@ namespace Faolan.GameServer.World
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, boss.Name, EntityVitals.FromMax(bossHealth, 0, bossHealth), boss.TemplateId);
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = bossLevel;
-			entity.Disposition = WorldEntity.DispositionHostile; // the trap sprung - she attacks
+			entity.Disposition = WorldEntity.DispositionHostile; // the trap has sprung - the boss attacks
 			entity.Hostile = true;
 			entity.LootContainer = boss.LootContainerTemplateId;
 			entity.SpawnBody = body;
 			await StampCombatKit(entity, boss);
-			entity.Route.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
+			entity.Route.NoRespawn = true; // the corpse fades and the lure comes back in its place
 			entity.Presentation.EncounterLureTemplateId = lure.NpcTemplateId;
 			foreach (var sp in boss.Spells)
 				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
 
 			// Added to the zone only: the interest manager streams a new entity to nearby players on its next pass,
-			// which is how the ambient pools spawn members mid-session too. No explicit broadcast to get wrong.
+			// which is how the ambient pools spawn members mid-session too.
 			zone.Add(entity);
 			_logger.LogInformation("Encounter: {Lure} on map {Map} sprang into {Boss} (level {Level}) at ({X:F1}, {Z:F1}).", lure.Name, lure.MapId, boss.Name, entity.Level, position.X, position.Z);
 			return entity;
 		}
 
-		// #502: the boss is gone - put her lure back where she stood, so the encounter can fire again. Spawned from the
-		// lure's TYPE at the boss's position: the boss took the lure's exact spot, so that position IS the lure's home.
+		/// <summary>
+		///     The boss is gone: put its lure back where it stood, so the encounter can fire again.
+		/// </summary>
+		/// <remarks>
+		///     Spawned from the lure's type at the boss's position, because the boss took the lure's exact spot, so
+		///     that position is the lure's home.
+		/// </remarks>
 		public async Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss)
 		{
 			ArgumentNullException.ThrowIfNull(boss);
@@ -131,17 +146,24 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// #528 quest ambush: a goal just advanced for the first time and it springs an NPC on the player. Spawned FROM
-		// ITS TYPE beside them, hostile, with no placement anywhere - the same shape as an encounter boss, triggered by
-		// quest progress instead of proximity.
-		//
-		// The delay is real, not cosmetic: in the capture the trigger EFFECTS (item grant, goal progress, feedback) all
-		// land at t=315.6 and the body arrives at t=318.6 - two distinct steps. It is scheduled rather than awaited so
-		// the pickup's own reply chain is not held up behind it.
-		//
-		// Retail anchors the spawn on the interacted OBJECT (3.6 u from the brick); this anchors on the PLAYER standing
-		// at it, which is the same spot to within the interaction range and needs no object identity to reach the
-		// progression engine. The offset direction is the player's own facing, so it lands in front of them.
+		/// <summary>
+		///     A quest ambush: a goal advanced for the first time and springs an NPC on the player.
+		/// </summary>
+		/// <remarks>
+		///     Spawned from its type beside the player, hostile, with no placement anywhere - the same shape as an
+		///     encounter boss, triggered by quest progress instead of proximity.
+		///     <para>
+		///         The delay is real rather than cosmetic: in the capture the trigger effects (item grant, goal
+		///         progress, feedback) all land at t=315.6 and the body arrives at t=318.6, two distinct steps. It is
+		///         scheduled rather than awaited so the pickup's own reply chain is not held up behind it.
+		///     </para>
+		///     <para>
+		///         Retail anchors the spawn on the interacted object, 3.6 units from the brick; this anchors on the
+		///         player standing at it, which is the same spot to within the interaction range and needs no object
+		///         identity to reach the progression engine. The offset direction is the player's own facing, so the
+		///         ambusher lands in front of them.
+		///     </para>
+		/// </remarks>
 		public void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush)
 		{
 			ArgumentNullException.ThrowIfNull(client);
@@ -169,15 +191,15 @@ namespace Faolan.GameServer.World
 		}
 
 		/// <summary>
-		///     Stamp the three combat properties a TYPE-built NPC would otherwise be missing (#837): what it shoots
-		///     with, how far, and which combos it swings.
+		///     Stamp the three combat properties a type-built NPC would otherwise be missing: what it shoots with, how
+		///     far, and which combos it swings.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ These NPCs are built from a TEMPLATE and wear nothing - `NpcSpawnBuilder.BuildFromType` is called
-		///     with no outfit here, unlike a placed spawn or an ambient pool member. So the weapon-derived half
-		///     answers "unarmed", which is what they are, and the value is in the CLASS half: `NpcStatCore.ComboClass`
-		///     is a harvested archetype that needs no equipment to say which family a mob swings. Without this a
-		///     Damsel-in-Distress boss or a quest ambusher fought with no combo at all, whatever its type states.
+		///     These NPCs are built from a template and wear nothing - <c>NpcSpawnBuilder.BuildFromType</c> is called
+		///     with no outfit here, unlike a placed spawn or an ambient pool member - so the weapon-derived half
+		///     answers "unarmed", which is what they are. The value is in the class half: <c>NpcStatCore.ComboClass</c>
+		///     is a harvested archetype that needs no equipment to say which family a mob swings. Without this an
+		///     encounter boss or a quest ambusher fights with no combo at all, whatever its type states.
 		/// </remarks>
 		private async Task StampCombatKit(WorldEntity entity, NpcTemplate type)
 		{
@@ -193,8 +215,8 @@ namespace Faolan.GameServer.World
 			var type = await _database.GetNpcByTemplateId(ambush.NpcTemplateId);
 			if (type?.StatCore?.Health is not { } health || type.StatCore.Level is not { } level)
 			{
-				// Loudly, not silently: an ambush whose type never got harvested would spring nothing at all, and the
-				// quest would look exactly the same as one with no ambush wired.
+				// Warn rather than fail silently: an ambush whose type was never harvested springs nothing at all, and
+				// the quest then looks exactly like one with no ambush wired.
 				_logger.LogWarning("Ambush: goal {Goal} on map {Map} names type {Type}, which has no usable stat core - nothing sprung.", ambush.GoalId, zone.MapId, ambush.NpcTemplateId);
 				return;
 			}
@@ -209,13 +231,13 @@ namespace Faolan.GameServer.World
 			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken,
 				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(type.StatCore) : null);
 			await StampCombatKit(entity, type);
-			entity.Route.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
+			entity.Route.NoRespawn = true; // the corpse fades: an ambush is a one-off, not a placement that comes back
 			foreach (var sp in type.Spells)
 				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
 
 			// Zone-only, as the encounter swap and the ambient pools are: the interest pass streams it to everyone in
-			// range on its next tick, and the sim's own aggro pass puts the player on its hate list - which is what the
-			// capture shows arriving with it, rather than a hate list we would have to author.
+			// range on its next tick, and the simulation's own aggro pass puts the player on its hate list, which is
+			// what the capture shows arriving with it.
 			zone.Add(entity);
 			_logger.LogInformation("Ambush: goal {Goal} sprang {Name} (level {Level}) on map {Map} at ({X:F1}, {Z:F1}).", ambush.GoalId, type.Name, level, zone.MapId, position.X, position.Z);
 		}

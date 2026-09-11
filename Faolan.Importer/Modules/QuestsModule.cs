@@ -16,7 +16,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Quest journal-content definitions + the hand-decoded snapshot/chain seeds (beach 10238, Casilda #261/#255).
+	// Quest journal-content definitions plus the hand-decoded snapshot/chain seeds (the beach chain 10238 and the
+	// Casilda chain).
 	public sealed class QuestsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => [nameof(MapsModule)];
@@ -41,8 +42,8 @@ namespace Faolan.Importer.Modules
 			var packets = ctx.Captures.SelectMany(c => c.Packets).ToList();
 			var defs = QuestDefinitionExtractor.Extract(packets);
 
-			// Areas FIRST: QuestDefinition.QuestLineId is an FK, so every area a definition points at must already have a
-			// row. The 4CCs come from the completed-quest journal (#390); the rest are placeholders.
+			// Areas first: QuestDefinition.QuestLineId is an FK, so every area a definition points at must already have a
+			// row. The 4CCs come from the completed-quest journal; the rest are placeholders.
 			// ...and a line an index block named without a header takes it from its own quests' header records (the
 			// three the completed journal would have carried for it) - the fix for the nameless completed-tab group.
 			var areas = QuestLineExtractor.WithHeadersFromQuests(QuestLineExtractor.Extract(packets), defs);
@@ -55,25 +56,25 @@ namespace Faolan.Importer.Modules
 			var harvest = CompletedQuestExtractor.Extract(packets);
 			var (addedCompleted, filledCompleted) = await QuestImportOps.ImportCompletedQuestDefinitions(ctx.Db, harvest);
 
-			// The index blocks and the mid-session MainQuestUpdate lists state each held line's WHOLE order, finished
+			// The index blocks and the mid-session MainQuestUpdate lists state each held line's whole order, finished
 			// steps or not - the completed journal only the finished ones. Fills the sequence the journal left at 0;
 			// the index block of a held quest is built from it, so a multi-step line without one keeps its quests out
-			// of the login snapshot (#926).
+			// of the login snapshot.
 			var lineOrder = LineOrderExtractor.Extract(packets);
 			foreach (var d in lineOrder.Disagreements)
 				Console.WriteLine($"  ⚠️ line order: {d}");
 			var (orderedSteps, orderDisagree, orderNoRow) = await QuestImportOps.ImportLineOrder(ctx.Db, lineOrder.ByQuest);
 			Console.WriteLine($"Line order from the quest index blocks + MainQuestUpdate lists: {lineOrder.ByQuest.Count} steps captured ({lineOrder.OnIndexBlocks} on an index block, {lineOrder.OnlyOnUpdateLists} only on a list), {orderedSteps} filled a 0 JournalSequence, {orderDisagree} disagree with the completed journal, {orderNoRow} name a quest with no row (#926).");
 
-			// The @609 objective goals - required before a quest can ride the login snapshot (#389).
+			// The @609 objective goals - required before a quest can ride the login snapshot.
 			var goals = ObjectiveGoalExtractor.Extract(packets);
 			var addedGoals = await QuestImportOps.ImportObjectiveGoals(ctx.Db, goals);
 
-			// NB the objective-region verification does NOT run here - it runs at the end of quest-wiring, because the
+			// NB the objective-region verification does not run here - it runs at the end of quest-wiring, because the
 			// rows it judges are not final until that overlay has re-applied the hand-authored fields this harvest
 			// clobbers (goal 1448's TrailingLocalized; see IImportModule.RequiredAfter). Verifying here flagged the
-			// quest against an intermediate state, which is how the beach starter stayed unverified while the SHIPPED
-			// rows rebuild byte-exact (#389).
+			// quest against an intermediate state, which is how the beach starter stayed unverified while the shipped
+			// rows rebuild byte-exact.
 
 			return new ImportResult($"{defs.Count} quest definitions, {addedGoals} objective goals, {areaCount} quest areas " +
 			                        $"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");

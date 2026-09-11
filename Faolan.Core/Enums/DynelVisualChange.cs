@@ -3,11 +3,11 @@ namespace Faolan.Core.Enums
 	// What a `SimpleDynelVisualChangeIIR` (0xE7F4F8F8) changes about a world object - the `kind` word that selects
 	// its payload.
 	//
-	// **These are the CLIENT's own names.** The applier beside the reader
+	// These are the client's own names. The applier beside the reader
 	// (`SimpleDynelVisualChangeIIR_c::SimpleDynelVisualChangeIIR_c()` = FUN_007a6480) switches on this word and logs
 	// "e_<name> Visual change iir is activating" into the `GameCode/simpledynel` debug channel before it acts, so
 	// each case carries its enum member as a string; the two that log through a shared helper
-	// (`PlayActionAnim`, `SetDisplayName`) were read off the string operand of that call (#678). Nothing here is
+	// (`PlayActionAnim`, `SetDisplayName`) are read off the string operand of that call. Nothing here is
 	// inferred from what a payload looked like.
 	//
 	// The payload each one takes is in `SimpleDynelVisualChangeCodec` (sizes) and `SimpleDynelVisualChanges`

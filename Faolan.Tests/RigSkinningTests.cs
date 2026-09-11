@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Validates the skinned-glb path (#275 rig import) WITHOUT the client RDB: a synthetic skeleton + a synthetic
+	// Validates the skinned-glb path (rig import) without the client RDB: a synthetic skeleton + a synthetic
 	// skinned sub-mesh exercise GlbWriter's skin emission, the local-palette -> skeleton-by-name remap (the bug where
 	// the mesh's compact bone palette was treated as a direct skeleton index), and rest-pose identity.
 	public class RigSkinningTests
@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, skeleton.Count);
 			Assert.Equal(2f, skeleton[2].WorldPosition.Y, 3); // tip world Y = 0+1+1
 
-			// Sub-mesh whose LOCAL palette deliberately reverses skeleton order: local 0 -> "rig_tip" (skel 2),
+			// Sub-mesh whose local palette deliberately reverses skeleton order: local 0 -> "rig_tip" (skel 2),
 			// local 1 -> "rig_root" (skel 0). v0 binds local 0 (=> joint 2), v1 binds local 1 (=> joint 0).
 			var sub = new RenderMeshReader.SubMesh([0f, 2f, 0f, 0f, 0f, 0f], null, null, [0, 1, 0])
 			{
@@ -46,8 +46,8 @@ namespace Faolan.Tests
 			var prim = gltf.GetProperty("meshes")[0].GetProperty("primitives")[0].GetProperty("attributes");
 			var joints = ReadAccessorBytes(gltf, bin, prim.GetProperty("JOINTS_0").GetInt32());
 
-			// THE remap assertion: v0's first joint must be skeleton index 2 (rig_tip), v1's must be 0 (rig_root) -
-			// proving the local palette index was resolved through the bone NAME, not used as a direct skeleton index.
+			// The remap assertion: v0's first joint must be skeleton index 2 (rig_tip), v1's must be 0 (rig_root) -
+			// proving the local palette index was resolved through the bone name, not used as a direct skeleton index.
 			Assert.Equal(2, joints[0]);
 			Assert.Equal(0, joints[4]);
 		}

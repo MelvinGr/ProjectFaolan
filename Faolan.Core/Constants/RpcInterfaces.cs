@@ -5,22 +5,21 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Constants
 {
-	// The fourteen client RPC interfaces, each as one row: its client class NAME, its endpoint class ID, and the
+	// The fourteen client RPC interfaces, each as one row: its client class name, its endpoint class id, and the
 	// `*Methods` enum that catalogs its methods.
 	//
-	// ⚠️ THIS IS THE ONE OWNER OF THE CLASS IDS. They had drifted into three places - `Endpoints`' constants (which
-	// now forward here), the docs generator's `ExpectedClassIds`, and the importer's method census - and the
-	// name/enum PAIRING into two. The pairing is the part that silently rots: an enum matched to the wrong class
-	// names every frame on that interface wrongly, and nothing type-checks it.
+	// This is the one owner of the class ids: `Endpoints`' constants, the docs generator's `ExpectedClassIds` and the
+	// importer's method census all read them from here. The name/enum pairing is the part that silently rots - an
+	// enum matched to the wrong class names every frame on that interface wrongly, and nothing type-checks it - so
+	// it too is stated once.
 	//
 	// It lives in `Faolan.Core` because that is where its two inputs already are - the `*Methods` enums next door in
 	// `Enums/`, and a class id is a plain constant. `Faolan.Core.Network.Endpoints` builds the wire `ProtoEndpoint`
 	// from these, which is the network concern; naming them is not.
 	//
-	// ⚠️ A `RpcInterface.Type` is `Crypt.Bkdr31.Of(Name)` - see that type for the hash and the other id namespace it
-	// serves. That is ASSERTED, not assumed: the docs generator
-	// recomputes every one and fails the build on a mismatch, which catches a typo'd or renamed class before it
-	// silently mismatches the Wireshark dissector.
+	// A `RpcInterface.Type` is `Crypt.Bkdr31.Of(Name)` - see that type for the hash and the other id namespace it
+	// serves. That is asserted, not assumed: the docs generator recomputes every one and fails the build on a
+	// mismatch, which catches a typo'd or renamed class before it silently mismatches the Wireshark dissector.
 	public static class RpcInterfaces
 	{
 		public const uint UniverseInterfaceType = 0x0C384054;
@@ -42,7 +41,7 @@ namespace Faolan.Core.Constants
 		// is a bare id here rather than a row in `All`.
 		public const uint PlayerAgentServiceConnectionType = 0x1D359116;
 
-		// c2s receivers are the *Agent classes, s2c receivers the *Interface ones - so the RpcHeader's RECEIVER class
+		// c2s receivers are the *Agent classes, s2c receivers the *Interface ones - so the RpcHeader's receiver class
 		// alone picks the table that names a frame.
 		public static readonly RpcInterface[] All =
 		[
@@ -76,7 +75,7 @@ namespace Faolan.Core.Constants
 
 	}
 
-	// `Methods` is the `*Methods` enum TYPE; `Members` walks it. A `Type` rather than a generic parameter because
+	// `Methods` is the `*Methods` enum type; `Members` walks it. A `Type` rather than a generic parameter because
 	// the fourteen rows have to live in one array.
 	public sealed record RpcInterface(string Name, uint Type, Type Methods)
 	{

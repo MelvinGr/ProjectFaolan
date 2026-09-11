@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The RDB collision-mesh (type 1000012, NovodeX PhysX cooked trimesh) parser + segment raycast for #284 tier-3
-	// (building-wall line-of-sight). Format decoded + validated against the live client (beach 4010 = 666 actors /
-	// 116,178 tris, 0 bad-parse; verts are world-space). These tests build a synthetic NXUSTREAM (one wall quad) and
+	// The RDB collision-mesh (type 1000012, NovodeX PhysX cooked trimesh) parser + segment raycast for tier-3
+	// line-of-sight (building walls). Format decoded + validated against the live client (beach 4010 = 666 actors /
+	// 116,178 tris, 0 bad-parse; verts are world-space). These tests build a synthetic nxustream (one wall quad) and
 	// lock the parse + the segment-vs-triangle raycast.
 	public class RdbCollisionMeshTests
 	{
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Skips_A_Spurious_Magic_And_Still_Parses_The_Real_Mesh()
 		{
-			// A stray NXS\x01MESH in junk bytes (bad counts) must be skipped without derailing the real actor after it.
+			// A stray nxs\x01MESH in junk bytes (bad counts) must be skipped without derailing the real actor after it.
 			var junk = new List<byte>();
 			junk.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]);
 			junk.AddRange(new byte[4]); // truncated - no valid nVerts/nTris reachable
@@ -78,11 +78,11 @@ namespace Faolan.Tests
 			Assert.Equal(2, mesh.TriangleCount);
 		}
 
-		// One cooked-mesh actor: [NXS\x01MESH][20 header bytes][u32 nVerts][u32 nTris][verts vec3 f32][tris u8 (nVerts<=256)].
+		// One cooked-mesh actor: [nxs\x01MESH][20 header bytes][u32 nVerts][u32 nTris][verts vec3 f32][tris u8 (nVerts<=256)].
 		internal static byte[] Actor(Vector3[] verts, (int, int, int)[] tris)
 		{
 			var b = new List<byte>();
-			b.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]); // NXS\x01 + MESH
+			b.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]); // Nxs\x01 + mesh
 			b.AddRange(new byte[20]); // ver/flags/3 header words (unused by us)
 			b.AddRange(BitConverter.GetBytes((uint)verts.Length));
 			b.AddRange(BitConverter.GetBytes((uint)tris.Length));

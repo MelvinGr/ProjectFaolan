@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #74/#71: the per-character KNOWN-SPELL list carried in the 0x737A6DF9 FullChar snapshot tails (the spellbook
+	// The per-character known-spell list carried in the 0x737A6DF9 FullChar snapshot tails (the spellbook
 	// region). Ground truth = the Faolanx (clean fresh necromancer) login snapshot, whose list is exactly its 2
 	// create-spells (count 0x0BD3, records 0x42CA77 + 0x125D9B, both type 2).
 	public class KnownSpellListTests
@@ -62,13 +62,13 @@ namespace Faolan.Tests
 			Assert.True(countOffset >= 0, "the empty known-list slot must be locatable by its landmark");
 			var slotStart = countOffset + 16; // past the 16-byte landmark to the count word
 
-			// Everything BEFORE the count word is identical between the two builds.
+			// Everything before the count word is identical between the two builds.
 			Assert.True(empty.AsSpan(0, slotStart).SequenceEqual(withSpells.AsSpan(0, slotStart)), "bytes before the known-list must be unchanged");
 
 			// The populated build carries the captured count + records at the slot.
 			Assert.True(withSpells.AsSpan(slotStart, FaolanxKnownListGolden.Length).SequenceEqual(FaolanxKnownListGolden), "the spliced known-list must equal the captured Faolanx bytes");
 
-			// Everything AFTER the list (the empty build's trailing bytes) is preserved, just shifted by 24.
+			// Everything after the list (the empty build's trailing bytes) is preserved, just shifted by 24.
 			Assert.True(empty.AsSpan(slotStart + 4).SequenceEqual(withSpells.AsSpan(slotStart + FaolanxKnownListGolden.Length)),
 				"bytes after the known-list must be preserved (shifted by the records)");
 		}

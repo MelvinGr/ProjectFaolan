@@ -6,11 +6,11 @@ namespace Faolan.Tests
 {
 	// Byte-exact reconstruction of the TradePostGUI_MailItemBought remoteformat XML (the body of the AH buy->mail
 	// notification) from its substitutable fields, against the NecroL80 buy_from_autionhouse_get_mail capture. Proves
-	// the buy->mail body is CONSTRUCTED, not replayed, for the captured inputs; arbitrary-item buys reuse the same
+	// the buy->mail body is constructed, not replayed, for the captured inputs; arbitrary-item buys reuse the same
 	// builder with a best-effort item-name fragment (the per-item RDB name key is unsynthesizable - see the builder).
 	public class TradepostMailBodyTests
 	{
-		// The captured mail body (#1604) - the XML is embedded between the mailId/endpoints header and the footer;
+		// The captured mail body - the XML is embedded between the mailId/endpoints header and the footer;
 		// reuse MailMessageCodec.Parse to lift it out (the same oracle MailMessageCodecTests uses).
 		private const string CapturedMail = "20d82b631c0c578f08006f3100074173736173323308006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                    "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 		{
 			var capturedXml = MailMessageCodec.Parse(Convert.FromHexString(CapturedMail)).BodyXml;
 
-			// Recipient = the captured character, because the captured XML this is compared against contains it (#417).
+			// Recipient = the captured character, because the captured XML this is compared against contains it.
 			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("Assas23" /* the capture's buyer, pseudonymised in the golden XML above (#465) */,
 				7310868733973495813ul, // the mail XML's param-1 item id (decimal, distinct from the saleId)
 				TradepostMailBodyCodec.CapturedItemNameEscaped, "Ponakin", "25"));

@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The level-scaled rating quad - AttackRating / DefenseRating / MagicRating / MagicalResist (#685).
+	// The level-scaled rating quad - AttackRating / DefenseRating / MagicRating / MagicalResist.
 	//
-	// Unlike the skill-point pool next door this one IS a formula. It was recovered by sweeping every captured
+	// Unlike the skill-point pool next door this one is a formula. It was recovered by sweeping every captured
 	// StatIIR record carrying one of the four ids: 2,100 records, 31 captures, 13 characters across 6 classes,
 	// 8 distinct values - and all 2,100 fit `400 x level - 300` exactly.
 	public class CombatRatingCurveTests
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, CombatRatingCurve.For(level));
 		}
 
-		// The corpus is read the other way too: no captured value is off the line, so a value that does NOT invert to
+		// The corpus is read the other way too: no captured value is off the line, so a value that does not invert to
 		// a whole level would have falsified the formula. Checking the inverse keeps that property explicit.
 		[Fact]
 		public void EveryCapturedValue_InvertsToAWholeLevel()
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// All four ids carry the SAME value in the same send - true of every one of the 525 sends of each id - so the
+		// All four ids carry the same value in the same send - true of every one of the 525 sends of each id - so the
 		// quad is one number, not four.
 		[Fact]
 		public void TheQuadIsTheFourClientNamedRatingStats()

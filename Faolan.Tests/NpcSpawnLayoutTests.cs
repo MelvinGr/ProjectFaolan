@@ -7,8 +7,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The RDB 1010506 ("NPC roam/movement") open-world spawn-layout parser (#332). The client RDB isn't in the repo,
-	// so - like RdbCollisionMeshTests / RdbHeightmapTests - these build a SYNTHETIC record in the exact wire grammar
+	// The RDB 1010506 ("NPC roam/movement") open-world spawn-layout parser. The client RDB isn't in the repo,
+	// so - like RdbCollisionMeshTests / RdbHeightmapTests - these build a synthetic record in the exact wire grammar
 	// and lock the parse. The synthetic record mirrors the real Tarantia Noble District (2010) shape: a numeric
 	// "Community" group with a roam path, plus a "Name" group whose id carries the creature name+tag.
 	public class NpcSpawnLayoutTests

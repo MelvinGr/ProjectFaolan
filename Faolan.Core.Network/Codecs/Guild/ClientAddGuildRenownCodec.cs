@@ -4,26 +4,29 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
-	// 0x203A DispatchClientAddGuildRenown - "you just earned renown", the message behind the renown gain the client
-	// shows. Long carried on the open-items list as an undecoded "counters update, semantics unknown"; it is neither
-	// unknown nor a counter update. The client's method table names its four fields
-	// `(renownType, amount, guildOnly, capType)` [V1: docs/re/aoc-client-rpc-methods.json], and the c2s twin
-	// `AddGuildRenown(const ID32& character, uint8 grType, uint64 amount, bool onlyGuild)` types three of them.
-	//
-	//   [u32 renownType][u64 amount][u32 guildOnly][u8 capType]     = 17 bytes
-	//
-	// All ten captured records are 17 bytes and agree: renownType is always 2, guildOnly and capType always 0, and the
-	// ONLY field that moves is the amount - 1, 1, 1, 1, 1, 1, 1, 3, 139, 108 - which is what a renown award looks like
-	// and is why the u64 slot is a u64 rather than two u32 (its high word is always zero, and the c2s twin declares
-	// `uint64 amount`).
-	//
-	// The renown TYPE values are the guild window's renown tabs (Valor / Glory / Artistry), but only type 2 is
-	// captured, so which tab that is stays open. [V0: the guild renown type ids]
+	/// <summary>
+	///     <c>DispatchClientAddGuildRenown</c> - "you just earned renown", the message behind the renown gain the client
+	///     shows, as <c>[u32 renownType][u64 amount][u32 guildOnly][u8 capType]</c> (17 bytes).
+	/// </summary>
+	/// <remarks>
+	///     The client's method table names its four fields <c>(renownType, amount, guildOnly, capType)</c>
+	///     [V1: docs/re/aoc-client-rpc-methods.json], and the c2s twin <c>AddGuildRenown(const ID32&amp; character, uint8
+	///     grType, uint64 amount, bool onlyGuild)</c> types three of them.
+	///     <para>
+	///         All ten captured records are 17 bytes and agree: renownType is always 2, guildOnly and capType always 0,
+	///         and the only field that moves is the amount (1, 1, 1, 1, 1, 1, 1, 3, 139, 108). The amount slot is a u64
+	///         rather than two u32 because the c2s twin declares <c>uint64 amount</c>; its high word is always zero.
+	///     </para>
+	///     <para>
+	///         The renown type values are the guild window's renown tabs (Valor / Glory / Artistry), but only type 2 is
+	///         captured, so which tab that is remains open. [V0: the guild renown type ids]
+	///     </para>
+	/// </remarks>
 	public static class ClientAddGuildRenownCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchClientAddGuildRenown;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ClientAddGuildRenown value)
 		{
 			ArgumentNullException.ThrowIfNull(value);

@@ -10,13 +10,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact round-trip of the quest INDEX region (the marker + the "W6QT" area-catalog table) between the
-	// COMPLETED-quest journal and the access-window table. docs/re/fullplayer-snapshot-reader.md, #186/#391.
+	// Byte-exact round-trip of the quest index region (the marker + the "W6QT" area-catalog table) between the
+	// completed-quest journal and the access-window table. docs/re/fullplayer-snapshot-reader.md.
 	public class QuestIndexRegionTests
 	{
-		// The index opens at its MARKER, not the 0x3F1 at 1168 - that word is the empty completed-journal frame (the
-		// beach char has no completed quests), decoded as a phantom "IndexTag" until #391. The index is 1172..1292.
-		private const int RegionStart = 1172, RegionEnd = 1288; // 1288, not 1292: the last four bytes are the access-window table's ListFrame word (#464)
+		// The index opens at its marker, not the 0x3F1 at 1168 - that word is the empty completed-journal frame (the
+		// beach char has no completed quests), not an "IndexTag". The index is 1172..1292.
+		private const int RegionStart = 1172, RegionEnd = 1288; // 1288, not 1292: the last four bytes are the access-window table's ListFrame word
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			var region = QuestIndexRegionCodec.Parse(template.AsSpan(RegionStart, RegionEnd - RegionStart));
 
-			// The region opens on the id-list FRAME - a one-element list, not the 0x7E2 "constant" it reads as.
+			// The region opens on the id-list frame - a one-element list, not the 0x7E2 "constant" it reads as.
 			Assert.Equal(ListFrame.ForCount(1), template.ReadU32Be(RegionStart));
 			Assert.Equal(new[] { 10238u }, region.QuestIds);
 			Assert.Equal(241u, region.Blocks[0].AreaId); // the beach area id (== 0xF1, the old "sentinel"/"leadAreaId")
@@ -34,8 +34,8 @@ namespace Faolan.Tests
 			Assert.Equal(10238u, region.Blocks[0].AreaQuestIds[0]);
 		}
 
-		// #896: the two per-LINE MainQuest_c trailer words come off the QuestLine row, and the SAME pair has to reach
-		// the client through BOTH producers - the login snapshot's index block and the incremental
+		// The two per-line MainQuest_c trailer words come off the QuestLine row, and the same pair has to reach
+		// the client through both producers - the login snapshot's index block and the incremental
 		// MainQuestUpdateIIR - or the client's quest tracker sorts one way at login and another after an accept.
 		[Theory]
 		[InlineData(1u, 0u)] // solo, the majority and the column's default
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 		}
 
 		// A line the caller cannot supply - no row loaded, or a line no captured index block ever named - keeps the
-		// SOLO values. That is what both paths sent before the columns existed, so the beach goldens stay byte-exact.
+		// solo values. That is what both paths sent before the columns existed, so the beach goldens stay byte-exact.
 		[Fact]
 		public void WithNoLineRow_BothProducersKeepTheSoloValues()
 		{
@@ -85,8 +85,8 @@ namespace Faolan.Tests
 			Assert.Equal(template[RegionStart..RegionEnd], QuestIndexRegionCodec.Build(region));
 		}
 
-		// The block's two lead words are the HELD quest's step number in its line and the number of steps after it -
-		// per-character progress (#926), not the `[1][count-1]` constant they read as while every captured character
+		// The block's two lead words are the held quest's step number in its line and the number of steps after it -
+		// per-character progress, not the `[1][count-1]` constant they read as while every captured character
 		// stood on step 1. Both halves are checked on every captured block: StepNumber equals the held quest's own
 		// sequence entry in the block's catalog, and StepsAfter is what remains of the catalog after it.
 		[Fact]

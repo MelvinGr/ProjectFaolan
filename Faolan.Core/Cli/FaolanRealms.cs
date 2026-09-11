@@ -17,8 +17,8 @@ namespace Faolan.Core.Cli
 	///     stack instead of being edited into the database by hand.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ Deliberately not the <c>Realm</c> entity, and deliberately not all of it. A realm row is three things
-	///     wearing one name: this static deployment config, the LIVE columns (<c>OnlineStatus</c> and
+	///     Deliberately not the <c>Realm</c> entity, and deliberately not all of it. A realm row is three things
+	///     wearing one name: this static deployment config, the live columns (<c>OnlineStatus</c> and
 	///     <c>LastSeenUtc</c>, written only by the host that serves the realm, plus <c>LoadStatus</c>, which is the
 	///     realm's population), and the parent of four foreign keys. Only the first can be declared - a file cannot
 	///     tell the login tier that a host on another machine just died, cannot count who is logged in, and a row that
@@ -44,23 +44,23 @@ namespace Faolan.Core.Cli
 	///     it declares none.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ This is the one part of faolan.json that is NOT in <see cref="FaolanSettings" />. That catalog is a flat
+	///     This is the one part of faolan.json that is not in <see cref="FaolanSettings" />. That catalog is a flat
 	///     list of scalars with one accessor per key, one command-line option per key, and a test pinning it in key
-	///     order; a LIST of records fits none of that. Rather than bend the catalog into holding arrays - which would
+	///     order; a list of records fits none of that. Rather than bend the catalog into holding arrays - which would
 	///     mean `--Realms:0:Port` as a command-line option and an accessor per field per realm - the section is read
 	///     here, and <c>FaolanSettingsTests</c> exempts it by name.
 	///     <para />
 	///     Everything else about it behaves the way the catalog does: the values below are the bottom layer, the
-	///     committed faolan.json is GENERATED from them, and a later layer (faolan.user.json, the command line, the
-	///     environment) overrides. What it does not do is MERGE - see <see cref="Declared" />.
+	///     committed faolan.json is generated from them, and a later layer (faolan.user.json, the command line, the
+	///     environment) overrides. What it does not do is merge - see <see cref="Declared" />.
 	/// </remarks>
 	public static class FaolanRealms
 	{
 		public const string Section = "Realms";
 
 		/// <summary>
-		///     The realm a deployment gets when it declares none - the historical single-process ports, so a checkout
-		///     that has never heard of this section comes up exactly as it did before.
+		///     The realm a deployment gets when it declares none - the single-process ports, so a checkout without this
+		///     section comes up unchanged.
 		/// </summary>
 		public static readonly ImmutableArray<DeclaredRealm> Default =
 		[
@@ -71,10 +71,10 @@ namespace Faolan.Core.Cli
 		///     Whether any configuration layer declares realms at all.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ This is what keeps every existing deployment byte-identical. An UNDECLARED deployment is left alone
-		///     entirely: the reconciler falls back to the old "insert the default realm if the table is empty, else do
-		///     nothing" behaviour, so a database whose realm happens to carry some other id is never duplicated by a
-		///     declaration it never made. Config becomes authoritative only once somebody writes it down.
+		///     An undeclared deployment is left alone entirely: the reconciler inserts the default realm only when the
+		///     table is empty and otherwise does nothing, so a database whose realm happens to carry some other id is
+		///     never duplicated by a declaration it never made. Configuration becomes authoritative only once somebody
+		///     writes it down.
 		/// </remarks>
 		public static bool IsDeclared(IConfiguration config)
 		{
@@ -85,9 +85,9 @@ namespace Faolan.Core.Cli
 		///     The declared realms, validated - or <see cref="Default" /> when nothing declares any.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ A configuration layer REPLACES an array element, it does not merge arrays: `Realms:1:Port` in
+		///     A configuration layer replaces an array element, it does not merge arrays: `Realms:1:Port` in
 		///     faolan.user.json overrides that one key of the second realm and leaves the rest of the committed entry
-		///     standing, but there is no way to REMOVE an entry a lower layer declared. So a deployment that wants a
+		///     standing, but there is no way to remove an entry a lower layer declared. So a deployment that wants a
 		///     different set of realms declares the whole set, and the generated faolan.json declares exactly one so
 		///     there is little to inherit by accident.
 		/// </remarks>
@@ -141,9 +141,9 @@ namespace Faolan.Core.Cli
 			return lines;
 		}
 
-		// The realm's own IPv4 check, run at CONFIG time rather than at wire-write time. Realm.IpAddressLong throws
-		// the same way (#845: the chat/CS handoff carries a u32 and the client is IPv4-only), but it throws on the
-		// send - i.e. once a player has already picked the realm and is waiting for a handoff that will never come.
+		// The realm's own IPv4 check, run at configuration time rather than at wire-write time. Realm.IpAddressLong
+		// throws the same way (the chat/CS handoff carries a u32 and the client is IPv4-only), but it throws on the
+		// send - once a player has already picked the realm and is waiting for a handoff that will never come.
 		private static string Address(IConfigurationSection realm, string key)
 		{
 			var text = Text(realm, key);
@@ -165,7 +165,7 @@ namespace Faolan.Core.Cli
 				: throw new InvalidOperationException($"{Where(realm, key)} is '{text}', which is not one of {Enum.GetValues<T>().JoinAsString(", ")}.");
 		}
 
-		// ⚠️ The three ports are read as ushort but rejected at ZERO, which uint16 parsing accepts. Port 0 means "let
+		// The three ports are read as ushort but rejected at zero, which uint16 parsing accepts. Port 0 means "let
 		// the kernel pick" to a bind and "nothing is listening" to the client the login tier hands it to - so it would
 		// come up looking healthy and route every player into a black hole.
 		private static ushort Port(IConfigurationSection realm, string key)
@@ -217,9 +217,8 @@ namespace Faolan.Core.Cli
 					$"{Where(realm, key)} has no value. A declared realm names every field - there is no per-field default, because a half-declared realm is a realm the login tier would advertise wrongly.");
 		}
 
-		// ⭐ The cross-realm checks are the ones worth having. A duplicate id silently makes two declarations fight
-		// over one row; a repeated port on one address is #910 again, except now it is two realm HOSTS racing for a
-		// bind and the loser dying with the winner already advertised.
+		// The cross-realm checks: a duplicate id silently makes two declarations fight over one row, and a repeated
+		// port on one address is two realm hosts racing for a bind, the loser dying with the winner already advertised.
 		private static void Validate(ImmutableArray<DeclaredRealm> realms)
 		{
 			if (Duplicate(realms.Select(r => r.Id.ToString(CultureInfo.InvariantCulture))) is { } id)

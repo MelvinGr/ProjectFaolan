@@ -11,16 +11,15 @@ namespace Faolan.Web.Components.Pages
 {
 	// A purpose-built editor for a spell and its effects, next to the generic DbEditor and the QuestEditor.
 	//
-	// Why not just use DbEditor: a spell's behaviour is spread over THREE tables, and the interesting one is a handful
-	// of rows hiding in a table of thousands. Wiring a summon or a proc meant finding the parent in ~20k Spells rows,
-	// then finding its children in SpellEffects by hand, with the row cap in the way and no hint which columns the
-	// chosen Kind actually reads. Here a spell shows its own fields, its server-acted effects and its extracted stat
-	// effects on one screen, and the effect columns disable themselves for the kinds that ignore them.
+	// Why not the generic DbEditor: a spell's behaviour is spread over three tables, and the interesting one is a
+	// handful of rows hiding in a table of thousands. Here a spell shows its own fields, its server-acted effects and
+	// its extracted stat effects on one screen, and the effect columns disable themselves for the kinds that ignore
+	// them.
 	//
-	// SpellEffects is EDITABLE (a few dozen hand-decoded rows - the pet summons and the fatality proc). SpellStatEffects
-	// is READ-ONLY on purpose: it is the client's own [2][9] template region, re-derived wholesale on every RDB
-	// re-import, so an edit here would be silently discarded by the next importer run. It is shown because it is what a
-	// buff actually modifies.
+	// SpellEffects is editable (a few dozen hand-decoded rows - the pet summons and the fatality proc).
+	// SpellStatEffects is read-only on purpose: it is the client's own [2][9] template region, re-derived wholesale on
+	// every RDB re-import, so an edit here would be silently discarded by the next importer run. It is shown because it
+	// is what a buff actually modifies.
 	//
 	// Admin-gated, edits the live DB (restart to apply) - same contract as the other two editors.
 	public partial class SpellEditor
@@ -47,7 +46,7 @@ namespace Faolan.Web.Components.Pages
 			_effects = (await ctx.SpellEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
 			_statEffects = (await ctx.SpellStatEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
 
-			// Open on something worth looking at rather than spell #1: the spells that HAVE server-acted effects are the
+			// Open on something worth looking at rather than spell 1: the spells that have server-acted effects are the
 			// reason this page exists.
 			var first = _spells.FirstOrDefault(s => _effects.ContainsKey(s.Id)) ?? _spells.FirstOrDefault();
 			if (first != null)

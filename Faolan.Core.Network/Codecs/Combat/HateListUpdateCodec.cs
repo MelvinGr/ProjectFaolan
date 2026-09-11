@@ -5,21 +5,22 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// HateListUpdateIIR (0x8A01E5A1) - a hate/aggro entry: a flag byte then three u32s (FUN_007a93a0); in the capture
-	// the trio is [u32 targetClass][u32 target handle][count] - the leading word is the standard [class][handle]
-	// entity-reference pair's CLASS half (0xC350 = EntityClass.Character on every captured record), not a marker.
-	//
-	// ⚠️ The carrier handle is the entity whose THREAT LIST this updates - the PLAYER - and `Target` is the creature
-	// that now threatens them. Not the other way round: this comment used to say the carrier was "the hater (the NPC)"
-	// and the aggro broadcast followed it, which addressed every record to a handle the client keeps no threat list
-	// for. Measured over the corpus, 270 of 270 captured records carry the session player as the carrier.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     HateListUpdateIIR - a hate/aggro entry: a flag byte then three u32 (client reader FUN_007a93a0), the trio being
+	///     [u32 targetClass][u32 target handle][u32 count]. The leading word is the class half of the wire's usual
+	///     [class][handle] entity reference, EntityClass.Character on every captured record.
+	/// </summary>
+	/// <remarks>
+	///     The carrier handle is the entity whose threat list this updates - the player - and <c>Target</c> is the creature
+	///     that now threatens them, not the other way round: all 270 captured records carry the session player as the
+	///     carrier. Addressing it to the NPC instead would send every record to a handle the client keeps no threat list for.
+	///     <para>The u32 carrier length belongs to the framing sender, not to this body.</para>
+	/// </remarks>
 	public static class HateListUpdateCodec
 	{
 		public const uint Opcode = (uint)IirTypes.HateListUpdateIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(HateListUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -65,8 +66,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// HateListUpdateIIR (0x8A01E5A1).
-	// (TargetClass, Target) is the wire's usual [class][handle] entity reference - TargetClass was long named
-	// "Marker" for its constant 0xC350 face.
+	/// <summary>
+	///     The HateListUpdateIIR body. (TargetClass, Target) is the wire's usual [class][handle] entity reference.
+	/// </summary>
 	public sealed record HateListUpdateIIR(uint Handle, byte Env, byte Flag, uint TargetClass, uint Target, uint Count);
 }

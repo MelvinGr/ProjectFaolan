@@ -10,8 +10,8 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #243/#244: every shipped NPC spawn builds its FA015807 body wholly from typed columns - the captured
-	// NpcSpawn.Data blob has been retired, so this is the gate that nothing regressed back into needing it.
+	// Every shipped NPC spawn builds its FA015807 body wholly from typed columns - there is no captured
+	// NpcSpawn.Data blob to fall back on, and this is the gate that nothing regresses back into needing one.
 	public class SpawnBuildsFromColumnsTests
 	{
 		private readonly ITestOutputHelper _out;
@@ -21,10 +21,9 @@ namespace Faolan.Tests
 			_out = o;
 		}
 
-		// Mirrors TryBuildLive's build guard, which is now the single condition `StatCore.IirHeader is not null`.
-		// It used to carry a third arm - an equipped no-morph humanoid also needed a derived post-IIR word2 - and
-		// that arm is gone because the word2 is gone: it was the movement mode under another name, so the post-IIR
-		// takes it from the character message and no separate column has to have been derived (#605).
+		// Mirrors TryBuildLive's build guard, the single condition `StatCore.IirHeader is not null`. An equipped
+		// no-morph humanoid needs no extra arm: its post-IIR word2 is the movement mode under another name, so the
+		// post-IIR takes it from the character message and no separate column has to be derived.
 		[Fact]
 		public void EveryShippedSpawn_BuildsFromColumns()
 		{
@@ -47,10 +46,10 @@ namespace Faolan.Tests
 			Assert.Empty(fallback);
 		}
 
-		// #309: an EPIC copy serves the normal population wearing the ELITE decorations - the builder's
+		// An epic copy serves the normal population wearing the elite decorations - the builder's
 		// normalsetOverride retags `NpcStats.normalset` exactly as the back-to-back Spider Caverns captures show
 		// (regulars absent -> 13, minions 1 -> 9, zero exceptions over 171 spawns), and the default build keeps the
-		// stored set so a NORMAL zone is untouched.
+		// stored set so a normal zone is untouched.
 		[Fact]
 		public void BuildLive_EpicNormalsetOverride_RetagsTheDecoration_AndDefaultKeepsTheStoredOne()
 		{
@@ -76,11 +75,10 @@ namespace Faolan.Tests
 			Assert.Null(EpicDecorations.NormalsetFor(new NpcStatCore { NpcType = 3 }));
 		}
 
-		// #672: the appearance entry's third word was read as "runtime state" and used to decline a whole morph
-		// table, which spawned three NPCs BALD - Turach, Kincaid and Valkyrie Skalla. The classifier now accepts it
-		// and `NpcSpawnMorph.Word2` carries it, and THIS is what makes that safe rather than a silent lie: a lifted
-		// table has to survive the row -> wire trip with the field intact. Dropping the emit would leave the DB
-		// truthful and the packet not, which is the state the ticket judged worse than the honest gap.
+		// The appearance entry's third word is not runtime state: read as such it declines a whole morph table and
+		// spawns NPCs bald (Turach, Kincaid and Valkyrie Skalla). `NpcSpawnMorph.Word2` carries it, and this is what
+		// makes that safe rather than a silent lie: a lifted table has to survive the row -> wire trip with the field
+		// intact. Dropping the emit would leave the DB truthful and the packet not, which is worse than an honest gap.
 		[Fact]
 		public void ASpawnCarryingWord2_RoundTripsItOntoTheWire()
 		{
@@ -107,34 +105,32 @@ namespace Faolan.Tests
 				var slot = built.Post.Slot;
 				Assert.Equal(expected, slot.Appearance.Select(m => (m.MorphId, m.Word2)).ToArray());
 
-				// The claim the acceptance rests on: the non-zero entries are a CONTIGUOUS PREFIX of the table, and
-				// their values are a PERMUTATION of 1..N - dense, distinct, gapless. Runtime state accrued in play
+				// The claim the acceptance rests on: the non-zero entries are a contiguous prefix of the table, and
+				// their values are a permutation of 1..N - dense, distinct, gapless. Runtime state accrued in play
 				// would be scattered through the table and arbitrary in value; this is an ordinal of something.
 				//
-				// ⚠️ NOT in ascending order. #672's own write-up said "Turach's first three entries hold 1/2/3 and
-				// Kincaid's first four hold 1/2/3/4", which reads as sorted and is not: Kincaid's are 3, 1, 2, 4. So
-				// whatever it ordinals, it is not the table's own position, and asserting the sorted form would have
-				// baked that misreading in.
+				// Not in ascending order: Turach's first three entries hold 1/2/3 but Kincaid's first four hold 3, 1, 2, 4.
+				// So whatever it ordinals, it is not the table's own position, and asserting the sorted form would bake that
+				// misreading in.
 				var nonZero = slot.Appearance.TakeWhile(m => m.Word2 != 0).Select(m => m.Word2).ToArray();
 				Assert.NotEmpty(nonZero);
 				Assert.Equal(Enumerable.Range(1, nonZero.Length).Select(i => (uint)i), nonZero.Order());
 				Assert.All(slot.Appearance.Skip(nonZero.Length), m => Assert.Equal(0u, m.Word2));
 
-				// ⭐ And WHAT it is attached to: every entry that carries it is a `*texscript_*` morph, i.e. a texture
+				// And what it is attached to: every entry that carries it is a `*texscript_*` morph, i.e. a texture
 				// script rather than a face/body slider or a hair mesh. That is the strongest single argument that it
-				// is appearance data - runtime state would not confine itself to one KIND of entry - and it is why
+				// is appearance data - runtime state would not confine itself to one kind of entry - and it is why
 				// the ordinal is not the table position: it orders the texscript run, whatever that ordering drives.
 				var texscripts = names.Where(kv => kv.Value.StartsWith("*texscript", StringComparison.Ordinal)).Select(kv => kv.Key).ToHashSet();
 				Assert.All(slot.Appearance.Where(m => m.Word2 != 0), m => Assert.Contains(m.MorphId, texscripts));
 			}
 		}
 
-		// The wire invariant the whole of #605 comes down to: a spawn body carries its movement mode TWICE - as the
-		// character message's `movement_mode` and as the post-IIR header's third word - and retail sends the same
-		// number in both. Measured over the corpus at 5,738/5,739 NPC spawns and 209/209 player spawns
-		// (`--report field-predictors`); here it is asserted of what WE emit, which holds exactly because the builder
-		// derives one from the other. Before that, the two came from two separate columns lifted from two different
-		// representative spawns, and 45 of the 368 shipped types disagreed with themselves.
+		// A spawn body carries its movement mode twice - as the character message's `movement_mode` and as the
+		// post-IIR header's third word - and retail sends the same number in both. Measured over the corpus at
+		// 5,738/5,739 NPC spawns and 209/209 player spawns (`--report field-predictors`); here it is asserted of what
+		// we emit, which holds exactly because the builder derives one from the other. Lifting the two from separate
+		// columns instead leaves types disagreeing with themselves.
 		[Fact]
 		public void EveryShippedSpawn_SendsOneMovementModeInBothPlaces()
 		{

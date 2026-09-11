@@ -8,12 +8,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The guild-city / Battlekeep rules (#147) and the minigame arena catalog (#146).
+	// The guild-city / Battlekeep rules and the minigame arena catalog.
 	//
-	// Both are DECISION-layer only - no capture in the corpus carries a siege or minigame message, so nothing here
+	// Both are decision-layer only - no capture in the corpus carries a siege or minigame message, so nothing here
 	// is sent. What these gates protect is the transcription: every constant is a quoted client string, and the
 	// failure mode for a table of quoted numbers is that someone "tidies" one into a rounder value. So the tests
-	// assert the numbers retail states, and - more usefully - the BOUNDARIES, which is where a rule read slightly
+	// assert the numbers retail states, and - more usefully - the boundaries, which is where a rule read slightly
 	// wrong shows up first.
 	public class GuildCityRulesTests
 	{
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void AGuildThatAlreadyHoldsAKeep_MayNotFightForAnother()
 		{
-			// Checked BEFORE the tier gate, because it is the more specific refusal and it is the one retail's own
+			// Checked before the tier gate, because it is the more specific refusal and it is the one retail's own
 			// string is about ("You may not fight for another one").
 			Assert.Equal(GuildCityRefusal.AlreadyOwnsABattlekeep, GuildCityRules.CanApplyForBattlekeep(Guild(tier: 3, battlekeep: true)).Refusal);
 		}
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 			Assert.True(GuildCityRules.IsVulnerable(opens, opens));
 			Assert.True(GuildCityRules.IsVulnerable(opens, opens.AddMinutes(119)));
 
-			// The instant the window closes is NOT vulnerable - a half-open interval, so two back-to-back windows
+			// The instant the window closes is not vulnerable - a half-open interval, so two back-to-back windows
 			// cannot both contain the same moment.
 			Assert.False(GuildCityRules.IsVulnerable(opens, opens.AddHours(2)));
 		}
@@ -128,12 +128,12 @@ namespace Faolan.Tests
 			Assert.True(GuildCityRules.CanRepairOrBuildDuringBattle(aBattleIsRunning: false).IsAllowed);
 		}
 
-		// --- The minigame arenas (#146) -------------------------------------------------------------------------
+		// --- The minigame arenas -------------------------------------------------------------------------
 
 		[Fact]
 		public async Task EveryArena_IsAPlayfieldWeHold()
 		{
-			// The arena ids come from the CLIENT's RDB 1000512; our Maps come from captures. A name that matches
+			// The arena ids come from the client's RDB 1000512; our Maps come from captures. A name that matches
 			// across the two is a real cross-check, not a tautology.
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
@@ -150,7 +150,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void OnlyTheTwoArenasTheClientDescribes_CarryAMode()
 		{
-			// ⚠️ The point of this gate: three of the five arenas have no LDB 10015 rules entry, and the honest state
+			// The point of this gate: three of the five arenas have no LDB 10015 rules entry, and the honest state
 			// is Unknown. If someone later fills them in, this fails and they have to say where the mode came from.
 			Assert.Equal(5, MinigameCatalog.Arenas.Count);
 
@@ -173,7 +173,7 @@ namespace Faolan.Tests
 			Assert.True(MinigameCatalog.TotemTorrentRules.ControlPointsHardenTheTotem);
 			Assert.True(MinigameCatalog.TotemTorrentRules.HasCentralHealZone);
 
-			// ⚠️ The tiebreak applies only "if both teams are alive when the time is up" - a wiped side loses
+			// The tiebreak applies only "if both teams are alive when the time is up" - a wiped side loses
 			// outright, so this must never be read as the win condition.
 			Assert.True(MinigameCatalog.TotemTorrentRules.MostKillsWinsOnTime);
 		}

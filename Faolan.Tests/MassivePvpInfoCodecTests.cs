@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// 0x20A5 DispatchMassivePvpInfoRequestReturn - the Massive-PvP battlekeep board (#146). The body below is
+	// 0x20A5 DispatchMassivePvpInfoRequestReturn - the Massive-PvP battlekeep board. The body below is
 	// retail's, verbatim from Hakotep_hox_login_gameplay0.
 	//
-	// It is the SHORTEST captured body whose last entry has a non-empty `otherName`, and that is the whole point of
+	// It is the shortest captured body whose last entry has a non-empty `otherName`, and that is the whole point of
 	// picking it: the grammar this codec replaced ended an entry with "[u16 len][name][7 zero bytes]", which is the
 	// same width as `[u16 0][u32 0][u8 0]` and so parses every board where `otherName` happens to be empty - 122 of
 	// the 125 distinct retail bodies. Only a body from the other three can tell the two readings apart.
@@ -41,7 +41,7 @@ namespace Faolan.Tests
 		{
 			var parsed = MassivePvpInfoCodec.Parse(Convert.FromHexString(CapturedBoard));
 
-			// The list is a MAP: the key ahead of each element repeats the entry's own rank, which is why a captured
+			// The list is a map: the key ahead of each element repeats the entry's own rank, which is why a captured
 			// entry starts with its rank twice.
 			for (var i = 0; i < parsed.Entries.Count; i++)
 			{
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			Assert.Equal("U.S.B", parsed.Entries[0].GuildName);
 
 			// The row that only this body can prove: a non-empty trailing string, with the tail pair that moves with
-			// it. Reading those 17 bytes as padding is exactly what the old grammar did.
+			// it. Reading those 17 bytes as padding loses both.
 			var last = parsed.Entries[^1];
 			Assert.Equal("Incursion", last.GuildName);
 			Assert.Equal("Fury (Dead)", last.OtherName);
@@ -74,8 +74,8 @@ namespace Faolan.Tests
 		}
 
 		// The board the server actually sends: no Massive-PvP layer, so no guilds. This is the one form with no
-		// capture oracle (every retail board carries 8), so it is pinned here explicitly - the trailing word is what
-		// #408 was: dropping it made the client read past the end and drop the whole CSPlayerAgent route.
+		// capture oracle (every retail board carries 8), so it is pinned here explicitly - and the trailing word is
+		// load-bearing: dropping it makes the client read past the end and drop the whole CSPlayerAgent route.
 		[Fact]
 		public void EmptyBoard_IsTheListFrameAndTheTrailingWord()
 		{

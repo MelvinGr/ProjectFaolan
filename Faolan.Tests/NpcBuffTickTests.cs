@@ -11,13 +11,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #776: the world tick for buffs sitting on a NON-PLAYER entity.
+	// The world tick for buffs sitting on a non-player entity.
 	//
 	// The gap these gate: `TickBuffExpiry`, `TickDots` and `TickAuras` all walk `Players`, so a debuff a player put on
-	// a MOB had nothing to expire it, nothing to bleed it and nothing to emit its own areas. `Gangrenous Stench` is
+	// a mob had nothing to expire it, nothing to bleed it and nothing to emit its own areas. `Gangrenous Stench` is
 	// the reported case - the aura ran, dealt its initial damage and then did nothing, because the 9.5s effect record
 	// its area names never actually landed on anybody. An applied buff with no tick behind it is also the never-
-	// expiring orphan icon #274 fixed on the player side, so the two halves have to ship together.
+	// expiring orphan icon the player side already guards against, so the two halves have to ship together.
 	public class NpcBuffTickTests
 	{
 		private const uint MapId = 4010; // Tortage Beach
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(MobHandle, tick.NpcHandle);
 			Assert.Equal(PlayerHandle, tick.CasterHandle);
 			Assert.Equal(-7, tick.Delta);
-			Assert.Equal(EffectSpell, tick.SpellId); // the BASE id, not the wire form
+			Assert.Equal(EffectSpell, tick.SpellId); // the base id, not the wire form
 		}
 
 		// ...and only on its own cadence: a tick inside the interval is not a second bleed. Without this the 10 Hz
@@ -56,8 +56,8 @@ namespace Faolan.Tests
 			Assert.Empty(output.DotTicks);
 		}
 
-		// The expiry half: a lapsed effect sends the retail END TWIN so the client drops the icon, and leaves the
-		// registry. This is the orphan-icon failure of #274, one entity over.
+		// The expiry half: a lapsed effect sends the retail end twin so the client drops the icon, and leaves the
+		// registry. This is the orphan-icon failure, one entity over.
 		[Fact]
 		public async Task AnExpiredEffect_SendsTheEndTwinAndLeavesTheRegistry()
 		{
@@ -73,8 +73,8 @@ namespace Faolan.Tests
 			Assert.Empty(mob.ActiveBuffs);
 		}
 
-		// The chain #776 is really about: the effect record states an area of ITS OWN, so an infected mob spreads it
-		// to its neighbours - centred on the MOB, not on the player who started it.
+		// The chain that matters: the effect record states an area of its own, so an infected mob spreads it
+		// to its neighbours - centred on the mob, not on the player who started it.
 		[Fact]
 		public async Task AnInfectedMob_EmitsTheEffectsOwnArea_CentredOnItself()
 		{
@@ -104,9 +104,9 @@ namespace Faolan.Tests
 			Assert.Single(output.Areas);
 		}
 
-		// TWO mobs carrying the same effect each emit their own area on the same tick. The stamp used to be keyed by
-		// (buff, area) alone, so the second holder's emission was swallowed as "already ticked this period" - the
-		// spread would have stalled at one mob however many it had reached.
+		// Two mobs carrying the same effect each emit their own area on the same tick. A stamp keyed by (buff, area)
+		// alone swallows the second holder's emission as "already ticked this period", stalling the spread at one mob
+		// however many it has reached.
 		[Fact]
 		public async Task TwoMobsCarryingTheSameEffect_BothEmit()
 		{

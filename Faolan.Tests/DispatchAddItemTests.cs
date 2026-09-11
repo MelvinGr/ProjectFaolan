@@ -85,9 +85,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The live-add factory must produce retail's stat list, in retail's ORDER (#722). The captured entry above
+		// The live-add factory must produce retail's stat list, in retail's order. The captured entry above
 		// is the oracle: its stats run 0x00, 0x08, 0x17, 0x2E - ascending by id, Duration second. Before this the
-		// live add reused the SNAPSHOT's triple (0x00, 0x17, 0x1A) and sent no Duration at all.
+		// live add reused the snapshot's triple (0x00, 0x17, 0x1A) and sent no Duration at all.
 		[Fact]
 		public void LiveAddEntry_CarriesDurationInStatIdOrder()
 		{
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 			Assert.Equal([0u, 8u, 23u, 26u], entry.StatLists.Select(s => s.Stat));
 			Assert.Equal(uint.MaxValue, entry.StatLists.Single(s => s.Stat == 8).Value);
 
-			// The snapshot form is deliberately DIFFERENT - three stats, no Duration.
+			// The snapshot form is deliberately different - three stats, no Duration.
 			var snapshot = SnapshotItems.ListEntry(0, ItemId, (ulong)RecordId, 1, item, item.Hash).Item;
 			Assert.Equal([0u, 23u, 26u], snapshot.StatLists.Select(s => s.Stat));
 		}

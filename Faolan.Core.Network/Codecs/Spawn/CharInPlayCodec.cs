@@ -5,20 +5,20 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// CharInPlayIIR (0x864CFEF8) - the "character is now in play" signal. 9 bytes past the subop:
-	//
-	//   [u32 subop][u32 class][u32 handle][u8 env]
-	//
-	// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs, so the
-	// carrier handle is the whole message (docs/re/iir-readers-combat-world.md). `env` is the base IIR's flag byte,
-	// 0 in every capture.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     CharInPlayIIR - the "character is now in play" signal:
+	///     <c>[u32 subop][u32 class][u32 handle][u8 env]</c>.
+	/// </summary>
+	/// <remarks>
+	///     An empty record: the client reader (FUN_0075a920) only resolves the SimpleChar for the handle and logs, so the
+	///     carrier handle is the whole message. See docs/re/iir-readers-combat-world.md. <c>env</c> is the base IIR's flag
+	///     byte, 0 in every capture, and the u32 carrier length belongs to the framing sender.
+	/// </remarks>
 	public static class CharInPlayCodec
 	{
 		public const uint Opcode = (uint)IirTypes.CharInPlayIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CharInPlayIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -49,6 +49,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 	}
 
-	// CharInPlayIIR (0x864CFEF8).
+	/// <summary>The CharInPlayIIR body.</summary>
 	public sealed record CharInPlayIIR(uint Handle, byte Env = 0);
 }

@@ -34,9 +34,9 @@ namespace Faolan.Web.Components.Pages
 			await LoadAsync(Ctx);
 		}
 
-		// The page's own load. The context is a PARAMETER rather than read off Ctx so the guarantee is in the
-		// signature: this runs only after the gate has passed and the context exists, so a subclass never has to
-		// null-check what the base just created.
+		// The page's own load. The context is a parameter rather than read off Ctx so the guarantee is in the signature:
+		// this runs only after the gate has passed and the context exists, so a subclass never has to null-check what
+		// the base just created.
 		protected abstract Task LoadAsync(DatabaseContext ctx);
 
 		protected async Task Save()
@@ -51,8 +51,8 @@ namespace Faolan.Web.Components.Pages
 			}
 			catch (Exception ex)
 			{
-				// The CHECK constraints (ConstrainToEnumValues) and composite keys surface here, and the useful half
-				// is the provider's message - "UNIQUE constraint failed" - not the EF wrapper around it.
+				// The CHECK constraints (ConstrainToEnumValues) and composite keys surface here, and the useful half is
+				// the provider's message - "UNIQUE constraint failed" - rather than the EF wrapper around it.
 				Set(ex.InnerException?.Message ?? ex.Message, true);
 			}
 		}

@@ -38,8 +38,8 @@ namespace Faolan.Tests
 			Assert.Equal(objectId, entry.ObjectId);
 		}
 
-		// #363: a LootBagFullUpdateIIR object is kept ONLY when it carries a world-builder [script-tag] (a PLACED
-		// container); every tagless one is a transient DROP - including boss/raid chests named exactly like a placed
+		// A LootBagFullUpdateIIR object is kept only when it carries a world-builder [script-tag] (a placed
+		// container); every tagless one is a transient drop - including boss/raid chests named exactly like a placed
 		// one, which is why keying on the "chest" name wrongly baked the "Large Chest" drops.
 		[Theory, InlineData("Chest [N7FU]", false), InlineData("aquilonian_treasure_chest [QRON]", false), InlineData("Large Chest", true), InlineData("Chest", true), InlineData("Bag of loot", true)]
 		public void IsTransientLootContainer_KeepsOnlyScriptTaggedPlacements(string name, bool transient)
@@ -47,11 +47,11 @@ namespace Faolan.Tests
 			Assert.Equal(transient, WorldObjectExtractor.IsTransientLootContainer(name));
 		}
 
-		// #554: `IsClosed` is the one identity field that changes during play - the map 4020 "Wharf Door" is captured
-		// closed in one session and open (the field ABSENT) in another - so first-seen made ordinal capture FILENAME
-		// order decide a door's world-entry state. Since #598 the value is not stored at all (it is live state on
-		// LiveWorldObject), so the winner no longer decides what ships - but the merge must still reach the same
-		// answer whatever order the captures arrive in, because it is choosing which capture's bytes EVERY OTHER
+		// `IsClosed` is the one identity field that changes during play - the map 4020 "Wharf Door" is captured
+		// closed in one session and open (the field absent) in another - so first-seen made ordinal capture filename
+		// order decide a door's world-entry state. The value is not stored at all (it is live state on
+		// LiveWorldObject), so the winner does not decide what ships - but the merge must still reach the same
+		// answer whatever order the captures arrive in, because it is choosing which capture's bytes every other
 		// field is lifted from. That is what the reversed case asserts. The all-null case is the sanity check that
 		// being order-independent is not just "it always picks the same slot".
 		[Theory, InlineData(true, null, true), InlineData(null, true, true), InlineData(null, null, null), InlineData(false, null, false), InlineData(true, false, true)]
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Assert.Single(WorldObjectExtractor.Merge(entries)).IsClosed);
 		}
 
-		// Two entries that are the SAME object by the dedup key (map, spawn point, display identity) and differ only
+		// Two entries that are the same object by the dedup key (map, spawn point, display identity) and differ only
 		// in the state field.
 		private static WorldObjectEntry Door(bool? isClosed)
 		{
@@ -83,8 +83,8 @@ namespace Faolan.Tests
 			};
 		}
 
-		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
-		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
+		// A real PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte, so a
+		// synthetic body with the map id at the right offset is not a MapChange.
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);

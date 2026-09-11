@@ -4,24 +4,27 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Faction
 {
-	// `DispatchApplyFactionRank` (GameCharInterface 0x4F) - "your rank with this faction is now N" (Gitea #310).
-	//
-	//   [u32 factionId][u32 rank]
-	//
-	// The twin of `ApplyFactionPointsCodec`, recovered the same way and with the same caveat: zero occurrences in the
-	// corpus, parameters named `(i_FactionId, i_Rank)` by the client's own method table
-	// [V1: docs/re/aoc-client-rpc-methods.json], body = the two parameters as bare big-endian values (#132's rule).
-	//
-	// ⚠️ RANK is derived, never stored: it is `FactionLadder.RankFor(points)` over the same points the other message
-	// carries. The two are sent together because the client keeps them in different places - the standing bar off the
-	// points, the TITLE off the rank - and a server that sent only one would leave the other showing the last value
-	// it was told. `Rank` is 0..4, and 0 means "no title yet", which is every standing below 50,000 including the
-	// whole negative half.
+	/// <summary>
+	///     <c>DispatchApplyFactionRank</c> - "your rank with this faction is now N", as
+	///     <c>[u32 factionId][u32 rank]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The twin of <see cref="ApplyFactionPointsCodec" />, recovered the same way and with the same caveat: zero
+	///     occurrences in the corpus, parameters named <c>(i_FactionId, i_Rank)</c> by the client's own method table
+	///     [V1: docs/re/aoc-client-rpc-methods.json], and a body of those two parameters as bare big-endian values.
+	///     <para>
+	///         Rank is derived rather than stored - it is <c>FactionLadder.RankFor(points)</c> over the same points the
+	///         other message carries. Both are sent together because the client keeps them in different places: the
+	///         standing bar off the points, the title off the rank, so sending only one leaves the other showing the
+	///         last value it was told. Rank is 0..4, and 0 means "no title yet", which is every standing below 50,000
+	///         including the whole negative half.
+	///     </para>
+	/// </remarks>
 	public static class ApplyFactionRankCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchApplyFactionRank;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ApplyFactionRank value)
 		{
 			ArgumentNullException.ThrowIfNull(value);

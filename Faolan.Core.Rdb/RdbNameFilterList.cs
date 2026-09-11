@@ -5,19 +5,22 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
-	// The client's own forbidden-word list: RDB type 1065100, one record (19.4 KB decompressed, 1,819 entries /
-	// 926 distinct). It is what gates a character name that no rule of ours should be inventing — see
-	// `NameFilterTerm` for why the import stores hashes rather than the words.
-	//
-	// Grammar (little-endian throughout):
-	//
-	//     [u32 typeId = 1065100][u32 0][u32 1][u32 count]  then count x  [u32 byteLen][UTF-8 bytes]
-	//
-	// The chain tiles the record exactly, so there is no resync case here and a short read is a real error.
-	// The first word of the header is the record's OWN type id, which is what makes the framing self-evident.
-	//
-	// The list is multilingual — German, English, Spanish, French, Polish and a large Korean block — and most
-	// terms are listed twice, non-adjacently (the shape of a hash-table dump). Callers dedupe.
+	/// <summary>
+	///     The client's own forbidden-word list: RDB type 1065100, one record (19.4 KB decompressed, 1,819 entries /
+	///     926 distinct). It is what gates a character name - see <c>NameFilterTerm</c> for why the import stores
+	///     hashes rather than the words.
+	/// </summary>
+	/// <remarks>
+	///     Grammar (little-endian throughout):
+	///     <code>
+	///     [u32 typeId = 1065100][u32 0][u32 1][u32 count]  then count x  [u32 byteLen][UTF-8 bytes]
+	///     </code>
+	///     The chain tiles the record exactly, so there is no resync case here and a short read is a real error. The
+	///     first word of the header is the record's own type id, which is what makes the framing self-evident.
+	///     <para />
+	///     The list is multilingual - German, English, Spanish, French, Polish and a large Korean block - and most
+	///     terms are listed twice, non-adjacently (the shape of a hash-table dump). Callers dedupe.
+	/// </remarks>
 	public static class RdbNameFilterList
 	{
 		public const uint Type = 1065100;

@@ -11,16 +11,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Importer.Captures
 {
-	// Discovers maps from captured MapChange packets (0x2000 / sub-opcode 0x5D85BFC7) and INSERTS any map not
-	// already in the DB. Existing rows (curated names/positions) are left untouched EXCEPT for the three PER-MAP rule
-	// words - PlayfieldFlags (the mount-permission bit), PlayfieldFieldA and PlayfieldFieldC (#451). Those ARE
-	// refreshed from the capture on every map, new or existing, because each is stable per playfield: across the 151
-	// captured MapChange records every record for a given map carries the same three, with no exceptions. The
-	// hand-curated value was wrong for un-curated maps (e.g. Tarantia Noble District read as no-mount), and FieldA /
-	// FieldC were builder constants, wrong for six of the twelve captured maps.
-	// The OTHER Playfield* fields are deliberately NOT imported: the token and the blob's last word really are session/entry-volatile
-	// (a capture shows many distinct values for the SAME map), so they stay curated.
-	// Takes raw on-wire packet bytes (no pcap dependency).
+	/// <summary>
+	///     Discovers maps from captured MapChange packets (0x2000 / sub-opcode 0x5D85BFC7) and inserts any map not
+	///     already in the DB. Takes raw on-wire packet bytes (no pcap dependency).
+	/// </summary>
+	/// <remarks>
+	///     Existing rows (curated names/positions) are left untouched except for the three per-map rule words:
+	///     PlayfieldFlags (the mount-permission bit), PlayfieldFieldA and PlayfieldFieldC. Those are refreshed from the
+	///     capture on every map, new or existing, because each is stable per playfield: every captured MapChange record
+	///     for a given map carries the same three. The other Playfield* fields are deliberately not imported: the token
+	///     and the blob's last word are session/entry-volatile (a capture shows many distinct values for the same map),
+	///     so they stay curated.
+	/// </remarks>
 	public static class CaptureMapImporter
 	{
 		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
@@ -40,8 +42,8 @@ namespace Faolan.Importer.Captures
 
 			var inserted = 0;
 			var reflagged = 0;
-			// A Map carries no position (it's the coordinate space) - the scan only discovers which map ids exist and
-			// their per-area rule words. The per-map default spawn lives in RespawnPoints now.
+			// A Map carries no position (it is the coordinate space) - the scan only discovers which map ids exist and
+			// their per-map rule words. The per-map default spawn lives in RespawnPoints.
 			foreach (var (id, mc) in found)
 			{
 				if (existing.TryGetValue(id, out var map))
@@ -56,9 +58,8 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				// Every word comes from a record that parsed WHOLE (#530 rule 4 - PlayfieldFCodec.Parse throws rather
-				// than reporting a half-read body), so there is no "the capture did not carry it" case any more: a
-				// zero FieldC is a REAL value on four maps and now only ever arrives as one.
+				// Every word comes from a record that parsed whole (PlayfieldFCodec.Parse throws rather than reporting a
+				// half-read body), so there is no "the capture did not carry it" case: a zero FieldC is a real value.
 				var row = new Map
 				{
 					Id = id,
@@ -78,8 +79,8 @@ namespace Faolan.Importer.Captures
 			return (inserted, reflagged);
 		}
 
-		// The MapChange inner body, read WHOLE by PlayfieldFCodec (the map id and the per-map rule words live in the
-		// embedded PlayfieldProxy and the trailer). Keeps the LAST seen record per map; it's stable across captures.
+		// The MapChange inner body, read whole by PlayfieldFCodec (the map id and the per-map rule words live in the
+		// embedded PlayfieldProxy and the trailer). Keeps the last seen record per map; it is stable across captures.
 		private static void TryReadMapChange(byte[] packetBytes, IDictionary<uint, PlayfieldFIIR> into)
 		{
 			try

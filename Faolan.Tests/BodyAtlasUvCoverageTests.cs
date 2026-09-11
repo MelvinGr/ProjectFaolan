@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #294: the body atlas's gutter is the set of texels the mesh's UV triangles do NOT cover. These pin the two
+	// The body atlas's gutter is the set of texels the mesh's UV triangles do not cover. These pin the two
 	// properties the fix rests on - that the rasterizer marks what a triangle covers, and that the dilator treats the
 	// mask as authoritative rather than blending it with its colour guess.
 	//
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 				rgba[i * 4 + 3] = 255;
 			}
 
-			// The mask says the RIGHT half is drawn and the left is not - the opposite of what any colour rule would
+			// The mask says the right half is drawn and the left is not - the opposite of what any colour rule would
 			// pick, so a result that preserves the right half can only have come from the mask.
 			var covered = new bool[w * h];
 			for (var i = 0; i < w * h; i++)
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 					Assert.Equal(rgba[i * 4], outp[i * 4]);
 			}
 
-			// And the uncovered half was filled from the covered edge, so it is no longer its original tone.
+			// The uncovered half is filled from the covered edge, so it differs from its original tone.
 			Assert.NotEqual(rgba[(5 * w + 1) * 4], outp[(5 * w + 1) * 4]);
 		}
 

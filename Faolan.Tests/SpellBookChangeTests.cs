@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of the DispatchLearnSpell (s2c 0x200A) / DispatchForgetSpell (0x200B) body - one spell
-	// entering or leaving the spellbook (#73, #915). Oracle: the captured grants on the GameCharInterface
+	// entering or leaving the spellbook. Oracle: the captured grants on the GameCharInterface
 	// conversation, whose body is a single big-endian u32 spell id (invariant across all 68 packets; see
 	// tools/capture/decode_learn_spell.py). The forget half shares the body - the client's two dispatch readers are
 	// the same function twice, see the codec's remark - so the same golden covers both methods.

@@ -11,23 +11,19 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report acg-pair` (#752): what the SECOND template on a `ProtoAcgItem` is.
+	// `--report acg-pair`: what the second template on a `ProtoAcgItem` is.
 	//
-	// Every item on the wire carries `template1`/`template2`/`template3` and three decryption keys. We used to emit
-	// `template2 = template1`, which is right for 8,445 of the 8,479 captured entries and was a guess for the rest.
-	// This report settled it: the pair is a LEVEL RANGE - both halves are the same item, differing only in their
-	// level fields, and the entry's own `level` says where between them this copy sits, which is what
-	// `AcgItemData_t::GetInterpolatedItem` is named for. `Item.TemplateId2` + `Item.PairKey` now carry it.
+	// Every item on the wire carries template1, template2 and template3 plus three decryption keys. The pair is a
+	// level range: both halves are the same item, differing only in their level fields, and the entry's own
+	// `level` says where between them this copy sits - which is what
+	// `AcgItemData_t::GetInterpolatedItem` is named for. `Item.TemplateId2` and `Item.PairKey`
+	// carry it. The vast majority of captured entries have template2 equal to template1, so no interpolation is
+	// involved in them at all.
 	//
-	// ⚠️ It was written up as the upstream cause of #754's socket-count anomaly and #756's `Bindings of Dark Terror`
-	// Flags disagreement. That was WRONG and is recorded here so it is not re-derived: all of those items have
-	// `template2 == template1`, so no generation is involved in either. #754's is legacy gem overflow (the client
-	// has a `GemOverflow` token for exactly that state); #756's is its own question.
-	//
-	// The report walks the DUMPS for every ProtoAcgItem it can reach, tabulates how template2 relates to template1
-	// and how the keys relate, and - the point - DECRYPTS BOTH HALVES of every differing pair (template1 with key1,
-	// template2 with key2) and diffs their property tables field by field. `Items` only stores ONE key, so the pair's
-	// second key exists nowhere but the captures; that is why this reads the wire rather than the catalog.
+	// The report walks the dumps for every ProtoAcgItem it can reach, tabulates how template2 relates to
+	// template1 and how the keys relate, and decrypts both halves of every differing pair (template1 with key1,
+	// template2 with key2) to diff their property tables field by field. `Items` stores only one key, so the
+	// pair's second key exists nowhere but the captures, which is why this reads the wire rather than the catalog.
 	public static partial class ReportCli
 	{
 		private static void AcgPair(IReadOnlyList<NamedCapture> captures, string rdbDir)
@@ -36,11 +32,11 @@ namespace Faolan.Importer.Cli
 			var seen = new Dictionary<(uint T1, uint T2), Sighting>();
 			var total = 0;
 
-			// ⚠️ The key relations are tallied HERE, per sighting, and deliberately not off `seen.Values` afterwards.
-			// `seen` keeps only the FIRST ProtoAcgItem of each (template1, template2) pair, so a count taken from it
+			// The key relations are tallied here, per sighting, and deliberately not off `seen.Values` afterwards.
+			// `seen` keeps only the first ProtoAcgItem of each (template1, template2) pair, so a count taken from it
 			// is over ~340 representatives, not the ~13k sightings - and it would be blind to exactly the case that
 			// matters: a later sighting of an already-seen pair whose key3 stopped equalling key1. The keys ought to
-			// be per-TEMPLATE (keyN decrypts RDB template N), but that is the assumption under test, not a premise.
+			// be per-template (keyN decrypts RDB template N), but that is the assumption under test, not a premise.
 			var key3IsKey1 = 0;
 			var key2IsKey1 = 0;
 			var template3Set = 0;

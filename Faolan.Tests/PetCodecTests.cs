@@ -6,24 +6,24 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct of PetIIR (0x1F4CB0F7) - the pet owner-assign/remove - vs the captured records in
-	// NecroL80_..._casting-with-chat-notes.pcapng (#307, docs/subsystems/summon-pet-decode.md). owner=0x0802E5D4 throughout.
+	// NecroL80_..._casting-with-chat-notes.pcapng (docs/subsystems/summon-pet-decode.md). owner=0x0802E5D4 throughout.
 	public class PetCodecTests
 	{
 		[Fact]
 		public void Assign_Combat_MatchesCapture()
 		{
 			// frame 679: the necro Deathless Acolyte (combat pet 0x00023EDC), kind (0,2,2).
-			// ⭐ The 2 in the middle is the pet's POINT COST, not a constant (#823) - a Deathless Acolyte costs 2, which
+			// The 2 in the middle is the pet's point cost, not a constant - a Deathless Acolyte costs 2, which
 			// is exactly why this golden survived a builder that sent 2 for every pet in the game.
 			var bytes = PetCodec.Build(PetBindings.Assign(0x0802E5D4, 0x00023EDC, PetBindings.CombatKind(2)));
 			Assert.Equal("1f4cb0f70000c3500802e5d400000000000000c35000023edc000000000000000200000002", Convert.ToHexStringLower(bytes));
 		}
 
-		// ⭐ The three cost classes the corpus holds, and what retail assigns for each (#823). Measured by
+		// The three cost classes the corpus holds, and what retail assigns for each. Measured by
 		// `--report pet-cost` over 62 owner-assigns resolved to a costed creature: `f2` equals the cost on 61 of them,
 		// and the shapes are (0,1,1) for the cost-1 pets, (0,2,2) for the cost-2 and (0,4,2) for the cost-4.
 		//
-		// ⚠️ `f3` is the fitted half and this pins only what was observed: 1 at cost 1, 2 at costs 2 AND 4. A cost-3
+		// `f3` is the fitted half and this pins only what was observed: 1 at cost 1, 2 at costs 2 and 4. A cost-3
 		// pet is what would separate "a coarse tier" from "a second copy of the cost", and the corpus has none.
 		[Theory]
 		[InlineData(1u, 0u, 1u, 1u)]
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			Assert.Equal("1f4cb0f70000c3500802e5d400000000010000c35000023edc", Convert.ToHexStringLower(bytes));
 		}
 
-		// Parse is gated on the CAPTURED bytes above, not on a round-trip of our own builder: a build->parse->build
+		// Parse is gated on the captured bytes above, not on a round-trip of our own builder: a build->parse->build
 		// loop agrees with itself even when both halves read the layout wrong, which is the whole failure mode these
 		// golden tests exist to catch.
 		[Theory]

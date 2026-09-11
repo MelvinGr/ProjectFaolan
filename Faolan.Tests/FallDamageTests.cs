@@ -6,15 +6,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Gates the fall-damage curve and the fall-debuff ladder (#495/#504) against EVERY fall the corpus contains: 24
+	// Gates the fall-damage curve and the fall-debuff ladder against every fall the corpus contains: 24
 	// events (of 28 school-12 StatDamage records; four have no resolvable airborne segment) in 9 of the 119 dumps,
-	// across FOUR characters whose health pools span 263 to 8241.
+	// across four characters whose health pools span 263 to 8241.
 	//
 	// That pool spread is what the table is for. At a comparable fall a level-80 necromancer (pool 6341) takes ~345
 	// health and a Tortage-beach Herald of Xotli (pool 263) takes ~32 - so the damage cannot be flat, and modelling it
-	// as a fraction of MAX HEALTH is not a guess but the only reading the observations allow.
+	// as a fraction of max health is not a guess but the only reading the observations allow.
 	//
-	// Values are at WIRE scale (x100) exactly as the capture carries them, so the table can be re-derived from a dump
+	// Values are at wire scale (x100) exactly as the capture carries them, so the table can be re-derived from a dump
 	// without a conversion step in between.
 	public class FallDamageTests
 	{
@@ -28,13 +28,13 @@ namespace Faolan.Tests
 			[4.58f, 634100u, 15586u, 0u],
 			[4.84f, 651800u, 24646u, 0u],
 			[5.36f, 634100u, 42083u, 0u],
-			[5.44f, 634100u, 50994u, 0u], // ⚠️ the INVERTED pair's no-debuff half, at 8.042% of pool
+			[5.44f, 634100u, 50994u, 0u], // the inverted pair's no-debuff half, at 8.042% of pool
 			[5.57f, 651800u, 19016u, 0u],
 			[5.81f, 651800u, 26192u, 0u],
-			[6.19f, 824100u, 65737u, FallDamage.BruisedBodySpellId], // ⚠️ ... and its Bruised half, at 7.977%
+			[6.19f, 824100u, 65737u, FallDamage.BruisedBodySpellId], // ... and its Bruised half, at 7.977%
 			[6.21f, 612600u, 42458u, 0u],
 			[6.23f, 651800u, 34573u, 0u],
-			[6.38f, 26300u, 3190u, FallDamage.BruisedBodySpellId], // the 263-pool character DOES get the debuff
+			[6.38f, 26300u, 3190u, FallDamage.BruisedBodySpellId], // the 263-pool character does get the debuff
 			[7.02f, 634100u, 111481u, FallDamage.BruisedBodySpellId],
 			[7.98f, 612600u, 98090u, FallDamage.BruisedBodySpellId],
 			[8.18f, 824100u, 96764u, FallDamage.BruisedBodySpellId],
@@ -47,12 +47,12 @@ namespace Faolan.Tests
 			[19.86f, 824100u, 534437u, FallDamage.BrokenBonesSpellId]
 		];
 
-		// The debuff tier reproduced from each fall's OBSERVED damage. Deliberately fed the observed damage rather than
-		// our own predicted damage: this asserts the TIER rule in isolation, so a drift in the damage curve cannot make
+		// The debuff tier reproduced from each fall's observed damage. Deliberately fed the observed damage rather than
+		// our own predicted damage: this asserts the tier rule in isolation, so a drift in the damage curve cannot make
 		// this test pass or fail for the wrong reason.
 		//
 		// 23 of 24 must match exactly. The one that cannot is the inverted pair documented on FallDamage: the 5.44-unit
-		// fall took 8.042% of its pool and NO debuff while the 6.19-unit fall took 7.977% and DID get one, so the
+		// fall took 8.042% of its pool and no debuff while the 6.19-unit fall took 7.977% and did get one, so the
 		// higher-damage observation is the undebuffed one and no threshold reproduces both.
 		[Fact]
 		public void DebuffTier_ReproducesEveryCorpusObservation_ExceptTheOneInversion()
@@ -66,16 +66,16 @@ namespace Faolan.Tests
 					mismatches.Add($"fall {fall:F2} ({100f * damage / pool:F3}% of pool): expected {expected}, got {actual}");
 			}
 
-			// Named exactly, so a NEW disagreement fails loudly instead of hiding inside an allowance.
+			// Named exactly, so a new disagreement fails loudly instead of hiding inside an allowance.
 			Assert.Equal(["fall 5.44 (8.042% of pool): expected 0, got 3744225"], mismatches);
 		}
 
-		// The damage curve, gated only on the falls big enough to MEASURE (>= 7 units). Below that the sampled fall
+		// The damage curve, gated only on the falls big enough to measure (>= 7 units). Below that the sampled fall
 		// distance is the limiting factor, not the model: the drop is reconstructed from position samples ~200 ms apart,
 		// which misses a fraction of a unit at each end, and that fraction dominates a 4-unit fall whose free distance
 		// is 3.08. Gating on the short falls would be gating on my sampling error.
 		//
-		// Asserted as a DISTRIBUTION rather than a worst case, because a worst case here would be asserting precision
+		// Asserted as a distribution rather than a worst case, because a worst case here would be asserting precision
 		// the measurement does not have: the median error is ~13% and nine of the ten are within 30%, with a single
 		// 65%-high outlier (the 8.18-unit fall on the 8241 pool, whose observed 967 sits below what the same character's
 		// 8.91-unit fall cost - i.e. that row's apex is the suspect part, not the curve).
@@ -90,7 +90,7 @@ namespace Faolan.Tests
 					continue;
 
 				var predicted = FallDamage.ResolveFromDistance(fall, pool);
-				// Cast BEFORE subtracting: both are uint, so `predicted - damage` underflows to ~4e9 whenever the
+				// Cast before subtracting: both are uint, so `predicted - damage` underflows to ~4e9 whenever the
 				// prediction is the smaller of the two, and every error reads as a few million percent.
 				var error = MathF.Abs((float)predicted - damage) / damage;
 				errors.Add((error, $"fall {fall:F2}, pool {pool}: observed {damage}, predicted {predicted} ({error:P0} off)"));
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 			Assert.True(within30 >= 9, $"only {within30} of 10 falls within 30%; worst row {errors.MaxBy(e => e.Error).Row}");
 		}
 
-		// Damage is POOL-RELATIVE, and this is the assertion that actually pins that rather than assuming it. Two
+		// Damage is pool-relative, and this is the assertion that actually pins that rather than assuming it. Two
 		// observations at almost the same fall distance (6.19 and 6.38 units) come from characters 31x apart in health,
 		// and their damages differ by very nearly the same 31x - which a flat-damage model cannot produce.
 		[Fact]
@@ -120,21 +120,21 @@ namespace Faolan.Tests
 
 			Assert.True(poolRatio > 25f, $"the two characters should be far apart in health; got {poolRatio:F1}x");
 
-			// The claim being pinned is "pool-relative, not flat", so assert the damage ratio is far nearer the POOL
+			// The claim being pinned is "pool-relative, not flat", so assert the damage ratio is far nearer the pool
 			// ratio than it is to 1 - not that it matches the pool ratio to some tight tolerance, which the sampled fall
 			// distances could not support. A flat-damage model predicts ~1 here; the observations give ~20.
 			Assert.True(damageRatio > 10f, $"a flat-damage model would put this near 1; got {damageRatio:F1}x");
 			Assert.InRange(damageRatio / poolRatio, 0.5f, 2f);
 		}
 
-		// ⭐ #515: the SPEED law, over every fall the corpus pairs with a landing move AND a health pool - the
+		// The speed law, over every fall the corpus pairs with a landing move and a health pool - the
 		// `--report fall-speed` table, at player scale rather than wire scale. This is the shipped path;
 		// `Observations` above is the fallback's.
 		//
 		// (impact speed in world units per second, max health, observed damage, observed debuff spell)
 		public static readonly IReadOnlyList<object[]> SpeedObservations =
 		[
-			[12.21f, 5949u, 77u, 0u], // the smallest DAMAGING fall - below the fitted intercept, see the class remarks
+			[12.21f, 5949u, 77u, 0u], // the smallest damaging fall - below the fitted intercept, see the class remarks
 			[12.75f, 6341u, 141u, 0u],
 			[14.55f, 6341u, 379u, 0u],
 			[15.00f, 5949u, 237u, 0u],
@@ -149,7 +149,7 @@ namespace Faolan.Tests
 			[17.75f, 6518u, 246u, 0u],
 			[18.21f, 6518u, 346u, 0u],
 			[18.24f, 6341u, 1115u, 0u],
-			[18.42f, 6518u, 31u, 0u], // ⚠️ the one ANOMALY: 0.5% of pool at a speed its neighbours cost 5-18% at
+			[18.42f, 6518u, 31u, 0u], // the one anomaly: 0.5% of pool at a speed its neighbours cost 5-18% at
 			[19.06f, 6341u, 617u, 0u],
 			[19.25f, 6341u, 657u, 0u],
 			[19.59f, 6341u, 766u, 0u],
@@ -170,9 +170,9 @@ namespace Faolan.Tests
 			[35.13f, 6341u, 5344u, 0u]
 		];
 
-		// The speed law reproduces the corpus, asserted as a DISTRIBUTION for the same reason the distance one is: a
+		// The speed law reproduces the corpus, asserted as a distribution for the same reason the distance one is: a
 		// worst case would be asserting precision the corpus does not have. Every fall counts here, not only the deep
-		// ones - which is the point of #515, since the short falls are exactly where the sampled drop fell apart.
+		// ones, because the short falls are exactly where a sampled drop falls apart.
 		[Fact]
 		public void SpeedLaw_TracksTheCorpus_OnEveryPairedFall()
 		{
@@ -191,7 +191,7 @@ namespace Faolan.Tests
 			var median = (sorted[16] + sorted[17]) / 2f;
 			Assert.True(median < 0.30f, $"the speed law drifted - median error {median:P0}; worst row {errors.MaxBy(e => e.Error).Row}");
 
-			// ⚠️ The single worst row is the 18.42 u/s fall that cost 0.5% of pool where its neighbours at the same
+			// The single worst row is the 18.42 u/s fall that cost 0.5% of pool where its neighbours at the same
 			// speed cost 5-18%. It is named rather than tolerated silently: no monotone law in the impact speed can
 			// fit it and its neighbours at once, so it is an observation about the corpus, not about the model.
 			var worst = errors.MaxBy(e => e.Error);
@@ -199,8 +199,8 @@ namespace Faolan.Tests
 			Assert.True(errors.Count(e => e.Error < 1.20f) >= 30, $"only {errors.Count(e => e.Error < 1.20f)} of 34 within 120%");
 		}
 
-		// ...and it beats the height law on the corpus it was fitted on, which is the whole claim of #515. Compared
-		// on the SAME falls, so the difference is the predictor and not the sample: each fall's sampled drop is
+		// ...and it beats the height law on the corpus it was fitted on. Compared
+		// on the same falls, so the difference is the predictor and not the sample: each fall's sampled drop is
 		// recovered from its own speed at the corpus's median gravity, which is the best case the drop ever had.
 		[Fact]
 		public void SpeedLaw_BeatsTheHeightLaw_OnTheSameFalls()

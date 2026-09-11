@@ -5,23 +5,21 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// NewCurrentLooterIIR (0xD06568C8) / NewAllowedLooterIIR (0x1E2E0139) - "this bag's looter is now <entity>". A
-	// FAMILY (#530 rule 5a): one layout with the verb in the opcode, so a shared base is the honest model and picking
-	// one of the two as *the* opcode would be a lie about the other. 21 B:
+	// NewCurrentLooterIIR / NewAllowedLooterIIR - "this bag's looter is now <entity>". A family: one layout with the
+	// verb in the opcode, so neither type can be named as *the* opcode without lying about the other. 21 B:
 	//   [subop][0xC87A LootBag][bagHandle][u8 flag][u32 looterClass][u32 looterHandle]
-	// The RESET (looter -> none, once the bag is emptied) is the same record with a NULL entity reference - class and
-	// handle both 0. It used to be written as a separate "two zero words then a byte" shape, which is the same nine
-	// bytes read as a different grammar.
+	// The reset (looter -> none, once the bag is emptied) is the same record with a null entity reference - looter
+	// class and handle both 0.
 	//
-	// Retail sends the ALLOWED-looter form immediately AFTER the LootBagFullUpdateIIR at a bag's mid-session spawn
-	// (capture fr1358: 1e2e0139 0000c87a <bag> 00 0000c350 <player>) - it is what makes the client INSTANTIATE +
-	// render a freshly-introduced loot bag mid-session (#263); the bag's FullUpdate alone only renders on a
-	// playfield (re)load.
+	// Retail sends the allowed-looter form immediately after the LootBagFullUpdateIIR at a bag's mid-session spawn
+	// (capture fr1358: 1e2e0139 0000c87a <bag> 00 0000c350 <player>); that is what makes the client instantiate and
+	// render a freshly introduced loot bag mid-session. The bag's FullUpdate alone only renders on a playfield
+	// (re)load.
 	public static class NewLooterCodec
 	{
 		public static readonly IirTypes[] HandledTypes = [IirTypes.NewCurrentLooterIIR, IirTypes.NewAllowedLooterIIR];
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(NewLooterIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -56,23 +54,22 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// NewCurrentLooterIIR / NewAllowedLooterIIR. LooterClass + LooterHandle are one entity reference; (0, 0) = no
-	// looter.
+	// LooterClass and LooterHandle are one entity reference; (0, 0) means no looter.
 	public sealed record NewLooterIIR(IirTypes SubOpcode, uint BagHandle, byte Flag, uint LooterClass, uint LooterHandle);
 
-	// VALUE factories for the two looter verbs. They live here, not as Build overloads, so a caller states WHICH
-	// looter it is setting by name instead of handing the codec an IIR opcode - #530 rule 7 keeps the IIR names
-	// inside Codecs/, and `NewLooterCodec.Build(IirTypes.NewAllowedLooterIIR, ...)` was the last
-	// place in the server layer that spelled one.
+	// Value factories for the two looter verbs. They live here, not as Build overloads, so a caller states which
+	// looter it is setting by name instead of handing the codec an IIR opcode, which keeps the IIR names inside
+	// Codecs/.
 	public static class NewLooters
 	{
-		// The bag's CURRENT looter - who is holding it open. `playerHandle` 0 clears it.
+		/// <summary>The bag's current looter - who is holding it open.</summary>
+		/// <param name="playerHandle">0 clears the looter.</param>
 		public static NewLooterIIR Current(uint bagHandle, uint playerHandle)
 		{
 			return For(IirTypes.NewCurrentLooterIIR, bagHandle, playerHandle);
 		}
 
-		// Who is ALLOWED to loot the bag - and, mid-session, what makes the client instantiate it at all (#263).
+		/// <summary>Who is allowed to loot the bag - and, mid-session, what makes the client instantiate it at all.</summary>
 		public static NewLooterIIR Allowed(uint bagHandle, uint playerHandle)
 		{
 			return For(IirTypes.NewAllowedLooterIIR, bagHandle, playerHandle);

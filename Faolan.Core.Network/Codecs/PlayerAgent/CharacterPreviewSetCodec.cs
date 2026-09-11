@@ -6,51 +6,64 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.PlayerAgent
 {
-	// `preview.bin` - the single member of the `UpdateCharacterPreview` / `SendCharacterPreview` archive, and the
-	// record that draws the posed, geared character on the select screen. Gitea #612 decoded it partially; #788
-	// finished it: EVERY list is count-prefixed, so the record is total and can be BUILT, not only read.
-	//
-	//   [u8  version = 4]
-	//   [u32 monsterDataId]                                     RDB 1010201, the body definition
-	//   [u32 resourceCount]  resourceCount x PREVIEW RESOURCE (88 bytes)
-	//   [u32 meshCount]      meshCount     x PREVIEW MESH     (16 bytes)
-	//   [u32 morphCount]     morphCount    x PREVIEW MORPH    (variable)
-	//   [u32 0]                                                 a fourth list, empty in every captured payload
-	//
-	//   PREVIEW RESOURCE  [u32 resourceType][u32 resourceId][u32 attractorType][16 x f32 transform]
-	//                     [u32 itemTemplateId][u32 unknown1][u32 unknown2]
-	//   PREVIEW MESH      [u32 meshIndexFileId][u32 unknown1][u32 unknown2][u32 slot]
-	//   PREVIEW MORPH     [u32 nameLength][name, LATIN1][f32 weight][u32 index]
-	//
-	// ⚠️ Every integer is LITTLE-endian and so is the float: this is a client-side FILE that happens to be shipped
-	// over a big-endian wire, exactly like the `IOz1` archive around it (`ClientSettingsBufferCodec`).
-	//
-	// ⭐ The record's vocabulary is the client's own `monsterdata` XML (RDB 1010201), which is what names the fields:
-	// a body record such as `1091339` = `StygianMaleCharacter` carries `<previewset><previewresource attractortype=""
-	// name="" resourceid="" resourcetype=""/></previewset>` - so the header id is the monsterdata, and each 88-byte
-	// entry is one `previewresource` plus a transform and an item template. `attractortype` is an attachment POINT
-	// (33 = Head, 1 = main hand, 6 = shield, ...), not a flags word.
-	//
-	// The mesh list is the worn look: every id resolves as RDB **1010030** (a `MeshIndexFile`, whose `<MeshClusters>`
-	// names the body part - `ItemNeck`, `ItemBelt`, `ItemLegs`), and its `slot` is the ordinary worn/vanity
-	// `CharacterEquipmentSlot` (1, 2, 5, 7, 11, 12, 14..18 and 1002/1007/1011/1014/1018 are all attested). Slot `0`
-	// is the odd one out and carries an RDB **1010001** 3D model rather than a mesh index - the hair/base model, which
-	// has no equip slot; it is left as a plain `uint` for exactly that reason.
-	//
-	// The morph list is the create editor's own stream: a resource ref at weight 1.0 (`*texscript_...`,
-	// `*beardmesh_...`) or a `MorphTargets` body slider at a small signed weight (`arm`, `arse`, `bosom`, `chest`,
-	// `leg`, `stomach`, `thigh`).
-	//
-	// ⚠️ Building one is NOT the same as retail: retail sends no preview for a freshly created character, and a record
-	// the client REJECTS is worse than no preview at all. `Build` exists so a constructed preview can be gated
-	// in-client; nothing in the server authors one today.
+	/// <summary>
+	///     <c>preview.bin</c> - the single member of the <c>UpdateCharacterPreview</c> / <c>SendCharacterPreview</c>
+	///     archive, and the record that draws the posed, geared character on the select screen.
+	/// </summary>
+	/// <remarks>
+	///     Every list is count-prefixed, so the record is total and can be built rather than only read:
+	///     <code>
+	///     [u8  version = 4]
+	///     [u32 monsterDataId]                                     RDB 1010201, the body definition
+	///     [u32 resourceCount]  resourceCount x PREVIEW RESOURCE (88 bytes)
+	///     [u32 meshCount]      meshCount     x PREVIEW MESH     (16 bytes)
+	///     [u32 morphCount]     morphCount    x PREVIEW MORPH    (variable)
+	///     [u32 0]                                                 a fourth list, empty in every captured payload
+	///
+	///     PREVIEW RESOURCE  [u32 resourceType][u32 resourceId][u32 attractorType][16 x f32 transform]
+	///                       [u32 itemTemplateId][u32 unknown1][u32 unknown2]
+	///     PREVIEW MESH      [u32 meshIndexFileId][u32 unknown1][u32 unknown2][u32 slot]
+	///     PREVIEW MORPH     [u32 nameLength][name, Latin1][f32 weight][u32 index]
+	///     </code>
+	///     <para>
+	///         Every integer is little-endian and so is the float: this is a client-side file that happens to be shipped
+	///         over a big-endian wire, exactly like the <c>IOz1</c> archive around it
+	///         (<see cref="ClientSettingsBufferCodec" />).
+	///     </para>
+	///     <para>
+	///         The record's vocabulary is the client's own <c>monsterdata</c> XML (RDB 1010201), which is what names the
+	///         fields: a body record such as <c>1091339</c> = <c>StygianMaleCharacter</c> carries
+	///         <c>&lt;previewset&gt;&lt;previewresource attractortype="" name="" resourceid=""
+	///         resourcetype=""/&gt;&lt;/previewset&gt;</c>, so the header id is the monsterdata and each 88-byte entry is
+	///         one <c>previewresource</c> plus a transform and an item template. <c>attractortype</c> is an attachment
+	///         point (33 = head, 1 = main hand, 6 = shield, …), not a flags word.
+	///     </para>
+	///     <para>
+	///         The mesh list is the worn look: every id resolves as RDB 1010030, a <c>MeshIndexFile</c> whose
+	///         <c>&lt;MeshClusters&gt;</c> names the body part (<c>ItemNeck</c>, <c>ItemBelt</c>, <c>ItemLegs</c>), and
+	///         its <c>slot</c> is the ordinary worn/vanity <c>CharacterEquipmentSlot</c> (1, 2, 5, 7, 11, 12, 14..18 and
+	///         1002/1007/1011/1014/1018 are all attested). Slot <c>0</c> is the odd one out and carries an RDB 1010001 3D
+	///         model rather than a mesh index - the hair or base model, which has no equip slot, which is why it is left
+	///         as a plain <c>uint</c>.
+	///     </para>
+	///     <para>
+	///         The morph list is the create editor's own stream: a resource ref at weight 1.0
+	///         (<c>*texscript_...</c>, <c>*beardmesh_...</c>) or a <c>MorphTargets</c> body slider at a small signed
+	///         weight (<c>arm</c>, <c>arse</c>, <c>bosom</c>, <c>chest</c>, <c>leg</c>, <c>stomach</c>, <c>thigh</c>).
+	///     </para>
+	///     <para>
+	///         Building one is not the same as retail: retail sends no preview for a freshly created character, and a
+	///         record the client rejects is worse than no preview at all. <c>Build</c> exists so a constructed preview can
+	///         be gated in-client; nothing in the server authors one.
+	///     </para>
+	/// </remarks>
 	public static class CharacterPreviewSetCodec
 	{
-		// The record's only observed version. Read as an identity check, not as a field - a different version is a
+		// The record's only observed version. Read as an identity check rather than as a field: a different version is a
 		// different grammar and must fail loudly rather than be decoded as this one.
 		private const byte Version = 4;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(CharacterPreviewSet value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -93,8 +106,8 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			for (var i = r.ReadU32Le(); i > 0; i--)
 				morphs.Add(new CharacterPreviewMorph(Encoding.Latin1.GetString(r.ReadBytes(checked((int)r.ReadU32Le()))), r.ReadF32Le(), r.ReadU32Le()));
 
-			// The fourth list. It is empty in all four captured payloads, so its element grammar is unknown - reading
-			// a non-zero count as "no more fields" would be exactly the partial decode rule 3 exists to catch.
+			// The fourth list. It is empty in all four captured payloads, so its element grammar is unknown; reading a
+			// non-zero count as "no more fields" would be a partial decode.
 			var trailing = r.ReadU32Le();
 			if (trailing != 0)
 				throw CodecParseException.Unexpected(nameof(CharacterPreviewSetCodec), r.Position - 4, "an empty fourth list", trailing.ToString());
@@ -132,22 +145,30 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		}
 	}
 
-	// One `preview.bin`: the character's body, what is attached to it, what it wears and how it is shaped.
+	/// <summary>
+	///     One <c>preview.bin</c>: the character's body, what is attached to it, what it wears and how it is shaped.
+	/// </summary>
 	public sealed record CharacterPreviewSet(
 		uint MonsterDataId,
 		IReadOnlyList<CharacterPreviewResource> Resources,
 		IReadOnlyList<CharacterPreviewMesh> Meshes,
 		IReadOnlyList<CharacterPreviewMorph> Morphs);
 
-	// One `<previewresource>`: a resource hung off an attachment point, with the pose transform and (for a weapon)
-	// the item template it came from. `Transform` is row-major with the translation in the LAST row, which is
-	// System.Numerics' own convention - most are the identity, and a `1010030` weapon carries a small Z offset.
-	// `Unknown1`/`Unknown2` are constant per `ResourceType` across every captured payload - (6, 58) on a 1010030
-	// weapon, (0, 35) on the 1010201 head - so nothing in the corpus varies them. The client's own record WRITER
-	// (`FUN_00fe9f60`, #464 2026-09-03) says where they come from: after the matrix it writes attachment `+0x80`
-	// (this record's `ItemTemplateId`), attachment `+0x84` (`Unknown1`) and the attached VISUAL's `+0x4c` (`Unknown2`)
-	// - so `Unknown2` is a property of the visual object, not of the attachment, which fits a per-class constant
-	// (35 on the head's `VisualCATMesh_c`, 58 on the weapon's `VisualMesh_t`). Neither has a named reader yet.
+	/// <summary>
+	///     One <c>&lt;previewresource&gt;</c>: a resource hung off an attachment point, with the pose transform and, for a
+	///     weapon, the item template it came from.
+	/// </summary>
+	/// <remarks>
+	///     <c>Transform</c> is row-major with the translation in the last row, which is System.Numerics' own convention;
+	///     most are the identity, and a 1010030 weapon carries a small Z offset. <c>Unknown1</c> and <c>Unknown2</c> are
+	///     constant per <c>ResourceType</c> across every captured payload - (6, 58) on a 1010030 weapon, (0, 35) on the
+	///     1010201 head - so nothing in the corpus varies them. The client's own record writer (<c>FUN_00fe9f60</c>) says
+	///     where they come from: after the matrix it writes attachment <c>+0x80</c> (this record's <c>ItemTemplateId</c>),
+	///     attachment <c>+0x84</c> (<c>Unknown1</c>) and the attached visual's <c>+0x4c</c> (<c>Unknown2</c>), so
+	///     <c>Unknown2</c> is a property of the visual object rather than of the attachment, which fits a per-class
+	///     constant (35 on the head's <c>VisualCATMesh_c</c>, 58 on the weapon's <c>VisualMesh_t</c>). Neither has a named
+	///     reader. [V0]
+	/// </remarks>
 	public sealed record CharacterPreviewResource(
 		uint ResourceType,
 		uint ResourceId,
@@ -157,41 +178,43 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		uint Unknown1,
 		uint Unknown2);
 
-	// One worn piece: an RDB 1010030 MeshIndexFile at a `CharacterEquipmentSlot` (slot 0 is the base/hair model and
-	// carries a 1010001 3D model instead). `Layer` runs 0..3 and is a property of the MESH, not of the slot - the
-	// same mesh id carries the same value at different slots and in different payloads; `Unknown2` is zero in every
-	// captured entry.
-	//
-	// What the client does with them (#464, 2026-09-03, from the writer `FUN_00fe9f60` and the attach path): each
-	// entry is a 28-byte struct in the visual's mesh vector, of which words 0, 1, 5 and 6 go on the wire, and the
-	// preview loader hands every entry to `VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, layer, unknown2,
-	// slot, word2)` (`FUN_00fed5d0`, named by its own log line). There the layer is consumed as a FLOAT (the int is
-	// converted on the way into `FUN_00dc3480`) and `MeshInstance::SetMesh` (`FUN_00f67b90`, which names its own
-	// file in an assert) stores it at instance `+0xd0` when it lies in [0, 6), setting bit 0x20 of `+0xe0` when it
-	// is non-zero; `Unknown2` is stored at instance `+0x1c` and DEFAULTS to the visual's own `+0x10` when 0, exactly
-	// as the slot defaults to `+0x14`.
-	//
-	// ⭐ **`Layer` is named by the client's own ACTION PAIR** (#464, 2026-09-10) - the sibling-PRODUCER route, after
-	// four rounds of offset scans failed to find a reader. Two GameAction kinds attach a skinned mesh to a
-	// character and they call this same function:
-	//
-	//   * `e_Type_GC_GameAction_AddSkinnedMesh` (53240, `FUN_008ac440`) - ONE key, `GameAction_MeshID` (0x4CA) -
-	//     passes **0** for this argument;
-	//   * `e_Type_GC_GameAction_AddLayeredSkinnedMesh` (53003, `FUN_008ac1f0`) - TWO keys, `GameAction_MeshID` and
-	//     `GameAction_Value` (0x2F9) - passes the Value stat for it.
-	//
-	// Every other argument is identical between the two (`docs/re/gameaction-keylists.tsv` carries the key lists,
-	// `gameaction-executors.tsv` the executor pair). So the one word that separates a skinned mesh from a LAYERED
-	// skinned mesh is this one, stated twice by the client - in the kind's own name and in its key list. It fits
-	// everything the value does: a small index the renderer takes as a float in [0, 6), with a "is layered" bit set
-	// iff it is non-zero, and 0..3 across the captured payloads. A third caller (`FUN_00fecf20`) passes
-	// **0xffffffff**, which as a float fails that range test and stores nothing - the "no layer" sentinel.
-	//
-	// ⛔ `Unknown2` is NOT named by the same route: both executors pass the same expression for it. It stays what
-	// the register says - an optional override of a per-visual default, zero in every captured entry.
+	/// <summary>
+	///     One worn piece: an RDB 1010030 MeshIndexFile at a <c>CharacterEquipmentSlot</c>. Slot 0 is the base or hair
+	///     model and carries a 1010001 3D model instead.
+	/// </summary>
+	/// <remarks>
+	///     <c>Layer</c> runs 0..3 and is a property of the mesh rather than of the slot - the same mesh id carries the same
+	///     value at different slots and in different payloads - and <c>Unknown2</c> is zero in every captured entry.
+	///     <para>
+	///         Each entry is a 28-byte struct in the visual's mesh vector, of which words 0, 1, 5 and 6 go on the wire,
+	///         and the preview loader hands every entry to <c>VisualCATMesh_c::AddSkinnedMesh(this, nIdxOrFmeId, layer,
+	///         unknown2, slot, word2)</c> (<c>FUN_00fed5d0</c>, named by its own log line). There the layer is consumed as
+	///         a float, and <c>MeshInstance::SetMesh</c> (<c>FUN_00f67b90</c>) stores it at instance <c>+0xd0</c> when it
+	///         lies in [0, 6), setting bit 0x20 of <c>+0xe0</c> when it is non-zero; <c>Unknown2</c> is stored at instance
+	///         <c>+0x1c</c> and defaults to the visual's own <c>+0x10</c> when 0, exactly as the slot defaults to
+	///         <c>+0x14</c>.
+	///     </para>
+	///     <para>
+	///         <c>Layer</c> is named by the client's own action pair. Two GameAction kinds attach a skinned mesh to a
+	///         character and call the same function: <c>e_Type_GC_GameAction_AddSkinnedMesh</c> (53240,
+	///         <c>FUN_008ac440</c>) has one key, <c>GameAction_MeshID</c>, and passes 0 for this argument, while
+	///         <c>e_Type_GC_GameAction_AddLayeredSkinnedMesh</c> (53003, <c>FUN_008ac1f0</c>) has two keys,
+	///         <c>GameAction_MeshID</c> and <c>GameAction_Value</c>, and passes the Value stat for it. Every other
+	///         argument is identical between the two (docs/re/gameaction-keylists.tsv carries the key lists,
+	///         gameaction-executors.tsv the executor pair), so this is the one word separating a skinned mesh from a
+	///         layered one. A third caller (<c>FUN_00fecf20</c>) passes 0xffffffff, which as a float fails the range test
+	///         and stores nothing: the "no layer" sentinel.
+	///     </para>
+	///     <para>
+	///         <c>Unknown2</c> is not named by the same route, because both executors pass the same expression for it. It
+	///         stays an optional override of a per-visual default, zero in every captured entry. [V0]
+	///     </para>
+	/// </remarks>
 	public sealed record CharacterPreviewMesh(uint MeshIndexFileId, uint Layer, uint Unknown2, uint Slot);
 
-	// One create-editor morph callback: a `MorphTargets` name with its weight, plus the editor stream index it
-	// arrived at (the same ordering `CharacterBodyResource.Sequence` keeps).
+	/// <summary>
+	///     One create-editor morph callback: a <c>MorphTargets</c> name with its weight, plus the editor stream index it
+	///     arrived at (the same ordering <c>CharacterBodyResource.Sequence</c> keeps).
+	/// </summary>
 	public sealed record CharacterPreviewMorph(string Name, float Weight, uint Index);
 }

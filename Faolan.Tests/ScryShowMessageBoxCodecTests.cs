@@ -12,18 +12,18 @@ namespace Faolan.Tests
 	// Byte-exact gates for the scry confirmation box - "Do you want to travel to Ymir's Pass?". Goldens are the
 	// captured boxes in NecroL80_mage-necromancer_login_gameplay_chat-annotated-4 and their answers.
 	//
-	// ⚠️ NOT local travel (#514), despite what these gates used to say. The box belongs to the ZONE-LINE DOOR the
+	// Not local travel. The box belongs to the zone-line door the
 	// player selects: at t=809.8 they click door 0x863 on Field of the Dead, the box follows, and answering it drives
 	// the cross-map redirect. The wagoneer who dropped them at that border half a minute earlier teleported them
 	// straight off the destination pick, with no box at all (docs/subsystems/local-travel.md).
 	//
-	// The point worth gating is that `id` is the DESTINATION MAP ID: every travel box names the map the player is
+	// The point worth gating is that `id` is the destination map ID: every travel box names the map the player is
 	// about to be moved to, and each is followed by a redirect and a MapChange to exactly that map. Which maps confirm
-	// is Map.TravelConfirmKey, harvested by `world-teleports` (#637) - gated below against the captured bytes.
+	// is Map.TravelConfirmKey, harvested by `world-teleports` - gated below against the captured bytes.
 	public class ScryShowMessageBoxCodecTests
 	{
-		// The end-to-end gate for #637: the key the seed carries for a confirming map re-renders to the wire form the
-		// capture holds, so the box we build from a DB row IS the captured box. Without this the harvest could store a
+		// The end-to-end gate: the key the seed carries for a confirming map re-renders to the wire form the
+		// capture holds, so the box we build from a DB row is the captured box. Without this the harvest could store a
 		// key that decodes but does not re-encode, and the codec gates above would still pass on their literals.
 		[Theory]
 		[InlineData(1090u, "%z&#36;n_zw5ComNiHcqoW4j")]
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			Assert.Equal(capturedKey, LdbKey.ToWire(map.TravelConfirmKey));
 		}
 
-		// ...and the maps a capture walked into WITHOUT a box carry none, which is the half that keeps us from raising
+		// ...and the maps a capture walked into without a box carry none, which is the half that keeps us from raising
 		// a box retail does not. 4020 (City of Tortage), 2000 (Old Tarantia) and 1010 (Conall's Valley) are all
 		// destinations of captured door walk-throughs with no box in the sequence.
 		[Theory]
@@ -124,7 +124,7 @@ namespace Faolan.Tests
 			Assert.Equal(cookie, parsed.Cookie);
 		}
 
-		// Strict parse (#530 rule 4): a short body is a decode FAILURE, not a `false` the caller can drop.
+		// Strict parse: a short body is a decode failure, not a `false` the caller can drop.
 		[Fact]
 		public void ShortAnswer_IsRejected()
 		{

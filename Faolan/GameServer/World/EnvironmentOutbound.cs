@@ -12,13 +12,13 @@ using Faolan.GameServer.Wire;
 namespace Faolan.GameServer.World
 {
 	/// <summary>
-	///     The wire for NON-COMBAT damage - fall, lava, drowning (#495/#504) - off GameServerListener (#826).
+	///     The wire for non-combat damage: fall, lava and drowning.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ PushVitals is written out here rather than delegating. It used to forward through
-	///     <c>((IWorldOutbound)this)</c>, and when that port left the listener the cast still COMPILED and would have
-	///     thrown on the first environmental hit (fixed in d66482f1). ApplySelfBuff likewise calls BuffService directly
-	///     instead of bouncing through a second port on the listener.
+	///     <see cref="PushVitals" /> is written out here rather than delegating through a self-cast to another port,
+	///     because such a cast compiles on an unsealed class whether or not the class still implements the interface
+	///     and throws only at runtime. <see cref="ApplySelfBuff" /> likewise calls <see cref="BuffService" /> directly
+	///     rather than bouncing through a second port.
 	/// </remarks>
 	internal sealed class EnvironmentOutbound : IEnvironmentOutbound
 	{
@@ -34,20 +34,22 @@ namespace Faolan.GameServer.World
 			_sendDismount = sendDismount;
 		}
 
-		// Same one path, reached from the other side (#681): a no-mount volume unseats through exactly the record pair
-		// the button press and a thrown rider do.
+		// The same path reached from the other side: a no-mount volume unseats through exactly the record pair the
+		// button press and a thrown rider do.
 		public Task SendDismount(INetworkClient client)
 		{
 			return _sendDismount(client);
 		}
-		// IEnvironmentOutbound (#495/#504). The StatDamageIIR ENVIRONMENTAL form - no caster, no spell, and NO paired
-		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
-		//
-		// ⚠️ `displayAmount` is in DISPLAY units, like everything on EntityVitals, and the record carries the WIRE
-		// value - so it is scaled here. Sending it unscaled is a bug you can watch happen: the health BAR moves by the
-		// right amount (PushVitals scales, through CharacterStatBlock.Set) while the floating number reads a hundredth
-		// of it, i.e. "1" for a fall that actually cost 27 health. The combat path scales at the same point, in
-		// CombatService, which is why only the environmental one was wrong.
+		/// <summary>
+		///     The StatDamageIIR environmental form: no caster, no spell, and no paired DamageResult, because retail
+		///     renders no floating combat number for a fall.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="displayAmount" /> is in display units, like everything on <see cref="EntityVitals" />,
+		///     and the record carries the wire value, so it is scaled here. Unscaled, the health bar moves by the right
+		///     amount - the vitals push scales through <c>CharacterStatBlock.Set</c> - while the floating number reads
+		///     a hundredth of it. The combat path scales at the same point.
+		/// </remarks>
 		public Task SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint displayAmount, uint statId, uint school)
 		{
 			return client.SendAsync(new Rpc(GameEndpoints.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
@@ -59,9 +61,9 @@ namespace Faolan.GameServer.World
 		///     <see cref="EntityVitals" /> does not carry.
 		/// </summary>
 		/// <remarks>
-		///     Per STAT rather than a flat 100, because that is what the client applies: `StatDisplayScale.Of` is the
-		///     same table <c>CharacterStatBlock.Set</c> goes through for the vitals push beside this record, so the two
-		///     halves of a fall cannot disagree about units again.
+		///     Per stat rather than a flat 100, because that is what the client applies: <c>StatDisplayScale.Of</c> is
+		///     the same table <c>CharacterStatBlock.Set</c> goes through for the vitals push beside this record, so the
+		///     two halves of a fall cannot disagree about units.
 		/// </remarks>
 		internal static uint WireAmount(uint displayAmount, uint statId)
 		{
@@ -69,12 +71,8 @@ namespace Faolan.GameServer.World
 		}
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
-			// #586: every caller of this - the regen tick, fall damage, lava, drowning - moves a CURRENT and nothing
-			// else, which is the case retail answers with the three-record currents-only block.
-			//
-			// This used to delegate to the listener's own IWorldOutbound.PushVitals. That port moved to WorldOutbound
-			// (#826) and the cast `((IWorldOutbound)this)` went with it: it still COMPILED, because the class is not
-			// sealed, and would have thrown InvalidCastException the first time an environmental hit landed.
+			// Every caller of this - the regen tick, fall damage, lava, drowning - moves a current and nothing else,
+			// which is the case retail answers with the three-record currents-only block.
 			return GameWire.SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
 		}
 		public Task ApplySelfBuff(INetworkClient client, uint wireSpellId)

@@ -16,8 +16,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// Summonable mount creatures (#27) into the dedicated never-loaded Mounts map. Isolated; NOT in the default
-	// set, so opt-in via --only mounts.
+	/// <summary>
+	///     Summonable mount creatures, into the dedicated never-loaded Mounts map. Not in the default set; opt in via
+	///     --only mounts.
+	/// </summary>
 	public sealed class MountsModule : IImportModule
 	{
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.

@@ -6,15 +6,23 @@ using System.Text;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Writes an AoC FCTX texture container (#295 Phase 2) — the inverse of FctxConverter's read path. Header
-	// (24 B): "FCTX", u32 ver=2, u32 unk=1, u16 width, u16 height, u8 mipCount ×2, u16 0, fourcc; then the DXT
-	// mip chain SMALLEST-first (the order the client reads). Currently emits DXT1 (opaque diffuse); DXT5/MIXD are
-	// follow-ups. The decompressed RDB entry for a texture IS the FCTX bytes (no separate RDB-Id header), so the
-	// output of Encode is ready to be IOz1+zlib-wrapped and inlined via RdbWriter.
+	/// <summary>
+	///     Writes an AoC FCTX texture container, the inverse of <see cref="FctxConverter" />'s read path.
+	/// </summary>
+	/// <remarks>
+	///     The 24-byte header is "FCTX", u32 version = 2, u32 maps mask, u16 width, u16 height, the mip count twice as
+	///     a byte, u16 0, then the fourcc; the DXT mip chain follows smallest-first, the order the client reads it in.
+	///     The decompressed RDB entry for a texture is exactly the FCTX bytes — there is no separate RDB-Id header —
+	///     so <see cref="Encode" /> output is ready to be IOz1+zlib-wrapped and inlined via <see cref="RdbWriter" />.
+	/// </remarks>
 	public static class FctxEncoder
 	{
-		// Encode RGBA32 as a full-mip FCTX blob in `fourCc` (DXT1 = opaque colour, DXT5 = colour + alpha). Mip
-		// levels: full res down to 1×1, each dimension = max(1, dim >> level), box-downsampled from the previous.
+		/// <summary>
+		///     Encodes RGBA32 as a full-mip FCTX blob in <paramref name="fourCc" /> (DXT1 for opaque colour, DXT5 for
+		///     colour plus alpha). Mip levels run from full resolution down to 1×1, each dimension being
+		///     max(1, dim >> level), box-downsampled from the previous level.
+		/// </summary>
+		/// <exception cref="NotSupportedException">The fourcc is neither DXT1 nor DXT5.</exception>
 		public static byte[] Encode(byte[] rgba, int width, int height, string fourCc)
 		{
 			if (fourCc != "DXT1" && fourCc != "DXT5")
@@ -25,8 +33,8 @@ namespace Faolan.Core.Rdb.Assets
 
 			// Header.
 			ms.Write(Encoding.ASCII.GetBytes("FCTX"));
-			WriteU32(ms, 2); // Version - the client's loader dispatch (FUN_00de0f00: 1 legacy / 2 current, #464)
-			WriteU32(ms, 1); // MapsMask - bit 0 = the base image alone (the single-image encoding this writes)
+			WriteU32(ms, 2); // Version, the client's loader dispatch (FUN_00de0f00: 1 legacy, 2 current)
+			WriteU32(ms, 1); // MapsMask: bit 0 = the base image alone, the single-image encoding this writes
 			WriteU16(ms, (ushort)width);
 			WriteU16(ms, (ushort)height);
 			ms.WriteByte((byte)mipCount);
@@ -34,7 +42,7 @@ namespace Faolan.Core.Rdb.Assets
 			WriteU16(ms, 0);
 			ms.Write(Encoding.ASCII.GetBytes(fourCc));
 
-			// Build every mip's RGBA (level 0 = full res), then write blocks SMALLEST-first.
+			// Build every mip's RGBA (level 0 = full res), then write the blocks smallest-first.
 			var levels = new byte[mipCount][];
 			var dims = new (int W, int H)[mipCount];
 			levels[0] = rgba;
@@ -59,21 +67,30 @@ namespace Faolan.Core.Rdb.Assets
 			return ms.ToArray();
 		}
 
-		// Encode RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob.
+		/// <summary>
+		///     Encodes RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob.
+		/// </summary>
 		public static byte[] EncodeDxt1(byte[] rgba, int width, int height)
 		{
 			return Encode(rgba, width, height, "DXT1");
 		}
 
-		// Encode a MIXD container (#295 / #293): the body normal/detail texture. Layout mirrors what the client
-		// reads (loader FUN_00ddf960): FCTX header (fourcc "MIXD", flags=6 = 2 sub-textures) then, per mip
-		// smallest-first, [seg1: blocks×6][BC5 normal: blocks×16]; then the "ATI1" tag; then per mip [BC4 detail:
-		// blocks×8]. `normalRgba` = the tangent-space normal (R=X,G=Y); `detail` = the single-channel detail map.
-		//
-		// seg1 is the compact-normal SOURCE the client only reads on the DXT5-fallback path (GPUs without BC5); the
-		// native BC5/ATI2 path (all modern GPUs, incl. the Proton/Wine target) SEEKS past it by blocks×6 and never
-		// reads its content. So seg1 is emitted as the correct SIZE of zero bytes - valid for the BC5 path. (A real
-		// seg1 would only matter for pre-DX10 hardware.) Round-trips through TryDecodeMixdNormal + DecodeMixdDetail.
+		/// <summary>
+		///     Encodes a MIXD container: the body normal/detail texture. Round-trips through
+		///     <see cref="FctxConverter.TryDecodeMixdNormal" /> and the converter's MIXD detail decode.
+		/// </summary>
+		/// <param name="normalRgba">The tangent-space normal map, R = X and G = Y.</param>
+		/// <param name="detail">The single-channel detail map.</param>
+		/// <remarks>
+		///     The layout mirrors what the client's loader (FUN_00ddf960) reads: an FCTX header with fourcc "MIXD" and
+		///     flags 6 (two sub-textures), then per mip smallest-first [seg1: blocks × 6][BC5 normal: blocks × 16],
+		///     then the "ATI1" tag, then per mip [BC4 detail: blocks × 8].
+		///     <para>
+		///         seg1 is the compact-normal source that only the DXT5 fallback path (GPUs without BC5) reads. The
+		///         native BC5/ATI2 path, which covers all modern GPUs including the Proton/Wine target, seeks past it
+		///         by blocks × 6 and never reads its content, so it is emitted as the correct size of zero bytes.
+		///     </para>
+		/// </remarks>
 		public static byte[] EncodeMixd(byte[] normalRgba, byte[] detail, int width, int height)
 		{
 			var mipCount = MipCount(width, height);
@@ -93,7 +110,7 @@ namespace Faolan.Core.Rdb.Assets
 			var det = BuildMipsChannel(detail, width, height, mipCount);
 			var dims = MipDims(width, height, mipCount);
 
-			// Normal sub-texture: per mip smallest-first, [seg1 blocks×6 zeros][BC5 blocks×16].
+			// Normal sub-texture: per mip smallest-first, [seg1 blocks × 6 zeros][BC5 blocks × 16].
 			for (var n = mipCount - 1; n >= 0; n--)
 			{
 				var blocks = BlockCount(dims[n].W, dims[n].H);
@@ -103,14 +120,17 @@ namespace Faolan.Core.Rdb.Assets
 
 			ms.Write(Encoding.ASCII.GetBytes("ATI1"));
 
-			// Detail sub-texture: per mip smallest-first, BC4 blocks×8.
+			// Detail sub-texture: per mip smallest-first, BC4 blocks × 8.
 			for (var n = mipCount - 1; n >= 0; n--)
 				ms.Write(BcEncoder.EncodeBc4(det[n], dims[n].W, dims[n].H));
 
 			return ms.ToArray();
 		}
 
-		// IOz1+zlib-wrap FCTX bytes into the raw on-disk blob a local RDB entry stores (what RdbWriter inlines).
+		/// <summary>
+		///     Wraps FCTX bytes in IOz1+zlib to produce the raw on-disk blob a local RDB entry stores, which is what
+		///     <see cref="RdbWriter" /> inlines.
+		/// </summary>
 		public static byte[] WrapIOz1(byte[] content)
 		{
 			using var ms = new MemoryStream();
@@ -126,8 +146,10 @@ namespace Faolan.Core.Rdb.Assets
 			return Math.Max(1, (w + 3) / 4) * Math.Max(1, (h + 3) / 4);
 		}
 
-		// Simple 2×2 box downsample (clamped for odd dimensions). Good enough for mip generation; the top mip is
-		// what's usually sampled and is authored at full quality by the caller (the upscaled image).
+		/// <summary>
+		///     A 2×2 box downsample, clamped for odd dimensions. Good enough for mip generation: the top mip is what
+		///     is usually sampled and the caller authors it at full quality.
+		/// </summary>
 		private static byte[] BoxDownsample(byte[] src, int sw, int sh, int dw, int dh)
 		{
 			var dst = new byte[dw * dh * 4];

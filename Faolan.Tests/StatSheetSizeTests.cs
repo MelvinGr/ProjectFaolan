@@ -11,18 +11,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The snapshot carries TWO 0x3F1-framed StatList_t (client reader FUN_00797440 calls FUN_0139d450 twice, on
-	// this+0x74 and this+0x78), and BOTH are built from one stat sheet of exactly SheetSize pairs.
+	// The snapshot carries two 0x3F1-framed StatList_t (client reader FUN_00797440 calls FUN_0139d450 twice, on
+	// this+0x74 and this+0x78), and both are built from one stat sheet of exactly SheetSize pairs.
 	//
-	// A wrong-sized sheet used to fall back to the baseline skeleton SILENTLY, which would ship a level-80 character
-	// with skeleton vitals and no error anywhere. It throws now, and these tests pin that: loud on corruption, still
-	// quiet on the legitimate create path.
+	// A wrong-sized sheet throws rather than falling back to the baseline skeleton, which would ship a level-80
+	// character with skeleton vitals and no error anywhere. These tests pin that: loud on corruption, still quiet on
+	// the legitimate create path.
 	public class StatSheetSizeTests
 	{
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x0802E5D4;
 
-		// A freshly created character - with a CLASS, because vitals are derived from (Class, Level) and there is
+		// A freshly created character - with a class, because vitals are derived from (Class, Level) and there is
 		// deliberately no fallback curve for an unset class (a 0 is a corrupt row, not a new character). This is what
 		// DatabaseRepository.CreateCharacter allocates.
 		private static Character Fresh()
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			return Fresh().MaxVitals(VitalAttributes.LevelOneBase);
 		}
 
-		// A character with NO stored sheet is the create path, not corruption: it must still build the skeleton.
+		// A character with no stored sheet is the create path, not corruption: it must still build the skeleton.
 		[Fact]
 		public async Task EmptyStatSheet_StillBuilds_TheBaselineSkeleton()
 		{

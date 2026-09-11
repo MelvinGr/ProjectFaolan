@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The ~Team chat channel (#668): the 0x003C that makes the team chat tab appear, and the 0x003D that retires it.
+	// The ~Team chat channel: the 0x003C that makes the team chat tab appear, and the 0x003D that retires it.
 	//
 	// The guild twin (GuildChatChannelTests) has to infer its unsubscribe; this one does not. `login_2-clients_group-
 	// trade-friend` subscribes every member on the accept and unsubscribes them all on the dissolve, three teams in a

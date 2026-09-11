@@ -4,8 +4,8 @@ using System.Linq;
 
 namespace Faolan.Core.Enums
 {
-	// The four ARCHETYPES a class belongs to. The ids are the client's own: RDB 1000505 `RDBPlayerClassData_c` is a
-	// `[classId][name][tier]` registry, and its TIER-1 entries are exactly these five (`docs/rdb/client-data-tables.md`)
+	// The four archetypes a class belongs to. The ids are the client's own: RDB 1000505 `RDBPlayerClassData_c` is a
+	// `[classId][name][tier]` registry, and its tier-1 entries are exactly these five (`docs/rdb/client-data-tables.md`)
 	// - `Commoner` is the pre-class starting state, the other four are the archetypes the create editor picks between
 	// before a class.
 	public enum ConanArchetype : byte
@@ -17,18 +17,14 @@ namespace Faolan.Core.Enums
 		Mage = 0x04
 	}
 
-	// Which classes each archetype holds (#581).
+	// Which classes each archetype holds.
 	//
-	// ⭐ **The CLIENT states this, in RDB 1000506** (`ClassMembershipTable`, #469) - a `[parentClassId][childClassId]`
-	// table whose loader bails with *"Could not load classmembership info. This will cause gui to loose parent class
-	// feats"*. Entry 1 is the shipped hierarchy: `Commoner (0)` parents the four archetypes, and each archetype
-	// parents its three classes. **All twelve placements below agree with it exactly**; `--report class-hierarchy`
-	// re-runs that comparison and fails loudly on any drift.
-	//
-	// This used to read "the client ships the archetype IDS (1000505 tier 1) but no MEMBERSHIP table", and took the
-	// twelve placements from the game's published documentation (https://aoc.fandom.com/wiki/Class) instead. That
-	// documentation turned out to be right - and it is now the CORROBORATION rather than the source, alongside the
-	// corpus arm that always backed it: the captured Assassin's action bar carries
+	// The client states this, in RDB 1000506 (`ClassMembershipTable`) - a `[parentClassId][childClassId]` table
+	// whose loader bails with "Could not load classmembership info. This will cause gui to loose parent class feats".
+	// Entry 1 is the shipped hierarchy: `Commoner (0)` parents the four archetypes, and each archetype parents its
+	// three classes. All twelve placements below agree with it exactly; `--report class-hierarchy` re-runs that
+	// comparison and fails loudly on any drift. The game's published documentation (https://aoc.fandom.com/wiki/Class)
+	// and the corpus corroborate it: the captured Assassin's action bar carries
 	// `Rogue_15_dotdetaunt_Vicious_Strike_II_2h` and `Rogue_19_damagedetaunt_Cunning_Strike_VI_2h`, two
 	// `Rogue_`-named archetype combos on an Assassin, which is a Rogue.
 	//
@@ -36,7 +32,7 @@ namespace Faolan.Core.Enums
 	// run in capture-driven importer modules with no `RdbDir` - the same reason `ConanClasses` inlines the names.
 	// The report is what keeps the constant honest.
 	//
-	// ⚠️ RDB 1000506 entry **0** is a WIDER table - 27 edges, the full authored hierarchy including eleven classes
+	// RDB 1000506 entry 0 is a wider table - 27 edges, the full authored hierarchy including eleven classes
 	// this build never shipped (Soldier alone has six children there). Entry 1 is the one that describes the game.
 	public static class ConanArchetypes
 	{
@@ -64,7 +60,7 @@ namespace Faolan.Core.Enums
 				: ConanArchetype.Commoner;
 		}
 
-		// The archetype an ARCHETYPE-SHARED name is for - the `Soldier_` / `Rogue_` / `Priest_` prefix the combo
+		// The archetype an archetype-shared name is for - the `Soldier_` / `Rogue_` / `Priest_` prefix the combo
 		// catalog uses. Null for anything else, including a class-named prefix.
 		public static ConanArchetype? FromNamePrefix(string name)
 		{

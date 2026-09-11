@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #767: `DispatchLockTemplate` is the spell COOLDOWN - what greys an action-bar button and runs its sweep. There
+	// `DispatchLockTemplate` is the spell cooldown - what greys an action-bar button and runs its sweep. There
 	// is no recast GameAction on the wire at all (0 across all 132 dumps), so this message is the whole mechanism,
 	// and we sent none of the 992 the corpus carries.
 	//
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(Captured), Convert.ToHexString(LockTemplateCodec.Build(CapturedSpell, CapturedSeconds)));
 		}
 
-		// The float is BIG-endian, like every other raw-body float. Little-endian would put the exponent in the last
+		// The float is big-endian, like every other raw-body float. Little-endian would put the exponent in the last
 		// byte and send 20.0 as 0000A041 - a denormal the client would read as ~0, i.e. no cooldown at all.
 		[Fact]
 		public void TheSecondsField_IsBigEndian()
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			Assert.Equal(0xA0, body[5]);
 		}
 
-		// A partial lock - retail re-sends the time LEFT rather than the base (15.143 s against the same spell's
+		// A partial lock - retail re-sends the time left rather than the base (15.143 s against the same spell's
 		// 20.00 s recast), the same restore shape a long buff's duration takes.
 		[Fact]
 		public void APartialLock_RoundTrips()

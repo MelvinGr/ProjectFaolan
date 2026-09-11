@@ -13,14 +13,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #400: only the ACTIVE weapon set's two slots feed the gear-stat aggregation, because a character can carry both a
+	// Only the active weapon set's two slots feed the gear-stat aggregation, because a character can carry both a
 	// melee and a ranged set at once and counting all four would double-count. Armour + jewellery always apply; the
 	// weapon set is selected by the drawn loadout.
 	//
-	// This used to test an in-memory CharacterEquipment.StatBearingItemIds over 26 slot COLUMNS. Since #750 the worn set
-	// is item instances in container 101, so the selection is a slot filter in the repository query - which means the
-	// gate has to go through the DB to exercise it at all. That is the point: the in-memory version could agree with
-	// itself while the query it stood in for disagreed.
+	// The worn set is item instances in container 101, so the selection is a slot filter in the repository query and
+	// the gate has to go through the DB to exercise it at all. An in-memory stand-in could agree with itself while the
+	// query it stands for disagreed.
 	public class CharacterEquipmentStatSlotsTests
 	{
 		// One item in every stat-bearing armour/jewellery slot, ids 1..12 so each slot is identifiable, plus both
@@ -58,8 +57,8 @@ namespace Faolan.Tests
 
 				Assert.Contains(100u, ids); // set-1 MainWeapon
 				Assert.Contains(101u, ids); // set-1 OffHandWeapon
-				Assert.DoesNotContain(200u, ids); // set-2 ranged NOT counted
-				Assert.DoesNotContain(201u, ids); // set-2 ammo NOT counted
+				Assert.DoesNotContain(200u, ids); // set-2 ranged not counted
+				Assert.DoesNotContain(201u, ids); // set-2 ammo not counted
 				Assert.All(Armour, a => Assert.Contains(a, ids));
 			});
 		}
@@ -73,13 +72,13 @@ namespace Faolan.Tests
 
 				Assert.Contains(200u, ids); // set-2 RangedWeapon (often a bow/crossbow)
 				Assert.Contains(201u, ids); // set-2 Ammo (often a quiver)
-				Assert.DoesNotContain(100u, ids); // set-1 main NOT counted
-				Assert.DoesNotContain(101u, ids); // set-1 off NOT counted
+				Assert.DoesNotContain(100u, ids); // set-1 main not counted
+				Assert.DoesNotContain(101u, ids); // set-1 off not counted
 				Assert.All(Armour, a => Assert.Contains(a, ids));
 			});
 		}
 
-		// The VANITY slots and the bag containers are NOT stat-bearing: vanity is appearance only and a bag's capacity is
+		// The vanity slots and the bag containers are not stat-bearing: vanity is appearance only and a bag's capacity is
 		// a bag stat, not a combat one. They are worn instances like any other, so nothing but the slot filter keeps them
 		// out - which is exactly the sort of thing a column-based model got for free and a row-based one has to state.
 		[Fact]
@@ -93,7 +92,7 @@ namespace Faolan.Tests
 
 		private const uint CharacterId = 7;
 
-		// A WRITABLE copy of the shipped fixture rather than a bare EnsureCreated: Character hangs off Account, Realm and
+		// A writable copy of the shipped fixture rather than a bare EnsureCreated: Character hangs off Account, Realm and
 		// Map, and the fixture already carries the seeded realm/account and the map rows.
 		private static async Task WithWorn(IEnumerable<(CharacterEquipmentSlot Slot, uint Template)> worn, Func<DatabaseRepository, Task> assert)
 		{

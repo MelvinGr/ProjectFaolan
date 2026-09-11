@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #514/#635: local travel - the dialogue branch that sells a trip, its fare and its arrival.
+	// Local travel - the dialogue branch that sells a trip, its fare and its arrival.
 	//
-	// The rows come from TWO modules and only one of them runs by default:
+	// The rows come from two modules and only one of them runs by default:
 	//   * `travel-wiring`         (Captures)          - the wagoner trips, harvested from captured dialogue
-	//   * `rdb-dialogue-teleports` (Rdb, ⚠️ OPT-IN)   - trips sold by an inline {teleportplayer} directive
+	//   * `rdb-dialogue-teleports` (Rdb, opt-in)   - trips sold by an inline {teleportplayer} directive
 	//
-	// ⚠️ And `TravelDestinations.FromNodeId` is an FK to `ConversationNodes`, which the `conversations` module
-	// rebuilds WHOLE-CORPUS. So a default import cascade-deletes every travel row, `travel-wiring` re-adds its own,
+	// And `TravelDestinations.FromNodeId` is an FK to `ConversationNodes`, which the `conversations` module
+	// rebuilds whole-corpus. So a default import cascade-deletes every travel row, `travel-wiring` re-adds its own,
 	// and the opt-in module's are simply gone - silently, because nothing counts them. That is exactly what
 	// happened on 2026-08-08: an ordinary `--skip characters` run took the table 7 -> 4 and the three lost trips
 	// (Tortage Smuggler, Wagoner Polus, Sigurd) were all `FromDialogueDirective`.

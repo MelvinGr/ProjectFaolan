@@ -3,16 +3,15 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The scale table stopped being a hand-maintained list and became a transcription of the client's own tooltip
-	// renderer (#251, FUN_0149a300 + the two bool(Int32Stat_e) predicates it dispatches through). What licenses that
-	// swap is that the transcription REPRODUCES every value the old table had established the slow way - each one an
-	// in-client experiment against a rendered number - so those readings live on here as the gate rather than as
-	// comments beside a switch nobody can re-derive.
+	// The scale table is a transcription of the client's own tooltip renderer (FUN_0149a300 + the two
+	// bool(Int32Stat_e) predicates it dispatches through). What licenses that is that the transcription reproduces
+	// every value established the slow way - each one an in-client experiment against a rendered number - so those
+	// readings live on here as the gate rather than as comments beside a switch nobody can re-derive.
 	//
 	// Two independent methods produced them:
 	//   - the character sheet, via the `.setstat <id> <raw>` GM command (2026-07-27): push a raw value, read what the
 	//     sheet draws, scale = raw / drawn.
-	//   - item and feat TOOLTIPS, matched by value against the wire number we hold for that item/feat.
+	//   - item and feat tooltips, matched by value against the wire number we hold for that item/feat.
 	public class StatDisplayScaleTests
 	{
 		// stat id -> the scale a human read off the screen, and how.
@@ -41,7 +40,7 @@ namespace Faolan.Tests
 				{ (uint)CharacterStatId.ChanceOfOffhandAttack, 100, ".setstat 1071 10000 -> 0.0% -> 100.0%" },
 				{ (uint)CharacterStatId.Immunity, 100, ".setstat 326 10000 -> 105.0% -> 205.0%" },
 				{ (uint)CharacterStatId.SpellFatalityChance, 100, ".setstat 380 10000 -> 0.0% -> 100%" },
-				// A multiplier, proven against an UNEQUAL base (451 = 4000 drew 8000, i.e. x2, not a flat +10000).
+				// A multiplier, proven against an unequal base (451 = 4000 drew 8000, i.e. x2, not a flat +10000).
 				{ (uint)CharacterStatId.BonusProtection, 100, ".setstat 334, re-probed against base 4000" },
 
 				// --- measured x1. The client prints these through its integer formatter.
@@ -55,8 +54,8 @@ namespace Faolan.Tests
 				{ (uint)CharacterStatId.OffhandRating, 1, "tooltip: Red Edge 5" },
 				{ (uint)CharacterStatId.CriticalRating, 1, "tooltip: Skirmisher 75, Helm 45" },
 
-				// --- the two the old table flagged as the warning against inferring a scale from a neighbour: despite
-				// the names, 0x0177 renders its raw value verbatim (the trailing % is a FORMAT, not a scale) while its
+				// --- the two that warn against inferring a scale from a neighbour: despite
+				// the names, 0x0177 renders its raw value verbatim (the trailing % is a format, not a scale) while its
 				// 0x017C sibling five ids away is a real ×100.
 				{ (uint)CharacterStatId.FatalityChance, 1, ".setstat 375 10000 -> \"10000.0 %\"" },
 				{ (uint)CharacterStatId.HateModifier, 1, ".setstat 170 10000 -> \"10000.0 %\"" },
@@ -77,9 +76,9 @@ namespace Faolan.Tests
 			Assert.NotEmpty(how); // the provenance is the point of the row; keep it non-empty
 		}
 
-		// The ten stats #251 recorded as unreachable by measurement, because a level-1 character's sheet does not
-		// render them. They are what the transcription buys: pinned here so a later re-transcription cannot quietly
-		// drop them back to the ×1 default that used to hide a wrong scale.
+		// The ten stats that are unreachable by measurement, because a level-1 character's sheet does not render them.
+		// They are what the transcription buys: pinned here so a later re-transcription cannot quietly drop them back to
+		// the ×1 default, which would hide a wrong scale.
 		[Theory]
 		[InlineData(920, 100)] // Attack Rating
 		[InlineData(922, 100)] // Defense Rating
@@ -96,7 +95,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, StatDisplayScale.Of(statId));
 		}
 
-		// The five ids that sit in BOTH percent predicates. The client multiplies the two divisors (an explicit MULSS
+		// The five ids that sit in both percent predicates. The client multiplies the two divisors (an explicit mulss
 		// against the same 100.0 constant), so ×10000 is the rule and not a transcription slip - which is worth a gate
 		// of its own, because it is the one result here that looks like a bug.
 		[Theory]

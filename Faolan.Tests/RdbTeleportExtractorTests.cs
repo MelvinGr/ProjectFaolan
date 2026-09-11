@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The client's own cross-playfield teleport table, RDB 1000087 (Gitea #883). Driven from a literal rather than
+	// The client's own cross-playfield teleport table, RDB 1000087. Driven from a literal rather than
 	// from the client, so the grammar is gated in a plain clone - the shape below is copied from the real record.
 	//
-	// What the SHIPPED data looks like is deliberately not asserted here: that is a fact about `faolan.db` against a
+	// What the shipped data looks like is deliberately not asserted here: that is a fact about `faolan.db` against a
 	// client we may or may not hold, and it belongs in `--report teleport-match`, not in a test (CLAUDE.md).
 	public class RdbTeleportExtractorTests
 	{
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Equal(row.SourceMapId, row.DestMapId);
 		}
 
-		// ⚠️ The record's floats are `.`-decimal regardless of the machine's locale. Parsed under a comma-decimal
+		// The record's floats are `.`-decimal regardless of the machine's locale. Parsed under a comma-decimal
 		// culture, an invariant-less parse turns 25.000000 into 25000000 and puts the door 25 km away - a silent
 		// mismatch, not an exception.
 		[Fact]

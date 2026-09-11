@@ -7,10 +7,10 @@ using Faolan.Core.Network.Server.GameServer;
 
 namespace Faolan.Tests.Support
 {
-	// An IGameServerDispatcher that RECORDS the world-tier ops the CS services drive (team membership pushes,
+	// An IGameServerDispatcher that records the world-tier ops the CS services drive (team membership pushes,
 	// teleports, minigame end/stop) and answers "done" to them, so a team / raid / group-finder / PvP flow can run
-	// without a world listener behind it. Everything else answers "nobody is there". It replaced five per-file
-	// copies (#928 item 2) - a test that needs to see a new op adds a list here rather than a sixth class.
+	// without a world listener behind it. Everything else answers "nobody is there". A test that needs to see a new
+	// op adds a list here rather than a copy of its own.
 	public sealed class RecordingGameServerDispatcher : IGameServerDispatcher
 	{
 		public List<(uint Recipient, uint Member, uint Team, uint Leader, bool Joined)> Membership { get; } = [];

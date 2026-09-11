@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Knockback (#496). The wire form is capture-backed and gated byte-exact; the gameplay around it is one
+	// Knockback. The wire form is capture-backed and gated byte-exact; the gameplay around it is one
 	// measurement, and these tests are careful to assert only what each half actually supports.
 	public class KnockbackTests
 	{
-		// The ONE knockback in the corpus: NecroL80_mage-necromancer_login_gameplay_chat-annotated, 18:49:54.284, the
+		// The one knockback in the corpus: NecroL80_mage-necromancer_login_gameplay_chat-annotated, 18:49:54.284, the
 		// packet the player's own `knockbacked` annotation names. A 69-byte MoveTaskIIR addressed to the player -
-		// 1 of only 11 s2c MoveTasks in 1,219 that name the player as SUBJECT, and the only long form among them.
+		// 1 of only 11 s2c MoveTasks in 1,219 that name the player as subject, and the only long form among them.
 		//
 		// from (298.83, 95.40, 337.74) -> to (300.71, 95.17, 335.40): 3.01 units. The `to` is exactly the position the
 		// SetPosIIR pins 1.7 s later, and SetPosIIR occurs twice in the entire capture (world entry, and here).
@@ -35,15 +35,15 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
-		// ⭐ THE SECOND KNOCKBACK (#742), and it is what turns the one measurement above into a constant. An INBOUND
+		// The second knockback, and it is what turns the one measurement above into a constant. An inbound
 		// knockback on the player in NecroL80_mage-necromancer_login_gameplay_annotated_3 frame 7790, at the second the
 		// player's own annotation says "got knockedback".
 		//
 		// It answers both of the questions one head-on sample could not:
-		//   - the horizontal displacement is 3.000, against the first sample's 3.01 - a CONSTANT, not a per-ability
+		//   - the horizontal displacement is 3.000, against the first sample's 3.01 - a constant, not a per-ability
 		//     or per-level curve;
-		//   - the attacker→victim distance goes 3.255 → 6.255, i.e. exactly the displacement, so the push is along
-		//     the attacker→victim RAY and not along the attacker's facing.
+		//   - the attackervictim distance goes 3.255 6.255, i.e. exactly the displacement, so the push is along
+		//     the attackervictim ray and not along the attacker's facing.
 		[Fact]
 		public void ForcedMove_IsByteIdenticalToTheSecondCapturedKnockback()
 		{
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
-		// The geometry the second sample settles: 3.0 units, straight along the attacker→victim ray. The attacker
+		// The geometry the second sample settles: 3.0 units, straight along the attackervictim ray. The attacker
 		// stood at (819.224, 73.090, 794.782), 3.255 from the victim; after the shove it is 6.255.
 		[Fact]
 		public void Resolve_ReproducesTheSecondCapturedKnockback()
@@ -139,7 +139,7 @@ namespace Faolan.Tests
 			Assert.Equal(p, Knockback.Resolve(p, p));
 		}
 
-		// Resistance reduces the distance monotonically and never inverts it or overshoots. The CURVE is invented
+		// Resistance reduces the distance monotonically and never inverts it or overshoots. The curve is invented
 		// (see Knockback's remarks) so this asserts the properties that must hold rather than specific values.
 		[Fact]
 		public void Resistance_ReducesTheDistance_MonotonicallyAndNeverInverts()
@@ -159,7 +159,7 @@ namespace Faolan.Tests
 			Assert.Equal(0.5f, Knockback.ResistanceScale((uint)Knockback.ResistanceDivisor), 4);
 		}
 
-		// A resisted push still moves the victim TOWARDS the same side - resistance shortens, it never reverses.
+		// A resisted push still moves the victim towards the same side - resistance shortens, it never reverses.
 		[Fact]
 		public void Resistance_ShortensButKeepsTheDirection()
 		{

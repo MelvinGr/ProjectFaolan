@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// What the character ADDS UP TO: the stat sheet and the inputs it is computed from - the class base, the buffs,
-	// and what the worn gear, the trained feats and the combos contribute. One of the five character slices
-	// (Gitea #928 item 9); the feats and spells THEMSELVES are ICharacterProgressionRepository.
+	// What the character adds up to: the stat sheet and the inputs it is computed from - the class base, the buffs,
+	// and what the worn gear, the trained feats and the combos contribute. One of the five character slices; the
+	// feats and spells themselves are ICharacterProgressionRepository.
 	public interface ICharacterStatRepository
 	{
 		Task<CharacterBuff[]> GetCharacterBuffs(uint characterId);
@@ -18,8 +18,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 
 		/// <summary>
-		///     The stat effects of the feats the CLIENT trains by itself for this class at or below this level - the
-		///     second, derived half of a character's feat contribution (Gitea #863).
+		///     The stat effects of the feats the client trains by itself for this class at or below this level - the
+		///     second, derived half of a character's feat contribution.
 		/// </summary>
 		/// <remarks>
 		///     These feats are deliberately absent from <c>CharacterFeats</c>: retail never puts one on the wire and
@@ -27,7 +27,7 @@ namespace Faolan.Core.Database.Repositories
 		///     client derives them from (class, level) against its featclass table and so does this. No wire change -
 		///     server-side stat contributions only.
 		///     <para>
-		///         ⭐ It is a LADDER PICK, not a sum, and the class progression track is excluded because
+		///         It is a ladder pick, not a sum, and the class progression track is excluded because
 		///         <see cref="GetClassAttributeBase" /> already applies it - see <see cref="AutoTrainedFeatLadder" />
 		///         for both, and for the three captured regen observations that corroborate the rule.
 		///     </para>
@@ -35,30 +35,30 @@ namespace Faolan.Core.Database.Repositories
 		Task<FeatEffect[]> GetClassAutoTrainedFeatEffects(ConanClass characterClass, uint level);
 
 		/// <summary>
-		///     The per-SPELL boosts a character's trained feats grant (#590), as <c>spellId -> percent x 100</c>.
-		///     Resolved through the spell LINE the feat actually names, so every rank of a boosted spell is in the
-		///     result and combat needs no line lookup of its own. Summed per spell, because two different feats can
-		///     boost the same line; a character holds only the HIGHEST rank of each feat, so the ranks of one feat
-		///     never stack with each other.
+		///     The per-spell boosts a character's trained feats grant, as <c>spellId -> percent x 100</c>. Resolved
+		///     through the spell line the feat actually names, so every rank of a boosted spell is in the result and
+		///     combat needs no line lookup of its own. Summed per spell, because two different feats can boost the same
+		///     line; a character holds only the highest rank of each feat, so the ranks of one feat never stack with
+		///     each other.
 		/// </summary>
 		Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId);
 
 		/// <summary>
-		///     What a character's trained feats do to their COMBOS (#697), as <c>comboId -> bonus</c>. Summed per
-		///     combo across every feat that names it, on the same "a character holds only the highest rank of each
-		///     feat" rule <see cref="GetCharacterSpellBoosts" /> relies on.
+		///     What a character's trained feats do to their combos, as <c>comboId -> bonus</c>. Summed per combo across
+		///     every feat that names it, on the same "a character holds only the highest rank of each feat" rule
+		///     <see cref="GetCharacterSpellBoosts" /> relies on.
 		/// </summary>
 		Task<IReadOnlyDictionary<uint, ComboFeatBonus>> GetCharacterComboBonuses(uint characterId);
 
 		/// <summary>
-		///     The PROCS a character's trained feats hang off its combos and spell lines (#697) - every
-		///     <see cref="FeatProc" /> row of every held feat, resolved through the wire→template feat map. Empty for a
-		///     character with no proc feats, which is most of them.
+		///     The procs a character's trained feats hang off its combos and spell lines - every
+		///     <see cref="FeatProc" /> row of every held feat, resolved through the wire-to-template feat map. Empty for
+		///     a character with no proc feats, which is most of them.
 		/// </summary>
 		Task<IReadOnlyList<FeatProc>> GetCharacterFeatProcs(uint characterId);
 
 		/// <summary>
-		///     The per-spell scaling-attribute OVERRIDES among a character's KNOWN spells (#592), as
+		///     The per-spell scaling-attribute overrides among a character's known spells, as
 		///     <c>spellId -> wire stat id</c>. Only spells whose template carries RDB field 847 appear; every other
 		///     spell takes the caster's class attribute (<c>CombatResolver.MagicDamageAttribute</c>), so an absent
 		///     entry means "no override", not "no scaling".
@@ -67,29 +67,29 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
 
-		// The class/level BASE stats (#444): what a character of this class and level starts with before gear and buffs.
+		// The class/level base stats: what a character of this class and level starts with before gear and buffs.
 		// Empty when that (class, level) has no decoded row - all 12 classes x 80 levels are shipped, so this means a
-		// level outside 1..80 or an unimported database - and the caller must treat empty as UNKNOWN, not as zero.
+		// level outside 1..80 or an unimported database - and the caller must treat empty as unknown, not as zero.
 		Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(ConanClass characterClass, uint level);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task SaveCharacterBuffs(uint characterId, IReadOnlyCollection<CharacterBuff> buffs);
 
 		/// <summary>
-		///     Sets the given stat sheet slots to new values (#739 - the skillpoint spend). A stat id may occupy more
-		///     than one ordinal (StatList#1 mirrors displayed stats that StatList#2 also carries), so EVERY row
-		///     holding the id is written - the sheet must not disagree with itself. Ids with no row are ignored: the
-		///     sheet is what the snapshot is authored from, and inventing an ordinal would put a stat on the wire in
-		///     a position no capture has.
+		///     Sets the given stat sheet slots to new values (the skillpoint spend). A stat id may occupy more than one
+		///     ordinal (StatList#1 mirrors displayed stats that StatList#2 also carries), so every row holding the id is
+		///     written - the sheet must not disagree with itself. Ids with no row are ignored: the sheet is what the
+		///     snapshot is authored from, and inventing an ordinal would put a stat on the wire in a position no capture
+		///     has.
 		/// </summary>
 		Task SaveCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
 
 		/// <summary>
-		///     The same write, but MINTING a sheet slot for an id the character has no row for (#509 - the daily
-		///     challenge counters). Deliberately a separate method rather than a flag on
-		///     <see cref="SaveCharacterStats" />: that one's refusal to invent an ordinal is a rule the skillpoint
-		///     spend depends on, and this is the one case where minting is right - retail's own login snapshots carry
-		///     stats 1000066..1000077 (46-72 of the 134 captures), so a character that has never had one is missing a
-		///     row retail would have sent. A new row is appended after the character's highest ordinal.
+		///     The same write, but minting a sheet slot for an id the character has no row for (the daily challenge
+		///     counters). Deliberately a separate method rather than a flag on <see cref="SaveCharacterStats" />: that
+		///     one's refusal to invent an ordinal is a rule the skillpoint spend depends on, and this is the one case
+		///     where minting is right - retail's own login snapshots carry stats 1000066..1000077 (46-72 of the 134
+		///     captures), so a character that has never had one is missing a row retail would have sent. A new row is
+		///     appended after the character's highest ordinal.
 		/// </summary>
 		Task UpsertCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
 	}
@@ -102,12 +102,12 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterBuffs.Where(b => b.CharacterId == characterId).OrderBy(b => b.BuffId).ToArrayAsync();
 		}
 
-		// The spell-scoped stat modifiers the character's TRAINED feats carry (#593/#710) - "your Shock costs 10% less
-		// mana", "every rank of your Frost line crits harder". The feat-sourced half of the one mechanism; the other
-		// half rides live BUFFS and is read straight off the catalog (SpellSpellStatModifier).
+		// The spell-scoped stat modifiers the character's trained feats carry - "your Shock costs 10% less mana",
+		// "every rank of your Frost line crits harder". The feat-sourced half of the one mechanism; the other half
+		// rides live buffs and is read straight off the catalog (SpellSpellStatModifier).
 		//
-		// Two hops, for the same reason GetCharacterFeatEffects has two: CharacterFeats holds the WIRE feat id and the
-		// modifier rows are keyed by the RDB TEMPLATE id, which FeatIdMaps bridges. The line -> rank fan-out is NOT
+		// Two hops, for the same reason GetCharacterFeatEffects has two: CharacterFeats holds the wire feat id and the
+		// modifier rows are keyed by the RDB template id, which FeatIdMaps bridges. The line -> rank fan-out is not
 		// done here - the rows keep the target space the client stated, and SpellModifierService resolves it once
 		// against the catalog, so a line row does not become N rows on every query.
 		public async Task<FeatSpellStatModifier[]> GetCharacterFeatSpellStatModifiers(uint characterId)
@@ -120,7 +120,7 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// The stat modifiers a character's trained feats grant. Two hops, because the wire and the catalog use
-		// different id spaces (#467): CharacterFeat.FeatId is a WIRE id, FeatIdMap resolves it to the RDB TEMPLATE id,
+		// different id spaces: CharacterFeat.FeatId is a wire id, FeatIdMap resolves it to the RDB template id,
 		// and FeatEffect hangs off the template.
 		//
 		// A feat whose template is one of the TEA-encrypted ones contributes nothing - we cannot read its effects -
@@ -134,12 +134,12 @@ namespace Faolan.Core.Database.Repositories
 						  select effect).ToArrayAsync();
 		}
 
-		// The AUTO-TRAINED half (#863). Same two id-space hops as the trained path above, but the left side is the
-		// client's featclass SCHEDULE rather than a character's list, because these feats are never in one.
+		// The auto-trained half. Same two id-space hops as the trained path above, but the left side is the client's
+		// featclass schedule rather than a character's list, because these feats are never in one.
 		//
-		// ⛔ Two filters carry the whole correctness of this, and both are argued in AutoTrainedFeatLadder: the class
-		// PROGRESSION track is excluded (ClassAttributeBases already applies it, from the same client templates), and
-		// what survives is LADDER-PICKED per stat rather than summed.
+		// Two filters carry the whole correctness of this, and both are argued in AutoTrainedFeatLadder: the class
+		// progression track is excluded (ClassAttributeBases already applies it, from the same client templates), and
+		// what survives is ladder-picked per stat rather than summed.
 		public async Task<FeatEffect[]> GetClassAutoTrainedFeatEffects(ConanClass characterClass, uint level)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -157,9 +157,9 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// Two hops. CharacterFeats holds the WIRE feat id and the modifier rows are keyed by the TEMPLATE id (a
-			// different id space, hence FeatIdMaps); then the modifier names a spell LINE, which fans out to every
-			// RANK of that spell. Resolving the fan-out HERE - once, at world entry - is what keeps the cast path a
+			// Two hops. CharacterFeats holds the wire feat id and the modifier rows are keyed by the template id (a
+			// different id space, hence FeatIdMaps); then the modifier names a spell line, which fans out to every
+			// rank of that spell. Resolving the fan-out here - once, at world entry - is what keeps the cast path a
 			// dictionary lookup instead of a per-cast query.
 			var rows = await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
 							  join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
@@ -174,16 +174,16 @@ namespace Faolan.Core.Database.Repositories
 			return totals;
 		}
 
-		// What a character's trained feats do to their combos (#697). Two hops for the same reason
-		// GetCharacterSpellBoosts has two: CharacterFeat.FeatId is a WIRE id and the modifier rows hang off the RDB
-		// TEMPLATE id, which FeatIdMaps bridges.
+		// What a character's trained feats do to their combos. Two hops for the same reason GetCharacterSpellBoosts has
+		// two: CharacterFeat.FeatId is a wire id and the modifier rows hang off the RDB template id, which FeatIdMaps
+		// bridges.
 		//
-		// TWO tables, kept apart in the result because they are not the same statement: 53250 modifies one weapon
-		// ATTACK of the combo (its opener or its finisher) and 53209 modifies the combo as a whole. Resolved here,
+		// Two tables, kept apart in the result because they are not the same statement: 53250 modifies one weapon
+		// attack of the combo (its opener or its finisher) and 53209 modifies the combo as a whole. Resolved here,
 		// once at world entry, so the swing path stays a dictionary lookup.
 		//
-		// ⚠️ The two tables' units differ - 53250's are whole percents and 53209's hundredths - which is the client's
-		// own doing (#593). Normalised to hundredths here so nothing downstream has to remember which is which.
+		// The two tables' units differ - 53250's are whole percents and 53209's hundredths - which is the client's own
+		// doing. Normalised to hundredths here so nothing downstream has to remember which is which.
 		public async Task<IReadOnlyList<FeatProc>> GetCharacterFeatProcs(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -237,7 +237,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<IReadOnlyDictionary<uint, uint>> GetCharacterSpellScalingAttributes(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// Only the character's OWN spells, and only the ones that actually carry an override - 716 of the 21,502
+			// Only the character's own spells, and only the ones that actually carry an override - 716 of the 21,502
 			// templates do, so a character typically has a handful or none, and the cast path stays a dictionary
 			// lookup (the same reason GetCharacterSpellBoosts resolves its fan-out here).
 			var rows = await (from known in ctx.CharacterSpells.Where(c => c.CharacterId == characterId)
@@ -254,13 +254,8 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterStats.Where(s => s.CharacterId == characterId).OrderBy(s => s.Ordinal).ToArrayAsync();
 		}
 
-		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
-		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3) - PLUS the
-		// gems socketed into them (#311), one entry per socket. Reads the
-		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
-		// character has no equipment row or no stat-bearing gear.
-		// The class/level BASE stats (#444). Empty when that (class, level) has no decoded row - some classes' higher
-		// levels are not located yet - and the caller MUST treat empty as unknown rather than as zero.
+		// The class/level base stats. Empty when that (class, level) has no decoded row - some classes' higher levels
+		// are not located yet - and the caller must treat empty as unknown rather than as zero.
 		public async Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(ConanClass characterClass, uint level)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -269,17 +264,17 @@ namespace Faolan.Core.Database.Repositories
 				.ToDictionaryAsync(r => r.StatId, r => r.Amount);
 		}
 
-		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
-		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3).
+		// The character's worn stat-bearing items (the 16 combat slots) with their StatModifiers loaded, one entry per
+		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation.
 		//
-		// #400: only the ACTIVE weapon SET's two slots are folded in - armour + jewellery always apply. A character can
-		// have BOTH loadouts equipped at once (Primary = slots 6/8, Secondary = 20/21) and counting all four would
-		// double-count. The two sets are just swappable loadouts, not inherently melee vs ranged.
+		// Only the active weapon set's two slots are folded in - armour + jewellery always apply. A character can have
+		// both loadouts equipped at once (Primary = slots 6/8, Secondary = 20/21) and counting all four would
+		// double-count. The two sets are swappable loadouts, not inherently melee vs ranged.
 		//
-		// #585: the result is one entry per occupied SLOT, and the DISTINCT set is for the QUERY only - `IN (...)` cannot
-		// use a duplicate, and loading the same template twice is just a second copy of one row. Returning the distinct
-		// set silently HALVED every stat the character wore twice: their pools, their attribute scores, and (since #580)
-		// the attribute-scaled part of every pool with them.
+		// The result is one entry per occupied slot, and the distinct set is for the query only - `IN (...)` cannot use
+		// a duplicate, and loading the same template twice is just a second copy of one row. Returning the distinct set
+		// would silently halve every stat the character wears twice: their pools, their attribute scores, and the
+		// attribute-scaled part of every pool with them.
 		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -287,7 +282,7 @@ namespace Faolan.Core.Database.Repositories
 			var wielded = activeSet == WeaponSet.Primary
 				? new[] { CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.OffHandWeapon }
 				: [CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo];
-			// The stat-bearing set minus the weapon slots of the loadout that is NOT drawn. Vanity slots are appearance
+			// The stat-bearing set minus the weapon slots of the loadout that is not drawn. Vanity slots are appearance
 			// only and the Bag / ResourceBag containers carry a bag stat, not a combat one - neither is stat-bearing.
 			var slots = CharacterEquipmentSlot.StatBearing
 				.Where(slot => !IsWeaponSlot(slot))
@@ -306,14 +301,12 @@ namespace Faolan.Core.Database.Repositories
 			if (wornInstances.Length == 0)
 				return [];
 
-			// #311: the GEMS socketed into those worn items count too, and they count through the ordinary item-stat
-			// path - a socket carries no stat value in either wire form, so a gem's effect IS its own template's
-			// modifier list. Returning them as extra entries is the whole of it, because the caller sums StatModifiers
-			// across the array.
+			// The gems socketed into those worn items count too, and they count through the ordinary item-stat path - a
+			// socket carries no stat value in either wire form, so a gem's effect is its own template's modifier list.
+			// Returning them as extra entries is the whole of it, because the caller sums StatModifiers across the array.
 			//
-			// One entry per SOCKET, exactly as the worn set is one entry per occupied slot: two of the same gem in two
-			// sockets is that bonus twice. Distinct-ing here would halve it, which is the bug #585 fixed for the worn
-			// items themselves.
+			// One entry per socket, exactly as the worn set is one entry per occupied slot: two of the same gem in two
+			// sockets is that bonus twice. Distinct-ing here would halve it.
 			var wornIds = wornInstances.Select(i => i.Id).ToArray();
 			var gems = await ctx.ItemInstanceSockets.AsNoTracking()
 				.Where(s => wornIds.Contains(s.ItemInstanceId))
@@ -331,9 +324,9 @@ namespace Faolan.Core.Database.Repositories
 			}
 		}
 
-		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainWeapon), for melee resolution
-		// (#395), or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection -
-		// no nav graph loaded (the combat swing hot path).
+		// The (min, max) damage of the character's equipped melee main-hand weapon (MainWeapon), for melee resolution,
+		// or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection - no
+		// nav graph loaded (the combat swing hot path).
 		public async Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -398,7 +391,7 @@ namespace Faolan.Core.Database.Repositories
 			if (missing.Length != 0)
 			{
 				// Append after the character's highest ordinal - the sheet is ordered by it, so an appended stat lands
-				// at the END of the snapshot's stat block rather than displacing a captured one.
+				// at the end of the snapshot's stat block rather than displacing a captured one.
 				var nextOrdinal = await ctx.CharacterStats.Where(s => s.CharacterId == characterId).Select(s => (int?)s.Ordinal).MaxAsync() ?? -1;
 				foreach (var statId in missing)
 					ctx.CharacterStats.Add(new CharacterStat { CharacterId = characterId, Ordinal = ++nextOrdinal, StatId = statId, Value = values[statId] });

@@ -6,54 +6,57 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Pvp
 {
-	// 0x20AA DispatchBattleKeepInfoRequestReturnPhase3And4 - the s2c answer to c2s RequestBattleKeepInformation
-	// (0x2042, CSPlayerAgent), the per-BATTLEKEEP status query that sits beside the guild-leaderboard board
-	// (MassivePvpInfoCodec). The client opens the Border Kingdoms siege panel and queries one keep at a time.
-	//
-	// ⚠️ CAPTURED, and this refutes #147's standing "not one siege or city message occurs anywhere in the corpus".
-	// `NecroL80_..._gameplay_annotated_9` carries four request/reply pairs, each immediately followed by a
-	// DispatchGuildRankingsUpdate (0x2041) naming the owning guild - "Vendetta", "Hand of Stygia", "Fleurs de Lys"
-	// - so the reply is the keep's numeric status and the owning-guild NAME arrives separately.
-	//
-	// Grammar (byte-exact on all four captured replies):
-	//
-	//   [u32 (count+1) * 0x3F1]  { count x entry }
-	//   entry = [ID32 owner: u32 class][u32 guildId]  <- preceded by [u32 keepId]
-	//         = [u32 keepId][u32 EntityClass.Guild][u32 owningGuildId][u32 attackerClass][u32 attackerGuildId]
-	//           [u32 nextPhaseUnix][u32 phase]
-	//
-	// ⭐ The columns are NAMED FROM THE CLIENT'S OWN VIEW, not inferred from values (#147, 2026-08-25). The reader
-	// `FUN_0134f280` scatters the seven words into a 0x1c struct in slot order [0][1][2][5][6][4][3], and the
-	// battlekeep window's filler `FUN_01315130` (`Views/MassivePvP/MassivePvPBattleKeepView.xml`) reads that struct:
-	//   * slots [1],[2] are passed as ONE ID32 to the guild-name lookup and rendered under
-	//     `MassivePvP_BattleKeepView_DefendingGuild` - so the word this codec used to call "zoneWord" is the guild
-	//     ID32's CLASS word (EntityClass.Guild = 0xDEB7, the same pair GuildRankingsCodec writes), not a zone;
-	//   * slot [3] (wire word 7) is the PHASE: `FUN_01315780` names it from LDB category 10032
-	//     (`FUN_0060f190(0x2730, phase, 0)`) under `MassivePvP_BattleKeepView_Phase` - see BattleKeepPhase;
-	//   * slot [4] (wire word 6) is the time the NEXT phase begins: `localtime` -> weekday + hh:mm under
-	//     `MassivePvP_BattleKeepView_NextPhase` (and, in phase War, a countdown);
-	//   * slots [5],[6] (wire words 4-5) are a second ID32, compared against the null ID32 and shown as the
-	//     ATTACKING guild (`MassivePvP_BattleKeepView_AttackingGuild` / `..._UnknownGuildName`). Zero on every
-	//     captured keep = no war declared; when set its class word is EntityClass.Guild too.
-	// The owner is CROSS-CORROBORATED three ways besides: keep 4's 0x7B726 is "Vendetta"'s guild id and keep 2's
-	// 0x7C6A6 is "Hand of Stygia"'s, BOTH matching (a) the guildId column of the same session's MassivePvp board
-	// (MassivePvpInfoCodec) and (b) the guild NAME in the DispatchGuildRankingsUpdate (0x2041) that follows each reply.
-	//
-	// The Phase1And2 twin (0x20A9) has NO captured body - an earlier note here called a frame in
-	// `Strie_rogue-assassin_login` its single sample, but that frame is GameCharInterface 0x29
-	// (DispatchReplyLootForCharacterTemplateClusterOk) on the GameServer stream; `0x20A9` is only the lossy wire
-	// rendering. Its layout is recovered from the client reader (`FUN_013b1680`) in
-	// docs/subsystems/guild-cities-and-sieges.md and is not built here: it carries a nested attacker-ranking list.
-	//
-	// The attacker pair is carried as two raw words so a reply that fills them round-trips rather than being
-	// rejected (the StatDamageIIR precedent); the OWNER's class word is asserted because every captured keep carries
-	// it and a keep without an owner has no meaning in this reply. WE RUN NO SIEGE LAYER, so nothing BUILDS this
-	// in-world yet; the codec exists so the decode is byte-exact and citable rather than prose.
+	/// <summary>
+	///     <c>DispatchBattleKeepInfoRequestReturnPhase3And4</c> - the s2c answer to c2s
+	///     <c>RequestBattleKeepInformation</c>, the per-battlekeep status query that sits beside the guild leaderboard
+	///     (<see cref="MassivePvpInfoCodec" />). The client opens the Border Kingdoms siege panel and queries one keep
+	///     at a time.
+	/// </summary>
+	/// <remarks>
+	///     <c>NecroL80_..._gameplay_annotated_9</c> carries four request/reply pairs, each immediately followed by a
+	///     <c>DispatchGuildRankingsUpdate</c> naming the owning guild ("Vendetta", "Hand of Stygia", "Fleurs de Lys"),
+	///     so the reply is the keep's numeric status and the owning guild's name arrives separately. The grammar is
+	///     byte-exact on all four captured replies:
+	///     <code>
+	///     [list frame]  { count x entry }
+	///     entry = [u32 keepId][u32 guildClass][u32 owningGuildId][u32 attackerClass][u32 attackerGuildId]
+	///             [u32 nextPhaseUnix][u32 phase]
+	///     </code>
+	///     <para>
+	///         The columns are named from the client's own view rather than inferred from values. The reader
+	///         <c>FUN_0134f280</c> scatters the seven words into a 0x1c struct in slot order [0][1][2][5][6][4][3], and
+	///         the battlekeep window's filler <c>FUN_01315130</c>
+	///         (<c>Views/MassivePvP/MassivePvPBattleKeepView.xml</c>) reads that struct: slots [1] and [2] are passed
+	///         as one ID32 to the guild-name lookup and rendered under
+	///         <c>MassivePvP_BattleKeepView_DefendingGuild</c>, so the second wire word is the guild ID32's class
+	///         word rather than a zone; slot [3] (wire word 7) is the phase, named by <c>FUN_01315780</c> from LDB
+	///         category 10032 under <c>MassivePvP_BattleKeepView_Phase</c>; slot [4] (wire word 6) is the time the next
+	///         phase begins, rendered as weekday plus hh:mm under <c>MassivePvP_BattleKeepView_NextPhase</c>, with a
+	///         countdown in phase War; slots [5] and [6] (wire words 4-5) are a second ID32, compared against the null
+	///         ID32 and shown as the attacking guild, zero on every captured keep.
+	///     </para>
+	///     <para>
+	///         The owner is cross-corroborated: keep 4's 0x7B726 is "Vendetta"'s guild id and keep 2's 0x7C6A6 is
+	///         "Hand of Stygia"'s, both matching the guildId column of the same session's Massive-PvP board and the
+	///         guild name in the <c>DispatchGuildRankingsUpdate</c> that follows each reply.
+	///     </para>
+	///     <para>
+	///         The Phase1And2 twin has no captured body. Its layout is recovered from the client reader
+	///         (<c>FUN_013b1680</c>) in docs/subsystems/guild-cities-and-sieges.md and is not built here, because it
+	///         carries a nested attacker-ranking list.
+	///     </para>
+	///     <para>
+	///         The attacker pair is carried as two raw words so that a reply which fills them round-trips rather than
+	///         being rejected; the owner's class word is asserted, because every captured keep carries it and a keep
+	///         without an owner has no meaning in this reply. No siege layer runs here, so nothing builds this
+	///         in-world; the codec exists so the decode is byte-exact and citable.
+	///     </para>
+	/// </remarks>
 	public static class BattleKeepInfoCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchBattleKeepInfoRequestReturnPhase3And4;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(BattleKeepInfo value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -106,13 +109,16 @@ namespace Faolan.Core.Network.Codecs.Pvp
 
 	public sealed record BattleKeepInfo(IReadOnlyList<BattleKeepInfoEntry> Keeps)
 	{
-		// The reply a server with no siege layer sends: every captured entry names an OWNING guild and an unowned
-		// keep's encoding is uncaptured, so zero entries is the only honest body (#147).
+		// The reply a server with no siege layer sends. Every captured entry names an owning guild and an unowned
+		// keep's encoding is uncaptured, so zero entries is the only honest body.
 		public static readonly BattleKeepInfo Empty = new BattleKeepInfo([]);
 	}
 
-	// One keep's status. AttackingGuildClass/AttackingGuildId are the attacker's ID32 as two raw words: [0][0] is the
-	// client's null ID32 (no war declared - every captured keep), a real attacker carries [EntityClass.Guild][id].
+	/// <summary>
+	///     One keep's status. <c>AttackingGuildClass</c> and <c>AttackingGuildId</c> are the attacker's ID32 as two raw
+	///     words: <c>[0][0]</c> is the client's null ID32 (no war declared, as on every captured keep), while a real
+	///     attacker carries the guild entity class and its id.
+	/// </summary>
 	public sealed record BattleKeepInfoEntry(
 		uint KeepId,
 		uint OwningGuildId,
@@ -121,10 +127,15 @@ namespace Faolan.Core.Network.Codecs.Pvp
 		uint NextPhaseUnix,
 		BattleKeepPhase Phase);
 
-	// The battlekeep's siege phase, named by the client from LDB category 10032 (`--report ldb-search
-	// --report-arg 10032:<letter>`). The two reply methods are named for the phases they answer in: the keep window
-	// shows the attacker RANKING list (the Phase1And2 record's nested list) below phase 2 and the single attacking
-	// guild from phase 2 on. Every captured keep is in SilenceBeforeTheStorm.
+	/// <summary>
+	///     The battlekeep's siege phase, named by the client from LDB category 10032
+	///     (<c>--report ldb-search --report-arg 10032:&lt;letter&gt;</c>).
+	/// </summary>
+	/// <remarks>
+	///     The two reply methods are named for the phases they answer in: the keep window shows the attacker ranking
+	///     list (the Phase1And2 record's nested list) below phase 2 and the single attacking guild from phase 2 on.
+	///     Every captured keep is in <see cref="SilenceBeforeTheStorm" />.
+	/// </remarks>
 	public enum BattleKeepPhase : uint
 	{
 		WarDeclaration = 0,

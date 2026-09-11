@@ -4,10 +4,14 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.GroupFinder
 {
-	// s2c DispatchGroupFinderReadyCheck (0x20C6): the finder has a group for the activity and asks everyone to
-	// confirm - the client raises the ready-check window and answers with c2s ReadyGroupFinder(bool, bool).
-	// Captured as [00000026][00000000] (activity 38, second word 0; chat-annotated-4 frame 11925). The second
-	// word varies in nothing we hold, so it is carried as-is and always sent 0.
+	/// <summary>
+	///     s2c <c>DispatchGroupFinderReadyCheck</c> - the finder has a group for the activity and asks everyone to
+	///     confirm. The client raises the ready-check window and answers with c2s <c>ReadyGroupFinder(bool, bool)</c>.
+	/// </summary>
+	/// <remarks>
+	///     Captured as <c>[00000026][00000000]</c> (activity 38, second word 0; chat-annotated-4 frame 11925). The
+	///     second word does not vary anywhere in the corpus, so it is carried as-is and always sent 0.
+	/// </remarks>
 	public static class GroupFinderReadyCheckCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGroupFinderReadyCheck;

@@ -1,20 +1,25 @@
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The AttributeChanged / Increased on-screen feedback TEXT - the `remoteformat` a FormatFeedbackIIR (0x8D5A8B6B)
-	// carries when a character's primary attribute rises: the VISIBLE half of a level-up (and of a quest attribute
-	// reward). Retail sends ONE such message per attribute that went up, then a 0x96B8DC59 vitals push with the new
-	// maxima. There is no "You reached level N" banner in any capture - this attribute burst IS the level-up
-	// feedback (#209).
-	//
-	// A rule-1a STRING codec (#530): the payload is text sitting inside a byte codec, so Build composes a `string`
-	// and FormatFeedbackCodec.Build(instance, TypeFlags, Footer, text) frames it. Build-only - the client never
-	// sends this, so there is no captured inbound body a Parse could be gated against, and an ungated regex inverse
-	// would be a decode claim nothing checks.
-	//
-	// Grammar decoded in tools/capture/decode_levelup_feedback.py, golden-tested in AttributeChangedCodecTests.
-	// The XML is entity-escaped (&quot;=" &lt;/&gt;=</> ). The three key="..." values are random per-burst nonces the
-	// client does not validate - reuse is in-client proven (the GenericDisplayAreaName banner reuses one captured
-	// key), so the default keys below are fixed captured ones.
+	/// <summary>
+	///     The AttributeChanged / Increased on-screen feedback text - the <c>remoteformat</c> a FormatFeedbackIIR carries
+	///     when a character's primary attribute rises: the visible half of a level-up, and of a quest attribute reward.
+	/// </summary>
+	/// <remarks>
+	///     Retail sends one such message per attribute that went up, then a vitals push with the new maxima. There is no
+	///     "You reached level N" banner in any capture - this attribute burst is the level-up feedback.
+	///     <para>
+	///         A string codec: the payload is text sitting inside a byte codec, so <c>Build</c> composes a string and
+	///         <c>FormatFeedbackCodec.Build(instance, TypeFlags, Footer, text)</c> frames it. Build-only, since the client
+	///         never sends this, so there is no captured inbound body a Parse could be gated against and an ungated regex
+	///         inverse would be a decode claim nothing checks.
+	///     </para>
+	///     <para>
+	///         Grammar decoded in tools/capture/decode_levelup_feedback.py, golden-tested in
+	///         <c>AttributeChangedCodecTests</c>. The XML is entity-escaped. The three <c>key</c> values are random
+	///         per-burst nonces the client does not validate - reuse is proven in-client, the GenericDisplayAreaName
+	///         banner reusing one captured key - so the defaults below are fixed captured ones.
+	///     </para>
+	/// </remarks>
 	public static class AttributeChangedCodec
 	{
 		public const uint Footer = 0;
@@ -22,19 +27,19 @@ namespace Faolan.Core.Network.Codecs.Text
 		// Invariant across all 33 captured AttributeChanged messages (decode_levelup_feedback.py).
 		public const uint TypeFlags = 0x40000006;
 
-		// Captured per-burst key nonces (from the strickenbla level-up burst). Reused verbatim by the live builder;
-		// already entity-escaped exactly as they appear on the wire.
+		// Captured per-burst key nonces (from the strickenbla level-up burst). Reused verbatim by the live builder; already
+		// entity-escaped exactly as they appear on the wire.
 		public const string DefaultAttributeKey = "?m3qJZNrTSBky8rp2l,w";
 		public const string DefaultIncreasedKey = "akfLdN&amp;#39;`0h^/eax0GI?K";
 		public const string DefaultOuterKey = "W8Kfv/@l29p&#36;ea0.&#36;r?.";
 
-		// The 5 primary-attribute category-615 localized string ids (stable across every capture). Every class gains
-		// all five on a level-up; only the amounts differ. The wire id is authoritative - we do not claim a
-		// id->Strength/Dexterity/... name mapping (not recoverable from the captures).
+		// The five primary-attribute category-615 localized string ids, stable across every capture. Every class gains all
+		// five on a level-up and only the amounts differ. The wire id is authoritative: no id-to-name mapping is claimed,
+		// since none is recoverable from the captures.
 		public static readonly uint[] PrimaryAttributeIds = [804, 806, 808, 810, 814];
 
-		// Attribute ORDER and spacing are part of the bytes, not cosmetic - the keys are passed through verbatim
-		// (already wire-escaped) and the amount rides the last parameter as a `1;<n>` scalar.
+		// Attribute order and spacing are part of the bytes rather than cosmetic: the keys are passed through verbatim,
+		// already wire-escaped, and the amount rides the last parameter as a `1;<n>` scalar.
 		public static string Build(AttributeChanged value)
 		{
 			return $"<remoteformat token=\"AttributeChanged\" category=\"100\" key=\"{value.OuterKey}\" knubot=\"0\"  >" +
@@ -43,15 +48,16 @@ namespace Faolan.Core.Network.Codecs.Text
 			       $"<parameter value=\"1;{value.Amount}\" /></remoteformat>";
 		}
 
-		// With the reusable captured key nonces (the client does not validate them).
+		// With the reusable captured key nonces; the client does not validate them.
 		public static string Build(uint attributeId, uint amount)
 		{
 			return Build(new AttributeChanged(attributeId, amount));
 		}
 	}
 
-	// An effect-LINE payload, not a banner: retail frames it with typeFlags 0x40000006 and footer 0, which is why
-	// those two used to be passed at every call site (#539).
+	/// <summary>
+	///     An effect-line payload rather than a banner: retail frames it with typeFlags 0x40000006 and footer 0.
+	/// </summary>
 	public sealed record AttributeChanged(
 		uint AttributeId,
 		uint Amount,

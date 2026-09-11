@@ -12,14 +12,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A player trade HANDS an item over, and #750 is what makes that expressible: the instance changes owner, so its
-	// crafter, its stack and its socketed GEMS come with it because they were never separable from the row.
+	// A player trade hands an item over: the instance changes owner, so its crafter, its stack and its socketed gems
+	// come with it, because they were never separable from the row.
 	//
-	// This is the gate on the bug #750 nearly shipped past. `TradeService.Exchange` granted a FRESH instance from the
-	// template and then cleared the giver's cell - which deleted the giver's row, cascading its sockets, and handed the
-	// receiver a gemless copy with no crafter. Nothing revealed it because before #750 an item had no per-instance state
-	// to lose; and the offer window is built from the real instance, so it was already advertising gems the exchange
-	// would not deliver.
+	// This is the gate on the shape that nearly shipped in its place. Granting a fresh instance from the template and
+	// then clearing the giver's cell deletes the giver's row, cascades its sockets, and hands the receiver a gemless
+	// copy with no crafter - while the offer window, built from the real instance, has already advertised gems the
+	// exchange would not deliver.
 	public class ItemTransferTests
 	{
 		private const uint Giver = 7;
@@ -33,19 +32,19 @@ namespace Faolan.Tests
 				var moved = await repo.TransferCharacterItem(instanceId, Receiver, ContainerKind.Bag, 3);
 
 				Assert.NotNull(moved);
-				Assert.Equal(instanceId, moved!.Id); // the SAME item, not a copy
+				Assert.Equal(instanceId, moved!.Id); // the same item, not a copy
 
 				// The receiver holds it, with everything that was attached to it.
 				var held = Assert.Single(await repo.GetCharacterItems(Receiver));
 				Assert.Equal((instanceId, "NecroL80", 3), (held.Id, held.CreatorName, held.Slot));
 				Assert.Equal(new uint[] { 0, 1 }, held.Sockets.OrderBy(x => x.SocketIndex).Select(x => x.SocketIndex));
 
-				// And the giver no longer does - one row moved, nothing was minted or deleted.
+				// And the giver does not - one row moved, nothing minted or deleted.
 				Assert.Empty(await repo.GetCharacterItems(Giver));
 			});
 		}
 
-		// An OCCUPIED destination is refused rather than overwritten: the caller found a free cell, so an occupied one
+		// An occupied destination is refused rather than overwritten: the caller found a free cell, so an occupied one
 		// means the receiver's inventory changed underneath us, and the alternative to refusing is destroying whatever is
 		// in it. The item must still be with the giver afterwards - a trade that fails has to fail safely.
 		[Fact]
@@ -75,7 +74,7 @@ namespace Faolan.Tests
 			});
 		}
 
-		// Two characters, and the giver holds a CRAFTED, twice-GEMMED item in bag cell 1. A WRITABLE copy of the shipped
+		// Two characters, and the giver holds a crafted, twice-gemmed item in bag cell 1. A writable copy of the shipped
 		// fixture rather than a bare EnsureCreated: Character hangs off Account, Realm and Map.
 		private static async Task WithTwoCharacters(Func<DatabaseRepository, uint, Task> assert)
 		{

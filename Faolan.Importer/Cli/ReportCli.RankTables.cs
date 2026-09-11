@@ -7,29 +7,29 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report rank-tables [--report-arg <spell id>]`: how a rank TABLE picks WHICH of its members applies (#861).
+	// `--report rank-tables [--report-arg <spell id>]`: how a rank table picks which of its members applies.
 	//
-	// A rank table is a spell in NO stacking line carrying one `CastNano` edge per rank of ONE line - `Furious
-	// Inspiration`'s 299074 fans out to the ten ranks of line 44235. #813 established that exactly one member may
-	// apply (a stacking line is a mutual-exclusion group) and left WHICH as an open question, answered by the walk's
-	// arrival order, and said so: "that is a pick, not a decode".
+	// A rank table is a spell in no stacking line carrying one `CastNano` edge per rank of one line - `Furious
+	// Inspiration`'s 299074 fans out to the ten ranks of line 44235. Exactly one member may apply (a stacking line is
+	// a mutual-exclusion group); which one is currently decided by the walk's arrival order, which is a pick rather
+	// than a decode.
 	//
-	// ⭐⭐ It IS a decode, and this report is the sweep that shows it. Every edge carries a CRITERION run, and the
-	// operator that matters is `MustHavePassiveAbilityRunning` (91), whose operand is a SPELL. Two shapes:
+	// It is a decode, and this report is the sweep that shows it. Every edge carries a CRITERION run, and the
+	// operator that matters is `MustHavePassiveAbilityRunning` (91), whose operand is a spell. Two shapes:
 	//
-	//   * an UPGRADE LADDER - the gate names another member of the SAME table, specifically the rank below, and the
+	//   * an UPGRADE LADDER - the gate names another member of the same table, specifically the rank below, and the
 	//     edges are stored highest-rank-first. Read in order, first match wins: nothing running -> rank 1, rank 5
-	//     running -> rank 6. ⭐ The TOP edge additionally ORs in ITSELF, so a subject at the cap refreshes rather
+	//     running -> rank 6. The TOP edge additionally ORs in itself, so a subject at the cap refreshes rather
 	//     than falling back to rank 1 - an asymmetry with no other possible meaning.
-	//   * a TRAINED-RANK LOOKUP - the gate names a spell OUTSIDE the table, the passive rank the character actually
-	//     holds (`Rampaging Horde`'s ten edges each require a different rank of the trained ability). ⚠️ Note this is
+	//   * a TRAINED-rank lookup - the gate names a spell outside the table, the passive rank the character actually
+	//     holds (`Rampaging Horde`'s ten edges each require a different rank of the trained ability). Note this is
 	//     the rule the ticket ruled out for line 44235 and it is right for these four - the criterion, not a global
 	//     rule, is what says which mechanism a table uses.
 	//
-	// The residue is honest and printed: a table with NO gate at all really does offer the walk nothing to choose
+	// The residue is honest and printed: a table with no gate at all really does offer the walk nothing to choose
 	// with, and there arrival order remains the incumbent.
 	//
-	// ⭐ Why a report and not a test: both populations are shipped RDB data (#729). The CODE property - that reading
+	// Why a report and not a test: both populations are shipped RDB data. The code property - that reading
 	// the run in order produces a one-rank-per-proc ladder - is gated in `RankTableLadderTests`.
 	public static partial class ReportCli
 	{
@@ -56,7 +56,7 @@ namespace Faolan.Importer.Cli
 				return 1;
 			}
 
-			// A rank TABLE: the carrier is in no line, and every edge lands in ONE line that is not 0.
+			// A rank table: the carrier is in no line, and every edge lands in one line that is not 0.
 			var tables = links.GroupBy(l => l.SpellId)
 				.Where(g => g.Count() >= 3
 				            && (names.GetValueOrDefault(g.Key)?.GuiStackingLine ?? 0) == 0
@@ -82,8 +82,8 @@ namespace Faolan.Importer.Cli
 			foreach (var (shape, carriers) in shapes.OrderByDescending(s => s.Value.Count))
 				Console.WriteLine($"  {carriers.Count,3} x {shape}");
 
-			// ⭐ The ladder's defining asymmetry, counted rather than asserted from one example: only the TOP edge
-			// gates on ITSELF, and that is what makes a subject at the cap refresh instead of dropping to rank 1.
+			// The ladder's defining asymmetry, counted rather than asserted from one example: only the TOP edge
+			// gates on itself, and that is what makes a subject at the cap refresh instead of dropping to rank 1.
 			var selfGating = tables.Count(t => gates.GetValueOrDefault((t.Key, t.Value[0].Sequence), []).Contains(t.Value[0].EffectSpellId));
 			Console.WriteLine($"  {selfGating,3} x table whose FIRST edge gates on ITSELF (the refresh-at-the-cap rung)");
 

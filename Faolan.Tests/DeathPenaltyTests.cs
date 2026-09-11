@@ -3,12 +3,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The death-penalty ladder (#504). The one thing worth gating here is that the tiers STACK rather than replace, and
+	// The death-penalty ladder. The one thing worth gating here is that the tiers stack rather than replace, and
 	// that the tier is read from what the player is already carrying - because the obvious implementation (a counter, or
 	// "escalate the one debuff") is wrong, and the wire says so.
 	//
 	// Ground truth: in NecroL80_..._chat-annotated-4 the playfield reload at 20:24:36 bulk re-applies the surviving buffs
-	// with their REMAINING durations, and Death Penalty 1 (1,261,960 ms left) and Death Penalty 2 (1,775,260 ms left)
+	// with their remaining durations, and Death Penalty 1 (1,261,960 ms left) and Death Penalty 2 (1,775,260 ms left)
 	// are both in the same batch - two live countdowns from two separate deaths. The lava death at 20:26:01 then adds
 	// Death Penalty 3 on top.
 	public class DeathPenaltyTests
@@ -19,7 +19,7 @@ namespace Faolan.Tests
 			Assert.Equal(2544u, DeathPenalty.NextTier([]));
 		}
 
-		// The stack grows: each death adds the next tier ALONGSIDE the ones already running.
+		// The stack grows: each death adds the next tier alongside the ones already running.
 		[Fact]
 		public void EachDeath_AddsTheNextTier_Alongside()
 		{
@@ -64,8 +64,8 @@ namespace Faolan.Tests
 			Assert.True(DeathPenalty.IsDeathPenalty(2543));
 			Assert.True(DeathPenalty.IsDeathPenalty(2542));
 
-			// ⚠️ 27631 is ALSO named "Death Penalty 2" in the Spells table but carries a 100 s duration instead of the
-			// ladder's 30 min, and no capture ever applies it. Matching on the NAME rather than the id would pull it in.
+			// 27631 is also named "Death Penalty 2" in the Spells table but carries a 100 s duration instead of the
+			// ladder's 30 min, and no capture ever applies it. Matching on the name rather than the id would pull it in.
 			Assert.False(DeathPenalty.IsDeathPenalty(27631));
 			// 4266542 is a bare "Death Penalty" (60 s) - likewise not part of the ladder.
 			Assert.False(DeathPenalty.IsDeathPenalty(4266542));

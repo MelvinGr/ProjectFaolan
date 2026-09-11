@@ -6,25 +6,37 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Builds the player-spawn ProtoCoreCharacterIIR from code + the character's DB fields. The message is a fixed
-	// render template (Strie's captured PlayerCharacterIirTemplate.bin, now constructed so the runtime ships no spawn
-	// byte-blob - #258) whose identity/looks/vitals/worn-gear are overridden per character. Pass character == null to
-	// get the bare template (the golden oracle; PlayerCharacterIirTests proves it is byte-exact to the .bin minus the
-	// worn-gear entries, which are always character-supplied).
+	/// <summary>
+	///     Builds the player-spawn ProtoCoreCharacterIIR from code plus the character's database fields. The message is a
+	///     fixed render template, constructed rather than replayed, whose identity, looks, vitals and worn gear are
+	///     overridden per character. Pass a null character to get the bare template - the golden oracle;
+	///     PlayerCharacterIirTests proves it is byte-exact to the captured template apart from the worn-gear entries, which
+	///     are always character-supplied.
+	/// </summary>
 	public static class PlayerCharacterIirs
 	{
-		// CharacterStats.bcc_state value for a dead character (alive==1). The behavior-controller Dead state enum.
+		/// <summary>
+		///     The CharacterStats.bcc_state value for a dead character, from the behaviour-controller's state enum; alive is
+		///     1.
+		/// </summary>
 		private const uint DeadBccState = 29;
 
-		// The forced "death" animation id retail sets in a dead player's BCC (Stihetfv login-while-dead FA015807).
-		// Capture-derived (conqueror); may be per-skeleton - see the call site.
+		/// <summary>
+		///     The forced death animation id retail sets in a dead player's BCC, from the Stihetfv login-while-dead capture.
+		///     Capture-derived from a conqueror, and possibly per-skeleton; see the call site.
+		/// </summary>
 		private const uint DeathForcedAnimId = 41877;
 
-		// The player-spawn message for `character` (their `worn` item instances applied). character == null returns the bare
-		// render template (fixed constants + Strie's identity/looks fallbacks, no worn gear).
-		//
-		// `maxVitals` is the character's LIVE ceiling (the world entity's EntityVitals) - the current-side vitals
-		// fields carry it, and only the live value knows the character's gear. Ignored when `character` is null.
+		/// <summary>
+		///     The player-spawn message for <paramref name="character" />, with their <paramref name="worn" /> item
+		///     instances applied. A null character returns the bare render template: fixed constants plus the captured
+		///     identity and looks fallbacks, and no worn gear.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="maxVitals" /> is the character's live ceiling, the world entity's EntityVitals. The
+		///     current-side vitals fields carry it, because only the live value knows the character's gear. It is ignored
+		///     when the character is null.
+		/// </remarks>
 		public static ProtoCoreCharacterIIR ForCharacter(Character character, IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>? worn, CharacterMaxStats maxVitals = null!)
 		{
 			var message = new ProtoCoreCharacterIIR
@@ -83,9 +95,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (character != null)
 				ApplyCharacter(message, character, worn, maxVitals);
 
-			// GM Level: drive player_stats.gm_level from the account type (GM/Admin -> non-zero -> retail GM mode).
-			// Only set when non-zero so the bare template (character == null) and normal players don't serialize the
-			// field - keeps the byte-exact golden template intact. Account may be unloaded on a broadcast spawn -> 0.
+			// player_stats.gm_level comes from the account type: a GM or admin account gives a non-zero level, which is
+			// retail's GM mode. It is set only when non-zero, so the bare template and normal players do not serialize
+			// the field and the byte-exact golden template stays intact. The account may be unloaded on a broadcast
+			// spawn, which reads as 0.
 			var gmLevel = character?.Account?.ClientGmLevel() ?? 0;
 			if (gmLevel > 0)
 				message.player_stats.GmLevel = gmLevel;
@@ -93,20 +106,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return message;
 		}
 
-		// Overrides `message` in place from the character: name, identity (sex/race/level + cur==max vitals), editor
-		// looks, worn equipment, and the dead-state signals. Fields with no DB value (race/sex 0, no Body, no buildable
-		// gear) keep the template's captured value.
+		/// <summary>
+		///     Overrides the message in place from the character: name, identity (sex, race, level and the current-equals-max
+		///     vitals), editor looks, worn equipment and the dead-state signals. Fields with no database value - no Body, no
+		///     buildable gear - keep the template's captured value.
+		/// </summary>
 		private static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>? worn, CharacterMaxStats maxVitals)
 		{
 			message.Name = character.Name;
 
-			// Override the player's identity (model) from the DB when set; otherwise keep the captured stats
-			// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
-			// The identity ALWAYS applies. This used to be gated on `message.Stats != null && character.Race != 0`, so a
-			// character with either missing kept the TEMPLATE's - meaning Strie's sex, race, LEVEL 1 and 9000/9800/23000
-			// vitals shipped to every client that saw them, presented as that character. Neither is a state a character can
-			// legitimately be in: every one is created with a race (CreateCharacter defaults it) and the template always
-			// carries a stat block, so both are corruption and say so.
+			// The identity always applies, and both of its preconditions are corruption rather than states a character
+			// can legitimately be in: every character is created with a race, and the template always carries a stat
+			// block. Falling back to the template instead would ship the template character's sex, race, level and
+			// vitals to every client that sees this one, presented as this character. The remaining CharacterStats
+			// fields stay as captured.
 			var stats = message.Stats
 				?? throw new InvalidOperationException($"The CharacterIIR template carries no CharacterStats, so {character.Name}'s identity cannot be applied.");
 			if ((uint)character.Race == 0)
@@ -115,26 +128,25 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			stats.Sex = (uint)character.Sex;
 			stats.Race = (uint)character.Race;
 			stats.Level = character.Level;
-			// ApprenticeLevel is the mentor system's EFFECTIVE level (#144), not a copy of Level - but retail keeps
-			// the two equal for an un-mentored character and NEVER omits it: all 17,717 captured spawns carry
-			// apprentice_level, and it equals level in every one (zero differing). Leaving the template's 1 here
-			// while overriding Level was the one place our spawn broke that invariant, and it matters twice over -
-			// the client DIVIDES by it for armour mitigation, and the over-head nameplate renders
-			// max(Level, ApprenticeLevel). See CharacterStatBlock.SetLevel (#472).
+			// ApprenticeLevel is the mentor system's effective level rather than a copy of Level, but retail keeps the
+			// two equal for an un-mentored character and never omits it: all 17,717 captured spawns carry
+			// apprentice_level, and it equals level in every one. The invariant matters twice over - the client divides
+			// by it for armour mitigation, and the overhead nameplate renders max(Level, ApprenticeLevel). See
+			// CharacterStatBlock.SetLevel.
 			stats.ApprenticeLevel = character.Level;
 
-			// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
-			// A DEAD character logs in with CURRENT health = 0 (life/max stays full): this FA015807 is the
-			// SimpleCharFullUpdateIIR that CONSTRUCTS the local SimpleChar whose dead-flag gates the
-			// release/resurrect window (DAT_0297d374->[0x10]). The flag is latched at construction from a 0
-			// current-health, NOT from the 0x737A6DF9 snapshot (a different object) - which is why zeroing only
-			// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
-			// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
-			// and can_fall(f20)=0 (alive=1).
-			// The max-side fields carry the CLASS BASE, which the client tops up; the current-side fields carry the
-			// full value. Retail proves the split in one packet - Stihetfv (Conqueror L2) has life 19600 = 196 = this
-			// curve's class base, against current health 229, and our sheet curve gives 228 for that same character.
-			// Sending the sheet value in the max slot made the client top up an already-topped-up number (#580).
+			// Vitals from the persisted MaxStats, on the x100 wire scale.
+			//
+			// A dead character logs in with current health 0 while life and the other maxima stay full: this record is
+			// the SimpleCharFullUpdateIIR that constructs the local SimpleChar whose dead flag gates the release and
+			// resurrect window, and the flag is latched at construction from a zero current health rather than from the
+			// snapshot, which is a different object. Verified against the retail login-while-dead capture (Stihetfv
+			// packet 50): health 0, life 19600 full, can_fall 0.
+			//
+			// The max-side fields carry the class base, which the client tops up, and the current-side fields carry the
+			// full value. Retail proves the split in one packet - a Conqueror at level 2 has life 19600, that curve's
+			// class base, against current health 229. Sending the sheet value in the max slot makes the client top up
+			// an already-topped-up number.
 			var (baseHealth, baseMana, baseStamina) = CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level);
 			if (maxVitals != null)
 			{
@@ -149,23 +161,22 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 			// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
 
-			// THE Dead-substate gate: CharacterStats.bcc_state (the behavior/state-controller state enum).
-			// Across all 15 captured ALIVE player spawns bcc_state==1; the ONLY spawn that carries DeadBccState
-			// (29) is the retail login-while-dead capture. Health=0 and the forced death animation are both
-			// COSMETIC (HP bar / lying-down pose - the avatar could still walk in-client #214); bcc_state is what
-			// locks the controller into the Dead substate and lets the resurrect window paint. Set it for a dead
-			// login (kept captured == alive 1 otherwise).
+			// The dead-substate gate is CharacterStats.bcc_state, the behaviour/state-controller state enum. Across
+			// all 15 captured alive player spawns it is 1, and the only spawn carrying 29 is the retail
+			// login-while-dead capture. Health 0 and the forced death animation are cosmetic - the HP bar and the
+			// lying-down pose, with the avatar still able to walk - while bcc_state is what locks the controller into
+			// the Dead substate and lets the resurrect window paint.
 			if (character.IsDead)
 				stats.BccState = DeadBccState;
 
-			// Retail's dead SimpleChar also reports can_fall=0 (alive=1) - a corpse is ragdoll/incapacitated, not
-			// gravity-stepped. Match it for a dead login (kept captured when alive).
+			// Retail's dead SimpleChar also reports can_fall 0, alive being 1: a corpse is ragdolled rather than
+			// gravity-stepped.
 			if (character.IsDead)
 				message.CanFall = false;
 
-			// The rendered looks from the editor choices (CharacterBody). CharacterBody now stores the TRUE wire
-			// values (the editor's doubled ChangeHeadMesh/Voice/Size are zigzag-decoded to their real value on read),
-			// so they're emitted as-is (e.g. dikketest head_mesh 1142847, voice 5, size 97). Unset = keep captured.
+			// The rendered looks from the editor choices. CharacterBody stores the true wire values - the editor's
+			// doubled ChangeHeadMesh, Voice and Size are zigzag-decoded to their real value on read - so they are
+			// emitted as-is. An unset value keeps the captured one.
 			if (message.Stats != null && character.Body != null)
 			{
 				if (character.Body.HeadMesh != 0)
@@ -176,7 +187,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					message.Stats.MonsterScale = character.Body.Size;
 			}
 
-			// Replace the worn equipment with the character's own (when it has fully-buildable gear).
+			// Replace the worn equipment with the character's own, when it has fully buildable gear.
 			var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(worn);
 			if (wornEquipment.Count > 0)
 			{
@@ -185,14 +196,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					message.InventoryEntries.Add(entry);
 			}
 
-			// THE dead-state signal: a FORCED death animation in the BCC (animation controller). Health=0 alone only
-			// blanks the HP bar (the avatar stays up, no release window - verified in-client #214); the client enters
-			// the Dead substate / paints the resurrect window off the forced animation, NOT health. Across all 33
-			// captured ALIVE player spawns the BCC carries NO anim_forced_* fields; the ONLY spawn that sets them is
-			// the retail login-while-dead capture (Stihetfv FA015807 #50): anim_forced_id=41877, timer=1.0, blend=1.
-			// Force it for a dead login (left unset when alive). The id is the conqueror capture's value - if the dead
-			// POSE renders wrong on another class/skeleton but the WINDOW shows, the mechanism is confirmed and the id
-			// just needs a per-skeleton lookup.
+			// The other dead-state signal is a forced death animation in the BCC's animation controller. Health 0 alone
+			// only blanks the HP bar, leaving the avatar standing with no release window; the client paints the
+			// resurrect window off the forced animation rather than off health. Across all 33 captured alive player
+			// spawns the BCC carries no anim_forced_* fields, and the only spawn that sets them is the retail
+			// login-while-dead capture (anim_forced_id 41877, timer 1.0, blend 1). The id is that conqueror capture's
+			// value: if the dead pose renders wrong on another skeleton but the window still shows, the mechanism is
+			// confirmed and the id needs a per-skeleton lookup.
 			if (character.IsDead && message.Bcc != null)
 			{
 				message.Bcc.AnimForcedId = DeathForcedAnimId;

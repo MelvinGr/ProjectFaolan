@@ -4,18 +4,16 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// Whisper (0x001E) - a tell. The SAME body both ways, which is why one codec serves both:
+	// Whisper - a tell. The same body both ways, which is why one codec serves both:
 	//   [u32 peerCharacterId][u16 len][text][u8 0][u8 1][u8 0]
-	// The peer slot carries the TARGET's id in the client's request and the SENDER's id on delivery - the shape does
+	// The peer slot carries the target's id in the client's request and the sender's id on delivery - the shape does
 	// not distinguish them, the direction does. Byte-exact against the whisper capture (WhisperTests); the receiving
 	// client resolves the name from the ChatSenderInfo (0x0014) that precedes it.
-	//
-	// Moved in from `ChatServerListener.BuildWhisper` in #530.
 	public static class WhisperCodec
 	{
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.Whisper;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical - the only method here that writes bytes.
 		public static byte[] Build(Whisper value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -56,6 +54,5 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	// Whisper (0x001E), both directions.
 	public sealed record Whisper(uint PeerCharacterId, string Text);
 }

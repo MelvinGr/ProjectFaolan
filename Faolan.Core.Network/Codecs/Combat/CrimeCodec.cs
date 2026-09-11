@@ -5,15 +5,16 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// CrimeIIR (0xC7954504). ReadSubClass (FUN_0148c9f0) reads a gate byte and, when set, a u32. Body observed as
-	// [u8 flag=1][u32 value]. Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	//
-	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	/// <summary>
+	///     CrimeIIR. The client reader (FUN_0148c9f0) reads a gate byte and, when it is set, a u32; the body is observed as
+	///     [u8 flag=1][u32 value]. Grammar from that reader; see docs/re/v1-iir-readers.md.
+	/// </summary>
+	/// <remarks>The u32 carrier length belongs to the framing sender, not to this body.</remarks>
 	public static class CrimeCodec
 	{
 		public const uint Opcode = (uint)IirTypes.CrimeIIR;
 
-		// CANONICAL - the only method here that writes bytes.
+		/// <summary>Canonical build: the only method here that writes bytes.</summary>
 		public static byte[] Build(CrimeIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -51,6 +52,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// CrimeIIR (0xC7954504).
+	/// <summary>The CrimeIIR body.</summary>
 	public sealed record CrimeIIR(uint Handle, byte Env, byte Flag, uint Value);
 }

@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Round-trip gate for the FCTX/DXT1 encoder (#295 Phase 2): a synthetic image encoded to FCTX and read back
-	// through the production FctxConverter decoder must reproduce the right dimensions and (within DXT1's lossy
-	// tolerance) the right colours. Proves the encoder emits a container + block layout the reader (= the client)
-	// accepts — the capability needed to write replaced/upscaled textures back into the RDB.
+	// Round-trip gate for the FCTX/DXT1 encoder: a synthetic image encoded to fctx and read back through the
+	// production FctxConverter decoder must reproduce the right dimensions and (within DXT1's lossy tolerance) the
+	// right colours. Proves the encoder emits a container + block layout the reader (= the client) accepts - the
+	// capability needed to write replaced/upscaled textures back into the RDB.
 	public class FctxEncoderTests
 	{
 		[Fact]
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 				nErr += Math.Abs(normal[i * 4] - nrm[i * 4]) + Math.Abs(normal[i * 4 + 1] - nrm[i * 4 + 1]);
 			Assert.True(nErr / (double)(w * h * 2) < 10, "MIXD normal MAE too high");
 
-			// Detail: TryDecodeTopMip(includeSingleChannel) routes MIXD to the ATI1/BC4 detail.
+			// Detail: TryDecodeTopMip(includeSingleChannel) routes mixd to the ATI1/BC4 detail.
 			Assert.True(FctxConverter.TryDecodeTopMip(mixd, out var det, out var dw, out var dh, true));
 			Assert.Equal((w, h), (dw, dh));
 			long dErr = 0;
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 			var fctx = FctxEncoder.EncodeDxt1(Gradient(32, 32), 32, 32);
 			var wrapped = FctxEncoder.WrapIOz1(fctx);
 
-			// The reader's IOz1 unwrap must recover the exact FCTX bytes (this is what RdbWriter inlines).
+			// The reader's IOz1 unwrap must recover the exact fctx bytes (this is what RdbWriter inlines).
 			var unwrapped = RdbReader.UnwrapIOz1Public(wrapped);
 			Assert.Equal(fctx, unwrapped);
 		}

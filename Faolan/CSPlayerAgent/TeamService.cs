@@ -20,17 +20,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	// Teams (groups): the live roster plus the wire fan-out. Decoded in docs/subsystems/teams-trade-friends.md from
-	// login_2-clients_group-trade-friend; every message this builds is gated byte-exact by TeamTradeFriendCodecTests.
-	//
-	// A team is EPHEMERAL - nothing here is persisted, and that is deliberate: retail teams do not survive a logout,
-	// so a DB table would be state with no owner. That also means no migration and no seed data.
-	//
-	// A composed collaborator of the CsPlayerAgent listener, exactly like GuildService: the CS tier owns the roster and
-	// every roster dispatch, and takes the cross-connection client lookup (ClientForCharacter) as a delegate seam. The
-	// other two tiers reach it the way every cross-listener action does, through a dispatcher: the world listener calls
-	// ICsPlayerAgentDispatcher for the LeaveTeam/KickFromTeam that arrive on the GAME connection, and the roster's own
-	// world-side pushes go back out through IGameServerDispatcher, as the guild tag push does.
+	/// <summary>
+	///     Teams (groups): the live roster plus the wire fan-out. Decoded in docs/subsystems/teams-trade-friends.md
+	///     from login_2-clients_group-trade-friend; every message this builds is gated byte-exact by
+	///     TeamTradeFriendCodecTests.
+	/// </summary>
+	/// <remarks>
+	///     A team is ephemeral: nothing here is persisted, because retail teams do not survive a logout and a table
+	///     would be state with no owner.
+	///     <para>
+	///         The CS tier owns the roster and every roster dispatch, and takes the cross-connection client lookup
+	///         (ClientForCharacter) as a delegate seam. The other two tiers reach it through a dispatcher: the world
+	///         listener calls ICsPlayerAgentDispatcher for the LeaveTeam/KickFromTeam that arrive on the game
+	///         connection, and the roster's own world-side pushes go back out through IGameServerDispatcher.
+	///     </para>
+	/// </remarks>
 	public sealed class TeamService
 	{
 		// Retail's team instances are minted sequentially by its CS tier (the capture's three groupings are
@@ -38,7 +42,7 @@ namespace Faolan.CSPlayerAgent
 		// client, only its identity matters.
 		private const uint FirstTeamId = 0x00500000;
 
-		// The SENDER of every CsPlayerAgent s2c packet: the guild/team server object. Instance 0x04 is what retail
+		// The sender of every CsPlayerAgent s2c packet: the guild/team server object. Instance 0x04 is what retail
 		// stamps (0x04 on the two-client capture and the Hoxxling login, 0x52 on one create session - an arbitrary
 		// server handle, not session data).
 		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, 0x04);
@@ -62,13 +66,13 @@ namespace Faolan.CSPlayerAgent
 			_connections = connections;
 		}
 
-		// A team member is ONLINE by definition, so its row comes from the live session rather than the DB.
+		// A team member is online by definition, so its row comes from the live session rather than the database.
 		private Character? CharacterOf(uint characterId)
 		{
 			return _connections.ForCharacter(characterId)?.Session.Character;
 		}
 
-		// The member record, stamped with the member's LIVE playfield from the world listener rather than the
+		// The member record, stamped with the member's live playfield from the world listener rather than the
 		// Character.MapId column, which only updates at save points - see TeamMemberRecord.FromCharacter.
 		private TeamMemberRecord MemberOf(Character character)
 		{
@@ -114,19 +118,19 @@ namespace Faolan.CSPlayerAgent
 				: null;
 		}
 
-		// The team a character is in, creating a one-person one if they are solo. A raid is built out of TEAMS, so a
-		// player who forms or joins one without a group needs a team to be in first (#669); a one-member team is not
-		// a state the team flow itself can reach, because Remove dissolves at one.
+		// The team a character is in, creating a one-person one if they are solo. A raid is built out of teams, so a
+		// player who forms or joins one without a group needs a team to be in first; a one-member team is not a state
+		// the team flow itself can reach, because Remove dissolves at one.
 		public uint EnsureTeam(uint characterId)
 		{
 			return TeamFor(characterId).Id;
 		}
 
-		// The group finder forms the team it is about to hand an instance to (#511/#512): a solo queuer gets a
-		// one-member "private team" WITH the full join fan-out - retail's DispatchYouJoinedTeam here carries a
-		// one-record roster (chat-annotated-4 frame 11943), then AddToGroupIIR and the ~Team subscription, exactly
-		// the shape a two-person accept produces. A queuer already grouped keeps their team; the roster re-broadcast
-		// is what retail's re-entry does anyway and the pushes are idempotent.
+		// The group finder forms the team it is about to hand an instance to: a solo queuer gets a one-member "private
+		// team" with the full join fan-out - retail's DispatchYouJoinedTeam here carries a one-record roster
+		// (chat-annotated-4 frame 11943), then AddToGroupIIR and the ~Team subscription, exactly the shape a
+		// two-person accept produces. A queuer already grouped keeps their team; the roster re-broadcast is what
+		// retail's re-entry does anyway and the pushes are idempotent.
 		public async Task<uint> FormGroupFinderTeam(uint characterId)
 		{
 			var team = TeamFor(characterId);
@@ -155,7 +159,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// Move a character between two teams that already exist - the raid's own MoveTeamMember/SwapCharacters, which
-		// have no team-tier counterpart because a team is never a member of anything. Deliberately does NOT dissolve
+		// have no team-tier counterpart because a team is never a member of anything. Deliberately does not dissolve
 		// the source team at one member the way Remove does: inside a raid a one-person team is a legitimate slot.
 		public bool MoveMember(uint characterId, uint destinationTeamId)
 		{
@@ -175,10 +179,10 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		// c2s TeamInvite (0x2003): remember the pending invite and tell both sides. Which dispatch goes WHERE is worth
-		// stating, because the names read backwards: retail sends DispatchYouInvitedToTeam to the INVITER carrying the
-		// TARGET's record ("you invited X" - f674 -> f678, both on the inviter's connection), and DispatchTeamInvite to
-		// the TARGET carrying the INVITER's ("X invites you" - f680, on the target's). Each side is shown the other.
+		// c2s TeamInvite (0x2003): remember the pending invite and tell both sides. Which dispatch goes where is worth
+		// stating, because the names read backwards: retail sends DispatchYouInvitedToTeam to the inviter carrying the
+		// target's record ("you invited X" - f674 -> f678, both on the inviter's connection), and DispatchTeamInvite
+		// to the target carrying the inviter's ("X invites you" - f680, on the target's). Each side is shown the other.
 		public async Task Invite(INetworkClient inviterClient, Character inviter, Character target, string message = "")
 		{
 			if (_teamByCharacter.ContainsKey(target.Id))
@@ -196,8 +200,8 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// c2s AcceptTeamInvite (0x2008): the invitee joins the inviter's team, creating it if the inviter was solo.
-		// Retail then sends the WHOLE roster to every member (DispatchYouJoinedTeam) plus a DispatchTeamJoin naming
-		// the joiner, and pushes AddToGroupIIR onto every member's world connection.
+		// Retail then sends the whole roster to every member (DispatchYouJoinedTeam) plus a DispatchTeamJoin naming the
+		// joiner, and pushes AddToGroupIIR onto every member's world connection.
 		public async Task AcceptInvite(uint accepterId)
 		{
 			if (!_pendingInvites.TryRemove(accepterId, out var inviterId))
@@ -219,15 +223,15 @@ namespace Faolan.CSPlayerAgent
 			await Broadcast(team, CSPlayerInterfaceMethods.DispatchTeamJoin, TeamMemberEventCodec.Build(team.Id, MemberOf(accepter)));
 			await PushMembership(team, accepterId, true);
 
-			// The ~Team chat channel, to EVERY member and not just the joiner - retail subscribes both clients when the
-			// team forms (frames 701/702), and the call is idempotent, so a member already on it is a no-op (#668).
+			// The ~Team chat channel, to every member and not just the joiner - retail subscribes both clients when the
+			// team forms (frames 701/702), and the call is idempotent, so a member already on it is a no-op.
 			foreach (var member in team.Members)
 				await _chatServerDispatcher.RefreshTeamChannel(member, team.Id);
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} joined ({Count} member(s), leader {Leader}).", team.Id, accepter.Name, team.Members.Count, inviter.Name);
 		}
 
-		// c2s LeaveTeam (0x2008 on the GAME tier - a different interface's method 0x2008 than AcceptTeamInvite).
-		// Retail sends DispatchTeamLeave to the remaining members AND the leaver, hands the lead to someone else when
+		// c2s LeaveTeam (0x2008 on the game tier - a different interface's method 0x2008 than AcceptTeamInvite).
+		// Retail sends DispatchTeamLeave to the remaining members and the leaver, hands the lead to someone else when
 		// the leader leaves (DispatchSetNewTeamLeader), and pushes RemoveFromGroupIIR.
 		public async Task<bool> Leave(uint characterId)
 		{
@@ -238,7 +242,7 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		// c2s KickFromTeam (0x2009, GAME tier): only the leader may kick. The target gets
+		// c2s KickFromTeam (0x2009, game tier): only the leader may kick. The target gets
 		// DispatchYouGotKickedFromTeam, everyone else the same DispatchTeamLeave a voluntary leave produces.
 		public async Task<bool> Kick(uint leaderId, uint targetId)
 		{
@@ -277,7 +281,7 @@ namespace Faolan.CSPlayerAgent
 
 			await PushMembership(team, characterId, false);
 			await _gameServerDispatcher.SendGroupMembership(characterId, characterId, team.Id, 0, false);
-			await _chatServerDispatcher.RefreshTeamChannel(characterId, null); // off the ~Team channel with the roster (#668)
+			await _chatServerDispatcher.RefreshTeamChannel(characterId, null); // off the ~Team channel with the roster
 
 			// The leader left: promote whoever is left and say so.
 			if (team.LeaderId == characterId && team.Members.Count > 0)
@@ -320,7 +324,7 @@ namespace Faolan.CSPlayerAgent
 			await Broadcast(team, CSPlayerInterfaceMethods.DispatchYouJoinedTeam, TeamRosterCodec.Build(roster));
 		}
 
-		// AddToGroupIIR / RemoveFromGroupIIR to every member's WORLD connection. The capture sends one record per
+		// AddToGroupIIR / RemoveFromGroupIIR to every member's world connection. The capture sends one record per
 		// member to every member, not just one for the joiner, so a client learns the whole group either way.
 		private async Task PushMembership(LiveTeam team, uint changedId, bool joined)
 		{
@@ -344,7 +348,7 @@ namespace Faolan.CSPlayerAgent
 		// `00000000 01 00000002` (free-for-all, need/greed on, threshold 2) - and the s2c
 		// DispatchTeamLootOptionChanged carries the same three fields, so the change echoes back unchanged to every
 		// member. Held on the live team only: nothing reads it yet (the server does not arbitrate loot rolls), so
-		// persisting it would be storing a setting no code consults. NEEDS in-client verification of the echo.
+		// persisting it would be storing a setting no code consults. Needs in-client verification of the echo.
 		public async Task<bool> SetLootOption(uint leaderId, uint lootMode, bool useNeedGreed, uint lootThreshold)
 		{
 			if (TeamOf(leaderId) is not { } teamId || !_teams.TryGetValue(teamId, out var team))
@@ -364,11 +368,11 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		// --- Looking for group: the registry the team search reads (#889) --------------------------------------
+		// --- Looking for group: the registry the team search reads ---------------------------------------------
 		//
 		// The client splits LFG in two, and so does this - they are different subjects, not two spellings of one flag:
-		//   c2s SetLookingForMemberStatus(bool, message) - a LEADER advertises the TEAM     -> the team-search rows
-		//   c2s SetLookingForTeamStatus(bool, message)   - a CHARACTER advertises themself  -> their own LFG status
+		//   c2s SetLookingForMemberStatus(bool, message) - a leader advertises the team    -> the team-search rows
+		//   c2s SetLookingForTeamStatus(bool, message)   - a character advertises themself -> their own LFG status
 		// Both are live CS-tier state and neither is persisted, for the same reason the roster is not: a team does not
 		// survive a logout, and an advert for a session that has ended is worse than no advert.
 
@@ -397,7 +401,7 @@ namespace Faolan.CSPlayerAgent
 				: new LookingForGroupStatus(false, "");
 		}
 
-		// c2s SetLookingForMemberStatus (0x2013) / GetLookingForMemberStatus (0x2015): the TEAM's advert - the flag that
+		// c2s SetLookingForMemberStatus (0x2013) / GetLookingForMemberStatus (0x2015): the team's advert - the flag that
 		// puts it in everyone else's SearchForTeam results, and the message the result row carries. Only the leader may
 		// set it, the same rule the loot options follow. Null when the caller leads no team, so the caller can stay quiet
 		// rather than echo a status for a team that does not exist.
@@ -439,20 +443,20 @@ namespace Faolan.CSPlayerAgent
 
 		// c2s SearchForTeam (0x200B) -> s2c DispatchTeamSearchResult (0x200F): the LFG window's result page.
 		//
-		// Only teams whose leader has FLAGGED them appear. That is the subsystem's own shape rather than a filter we
+		// Only teams whose leader has flagged them appear. That is the subsystem's own shape rather than a filter we
 		// invented: the client has a c2s method whose entire job is to advertise a team (SetLookingForMemberStatus), and
-		// the result ROW carries that advert's message, so a team that never set one has nothing to put in the row. A
+		// the result row carries that advert's message, so a team that never set one has nothing to put in the row. A
 		// search that returns every live team would also be a privacy change, not just a laxer WHERE clause.
 		//
-		// Every criterion the client sends is APPLIED, and each is a reading of a request field the corpus shows but
+		// Every criterion the client sends is applied, and each is a reading of a request field the corpus shows but
 		// never varies enough to prove [V0]:
-		//   playfields    - kept if ANY member is in one of them (the client sends the playfields it wants to play in;
+		//   playfields    - kept if any member is in one of them (the client sends the playfields it wants to play in;
 		//                   a team spread across two zones is in both as far as the searcher is concerned)
-		//   level range   - kept if ANY member's level is inside it (the searcher is asking who they could play with,
+		//   level range   - kept if any member's level is inside it (the searcher is asking who they could play with,
 		//                   and one in-range member is what makes a team joinable for them)
-		//   member counts - the roster size, inclusive. Both captured requests cap at FIVE, one floor at 2 and one at 1,
-		//                   which is the client's own slider and is applied as sent - so a full six is excluded by the
-		//                   client's default search, not by us.
+		//   member counts - the roster size, inclusive. Both captured requests cap at five, one floor at 2 and one at
+		//                   1, which is the client's own slider and is applied as sent - so a full six is excluded by
+		//                   the client's default search rather than by this filter.
 		// Results are ordered by team id (mint order) so paging is stable across the client's repeated requests.
 		public TeamSearchResult SearchTeams(uint searcherId, IReadOnlyList<uint> playfields, uint minLevel, uint maxLevel, uint memberCountMin, uint memberCountMax, uint skipResults)
 		{
@@ -468,7 +472,7 @@ namespace Faolan.CSPlayerAgent
 				.Where(x => playfields.Count == 0 || x.Roster!.Members.Any(m => playfields.Contains(m.MapId)))
 				.ToList();
 
-			// The skip is the CLIENT's number, so it is clamped rather than cast: an out-of-range one would wrap
+			// The skip is the client's number, so it is clamped rather than cast: an out-of-range one would wrap
 			// negative and Skip(-1) silently skips nothing, which would answer a page request with the whole list.
 			var skip = (int)Math.Min(skipResults, int.MaxValue);
 			var page = matches.Skip(skip).Take(MaxTeamSearchResults).Select(x => new TeamSearchResultRow(x.Roster!, x.Team.LookingForMembersMessage)).ToList();
@@ -480,18 +484,18 @@ namespace Faolan.CSPlayerAgent
 			return new TeamSearchResult(page, moreHits);
 		}
 
-		// The client's memberCount range, inclusive. A ZERO maximum is treated as "no ceiling": the field is a count, so
+		// The client's memberCount range, inclusive. A zero maximum is treated as "no ceiling": the field is a count, so
 		// a literal 0 would match nothing at all, and neither captured request sends one.
 		private static bool WithinCount(int count, uint min, uint max)
 		{
 			return count >= min && (max == 0 || count <= max);
 		}
 
-		// c2s TeamApply (0x2005): the "apply" button on a team-search row. The applicant does NOT join - retail tells
-		// the LEADER, with DispatchTeamCharacterApplied(i_cWho) carrying the applicant's own member record, and the
+		// c2s TeamApply (0x2005): the "apply" button on a team-search row. The applicant does not join - retail tells
+		// the leader, with DispatchTeamCharacterApplied(i_cWho) carrying the applicant's own member record, and the
 		// leader then invites them through the ordinary TeamInvite flow. The dispatch reads through the client's
-		// `FUN_005574d0` - the same member-record reader the team and raid single-character messages use (#889) - which
-		// is why TeamMemberRecordCodec handles it rather than a codec of its own.
+		// `FUN_005574d0`, the same member-record reader the team and raid single-character messages use, which is why
+		// TeamMemberRecordCodec handles it rather than a codec of its own.
 		public async Task<bool> Apply(uint applicantId, uint teamId)
 		{
 			if (!_teams.TryGetValue(teamId, out var team))
@@ -509,8 +513,8 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		// A disconnecting character takes their LFG advert with them - the search answers from live sessions, so a stale
-		// flag would put a row on the wire for somebody who is not there.
+		// A disconnecting character takes their LFG advert with them - the search answers from live sessions, so a
+		// stale flag would put a row on the wire for somebody who is not there.
 		public void ForgetLookingForTeam(uint characterId)
 		{
 			_lookingForTeam.TryRemove(characterId, out _);
@@ -538,11 +542,10 @@ namespace Faolan.CSPlayerAgent
 				await Send(client, opcode, body);
 		}
 
-		// ⚠️ The RECEIVER is the recipient's OWN CSPlayerInterface instance - its character id - never instance 0.
-		// Retail addresses every one of these that way (f678 -> the inviter's id, f680 -> the target's), and it is how
-		// the client routes the packet to the right interface object: a push addressed to instance 0 arrives and is
-		// dropped, which is why the invited client received DispatchTeamInvite, answered it with RequestTeamInvite, and
-		// still showed no invite window.
+		// The receiver is the recipient's own CSPlayerInterface instance - its character id - never instance 0. Retail
+		// addresses every one of these that way (f678 -> the inviter's id, f680 -> the target's), and it is how the
+		// client routes the packet to the right interface object: a push addressed to instance 0 arrives and is
+		// dropped, which shows up as an invite the client acknowledges but never displays.
 		private static Task Send(INetworkClient client, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
 			return client.SendAsync(new Rpc(PushSender, client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), (ushort)opcode, body));

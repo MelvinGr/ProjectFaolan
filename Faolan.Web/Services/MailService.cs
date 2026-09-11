@@ -55,8 +55,8 @@ namespace Faolan.Web.Services
 			}
 		}
 
-		// Compose a mail. money/item attachments are GM-style (minted, not deducted from the sender) — gate them to
-		// admins at the call site. Returns (ok, message).
+		// Compose a mail. Money and item attachments are GM-style - minted rather than deducted from the sender - so
+		// they must be gated to admins at the call site. Returns (ok, message).
 		public async Task<(bool Ok, string Message)> SendAsync(string recipientName, string senderName, string body, ulong moneyTin = 0, uint itemId = 0, uint count = 1)
 		{
 			if (string.IsNullOrWhiteSpace(recipientName))

@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
-	// What the character has LEARNED: feats and their graph, spells, skills, abilities, combos, the shortcut bar and
-	// the level/experience line. One of the five character slices (Gitea #928 item 9); what those do to the stat
-	// sheet is ICharacterStatRepository.
+	// What the character has learned: feats and their graph, spells, skills, abilities, combos, the shortcut bar and
+	// the level/experience line. One of the five character slices; what those do to the stat sheet is
+	// ICharacterStatRepository.
 	public interface ICharacterProgressionRepository
 	{
 		Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds);
@@ -29,30 +29,30 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
 
-		// The WIRE ids of the AUTOMATIC feats - the handed-out ones, which cost no feat points (#850).
+		// The wire ids of the automatic feats - the handed-out ones, which cost no feat points.
 		Task<HashSet<uint>> GetAutotrainedFeatWireIds();
 
 		/// <summary>
-		///     What each of <paramref name="wireFeatIds" /> costs as an ALTERNATE-ADVANCEMENT PERK for
-		///     <paramref name="conanClass" />, and out of which token pool (#150). A feat with no entry here is an
-		///     ordinary feat, bought with a feat point.
+		///     What each of <paramref name="wireFeatIds" /> costs as an alternate-advancement perk for
+		///     <paramref name="conanClass" />, and out of which token pool. A feat with no entry here is an ordinary
+		///     feat, bought with a feat point.
 		/// </summary>
 		Task<Dictionary<uint, (TokenPool Pool, uint Cost)>> GetPerkCosts(ConanClass conanClass, IEnumerable<uint> wireFeatIds);
 
-		// The inverse: the TREE spells a set of just-trained feats teaches. See the implementation's remarks.
+		// The inverse: the tree spells a set of just-trained feats teaches. See the implementation's remarks.
 		Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 
-		// The whole feat graph's single-prerequisite edges - what the tradeskill ladders are walked out of (#735).
+		// The whole feat graph's single-prerequisite edges - what the tradeskill ladders are walked out of.
 		Task<Dictionary<uint, uint>> GetSingleFeatPrereqs();
 
-		// The WIRE feat id of an RDB feat TEMPLATE id, or null when the template has no wire id at all. The two id
+		// The wire feat id of an RDB feat template id, or null when the template has no wire id at all. The two id
 		// spaces are bridged by FeatIdMaps; this is the direction a requirement stated as a template id needs, which
-		// is how retail's own `FeatRequired` refusal names a feat (#779).
+		// is how retail's own `FeatRequired` refusal names a feat.
 		Task<uint?> GetWireFeatId(uint templateFeatId);
 
-		// Every wire id a character's spawn scaffold carries in `CharacterSkills`. The TRADESKILL professions ride
-		// this list (#735), which is why it is read as ids rather than through the slot it sits in.
+		// Every wire id a character's spawn scaffold carries in `CharacterSkills`. The tradeskill professions ride this
+		// list, which is why it is read as ids rather than through the slot it sits in.
 		Task<uint[]> GetCharacterSkillIds(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
@@ -60,14 +60,14 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 
-		/// <summary>The two ALTERNATE-ADVANCEMENT xp pools (#150), persisted as they move.</summary>
+		/// <summary>The two alternate-advancement xp pools, persisted as they move.</summary>
 		Task SetAlternateAdvancementPools(uint characterId, uint pvE, uint pvP);
 
 		/// <summary>Every token wallet the character has ever touched. An absent pool is 0/0.</summary>
 		Task<CharacterToken[]> GetCharacterTokens(uint characterId);
 
 		/// <summary>
-		///     Adds to one wallet's LIFETIME totals and returns what they now read. Both halves move independently -
+		///     Adds to one wallet's lifetime totals and returns what they now read. Both halves move independently -
 		///     an award raises <c>gained</c>, a purchase raises <c>spent</c> - because that is what the wire carries.
 		/// </summary>
 		Task<(ulong Gained, ulong Spent)> AddTokens(uint characterId, TokenPool pool, ulong gained, ulong spent);
@@ -75,17 +75,18 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		// Trains feats onto a character. A feat id is composite (base*100 + rank) and retail keeps exactly ONE id per
-		// BASE - the highest rank held. No captured character carries two ranks of one base, so ranking a feat up
-		// REPLACES its row; keeping both would put an entry on the wire retail never sends and would lengthen the
+		// Trains feats onto a character. A feat id is composite (base*100 + rank) and retail keeps exactly one id per
+		// base - the highest rank held. No captured character carries two ranks of one base, so ranking a feat up
+		// replaces its row; keeping both would put an entry on the wire retail never sends and would lengthen the
 		// spawn's pre-IIR frame. A request at or below the rank already held is ignored - feats do not downgrade here
 		// (the untrain path is a full reset, ClearCharacterFeats).
 		//
-		// The replacement keeps the original Sequence: the wire order is TRAIN order, and ranking a feat up is not a
+		// The replacement keeps the original Sequence: the wire order is train order, and ranking a feat up is not a
 		// new train, so it holds its place in the list.
-		// Trains into the character's FIRST spec (index 0). Retail's train packet carries no spec id, and every
+		//
+		// Trains into the character's first spec (index 0). Retail's train packet carries no spec id, and every
 		// captured train is on a single-spec character, so which spec a trained feat lands in is not something the
-		// corpus answers - spec 0 is the only defensible reading until a multi-spec train is captured (#474).
+		// corpus answers - spec 0 is the only defensible reading until a multi-spec train is captured.
 		public async Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -154,9 +155,9 @@ namespace Faolan.Core.Database.Repositories
 			return true;
 		}
 
-		// #915: the spellbook could only ever GROW - `AddCharacterSpell` had no counterpart, so a learned spell was
-		// permanent for the life of the character row. Retail has both halves (`GameCharAgent.MagicForgetSpell` c2s,
-		// `GameCharInterface.DispatchForgetSpell` s2c), so a shrink is a real operation, not an invention.
+		// Retail has both halves of the spellbook (`GameCharAgent.MagicForgetSpell` c2s,
+		// `GameCharInterface.DispatchForgetSpell` s2c), so a shrink is a real operation: a learned spell must not be
+		// permanent for the life of the character row.
 		public async Task<bool> RemoveCharacterSpell(uint characterId, uint spellId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -224,47 +225,22 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
 		}
 
-		// The WIRE feat ids of the feats that TEACH any of `spellIds` (#298). The inverse of FeatSpellGrants: a feat
-		// template's GameAction kind 53019 `Spell` element names the spell the feat grants, so reading it backwards
-		// answers "which feat has to be trained for this spell to be castable".
-		//
-		// This is the datum the issue was parked on for a month. The workaround it replaces - granting a whole
-		// captured character's skill scaffold - existed because the spell->feat mapping was believed to be
-		// server-GDB-only; it is in the client RDB, and all 1,510 grant rows resolve to a shipped Spells.Id.
-		//
-		// Two hops for the same reason GetCharacterFeatEffects has two: FeatSpellGrant.FeatId is the RDB TEMPLATE id
-		// and the wire (and CharacterFeat) speak a different id space, which FeatIdMaps bridges. A feat whose
-		// template has no wire id contributes nothing - 58 of the 1,510 rows - which is expected, not a fault: it
-		// cannot be put on the wire, so training it would be invisible to the client anyway.
-		//
-		// ⚠️ PROGRESSION TRACKS are excluded, because retail never puts one in a character's feat list and this list
-		// goes on the wire. They are the bases whose low digits run past the client's own rank ceiling
-		// (<see cref="FeatIdMap.MaxRank" />, FUN_007850c0's `base*100 + 10`) - so the digits are a family INDEX, not
-		// a rank: the twelve `<Class> Class Feat 001` tracks with one entry per character level, plus `2HE 60-80`,
-		// `Bow 60-80` and `Class Specific HP 60-80`. Filtered per BASE rather than per row, since ranks 0..9 of an
-		// 80-entry track are inside the ceiling and would otherwise leak through.
-		//
-		// The evidence they are not trained is the captured lists themselves: across the four imported characters
-		// not one of them appears, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of
-		// them her class track. So training one would be inventing wire content to satisfy a criterion that
-		// demonstrably does not need it.
 		/// <summary>
-		///     The WIRE feat ids the CLIENT trains by itself - <see cref="FeatClassEntry.Autotrain" />, straight out
+		///     The wire feat ids the client trains by itself - <see cref="FeatClassEntry.Autotrain" />, straight out
 		///     of the client's own featclass table.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ These must never be in a character's feat list (#862). The list goes on the wire; the client builds
-		///     its own auto-trained set from this table plus the character's class and level, and
-		///     <c>FeatHolder::TrainFeat</c> refuses one outright ("will break feats!"). All 56 feat ids across the
-		///     four captured characters are auto-train FALSE, so retail agrees without exception.
+		///     These must never be in a character's feat list. The list goes on the wire; the client builds its own
+		///     auto-trained set from this table plus the character's class and level, and <c>FeatHolder::TrainFeat</c>
+		///     refuses one outright ("will break feats!"). All 56 feat ids across the four captured characters are
+		///     auto-train false, so retail agrees without exception.
 		///     <para />
-		///     ⚠️ Was <c>Feat.AutomaticUnlockCategory</c> (7063) until #862 - a proxy measured over the
-		///     spell-granting feats, which disagrees with the client on 204 of 9,907 rows. The category still
-		///     classifies a spell GRANT; this decides what may be trained.
+		///     <c>Feat.AutomaticUnlockCategory</c> (7063) is not a substitute: it is a proxy measured over the
+		///     spell-granting feats and disagrees with the client on 204 of 9,907 rows. That category classifies a
+		///     spell grant; this decides what may be trained.
 		///     <para />
-		///     Used as the free set for <c>FeatRules.PointCost</c>, which should now find nothing to exempt: the
-		///     grant that put these in a character's list is gone. It stays as the guard for rows written before it
-		///     was removed.
+		///     Used as the free set for <c>FeatRules.PointCost</c>, which should find nothing to exempt - it is the
+		///     guard for rows written by an earlier grant.
 		/// </remarks>
 		public async Task<HashSet<uint>> GetAutotrainedFeatWireIds()
 		{
@@ -276,13 +252,13 @@ namespace Faolan.Core.Database.Repositories
 		///     The perk price of each requested feat in one class's tree.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ A price is attached to a PLACEMENT, not to a feat: <see cref="FeatPerkCost" /> keys on the
+		///     A price is attached to a placement, not to a feat: <see cref="FeatPerkCost" /> keys on the
 		///     <see cref="FeatClassEntry" /> row id, so the same perk in two classes' trees is two rows. Hence the
 		///     class parameter - asking without it would price a Conqueror's perk off a Necromancer's tree.
 		///     <para />
-		///     ⚠️ 216 placements are priced in BOTH specific pools at the same price. The PvE one is taken when both
+		///     216 placements are priced in both specific pools at the same price. The PvE one is taken when both
 		///     exist, because that is the pool a PvE server can actually fill; nothing in the client picks for us -
-		///     `GetPointCost` renders whichever row it is handed.
+		///     <c>GetPointCost</c> renders whichever row it is handed.
 		/// </remarks>
 		public async Task<Dictionary<uint, (TokenPool Pool, uint Cost)>> GetPerkCosts(ConanClass conanClass, IEnumerable<uint> wireFeatIds)
 		{
@@ -306,31 +282,30 @@ namespace Faolan.Core.Database.Repositories
 				});
 		}
 
-		// The twelve ALTERNATE-ADVANCEMENT perk trees, one per playable class: TreeId 1000177..1000190 (the range is
+		// The twelve alternate-advancement perk trees, one per playable class: TreeId 1000177..1000190 (the range is
 		// not dense - 1000185 and 1000187 do not exist). See FeatClassEntry.TreeId.
 		private const uint AlternateAdvancementFirstTreeId = 1000177;
 		private const uint AlternateAdvancementLastTreeId = 1000190;
 
 		/// <summary>
-		///     The spells a set of just-TRAINED feats teaches - the other half of the spell-grant story (#847).
+		///     The spells a set of just-trained feats teaches - the other half of the spell-grant story.
 		/// </summary>
 		/// <remarks>
 		///     The catalog carries two grant mechanisms and the level path only owns one of them
 		///     (<see cref="Feat.AutomaticUnlockCategory" />): the feats a character gets automatically teach the spells
-		///     a ding hands out, and the feat TREE teaches the rest - one named feat per spell, bought with a feat
-		///     point. This is that second path, so it deliberately EXCLUDES the automatic category: those spells are
+		///     a ding hands out, and the feat tree teaches the rest - one named feat per spell, bought with a feat
+		///     point. This is that second path, so it deliberately excludes the automatic category: those spells are
 		///     the level path's to grant and re-granting them here would re-toast a spell the character already has.
 		///     <para>
 		///         The oracle is the captured level-80s. Both hold tree spells - the Necromancer <c>Cannibalism</c>,
 		///         <c>No Rest For the Dead</c> and <c>Mark of the Devourer</c>, the Demonologist <c>Thunderclap</c>,
-		///         <c>Possession</c>, <c>Lore of Skelos</c> and two more - and hold only SOME of the tree, which is
+		///         <c>Possession</c>, <c>Lore of Skelos</c> and two more - and hold only some of the tree, which is
 		///         what says they were bought rather than handed out: the same class catalog offers 19 more of exactly
 		///         the same kind that neither character has.
 		///     </para>
 		///     <para>
-		///         ⚠️ Takes WIRE feat ids, like <c>CharacterFeat.FeatId</c>, and hops through
-		///         <see cref="FeatIdMap" /> to the RDB TEMPLATE id the grant is keyed by - the two id spaces #467
-		///         bridges.
+		///         Takes wire feat ids, like <c>CharacterFeat.FeatId</c>, and hops through <see cref="FeatIdMap" /> to
+		///         the RDB template id the grant is keyed by.
 		///     </para>
 		/// </remarks>
 		public async Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds)
@@ -360,14 +335,7 @@ namespace Faolan.Core.Database.Repositories
 			return rows.GroupBy(p => p.WireFeatId).ToDictionary(g => g.Key, g => g.Select(p => p.RequiresWireFeatId).ToArray());
 		}
 
-		// The SINGLE-prerequisite edges of the whole feat graph, as feat -> the one feat it requires (#735). The
-		// tradeskill ladders are recovered by walking these, and a walk cannot ask for the ids it has not reached yet -
-		// which is why this loads the graph rather than taking a wanted set like the method above.
-		//
-		// Cheap enough to do so: 5,501 edges, of which only 12 feats carry more than one requirement, and those are
-		// skipped rather than picked from - a rung of a ladder has exactly one rung below it, so a multi-prerequisite
-		// feat is by construction not one.
-		// The TEMPLATE -> WIRE hop, one feat at a time. Null when the template carries no wire id (58 of the client's
+		// The template -> wire hop, one feat at a time. Null when the template carries no wire id (58 of the client's
 		// 1,510 spell-granting feats are in that state), which is a real answer and not a lookup failure: a feat with
 		// no wire id can never appear in a character's feat list, so nothing can have trained it.
 		public async Task<uint?> GetWireFeatId(uint templateFeatId)
@@ -378,6 +346,13 @@ namespace Faolan.Core.Database.Repositories
 			return map?.WireFeatId;
 		}
 
+		// The single-prerequisite edges of the whole feat graph, as feat -> the one feat it requires. The tradeskill
+		// ladders are recovered by walking these, and a walk cannot ask for the ids it has not reached yet - which is
+		// why this loads the graph rather than taking a wanted set like GetFeatPrereqs.
+		//
+		// Cheap enough to do so: 5,501 edges, of which only 12 feats carry more than one requirement, and those are
+		// skipped rather than picked from - a rung of a ladder has exactly one rung below it, so a multi-prerequisite
+		// feat is by construction not one.
 		public async Task<Dictionary<uint, uint>> GetSingleFeatPrereqs()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

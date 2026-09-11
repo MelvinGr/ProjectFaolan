@@ -4,21 +4,21 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// DispatchReceivedStockPhraseText (GameCharInterface 0x205D) - the create-world cutscene's SUBTITLE reply: the
-	// remoteformat line the client renders for one `{stock_N}` token, on the script thread that asked for it.
-	//   [u32 threadContext][u16 textLen][remoteformat text]
-	// The client blocks up to 60s per line waiting for this, which is why the cutscene stalls without it (#234).
-	//
-	// The text is the same `<remoteformat>` payload RemoteFormatScreenCodec builds, carried here as a STRING because
-	// that is what the layer above holds; the wire encoding is Latin1, as everywhere else (`WriteString`).
-	//
-	// Moved in from `StockConversationService.BuildReceivedStockPhraseBody` in #530 wave 7 - the service keeps the
-	// StockPhrases lookup and the send.
+	/// <summary>
+	///     <c>DispatchReceivedStockPhraseText</c> - the create-world cutscene's subtitle reply: the remoteformat line the
+	///     client renders for one <c>{stock_N}</c> token, on the script thread that asked for it, as
+	///     <c>[u32 threadContext][u16 textLen][remoteformat text]</c>.
+	/// </summary>
+	/// <remarks>
+	///     The client blocks up to 60 s per line waiting for this, which is why the cutscene stalls without it. The text
+	///     is the same <c>remoteformat</c> payload <c>RemoteFormatScreenCodec</c> builds, carried here as a string
+	///     because that is what the layer above holds; the wire encoding is Latin1.
+	/// </remarks>
 	public static class ReceivedStockPhraseTextCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchReceivedStockPhraseText;
 
-		// CANONICAL - the only method here that writes bytes.
+		// Canonical: the only method here that writes bytes.
 		public static byte[] Build(ReceivedStockPhraseText value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
@@ -48,6 +48,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 	}
 
-	// DispatchReceivedStockPhraseText (0x205D).
+	/// <summary>The DispatchReceivedStockPhraseText body.</summary>
 	public sealed record ReceivedStockPhraseText(uint ThreadContext, string Text);
 }

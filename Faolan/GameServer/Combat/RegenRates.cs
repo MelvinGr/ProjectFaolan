@@ -3,7 +3,7 @@ using System;
 namespace Faolan.GameServer.Combat
 {
 	/// <summary>
-	///     The out-of-combat vitals REGEN rates, per second, in DISPLAY units (#442).
+	///     The out-of-combat vitals regen rates, per second, in display units.
 	///     <para>
 	///         These are not tuned guesses. Each coefficient is a named constant out of the client's own tweak table (RDB
 	///         1000516, <c>docs/rdb/client-tweak-table.md</c>) and every result is confirmed byte-for-byte against retail's
@@ -32,7 +32,7 @@ namespace Faolan.GameServer.Combat
 	///         </item>
 	///     </list>
 	///     <para>
-	///         The rate is PER SECOND: the median <c>RegenIIR</c> inter-arrival across all 1502 captured packets is 1.00 s
+	///         The rate is per second: the median <c>RegenIIR</c> inter-arrival across all 1502 captured packets is 1.00 s
 	///         (min 0.77, and the gaps above that are pools already full, not a slower cadence). The character sheet's
 	///         "Non Combat Health Regen" row is the same number - it reads the stat and prints <c>value / 100</c> with an
 	///         integer divide (client <c>FUN_016d9cb0</c> case 0x116), which is what pins the constants exactly: 86.75 and
@@ -52,89 +52,101 @@ namespace Faolan.GameServer.Combat
 	///         terms are fitted - the server's formula and the client's display are the same computation.
 	///     </para>
 	///     <para>
-	///         The rates need the character's TOTAL attribute scores, which the client computes locally: retail sends
-	///         Strength/Constitution/… as a flat 10 in the snapshot stat sheet, so the class/level attribute BASE is not
-	///         on the wire and is not in any of the client's 10005xx data tables either. It IS decoded now - the RDB's
-	///         per-class, per-level class-feat templates (#444, <c>ClassAttributeBaseModule</c>) - and reaches this
-	///         through <c>WorldEntity.AttributeScore</c>, so a geared character no longer regenerates short.
+	///         The rates need the character's total attribute scores, which the client computes locally: retail sends
+	///         Strength, Constitution and the rest as a flat 10 in the snapshot stat sheet, so the class/level
+	///         attribute base is neither on the wire nor in any of the client's 10005xx data tables. It comes from the
+	///         RDB's per-class, per-level class-feat templates (<c>ClassAttributeBaseModule</c>) and reaches this
+	///         through <c>WorldEntity.AttributeScore</c>.
 	///     </para>
 	/// </summary>
 	public static class RegenRates
 	{
 		// TWK_OOCHealthRegenConModifier / TWK_OOCHealthRegenStrModifier, and the same 0.15 on all three
-		// TWK_OOCStaminaRegen{Con,Str,Dex}Modifier. The CLIENT reads these too, to compute the character sheet's row -
+		// TWK_OOCStaminaRegen{Con,Str,Dex}Modifier. The client reads these too, to compute the character sheet's row -
 		// see the class remark on how its form reduces to this one.
 		public const double OutOfCombatAttributeModifier = 0.15;
 
 		// TWK_OOCManaRegenIntModifier / TWK_OOCManaRegenWisModifier.
 		public const double OutOfCombatManaAttributeModifier = 0.38;
 
-		// The flat term each pool adds on top of its attribute sum. NOT in the tweak table (there is no TWK_*RegenBase);
-		// it is the pool's regen stat's OWN seeded value, which the client adds the attribute "trickledown" onto (see the
-		// class remark). Read straight off the client: stat 278 → 2000 and 279 → 1000 in the ×100 wire scale, i.e. the
-		// display 20.00 / 10.00 below, and identical across all four characters observed - including a Necromancer with
-		// no stamina pool at all.
+		// The flat term each pool adds on top of its attribute sum. It is not in the tweak table - there is no
+		// TWK_*RegenBase - but is the pool's regen stat's own seeded value, which the client adds the attribute
+		// "trickledown" onto (see the class remark). Read straight off the client: stat 278 seeds to 2000 and 279 to
+		// 1000 in the x100 wire scale, i.e. the display 20.00 / 10.00 below, and identical across all four characters
+		// observed - including a Necromancer with no stamina pool at all.
 		public const double HealthFlatRate = 20.0; // stat 278 seeds to 2000
 		public const double StaminaFlatRate = 10.0; // stat 279 seeds to 1000
 
-		// Mana has NO universal flat term - unlike health and stamina, its base is CLASS data, the class's own value for
-		// stat 280 (Non Combat Mana Regen). Observed: never written at all for a level 23 Assassin (so 0), 2000 for a
-		// level 24 Herald of Xotli, and 2200 for both level 80 mage classes (a 2000 seed plus 200 from their class
-		// template). Callers pass it; 0 is the no-mana-base default, NOT a claim that every class has none.
+		// Mana has no universal flat term: unlike health and stamina its base is class data, the class's own value for
+		// stat 280 (Non Combat Mana Regen). Observed as never written at all for a level 23 Assassin (so 0), 2000 for a
+		// level 24 Herald of Xotli, and 2200 for both level 80 mage classes - a 2000 seed plus 200 from their class
+		// template. Callers pass it; 0 is the no-mana-base default rather than a claim that every class has none.
 		//
-		// ⭐ All three of those observations are now SOURCED rather than merely recorded (#863). The 2000 is the
-		// auto-trained `Mage` feat (Necromancer / Herald of Xotli / Demonologist) and its `Priest` twin, which the
-		// CLIENT trains off its featclass table at level 1 and never puts on the wire; the 200 is the class
-		// progression template, already in ClassAttributeBases. The Assassin's class trains neither, hence nothing.
-		// `WorldEntity.NonCombatManaRegenBase` is the sum, and the simulation passes it here.
+		// Each of those figures has a source. The 2000 is the auto-trained `Mage` feat (Necromancer, Herald of Xotli,
+		// Demonologist) and its `Priest` twin, which the client trains off its featclass table at level 1 and never
+		// puts on the wire; the 200 is the class progression template, already in ClassAttributeBases. The Assassin's
+		// class trains neither. `WorldEntity.NonCombatManaRegenBase` is the sum, and the simulation passes it here.
 		public const double ManaFlatRate = 0.0;
 
-		// ⭐ The CEILING the attribute+flat sum is held under, as a share of the character's MAX health per second.
+		// The ceiling the attribute-plus-flat sum is held under, as a share of the character's max health per second.
 		//
-		// Measured off the corpus (#902): retail's own-handle `RegenIIR` ticks at a median 1.01s and carries a median
-		// 3.90% of the character's max health per second - p25 3.07%, p75 4.63%. That share is the rule rather than a
-		// coincidence of one pool size: the captured pools span **17.2x** (13,800 to 237,100 wire) and the
-		// share-of-pool reading is the TIGHTER of the two (CV 0.49 against 0.75 for a flat HP/s), which is the
-		// comparison that makes it identifiable at all.
+		// Measured off the corpus: retail's own-handle `RegenIIR` ticks at a median 1.01 s and carries a median 3.90%
+		// of the character's max health per second - p25 3.07%, p75 4.63%. That share is the rule rather than a
+		// coincidence of one pool size: the captured pools span 17.2x (13,800 to 237,100 wire) and the share-of-pool
+		// reading is the tighter of the two (CV 0.49 against 0.75 for a flat HP/s), which is what makes it
+		// identifiable at all.
 		//
-		// ⚠️ It is a CAP, not a replacement, because the formula below is already right where retail was captured. Every
-		// capture is a level 23-80 character, and there the attribute term dominates: a level-80 Necromancer computes
-		// 106 HP/s against the 92 HP/s the corpus measures, i.e. 4.5% of its 2,371 pool - just under this ceiling, so
-		// nothing about #442's verified shape changes.
+		// It is a cap rather than a replacement, because the formula below is already right where retail was captured.
+		// Every capture is a level 23-80 character, and there the attribute term dominates: a level-80 Necromancer
+		// computes 106 HP/s against the 92 HP/s the corpus measures, 4.5% of its 2,371 pool, just under this ceiling.
 		//
-		// ⛔ What it bites is the LOW-LEVEL band, which no capture covers. `HealthFlatRate` is a flat 20 HP/s read off
-		// the client's own stat 278, and a flat term does not scale down: on a level-4's 202-point pool it alone is
-		// 10% of the bar PER SECOND (a full bar in 9s), against the 3.9% that holds across every captured character.
-		// Capping at the observed p75 leaves the verified band untouched and pulls the unverified one into the measured
-		// range, which is the conservative direction when the evidence stops before the level you are standing on.
+		// What it bites is the low-level band, which no capture covers. `HealthFlatRate` is a flat 20 HP/s read off the
+		// client's own stat 278, and a flat term does not scale down: on a level-4's 202-point pool it alone is 10% of
+		// the bar per second - a full bar in 9 s - against the 3.9% that holds across every captured character. Capping
+		// at the observed p75 leaves the verified band untouched and pulls the unverified one into the measured range,
+		// which is the conservative direction where the evidence stops short of the level in play.
 		public const double HealthRegenMaxFractionPerSecond = 0.0463;
 
-		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).
+		/// <summary>
+		///     Health: Constitution + Strength. Halted in combat by the caller, which is retail's out-of-combat versus
+		///     natural split.
+		/// </summary>
 		public static double HealthPerSecond(uint constitution, uint strength, uint maxHealth = 0)
 		{
 			var rate = OutOfCombatAttributeModifier * (constitution + strength) + HealthFlatRate;
 
 			return maxHealth == 0
-				? rate // no pool stated: the historical rate, unchanged
+				? rate // no pool stated, so there is nothing to take a share of
 				: Math.Min(rate, maxHealth * HealthRegenMaxFractionPerSecond);
 		}
 
-		// Stamina: Constitution + Strength + Dexterity. Keeps ticking in combat - it is the action resource, and the
-		// tweak table has no "Natural" health twin but does have Natural stamina/mana modifiers.
+		/// <summary>
+		///     Stamina: Constitution + Strength + Dexterity. Keeps ticking in combat, because it is the action resource
+		///     and the tweak table has no "Natural" health twin while it does have Natural stamina and mana modifiers.
+		/// </summary>
 		public static double StaminaPerSecond(uint constitution, uint strength, uint dexterity)
 		{
 			return OutOfCombatAttributeModifier * (constitution + strength + dexterity) + StaminaFlatRate;
 		}
 
-		// Mana: Intelligence + Wisdom, at the higher 0.38 modifier, plus the CLASS's mana-regen base in display units
-		// (see ManaFlatRate - the class's stat 280, which the server cannot source yet, so it is 0 in practice today).
+		/// <summary>
+		///     Mana: Intelligence + Wisdom, at the higher 0.38 modifier, plus the class's mana-regen base in display
+		///     units - the class's stat 280, which the simulation supplies from
+		///     <c>WorldEntity.NonCombatManaRegenBase</c>. See <see cref="ManaFlatRate" />.
+		/// </summary>
 		public static double ManaPerSecond(uint intelligence, uint wisdom, double classManaBase = ManaFlatRate)
 		{
 			return OutOfCombatManaAttributeModifier * (intelligence + wisdom) + classManaBase;
 		}
 
-		// A per-second display rate turned into the whole DISPLAY points gained over `elapsedSeconds`. The wire scale is
-		// ×100, so a fractional rate is not lost: the caller multiplies by 100 for the RegenIIR delta. Never negative.
+		/// <summary>
+		///     A per-second display rate turned into the whole display points gained over
+		///     <paramref name="elapsedSeconds" />. Never negative.
+		/// </summary>
+		/// <remarks>
+		///     The wire scale is x100, so a fractional rate is not lost: the caller multiplies by 100 for the RegenIIR
+		///     delta.
+		/// </remarks>
 		public static uint Gain(double perSecond, double elapsedSeconds)
 		{
 			return perSecond <= 0 || elapsedSeconds <= 0

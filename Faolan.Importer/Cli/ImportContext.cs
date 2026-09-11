@@ -6,51 +6,69 @@ using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
 {
-	// Shared, per-run state handed to every module. Captures are read once and shared; the DB context is the
-	// single tracked context the runner wraps in a transaction.
+	/// <summary>
+	///     Shared, per-run state handed to every module. Captures are read once and shared; the database context is
+	///     the single tracked context the runner wraps in a transaction.
+	/// </summary>
 	public sealed class ImportContext
 	{
 		public required DatabaseContext Db { get; init; }
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();
 
-		// Per create-flow capture (filename contains "creat"), its packet bytes - the source for the starting
-		// ability/spell kits (each capture's grants are attributed to the class it created).
+		/// <remarks>
+		///     Per create-flow capture (its file name contains "creat"), that capture's packet bytes - the source for
+		///     the starting ability and spell kits, each capture's grants attributed to the class it created.
+		/// </remarks>
 		public required IReadOnlyList<IReadOnlyList<byte[]>> CreateCaptures { get; init; }
 		public required IReadOnlyList<NamedCapture> Captures { get; init; }
 
-		// Raw packet bytes across every capture PLUS the loose *.bin files in the captures dir - the input the
-		// item/map/spell/ability importers scan (the `itemPackets` source).
+		/// <remarks>
+		///     Raw packet bytes across every capture plus the loose *.bin files in the captures directory - the input
+		///     the item, map, spell and ability importers scan (the <c>itemPackets</c> source).
+		/// </remarks>
 		public required IReadOnlyList<byte[]> RawPackets { get; init; }
 
 		public TextWriter Out { get; init; } = Console.Out;
 
-		// Global write strategy + optional per-module overrides (--mode npcs=overwrite,items=insert).
+		/// <remarks>
+		///     Global write strategy plus optional per-module overrides (<c>--mode npcs=overwrite,items=insert</c>).
+		/// </remarks>
 		public WriteMode Mode { get; init; } = WriteMode.Upsert;
 
-		// Informational - the runner's transaction rollback is what actually makes a dry run write nothing -
-		// but a module with an OUT-OF-DB side effect (e.g. rdb-respawns writing CDN blobs to the mirror store) must
-		// check this and skip that side effect.
+		/// <remarks>
+		///     Informational for database writes - the runner's transaction rollback is what makes a dry run write
+		///     nothing - but a module with an out-of-database side effect (rdb-respawns writing CDN blobs to the mirror
+		///     store, say) must check this and skip that side effect.
+		/// </remarks>
 		public bool DryRun { get; init; }
 
-		// Permits Overwrite on guarded modules (e.g. characters, which cascades to live player data).
+		/// <remarks>
+		///     Permits Overwrite on guarded modules, such as characters, which cascades to live player data.
+		/// </remarks>
 		public bool Force { get; init; }
-		// The corpus directory the run loaded, or EMPTY when no module in the plan needed it (a Db-source-only run).
+		/// <remarks>
+		///     The corpus directory the run loaded, or empty when no module in the plan needed it (a run of Db-source
+		///     modules only).
+		/// </remarks>
 		public required string CapturesDir { get; init; }
 		public required string? RdbProxyBase { get; init; }
 		public string? DumpTemplatesDir { get; init; }
 
-		// rdb-* module sub-options (from --rdb / --dump-templates). Out-of-DB write paths (dump) must be suppressed
-		// under DryRun by the module.
+		/// <remarks>
+		///     Sub-options for the rdb-* modules. A module's out-of-database write paths must be suppressed under
+		///     <see cref="DryRun" /> by the module itself.
+		/// </remarks>
 		public string? RdbDir { get; init; }
 
-		// The mode a module will actually RUN in: the requested one (per-module override beats the global default),
-		// COERCED to something the module supports.
-		//
-		// The coercion has to be recorded here rather than computed by the module, because a module only declares
-		// what it supports - it cannot resolve its own fallback. Before this existed the runner printed
-		// "mode 'Upsert' unsupported; using 'Overwrite'" and then ran the module with Upsert anyway, so every module
-		// that branches on its mode took the wrong branch: `npcs` never performed the clean rebuild it documents,
-		// and its spawn set ACCRETED across imports - exactly the failure its own comment warns Upsert would cause.
+		/// <summary>
+		///     The mode a module actually runs in: the requested one - a per-module override beating the global default
+		///     - coerced to something the module supports.
+		/// </summary>
+		/// <remarks>
+		///     The coercion is recorded here rather than computed by the module, because a module only declares what it
+		///     supports and cannot resolve its own fallback. A module that branches on its mode must see the coerced
+		///     value, or it takes the branch for a mode the runner did not give it.
+		/// </remarks>
 		public WriteMode ModeFor(string moduleName)
 		{
 			if (_effectiveModes.TryGetValue(moduleName, out var effective))
@@ -61,7 +79,7 @@ namespace Faolan.Importer.Cli
 				: Mode;
 		}
 
-		// Called by ImportRunner once per module, before it runs.
+		/// <summary>Called by <see cref="ImportRunner" /> once per module, before it runs.</summary>
 		public void SetEffectiveMode(string moduleName, WriteMode mode)
 		{
 			_effectiveModes[moduleName] = mode;

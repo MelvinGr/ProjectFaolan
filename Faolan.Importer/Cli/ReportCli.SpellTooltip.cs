@@ -10,29 +10,29 @@ using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report spell-tooltip --report-arg <spellId>[,<spellId>...]` (#775): render a spell's in-client TOOLTIP out of
+	// `--report spell-tooltip --report-arg <spellId>[,<spellId>...]`: render a spell's in-client tooltip out of
 	// our own decode, beside the raw record it came from.
 	//
 	// ## Why a tooltip is the gate
 	//
-	// The mechanics region of a spell record is structurally complete (0 unparsed element heads over all 20,847
-	// records, 0 unregistered kinds - #772/#774), which says we can SEE every mechanic a spell has. It does not say we
-	// can read one. A tooltip is the strongest available accounting check on that second question, for the same reason
+	// The mechanics region of a spell record is structurally complete - zero unparsed element heads and zero
+	// unregistered kinds over the whole catalog - which says we can see every mechanic a spell has. It does not say
+	// we can read one. A tooltip is the strongest available accounting check on that second question, for the same reason
 	// a codec round-trip is: it consumes nearly everything a record holds, and a screenshot is an unarguable oracle.
 	//
-	// The renderer is deliberately the CLIENT'S, not ours:
+	// The renderer is deliberately the client's, not ours:
 	//
-	//   * the per-kind SENTENCE is LDB category 170, keyed by the GameAction type id - `53088` really is
-	//     `%s %.2fm%s radius up to %d%s targets`. Recovered here (#775); nothing had read that category before, and
+	//   * the per-kind sentence is LDB category 170, keyed by the GameAction type id - `53088` really is
+	//     `%s %.2fm%s radius up to %d%s targets`. Recovered here; nothing had read that category before, and
 	//     it is what turns a decoded element into a line of English;
-	//   * the stat NAME is LDB category 615 keyed by the wire stat id;
-	//   * the DIVISOR is `StatDisplayScale` (the client's own tooltip arithmetic, #251);
-	//   * the UNIT is `StatUnitSuffix` (the client's own suffix helper, #775) - and it is NOT derivable from the
+	//   * the stat name is LDB category 615 keyed by the wire stat id;
+	//   * the divisor is `StatDisplayScale` (the client's own tooltip arithmetic);
+	//   * the unit is `StatUnitSuffix` (the client's own suffix helper) - and it is not derivable from the
 	//     divisor: `0x348 DamageMultiplier` is a x1 that draws `%`, `0x001 HealthMax` a x100 that draws nothing.
 	//
 	// ## What it reproduces
 	//
-	// `Gangrenous Stench` (221070) is the worked case, against the in-client screenshots on #772:
+	// `Gangrenous Stench` (221070) is the worked case, against the in-client screenshots:
 	//
 	//     -10% Slashing / Piercing / Crushing / Poison Invulnerability   (4x `Modify` -1000, stat 902/903/904/909,
 	//                                                                     divisor 100, `%` suffix)
@@ -40,32 +40,32 @@ namespace Faolan.Importer.Cli
 	//     7.00m radius up to 12 targets                                  (`FilteredAreaFormula` 11=7 170=12)
 	//     60 seconds recast                                              (`SetSpellRecastTime` 39=6000)
 	//
-	// ⚠️ **and the four invulnerabilities are not on the spell**. They live two links down the chain - 221070's area
+	// and the four invulnerabilities are not on the spell. They live two links down the chain - 221070's area
 	// element points at 221069, whose `CastNano` points at 3963058, which is where the -1000s are. A renderer that
 	// does not FOLLOW the chain reproduces none of the line the player actually reads, which is precisely why the
 	// tooltip is a better gate than any per-record assertion: it fails unless the whole graph is walked.
 	//
-	// ## What it does NOT claim
+	// ## What it does not claim
 	//
 	// A slot whose binding is not established prints as its raw key list beside the unfilled format string, never as
 	// a guess - the point is an honest diff against a screenshot, and a plausible wrong number is worse than a
 	// visible gap. Three known ones, tracked rather than papered over:
 	//
-	//   * the MANA cost is usually a percent of the caster's pool (#629), so the client's "913 mana" is a number this
+	//   * the mana cost is usually a percent of the caster's pool, so the client's "913 mana" is a number this
 	//     report cannot produce from the record alone - it prints the mode and the stored value;
-	//   * a LEVEL RAMP needs the caster's level; `--report-arg <id>@<level>` supplies one, and without it the ramp
+	//   * a level RAMP needs the caster's level; `--report-arg <id>@<level>` supplies one, and without it the ramp
 	//     prints as its two endpoints;
-	//   * the property run's unread fields are listed with the client's own name for each, marked `unread`, which is
-	//     the #633/#592 backlog seen per spell instead of per catalog.
+	//   * the property run's unread fields are listed with the client's own name for each, marked `unread` - the
+	//     unread-field backlog seen per spell instead of per catalog.
 	public static partial class ReportCli
 	{
-		// LDB category 170: the tooltip SENTENCE per GameAction type, keyed by the type id itself for the ~30 types
+		// LDB category 170: the tooltip sentence per GameAction type, keyed by the type id itself for the ~30 types
 		// that have one (the rest of the category is keyed by ACG-hashed token names and is not element text).
 		private const uint LdbGameActionFormatCategory = 170;
 
-		// LDB category 100: the client's COMMON WORDS and label nouns - `Spell`, `Combo`, `Ability`, and the `And`
+		// LDB category 100: the client's COMMON words and label nouns - `Spell`, `Combo`, `Ability`, and the `And`
 		// that `AddSpellLineProc` joins its two sides with. A separate category, reached through a separate getter
-		// (`FUN_0060eb50`), which is why none of these appear in a tooltip-token dump (#782).
+		// (`FUN_0060eb50`), which is why none of these appear in a tooltip-token dump.
 		private const uint LdbCommonWordCategory = 100;
 
 		// The GameAction key that carries a target CAP on the area kinds (see RdbSpellImporter.KeyMaxTargets - the
@@ -73,7 +73,7 @@ namespace Faolan.Importer.Cli
 		private const int KeyAreaMaxTargets = 170;
 
 		// How many carriers `kind:<typeId>` prints before it only counts - a kind can be on thousands of records and
-		// the point is a handful to read, with the TOTAL stated so the cap is never silent.
+		// the point is a handful to read, with the total stated so the cap is never silent.
 		private const int KindSampleLimit = 12;
 
 		// How deep the effect chain is followed. A spell chain is a graph and it is cycle-guarded by id, so this is
@@ -88,9 +88,9 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			// `kind:<typeId>` - the spells that CARRY a GameAction kind, rendered. Every pass on #782 has begun by
-			// hunting for "a spell that carries this kind" so its branch could be checked against ground truth, and
-			// nothing answered that question; the census knows one sample and this walks the catalog for more.
+			// `kind:<typeId>` - the spells that carry a GameAction kind, rendered. Reading a branch is only half the
+			// job; the other half is a shipped record to check the reading against. The census knows one sample and
+			// this walks the catalog for more.
 			if ((arg ?? "").Trim().StartsWith("kind:", StringComparison.OrdinalIgnoreCase)
 			    && uint.TryParse(arg!.Trim()[5..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var wantedKind))
 			{
@@ -119,9 +119,9 @@ namespace Faolan.Importer.Cli
 		}
 
 		// `kind:<typeId>` - which spells carry one GameAction kind, with the element's raw key list and the line the
-		// renderer makes of it. The tool #782's per-branch passes kept needing and never had: reading a branch is only
-		// half the job, and the other half is a shipped record to check the reading against (`SpellAreaEffects.
-		// RadiusMetres` is what settled `ConeFormula`, and `Annihilate`'s own prose is what caught an inverted sign).
+		// renderer makes of it. Reading a branch is only half the job; the other half is a shipped record to check
+		// the reading against (`SpellAreaEffects.RadiusMetres` is what settles `ConeFormula`, and `Annihilate`'s own
+		// prose is what catches an inverted sign).
 		private static void SpellTooltipByKind(string rdbDir, uint kind)
 		{
 			using var rdb = OpenRdb(rdbDir);
@@ -165,12 +165,11 @@ namespace Faolan.Importer.Cli
 			                  + (carriers > shownCarriers ? $"; the first {shownCarriers} are above" : ""));
 		}
 
-		// The same renderer run over the WHOLE catalog, scored rather than printed: how many elements it can turn into
+		// The same renderer run over the whole catalog, scored rather than printed: how many elements it can turn into
 		// a sentence, and how much of a record's bytes the decode accounts for.
 		//
-		// This is the number #775 was opened on ("46.2% of record bytes inside parsed elements, 13 of 111 property
-		// fields read"), made repeatable. A per-spell render says whether ONE tooltip comes out right; only a census
-		// says whether the thing generalises, and the two failure modes it separates are the ones that matter - an
+		// A per-spell render says whether one tooltip comes out right; only a census says whether the thing
+		// generalises, and the two failure modes it separates are the ones that matter - an
 		// element kind with no sentence at all (a decode gap) against one whose sentence exists but whose slots are
 		// not bound (a binding gap).
 		private static void SpellTooltipCensus(string rdbDir)
@@ -181,8 +180,8 @@ namespace Faolan.Importer.Cli
 
 			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0, stringBytes = 0, withText = 0, listFieldBytes = 0, withListFields = 0;
 			long elements = 0, rendered = 0;
-			// #789: how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
-			// selects - the only way to say what the flag MEANS is to look at which spells wear it.
+			// how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
+			// selects - the only way to say what the flag means is to look at which spells wear it.
 			long hidden = 0, hiddenRanked = 0, shownRanked = 0, hiddenNameless = 0, shownNameless = 0, shown = 0;
 			var hiddenSample = new List<string>();
 			var fieldCounts = new Dictionary<uint, int>();
@@ -192,12 +191,12 @@ namespace Faolan.Importer.Cli
 			var noSentenceByConstruction = new Dictionary<uint, int>();
 			var notDrawn = new Dictionary<uint, int>();
 			var unbound = new Dictionary<uint, int>();
-			// Elements whose sentence is in hand and whose NUMBER lives on the casting character rather than in the
-			// record - settled the same way NoSentenceReason's entries are, and per ELEMENT rather than per kind
+			// Elements whose sentence is in hand and whose number lives on the casting character rather than in the
+			// record - settled the same way NoSentenceReason's entries are, and per element rather than per kind
 			// because it is one arm of a branch, not a whole kind (see UnrenderableReason).
 			var liveState = new Dictionary<uint, int>();
-			// ⭐ One example spell id per bucketed kind. Every pass on #782 has had to go hunting for "a spell that
-			// carries this kind" before it could read one, and the census is the one place that already knows.
+			// One example spell id per bucketed kind. Reading a kind means finding a spell that carries it, and the
+			// census is the one place that already knows.
 			var sampleOf = new Dictionary<uint, uint>();
 
 			foreach (var entry in rdb.EntriesOfType(SpellTemplateType).Where(rdb.CanRead))
@@ -246,18 +245,18 @@ namespace Faolan.Importer.Cli
 						shownNameless++;
 				}
 
-				// ⭐ #632: the whole PAIR REGION is decoded now, not just the property run - the 20-byte prefix, the
-				// head's own pairs, the run, and any trailing resource reference. Its length is exactly where the
-				// string block starts, which the record itself states in its frame word.
+				// The whole pair region is decoded, not just the property run - the 20-byte prefix, the head's own
+				// pairs, the run, and any trailing resource reference. Its length is exactly where the string block
+				// starts, which the record itself states in its frame word.
 				fieldBytes += afterRun;
-				// #632: the record's own name + description sit immediately after the run, and were a large slice of
+				// the record's own name + description sit immediately after the run, and were a large slice of
 				// what that ticket measured as "never looked at".
 				var block = RdbSpellImporter.ReadStringBlock(body, afterRun);
 				stringBytes += block.Bytes;
 				if (block.Bytes > 0)
 					withText++;
 
-				// #632: the two LIST-valued fields (22 and 36) that follow the text ones on 1,871 records.
+				// the two list-valued fields (22 and 36) that follow the text ones on 1,871 records.
 				var listFields = ScanListFields(body, afterRun + block.Bytes);
 				listFieldBytes += listFields;
 				if (listFields > 0)
@@ -265,7 +264,7 @@ namespace Faolan.Importer.Cli
 				foreach (var field in fields.Keys)
 					fieldCounts[field] = fieldCounts.GetValueOrDefault(field) + 1;
 
-				// The element-list headers (#785) - 12 bytes each, and decoded, so they count as accounted for.
+				// The element-list headers - 12 bytes each, and decoded, so they count as accounted for.
 				listBytes += ItemTemplateStatModifiers.ParseElementLists(body).Count * 12;
 
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body))
@@ -274,7 +273,7 @@ namespace Faolan.Importer.Cli
 					elementBytes += element.WidthBytes;
 
 					// Before anything is looked up: an element the client itself cannot draw from the template is
-					// settled, not debt. Counted per ELEMENT because it is one ARM of a branch that renders
+					// settled, not debt. Counted per element because it is one ARM of a branch that renders
 					// perfectly well on its others.
 					if (UnrenderableReason(element) != null)
 					{
@@ -286,7 +285,7 @@ namespace Faolan.Importer.Cli
 					var (format, args) = Sentence(ctx, element);
 					if (format == null)
 					{
-						// ⭐ Split THREE ways, because only one of them is OURS. A kind the tooltip builder has no
+						// Split three ways, because only one of them is OURS. A kind the tooltip builder has no
 						// branch for falls to its default and the client draws nothing either; a kind whose absence
 						// is PROVEN (a category-100 label, or a number that lives in the invocation context) is
 						// settled rather than outstanding. Counting either as a missing sentence reads as decode debt
@@ -319,7 +318,7 @@ namespace Faolan.Importer.Cli
 			                  + $" {listFieldBytes:N0} in the list-valued fields on {withListFields:N0})");
 			Console.WriteLine($"  property-run field ids read         : {SpellFieldsRead.Count(f => fieldCounts.ContainsKey(f.Key))} / {fieldCounts.Count}");
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
-			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
+			// The honest headline: an element the client draws nothing for is accounted for too, so the outstanding
 			// work is what is left after both.
 			var accountedElements = rendered + notDrawn.Values.Sum() + noSentenceByConstruction.Values.Sum() + liveState.Values.Sum();
 			Console.WriteLine($"  ...or accounted for                 : {accountedElements:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * accountedElements / elements):0.0}%"
@@ -434,15 +433,15 @@ namespace Faolan.Importer.Cli
 			}
 
 			var body = record.AsSpan(12);
-			// ⚠️ ONE scan. `ReadIncreasingFields` is quadratic in the record's word count (it restarts the ascending
+			// one scan. `ReadIncreasingFields` is quadratic in the record's word count (it restarts the ascending
 			// walk at every offset), so the run end is taken from this call and threaded down rather than re-derived
 			// where it is needed.
 			var fields = RdbSpellImporter.ReadIncreasingFields(body, out var runStart, out var runEnd);
 			var elements = ItemTemplateStatModifiers.ParseElements(body);
 
-			// ⭐ #632: the record carries its OWN name and description, and for the 1,594 spells LDB 50210 has no name
-			// for it is the only one there is - `Hellfire Stream` (8600) renders as "spell 8600" out of the LDB. The
-			// LDB still wins where it has one: it is the LOCALISED string and this is the raw authoring name.
+			// The record carries its own name and description, and for the spells LDB 50210 has no name for it is the
+			// only one there is - `Hellfire Stream` (8600) renders as "spell 8600" out of the LDB. The LDB still wins
+			// where it has one: it is the localised string and this is the raw authoring name.
 			var inline = RdbSpellImporter.ReadStringBlock(body, runEnd);
 			if (name.StartsWith("spell ", StringComparison.Ordinal) && inline.Name.Length > 0)
 				name = $"{inline.Name} [from the record]";
@@ -455,8 +454,8 @@ namespace Faolan.Importer.Cli
 				foreach (var line in description.Replace("\r", "").Split('\n'))
 					Console.WriteLine($"{pad}  \"{line}\"");
 
-			// ⚠️ The mana mode is in the record's FLAGS word, not in the property run - three sweeps over the run
-			// found nothing before #630 pinned it at word 13 of the whole record, header included.
+			// The mana mode is in the record's flags word, not in the property run: word 13 of the whole record,
+			// header included.
 			var manaIsPercent = (RdbSpellImporter.ReadFlagsWord(body, runStart) >> ManaCostIsPercentBit & 1) == 1;
 
 			foreach (var line in HeaderLines(fields, elements, manaIsPercent))
@@ -470,7 +469,7 @@ namespace Faolan.Importer.Cli
 				foreach (var line in RenderElement(ctx, element))
 					Console.WriteLine($"{pad}  {line}");
 
-				// The chain. An element that names another SPELL is the reason a tooltip reads as one sentence and
+				// The chain. An element that names another spell is the reason a tooltip reads as one sentence and
 				// the record does not - see the type comment.
 				foreach (var child in ChainedSpells(element))
 				{
@@ -504,8 +503,8 @@ namespace Faolan.Importer.Cli
 			if (fields.TryGetValue(447, out var interval))
 				yield return $"ticks     every {interval / 100.0:0.##} s   [field 447 = {interval} cs]";
 
-			// The recast is NOT a property field on most spells - it is a `SetSpellRecastTime` element pointing at the
-			// spell itself, which is why #271 could not find it in the run.
+			// The recast is not a property field on most spells - it is a `SetSpellRecastTime` element pointing at the
+			// spell itself, so it is not in the property run at all.
 			foreach (var element in elements.Where(e => e.Kind == SetSpellRecastTimeKind))
 			{
 				if (element.Value(GameActionTypes.KeyValue) is { } centiseconds)
@@ -515,7 +514,7 @@ namespace Faolan.Importer.Cli
 			if (fields.TryGetValue(210, out var rechargeDelay))
 				yield return $"recharge  {rechargeDelay} (unit unverified)   [field 210 Recharge Delay, UNREAD by the importer - #633]";
 
-			// ⚠️ The mana cost is usually a PERCENT of the caster's pool (#629/#630), and the pool is a property of
+			// The mana cost is usually a percent of the caster's pool, and the pool is a property of
 			// the caster, not of this record - so the number the client prints is not reproducible here. Say which
 			// mode the record declares and stop.
 			if (fields.TryGetValue(132, out var mana))
@@ -532,16 +531,16 @@ namespace Faolan.Importer.Cli
 		{
 			var type = element.Type;
 			// The byte OFFSET rides with the name, because "which element" is the first question asked of a line that
-			// looks wrong - and a record that states the same element twice (#783) is otherwise two identical lines
+			// looks wrong - and a record that states the same element twice is otherwise two identical lines
 			// with nothing to tell them apart.
 			var typeName = (type?.Name ?? $"kind {element.Kind}") + $"@{element.Offset}";
 			var (format, args) = Sentence(ctx, element);
 
 			// The element's 0x2d6 is the AURA PERIOD in centiseconds when it is set - a repeating element and a
-			// one-shot element are the same kind with the same keys, and the difference is only there (#772).
+			// one-shot element are the same kind with the same keys, and the difference is only there.
 			var period = element.Fixed2d6 == 0 ? "" : $", every {element.Fixed2d6 / 100.0:0.##} s";
 
-			// #789: the client checks a HIDE bit on a spell an element references, and draws nothing for the element
+			// the client checks a HIDE bit on a spell an element references, and draws nothing for the element
 			// when it is set. Flagged rather than acted on - see HiddenSpellNote.
 			var hidden = HiddenSpellNote(ctx, element);
 
@@ -555,7 +554,7 @@ namespace Faolan.Importer.Cli
 				? string.Join(" ", element.Values.Select((v, i) => $"[{i}]={(int)v}"))
 				: string.Join(" ", type.Keys.Select((k, i) => $"{k}={(i < element.Values.Length ? ((int)element.Values[i]).ToString(CultureInfo.InvariantCulture) : "-")}"));
 
-			// An element whose number lives on the CASTER says so - "slot binding not established" would read as decode
+			// An element whose number lives on the caster says so - "slot binding not established" would read as decode
 			// debt for a case the client itself cannot draw from a template either.
 			if (UnrenderableReason(element) is { } live)
 			{
@@ -569,12 +568,12 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     The byte length of the record's LIST-valued fields (22 and 36), searched for from <paramref name="from" />.
+		///     The byte length of the record's list-valued fields (22 and 36), searched for from <paramref name="from" />.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Searched rather than read at a fixed place: the block does not always sit immediately after the text
-		///     - on `Spirit of the Bear (Rank 1)` it appears between two element lists - so its POSITION is not part of
-		///     the grammar yet even though its shape is (#632).
+		///     Searched rather than read at a fixed place: the block does not always sit immediately after the text
+		///     - on `Spirit of the Bear (Rank 1)` it appears between two element lists - so its position is not part of
+		///     the grammar yet even though its shape is.
 		/// </remarks>
 		private static int ScanListFields(ReadOnlySpan<byte> body, int from)
 		{
@@ -589,13 +588,13 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     A marker for an element whose referenced spell carries the client's hide-from-tooltip bit (#789), or the
+		///     A marker for an element whose referenced spell carries the client's hide-from-tooltip bit, or the
 		///     empty string.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Deliberately a NOTE and not a suppression. `FUN_014a3b30` makes `ConeFormula` skip its whole sentence
+		///     Deliberately a NOTE and not a suppression. `FUN_014a3b30` makes `ConeFormula` skip its whole sentence
 		///     and makes `AddComboProc` treat that side as absent, so acting on it would make lines DISAPPEAR - and
-		///     only bits 1-2 of the flags word this bit lives in are proven to reach the client verbatim (#629/#630).
+		///     only bits 1-2 of the flags word this bit lives in are proven to reach the client verbatim.
 		///     Over-drawing is visible in a screenshot diff; under-drawing is not, so the report takes the visible
 		///     failure. Flip this to a suppression once the bit is confirmed in-client.
 		/// </remarks>
@@ -617,18 +616,18 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     Why this ELEMENT cannot be drawn from its template at all - or null when it can.
+		///     Why this element cannot be drawn from its template at all - or null when it can.
 		/// </summary>
 		/// <remarks>
 		///     <para>
-		///         ⭐ The twin of <see cref="GameActionTooltip.NoSentenceReason" />, one level down. That one is per
-		///         KIND; these are one ARM of a branch whose other arms render perfectly well, so the whole kind
+		///         The twin of <see cref="GameActionTooltip.NoSentenceReason" />, one level down. That one is per
+		///         kind; these are one ARM of a branch whose other arms render perfectly well, so the whole kind
 		///         cannot be written off and neither can the arm be counted as debt. Both are settled facts about
 		///         retail rather than gaps in our decode, which is why the census counts them apart from
-		///         "cannot fill" (#782).
+		///         "cannot fill".
 		///     </para>
 		///     <para>
-		///         ⚠️ Each entry must be a case the TEMPLATE genuinely cannot answer, not one where the report is
+		///         Each entry must be a case the template genuinely cannot answer, not one where the report is
 		///         merely missing a binding - the whole point of the split is that this bucket can never be worked
 		///         off. Both below are measured:
 		///         <list type="bullet">
@@ -636,13 +635,13 @@ namespace Faolan.Importer.Cli
 		///                 <b><c>HitPercentage</c> mode 1/2</b> - branch <c>0x014a0b99</c> tests the mode word
 		///                 first (<c>iVar7 == 2 || iVar7 == 1</c>), fetches the local player through
 		///                 <c>FUN_01107340</c>, reads the key-1 stat off it with a virtual call and renders
-		///                 <c>charStat x value x 0.01</c>. With no player it draws NOTHING - the whole arm sits
-		///                 inside <c>if (player != 0)</c>. ⚠️ No shipped element takes it, so this is a GUARD
+		///                 <c>charStat x value x 0.01</c>. With no player it draws nothing - the whole arm sits
+		///                 inside <c>if (player != 0)</c>. No shipped element takes it, so this is a GUARD
 		///                 rather than a population: without it a mode-1/2 element would fall through to the
 		///                 stored-value arms and draw a confidently wrong number.
 		///             </item>
 		///             <item>
-		///                 <b>A Stat slot that is present and ZERO</b> - the element names no stat, so the stat
+		///                 <b>A Stat slot that is present and zero</b> - the element names no stat, so the stat
 		///                 slot of its sentence has nothing to fill it. `Storyteller` (4695200) carries exactly one
 		///                 element, `Modify 0=0 39=0`, and the client's own stat-name lookup answers nothing for
 		///                 id 0. That is a record that states no modifier, not a binding we are missing.
@@ -655,7 +654,7 @@ namespace Faolan.Importer.Cli
 			if (element.Kind == HitPercentageKind && element.Value(KeyHitPercentMode) is 1 or 2)
 				return "mode 1/2 renders the CASTER's own key-1 stat x value x 0.01; retail draws nothing without a character";
 
-			// Scoped to the kinds whose sentence NAMES the stat, so a kind that merely happens to declare a Stat key
+			// Scoped to the kinds whose sentence names the stat, so a kind that merely happens to declare a Stat key
 			// it does not draw cannot be swallowed by this.
 			return element.Kind is ModifyKind or SkillKind or HitKind or SpecialHitKind or InterpolatedHitKind
 			       && element.Value(GameActionTypes.KeyStat) == 0
@@ -668,15 +667,15 @@ namespace Faolan.Importer.Cli
 		///     client ships none; null args mean this kind's slot binding is not established.
 		/// </summary>
 		/// <remarks>
-		///     Kept as ONE function because the two halves are not independent: the <c>Hit</c> family's sentence is
-		///     CHOSEN BY ITS VALUES (health vs another stat, damage vs heal - see
+		///     Kept as one function because the two halves are not independent: the <c>Hit</c> family's sentence is
+		///     CHOSEN by its values (health vs another stat, damage vs heal - see
 		///     <see cref="GameActionTooltip.HitSentenceToken" />), so "which string" cannot be answered before the
-		///     slots are read. Splitting them is what would force a guess (#782).
+		///     slots are read. Splitting them is what would force a guess.
 		/// </remarks>
 		private static (string? Format, object?[]? Args) Sentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			// The damage/heal family - `Hit`, `SpecialHit` and `InterpolatedHit`, all four keys of the first two being
-			// (Stat, min, max, flag). The `%s %s %s` sitting at their own type id is NOT what the client draws; the
+			// (Stat, min, max, flag). The `%s %s %s` sitting at their own type id is not what the client draws; the
 			// three token sentences below are (branch 0x014a0ae6 -> FUN_0149aa30).
 			if (element.Kind is HitKind or SpecialHitKind or InterpolatedHitKind)
 				return HitSentence(ctx, element);
@@ -697,32 +696,32 @@ namespace Faolan.Importer.Cli
 				return (format, format == null ? null : [$"{percent * 0.01:0.##}%"]);
 			}
 
-			// The PERCENT-of-a-stat family, whose sentence is chosen by three things at once - which stat, the sign of
+			// The percent-of-a-stat family, whose sentence is chosen by three things at once - which stat, the sign of
 			// the percentage, and a mode word (branch 0x014a0b99).
 			if (element.Kind == HitPercentageKind)
 				return HitPercentageSentence(ctx, element);
 
-			// `AddPercentSkillModifier` (branch 0x014a1b52) - one of the kinds #782 named as having no Stat slot at
-			// all, so the generic (Stat, magnitude) binder cannot touch it and it sat in the "no sentence we can
-			// find" bucket. It has two, and the branch picks between them by COMPARING ITS TWO STAT SLOTS:
+			// `AddPercentSkillModifier` (branch 0x014a1b52) - one of the kinds with no Stat slot at all, so the
+			// generic (Stat, magnitude) binder cannot touch it. It has two sentences, and the branch picks between
+			// them by comparing its two stat slots:
 			//
-			//     CMP ESI,EDI ; JNZ <different-stat arm>      ESI = GetIntStat(0x315) = key 66
+			//     CMP ESI,EDI; JNZ <different-stat arm>      ESI = GetIntStat(0x315) = key 66
 			//                                                 EDI = GetIntStat(0x316) = key 67
 			//                                                 EBX = GetIntStat(0x2f9) = key 39, the percentage
 			//
 			//   same      `#2{1: Increases | Decreases } your #3%s by #1%s`
 			//   different `#2{1: Increases | Decreases } your #4%s by #1%s of your #3%s`
 			//
-			// ⭐ The SLOT ORDER is read off the binds rather than guessed: both arms append the value, then the
+			// The slot order is read off the binds rather than guessed: both arms append the value, then the
 			// `SETG` of the value's sign as the branch selector, then the stat saved at `[ESP+0x10]` (key 66), and
 			// the different-stat arm appends one more from `[ESP+0x24]` (key 67). So `#3` is key 66 and `#4` is key
-			// 67 - "increases your <67> by N% of your <66>", i.e. 66 is the SOURCE stat and 67 the one raised.
+			// 67 - "increases your <67> by N% of your <66>", i.e. 66 is the source stat and 67 the one raised.
 			//
 			// The shipped data agrees independently: `Absolute Philtre of Constitution` carries 66=806, 67=806
 			// (equal -> the same-stat arm) with 39=8, and `Arcane Plunder` carries 66=804 Strength, 67=490, 39=2..8,
 			// which reads as "increases your 490 by 2% of your Strength" and not the other way round.
 			//
-			// ⚠️ The magnitude is a PLAIN percent here (8, 13, 2..8), not the hundredths `ChangeHitPercent` and
+			// The magnitude is a PLAIN percent here (8, 13, 2..8), not the hundredths `ChangeHitPercent` and
 			// `UpgradeCombo` carry - so it is rendered `8%`, not `0.08%`. The sentence has no literal `%`, so the
 			// suffix belongs to the value string, which is what the branch's own value formatter appends.
 			if (element.Kind == AddPercentSkillModifierKind)
@@ -751,14 +750,14 @@ namespace Faolan.Importer.Cli
 			// falling to `%.2fm%s wide column to target` when there is none and to `ColumnAddTargetsWithDistance`
 			// when there is, which appends the distance and its own modifier annotation.
 			//
-			// ⚠️ Its two magnitudes do NOT come from the `GetIntStat(GameActionStat_e)` every other branch uses - it
+			// Its two magnitudes do not come from the `GetIntStat(GameActionStat_e)` every other branch uses - it
 			// reads them through `FUN_014af090(record, <statKey>)`, which takes the key as a PUSHED argument and
-			// returns a FLOAT. That is why a dump anchored on `MOV ECX,<key>; CALL 0x0077a510` reported this branch
-			// as reading no keys at all (#782).
+			// returns a FLOAT. That is why a dump anchored on `MOV ECX,<key>; call 0x0077a510` reported this branch
+			// as reading no keys at all.
 			//
-			// ⚠️⚠️ And that getter ends `CVTSI2SS; MULSS XMM0,[0x01F2800C]` - it divides the stored integer by 100
+			// And that getter ends `CVTSI2SS; MULSS XMM0,[0x01F2800C]` - it divides the stored integer by 100
 			// on the way out, where the int getter every other branch uses hands the value back verbatim. So a stored
-			// 50 is a HALF-METRE column, not a 50m one; the client's own `%.2f` is what makes a 100x error here look
+			// 50 is a half-METRE column, not a 50m one; the client's own `%.2f` is what makes a 100x error here look
 			// like a finished line rather than a failed bind.
 			if (element.Kind == ColumnAddTargetsKind)
 			{
@@ -793,22 +792,22 @@ namespace Faolan.Importer.Cli
 			if (element.Kind == AddSpellProcKind)
 				return SpellProcSentence(ctx, element);
 
-			// `AddComboProc` picks its sentence by WHICH of its two spell slots are present (branch 0x0149ec8e): key
-			// 88 is the proc run on SELF and key 236 the one run on the TARGET, and the branch has a token for each
+			// `AddComboProc` picks its sentence by which of its two spell slots are present (branch 0x0149ec8e): key
+			// 88 is the proc run on SELF and key 236 the one run on the target, and the branch has a token for each
 			// of the three combinations - `%s on self and %s on target`, `%s on self`, `%s on target`. The
 			// `Add Combo Proc. Run #1%s on self and #2%s on target. Triggers #4%d times per minute.` sitting at its
 			// own type id is not what the client draws.
 			//
-			// ⚠️ The branch reads key 237 (procs per minute) and appends it as a third argument that none of the
+			// The branch reads key 237 (procs per minute) and appends it as a third argument that none of the
 			// three token sentences has a slot for, so it does not appear - the same shape as `Knockback`'s key 191.
 			if (element.Kind == AddComboProcKind)
 			{
 				var onSelf = element.Value(GameActionTypes.KeySpell) ?? 0;
 				var onTarget = element.Value(GameActionTypes.KeyProcTargetSpell) ?? 0;
 
-				// ⚠️ The client's presence test is `id != 0 && !hidden`, and a side whose spell carries the
-				// hide-from-tooltip bit renders as a ONE-sided proc. Not acted on here for the same reason as the
-				// cone kinds - see #789 and HiddenSpellNote; the line is drawn and flagged.
+				// The client's presence test is `id != 0 && !hidden`, and a side whose spell carries the
+				// hide-from-tooltip bit renders as a one-sided proc. Not acted on here for the same reason as the
+				// cone kinds - see HiddenSpellNote; the line is drawn and flagged.
 				var self = onSelf != 0 ? $"{ctx.SpellName(onSelf)} ({onSelf})" : null;
 				var target = onTarget != 0 ? $"{ctx.SpellName(onTarget)} ({onTarget})" : null;
 
@@ -830,51 +829,51 @@ namespace Faolan.Importer.Cli
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
 		}
 
-		// `ChangeInheritedWeaponAttack` (53250), branch 0x014a1da2 - the last kind in #782's "branch but no sentence"
-		// bucket, and a composer like `AddSpellLineProc` with four optional clauses instead of two.
+		// `ChangeInheritedWeaponAttack` (53250), branch 0x014a1da2 - a composer like `AddSpellLineProc` with four
+		// optional clauses instead of two.
 		//
-		// The HEADER is picked by key 84, and it is a two-value enum: anything but 0 or 1 bails out of the branch
-		// entirely (`CMP EDI,1 ; JNZ 0x014a22e4`), so such an element draws nothing at all.
+		// The header is picked by key 84, and it is a two-value enum: anything but 0 or 1 bails out of the branch
+		// entirely (`CMP EDI,1; JNZ 0x014a22e4`), so such an element draws nothing at all.
 		//
 		//     key 84 = 0  ->  FinishingComboAttack  "Finishing attack"
 		//     key 84 = 1  ->  OpeningComboAttack    "Opening attack"
 		//
-		// Then one clause per metric, each gated on ITS OWN key being non-zero:
+		// Then one clause per metric, each gated on its own key being non-zero:
 		//
 		//     key 66  Increase/DecreaseComboDPS             "Increase Damage per Sec %s"
 		//     key 67  Increase/DecreaseComboCriticalChance  "Increase Critical Chance %s"
 		//     key 68  Increase/DecreaseComboHateAdjustment  "Increase Hate Adjustment %s"
 		//     key 69  ChangeComboDamageType                 "Changes damage type to %s"
 		//
-		// ⚠️ Each clause is a separate LINE in the client (each ends in a `FUN_010d1850` push onto a string vector),
+		// Each clause is a separate line in the client (each ends in a `FUN_010d1850` push onto a string vector),
 		// not one sentence. This report draws one line per element, so the clauses are joined with "; " - that
-		// separator is THIS report's presentation and not something the client ships.
+		// separator is this report's presentation and not something the client ships.
 		//
-		// ⛔ **The client picks the crit clause's increase/decrease from key 66, not key 67** - `TEST EBX,EBX` at
+		// The client picks the crit clause's increase/decrease from key 66, not key 67 - `test EBX,EBX` at
 		// 0x014a1fe3, where `EBX` still holds the DPS delta fetched at 0x014a1de5 and nothing has reloaded it. Read
-		// literally that is a client BUG: a positive key 66 with a negative key 67 would draw "Increase Critical
+		// literally that is a client bug: a positive key 66 with a negative key 67 would draw "Increase Critical
 		// Chance -N". It is reproduced here rather than corrected, because retail is authoritative - and it is
-		// UNOBSERVABLE either way: key 66 is **0 on all 796 shipped elements** (key 67 is non-zero on 767), so the
-		// DPS clause never fires at all and the crit clause always takes its Increase arm.
+		// unobservable either way: key 66 is 0 on every shipped element, so the DPS clause never fires at all and
+		// the crit clause always takes its Increase arm.
 		//
-		// ⚠️ The crit clause's value is a FLOAT, unlike the DPS clause's int: `CVTSI2SS` off key 67's slot then
-		// `MULSS [0x020b5944]`, and that constant is **0.025**. So `Annihilate`'s stored 1000 draws as 25.
+		// The crit clause's value is a FLOAT, unlike the DPS clause's int: `CVTSI2SS` off key 67's slot then
+		// `MULSS [0x020b5944]`, and that constant is 0.025. So `Annihilate`'s stored 1000 draws as 25.
 		//
-		// ⭐ The DAMAGE-TYPE clause's `%s` IS a resolved name space - **LDB category 600, keyed by key 69's value**.
-		// The client says so outright at `0x014A226D`: `PUSH 0x258 ; PUSH EDI ; CALL 0x0060ECE0`, where `0x258` is
-		// 600 and `EDI` is the key it just fetched. Category 600 is the DAMAGE-SCHOOL name table and its ids are
+		// The damage-type clause's `%s` is a resolved name space - LDB category 600, keyed by key 69's value.
+		// The client says so outright at `0x014A226D`: `PUSH 0x258; PUSH EDI; call 0x0060ECE0`, where `0x258` is
+		// 600 and `EDI` is the key it just fetched. Category 600 is the damage-school name table and its ids are
 		// `DamageSchool`'s exactly - 1 slashing, 4 fire, 6 holy, 7 unholy, 8 poison.
 		//
 		// All 29 shipped elements that reach this clause are one spell, `Prince of Terror` (4281690), and every one
 		// carries key 69 = 7. Three statements agree on what that draws: the client's own lookup, our enum, and the
 		// spell's own description - *"causes all combo finishers to deal UNHOLY damage"*.
 		//
-		// ⚠️ Its gate is `TEST/JZ` then `JLE`, so a NEGATIVE key 69 skips the clause exactly as zero does - and a
+		// Its gate is `test/JZ` then `JLE`, so a NEGATIVE key 69 skips the clause exactly as zero does - and a
 		// missing LDB row drops it too (the client's `ESP+0xe` success byte gates the append).
 		//
-		// ⚠️ The HATE clause stays gated-but-unrendered, and deliberately: no shipped element carries key 68, so its
+		// The HATE clause stays gated-but-unrendered, and deliberately: no shipped element carries key 68, so its
 		// scale is unmeasured. An element that grew one returns null and lands in the census's unrendered bucket,
-		// which SAYS so - rather than being drawn with an invented number.
+		// which says so - rather than being drawn with an invented number.
 		private static (string? Format, object?[]? Args) InheritedWeaponAttackSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var header = element.Value(GameActionTypes.KeyComboAttackSlot) switch
@@ -896,13 +895,13 @@ namespace Faolan.Importer.Cli
 				return (null, null); // see the remarks - the hate scale is unmeasured, so it is not drawn
 
 			var clauses = new List<string>();
-			// ⚠️ `Increase` is the DEFAULT and `Decrease` is taken only when the value is NEGATIVE - the client loads
-			// the Increase token first and overwrites it under `JNS` (jump if not sign), so ZERO takes Increase. A
+			// `Increase` is the default and `Decrease` is taken only when the value is NEGATIVE - the client loads
+			// the Increase token first and overwrites it under `JNS` (jump if not sign), so zero takes Increase. A
 			// `> 0` test instead of `>= 0` inverts every clause whose driver is 0, which is all of them here.
 			if (dps != 0 && Clause(ctx, dps < 0 ? "DecreaseComboDPS" : "IncreaseComboDPS", dps) is { } dpsLine)
 				clauses.Add(dpsLine);
 
-			// ⛔ The sign comes from `dps`, not from `crit`. That is the client's bug, reproduced - see the remarks.
+			// The sign comes from `dps`, not from `crit`. That is the client's bug, reproduced - see the remarks.
 			if (crit != 0 && Clause(ctx, dps < 0 ? "DecreaseComboCriticalChance" : "IncreaseComboCriticalChance", crit * ComboCriticalScale) is { } critLine)
 				clauses.Add(critLine);
 
@@ -932,24 +931,24 @@ namespace Faolan.Importer.Cli
 		}
 
 		// `AddSpellLineProc` (53070), branch 0x0149f69e. It looked like a kind with three tokens and no sentence; it is
-		// a kind that BUILDS its line out of fragments, and none of the three tokens is a sentence:
+		// a kind that builds its line out of fragments, and none of the three tokens is a sentence:
 		//
 		//     OnSelf          "on self"            OnTarget  "on target"       TimesPerMinute  "Procs per Minute"
 		//
 		// The branch reads GetIntStat(0x463) = key 88 (the spell run on SELF), 0x4f4 = key 236 (the one on the
-		// TARGET) and 0x4f5 = key 237 (the rate), then concatenates with three LITERAL formats found at the push
+		// target) and 0x4f5 = key 237 (the rate), then concatenates with three LITERAL formats found at the push
 		// sites rather than in the LDB:
 		//
 		//     "%s %s"      per side          -> "<spell> on self"
 		//     " %s "       the joiner        -> " and ",  its word from LDB category 100 id 18500 ("and")
 		//     "%s, %d %s"  the wrapper       -> "<pieces>, <rate> Procs per Minute"
 		//
-		// ⚠️ The joiner's word comes through a THIRD localised-string getter, `FUN_0060eb50`, which
+		// The joiner's word comes through a third localised-string getter, `FUN_0060eb50`, which
 		// `DumpTooltipTokens.java` does not anchor on (it knows `FUN_0060ec00` and `FUN_0060f2f0`) - and it reads
-		// category 100, not 170. That is why "And" appears in no token dump: it is a common WORD, not a tooltip
+		// category 100, not 170. That is why "And" appears in no token dump: it is a common word, not a tooltip
 		// sentence, the same category the `Spell`/`Combo`/`Ability` label nouns come from.
 		//
-		// ⚠️ The wrapper is UNCONDITIONAL - the rate clause is appended whether or not either side is present. What
+		// The wrapper is UNCONDITIONAL - the rate clause is appended whether or not either side is present. What
 		// is conditional is only the trim call before it, so a proc with no spell at all still draws its rate.
 		private static (string? Format, object?[]? Args) SpellLineProcSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
@@ -966,9 +965,9 @@ namespace Faolan.Importer.Cli
 			if (self == null || target == null || rate == null || and == null)
 				return (null, null);
 
-			// ⚠️ Both sides gated on `id != 0` only. The client's test is `id != 0 && !hidden` - a side whose spell
-			// carries the hide-from-tooltip bit renders as a ONE-sided proc - and that is deliberately not acted on
-			// here for the same reason as `AddComboProc`: see #789 and HiddenSpellNote, which flags the line instead.
+			// Both sides gated on `id != 0` only. The client's test is `id != 0 && !hidden` - a side whose spell
+			// carries the hide-from-tooltip bit renders as a one-sided proc - and that is deliberately not acted on
+			// here for the same reason as `AddComboProc`: see HiddenSpellNote, which flags the line instead.
 			var pieces = new List<string>();
 			if (onSelf != 0)
 				pieces.Add($"{ctx.SpellName(onSelf)} ({onSelf}) {self}");
@@ -983,19 +982,19 @@ namespace Faolan.Importer.Cli
 
 		// `UpgradeCombo` (53209), branch 0x014a1817 - a composer like `AddSpellLineProc`, with two clauses instead of
 		// two sides. The `Upgrade combo: %s, damage modifier: %d, recharge adjust: %d` sitting at its own type id is
-		// NOT what the client draws; each clause is a separate line built from a token sentence.
+		// not what the client draws; each clause is a separate line built from a token sentence.
 		//
-		//     key 66  (0x315)  the DAMAGE delta    UpgradeCombo_{Increase,Decrease}Damage    unit "%"  (0x1fbcf18)
-		//     key 67  (0x316)  the COOLDOWN delta  UpgradeCombo_{Increase,Decrease}Cooldown  unit ""   (0x2c23bf8)
+		//     key 66  (0x315)  the damage delta    UpgradeCombo_{Increase,Decrease}Damage    unit "%"  (0x1fbcf18)
+		//     key 67  (0x316)  the cooldown delta  UpgradeCombo_{Increase,Decrease}Cooldown  unit ""   (0x2c23bf8)
 		//
-		// ⭐ The `Increase*` half of BOTH pairs is a token no dump had: `gameaction-tooltip-kinds.tsv` lists only the
+		// The `Increase*` half of both pairs is a token no dump had: `gameaction-tooltip-kinds.tsv` lists only the
 		// two `Decrease` strings for this kind, because `DumpTooltipTokens.java` walks call sites and the Increase
 		// arms are the fall-through. Same shape as `FinishingComboAttack` on 53250.
 		//
-		// ⚠️ Both magnitudes are HUNDREDTHS (`CVTSI2SS ; MULSS [0x01f2800c]` = x0.01), like `ChangeHitPercent` and
+		// Both magnitudes are HUNDREDTHS (`CVTSI2SS; MULSS [0x01f2800c]` = x0.01), like `ChangeHitPercent` and
 		// unlike `AddPercentSkillModifier`'s plain percent.
 		//
-		// ⚠️ The token is picked by `JLE`, so ZERO takes the DECREASE arm here - the opposite of 53250, where the
+		// The token is picked by `JLE`, so zero takes the DECREASE arm here - the opposite of 53250, where the
 		// client loads Increase first and overwrites it under `JNS`. Written out per clause rather than shared,
 		// because the two kinds genuinely disagree and a shared helper would have to pick one.
 		private static (string? Format, object?[]? Args) UpgradeComboSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
@@ -1011,7 +1010,7 @@ namespace Faolan.Importer.Cli
 				clauses.Add(cooldownLine);
 
 			// Both keys zero is the client drawing nothing at all - neither clause is entered.
-			// ⚠️ Handed back as an ARGUMENT to a bare `%s` rather than as the format: a composed line contains a
+			// Handed back as an ARGUMENT to a bare `%s` rather than as the format: a composed line contains a
 			// literal `%` (the damage clause's unit), and LdbFormat would read that as a conversion and fail.
 			return clauses.Count == 0 ? (null, null) : (ComposedLine, [string.Join("; ", clauses)]);
 
@@ -1025,9 +1024,9 @@ namespace Faolan.Importer.Cli
 
 		// The client's own signed-number formatter, `FUN_0149a5c0` - `<font color="%s">%+.Nf%s</font>`, where the
 		// colour is `tooltip_positive`/`tooltip_negative` (`FUN_0149a6c0`) and the trailing `%s` is the unit. The font
-		// markup is dropped here for the same reason LdbFormat drops it: the report diffs against a screenshot's TEXT.
+		// markup is dropped here for the same reason LdbFormat drops it: the report diffs against a screenshot's text.
 		//
-		// ⚠️ The PRECISION is picked from the value, not fixed - `modf` splits it and the three arms are
+		// The PRECISION is picked from the value, not fixed - `modf` splits it and the three arms are
 		// `%+.2f` (no integer part and a fraction under 0.05), `%+.0f` (an integer part and a fraction under 0.05)
 		// and `%+.1f` for everything else. So a stored 1500 hundredths draws "+15", not "+15.0".
 		private static string SignedValue(double value)
@@ -1045,13 +1044,13 @@ namespace Faolan.Importer.Cli
 		// sites - `"%.0f%% %s "` for the chance, `"%s %s "` per side, `"%s "` for the joiner. Same shape as 53070,
 		// whose joiner word (`And`) likewise comes out of LDB category 100.
 		//
-		// ⭐ The CHANCE is computed, not stored. `FUN_0149bc20` reads key 237 (the rate) and key 187 (a spell), loads
+		// The CHANCE is computed, not stored. `FUN_0149bc20` reads key 237 (the rate) and key 187 (a spell), loads
 		// that spell and takes its property 294 - the cast time in centiseconds, the same field the importer reads -
 		// then returns `min(100, castSeconds x rate x 1.67)`. 1.67 is 100/60, so the line is the familiar
 		// procs-per-minute -> per-cast percentage: a 20 PPM proc on a 3-second cast draws 100%.
 		//
-		// ⚠️ When the key-187 spell is missing or its cast time is <= 0 the client falls back to a literal 50
-		// centiseconds - a HALF-SECOND cast, not zero - so an unresolvable reference still draws a number.
+		// When the key-187 spell is missing or its cast time is <= 0 the client falls back to a literal 50
+		// centiseconds - a half-second cast, not zero - so an unresolvable reference still draws a number.
 		private static (string? Format, object?[]? Args) SpellProcSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var onSelf = element.Value(GameActionTypes.KeyProcSelfSpell) ?? 0;
@@ -1091,9 +1090,9 @@ namespace Faolan.Importer.Cli
 		// the client draws none of it: branch 0x014a0b99 reads all four slots plus key 32, and picks one of five token
 		// sentences.
 		//
-		// ⚠️ The MAGNITUDE is raw here. The client builds the value string with `FUN_0149a700(v, v, 0)` - the same
+		// The MAGNITUDE is raw here. The client builds the value string with `FUN_0149a700(v, v, 0)` - the same
 		// range builder the `Hit` family uses, but with the divide flag passed as a literal 0, where `Hit` passes the
-		// stat's own percent predicate. So a `HitPercentage` value is NOT divided by the stat's display scale, and
+		// stat's own percent predicate. So a `HitPercentage` value is not divided by the stat's display scale, and
 		// scaling it would report a 30% drain as 0.3%.
 		private static (string? Format, object?[]? Args) HitPercentageSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
@@ -1120,15 +1119,15 @@ namespace Faolan.Importer.Cli
 				return (heal, heal == null ? null : [range]);
 			}
 
-			// Stamina, drained: the second slot is simply that stat's own NAME.
-			// ⚠️ The client appends its `OnTarget` token to this one; that qualifier is not reproduced here.
+			// Stamina, drained: the second slot is simply that stat's own name.
+			// The client appends its `OnTarget` token to this one; that qualifier is not reproduced here.
 			if (stat == StaminaStatId && signed < 0)
 			{
 				var drain = ctx.SentenceForToken("HitPercentDamage");
 				return (drain, drain == null ? null : [range, ctx.StatName(stat.Value)]);
 			}
 
-			// Everything else is the three-slot form: how much, of WHICH stat, based on WHICH other stat.
+			// Everything else is the three-slot form: how much, of which stat, based on which other stat.
 			var token = signed > 0 ? "HitPercentHealStatByOtherStat" : "HitPercentDamageStatByOtherStat";
 			var format = ctx.SentenceForToken(token);
 			return (format, format == null ? null : [range, ctx.StatName(stat.Value), ctx.StatName(otherStat.Value)]);
@@ -1136,7 +1135,7 @@ namespace Faolan.Importer.Cli
 
 		// `Hit` / `SpecialHit` carry their two magnitudes flat; `InterpolatedHit` ramps each of them over the caster's
 		// level, which is the same four-slot ramp shape the interpolated modifiers use, doubled: (168 @172 -> 169 @173)
-		// is the LOW magnitude and (170 @172 -> 171 @173) the high one. Gangrenous Stench's tick states -5840..-7140 at
+		// is the low magnitude and (170 @172 -> 171 @173) the high one. Gangrenous Stench's tick states -5840..-7140 at
 		// level 75 and -6220..-7610 at 80, which is what pins which pair is which.
 		private static (string? Format, object?[]? Args) HitSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
@@ -1194,16 +1193,16 @@ namespace Faolan.Importer.Cli
 		// The arguments the client's own tooltip branch feeds its format string, per kind. Null = this kind's binding
 		// is not established, and the caller prints the raw slots instead of inventing one.
 		//
-		// ⚠️ These are NOT the key list in order. `FilteredAreaFormula`'s keys are [Spell, Radius, MaxTargets, 93,
+		// These are not the key list in order. `FilteredAreaFormula`'s keys are [Spell, Radius, MaxTargets, 93,
 		// 250] and its sentence takes five slots where the record has three magnitudes.
 		//
-		// ⭐ The extra `%s` after every `%.2f`/`%d` is the VALUE-MODIFIER ANNOTATION, not a unit (the unit is in the
+		// The extra `%s` after every `%.2f`/`%d` is the value-MODIFIER ANNOTATION, not a unit (the unit is in the
 		// literal text - `%.2fm%s radius`). Every magnitude the builder appends is appended twice: the resolved
-		// number, then `FUN_014a3880(resolved - raw, <unit token>)`, which is `FUN_014aa410` - it returns the EMPTY
+		// number, then `FUN_014a3880(resolved - raw, <unit token>)`, which is `FUN_014aa410` - it returns the empty
 		// string when the difference is zero and otherwise
 		// `<font color="tooltip_positive|negative">` + LDB170(`ValueModSign{Positive,Negative}`) + the delta + the
 		// unit. So a tooltip drawn with no character modifier in play has an empty string in every one of those
-		// slots, which is what `""` means at each of them below (#782).
+		// slots, which is what `""` means at each of them below.
 		private static object?[]? BindArgs(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var type = element.Type;
@@ -1238,10 +1237,10 @@ namespace Faolan.Importer.Cli
 				// The CONE kinds: `%s %.2f%s degree arc, %.2fm%s radius` (53259, which names the effect spell) and
 				// the same line without the leading `%s` (53273, which does not). Both branches - 0x014a2316 and
 				// 0x014a28f9 - append exactly (arc, arcMod, radius, radiusMod), and 53259 prefixes the spell link;
-				// the append COUNT matching each sentence's slot count is the structural check that the two are
+				// the append count matching each sentence's slot count is the structural check that the two are
 				// paired the right way round.
 				//
-				// ⭐ The ARC is key 213 and the RADIUS is key 11, which is the opposite of the order the branch
+				// The ARC is key 213 and the RADIUS is key 11, which is the opposite of the order the branch
 				// FETCHES them in (it reads 11 first). Two independent pins: the radius slot's value is what
 				// `SpellAreaEffects.RadiusMetres` holds (6 for `Wave of Life (Rank 2)`, whose key 11 is 6), and the
 				// arc slot's value is clamped to [0, 360] against the 360.0 at 0x020b5270. Key 212 (the cone's
@@ -1251,8 +1250,8 @@ namespace Faolan.Importer.Cli
 				// to the raw key here: the MULTIPLICATIVE term is `(stat 0x57B * 0.1 * 0.01 * w + 1) * value`
 				// (`FUN_014a9f90`) where `w` is a per-call float global - 0x02D25E34 and 0x02D25E54 for these two -
 				// and all of those globals are 0.0 in the image with no writer anywhere in it, so the term is exactly
-				// 1; the ADDITIVE term (`FUN_014a9c10`) comes off the viewing CHARACTER and is 0 without one. What a
-				// character does contribute shows up in the `%s` annotation, not in the number. See #782.
+				// 1; the additive term (`FUN_014a9c10`) comes off the viewing character and is 0 without one. What a
+				// character does contribute shows up in the `%s` annotation, not in the number.
 				case ConeFormulaKind:
 				case AttackAddTargetsKind:
 				{
@@ -1265,10 +1264,10 @@ namespace Faolan.Importer.Cli
 					if (element.Kind == AttackAddTargetsKind)
 						return cone;
 
-					// ⚠️ 53259 checks the hide-from-tooltip bit on its effect spell BEFORE building anything and
-					// skips its whole sentence when it is set (#789). This renderer does NOT act on that: the bit
+					// 53259 checks the hide-from-tooltip bit on its effect spell before building anything and
+					// skips its whole sentence when it is set. This renderer does not act on that: the bit
 					// is bit 24 of the flags word and only bits 1-2 of that word are proven to reach the client
-					// verbatim, so suppressing on it would silently DROP lines if the reading is wrong - the worse
+					// verbatim, so suppressing on it would silently drop lines if the reading is wrong - the worse
 					// direction of the two. The line is drawn and flagged instead (see HiddenSpellNote).
 					var coneSpell = element.Value(GameActionTypes.KeySpell);
 					return coneSpell is null
@@ -1276,10 +1275,10 @@ namespace Faolan.Importer.Cli
 						: [$"{ctx.SpellName(coneSpell.Value)} ({coneSpell.Value})", .. cone];
 				}
 
-				// `%s resistance to %s` - the value, then the RESISTANCE KIND. Branch 0x0149e942 reads key 152 and
+				// `%s resistance to %s` - the value, then the RESISTANCE kind. Branch 0x0149e942 reads key 152 and
 				// key 39, renders the value through stat 0x4B `MetaType`'s display scale (which is 1, so it prints
 				// raw), and resolves key 152 through LDB category 55200 - the client's spell-effect/metatype catalog
-				// (`68` is "Poison/Electrical resistance rating buff"), NOT the stat-name category.
+				// (`68` is "Poison/Electrical resistance rating buff"), not the stat-name category.
 				case NanoResistanceKind:
 				{
 					var metaType = element.Value(KeyNanoResistanceMetaType);
@@ -1291,8 +1290,8 @@ namespace Faolan.Importer.Cli
 					return kind == null ? null : [TooltipContext.Magnitude(MetaTypeStatId, (int)amount.Value), kind];
 				}
 
-				// `Knockback %d meters` - one conversion, and the branch (0x014a1542) fills it from key 238 FIRST.
-				// ⚠️ It reads key 191 as well and hands it to a second format call that has no slot left to fill, so
+				// `Knockback %d meters` - one conversion, and the branch (0x014a1542) fills it from key 238 first.
+				// It reads key 191 as well and hands it to a second format call that has no slot left to fill, so
 				// the drawn number is 238 and 191 does not appear. Binding the two the other way round would put a
 				// resistance-shaped number where the metres go.
 				case KnockbackKind:
@@ -1303,14 +1302,14 @@ namespace Faolan.Importer.Cli
 
 				// `Absorbs 1 point of #1%s for each #2%.2f point(s) of damage. / capped to #3%.0f points of damage
 				// per attack, / or #4%.0f% of the damage dealt` - four slots, and branch 0x0149eaed appends them in
-				// sentence order: the stat's NAME, then keys 70, 33 and 34, each x0.01.
+				// sentence order: the stat's name, then keys 70, 33 and 34, each x0.01.
 				//
-				// ⭐ The stat slot is the pin. The branch's `FUN_0060f0e0(0x267, ...)` passes key 0's value in ESI,
+				// The stat slot is the pin. The branch's `FUN_0060f0e0(0x267,...)` passes key 0's value in ESI,
 				// and 0x267 = 615 is the client's stat-name category - the same `FUN_0060ebb0(0x267, statId)` that
 				// 53007's arms use to name a stat. That is what says #1 is the stat and not the end spell.
 				//
-				// ⚠️ Its second line - the `AddAbsorbEndSpell` token filled with key 88's spell - is only drawn when
-				// that spell is present AND does not carry the hide-from-tooltip bit (#789). Not composed here: the
+				// Its second line - the `AddAbsorbEndSpell` token filled with key 88's spell - is only drawn when
+				// that spell is present and does not carry the hide-from-tooltip bit. Not composed here: the
 				// report draws one line per element, and the absorb numbers are what the ticket is about.
 				case AddAbsorbKind:
 				{
@@ -1345,7 +1344,7 @@ namespace Faolan.Importer.Cli
 
 				// `#1{1:Increases | Decreases} your #2%s by #3%d` - the sentence itself pins all three: a sign
 				// selector, the stat's name and an integer magnitude, and the branch (0x014a1a2e) reads exactly
-				// (Stat, Value). ⚠️ `%d`, so the magnitude is the RAW rating - not run through the display scale.
+				// (Stat, Value). `%d`, so the magnitude is the raw rating - not run through the display scale.
 				case ModifyAsRatingKind:
 				{
 					var ratingStat = element.Value(GameActionTypes.KeyStat);
@@ -1371,11 +1370,11 @@ namespace Faolan.Importer.Cli
 					return centiseconds is null ? null : [centiseconds.Value / 100.0];
 				}
 
-				// `Modify recast time by <font color="tooltip_positive">%s</font>` - ONE slot, key 39, and it is a
-				// DURATION rather than a number: branch 0x014a02b4 hands the raw centiseconds to `FUN_00807ae0`.
-				// ⚠️ The `tooltip_positive` colour is baked into the LDB string, so a negative delta still draws in
+				// `Modify recast time by <font color="tooltip_positive">%s</font>` - one slot, key 39, and it is a
+				// duration rather than a number: branch 0x014a02b4 hands the raw centiseconds to `FUN_00807ae0`.
+				// The `tooltip_positive` colour is baked into the LDB string, so a negative delta still draws in
 				// the positive colour. Reproduced by dropping the markup, the same as everywhere else here.
-				// 53069 `ChangeLineRecastTime` shares the branch AND the sentence (GameActionTooltip.SentenceKinds).
+				// 53069 `ChangeLineRecastTime` shares the branch and the sentence (GameActionTooltip.SentenceKinds).
 				case ChangeRecastTimeKind:
 				case ChangeLineRecastTimeKind:
 				{
@@ -1388,9 +1387,9 @@ namespace Faolan.Importer.Cli
 				}
 
 				// `Change hit percent by #2%d%% for spell #1%s #3%s` - and the branch (0x0149fdda) appends exactly
-				// TWO arguments: the NAME behind key 0 (`FUN_008d76b0` resolves the id through the spell catalog and
+				// two arguments: the name behind key 0 (`FUN_008d76b0` resolves the id through the spell catalog and
 				// looks its name up in LDB 50210) and key 39 as an int.
-				// ⚠️ `#3` is never supplied by the client either, so it draws empty. Passed as "" rather than left
+				// `#3` is never supplied by the client either, so it draws empty. Passed as "" rather than left
 				// unbound, because the alternative is refusing to draw a line retail does draw - and an empty tail
 				// slot invents no number, which is the failure this kind of bind has to avoid.
 				case CastingLevelModifierKind:
@@ -1458,22 +1457,22 @@ namespace Faolan.Importer.Cli
 		}
 
 		// How much of the record the tooltip above actually consumed. The three regions are the fixed head, the
-		// ascending property run, and the element list; anything left over is bytes nobody has looked at (#632).
+		// ascending property run, and the element list; anything left over is bytes nobody has looked at.
 		private static IEnumerable<string> AccountingLines(TooltipContext ctx, byte[] record, Dictionary<uint, uint> fields,
 			IReadOnlyList<ItemTemplateStatModifiers.Element> elements, int textBytes, int pairRegionBytes)
 		{
 			var body = record.Length - 12;
 			var elementBytes = elements.Sum(e => e.WidthBytes);
-			// ⭐ The whole PAIR REGION, not just the property run: the 20-byte prefix, the head's own pairs, the run
-			// and any trailing resource reference. Its length IS where the string block starts, which the record
-			// states in its frame word - `(pairs + 1) * 0x3F1` at byte 16 (#632).
+			// The whole pair region, not just the property run: the 20-byte prefix, the head's own pairs, the run
+			// and any trailing resource reference. Its length is where the string block starts, which the record
+			// states in its frame word - `(pairs + 1) * 0x3F1` at byte 16.
 			var fieldBytes = pairRegionBytes;
-			// The 12-byte `[2][listId][(n + 1) * 0x3F1]` header in front of each element group (#785). Counted here
-			// because it IS decoded now - leaving it out reported the record as less accounted-for than it is, and it
+			// The 12-byte `[2][listId][(n + 1) * 0x3F1]` header in front of each element group. Counted here
+			// because it is decoded now - leaving it out reported the record as less accounted-for than it is, and it
 			// is what says which of two identical-looking elements belong to the same list.
 			var lists = ItemTemplateStatModifiers.ParseElementLists(record.AsSpan(12));
 			var listBytes = lists.Count * 12;
-			// #632: the record's own name + description, immediately after the property run. Measured by the caller,
+			// the record's own name + description, immediately after the property run. Measured by the caller,
 			// which already has the run end.
 			var listFieldBytes = ScanListFields(record.AsSpan(12), pairRegionBytes + textBytes);
 			var accounted = elementBytes + fieldBytes + listBytes + textBytes + listFieldBytes;
@@ -1488,12 +1487,12 @@ namespace Faolan.Importer.Cli
 			if (unparsed.Count > 0)
 				yield return $"⚠️ {unparsed.Count} element head(s) the scan did not account for: {string.Join(", ", unparsed.Take(8))}";
 
-			// ⚠️ The OTHER half of the accounting, and the one the byte total cannot show: an element whose head sits
-			// INSIDE another element's payload. The scan anchors byte by byte and does not skip an element's own span,
+			// The other half of the accounting, and the one the byte total cannot show: an element whose head sits
+			// inside another element's payload. The scan anchors byte by byte and does not skip an element's own span,
 			// so a sub-record run holding a type-id-shaped word plus a `4` yields a second, nested "element" - and
-			// because the line above SUMS the widths, two overlapping elements make the record look BETTER accounted
+			// because the line above SUMS the widths, two overlapping elements make the record look better accounted
 			// for than it is. Reported as a span pair, because the fix for a real one is to read the outer element's
-			// grammar rather than to filter the inner one out (#783).
+			// grammar rather than to filter the inner one out.
 			var overlaps = new List<string>();
 			for (var i = 1; i < elements.Count; i++)
 			{
@@ -1505,8 +1504,8 @@ namespace Faolan.Importer.Cli
 			if (overlaps.Count > 0)
 				yield return $"⚠️ {overlaps.Count} element(s) nested inside another's payload: {string.Join(", ", overlaps.Take(8))}";
 
-			// Every property field with the client's own name for it, and whether the importer reads it. This is the
-			// #592/#633 backlog rendered for ONE spell, which is the form that says whether a gap matters here.
+			// Every property field with the client's own name for it, and whether the importer reads it - the
+			// unread-field backlog rendered for one spell, which is the form that says whether a gap matters here.
 			foreach (var (field, value) in fields.OrderBy(f => f.Key))
 			{
 				var read = SpellFieldsRead.TryGetValue(field, out var what);
@@ -1518,29 +1517,29 @@ namespace Faolan.Importer.Cli
 		}
 
 		// The record's FLAGS word (word 13, whole record, header included) and the bit that says how to read the mana
-		// cost - see RdbSpellImporter, which owns the decode (#630).
+		// cost - see RdbSpellImporter, which owns the decode.
 		private const int ManaCostIsPercentBit = 2;
 
 		/// <summary>
-		///     Bit 24 of that same flags word: the client's HIDE-FROM-TOOLTIP flag on a spell (#789).
+		///     Bit 24 of that same flags word: the client's HIDE-from-TOOLTIP flag on a spell.
 		/// </summary>
 		/// <remarks>
 		///     <para>
 		///         `FUN_014a3b30(spellId)` loads the referenced spell through `SpellTemplate_t::GetMagicSpell` and
-		///         returns `*(byte*)(spell + 0xCB) &amp; 1`. ⭐ `+0xCB` is byte 3 of the dword at `+0xC8`, which is the
-		///         SAME flags word #629/#630 already reads bit 2 of for the mana mode. So the flag needed no new
-		///         field: it is bit 24 of a word we were already reading.
+		///         returns `*(byte*)(spell + 0xCB) &amp; 1`. `+0xCB` is byte 3 of the dword at `+0xC8`, which is the
+		///         same flags word whose bit 2 carries the mana mode, so the flag needs no new field: it is bit 24 of
+		///         a word that is already read.
 		///     </para>
 		///     <para>
-		///         ⚠️ That word is located by `RdbSpellImporter.ReadFlagsWord`, five words BEFORE the property run -
+		///         That word is located by `RdbSpellImporter.ReadFlagsWord`, five words before the property run -
 		///         not at a fixed record offset. The head is variable-length, and the fixed form read 0 on 936
-		///         records, which forced their bit clear whatever the record said (#632).
+		///         records, which forced their bit clear whatever the record said.
 		///     </para>
 		///     <para>
 		///         Two branches consult it, and neither is cosmetic. `ConeFormula` calls it on key 88 and, when set,
 		///         skips its whole sentence (falling into the shared tail, so a periodic element still draws its
 		///         "every N s" suffix and nothing else). `AddComboProc` calls it on key 88 and key 236 separately and
-		///         treats a flagged side as ABSENT, so a two-sided proc draws as a one-sided one.
+		///         treats a flagged side as absent, so a two-sided proc draws as a one-sided one.
 		///     </para>
 		/// </remarks>
 		private const int HiddenFromTooltipBit = 24;
@@ -1551,9 +1550,9 @@ namespace Faolan.Importer.Cli
 		///     per-spell view of.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ Hand-maintained, and it has DRIFTED before: it once claimed 79/129/321/551 were read when nothing
+		///     Hand-maintained, and it has DRIFTED before: it once claimed 79/129/321/551 were read when nothing
 		///     read any of them, inflating "read by the importer" from 13 to 17 and hiding four gaps behind a
-		///     green-looking column (#633). Keep it in step with the importer's <c>*Field</c> constants. It is one map
+		///     green-looking column. Keep it in step with the importer's <c>*Field</c> constants. It is one map
 		///     rather than two exactly so the drift can only happen once.
 		/// </remarks>
 		internal static readonly Dictionary<uint, string> SpellFieldsRead = new()
@@ -1577,18 +1576,18 @@ namespace Faolan.Importer.Cli
 		private const uint SkillKind = 53012;
 		private const uint UpgradeComboKind = 53209;
 
-		// `AddAbsorb`'s three magnitudes, all HUNDREDTHS (each is `CVTSI2SS ; MULSS [0x01f2800c]` in the branch).
-		// Per-TYPE names like every unnamed key - 33/34 are the `Hit` family's magnitude pair elsewhere.
+		// `AddAbsorb`'s three magnitudes, all HUNDREDTHS (each is `CVTSI2SS; MULSS [0x01f2800c]` in the branch).
+		// Per-type names like every unnamed key - 33/34 are the `Hit` family's magnitude pair elsewhere.
 		private const int AbsorbPerPointKey = 70;
 		private const int AbsorbPerAttackCapKey = 33;
 		private const int AbsorbDamageShareKey = 34;
 
-		// `UpgradeCombo`'s two clause keys. Per-TYPE: 66/67 are the SOURCE and TARGET stats on
+		// `UpgradeCombo`'s two clause keys. Per-type: 66/67 are the source and target stats on
 		// `AddPercentSkillModifier` and the DPS/crit deltas on `ChangeInheritedWeaponAttack`.
 		private const int UpgradeComboDamageKey = 66;
 		private const int UpgradeComboCooldownKey = 67;
 
-		// `AddSpellProc`'s chance arithmetic, all of it out of `FUN_0149bc20`: the SPELL whose cast time scales the
+		// `AddSpellProc`'s chance arithmetic, all of it out of `FUN_0149bc20`: the spell whose cast time scales the
 		// rate (key 187), the 1.67 = 100/60 that turns procs-per-minute into a per-cast percentage, the 100% cap, and
 		// the half-second the client falls back to when that spell has no positive cast time of its own.
 		private const int SpellProcCastTimeSpellKey = 187;
@@ -1607,8 +1606,8 @@ namespace Faolan.Importer.Cli
 		// `FUN_00807ae0`'s two-minute threshold, above which it stops drawing seconds - see TooltipContext.Duration.
 		private const int DurationMinutesThresholdCentiseconds = 12000;
 
-		// The DAMAGE SCHOOL an element states (key 71), and the LDB category naming one - see
-		// TooltipContext.DamageSchool. The 1..14 window is the client's own bounds check (`CMP EAX,0xd ; JA`).
+		// The damage school an element states (key 71), and the LDB category naming one - see
+		// TooltipContext.DamageSchool. The 1..14 window is the client's own bounds check (`CMP EAX,0xd; JA`).
 		private const int KeyDamageSchool = 71;
 		private const uint LdbDamageSchoolCategory = 600;
 		private const uint FirstDamageSchool = 1;
@@ -1616,7 +1615,7 @@ namespace Faolan.Importer.Cli
 
 		private const uint AddPercentSkillModifierKind = 53189;
 		private const uint AddSpellLineProcKind = 53070;
-		// LDB category 600 - the DAMAGE-SCHOOL name table, keyed by `DamageSchool`. The client fetches it as
+		// LDB category 600 - the damage-school name table, keyed by `DamageSchool`. The client fetches it as
 		// `PUSH 0x258` at 0x014A226D to fill `ChangeComboDamageType`'s `%s`.
 		private const uint DamageSchoolNameCategory = 600;
 
@@ -1639,7 +1638,7 @@ namespace Faolan.Importer.Cli
 		private const uint TeamPropagatedBuffKind = 53224;
 
 		// `ChangeInheritedWeaponAttack`'s three unnamed clause keys, and the float its crit value is scaled by
-		// (0x020b5944 = 0.025). Per-TYPE like every unnamed key - 67 is a stat id on `AddPercentSkillModifier` and a
+		// (0x020b5944 = 0.025). Per-type like every unnamed key - 67 is a stat id on `AddPercentSkillModifier` and a
 		// cooldown delta on `UpgradeCombo`.
 		private const int ComboAttackCriticalKey = 67;
 		private const int ComboAttackHateKey = 68;
@@ -1650,8 +1649,8 @@ namespace Faolan.Importer.Cli
 		// "<the composed sides>, <rate> Procs per Minute".
 		private const string SpellLineProcWrapper = "%s, %d %s";
 
-		// `AddPercentSkillModifier`'s two stat slots. Per-TYPE like every unnamed key: on `UpgradeCombo` 66/67 are the
-		// damage and cooldown deltas, here they are the SOURCE stat and the stat it raises (see the branch note).
+		// `AddPercentSkillModifier`'s two stat slots. Per-type like every unnamed key: on `UpgradeCombo` 66/67 are the
+		// damage and cooldown deltas, here they are the source stat and the stat it raises (see the branch note).
 		private const int SkillModifierSourceKey = 66;
 		private const int SkillModifierTargetKey = 67;
 
@@ -1659,7 +1658,7 @@ namespace Faolan.Importer.Cli
 		// than written as a bare /100 because it belongs to the GETTER, not to either key.
 		private const double ColumnScale = 0.01;
 
-		// `ColumnAddTargets`'s optional distance-to-target (key 238). Per-TYPE, like every unnamed key: 238 is the
+		// `ColumnAddTargets`'s optional distance-to-target (key 238). Per-type, like every unnamed key: 238 is the
 		// knockback distance on `Knockback`.
 		private const int KeyColumnDistance = 238;
 
@@ -1670,21 +1669,21 @@ namespace Faolan.Importer.Cli
 		// `ResurrectTarget`'s only payload slot - the health percentage the target comes back at.
 		private const int KeyResurrectHealth = 188;
 
-		// `HitPercentage`'s MODE word: 1 or 2 sends the client down a path that reads the caster's own stat, so those
+		// `HitPercentage`'s mode word: 1 or 2 sends the client down a path that reads the caster's own stat, so those
 		// two values are not renderable from the record.
 		private const int KeyHitPercentMode = 32;
 
-		// `Knockback`'s distance in metres (key 238) - the slot the client fills its one `%d` from. Per-TYPE.
+		// `Knockback`'s distance in metres (key 238) - the slot the client fills its one `%d` from. Per-type.
 		private const int KeyKnockbackMetres = 238;
 
 		// `NanoResistance`'s first slot: an id into LDB 55200, the client's spell-effect / METATYPE catalog.
 		private const int KeyNanoResistanceMetaType = 152;
 
 		// LDB category 55200 - what a `NanoResistance` element's key 152 names ("Poison/Electrical resistance rating
-		// buff", "Damage - Poison Instant DD", ...). Not the stat-name category.
+		// buff", "Damage - Poison Instant DD",...). Not the stat-name category.
 		private const uint LdbMetaTypeCategory = 55200;
 
-		// 0x4B `MetaType` - the stat whose DISPLAY SCALE the client renders a `NanoResistance` amount through.
+		// 0x4B `MetaType` - the stat whose display SCALE the client renders a `NanoResistance` amount through.
 		private const uint MetaTypeStatId = 0x4B;
 
 		// 0x1F8 Stamina - the one non-Health stat `HitPercentage` gives its own phrasing to.
@@ -1693,8 +1692,8 @@ namespace Faolan.Importer.Cli
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SpecialHitKind = 53196;
 
-		// The `Hit` family's magnitude slots. ⚠️ Per-TYPE names, like every unnamed key: 170 is the target CAP on the
-		// area kinds and the high magnitude's LOW endpoint here.
+		// The `Hit` family's magnitude slots. Per-type names, like every unnamed key: 170 is the target CAP on the
+		// area kinds and the high magnitude's low endpoint here.
 		private const int KeyHitMax = 37;
 		private const int KeyHitMaxHigh = 171;
 		private const int KeyHitMaxLow = 170;
@@ -1713,30 +1712,30 @@ namespace Faolan.Importer.Cli
 			public RdbReader Rdb { get; } = rdb;
 
 			/// <summary>
-			///     The tooltip SENTENCE for a GameAction kind, or null when the client ships none for it.
+			///     The tooltip sentence for a GameAction kind, or null when the client ships none for it.
 			/// </summary>
 			/// <remarks>
 			///     <para>
-			///         LDB category 170 is keyed TWO ways, and both are the client's own. About 30 entries are keyed
-			///         by the GameAction TYPE ID itself (<c>53088</c> → <c>%s %.2fm%s radius up to %d%s targets</c>);
-			///         the rest are keyed by the ELF-28 hash of a TOKEN NAME the tooltip builder pushes -
+			///         LDB category 170 is keyed two ways, and both are the client's own. About 30 entries are keyed
+			///         by the GameAction type ID itself (<c>53088</c> → <c>%s %.2fm%s radius up to %d%s targets</c>);
+			///         the rest are keyed by the ELF-28 hash of a token name the tooltip builder pushes -
 			///         <c>elf28("IncreaseAOERadius") == 22958195</c>, which is the "Increases the area of effect by %d
 			///         meters" line. 21 of the 21 token strings recovered from <c>FUN_0149e450</c>'s 48
 			///         category-170 call sites hash onto a shipped id, with no misses
 			///         (<c>docs/re/gameaction-tooltip-tokens.tsv</c>).
 			///     </para>
 			///     <para>
-			///         So a kind with no type-id entry is tried under its own NAME, because the client's token names
+			///         So a kind with no type-id entry is tried under its own name, because the client's token names
 			///         are the type names - <c>ModifyAsRating</c> (53067) has no id entry and a token entry.
-			///         ⚠️ A hash match is evidence and not proof (28 bits, see <see cref="Elf28" />), which is why the
+			///         A hash match is evidence and not proof (28 bits, see <see cref="Elf28" />), which is why the
 			///         census counts the two key forms separately.
 			///     </para>
 			/// </remarks>
 			public string? SentenceFor(uint kind)
 			{
-				// ⭐ A kind may draw itself with ANOTHER type's sentence, and several of the most common ones do -
+				// A kind may draw itself with ANOTHER type's sentence, and several of the most common ones do -
 				// `InterpolatedModify` renders through `Modify`, the whole spell-stat-modifier family through
-				// `SpellStatModifier`. See GameActionTooltip.SentenceKinds (#782).
+				// `SpellStatModifier`. See GameActionTooltip.SentenceKinds.
 				if (Ldb.TryGetValue((LdbGameActionFormatCategory, GameActionTooltip.SentenceKind(kind)), out var byId))
 					return byId;
 
@@ -1744,17 +1743,17 @@ namespace Faolan.Importer.Cli
 				return name != null ? SentenceForToken(name) : null;
 			}
 
-			/// <summary>The sentence keyed by a TOKEN NAME - see <see cref="SentenceFor" />'s remarks.</summary>
+			/// <summary>The sentence keyed by a token name - see <see cref="SentenceFor" />'s remarks.</summary>
 			public string? SentenceForToken(string token)
 			{
 				return Ldb.GetValueOrDefault((LdbGameActionFormatCategory, Elf28.Of(token)));
 			}
 
 			/// <summary>
-			///     A COMMON WORD, from LDB category 100 rather than 170 - the category the client's label nouns
+			///     A COMMON word, from LDB category 100 rather than 170 - the category the client's label nouns
 			///     ("Spell", "Combo", "Ability") and its glue words come from. `AddSpellLineProc` joins its two sides
 			///     with `And` out of here, which is why that token appears in no tooltip-token dump: the dumps anchor
-			///     on the two category-170 getters and this one comes through `FUN_0060eb50` (#782).
+			///     on the two category-170 getters and this one comes through `FUN_0060eb50`.
 			/// </summary>
 			public string? CommonWord(string token)
 			{
@@ -1766,11 +1765,11 @@ namespace Faolan.Importer.Cli
 			///     display scale.
 			/// </summary>
 			/// <remarks>
-			///     ⚠️ Drawn as a MAGNITUDE, not signed: the client's hit branch takes the absolute value when the low
+			///     Drawn as a MAGNITUDE, not signed: the client's hit branch takes the absolute value when the low
 			///     endpoint is negative, because the sentence around it already says "points of" or "Removes". Signing
 			///     it here would render "-58--71 points of Health".
 			///     <para>
-			///         ⚠️ EQUAL endpoints collapse to one number. That is the client's own branch, not a tidy-up:
+			///         equal endpoints collapse to one number. That is the client's own branch, not a tidy-up:
 			///         `FUN_0149a700` compares its two arguments and takes a separate path when they match, so a flat
 			///         magnitude draws as "20", never "20-20".
 			///     </para>
@@ -1786,10 +1785,10 @@ namespace Faolan.Importer.Cli
 			}
 
 			/// <summary>
-			///     The same range with NO divisor and no unit - `FUN_0149a700(min, max, 0)`.
+			///     The same range with no divisor and no unit - `FUN_0149a700(min, max, 0)`.
 			/// </summary>
 			/// <remarks>
-			///     ⚠️ Whether the range divides is the builder's THIRD argument, and it is per CALL SITE, not per stat:
+			///     Whether the range divides is the builder's third argument, and it is per call SITE, not per stat:
 			///     the `Hit` family passes the stat's own percent predicate, `HitPercentage` passes a literal 0. Reusing
 			///     <see cref="Range" /> there would report a 30% drain as 0.3%.
 			/// </remarks>
@@ -1800,7 +1799,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			/// <summary>
-			///     The spell's own name, WITHOUT its id - a caller that wants both appends it, and the effect chain
+			///     The spell's own name, without its id - a caller that wants both appends it, and the effect chain
 			///     is full of unnamed links where the id is all there is.
 			/// </summary>
 			public string SpellName(uint spellId)
@@ -1812,10 +1811,10 @@ namespace Faolan.Importer.Cli
 
 			/// <summary>
 			///     Whether the spell a tooltip element REFERENCES carries <see cref="HiddenFromTooltipBit" /> - the bit
-			///     the client's own `FUN_014a3b30` reads to decide the element draws nothing (#789).
+			///     the client's own `FUN_014a3b30` reads to decide the element draws nothing.
 			/// </summary>
 			/// <remarks>
-			///     It loads the OTHER spell's record to answer, which is why an element's own bytes cannot decide it.
+			///     It loads the other spell's record to answer, which is why an element's own bytes cannot decide it.
 			///     A spell with no record at all is not flagged - the client's `GetMagicSpell` returns null there and
 			///     the predicate answers 0.
 			/// </remarks>
@@ -1839,21 +1838,21 @@ namespace Faolan.Importer.Cli
 			}
 
 			/// <summary>
-			///     The client's DURATION formatter, <c>FUN_00807ae0(centiseconds)</c> - what a recast delta's single
+			///     The client's duration formatter, <c>FUN_00807ae0(centiseconds)</c> - what a recast delta's single
 			///     slot is filled with.
 			/// </summary>
 			/// <remarks>
 			///     <para>
-			///         Four arms, on <c>|centiseconds|</c>: under 1 it draws the EMPTY string; over 12,000 (two
+			///         Four arms, on <c>|centiseconds|</c>: under 1 it draws the empty string; over 12,000 (two
 			///         minutes) it switches to a d/h/m/s breakdown (<c>FUN_005451e0</c> splits by 86400/3600/60) under
 			///         the literal <c>%s%s</c> at <c>0x1fcdbb4</c>; otherwise it takes a common-word (category 100)
 			///         sentence - <c>TimeFormatSeconds</c> with an INT when the value is whole seconds, and
 			///         <c>TimeFloatFormatSeconds</c> with a float when it is not.
 			///     </para>
 			///     <para>
-			///         ⚠️ Returns null for the over-two-minutes arm rather than composing one. The breakdown's own
+			///         Returns null for the over-two-minutes arm rather than composing one. The breakdown's own
 			///         sentence is not read out, and no shipped recast delta reaches it - a fabricated "2 minutes"
-			///         would be exactly the confident-wrong-line failure this report exists to avoid (#782).
+			///         would be exactly the confident-wrong-line failure this report exists to avoid.
 			///     </para>
 			/// </remarks>
 			public string? Duration(int centiseconds)
@@ -1875,19 +1874,19 @@ namespace Faolan.Importer.Cli
 			}
 
 			/// <summary>
-			///     The DAMAGE-SCHOOL phrase a hit's second slot is filled with - <c>FUN_0149a8f0(buf, damageType)</c>.
+			///     The damage-school phrase a hit's second slot is filled with - <c>FUN_0149a8f0(buf, damageType)</c>.
 			/// </summary>
 			/// <remarks>
 			///     <para>
-			///         ⭐ Two lookups, in two categories. The client bounds-checks the type (<c>type - 1 &gt; 13</c>,
+			///         Two lookups, in two categories. The client bounds-checks the type (<c>type - 1 &gt; 13</c>,
 			///         i.e. 1..14 pass) and inside the range fetches LDB 170's <c>DamageType</c> sentence and fills
-			///         its slot with the school's NAME out of <b>category 600</b> - <c>1 slashing, 2 piercing,
+			///         its slot with the school's name out of <b>category 600</b> - <c>1 slashing, 2 piercing,
 			///         3 crushing, 4 fire, 5 electrical, 6 holy, 7 unholy, 8 poison, 9 siege</c>. Outside the range
-			///         it returns LDB 170's <c>GenericDamage</c> whole, which is also the DEFAULT text the in-range
+			///         it returns LDB 170's <c>GenericDamage</c> whole, which is also the default text the in-range
 			///         lookup falls back to.
 			///     </para>
 			///     <para>
-			///         ⚠️ Category 600 is what made this look undecodable. The note this replaces recorded that
+			///         Category 600 is what made this look undecodable. The note this replaces recorded that
 			///         <c>elf28("DamageType&lt;n&gt;")</c> misses in category 170 for every n in 0..14, and that is
 			///         true - the per-school word was never in 170 at all, and <c>FUN_00a8f470</c> (the hash the
 			///         resolver calls) turns out to be plain elf28 over the single literal <c>"DamageType"</c>.
@@ -1959,14 +1958,14 @@ namespace Faolan.Importer.Cli
 	//               and Korean pages reorder their slots, which is what the marker exists for.
 	//   `#N{1: a| b}`  a plural/branch form: argument N equal to 1 takes the first arm, anything else the second.
 	//   `<font …>`  colour markup the client's rich-text layer eats; stripped here so the output diffs against a
-	//               screenshot's TEXT.
+	//               screenshot's text.
 	internal static class LdbFormat
 	{
 		/// <summary>
 		///     Fills <paramref name="format" />'s slots from <paramref name="args" />, or fails.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ It FAILS on a conversion with no argument rather than leaving the `%s` in place. A half-filled
+		///     It FAILS on a conversion with no argument rather than leaving the `%s` in place. A half-filled
 		///     sentence renders as a confident line with a stray `%s` in it, which is exactly the thing this report
 		///     must not produce - `Hit`'s `%s %s %s` takes three slots and the generic (stat, magnitude) binder
 		///     supplies two, so it has to fall back to the raw key list, not print two thirds of a sentence.
@@ -2022,12 +2021,12 @@ namespace Faolan.Importer.Cli
 
 				// A conversion: `%[flags][width][.precision]<conv>`. Only the precision matters for the output.
 				//
-				// ⚠️ The scan is STRICT about what may sit between the `%` and the conversion letter, and it has to
+				// The scan is STRICT about what may sit between the `%` and the conversion letter, and it has to
 				// be: a lone `%` that is not a conversion is a literal in these strings, and a loose scan runs
-				// forward until it finds an `s`/`d`/`f` in ordinary WORDS. `AddAbsorb`'s sentence ends
+				// forward until it finds an `s`/`d`/`f` in ordinary words. `AddAbsorb`'s sentence ends
 				// `#4%.0f% of the damage dealt` - a single `%` where the client's own author meant `%%` - and the
 				// loose form read `% o` + the `f` of "of" as a fifth conversion, so a fully bound four-slot sentence
-				// failed to render (#782).
+				// failed to render.
 				var end = i + 1;
 				while (end < format.Length && "-+ #0".Contains(format[end]))
 					end++;
@@ -2077,7 +2076,7 @@ namespace Faolan.Importer.Cli
 			if (arms.Length == 0)
 				return "";
 
-			// ⚠️ The selector is a NUMBER. A branch arm fed the wrong slot - a stat name where the client passes an
+			// The selector is a number. A branch arm fed the wrong slot - a stat name where the client passes an
 			// increase/decrease flag - is a binding that does not hold, so it takes the plural arm rather than
 			// throwing on a parse: `ModifyAsRating`'s `#1{1:increases | decreases} #2%s by #3%d` wants three
 			// arguments and the generic (stat, magnitude) binder supplies two.

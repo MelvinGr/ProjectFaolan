@@ -9,9 +9,9 @@ using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// The shared analysis behind gen/coverage.md AND gen/messages.md: which codec declares which IIR type, whether a
-	// byte-exact golden guards it, and (for messages.md) the NAME of that golden test method. Both pages read from ONE
-	// index so their attribution can never disagree. Everything here is derived from the codecs themselves - the #317
+	// The shared analysis behind gen/coverage.md and gen/messages.md: which codec declares which IIR type, whether a
+	// byte-exact golden guards it, and (for messages.md) the name of that golden test method. Both pages read from one
+	// index so their attribution can never disagree. Everything here is derived from the codecs themselves - their
 	// Opcode/HandledTypes declarations, enforced by CodecConventionTests - not from name-guessing.
 	public sealed class CodecIndex
 	{
@@ -57,10 +57,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			foreach (var f in enumFields)
 				idx.NameByValue[Convert.ToUInt32(f.GetRawConstantValue())] = f.Name;
 
-			// Codec -> the IIR types it DECLARES. HandledTypes wins (the whole set); else every `const uint *Opcode`.
-			// Anchor the scan on a Faolan.Core.Network type (Rpc), NOT IirTypes: the opcode enums moved to
-			// Faolan.Core, so typeof(IirTypes).Assembly is now Faolan.Core.dll - the codecs live in
-			// Faolan.Core.Network.dll, and scanning the wrong assembly found zero codecs (every IIR fell back to "inline").
+			// Codec -> the IIR types it declares. HandledTypes wins (the whole set); else every `const uint *Opcode`.
+			// Anchor the scan on a Faolan.Core.Network type (Rpc), not IirTypes: the opcode enums moved to
+			// Faolan.Core, so typeof(IirTypes).Assembly is Faolan.Core.dll while the codecs live in
+			// Faolan.Core.Network.dll - scanning the wrong assembly finds zero codecs (every IIR falls back to "inline").
 			foreach (var t in typeof(Rpc).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
 			{
 				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
@@ -117,22 +117,22 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 			}
 
-			// codec -> has a byte-exact test, and the NAME of that test method (for messages.md citations).
+			// codec -> has a byte-exact test, and the name of that test method (for messages.md citations).
 			var testFiles = SourceFiles(Path.Combine(repo, "Faolan.Tests"), "*.cs").Select(f => (Text: File.ReadAllText(f), Path: f)).ToList();
 			foreach (var codec in idx.CodecToIir.Keys)
 			{
 				var re = new Regex(@"\b" + Regex.Escape(codec) + @"\b");
 				string? method = null;
 
-				// Most SPECIFIC proof first - the test class named after the codec beats an unrelated suite that merely
+				// Most specific proof first - the test class named after the codec beats an unrelated suite that merely
 				// touches it - then the sorted order as a stable tie-break (OrderBy is stable), so the citation is
 				// picked by name, never by which file the filesystem happened to hand back first.
 				foreach (var (text, _) in testFiles.OrderBy(f => Affinity(Path.GetFileNameWithoutExtension(f.Path), codec)))
 				{
-					// File-level IsByteExact is only a cheap pre-filter; the authoritative signal is a SINGLE method
+					// File-level IsByteExact is only a cheap pre-filter; the authoritative signal is a single method
 					// that both references the codec and is byte-exact (FindGoldenMethod). Requiring the method-level
 					// match stops a file from crediting a codec when its FromHexString and its .ToArray()/marker live in
-					// DIFFERENT, unrelated methods (e.g. InboundParserTests builds test input with .ToArray() in one
+					// different, unrelated methods (e.g. InboundParserTests builds test input with .ToArray() in one
 					// method and loads a capture with FromHexString in another - neither a byte-exact InventoryMove golden).
 					if (!re.IsMatch(text) || !IsByteExact(text, codec))
 						continue;
@@ -153,8 +153,8 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				.OrderBy(x => x.Name, StringComparer.Ordinal));
 
 			// The RPC method catalogs: every `*Methods` enum, plus the two `ChatServer*Opcodes` (chat carries no
-			// RpcHeader, so its numbers really are opcodes). IirTypes is counted above. Before #615 this counted
-			// `*Opcodes` alone, which is why renaming the twelve would otherwise have quietly dropped it to 18.
+			// RpcHeader, so its numbers really are opcodes). IirTypes is counted above. Counting `*Opcodes` alone would
+			// quietly drop the total to 18.
 			idx.RpcMethodTotal = typeof(GameCharAgentMethods)
 				.Assembly.GetTypes()
 				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } &&
@@ -198,7 +198,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				: 3;
 		}
 
-		// Finds a `TestClass.Method` whose body references `codec` AND asserts on bytes - a real [V3: ...] citation.
+		// Finds a `TestClass.Method` whose body references `codec` and asserts on bytes - a real [V3: ...] citation.
 		private static string? FindGoldenMethod(string text, string codec)
 		{
 			var cls = TestClass.Match(text) is { Success: true } m
@@ -222,14 +222,14 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			return null;
 		}
 
-		// Walks BACK from a method declaration over the blank lines, `//` comments and `[Attribute]` lines directly
-		// above it - that trivia belongs to the method BELOW, not to the one before it.
+		// Walks back from a method declaration over the blank lines, `//` comments and `[Attribute]` lines directly
+		// above it - that trivia belongs to the method below, not to the one before it.
 		//
-		// ⚠️ Without this, a method's slice ran to the next method's DECLARATION, so the next method's doc comment was
+		// Without this, a method's slice ran to the next method's declaration, so the next method's doc comment was
 		// attributed to the previous method's body. A comment is enough to satisfy `body.Contains(codec)`, so merely
-		// NAMING a codec in prose above a test could credit it with the byte-exact golden of the test above - which is
+		// naming a codec in prose above a test could credit it with the byte-exact golden of the test above - which is
 		// exactly what happened: a comment about `DeleteItemCodec`/`MoveInventoryItemCodec` promoted both from V2 to V3
-		// on the strength of `BuildParseRoundTripsOverTheCorpus`. Both are PARSE-ONLY c2s codecs with no serialize path
+		// on the strength of `BuildParseRoundTripsOverTheCorpus`. Both are parse-only c2s codecs with no serialize path
 		// at all, which `IsByteExact` goes out of its way to protect against, so the claim was doubly wrong. A
 		// generated page states what is proven; a mention is not a proof.
 		private static int StartOfLeadingTrivia(string text, int declaration)
@@ -249,18 +249,18 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		}
 
 		// A scope (whole test file, or one method body) is byte-exact for `codec` if it carries one of the explicit
-		// markers above, OR it loads a captured hex oracle (Convert.FromHexString) and compares it against a serialize
+		// markers above, or it loads a captured hex oracle (Convert.FromHexString) and compares it against a serialize
 		// output - either the round-trip `.ToArray()` (V1IirCodecTests: `Assert.Equal(body, codec.Parse(body).ToArray())`)
-		// or a direct call to THIS codec's Build* (ShopOpenBuilderTests/N3ToClientQuitCodecTests: `Assert.Equal(captured,
+		// or a direct call to this codec's Build* (ShopOpenReplyTests/N3ToClientQuitCodecTests: `Assert.Equal(captured,
 		// codec.BuildX(...))`). Requiring the codec's own Build keeps parse-only codecs (MoveInventoryItemCodec, which has
 		// no serialize path) from being falsely credited by an input-hex parser test. These idioms are real byte-exact
-		// goldens the explicit markers missed - why a batch of genuinely-tested IIR types read as V2.
+		// goldens the explicit markers miss, and without them a batch of genuinely-tested IIR types reads as V2.
 		private static bool IsByteExact(string scope, string codec)
 		{
 			return ByteExactMarkers.Any(scope.Contains) || (scope.Contains("FromHexString") && (scope.Contains(".ToArray(") || scope.Contains($"{codec}.Build")));
 		}
 
-		// Every source file under `dir`, in a DETERMINISTIC order. Directory.EnumerateFiles returns filesystem order,
+		// Every source file under `dir`, in a deterministic order. Directory.EnumerateFiles returns filesystem order,
 		// which changes when a file is rewritten (an editor or `sed -i` replaces the inode) - and several of the picks
 		// below are "first match wins", so an unordered scan silently rewrites generated pages: a codec with two equally
 		// valid golden tests would flip citation between machines and between commits. Sorted, the page is a function of

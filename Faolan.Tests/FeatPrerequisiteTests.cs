@@ -4,10 +4,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The feat-tree PREREQUISITE rule (Gitea #251), against the client's own edges (FeatPrereq, from RDB 1000042).
+	// The feat-tree prerequisite rule, against the client's own edges (FeatPrereq, from RDB 1000042).
 	//
-	// The subtlety these gates exist for: the graph links ADJACENT RANKS (80004 requires 80003) while a character's
-	// wire feat list carries only the HIGHEST rank per base - retail never stores the intermediate ranks. An exact-id
+	// The subtlety these gates exist for: the graph links adjacent ranks (80004 requires 80003) while a character's
+	// wire feat list carries only the highest rank per base - retail never stores the intermediate ranks. An exact-id
 	// check would reject every captured retail character (NecroL80 19 unmet, DemoL80 18, Hakotep 3); the same-base rule
 	// clears all three at zero.
 	public class FeatPrerequisiteTests
@@ -16,7 +16,7 @@ namespace Faolan.Tests
 		[InlineData(80004u, 80003u, true)]  // rank 4 held, rank 3 required - the retail case
 		[InlineData(80004u, 80004u, true)]  // exactly what is required
 		[InlineData(80004u, 80000u, true)]  // the unlock, implied by any rank
-		[InlineData(80003u, 80004u, false)] // a LOWER rank does not satisfy a higher requirement
+		[InlineData(80003u, 80004u, false)] // a lower rank does not satisfy a higher requirement
 		[InlineData(80104u, 80003u, false)] // a different base never satisfies, at any rank
 		public void Satisfies_IsSameBaseAtAnEqualOrHigherRank(uint held, uint required, bool expected)
 		{
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			Assert.Empty(FeatRules.MissingPrerequisites(held, prereqs));
 		}
 
-		// The rule still BITES: a feat whose prerequisite is on another base the character does not hold is rejected.
+		// The rule still bites: a feat whose prerequisite is on another base the character does not hold is rejected.
 		[Fact]
 		public void MissingPrerequisites_RejectsAFeatWhoseRequirementIsAbsent()
 		{
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 		}
 
 		// Training a feat together with its own prerequisite in one request is legal - the check runs against the
-		// RESULTING set, so order within the request must not matter.
+		// resulting set, so order within the request must not matter.
 		[Fact]
 		public void MissingPrerequisites_AllowsAFeatAndItsPrerequisiteInTheSameSet()
 		{

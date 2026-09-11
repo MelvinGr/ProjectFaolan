@@ -12,9 +12,9 @@ using Faolan.GameServer.Wire;
 
 namespace Faolan.Tests
 {
-	// Proves the from-scratch world-entry record framers (#210) reproduce their captured packets byte-for-byte when
+	// Proves the from-scratch world-entry record framers reproduce their captured packets byte-for-byte when
 	// given the capture's own record body - i.e. the shared RpcHeader, the IIR record framing and (for the snapshot)
-	// the 5-byte blob prefix are all assembled from the live session with NO captured packet as a template. The body
+	// the 5-byte blob prefix are all assembled from the live session with no captured packet as a template. The body
 	// generation is proven separately (FullCharIirRoundTripTests / SnapshotTailsFromScratchTests / the SpawnPacketBuilder
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
@@ -60,8 +60,7 @@ namespace Faolan.Tests
 		{
 			var captured = File.ReadAllBytes(PlayerSpawnCap);
 			var bodyStart = 12 + (int)captured.ReadU32Be(8);
-			// The RECORD, without the carrier's u32 length - that belongs to the sender, which is what this frames
-			// (#530 rule 2).
+			// The record, without the carrier's u32 length - that belongs to the sender, which is what this frames.
 			var spawnRecord = captured[(bodyStart + 4)..];
 
 			var built = GameWire.BuildWorldEntrySpawn(BeachClient(), spawnRecord).Serialize();
@@ -70,7 +69,7 @@ namespace Faolan.Tests
 			Assert.True(captured.SequenceEqual(built), "from-scratch player-spawn packet must be byte-identical to the capture");
 		}
 
-		// A world-object record (66AEDD50, handle != the player) frames with the SAME shared header as the snapshot /
+		// A world-object record (66AEDD50, handle != the player) frames with the same shared header as the snapshot /
 		// player spawn - confirming the keystone covers every world-entry record class, not just the player's own.
 		[Fact]
 		public void FrameWorldEntryRecord_ReproducesCapturedWorldObjectPacket()

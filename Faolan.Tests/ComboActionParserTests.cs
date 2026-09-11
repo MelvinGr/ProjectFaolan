@@ -8,13 +8,11 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// docs/subsystems/combos.md claims ComboActionParser is "validated against all 130 distinct Actions (109
-	// directional, 21 non-directional, 0 unknown)". Nothing validated it: the only caller was ComboService, dropped
-	// as dead in #353, and its tests went with it - leaving the parser unreferenced by anything, with a doc saying
-	// otherwise. This is that claim, restored as a test against the shipped catalog.
+	// directional, 21 non-directional, 0 unknown)". This is that claim, gated against the shipped catalog.
 	//
 	// The Actions column is the RDB catalog's own text, and it is inconsistent on purpose - the same key appears as
-	// "UR", "CombatUpperRight", "Up Right", "UpRight" and "1_Combatupperleft". That normalisation table IS the
-	// harvested knowledge here, so the gate that matters is the LAST assertion: zero unknown tokens. A new catalog
+	// "UR", "CombatUpperRight", "Up Right", "UpRight" and "1_Combatupperleft". That normalisation table is the
+	// harvested knowledge here, so the gate that matters is the last assertion: zero unknown tokens. A new catalog
 	// spelling must fail loudly rather than be silently dropped from a combo's input sequence.
 	public class ComboActionParserTests
 	{
@@ -67,9 +65,9 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #455: the direction after a marker is a SELECTOR, not a step. The catalog settles it - the marked rows form
-		// a complete 4 (family) x 5 (direction) grid with every cell present EXACTLY once, and the three reactive
-		// families share one GameActionId per direction. A key SEQUENCE could not come out that way.
+		// The direction after a marker is a selector, not a step. The catalog settles it - the marked rows form
+		// a complete 4 (family) x 5 (direction) grid with every cell present exactly once, and the three reactive
+		// families share one GameActionId per direction. A key sequence could not come out that way.
 		[Fact]
 		public async Task MarkedCombos_AreAFourByFiveGrid_TheDirectionSelectingTheProc()
 		{
@@ -89,12 +87,12 @@ namespace Faolan.Tests
 			Assert.All(marked.GroupBy(x => (x.Trigger, x.Direction)), cell => Assert.Single(cell));
 
 			// `action` is the fifth marker and the one with no direction after it, so it is a known marker that does
-			// NOT reach the grid.
+			// not reach the grid.
 			Assert.True(ComboActionParser.TryParseMarker("action", out var placeholder));
 			Assert.Equal(ComboTrigger.NpcCombo, placeholder);
 			Assert.False(ComboActionParser.TryParseTriggered("action", out _, out _));
 
-			// The three REACTIVE families are the same five effects - the family says what triggers the proc, the
+			// The three reactive families are the same five effects - the family says what triggers the proc, the
 			// direction says which proc. MagicCombo is the caster's own distinct set.
 			var reactive = marked.Where(x => x.Trigger != ComboTrigger.MagicCombo).ToList();
 			Assert.Equal(15, reactive.Count);
@@ -114,7 +112,7 @@ namespace Faolan.Tests
 		[InlineData("MagicCombo,Combatlowerleft", ComboTrigger.MagicCombo, ComboInput.LowerLeft)]
 		public void TryParseTriggered_KeepsTheDirectionTheSequenceParserDiscards(string actions, ComboTrigger trigger, ComboInput direction)
 		{
-			// TryParse still refuses these - they are not a key sequence - but the direction is no longer lost.
+			// TryParse refuses these - they are not a key sequence - but the direction is still recovered.
 			Assert.False(ComboActionParser.TryParse(actions, out _));
 			Assert.True(ComboActionParser.TryParseTriggered(actions, out var parsedTrigger, out var parsedDirection));
 			Assert.Equal(trigger, parsedTrigger);

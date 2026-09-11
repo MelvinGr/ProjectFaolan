@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Ambient NPC barks are stored COLUMNIZED, like their StockPhrase sibling (#410): the captured
+	// Ambient NPC barks are stored columnized, like their StockPhrase sibling: the captured
 	//   <remoteformat token="sayinchat(16)|conversation1(3)|RenownBystanderLovers" category="50015" key="..." knubot="0"  >
 	// is lifted into typed columns and rebuilt at send time (WorldBroadcaster -> NpcChatterCodec.Build), so
 	// there is no verbatim blob left to replay. These tests are what makes that safe: the constructed string must be
@@ -19,7 +19,7 @@ namespace Faolan.Tests
 	public class NpcChatterColumnsTests
 	{
 		// A real captured bark (template 11852, the RenownBystanderLovers group). Note the XML entity in the key and
-		// the DOUBLE space before '>' - the empty antitag slot. Both must survive the round trip untouched.
+		// the double space before '>' - the empty antitag slot. Both must survive the round trip untouched.
 		private const string CapturedBark =
 			"<remoteformat token=\"sayinchat(16)|conversation1(3)|RenownBystanderLovers\" category=\"50015\" key=\"]&#39;siB8WQ*b25XY8J7Gd*\" knubot=\"0\"  ></remoteformat>";
 
@@ -37,16 +37,16 @@ namespace Faolan.Tests
 			Assert.Equal(0u, row.Knubot);
 			Assert.Empty(row.Parameters);
 
-			// The key is stored decoded (the 128-bit TEA key) and RENDERS back to the captured attribute exactly,
+			// The key is stored decoded (the 128-bit TEA key) and renders back to the captured attribute exactly,
 			// XML entity included - that round-trip is the claim, not the storage form.
 			Assert.Equal("]&#39;siB8WQ*b25XY8J7Gd*", LdbKey.ToWire(row.FormatKey));
 			Assert.Equal(CapturedBark, NpcChatterCodec.Build(row));
 		}
 
-		// The `sendtell` crier bark, the only captured one with a parameter - and its value is the CAPTURING PLAYER'S
+		// The `sendtell` crier bark, the only captured one with a parameter - and its value is the capturing player's
 		// character name. Two things have to hold at once: the columns must reproduce the captured string exactly
 		// when handed that value back (so the import gate can prove nothing was lost), and the row itself must carry
-		// only the slot NAME, so the real name never reaches faolan.sql (#417). Its channel is also why Channel is a
+		// only the slot name, so the real name never reaches faolan.sql. Its channel is also why Channel is a
 		// string rather than a parsed conversation index - "sendtell" has no number.
 		[Fact]
 		public void ParseChatter_KeepsTheDetectedCharSlotButNotItsCapturedValue()
@@ -63,13 +63,13 @@ namespace Faolan.Tests
 			Assert.Equal(57u, row.SayInChat);
 			Assert.Equal("RenownCrier", row.Group);
 			Assert.Equal("DetectedChar.name", Assert.Single(row.Parameters).Name);
-			Assert.Null(Assert.Single(row.Parameters).Value); // session slot - the captured name is NOT stored
+			Assert.Null(Assert.Single(row.Parameters).Value); // session slot - the captured name is not stored
 			Assert.Equal("Sonja", parameterValue);
 
 			// Byte-exact when the captured value is handed back - what the importer gates on.
 			Assert.Equal(captured, NpcChatterCodec.Build(row, parameterValue));
 
-			// ...but the row alone renders the slot EMPTY, carrying no captured name.
+			// ...but the row alone renders the slot empty, carrying no captured name.
 			Assert.DoesNotContain("Sonja", NpcChatterCodec.Build(row), StringComparison.Ordinal);
 			Assert.Contains("name=\"DetectedChar.name\"", NpcChatterCodec.Build(row), StringComparison.Ordinal);
 
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Contains("7;Valeria", NpcChatterCodec.Build(row, "Valeria"), StringComparison.Ordinal);
 		}
 
-		// Anything that is not a bark must FAIL to parse rather than be half-read into columns - the importer turns a
+		// Anything that is not a bark must fail to parse rather than be half-read into columns - the importer turns a
 		// null into a rejected import, which is the only way an undecodable line surfaces at all now that there is no
 		// blob to fall back on.
 		[Theory]
@@ -91,10 +91,10 @@ namespace Faolan.Tests
 			Assert.Throws<CodecParseException>(() => NpcChatterCodec.Parse(xml));
 		}
 
-		// #493: the Damsel in Distress bark carries TWO slots, one of them CONTENT. Before this the grammar allowed
-		// one and the importer aborted the entire run on it. The two must round-trip together AND be treated
+		// The Damsel in Distress bark carries two slots, one of them content. Before this the grammar allowed
+		// one and the importer aborted the entire run on it. The two must round-trip together and be treated
 		// differently: `Target.Name` is the addressed player (regenerated, never stored), while `helptext` is a
-		// `<localized>` element that IS the line's content and must survive into the DB.
+		// `<localized>` element that is the line's content and must survive into the DB.
 		[Fact]
 		public void ParseChatter_KeepsBothSlotsOfATwoParameterBark_ContentStoredSessionBlanked()
 		{
@@ -116,7 +116,7 @@ namespace Faolan.Tests
 
 			var slots = row.Parameters.OrderBy(x => x.Ordinal).ToList();
 			Assert.Equal("Target.Name", slots[0].Name);
-			Assert.Null(slots[0].Value); // session state - the capturing player's name is NOT stored (#417)
+			Assert.Null(slots[0].Value); // session state - the capturing player's name is not stored
 			Assert.Equal("helptext", slots[1].Name);
 			Assert.Contains("localized", slots[1].Value!, StringComparison.Ordinal); // content - kept verbatim
 			Assert.Equal("Sonja", parameterValue);
@@ -124,14 +124,14 @@ namespace Faolan.Tests
 			// Byte-exact when the captured session value is handed back - what the import gate requires.
 			Assert.Equal(captured, NpcChatterCodec.Build(row, parameterValue));
 
-			// The row alone renders the session slot empty but keeps the content slot intact, and ORDER is preserved.
+			// The row alone renders the session slot empty but keeps the content slot intact, and order is preserved.
 			var alone = NpcChatterCodec.Build(row);
 			Assert.DoesNotContain("Sonja", alone, StringComparison.Ordinal);
 			Assert.Contains("name=\"helptext\"", alone, StringComparison.Ordinal);
 			Assert.True(alone.IndexOf("Target.Name", StringComparison.Ordinal) < alone.IndexOf("helptext", StringComparison.Ordinal));
 		}
 
-		// Whole-table CONSISTENCY, not fidelity - the same distinction as InnerElementXmlTests. The value it builds
+		// Whole-table consistency, not fidelity - the same distinction as InnerElementXmlTests. The value it builds
 		// from is our own output, so it proves the columns express a legal bark, not that they match retail. Fidelity
 		// is the two [Fact] cases above, whose strings are real captured barks.
 		[Fact]
@@ -151,7 +151,7 @@ namespace Faolan.Tests
 			}
 		}
 
-		// #691: the SEND-time fill. Everything above already proved the codec renders a name into the session slot
+		// The send-time fill. Everything above already proved the codec renders a name into the session slot
 		// when it is given one - what was missing is that nothing ever gave it one. The world layer caches each NPC
 		// type's barks once, at spawn, where no recipient exists, and the chat tier broadcast that one body to
 		// everybody - so the client rendered the macro literally and the player read
@@ -162,7 +162,7 @@ namespace Faolan.Tests
 			var row = NpcChatterColumns.ToRow(NpcChatterCodec.Parse(
 				"<remoteformat token=\"sayinchat(57)|sendtell(3)|RenownCrier\" category=\"50015\" key=\".&#39;eMV&#92;79&quot;!GSlWOqs*sl\" knubot=\"0\"  ><parameter value=\"7;Sonja\" name=\"DetectedChar.name\" /></remoteformat>"));
 
-			// What the world layer caches: the slot is present and EMPTY (no captured name rides along).
+			// What the world layer caches: the slot is present and empty (no captured name rides along).
 			var cached = NpcChatterColumns.ToBark(row);
 			Assert.DoesNotContain("Sonja", NpcChatterCodec.Build(cached), StringComparison.Ordinal);
 
@@ -175,7 +175,7 @@ namespace Faolan.Tests
 			Assert.DoesNotContain("{", toNecroL80, StringComparison.Ordinal); // no macro left for the client to render raw
 		}
 
-		// A bark with no session slot is the SAME body for everyone - the fill must not disturb it (and returns the
+		// A bark with no session slot is the same body for everyone - the fill must not disturb it (and returns the
 		// identical instance, so the common case costs nothing).
 		[Fact]
 		public void ABarkWithNoSessionSlot_IsUntouchedByTheFill()

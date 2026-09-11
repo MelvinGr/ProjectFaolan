@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Local travel (#506/#514): the 0xD00D action that states a trip, and the wiring that joins a harvested trip onto
+	// Local travel: the 0xD00D action that states a trip, and the wiring that joins a harvested trip onto
 	// the dialogue branch that sells it.
 	//
 	// The bodies below are the complete GameActionListIIR carriers retail sent the instant a destination was picked,
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			var trip = TravelActionCodec.Parse(GameActionListCodec.Parse(Convert.FromHexString(CordeliaTrip)).ActionTail);
 
 			// Exactly what the player's re-stream then confirmed: SimpleCharFullUpdate at (1136.0, 132.8, 223.0) on
-			// playfield 1020. `ypos` is the HEIGHT.
+			// playfield 1020. `ypos` is the height.
 			Assert.Equal(1020u, trip.DestinationMapId);
 			Assert.Equal(1136f, trip.X);
 			Assert.Equal(133f, trip.Y);
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		}
 
 		// The flag is the only thing that separates a wagoner's relocate from an instance entry, so it is carried as a
-		// (key, value) pair rather than as a bool: a `Local`-only model reads HeroicEnabled=0 as "not local" AND
+		// (key, value) pair rather than as a bool: a `Local`-only model reads HeroicEnabled=0 as "not local" and
 		// re-emits the wrong key.
 		[Fact]
 		public void TheHeroicFlagTrip_KeepsItsOwnKeyAndIsNotLocal()
@@ -64,12 +64,11 @@ namespace Faolan.Tests
 			"6b87e3160000c3500802e5d400004cbd29000000000000000000000000000000000000000032000000000001" +
 			"00000000004cbd29000000000000000000000000000000000000005000000000151bb10c";
 
-		// ⚠️ THE gate this issue exists for (#636). The trip's GameActionList used to be un-BUILDABLE: the element's
-		// `field` (0x1A18 here) read as a per-trip value derived from nothing we hold, so the server sent the teleport
-		// pair alone. It is retail's `GameActionData::s_nInstance` - the sending PROCESS's unique-instance counter -
-		// so the only thing a build needs from the capture is that counter reading, and everything else comes from the
-		// destination. Constructing both flag shapes from (map, x, y, z) and landing on the captured bytes is what
-		// says the decode is right.
+		// The element's `field` (0x1A18 here) is retail's `GameActionData::s_nInstance` - the sending process's
+		// unique-instance counter - not a per-trip value derived from something the server holds. So the only thing a
+		// build needs from the capture is that counter reading, and everything else comes from the destination.
+		// Constructing both flag shapes from (map, x, y, z) and landing on the captured bytes is what says the decode
+		// is right.
 		[Theory]
 		[InlineData(CordeliaTrip, 0x0802E5D4u, 0x1A18u, true, 1020u, 1136f, 133f, 223f)]
 		[InlineData(HeroicTrip, 0x0802E5D4u, 0x0B32u, false, 2070u, 1520f, 172f, 1476f)]
@@ -84,7 +83,7 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.FromHexString(captured), built);
 		}
 
-		// The counter is an ALLOCATION, so what a test can pin is the invariant the client asserts on: it never hands
+		// The counter is an allocation, so what a test can pin is the invariant the client asserts on: it never hands
 		// out 0 ("not assigned" - the default ctor leaves the field there), and it only ever goes up.
 		[Fact]
 		public void TheGameActionInstanceCounter_NeverHandsOutZeroAndOnlyRises()
@@ -96,7 +95,7 @@ namespace Faolan.Tests
 			Assert.Equal(ids.Length, ids.Distinct().Count());
 		}
 
-		// The Racer buff, byte-exact from the catalog. It is the CASTERLESS apply form - a zero entity-class word where
+		// The Racer buff, byte-exact from the catalog. It is the casterless apply form - a zero entity-class word where
 		// the caster reference would be, `Bool2` 0 and Descriptor[3] 0 - which is why it does not go through the
 		// generic `Apply`. All 11 casterless applies in the corpus carry those two slots that way.
 		[Fact]
@@ -128,8 +127,8 @@ namespace Faolan.Tests
 			Assert.ThrowsAny<Exception>(() => TravelActionCodec.Parse("xpos=1;ypos=2;zpos=3;PlayFieldID=4;Whatever=5", 0));
 		}
 
-		// THE wiring invariant (#514/#642): a shipped trip is only reachable if the dialogue BRANCH it names exists. The
-		// row IS that branch now - keyed by the screen it leaves and the option's own LDB id - so the check is that the
+		// The wiring invariant: a shipped trip is only reachable if the dialogue branch it names exists. The
+		// row is that branch now - keyed by the screen it leaves and the option's own LDB id - so the check is that the
 		// graph has an edge with exactly that key. A row with none is dead wiring: the trip can never be picked, and
 		// that is precisely the failure a hand-authored path would produce silently.
 		[Fact]
@@ -142,9 +141,9 @@ namespace Faolan.Tests
 			Assert.Equal([], trips.Where(t => !edges.Contains(t)).ToArray());
 		}
 
-		// ...and the screen that PRESENTS the list has to exist too, or the fare is never charged. That screen is the
-		// branch's own From node, so this is now a foreign key rather than a string-surgery derivation - which is the
-		// point of the re-key, and worth pinning because the old form silently accepted a path with no parent row.
+		// ...and the screen that presents the list has to exist too, or the fare is never charged. That screen is the
+		// branch's own From node, i.e. a foreign key rather than a string-surgery derivation - worth pinning, because
+		// a derived form silently accepts a path with no parent row.
 		[Fact]
 		public void EveryShippedTrip_HasTheListScreenThatChargesForIt()
 		{
@@ -154,10 +153,10 @@ namespace Faolan.Tests
 			Assert.Equal([], trips.Where(t => !screens.Contains(t)).ToArray());
 		}
 
-		// #635: the SECOND travel mechanism - the three travellers who carry their destination inline in their dialogue
-		// TEXT as a `{teleportplayer}` directive, harvested by `rdb-dialogue-teleports` into this same table.
+		// The second travel mechanism - the three travellers who carry their destination inline in their dialogue
+		// text as a `{teleportplayer}` directive, harvested by `rdb-dialogue-teleports` into this same table.
 		//
-		// Pinned by VALUE, not by count, because the values are the decode: the grammar is
+		// Pinned by value, not by count, because the values are the decode: the grammar is
 		// `{teleportplayer <x> <z> [y <y>] <map>}`, and the load-bearing reading is that the two leading numbers are X
 		// and Z with the height carried optionally behind a literal `y`. The Smuggler's row is the one the corpus
 		// checks - `{teleportplayer 210 205 y 11 4579}` against a capture that lands the player at (210.0, 10.5, 205.0)
@@ -189,7 +188,7 @@ namespace Faolan.Tests
 			Assert.Equal(delay, row.Delay, 3);
 
 			// A directive traveller charges nothing - there is no fare and no trade window anywhere in the flow - so a
-			// NULL Cost here means FREE, unlike a wagoner's NULL, which means "the capture never showed the wallet move".
+			// null Cost here means free, unlike a wagoner's null, which means "the capture never showed the wallet move".
 			Assert.False(row.HasCost);
 		}
 

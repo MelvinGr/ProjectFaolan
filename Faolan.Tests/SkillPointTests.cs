@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Skillpoint spends (#739), against the four annotated spends in
+	// Skillpoint spends, against the four annotated spends in
 	// NecroL80_mage-necromancer_login_gameplay_annotated_3. The hex is the frame body with the carrier's u32 length
 	// prefix stripped; the character is 0x0802E5D4 throughout, and the annotations name the skill each time:
 	//
@@ -18,9 +18,9 @@ namespace Faolan.Tests
 	{
 		private const uint Character = 0x0802E5D4;
 
-		// ⚠️ THE 0x3F1 TRAP, caught in the act. These bodies were first split as
+		// The 0x3F1 trap, caught in the act. These bodies were first split as
 		//   [u32 0x0000000B][u8 0xD3][pairs]
-		// - two constants that are really one MISALIGNED word. The correct split puts the base record's `env` byte
+		// - two constants that are really one misaligned word. The correct split puts the base record's `env` byte
 		// where the leading zero-run seems to continue, leaving 0x00000BD3 = 3 * 0x3F1 = a two-element list. Both
 		// readings consume the same 37 bytes and both "work" on all four captures, which is exactly why the framing
 		// word has to be checked against ListFrame rather than eyeballed.
@@ -48,14 +48,14 @@ namespace Faolan.Tests
 			Assert.Equal(0x00, spend.Env);
 			Assert.Equal([((uint)CharacterStatId.SkillPoints, -1), ((uint)skill, 1)], spend.Adjustments.Select(a => (a.StatId, a.Delta)));
 
-			// The deltas cancel: a spend MOVES points, it does not create them.
+			// The deltas cancel: a spend moves points, it does not create them.
 			Assert.Equal(0, spend.Adjustments.Sum(a => a.Delta));
 
 			// ...and re-Builds byte-exact.
 			Assert.Equal(Convert.ToHexStringLower(body), Convert.ToHexStringLower(SkillCodec.Build(spend)));
 		}
 
-		// The reply is two ordinary StatIIR records - the skill at its new TOTAL, then the pool - so the spend needs
+		// The reply is two ordinary StatIIR records - the skill at its new total, then the pool - so the spend needs
 		// no bespoke answer message. The captured totals are the necromancer's own sheet: Climbing 300 -> 301,
 		// Hiding 250 -> 251, Perception 560 -> 561, and the pool 1892 counting down one per spend.
 		[Theory]
@@ -68,8 +68,8 @@ namespace Faolan.Tests
 			Assert.Equal(poolHex, Convert.ToHexStringLower(StatCodec.Build(StatIirs.ForCharacter(Character, (uint)CharacterStatId.SkillPoints, pool))));
 		}
 
-		// Runspeed - and ONLY Runspeed - is restated with the base byte clear before the ordinary record. Sweeping
-		// every captured character StatIIR shows env=0 is a property of the STAT (22 ids of 53 carry one, Runspeed
+		// Runspeed - and only Runspeed - is restated with the base byte clear before the ordinary record. Sweeping
+		// every captured character StatIIR shows env=0 is a property of the stat (22 ids of 53 carry one, Runspeed
 		// among them; the other three skills never do), not of "the first point in a skill".
 		[Fact]
 		public void BuildRunspeedSpendReply_LeadsWithTheDynelLayerCopy()

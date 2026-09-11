@@ -14,18 +14,18 @@ namespace Faolan.Tests
 {
 	// Locks the CharacterIIR half of player-spawn generation: the char message inside the spawn body is a
 	// ProtoCoreCharacterIIR (name / firstname / lastname / stats / npc_stats / player_stats / bcc / targets /
-	// generic_stats / inventory) that decodes and RE-ENCODES byte-identically through the client schema, so the
+	// generic_stats / inventory) that decodes and RE-encodes byte-identically through the client schema, so the
 	// spawn's identity/stats/equipment is built from a typed object populated from the character. The scaffold
 	// frame around it is covered by PlayerSpawnScaffoldCodecTests/RowsTests. The Strie bytes used here are a
 	// golden test oracle only (SpawnAssassinTemplate.bin) - the server embeds no captured spawn. See
 	// docs/re/player-spawn-generation.md.
 	public class PlayerSpawnGenerationTests
 	{
-		// A DEAD character's player FA015807 self-spawn (the SimpleCharFullUpdateIIR that CONSTRUCTS the local
-		// SimpleChar whose dead-flag gates the release/resurrect window) carries CURRENT health = 0 while life/max
-		// stays full - matching the retail login-while-dead capture (Stihetfv #50: health(f7)=0, life(f6) full).
+		// A dead character's player FA015807 self-spawn (the SimpleCharFullUpdateIIR that constructs the local
+		// SimpleChar whose dead-flag gates the release/resurrect window) carries current health = 0 while life/max
+		// stays full - matching the retail login-while-dead capture (Stihetfv packet 50: health(f7)=0, life(f6) full).
 		// An alive character keeps cur==max. This is the FA015807 analogue of the snapshot HealthCurrent=0
-		// (#214); the SimpleChar is built from THIS packet, not the 0x737A6DF9 snapshot.
+		//; the SimpleChar is built from this packet, not the 0x737A6DF9 snapshot.
 		[Theory, InlineData(false, 13000u), InlineData(true, 0u)]
 		// alive: current health == max (Guardian L1 = 130, x100 wire scale)
 		// dead:  current health == 0,   max/life stays full
@@ -48,9 +48,9 @@ namespace Faolan.Tests
 			var message = PlayerCharacterIirs.ForCharacter(character, Worn(), maxVitals);
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
-			// `life` carries the CLASS BASE, which the client tops up - not our sheet ceiling. Retail proves the split
+			// `life` carries the class base, which the client tops up - not our sheet ceiling. Retail proves the split
 			// in one packet: Stihetfv (Conqueror L2) has life 19600 = 196 = the class base against current health 229
-			// (#580). It stays full regardless of dead state; only `health` is zeroed.
+			//. It stays full regardless of dead state; only `health` is zeroed.
 			Assert.Equal(CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level).Health, message.Stats.Life);
 			Assert.True(message.Stats.Life < maxVitals.Health * 100, "the base must sit below the sheet ceiling");
 			if (isDead)
@@ -145,14 +145,12 @@ namespace Faolan.Tests
 			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItems)
 		}
 
-		// A worn item whose token was never harvested renders anyway, with a minted one (#723).
+		// A worn item whose token was never harvested renders anyway, with a minted one.
 		//
-		// The history is worth keeping: this piece used to be SKIPPED, which showed it to its WEARER (their client
-		// rendered it from their own inventory) and to nobody else - a divergence with no error anywhere - and was
-		// then changed to THROW, on the reasoning that a token is harvested content so a worn item lacking one is a
-		// gap in Items rather than a state to render around. Both were right while the token could only be
-		// harvested. It carries no information and the client validates nothing, so there is now a third option
-		// that is better than either: mint one, and let everybody see the same piece.
+		// Skipping the piece would show it to its wearer (their client renders it from their own inventory) and to
+		// nobody else - a divergence with no error anywhere - and throwing would treat a gap in Items as unrenderable
+		// state. The token carries no information and the client validates nothing, so minting one is better than
+		// either: every viewer sees the same piece.
 		[Fact]
 		public void PlayerSpawnEquipment_WornItemWithoutAHarvestedHash_RendersWithAMintedToken()
 		{
@@ -166,14 +164,15 @@ namespace Faolan.Tests
 			Assert.True(AcgHash.IsWellFormed(entry.Item.Hash), $"minted {AcgHash.Token(entry.Item.Hash)} is not a token the client would accept");
 		}
 
-		// #755: the worn item's `level` on a SPAWN is its own `Items.Level`, not a constant.
+		// The worn item's `level` on a spawn is its own `Items.Level`, not a constant.
 		//
-		// It was hardcoded `1`, and the snapshot entry's identical result was deliberately not assumed to transfer -
-		// this is a different message. Measured over the DUMPS instead: 125,721 of 125,722 captured worn-item entries
+		// A hardcoded `1` is indistinguishable from the derivation on most items, and the snapshot entry's identical
+		// result is deliberately not assumed to transfer - this is a different message. Measured over the dumps
+		// instead: 125,721 of 125,722 captured worn-item entries
 		// across 23,478 spawns carry exactly their template's level, zero disagreements, and no template carries two.
 		//
-		// The theory asserts the DERIVATION rather than one number, because level 1 is 108,819 of those 125,722
-		// entries - a gate that only tried a level-1 item would pass against the old constant.
+		// The theory asserts the derivation rather than one number, because level 1 is 108,819 of those 125,722
+		// entries - a gate that only tried a level-1 item would pass against a hardcoded 1.
 		[Theory]
 		[InlineData((byte)1)]
 		[InlineData((byte)5)]
@@ -191,7 +190,7 @@ namespace Faolan.Tests
 			Assert.Equal(level, entry.Item.Level);
 		}
 
-		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair
+		// The melee weapons render from the left-hand navs (the wire melee pair is 6/8); the ranged pair
 		// (MainHandRight/OffHandRight) is 20/21 - NecroL80's crossbow/quiver slots. A swap here makes weapons
 		// silently not render (the bug this fixed: MainWeapon read MainHandRight).
 		[Fact]
@@ -210,7 +209,7 @@ namespace Faolan.Tests
 				}, entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
 		}
 
-		// ToggleVanityArmorFilter (0x200B) does NOT withhold anything from the spawn: every worn + vanity item always
+		// ToggleVanityArmorFilter (0x200B) does not withhold anything from the spawn: every worn + vanity item always
 		// ships, and hiding a slot is carried purely by the VanityShownMask bitmask in the spawn header (the client
 		// renders the show/hide off it). So the snapshot equipment is invariant under the toggle - only the mask moves.
 		[Fact]
@@ -280,7 +279,7 @@ namespace Faolan.Tests
 			Assert.Equal(body, rebuilt);
 		}
 
-		// A worn set as the builder takes it since #750: slot -> the item instance in it. The instances are in-memory
+		// A worn set as the builder takes it: slot -> the item instance in it. The instances are in-memory
 		// only (no DB), which is all the builder reads - it wants the template behind each slot.
 		private static Dictionary<CharacterEquipmentSlot, ItemInstance> Worn(params (CharacterEquipmentSlot Slot, Item Item)[] pieces)
 		{

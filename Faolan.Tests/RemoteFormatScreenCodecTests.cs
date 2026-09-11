@@ -6,13 +6,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact parse/build of a remoteformat dialogue screen (#188): proves a Knubot screen can be GENERATED from
+	// Byte-exact parse/build of a remoteformat dialogue screen: proves a Knubot screen can be generated from
 	// structured fields (id/category/key/knubot/antitag + named parameters) byte-for-byte, so the captured XML
 	// doesn't have to be replayed. Oracles are real screens from the captured ConversationPackets.
 	public class RemoteFormatScreenCodecTests
 	{
 		// Real AppendText screen with all three inner parameter shapes (localized token, stringentry, localized id).
-		// The `name` session slot holds a PLACEHOLDER, not the captured player (#417) - the grammar under test is the
+		// The `name` session slot holds a placeholder, not the captured player - the grammar under test is the
 		// parameter framing, which is indifferent to the string, and no real character name belongs in the repo.
 		private const string AppendXml =
 			"<remoteformat id=\"33600\" category=\"50002\" key=\"djaj!xgdVQpMtKta6Csp\" knubot=\"0\" antitag=\"0\" ><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" a\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" p\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" t\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"a\" /><parameter value=\"7;&lt;stringentry string=&quot;&quot; flags=&quot;&quot; &gt;\" name=\"guildname\" /><parameter value=\"7;&lt;stringentry string=&quot;DemoL80&quot; flags=&quot;m&quot; &gt;\" name=\"name\" /><parameter value=\"7;&lt;stringentry string=&quot;Not in guild [Legacy of Cimmeria]&quot; flags=&quot;&quot; &gt;\" name=\"npcguildname\" /><parameter value=\"7;&lt;localized id=&quot;15148&quot; category=&quot;51000&quot; flags=&quot;m&quot; key=&quot;+u#I9(w2ZeOsi!lii6qs&quot; &gt;\" name=\"npcname\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"p\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"t\" /></remoteformat>";
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			Assert.Equal(xml, RemoteFormatScreenCodec.Build(RemoteFormatScreenCodec.Parse(xml)));
 		}
 
-		// The DB columnization (#188): a captured screen -> ConversationScreen row (+ parameter children) -> back to
+		// The DB columnization: a captured screen -> ConversationScreen row (+ parameter children) -> back to
 		// the wire XML must be byte-exact, so ScreensJson can be dropped for typed columns. Covers the double-space
 		// "knubot=\"0\"  >" (absent antitag) and the full 10-parameter scaffold.
 		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
@@ -75,10 +75,10 @@ namespace Faolan.Tests
 			Assert.Equal("100", s.Category);
 		}
 
-		// #418: the female token is "f", recovered from the client rather than guessed - every captured screen carries
+		// The female token is "f", recovered from the client rather than guessed - every captured screen carries
 		// flags="m" because every capture's player was male, so a female character was declined as male in every line
 		// of dialogue naming her. FUN_011012a0 reads stat 0x3B (Sex) and pushes 0x6d ('m') for 2 and 0x66 ('f') for 3,
-		// with no third branch - so a sex that is neither carries NO token.
+		// with no third branch - so a sex that is neither carries no token.
 		[Theory]
 		[InlineData(Sex.Male, "m")]
 		[InlineData(Sex.Female, "f")]
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, RemoteFormatSession.FlagsOf(name.InnerRaw));
 		}
 
-		// Sex.None means "no live sex", and has to leave the CAPTURED flags alone - the construct-vs-capture gates
+		// Sex.None means "no live sex", and has to leave the captured flags alone - the construct-vs-capture gates
 		// re-encode a parsed screen and expect it back byte-identical.
 		[Fact]
 		public void WithLivePlayer_WithNoSex_KeepsTheCapturedFlags()
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);
 			Assert.Contains("string=&quot;Cimmerians&quot;", xml);
 			Assert.DoesNotContain("DemoL80", xml);
-			// The NPC guild label carries OUR realm, not the capture's retail server (#417).
+			// The NPC guild label carries our realm, not the capture's retail server.
 			Assert.Contains("string=&quot;Not in guild [Project Faolan]&quot;", xml);
 			Assert.DoesNotContain("Legacy of Cimmeria", xml);
 			// NPC name + localized tokens untouched.
@@ -123,7 +123,7 @@ namespace Faolan.Tests
 			Assert.StartsWith("<remoteformat id=\"33600\" category=\"50002\" key=\"djaj!xgdVQpMtKta6Csp\"", xml);
 		}
 
-		// #417: what gets PERSISTED carries no captured character / guild / server name - the slot stays (the client
+		// What gets persisted carries no captured character / guild / server name - the slot stays (the client
 		// parses the screen by parameter name and order, and `flags` drives the localized declension), the string goes.
 		[Fact]
 		public void ToStoredRow_BlanksTheSessionSlots_KeepingSlotAndFlags()

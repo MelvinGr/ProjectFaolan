@@ -4,18 +4,18 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The sprint/regen family (#867). These bodies are one to five bytes, so what can be wrong about them is not a
-	// blob comparison - it is the GRAMMAR: how many fields the body has, and which byte is which. That is exactly what
+	// The sprint/regen family. These bodies are one to five bytes, so what can be wrong about them is not a
+	// blob comparison - it is the grammar: how many fields the body has, and which byte is which. That is exactly what
 	// was wrong before, so the regression case is the point of the file.
 	//
 	// The values are the ones `--report sprint` measures over 134 captures; the report is the oracle, and it is
-	// re-runnable, so these carry no retail bytes of their own (#555).
+	// re-runnable, so these carry no retail bytes of their own.
 	public class SprintCodecTests
 	{
-		// ⚠️ THE REGRESSION. `SetSprintInputState(bool sprintInput, bool clientCheck)` is two bytes, and the corpus
-		// carries all four combinations: 00 01 x3714, 00 00 x2954, 01 01 x1958, 01 00 x703. Read as one u16 and
-		// compared to 1 - the pre-#867 reading - `00 01` is the ONLY match, which is the player NOT sprinting. So the
-		// old code sprinted on the commonest not-sprinting frame and missed all 2,661 sprinting ones.
+		// `SetSprintInputState(bool sprintInput, bool clientCheck)` is two bytes, and the corpus carries all four
+		// combinations: 00 01 x3714, 00 00 x2954, 01 01 x1958, 01 00 x703. Read as one u16 and compared to 1, `00 01`
+		// is the only match - which is the player not sprinting, so that reading sprints on the commonest
+		// not-sprinting frame and misses all 2,661 sprinting ones.
 		[Theory]
 		[InlineData(0x00, 0x01, false, true)]
 		[InlineData(0x00, 0x00, false, false)]
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Assert.Equal(clientCheck, parsed.ClientCheck);
 			Assert.Equal(body, SprintInputStateCodec.Build(parsed));
 
-			// The reading this replaced: a u16 == 1 selects the frame where sprintInput is FALSE.
+			// The reading this replaced: a u16 == 1 selects the frame where sprintInput is false.
 			var asSingleU16 = (first << 8) | second;
 			Assert.Equal(asSingleU16 == 1, !sprintInput && clientCheck);
 		}
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 		}
 
 		// `DispatchUpdateSprintbar(energyValue, forceUpdate)` - the two modal bodies in the corpus are 00 00 23 28 01
-		// and 00 00 36 B0 01, i.e. 9,000 and 14,000 with forceUpdate set. Those are class ENERGY maxima, which is what
+		// and 00 00 36 B0 01, i.e. 9,000 and 14,000 with forceUpdate set. Those are class energy maxima, which is what
 		// says the field is an absolute value rather than a delta.
 		[Theory]
 		[InlineData(new byte[] { 0x00, 0x00, 0x23, 0x28, 0x01 }, 9000u, true)]

@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
-	// LOCAL TRAVEL wiring (#506/#514): which dialogue branch of which NPC sells which trip, for how much, and where it
+	// local TRAVEL wiring: which dialogue branch of which NPC sells which trip, for how much, and where it
 	// drops the player.
 	//
-	// ⚠️ HARVESTED, not hand-authored - unlike `quest-wiring`, which it otherwise resembles. Retail states every field
+	// HARVESTED, not hand-authored - unlike `quest-wiring`, which it otherwise resembles. Retail states every field
 	// of a trip on the wire, so there is nothing left to author: the branch comes from the player's KnubotAnswer pick
 	// (the screen it answered, and that option's own LDB id), the destination and arrival from the trip's own
 	// GameActionListIIR ("xpos=..;ypos=..;zpos=..;PlayFieldID=..;Local=1", TravelActionCodec), and the fare from the
@@ -22,10 +22,10 @@ namespace Faolan.Importer.Modules
 	// writes a different table.
 	public sealed class TravelWiringModule : IImportModule
 	{
-		// Maps must exist first (DestinationMapId is an FK) and so must the CONVERSATIONS: since #642 the row is keyed
-		// by the dialogue screen its branch leaves, so the screen has to be there to point at. That is stricter than
-		// before - the old (name, answer path) key stood on its own - and it is the point: a trip whose branch does not
-		// exist is dead wiring, and now it cannot be written at all rather than sitting there unreachable.
+		// Maps must exist first (DestinationMapId is an FK) and so must the conversations: the row is keyed by the
+		// dialogue screen its branch leaves, so the screen has to be there to point at. That strictness is the point -
+		// a trip whose branch does not exist is dead wiring, and it cannot be written at all rather than sitting
+		// there unreachable.
 		public IReadOnlyList<string> DependsOn => [nameof(MapsModule), nameof(ConversationsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -110,10 +110,10 @@ namespace Faolan.Importer.Modules
 				if (ctx.ModeFor(Name) == WriteMode.Insert)
 					continue;
 
-				// ⚠️ A row sourced from a `{teleportplayer}` DIRECTIVE is not refreshed from the wire (#821). The two
+				// A row sourced from a `{teleportplayer}` DIRECTIVE is not refreshed from the wire. The two
 				// state different things about the same trip: the directive is the decoded grammar
-				// (`{teleportplayer <x> <z> [y <y>] <map>}`, where a MISSING height means ground-snap at run time and
-				// is stored as a NULL Y), while an n3Teleport states one session's actual arrival. Overwriting the
+				// (`{teleportplayer <x> <z> [y <y>] <map>}`, where a missing height means ground-snap at run time and
+				// is stored as a null Y), while an n3Teleport states one session's actual arrival. Overwriting the
 				// first with the second silently replaces a [V2]-cited decode with a sample - it turned Sigurd's
 				// (55.7, 158.1, 113.9) into (55, 158, 113) and gave Wagoner Polus a height his directive deliberately
 				// omits. The directive is the better source for the rows it owns, so it wins.
@@ -129,17 +129,17 @@ namespace Faolan.Importer.Modules
 				updated++;
 			}
 
-			// ⚠️ CORRECTIVE (#839): an ESCORTEE never sells rides, so a captured travel row pointing at one is a
+			// CORRECTIVE: an ESCORTEE never sells rides, so a captured travel row pointing at one is a
 			// misattribution an earlier harvest wrote - and upsert never deletes, so it would outlive the fix.
 			//
-			// Casilda is the case. Her farewell is opened BY the city gate, and retail's order is: the escort completes,
+			// Casilda is the case. Her farewell is opened by the city gate, and retail's order is: the escort completes,
 			// she runs off and DESPAWNS, and the gate's own zone-line then carries the player in. So a teleport followed
 			// her conversation, and the extractor's changemap branch wrote it up as "travel with Casilda to Tortage" -
-			// shipping the gate's exact arrival (754/176/673), because it WAS the gate's. In play that teleported the
+			// shipping the gate's exact arrival (754/176/673), because it was the gate's. In play that teleported the
 			// player the instant the farewell closed, with a trip announcement and a Racer buff retail never sends here.
 			//
-			// The extractor now stops at the NPC's despawn so she is no longer harvested; this clears what she left.
-			// STRUCTURAL, not a name match: the row's NPC is the target of an `Escort` goal. An escort ends AT a door,
+			// The extractor stops at the NPC's despawn so she is not harvested; this clears any row she left behind.
+			// Structural, not a name match: the row's NPC is the target of an `Escort` goal. An escort ends at a door,
 			// which is exactly the shape that gets mistaken for a ride, and it selects one row in the shipped data.
 			// Directive rows are exempt - those are authored from the client's own dialogue text, not from a correlation.
 			var escortees = await ctx.Db.QuestGoalDefinitions

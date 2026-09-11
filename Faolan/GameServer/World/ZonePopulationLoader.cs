@@ -17,56 +17,55 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Fills a zone with its POPULATION, once per (map, instance): the captured NPC spawns and the static world objects
-	// a map ships, read out of the DB and turned into live `WorldEntity` / `LiveWorldObject` instances in the world
-	// model. Also answers why a class-specific map looks empty (`DescribeMissingClassImport`).
-	//
-	// It writes nothing to the wire - that is the whole point of it being its own class (#826). Loading happens on the
-	// FIRST entry to an instance, before anyone can see it; the streaming that follows is interest-driven and belongs
-	// to WorldBroadcaster, which is also where the per-viewer questions live. The three caches here
-	// (quest-gated NPCs, story-kill targets, escort-hidden NPCs) are read-once catalog maps, not per-player state.
-	//
-	// ⚠️ The load is idempotent by the `TryAdd` gates, and each INSTANCE gets its own population (#268) - two copies of
-	// a playfield must not share entities, so the key is (mapId, instanceId) and never mapId alone.
+	/// <summary>
+	///     Fills a zone with its population, once per map and instance: the captured NPC spawns and the static world
+	///     objects a map ships, read out of the database and turned into live <see cref="WorldEntity" /> and
+	///     <see cref="LiveWorldObject" /> instances in the world model.
+	/// </summary>
+	/// <remarks>
+	///     It writes nothing to the wire, which is the point of it being its own class. Loading happens on the first
+	///     entry to an instance, before anyone can see it; the streaming that follows is interest-driven and belongs to
+	///     <see cref="WorldBroadcaster" />, which is also where the per-viewer questions live. The three caches here -
+	///     quest-gated NPCs, story-kill targets and escort-hidden NPCs - are read-once catalog maps, not per-player
+	///     state.
+	///     <para>
+	///         The load is idempotent through its <c>TryAdd</c> gates, and each instance gets its own population: two
+	///         copies of a playfield must not share entities, so the key is (mapId, instanceId) and never mapId alone.
+	///     </para>
+	///     It also answers why a class-specific map looks empty - see <see cref="DescribeMissingClassImport" />.
+	/// </remarks>
 	public sealed class ZonePopulationLoader
-	{		// #703: how close a route's last waypoint must come back to its first for the route to count as CLOSED (walked
-		// round and round) rather than open (walked back down again). 494 of the 1,318 stored routes close this way.
+	{
+		/// <summary>
+		///     How close a route's last waypoint must come back to its first for the route to count as closed - walked
+		///     round and round - rather than open, walked back down again. 494 of the 1,318 stored routes close this way.
+		/// </summary>
 		private const float RouteClosedTolerance = 5f;
 
 		private const double PatrolDwellSeconds = 2.0;
 
-		// #363 live ambient spawner: the capture-INDEPENDENT open-world
-		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
-		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
-		// group's points (its PatrolWaypoints -> the #266 wander) and fades on death (NoRespawn); MaintainAmbientPools
-		// then respawns the deficit at a free point. Built WHOLE from the creature TYPE (TryBuildFromType, the pet path).
-		// Worked example - Tortage beach (4010): the four T_Crocodile-* areas become four Crocodile pools (8/7/8/11)
-		// that each hold that many crocs roaming their stretch of shore, refilled as the player kills them.
-		// #741: bind each formation FOLLOWER to the nearest live leader of a type it walks with. Retail expresses this
-		// as a MoveTaskIIR whose task names the other creature's handle, so it is a per-PLACEMENT binding built out of
-		// a per-TYPE rule - which is exactly what the DB holds (NpcFollowPair) and what cannot be resolved until every
-		// entity is in the zone.
-		//
-		// NEAREST, and within FormationBindRange: a map carries several groups of the same two types (five separate
-		// `Nemedian Deathstalker` groups in one capture, four `Ginger`/`Scruffy` pairs across three), so binding to
-		// "any leader of that type" would march a follower across the zone to the wrong one. The range is ours, not
-		// retail's - the corpus states the pairing, never a maximum distance - so it is set at the leash territory a
-		// patroller already works in rather than invented smaller.
-		//
-		// A leader that is itself a follower is fine (nothing in the corpus chains, but nothing forbids it); a
-		// follower that finds no leader in range simply keeps its own behaviour.
-		// How far a formation follower will look for its leader at zone load. OURS, not retail's - the corpus states
-		// which creature walks with which and never a maximum distance - so it is the leash territory a patroller
-		// already works in rather than a smaller invented number.
-		// The ordinary standing idle - shared by 1,008 of the 1,208 templates, against a story pose like Casilda's
-		// chained 156196 which exactly one template carries. Used as the freed escortee's held pose (#827).
+		/// <summary>
+		///     The ordinary standing idle, shared by 1,008 of the 1,208 templates, against a story pose such as
+		///     Casilda's chained 156196 which exactly one template carries. Used as a freed escortee's held pose.
+		/// </summary>
 		private const uint GenericIdleAnimationId = 42024;
 
-		// The ordinary BEHAVIOUR-CONTROL state - 1,186 of the templates that declare one carry it, against Casilda's
-		// captive 80. The client calls it "BCC State" (CharacterStatId 0x14) and it selects the behaviour tree, so a
-		// creature left in a story state never runs its locomotion: she slid instead of walking (#827).
+		/// <summary>
+		///     The ordinary behaviour-control state: 1,186 of the templates that declare one carry it, against
+		///     Casilda's captive 80.
+		/// </summary>
+		/// <remarks>
+		///     The client calls it the BCC state (<c>CharacterStatId</c> 0x14) and it selects the behaviour tree, so a
+		///     creature left in a story state never runs its locomotion and slides instead of walking.
+		/// </remarks>
 		private const uint OrdinaryBccState = 1;
 
+		/// <summary>How far a formation follower looks for its leader at zone load.</summary>
+		/// <remarks>
+		///     Ours rather than retail's: the corpus states which creature walks with which and never a maximum
+		///     distance, so it is set at the leash territory a patroller already works in rather than a smaller
+		///     invented number.
+		/// </remarks>
 		private const float FormationBindRange = WorldState.NpcLeashRange;
 
 		private readonly AmbientPoolService _ambient;
@@ -80,23 +79,22 @@ namespace Faolan.GameServer.World
 
 		private readonly WorldSimulation _sim;
 
-		// (mapId, instanceId) zones whose static WORLD OBJECTS have been loaded.
+		// The zones whose static world objects have been loaded.
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _objectLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
-		// #262 escort NPCs hidden until their quest is active: TEMPLATE id -> the quest that reveals it.
+		// Escort NPCs hidden once their quest is complete: template id -> the quest that hides it.
 		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
 
-		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
-		// to that copy - each instance gets its own NPC population) (#268).
+		// The zones whose NPCs have been loaded into the world model: once per instance, on first entry to that copy,
+		// because each instance gets its own NPC population.
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
-		// Quest-gated NPC TEMPLATE id -> the quest ids that reveal it (#261, re-keyed off the name in #521). Cached once;
-		// an NPC in this map is streamed only to players holding one of its quests active (see WorldEntity.GateQuestIds
-		// / IsVisibleTo).
+		// Quest-gated NPC template id -> the quest ids that reveal it, cached once. Such an NPC is streamed only to
+		// players holding one of its quests active; see WorldEntity.GateQuestIds and IsVisibleTo.
 		private Dictionary<uint, uint[]> _questGatedNpcs = null!;
 
-		// #708: the NPCs a quest kills ONCE. A separate set from _questGatedNpcs on purpose - visibility and respawn
-		// are independent, and one column answering both could not express a quest-only target that must come back.
+		// The NPCs a quest kills once. A separate set from the quest-gated map on purpose: visibility and respawn are
+		// independent, and one column answering both could not express a quest-only target that must come back.
 		private HashSet<uint> _storyKillTargets = null!;
 
 		public ZonePopulationLoader(WorldSimulation sim, INpcRepository npcs, IWorldRepository world, ComboService combos, AmbientPoolService ambient, ILogger logger)
@@ -109,16 +107,16 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
-		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
-		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still
-		// render them from the burst for now, so this is model bookkeeping (no wire change).
-		//
-		// `forClass` is the class of the character this copy is being populated for. It only matters on a
-		// class-specific map (Map.ClassSpecific - the city armories and The Reliquary), where the playfield holds a
-		// different NPC set per
-		// class; such a map is necessarily Solo, so the copy has exactly one owner and one class. Everywhere else every
-		// spawn is class-agnostic and this is ignored.
+		/// <summary>
+		///     Loads a map's NPCs from the spawn rows into the world model once, on first entry, so the server has an
+		///     authoritative shared view of them for the tick, the AI and combat to drive.
+		/// </summary>
+		/// <param name="forClass">
+		///     The class of the character this copy is being populated for. It matters only on a class-specific map -
+		///     <c>Map.ClassSpecific</c>, the city armories and The Reliquary - where the playfield holds a different NPC
+		///     set per class; such a map is necessarily Solo, so the copy has exactly one owner and one class. Elsewhere
+		///     every spawn is class-agnostic and this is ignored.
+		/// </param>
 		public async Task EnsureZoneNpcs(uint mapId, uint instanceId, ConanClass forClass)
 		{
 			if (!_npcLoadedZones.TryAdd((mapId, instanceId), 0))
@@ -127,25 +125,26 @@ namespace Faolan.GameServer.World
 			var clock = System.Diagnostics.Stopwatch.StartNew();
 			var npcs = await _npcs.GetNpcSpawns(mapId, forClass);
 
-			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
+			// The map's scripted encounters, keyed by lure type - one query per zone load rather than per placement.
 			var encounters = (await _npcs.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
 
-			// #528: the map's TRIGGER-SPAWNED types - a quest ambusher and an encounter BOSS alike. Neither stands in
-			// the world (one appears when a goal advances, the other when a lure swaps), so a captured "placement" of
-			// one is a harvest of the trigger FIRING, and it is skipped below. The importer already excludes them from
-			// the burst-truth set (ImportOps.BuildBurstTruthSpawns, alongside the summoned pets), so on a current
-			// database this finds nothing; it is the second net, for a database built before that rule.
+			// The map's trigger-spawned types: a quest ambusher and an encounter boss alike. Neither stands in the
+			// world - one appears when a goal advances, the other when a lure swaps - so a captured placement of one is
+			// a harvest of the trigger firing, and it is skipped below. The importer already excludes them from the
+			// burst-truth set, so on a current database this finds nothing; it is the second net, for a database built
+			// before that rule.
 			var triggerSpawned = (await _npcs.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId)
 				.Concat(encounters.Values.Select(e => e.BossNpcTemplateId))
 				.ToHashSet();
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
-			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
-			// `.togglenpcgroup` toggle. Computed at load (a cheap query, stored as a string) so the toggle is instant and
-			// also catches NPCs that stream in while it's on - the toggle only gates whether the label is SENT.
+			// The map's RDB spawn areas, so each NPC carries its area label ready for the live .togglenpcgroup toggle.
+			// Computed at load - a cheap query stored as a string - so the toggle is instant and also catches NPCs that
+			// stream in while it is on; the toggle only gates whether the label is sent.
 			var spawnAreas = await _npcs.GetNpcSpawnAreas(mapId);
 
-			// #261 quest-gated spawns: NPC template id -> the quest ids that reveal it (kill-target NPCs that aren't givers).
+			// The quest-gated spawns: NPC template id -> the quest ids that reveal it, for kill targets that are not
+			// quest givers.
 			if (_questGatedNpcs == null || _storyKillTargets == null || _escortHiddenNpcs == null)
 			{
 				var maps = System.Diagnostics.Stopwatch.StartNew();
@@ -155,28 +154,24 @@ namespace Faolan.GameServer.World
 				_logger.LogInformation("World: quest-gated / story-kill / escort-hidden NPC maps built in {Ms} ms (once per server).", maps.ElapsedMilliseconds);
 			}
 
-			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
-			// already produced one clean row per intended placement (keyed by MapId + exact XYZ), so this load path
-			// renders EVERY row verbatim - NO runtime dedup. The old name/cell collapse silently dropped legitimately
-			// distinct NPCs: neutral animals of the same name (5 Hens, 4 Scorpions), and faction guards standing 1-4
-			// units apart (the Tarantia Noble District line and the Castle of King Conan door pairs). Any genuine
-			// over-density is a data bug fixed in the importer, never hidden here.
+			// The spawn rows are the source of truth: the importer's burst-truth extraction already produced one clean
+			// row per intended placement, keyed by map and exact position, so this load path renders every row
+			// verbatim with no runtime deduplication. A name-or-cell collapse here silently drops legitimately distinct
+			// NPCs - neutral animals of the same name (5 Hens, 4 Scorpions) and faction guards standing 1 to 4 units
+			// apart (the Tarantia Noble District line, the Castle of King Conan door pairs). Genuine over-density is a
+			// data bug to fix in the importer, never to hide here.
 			//
-			// Wire handles are MINTED here (Zone.AllocateHandle), never read off the row. They used to be the spawn's
-			// CapturedHandle - whichever handle the capture the importer last saw it in happened to assign - which is a
-			// session-volatile value serving as a persistence key, and it was not even unique across the merged DB, so
-			// this loop needed a collision dance to stop one row silently overwriting another in the handle-keyed zone.
-			// The zone's counter is unique by construction and shared with the static objects, which the two separate
-			// captured ranges never guaranteed against each other.
-			// #713: rows sharing a PlacementId are SIGHTINGS of one patroller, not separate NPCs - the importer says
-			// so, having identified them by their harvested beat. One entity per placement, and the row it renders as
-			// is drawn from the others: they differ in exactly what retail re-rolls per spawn (level, morphs, all 7
-			// equipment slots), so the pool is what makes two spawns of one placement look different.
+			// Wire handles are minted here and never read off the row: a captured handle is session-volatile, is not
+			// unique across the merged database, and would need a collision dance to stop one row silently overwriting
+			// another in the handle-keyed zone. The zone's counter is unique by construction and shared with the static
+			// objects, which two separate captured ranges could never guarantee against each other.
 			//
-			// This is NOT the runtime dedup the note above forbids. That rule is about this layer inventing a collapse
-			// (the old name/cell heuristic, which silently dropped legitimately distinct NPCs); this renders a
-			// relationship the DATA declares. A row with no PlacementId stands for itself and is rendered verbatim;
-			// each pool contributes ONE row, drawn at random, so the beat gets one NPC wearing one of its rolls.
+			// Rows sharing a PlacementId are sightings of one patroller rather than separate NPCs - the importer says
+			// so, having identified them by their harvested beat - so each placement contributes one entity, and the
+			// row it renders as is drawn at random from the pool: the rows differ in exactly what retail re-rolls per
+			// spawn (level, morphs, all seven equipment slots), which is what makes two spawns of one placement look
+			// different. That is not the runtime deduplication forbidden above, which is about this layer inventing a
+			// collapse; this renders a relationship the data declares. A row with no PlacementId stands for itself.
 			var spawnRows = npcs
 				.Where(n => n.PlacementId == null)
 				.Concat(npcs.Where(n => n.PlacementId != null)
@@ -184,24 +179,24 @@ namespace Faolan.GameServer.World
 					.Select(pool => pool.ElementAt(Random.Shared.Next(pool.Count()))))
 				.ToList();
 
-			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
-			// #840: creatures with NO harvested disposition, which are served FRIENDLY and never aggro. Counted so the
-			// gap is stated at load instead of being discovered in play as "the crocodiles ignore me".
+			var labelledCount = 0; // diagnostic: how many captured spawns got a non-null area label this load
+			// Creatures with no harvested disposition, which are served friendly and never aggro. Counted so the gap is
+			// stated at load rather than discovered in play as creatures that ignore the player.
 			var undisposed = 0;
 			var undisposedNames = new HashSet<string>();
 			string? labelSample = null;
-			var followers = new Dictionary<WorldEntity, HashSet<uint>>(); // #741: follower -> the leader TYPES it may bind to
+			var followers = new Dictionary<WorldEntity, HashSet<uint>>(); // follower -> the leader types it may bind to
 			foreach (var npc in spawnRows)
 			{
-				// #528/#501: this type only exists inside a triggered spawn, so a row for it is not a creature standing
-				// in the world.
+				// This type only exists inside a triggered spawn, so a row for it is not a creature standing in the
+				// world.
 				if (triggerSpawned.Contains(npc.NpcTemplateId))
 					continue;
 
 				var npcName = npc.NpcTemplate.Name;
 
-				// Seed killable vitals from the NPC's REAL max health (lifted from the spawn into NpcSpawn.Health by the
-				// importer), falling back to a level-scaled value when the spawn carried none.
+				// Seed killable vitals from the NPC's real max health, which the importer lifts from the spawn, falling
+				// back to a level-scaled value when the spawn carried none.
 				var maxHealth = npc.Health > 0
 					? npc.Health
 					: CombatResolver.NpcMaxHealthForLevel(npc.Level);
@@ -211,81 +206,80 @@ namespace Faolan.GameServer.World
 				var handle = zone.AllocateHandle();
 
 				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals, npc.NpcTemplateId);
-				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
-				// #671: a mob that SHOOTS deals about a fifth of what one that swings does. Decided here, off the
-				// equipment rows this query already Includes, so the combat tick reads a flag rather than a join.
+				entity.InstanceId = instanceId; // this NPC belongs to this copy of the map
+				// Whether the mob shoots rather than swings, which is worth about a fifth of the damage. Decided here,
+				// off the equipment rows this query already includes, so the combat tick reads a flag rather than a join.
 				entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment);
-				entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange); // #838: hold a bow's distance
-				// #623: and which `combo_npc_generic_*` its swings perform, off the same rows.
+				entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange); // hold a bow's distance
+				// And which generic weapon combo its swings perform, off the same rows.
 				entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment);
 				entity.Level = npc.Level;
-				// #675: and the class-family rows it may swing instead, level-gated on the level just stamped.
+				// And the class-family rows it may swing instead, gated on the level just stamped.
 				entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level, npc.NpcTemplate.StatCore?.ComboClass);
-				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
-				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
-				// #262: an escortee NPC vanishes once its escort quest is COMPLETED (e.g. Casilda after the beach escort);
-				// keyed by template id, complement of the "show while active" gate below.
+				// An escortee NPC vanishes once its escort quest is completed - Casilda after the beach escort - keyed
+				// by template id. This is the complement of the show-while-active gate below, which stamps the quest
+				// ids that reveal a gated NPC so interest streams it only to players holding one of them.
 				if (_escortHiddenNpcs.TryGetValue(npc.NpcTemplateId, out var hideQuest))
 					entity.HideWhenQuestCompletedId = hideQuest;
 
 				if (_questGatedNpcs.TryGetValue(npc.NpcTemplateId, out var gateQuests))
 					entity.GateQuestIds = gateQuests;
 
-				// …and, SEPARATELY, whether it stays dead (#708). A story kill target must not respawn at all -
-				// killing Scavenger Tuut for Casilda's quest completes the goal and he should stay dead (retail
-				// solo-instances him), so he despawns after death instead of reviving; his loot bag (the quest key) is
-				// a separate entity and still drops. ⚠️ Not implied by the gate: a quest-only target on a REPEATABLE
-				// quest is gated and must come back, which is the case the welded column could not express.
+				// And, separately, whether it stays dead. A story kill target must not respawn: killing Scavenger Tuut
+				// for Casilda's quest completes the goal and he should stay dead, retail solo-instancing him, so he
+				// despawns after death instead of reviving, while his loot bag - the quest key - is a separate entity
+				// and still drops. This is not implied by the visibility gate: a quest-only target on a repeatable
+				// quest is gated and must come back.
 				if (_storyKillTargets.Contains(npc.NpcTemplateId))
 					entity.Route.NoRespawn = true;
 
-				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
-				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
-				// speed/flags, so the client walks the route at the right pace (a rebuilt mode-1 path lost the speed and
-				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
+				// Attach this NPC's captured route, linked by exact spawn position, replaying the captured MoveTask
+				// re-addressed to this entity. The original form carries the real speed and flags, so the client walks
+				// the route at the right pace; a rebuilt mode-1 path loses the speed and crawls. The cycle timer - path
+				// time plus dwell - re-issues it so the route keeps looping.
 				if (npc.PatrolNodes is { Count: > 0 } patrol)
 				{
 					var waypoints = PatrolRoute.Waypoints(patrol);
 					if (waypoints.Count > 0)
 					{
 						entity.Route.PatrolWaypoints = waypoints;
-						// #703: an ORDERED route, so the tick WALKS it waypoint by waypoint instead of drifting to a
-						// random one of its waypoints - that straight line is what sent Old Tarantia's guards through
-						// the houses. A route whose ends meet is walked round and round; an open one is walked back
+						// An ordered route, so the tick walks it waypoint by waypoint instead of drifting to a random
+						// one of its waypoints - that straight line is what sends Old Tarantia's guards through the
+						// houses. A route whose ends meet is walked round and round and an open one is walked back
 						// down again; either way it joins at the waypoint nearest where it spawned.
 						entity.Route.WalksRoute = true;
 						entity.Route.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
 						entity.Route.RejoinRouteAtNearest(entity.Position);
 						entity.Route.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
-						// #714: a beat is WALKED, at the speed retail's own patrollers are observed moving at - not at the
-						// chase speed, and not at the route's trailer scalar (which is not a ground speed; see
-						// WorldState.RouteWalkSpeed for the measurement that rules it out).
+						// A beat is walked, at the speed retail's own patrollers are observed moving at - not the chase
+						// speed, and not the route's trailer scalar, which is not a ground speed; see
+						// WorldState.RouteWalkSpeed for the measurement that rules it out.
 						entity.Route.RouteSpeed = WorldState.RouteWalkSpeed;
 						entity.Route.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.Route.PatrolWaypoints) / entity.Route.RouteSpeed + PatrolDwellSeconds;
 						entity.Route.ArmPatrolCycle();
 					}
 				}
 
-				// Disposition drives BOTH the overhead name colour and whether this NPC aggros. It is the captured
-				// retail cCategory (NpcStatCore.Disposition, #256/aggro) - the SOLE correct hostility source. Community
-				// is faction MEMBERSHIP, NOT hostility: community 1 is the civilian/default faction shared by Citizens,
-				// vendors and guards, so the old `community > 0` test wrongly aggroed every townsperson. NULL disposition
-				// -> friendly (the client's green default for an un-told-about NPC). Only cCategory 1 (hostile) aggros.
+				// Disposition drives both the overhead name colour and whether this NPC aggros. It is the captured
+				// retail cCategory, and the only correct hostility source: community is faction membership rather than
+				// hostility, since community 1 is the civilian default shared by citizens, vendors and guards, so
+				// testing on it aggros every townsperson. A null disposition means friendly, the client's green default
+				// for an NPC it has been told nothing about, and only cCategory 1 aggros.
 				//
-				// ⚠️ That default is a real gap, not a neutral choice, and it is COUNTED rather than passed over (#840):
-				// a creature nobody ever polled and that no capture caught fighting stands in the world green and
-				// passive. The beach crocodiles were the reported case. The count is reported per zone below, because a
-				// world that is quietly missing its monsters looks exactly like a world with no monsters in it.
+				// That default is a real gap rather than a neutral choice, so it is counted rather than passed over: a
+				// creature nobody ever polled and that no capture caught fighting stands in the world green and
+				// passive. The count is reported per zone below, because a world quietly missing its monsters looks
+				// exactly like a world with no monsters in it.
 				//
-				// The gap is now the RESIDUE of four tiers rather than of one (#841, `NpcDispositionTiers`): own poll,
-				// caught attacking, faction roll-up, then the static mob rule. 645 placements over 154 types came down
-				// to 102 over 61 - and what is left is Refugees, Commoners, a Target Dummy and named story NPCs, which
-				// is the population the friendly default is actually right for.
+				// The gap is the residue of four tiers (see NpcDispositionTiers): the creature's own poll, being caught
+				// attacking, a faction roll-up, then the static mob rule. That takes 645 placements over 154 types down
+				// to 102 over 61, and what is left is Refugees, Commoners, a Target Dummy and named story NPCs - the
+				// population the friendly default is right for.
 				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
-				// #822: hostile-COLOURED is not hostile-BEHAVED. An armed humanoid engages; an unarmed one is a
-				// civilian retail happens to colour red (the Town Crier, the Tarantia nobles, the Dockworkers), and
-				// anything non-humanoid needs no weapon to mean it. Morph rows are the humanoid signal.
+				// Hostile-coloured is not hostile-behaved. An armed humanoid engages; an unarmed one is a civilian
+				// retail happens to colour red - the Town Crier, the Tarantia nobles, the Dockworkers - and anything
+				// non-humanoid needs no weapon to mean it. Morph rows are the humanoid signal.
 				entity.Aggressive = NpcWeapon.Initiates(npc.Equipment, npc.Morphs.Count > 0);
 				if (npc.NpcTemplate.StatCore?.Disposition == null)
 				{
@@ -293,32 +287,33 @@ namespace Faolan.GameServer.World
 					undisposedNames.Add(npc.NpcTemplate.Name ?? $"#{npc.NpcTemplateId}");
 				}
 
-				// The creature's death animation (#362): use the type's harvested death behaviorId, else the humanoid
-				// default. Sent in the death BccIIR by CombatService.OnNpcKilled so demons/beasts play their own death.
+				// The creature's death animation: the type's harvested death behaviour id, else the humanoid default.
+				// The kill path sends it in the death BccIIR, so demons and beasts play their own death.
 				if (npc.NpcTemplate.DeathBehaviorId is { } deathBehavior)
 					entity.DeathBehaviorId = deathBehavior;
 				entity.DeathActivationTime = npc.NpcTemplate.DeathActivationTime;
 
-				// The loot container this type drops on death (Bag by default, a bigger chest for bosses) - picked by
-				// the kill-drop path (SpawnLootBagAt) via its LootContainerTemplate variant.
+				// The loot container this type drops on death - a bag by default, a bigger chest for bosses - which the
+				// kill-drop path picks by its container variant.
 				entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId;
-				// #310: the Khitai faction this creature belongs to, so a kill can pay reputation. Null for every
-				// base-game NPC - the ids are the expansion's.
+				// The Khitai faction this creature belongs to, so a kill can pay reputation. Null for every base-game
+				// NPC, because the ids are the expansion's.
 				entity.FactionId = npc.NpcTemplate.StatCore?.FactionId;
-				// #150: what this creature's kill is worth to the AA pool is a property of its TEMPLATE - the named
-				// tier pays roughly double and one flagged tier ~15% more (AlternateAdvancementRules).
+				// What this creature's kill is worth to the alternate-advancement pool is a property of its template:
+				// the named tier pays roughly double and one flagged tier about 15% more - see AlternateAdvancementRules.
 				entity.NpcType = npc.NpcTemplate.StatCore?.NpcType;
 				entity.NpcFlags = npc.NpcTemplate.StatCore?.NpcFlags;
 
-				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
-				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
-				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
-				// token per-send (SpawnTransformPatch), since that token isn't known until the player enters.
-				// #363 dev label: the client ignores the spawn-body free `Name` for an NPC's floating nameplate (it uses
-				// the template_id LDB name), so we DON'T bake the label into the spawn body - we push the AREA LABEL via a
-				// SetNameIIR after the spawn (SendWorldSpawn), gated on the .togglenpcgroup toggle. The client hard-caps a
-				// SetNameIIR name at 31 bytes, so we show the label alone (group | tier xN, ~24 chars) - the group name is
-				// what a labeling pass needs. Stashed here unconditionally so the toggle is instant.
+				// Keep the NPC's FA015807 spawn body, addressed to the chosen handle, so interest and respawn can
+				// re-render it for nearby players. It is built whole from typed columns with this zone's load-time
+				// playfield token baked in, and the send re-stamps the entering player's live token, which is not known
+				// until that player enters.
+				//
+				// The area label is not baked into the spawn body: the client ignores the body's free-text name for an
+				// NPC's floating nameplate, using the template's LDB name instead, so the label is pushed as a separate
+				// name record after the spawn, gated on the .togglenpcgroup toggle. That record's name is hard-capped
+				// at 31 bytes by the client, so it carries the label alone - group and tier, about 24 characters - which
+				// is what a labelling pass needs. It is stashed here unconditionally so the toggle is instant.
 				if (SpawnAreaLabels.AreaLabelFor(spawnAreas, npc) is { } areaLabel)
 				{
 					entity.OverheadNameOverride = areaLabel;
@@ -326,66 +321,56 @@ namespace Faolan.GameServer.World
 					labelSample ??= areaLabel;
 				}
 
-				// #714: a creature that WALKS a captured beat spawns in movement mode 1, not the type's stored one.
-				// The mode is what the client picks its locomotion speed by (PathMoveTask advances by a per-mode speed
-				// field), and it is per-spawn STATE rather than type identity - retail sends 1 and 2 for the same
-				// creature. Ours were locked to whatever value the type happened to be lifted with, which for the
-				// Old Tarantia patrollers is 2, so they ran their beats.
+				// A creature that walks a captured beat spawns in movement mode 1 rather than the type's stored mode.
+				// The mode is what the client picks its locomotion speed by - the path task advances by a per-mode
+				// speed field - and it is per-spawn state rather than type identity: retail sends 1 and 2 for the same
+				// creature. Taking the type's value gives the Old Tarantia patrollers mode 2, and they run their beats.
 				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeWalk : (uint?)null;
 				var bodyZone = _sim.World.ZoneFor(mapId, instanceId);
 				var token = bodyZone.PlayfieldToken;
-				// #309: an EPIC copy serves the normal population wearing the ELITE decorations - the one spawn-level
-				// change beside health the captures show, and health is deliberately not retuned yet.
+				// An epic copy serves the normal population wearing the elite decorations: the one spawn-level change
+				// beside health the captures show, and health is deliberately not retuned yet.
 				var epicNormalset = bodyZone.IsEpic ? EpicDecorations.NormalsetFor(npc.NpcTemplate.StatCore) : null;
 				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, spawnMovementMode, normalsetOverride: epicNormalset);
 
-				// #827: a quest ESCORTEE gets a second body for after its rescue. Two things differ, and both were
-				// reported in-client against Casilda:
+				// A quest escortee gets a second body for after its rescue, built here rather than at the rescue
+				// because this is where the row is in hand. What differs is the pose: AnimIdleId is the pose the
+				// creature holds, and Casilda's is 156196, her chained struggle, unique across all 1,208 templates
+				// where the generic idle is shared by 1,008. It ships in the spawn record, so every stream-in
+				// re-asserts the chains no matter what behaviour pose follows.
 				//
-				//   * the POSE. `AnimIdleId` is the pose the creature HOLDS, and hers is 156196 - her chained struggle,
-				//     unique across all 1,208 templates where the generic idle 42024 is shared by 1,008. It ships in
-				//     the spawn record, so every stream-in re-asserted the chains no matter what BCC pose followed;
-				//     she stood up the moment the record carried the ordinary idle.
-				// Built here rather than at the rescue because this is where the row is in hand.
-				//
-				// ⚠️ The MODE is deliberately left as the type's (mode 2, run) and is NOT forced to walk. Forcing walk
-				// was tried and made things worse: a follower is stepped by the server at `NpcMoveSpeed` (7 u/s, the
-				// chase constant) while the client animates at the per-mode speed from ITS OWN template data (#714), so
-				// walk mode widened the gap the 6-unit segment broadcast then closes by snapping her forward. The
-				// remaining slide is that same server-step vs client-speed mismatch and is NOT fixed here - see #829.
+				// The movement mode is deliberately left as the type's - mode 2, run - and not forced to walk. A
+				// follower is stepped by the server at the chase speed while the client animates at the per-mode speed
+				// from its own template data, so walk mode widens the gap that the segment broadcast then closes by
+				// snapping the follower forward.
 				if (entity.IsQuestEscortee)
 					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId, OrdinaryBccState, epicNormalset);
 
-				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
-				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
+				// The spells this NPC type casts, read from the template's own rows, which are loaded with the spawn.
+				// Empty for a non-caster.
 				if (npc.NpcTemplate.Spells is { Count: > 0 } typeSpells)
 				{
 					foreach (var s in typeSpells)
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
 
-					// ⛔ `AttackSpellBaseId` was DECLARED and READ and never once ASSIGNED (#902, 2026-08-30) - the whole
-					// tree had exactly three mentions of it: the property, the `!= 0` guard in `NpcCombatService`, and
-					// the call that guard protects. So it was 0 for every creature that has ever existed here, the guard
-					// was never true, and a melee swing has NEVER put a health `StatDamageIIR` on the wire. The gap read
-					// as a DATA gap ("only 35 of 1,227 templates carry an ability") when it was a wiring one: not even
-					// those 35 reached the entity.
+					// The ability a physical hit names in its health record. This is the only place it is assigned, and
+					// without it the guard in the NPC combat path never fires, so a melee swing puts no health record
+					// on the wire at all. The base id is the spell row's wire id shifted right by 8, and this is where
+					// that row is in hand.
 					//
-					// The property documents its own source - `NpcSpells.SpellId >> 8` - and this is where that row is
-					// already in hand, so it is where the shift belongs. First row wins: a creature's rows are its
-					// abilities and retail names one of them per physical hit (`Ripper Volley`, `Rend`, `Butcher`), so
-					// which one is a fidelity question, while having none at all is why the record is absent entirely.
+					// The first row wins: a creature's rows are its abilities and retail names one of them per physical
+					// hit (Ripper Volley, Rend, Butcher), so which one is a fidelity question where having none at all
+					// is a missing record.
 					entity.AttackSpellBaseId = typeSpells.First().SpellId >> 8;
 				}
 
-				// Bark lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent). The entity
-				// caches the bark VALUES; the chat tier renders them (#539), so the world model never holds pre-built
-				// wire text - the same reason wave 6 took OriginalData off the snapshot sub-class.
+				// The bark lines for this NPC type; an NPC with no captured group stays silent. The entity caches the
+				// bark values and the chat tier renders them, so the world model never holds pre-built wire text.
 				//
-				// #694: split by CUE, not pooled. A bark's channel says what makes the NPC say it - ambient chatter runs
-				// on the tick's clock, a `sendtell` greeting fires when a player is DETECTED arriving, and an `event`
-				// line belongs to the encounter script's own trigger (#502). Pooling them put the crier's greeting and
-				// the Damsel's cry for help on the ambient clock, which is why the crier greeted an empty street and the
-				// Damsel called for help twice.
+				// They are split by cue rather than pooled, because a bark's channel says what makes the NPC say it:
+				// ambient chatter runs on the tick's clock, a greeting fires when a player is detected arriving, and an
+				// event line belongs to the encounter script's own trigger. Pooling them puts a greeting on the ambient
+				// clock, so the NPC greets an empty street.
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
 				{
 					var barks = chatter.Select(c => NpcChatterColumns.ToBark(c)).ToLookup(NpcChatterBarks.TriggerOf);
@@ -394,9 +379,9 @@ namespace Faolan.GameServer.World
 					entity.Presentation.EncounterLines = barks[BarkTrigger.EncounterScript].ToArray();
 				}
 
-				// #766: the ambient idle ANIMATIONS this creature performs while standing about, weighted as retail was
-				// captured playing them. A type with none stands still - the honest gap, and the reason this is not
-				// defaulted to the type's single `AnimIdleId` (that is the pose it holds, not something it does).
+				// The ambient idle animations this creature performs while standing about, weighted as retail was
+				// captured playing them. A type with none stands still, which is the honest gap and the reason this is
+				// not defaulted to the type's single AnimIdleId: that is the pose it holds, not something it does.
 				if (npc.NpcTemplate.AmbientAnimations is { Count: > 0 } ambient)
 				{
 					entity.Presentation.AmbientAnimations = ambient
@@ -406,23 +391,23 @@ namespace Faolan.GameServer.World
 					entity.Presentation.ArmAmbientAnimation(Random.Shared.NextDouble() * WorldState.AmbientAnimationPauseMedianSeconds * 4);
 				}
 
-				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
-				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades
-				// on death, replaced by the pool), and it counts toward MaxCount so the pool only tops up the DEFICIT -
-				// no captured/ambient overlap.
+				// A captured spawn linked to an ambient area is a member of that area's pool: it renders with its
+				// captured appearance, but the pool owns its respawn - it fades on death and the pool replaces it - and
+				// it counts toward the pool's MaxCount, so the pool only tops up the deficit and the two populations
+				// never overlap.
 				if (npc.NpcSpawnAreaId is { } linkedAreaId)
 				{
 					entity.SpawnAreaId = linkedAreaId;
 					entity.Route.NoRespawn = true;
 				}
 
-				// #502: a placement whose TYPE has a scripted encounter on this map becomes a LURE - it watches for an
-				// approaching player and swaps itself for its boss. Every placement of the type is armed, since the
-				// definition is keyed by (map, type) rather than by one spot.
+				// A placement whose type has a scripted encounter on this map becomes a lure: it watches for an
+				// approaching player and swaps itself for its boss. Every placement of the type is armed, because the
+				// definition is keyed by map and type rather than by one spot.
 				entity.Presentation.ArmEncounter(encounters.GetValueOrDefault(npc.NpcTemplateId));
 
-				// #741: the creature TYPES this one walks with, kept until every entity is in the zone - a follower is
-				// bound to a LIVE leader, so the binding cannot be made while the leader may not be loaded yet.
+				// The creature types this one walks with, kept until every entity is in the zone: a follower is bound
+				// to a live leader, so the binding cannot be made while the leader may not be loaded yet.
 				if (npc.NpcTemplate.Follows is { Count: > 0 } follows)
 					followers[entity] = follows.Select(f => f.LeaderTemplateId).ToHashSet();
 
@@ -436,8 +421,8 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup) in {Ms} ms.", zone.Count, mapId, instanceId, npcs.Length, clock.ElapsedMilliseconds);
 			if (undisposed > 0)
 			{
-				// WARNING, not information: these creatures are being served green and passive because nothing in the
-				// corpus ever said otherwise, which in play reads as "the monsters are broken" (#840).
+				// A warning rather than information: these creatures are served green and passive because nothing in
+				// the corpus said otherwise, which in play reads as the monsters being broken.
 				_logger.LogWarning("World: {Count} NPC(s) on map {Map} have NO harvested disposition and are served FRIENDLY - they will not aggro: {Names}.", undisposed, mapId,
 					string.Join(", ", undisposedNames.Order().Take(8)) + (undisposedNames.Count > 8
 						? $", +{undisposedNames.Count - 8} more"
@@ -447,10 +432,15 @@ namespace Faolan.GameServer.World
 				labelSample ?? "<none>");
 		}
 
-		// Loads a map's static world objects into its zone ONCE, the world-object twin of EnsureZoneNpcs (#424). Before
-		// this the entry path re-queried them per world entry, which is also how a missing `Include(o => o.Words)`
-		// managed to ship invisible doors, vines and destructibles (ef9b59de) - one load per zone is one place to get
-		// that right.
+		/// <summary>
+		///     Loads a map's static world objects into its zone once: the world-object twin of
+		///     <see cref="EnsureZoneNpcs" />.
+		/// </summary>
+		/// <remarks>
+		///     One load per zone is one place to get the query right. Re-querying per world entry instead spreads that
+		///     across the entry path, where a missing include has already shipped invisible doors, vines and
+		///     destructibles.
+		/// </remarks>
 		public async Task EnsureZoneWorldObjects(uint mapId, uint instanceId)
 		{
 			if (!_objectLoadedZones.TryAdd((mapId, instanceId), 0))
@@ -461,10 +451,10 @@ namespace Faolan.GameServer.World
 			[
 				.. (await _world.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row)
 				{
-					// A harvest node starts FULL on every zone load (#494). Retail's nodes are shared across the whole
-					// playfield and regrow, and neither the sharing nor a respawn cadence is measured - so a fresh zone
-					// giving a full node is the closest honest model, and it means a harvested node comes back rather
-					// than being gone for good. Null for everything that is not a node.
+					// A harvest node starts full on every zone load. Retail's nodes are shared across the whole
+					// playfield and regrow, and neither the sharing nor a respawn cadence is measured, so a fresh zone
+					// giving a full node is the closest honest model and means a harvested node comes back rather than
+					// being gone for good. Null for everything that is not a node.
 					Health = HarvestCatalog.IsHarvestable(row.DisplayCategory, row.DisplayId)
 						? HarvestCatalog.NodeMaxHealth
 						: null
@@ -472,13 +462,14 @@ namespace Faolan.GameServer.World
 			];
 		}
 
-		// Why a class-specific destination may not be enterable yet, or null when it is.
-		//
-		// A class-specific playfield (Map.ClassSpecific - the city armories, and The Reliquary) holds a different NPC
-		// set per class, and we
-		// only have the classes some capture actually walked into. Teleporting a class we hold no set for would drop the
-		// player into an empty room - and on a map with no captured world objects either, one with no door back out. So
-		// the zone-line reports the gap in-game instead of teleporting, the same rule as an un-imported vendor.
+		/// <summary>Why a class-specific destination may not be enterable yet, or null when it is.</summary>
+		/// <remarks>
+		///     A class-specific playfield - <c>Map.ClassSpecific</c>, the city armories and The Reliquary - holds a
+		///     different NPC set per class, and only the classes a capture actually walked into are imported.
+		///     Teleporting a class with no set would drop the player into an empty room, and on a map with no captured
+		///     world objects either, one with no door back out. The zone-line therefore reports the gap in-game instead
+		///     of teleporting, the same rule an un-imported vendor takes.
+		/// </remarks>
 		public async Task<string?> DescribeMissingClassImport(uint mapId, ConanClass forClass)
 		{
 			var map = await _world.GetMap(mapId);
@@ -498,6 +489,21 @@ namespace Faolan.GameServer.World
 			return $"{name} is class-specific and has no import for {forClass} - {have}.";
 		}
 
+		/// <summary>
+		///     Binds each formation follower to the nearest live leader of a type it walks with.
+		/// </summary>
+		/// <remarks>
+		///     Retail expresses this as a move task whose task names the other creature's handle, so it is a
+		///     per-placement binding built out of a per-type rule - which is what the database holds, and what cannot be
+		///     resolved until every entity is in the zone.
+		///     <para>
+		///         The leader is the nearest one within <see cref="FormationBindRange" />: a map carries several groups
+		///         of the same two types - five separate Nemedian Deathstalker groups in one capture, four Ginger and
+		///         Scruffy pairs across three - so binding to any leader of that type would march a follower across the
+		///         zone to the wrong one. A leader that is itself a follower is allowed, and a follower that finds no
+		///         leader in range keeps its own behaviour.
+		///     </para>
+		/// </remarks>
 		private void BindFormationFollowers(Zone zone, Dictionary<WorldEntity, HashSet<uint>> followers)
 		{
 			if (followers.Count == 0)

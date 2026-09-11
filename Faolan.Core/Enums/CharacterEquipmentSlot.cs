@@ -6,8 +6,8 @@ namespace Faolan.Core.Enums
 	// snapshot's equipped-container slot bytes / the archive player_items column order). All 17 retail slots
 	// are mapped from captures - the layout is the melee pair (6/8), the ranged pair (20/21) and gaps at
 	// 4/13/19; 17 is the legacy starter-bag cell (FirstPosBag, handled separately). NecroL80 wears items in every
-	// slot incl. Bag (3, the equipped bag that sizes the backpack - was mislabeled "Tokens"), OffHandWeapon
-	// (8, Ceremonial Dagger), RangedWeapon (20, Executioner Crossbow) and Ammo (21, Bolt Quiver).
+	// slot incl. Bag (3, the equipped bag that sizes the backpack), OffHandWeapon (8, Ceremonial Dagger),
+	// RangedWeapon (20, Executioner Crossbow) and Ammo (21, Bolt Quiver).
 	public enum CharacterEquipmentSlot : uint
 	{
 		Neck = 1,
@@ -27,25 +27,24 @@ namespace Faolan.Core.Enums
 		Wrist = 18,
 		RangedWeapon = 20, // main_hand_right (bow/crossbow/thrown)
 		Ammo = 21, // off_hand_right (quiver/bolts)
-		// ⭐ The CARRIED-object slot, recovered from the client's item templates (#916). Six templates place here -
+		// The carried-object slot, recovered from the client's item templates. Six templates place here -
 		// `Placement` = 1<<23 with `DefaultPos` = 23 - and they are exactly the things a character visibly carries:
 		// "Bundle of Wood", "Baracha Basket of Fruit", "Battle Plan Fragment I", "Letter to Hakon Wolftamer" and two
 		// whose own asset names end in `_carryable` ("Global rolledup blankets carryable", "Global decor crate
 		// carryable"). No capture shows one worn - none of the corpus's sessions runs a carry quest - so the slot is
-		// named from the client's data rather than from the wire, the same way slot 26 was found before a live equip
-		// confirmed it.
+		// named from the client's data rather than from the wire.
 		// [V1: Items.Placement, imported from RDB item-template field 298]
 		Carried = 23,
 
-		ResourceBag = 26, // the equipped RESOURCE bag - sizes the resource container (kind 112), the sibling of Bag (3)
+		ResourceBag = 26, // the equipped resource bag - sizes the resource container (kind 112), the sibling of Bag (3)
 		// for the backpack. Live-confirmed: equipping a Max Resource Bag sent InventoryToEquipped
 		// target 26. Its extra slots come from Item.ResourceBagExtraSlots (RDB field 1331), added on
 		// top of the 48-slot base.
 
-		// NOTE: there is apparently also a QUEST bag - the third sibling, growing the quest container (kind 113) the way
-		// Bag grows the backpack and ResourceBag grows the resource container. Its equip slot id is UNKNOWN: no quest
-		// bag exists in the DB to equip and read the target slot from (the resource bag's slot 26 was recovered that
-		// way). Add the enum member + the CharacterEquipment slot + the quest-container sizing once one surfaces.
+		// There is apparently also a quest bag - the third sibling, growing the quest container (kind 113) the way
+		// Bag grows the backpack and ResourceBag grows the resource container. Its equip slot id is unknown: no quest
+		// bag exists in the DB to equip and read the target slot from. Add the enum member, the CharacterEquipment
+		// slot and the quest-container sizing once one surfaces.
 
 		// Vanity ("costume") item slots = 1000 + the base equip slot id. VanityHead (1002) and VanityChest (1005) are
 		// capture-confirmed by the ToggleVanityArmorFilter slot arg (base slot 2/5); 1007/1011/1014/1018 are confirmed
@@ -53,9 +52,9 @@ namespace Faolan.Core.Enums
 		// 1011, 1014 and 1018 next to the worn set (faolan-account-login-necrol80-necro-lvl80), and VanityLegs (1016)
 		// by DemoL80's ("Red Rags", faolan-account-login-demol80-demonologist-lvl80). Only VanityChest (1005) has yet
 		// to appear in a captured equipped container.
-		// ⚠ A slot missing from this enum is DROPPED on import (`Enum.IsDefined` in CaptureCharacterImporter) and
+		// A slot missing from this enum is dropped on import (`Enum.IsDefined` in CaptureCharacterImporter) and
 		// never reaches the wire. Sweep the captured equipped containers for unknown pos values before assuming the
-		// set is complete - that is how 1016 was found, one item short at "20/21 worn".
+		// set is complete.
 		VanityHead = 1002,
 		VanityChest = 1005,
 		VanityBelt = 1007,

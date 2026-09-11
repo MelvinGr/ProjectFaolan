@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 {
 	// One waypoint of a PatrolNode's PathMoveTask (mode 1) - a big-endian vec3 the NPC walks to, in walk order
 	// (Ordinal). Cascade-deletes with its PatrolNode. Split from PatrolWaypoint (which is the legacy flat per-path
-	// list) so multi-segment patrols keep each segment's waypoints under their own node (#316).
+	// list) so multi-segment patrols keep each segment's waypoints under their own node.
 	// Keyed by the natural composite (PatrolNodeId, Ordinal) - configured in DatabaseContext.OnModelCreating -
 	// rather than a surrogate Id: a node has exactly one waypoint per walk position.
 	[PrimaryKey(nameof(NpcSpawnId), nameof(OrdinalPath), nameof(Ordinal))]
