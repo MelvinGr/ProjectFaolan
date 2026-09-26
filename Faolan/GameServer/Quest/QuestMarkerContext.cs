@@ -17,8 +17,8 @@ namespace Faolan.GameServer.Quest
 	public sealed class QuestMarkerContext
 	{
 		private readonly IWorldRepository _world;
-		private readonly Dictionary<uint, QuestLineMembership?> _membership = new Dictionary<uint, QuestLineMembership?>();
-		private readonly Dictionary<uint, QuestDefinition[]> _lineSteps = new Dictionary<uint, QuestDefinition[]>();
+		private readonly Dictionary<uint, QuestLineMembership?> _membership = [];
+		private readonly Dictionary<uint, QuestDefinition[]> _lineSteps = [];
 
 		private QuestMarkerContext(IWorldRepository world, Character character, CharacterQuest[] quests, (CharacterQuest Quest, QuestDefinition Definition)[] active)
 		{
