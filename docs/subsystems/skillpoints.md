@@ -33,7 +33,7 @@ The list IS the transfer: one pair debits the pool, the rest credit skills, and 
 
 Four for four, in order. [V3: SkillPointTests.ParseCapturedSpend_IsAConservingTransferOutOfThePool]
 
-⚠️ **The `0x3F1` trap, caught in the act.** These bodies read naturally as
+**The `0x3F1` trap.** These bodies read naturally as
 `[u32 0x0000000B][u8 0xD3][pairs]` — two plausible constants that are really **one misaligned word**. Split
 correctly, the base record's `env` byte takes the third byte of the apparent zero-run and what is left is
 `0x00000BD3 = 3 × 0x3F1` = a two-element list. Both readings consume the same 37 bytes and both "work" on all four
@@ -81,7 +81,7 @@ per-login grant.
 Refusals are **silent**: retail's client gates the spend itself, so a request that fails here is a client that
 already disagrees with us, and there is no captured rejection message to send.
 
-⚠️ **Sellback is deliberately not implemented.** `DoSkillSellback(int i_eStat)` exists in the client's method table
+**Sellback is deliberately not implemented.** `DoSkillSellback(int i_eStat)` exists in the client's method table
 and the transfer grammar would express a refund perfectly well (pool credit, skill debit), but there is **zero**
 sellback traffic in the corpus and the signature carries no amount, so the refund is unrecoverable. Accepting the
 reverse direction on trust would let a client cash out the base value every character starts with (`Perception` 560
@@ -89,4 +89,4 @@ on the captured necromancer) as 560 free points.
 
 Also unmodelled: a **cap** per skill. The client names `MaxClimbing` / `MaxHiding` / `MaxPerception` /
 `MaxRunspeed` (`0x333` / `0x33D` / `0x33F` / `0x43E`), but none of them appears in any captured stat sheet, so
-there is nothing to enforce against yet.
+there is nothing to enforce against.

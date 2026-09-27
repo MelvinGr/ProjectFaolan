@@ -1,17 +1,14 @@
-# Body-morph reverse engineering (#275)
+# Body-morph reverse engineering
 
-Status of the attempt to recover AoC's *exact* body-proportion morph deformation from `AgeOfConan.exe`
-(so the viewer can apply authentic morphs instead of the geometric approximation in
-`Faolan.Core.Rdb/Assets/BodyMorphDeformer.cs`). Ghidra project: `tools/ghidra/output`
-(scripts in `tools/ghidra/`, exe PE32 i386 stripped).
+How AoC's body-proportion morph deformation works, recovered from `AgeOfConan.exe` (PE32 i386, stripped; scripts
+in `tools/ghidra/`), and how `Faolan.Core.Rdb/Assets/BodyMorphDeformer.cs` applies it.
 
-## What was recovered (solid)
+## Rendermesh chunks
 
 - **Rendermesh chunk dispatcher** `FUN_00e4ec90` (`fmemesh.cpp`) switches on the 4-byte chunk tag:
   - `0x53554c43` **"CLUS"** → `FUN_00e51cb0` (cluster definitions)
   - `0x4d505044` **"DPPM"** → `FUN_00e51ef0` (**DPP = depth-pre-pass / alpha-safe mesh, NOT a morph target** —
-    the reader's own assert string is *"DPP mesh for alpha-safe mesh %d"*). This kills the earlier theory
-    that DPPM is the morph submesh; the viewer's geometric deformer is right to ignore it.
+    the reader's own assert string is *"DPP mesh for alpha-safe mesh %d"*); the deformer ignores it.
   - `0x30464e49` **"INF0"** → `FUN_00e51b40` (influence data)
   - `0x54535543` **"CUST"** → `FUN_00e51a50`
 - **CLUS reader** `FUN_00e51cb0`: iterates a *pre-existing* cluster vector (mesh `+0x624` data / `+0x628`
@@ -24,9 +21,9 @@ Status of the attempt to recover AoC's *exact* body-proportion morph deformation
   within `[min_value, max_value]`. Confirms the BodyNode clamp model (BODY morphs clamp to ±0.1; the
   importer stores the raw slider ~[-100,100]). Other refs: `FUN_012900e0`, `FUN_012940b0`.
 
-## CLUS is NOT the morph system (the key reframe)
+## CLUS is not the morph system
 
-A second Ghidra pass settled it. The `FUN_00f73xxx` functions that consume the cluster vector
+The `FUN_00f73xxx` functions that consume the cluster vector
 (`mesh+0x624`, stride `0x2c`) all live in **`SandBox\modelconstraints.cpp`** / `ModelInstance.h` and only
 **toggle per-cluster status flags** ("pStatus") — enable/disable a body-part triangle group. The cluster
 set includes `_L_arm_decapitation` / `_R_arm_decapitation`. So **CLUS is the body-part visibility /
@@ -36,24 +33,24 @@ the index count). It is not a proportion-morph carrier. The correct CLUS parse i
 `[u16 start][u16 count][u16 0x9030][u8 flag][u32 nameLen][name]` (numbers BEFORE name) — but it does not
 help morphs.
 
-Other carriers eliminated this pass:
+Other carriers that are not morphs:
 - **DPPM** = depth-pre-pass / alpha-safe mesh (assert *"DPP mesh for alpha-safe mesh %d"*).
 - **INF0** (`FUN_00e51b40`) = bbox/pivot floats into `mesh+0x2f0` + a **vertex-lighting** buffer ("unable
   to create vertex lighting buffer"). Not morphs.
 - The body mesh-index (1102540) bundles two extra resources (`type=5204334`, `type=9398638`) — both turned
   out to be **PNG textures**, not morph geometry.
 
-## Where the body morph actually is (still open)
+## No static anchor into the runtime deform
 
 The CHARACTERCREATOR `BodyNodes/MorphNode` carry only `MorphName` + `min/max` (no target geometry, unlike
 `FaceNodes` which name blend targets). The morph names (`bosom`, `thigh`, ...) are referenced ONLY by the
 CC XML parser `FUN_01106a60` — so at runtime body morphs are applied **positionally** (a value array), not
 matched by name. `FUN_01106a60` itself is reached only through a **vtable** (`DATA @0203ec08`), i.e. virtual
-dispatch. There is no static string/const anchor into the runtime deform.
+dispatch. There is no static string/const anchor into the runtime deform, so it is recovered dynamically.
 
-## SOLVED — dynamic analysis (gdb on the live char-create screen)
+## The runtime apply (gdb on the live char-create screen)
 
-Found the runtime apply by searching the exe for morph action strings: `ApplyMorph` → **`FUN_00fede10`**
+The runtime apply is found by searching the exe for morph action strings: `ApplyMorph` → **`FUN_00fede10`**
 (blend-shape morph apply). gdb attached to the live client (no ASLR, image base `0x400000` = Ghidra
 addresses; pass Wine signals `handle SIGUSR1/2/32-34/PWR nostop noprint pass`), with the Aquilonian-female
 char-create body on screen. Breakpoint in the case-1 delta loop (`0x00fee405`) fires on a **SIZE-slider
@@ -82,8 +79,8 @@ data with positions: `docs/re/body_morphs_aqf.json`. gdb scripts: `tools/ghidra/
 (delta lists), `dump_nodes.gdb` (node array).
 
 DB slider [-100,100] → `t=slider/100` → client weight `= t × (t≥0 ? max : |min|)`. The viewer's
-`BodyMorphDeformer` now applies this data-driven (radial soft-skin about each joint's world position, weighted
+`BodyMorphDeformer` applies this data-driven (radial soft-skin about each joint's world position, weighted
 by the captured joint weight). Exact replication = standard linear-blend skinning with the captured node
-skeleton + the mesh's BLENDINDICES/WEIGHT (ties into the #275 rig-import follow-up). Note the captured node
-positions are the Aquilonian-female body in the muscular state; other race/sex bodies share the node topology
+skeleton + the mesh's BLENDINDICES/WEIGHT (see the rig import in [skeleton-grammar.md](skeleton-grammar.md)). The
+captured node positions are the Aquilonian-female body in the muscular state; other race/sex bodies share the node topology
 (same indices/weights) but have their own positions — re-dump per body for exactness.

@@ -1,7 +1,7 @@
 # Faolan.ClientLauncher + automated client testing
 
 How to drive the retail AoC client against a local Faolan server without manual clicks — the basis for
-automated, capture-backed integration testing. Proven end-to-end 2026-06-10 (login → EnterWorld, unattended).
+automated, capture-backed integration testing (login → EnterWorld, unattended).
 
 Pieces: **`Faolan.ClientLauncher`** (launches + drives the client), the **server** (`Faolan` project), **loopback
 packet capture** (`tshark`/`dumpcap` on `lo`), and the capture tooling (`tools/capture/*.py` + the Wireshark plugin
@@ -44,7 +44,7 @@ character/playfield), `-clienthash`, `-key`, `-loginkey`, `-logindata`, `-statin
 - **`-openautomate`** = NVIDIA's benchmark framework (perf plugins; not functional testing).
   **`autotest.txt`** (gated by `-nautotest`) = a LOGIN-AUTOMATION file (`Server`/`Login`/`Character` records,
   parsed in the LauncherWindow) — same job as `-username`/`-password`/`-charname`, via a file, NOT a test
-  script (corrected 2026-06-15). The actual test-result channel is the `<testreportscriptcommand>` ScriptCommand
+  script. The actual test-result channel is the `<testreportscriptcommand>` ScriptCommand
   (RDB scriptgroups → the `Autotest` log line in `AgeOfConan.log`). Both decoded in **`docs/tooling/client-autotest.md`**
   (with the harness sketch for hands-free in-client asserts).
 
@@ -165,7 +165,8 @@ realm row; the world connection shares this same port — the handoff advertises
 tshark -i lo -f "tcp portrange 7001-7014" -w /tmp/session.pcap &
 ```
 The result is a normal pcap the capture tools read (`tools/capture/*.py`, the Wireshark plugin) — diff it
-against a retail capture for regressions, or `--dump` it.
+against a retail capture for regressions, or dump it with `tools/capture/tshark_dump.sh`. Loopback dumps are for
+local diffing only; they do not belong in the capture corpus.
 
 ### Launch + drive the client
 ```
@@ -182,28 +183,21 @@ Faolan.ClientLauncher --patch-universeaddr --console -u faolan -p aa -c tester
   `does not exist in any RDB` is benign.)
 
 ### Teardown
-Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; `--patch-universeaddr` reverts
-`LocalConfig.xml` automatically on the launcher's exit.
+Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server. The `--patch-universeaddr` /
+`--patch-cdn` / `--patch-login` edits persist after the run; `--restore` undoes them.
 
 ### Harness (a local `client-smoke-test.sh` — not committed to the repo)
 A ready-made version of the above: starts the server, captures loopback, launches the client unattended, asserts
 the battery of markers (login → EnterWorld → GameServer traffic, gametweaks, no Dispatcher failures, pcap on
 7010+7014), **grabs a frame of the game window once in-world** (the game is an X11/XWayland window, so
 `import -window $(xdotool search --name "Age of Conan")`, full-screen fallback) →
-`/tmp/faolan-session-screenshot.png`, and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to
-`/tmp/faolan-test-report.txt`. The screenshot is the visual-assertion layer — confirm the client actually rendered
+a screenshot file, and tears down (`--restore`). Writes a PASS/FAIL report beside it. The screenshot is the visual-assertion layer — confirm the client actually rendered
 (world/character-select/cutscene), which logs+packets can only hint at.
 
 ### Limits
 Auto-login enters an **existing** character only. **New-character creation** (and thus the create-world cutscene)
 needs interactive editor input, which the launcher flags can't provide — it'd require input injection
 (only `xdotool`/XWayland is present; no Wayland injector, `/dev/uinput` is root-only).
-
-### Proven run (2026-06-10)
-The smoke-test script → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
-`RequestAuth` → `EnterWorld (0x20B6)` → CSPlayerAgent auth → in-world GameServer traffic; client applied the
-gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher applied
-the `UniverseAddr` redirect — all with **no manual interaction**.
 
 ---
 

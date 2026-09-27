@@ -22,12 +22,15 @@ The protocol has **two** unrelated id systems — don't confuse them:
 | id (`uint`) | dec | class | IIR record type |
 |---|---|---|---|
 | `0xC350` | 50000 | **Character** — players / NPCs / creatures (`n3Char`/creature) | (the per-character records) |
-| `0xC75B` | 50011 | Shop — a vendor's shop container | (the `ShopContent` ID32) |
+| `0xC75B` | 51035 | Shop — a vendor's shop container | (the `ShopContent` ID32) |
 | `0xC748` | 51016 | ZoneLabel — zone/city labels | `0x33A56FB0` |
 | `0xC878` | 51320 | SimpleDynel — static decor / props | `0x66AEDD50` |
 | `0xC879` | 51321 | Destructible | `0x6BD56736` |
 | `0xC87A` | 51322 | LootBag / container | `0xF096251E` |
+| `0xC87B` | 51323 | TombStone — a dead player's corpse marker | `0x0D80E7C9` |
 | `0xC87D` | 51325 | ClimbingDynel | `0x1FD6412B` |
+| `0xDEA9` | 57001 | Team — a player team/group (the ID32 it is addressed by) | |
+| `0xDEB7` | 57015 | Guild — a player guild (the ID32 it is addressed by) | |
 
 Note the object-CLASS id (`type` in the record header) is distinct from the IIR record-TYPE (the `0x2000`
 sub-opcode / message kind) — they map 1:1 per class but are different values on the wire.
@@ -42,7 +45,7 @@ share the FA015807 grammar — both are Characters.
 
 ## Evidence it's the "Character" class id
 
-Ghidra, this session (`MoveTaskIIR_c::PollStatus`, the move-task reader's status poll):
+Ghidra (`MoveTaskIIR_c::PollStatus`, the move-task reader's status poll):
 
 ```c
 if (*id != 50000)   // 0xC350
@@ -53,16 +56,12 @@ So the client itself treats `type == 50000` as "this id refers to a character." 
 ids were `{type=0, instance=0}` (empty / no-owner) — a real looter would be `{50000, handle}`.
 
 ## In code
-`Faolan.Core.Network/Constants/EntityClass.cs` — the canonical `EntityClass.Character` (+ the world-object classes). It
-replaced ~a dozen ad-hoc local constants (`CharacterWireType`, `TypeTagAck`, `VitalsMarker`, `Ack`, `WireType`,
-`IirMarker`, `EntityTypeTag`, …) that all held `0x0000C350`.
-
-That consolidation then **grew back nine more aliases**, because nothing enforced it: `SpellTargetTypeWord`,
-`CharacterClass` (twice), `ReceiverClass`, `Marker`, `TypeTag`, `LootTypeTag`, `VisualChangeTypeTag`, a bare
-`C350` in the importer, plus raw `0x0000c350` literals in the PlayerAgent handoff. `CodecConventionTests.`
-`EntityClassWordComesFromEntityClass_NotAHandRolledLiteral` now scans `Faolan.Core.Network/`, `Faolan/` and
-`Faolan.Importer/` and fails on any of these ids written as a literal, the same way the `ListFrame` rule guards
-the count-framing word.
+`Faolan.Core.Network/Constants/EntityClass.cs` holds the canonical `EntityClass.Character` and the world-object
+classes; nothing else may spell these words. `CodecConventionTests.EntityClassWordComesFromEntityClass_NotAHandRolledLiteral`
+scans `Faolan.Core.Network/`, `Faolan/` and `Faolan.Importer/` and fails on any of these ids written as a literal
+(a local alias such as `CharacterWireType` or `TypeTag` holding `0x0000C350` drifts out of sync unnoticed), the same
+way the `ListFrame` rule guards the count-framing word. `--report entity-classes` prints the class word each
+dynel-family IIR carries in the capture corpus.
 
 **Not entity class ids**, though they sit numerically nearby and have been mistaken for them:
 
@@ -71,4 +70,4 @@ the count-framing word.
   word cannot be a property of the thing it addresses (`ValidResurrectionSpotsCodec`). Undecoded; kept local to their
   codecs.
 - `0x9C50` = 40016 — shows up inside the PlayfieldFIIR body and the teleport destination proxy. Below the 50000
-  base entirely; semantics TBD.
+  base entirely; undecoded.

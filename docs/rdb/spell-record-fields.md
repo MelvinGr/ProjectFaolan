@@ -3,13 +3,12 @@
 RDB type **1040005** (the spell catalog, 21,502 records) is a 12-byte header followed by a fixed HEAD, then a run
 of `[fieldId u32][value u32]` LE pairs in strictly INCREASING field order. **83 distinct field ids occur.**
 
-⚠️ **It was 111 until the run stopped being found by a heuristic (#632).** The old rule took the LONGEST ascending
-run anywhere in the record, and 28 of those "field ids" were regions that are not the property run at all —
+The run's extent is stated by the record (below), not searched for. Taking the LONGEST ascending run anywhere in
+the record instead finds 111 "field ids", 28 of which are regions that are not the property run at all —
 `3 Attack Speed` (1,207 records), `23 Static Instance` (1,203) and `76 Item Class` (1,167) are the record's own
-HEAD words, read as a 3-pair run because their ids happen to ascend. Any figure derived from the old count is
-inflated by those; the named-field tallies below were checked against the corrected set.
+HEAD words, read as a 3-pair run because their ids happen to ascend.
 
-## ⭐ The record, whole (#632)
+## The record, whole
 
 It is one **tagged field stream**, and word 4 states its own length. A field's value is a u32, a string, or a
 `0x3F1`-framed list:
@@ -19,10 +18,10 @@ It is one **tagged field stream**, and word 4 states its own length. A field's v
 pairs x [u32 fieldId][u32 value]                          scalar fields
 [u32 21][u32 33][u16 nameLen][u16 descLen][name][desc]    the two TEXT fields
 [u32 22][u32 36][frame][1-word items][frame][criteria]    the two LIST fields   (1,871 records)
-element lists                                             [2][listId][frame] groups, #785
+element lists                                             [2][listId][frame] groups
 ```
 
-⭐ **The frame word at byte 16 is load-bearing**: the string block sits at exactly `20 + 8 * pairs`, on
+**The frame word at byte 16 is load-bearing**: the string block sits at exactly `20 + 8 * pairs`, on
 **21,502 of 21,502 records**. So the property run's extent is stated by the record rather than searched for, and
 the search is kept only as a fallback (one record carries the `[21][33]` pair twice, so a search that wins could
 anchor on a description's bytes).
@@ -31,18 +30,18 @@ The `pairs` count spans the head's own pairs, the ascending property run, and an
 which is why `frameCount - propertyFields` is exactly the head-pair count, 5 / 4 / 3 for the 60 / 52 / 44-byte
 heads.
 
-⭐ **The two LIST-valued fields carry CRITERIA.** Field 22's items are one word; field 36's are three, and they
-are `[id][value][operator]` - the same triple the elements carry (#785/#790), with the same operator vocabulary
-(35 distinct, max 166, against the client's own `0..0x401` bound in `FUN_006e9f20`). ⚠️ Variable length - 32
+**The two LIST-valued fields carry CRITERIA.** Field 22's items are one word; field 36's are three, and they
+are `[id][value][operator]` - the same triple the elements carry, with the same operator vocabulary
+(35 distinct, max 166, against the client's own `0..0x401` bound in `FUN_006e9f20`). Variable length - 32
 bytes on 1,338 records but 24, 44, 56 and 80 on the rest, so a fixed-32 read finds a third of them.
 
 Accounting over the whole catalog: **99.2%**, and `Hellfire Stream` (8600) is at **100%, zero bytes
 unaccounted**.
 
-## What the rest of a record is (#632)
+## What the rest of a record is
 
-That run is only ~13% of a record, and #632 was filed on the other ~87% having "never been looked at". It is
-five things, and the accounting now reaches **99.2%** of all 8.2 MB (was 64.4%):
+The property run is only ~13% of a record. The whole record is five things, and the accounting reaches **99.2%**
+of all 8.2 MB:
 
 | region | bytes over the catalog | where it is decoded |
 |---|---:|---|
@@ -50,7 +49,7 @@ five things, and the accounting now reaches **99.2%** of all 8.2 MB (was 64.4%):
 | the **name + description block** | 1,261,636 | below |
 | the head + property run | 2,808,488 | this page |
 | the list-valued fields | 70,764 | this page |
-| the element-list headers | 249,504 | `[2][listId][(n+1) * 0x3F1]`, #785 |
+| the element-list headers | 249,504 | `[2][listId][(n+1) * 0x3F1]` |
 
 ### The name/description block
 
@@ -64,12 +63,12 @@ next two field ids carry TEXT rather than a u32.
 LATIN1, unterminated, back to back. A zero description length is normal; a zero name length is not. 21,459 of
 the 21,502 records carry one, and `RdbSpellImporter.ReadStringBlock` reads it.
 
-⭐ It is the record's OWN text rather than the LDB's, which matters for the **1,594 spells LDB category 50210
+It is the record's OWN text rather than the LDB's, which matters for the **1,594 spells LDB category 50210
 has no name for**: `Hellfire Stream` (8600) renders as *"spell 8600"* out of the LDB and the record says
 `Hellfire Stream`, with its full description. `--report spell-tooltip` falls back to it and marks the line
 `[from the record]`.
 
-### ⭐ The head, and why its length matters
+### The head, and why its length matters
 
 The head is **variable**: 60 bytes on 20,538 records, 52 on 959 and 44 on 5. Read against the property run's
 start, the last five words are constant in shape —
@@ -80,30 +79,29 @@ start, the last five words are constant in shape —
 
 — and `298` / `88` hold catalog-wide, which is what pins the FLAGS word to `runStart - 20`. Everything earlier is
 `[51051 classTag][a][15][23][b][76][0][30][c][0]`, where `15`, `23`, `76`, `0`, `30` and `0` are catalog-wide
-constants and the optional `[76][0]` pair is what makes the short head short. ⭐ `b` is not data at all - it is
+constants and the optional `[76][0]` pair is what makes the short head short. `b` is not data at all - it is
 the **frame word** above, `(pairs + 1) * 0x3F1`, which is why it took 28 values that are all multiples of
 `0x3F1`. The head's five leading pairs are `(76, 30, 0, 298, 88)` — so the FLAGS word is the value of field `0`
 and `c` the value of field `30`, ordinary fields that simply sit in front of the ascending run. What genuinely
 carries data is `a` (6 distinct values, a block count — below), `c` (17) and the flags word (1,364).
 
-⚠️ **The flags word was read at a FIXED `record byte 52` until #632**, and the head being variable-length means
-that lands on the wrong word for the short ones — it returned **0 on 936 records**, forcing their mana cost to
-read as absolute and their hide-from-tooltip bit to read as clear whatever the record said. Fixing it moved 20
-spells' `ManaCostIsPercent` and 78 spells into the hidden set. `RdbSpellImporter.ReadFlagsWord` is the one place
-that locates it.
+**The flags word is not at a fixed offset.** The head is variable-length, so a fixed `record byte 52` read lands on
+the wrong word for the short heads — it returns **0 on 936 records**, forcing their mana cost to read as absolute
+and their hide-from-tooltip bit to read as clear whatever the record says (20 spells' `ManaCostIsPercent` and 78
+spells' hidden bit). `RdbSpellImporter.ReadFlagsWord` is the one place that locates it.
 
 ### The flags word's bits
 
 `--report spell-flags` sweeps it bit by bit against twelve predicates — the DB's columns plus, from the record
-itself, whether it carries a proc element, any criterion, any element at all, or a `CastNano`. ⭐ **Bit 2 is the
-control**: it is a known predicate (`ManaCostIsPercent`, #630) and it reproduces that column exactly, which is
+itself, whether it carries a proc element, any criterion, any element at all, or a `CastNano`. **Bit 2 is the
+control**: it is a known predicate (`ManaCostIsPercent`) and it reproduces that column exactly, which is
 the yardstick every other row is read against.
 
 | bit | records set | reading |
 |---:|---:|---|
-| 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control |
-| 24 | 3,189 | **hide from tooltip** (#789) — from the client's own `FUN_014a3b30` |
-| 16 | 11,610 | **gates the timed-effect path** — the client only computes and applies a duration behind it (#632, below) |
+| 2 | 1,778 | **mana cost is a percent of the pool** — the control |
+| 24 | 3,189 | **hide from tooltip** — from the client's own `FUN_014a3b30` |
+| 16 | 11,610 | **gates the timed-effect path** — the client only computes and applies a duration behind it (below) |
 | 1 | 1,349 | **opts out of the global spell modifier** — the Ferocity scaling, unless the spell is on the `GlobalModIncludedSpellLine` tuning line (below) |
 | 20 | 2,289 | **the stated duration is neither drawn nor counted down** — 98.51% inside bit 16, so a modifier on the timed-effect path rather than a flag of its own (below) |
 | 25 | 185 | 100% inside bit 16 — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
@@ -115,7 +113,7 @@ the yardstick every other row is read against.
 | 8 | 2,389 | **the effect is never NARRATED** — no line when it lands and none when it ends (below) |
 | 19 | 7,692 | **the buff's EXPIRY is silent** — no `Effect %s terminated.` when it drops off (below) |
 
-### ⭐ Bit 15: HOSTILE, and the client says it in English
+### Bit 15: HOSTILE, and the client says it in English
 
 The combat-feedback builders pick their VERB on this bit. `FUN_007E9B50`:
 
@@ -127,13 +125,13 @@ if ((flags >> 0xf & 1) == 0)  "OtherAffectsYouByEffect"   else  "OtherAfflictsYo
 — **affect** when clear, **afflict** when set, in both directions of the sentence. `FUN_007F4120` uses it a
 second way that agrees: it selects a targeting mode (5 when the bit is clear, 3 when it is set).
 
-12,069 of 20,847 spells carry it. ⚠️ Its predicate scores are unremarkable (area +4.4, elements +2.4, cast +2.3)
+12,069 of 20,847 spells carry it. Its predicate scores are unremarkable (area +4.4, elements +2.4, cast +2.3)
 and that is expected rather than a problem — none of the twelve predicates is "is this spell hostile", so this is
 another row named from the client's reads and NOT from its score, like bits 1 and 20 before it.
 
-### ⭐⭐ Bits 8 and 19 SPLIT: never narrated, and silent expiry
+### Bits 8 and 19 SPLIT: never narrated, and silent expiry
 
-They appear in ONE guard together, which is why they were recorded as an inseparable pair. The function is
+They appear in ONE guard together. The function is
 `FUN_007EBE70`, and it names itself: it logs *"DeactivateBuff missing spell %d"*. So this is buff REMOVAL.
 
 ```c
@@ -141,8 +139,7 @@ if (holder->+0xDE != 0 && (spell == 0 || (bit19 == 0 && bit8 == 0)) && param3 ==
     <emit>                                  // skipped when EITHER bit is set
 ```
 
-⭐ **What it emits is English after all.** The block carries no log string — which is where the previous pass
-stopped — but it calls `FUN_0060EBB0(0x64, 0x254)`, and that is an **LDB (category, id) fetch**: the pipeline
+**What it emits is English.** The block carries no log string, but it calls `FUN_0060EBB0(0x64, 0x254)`, and that is an **LDB (category, id) fetch**: the pipeline
 behind it (`FUN_0060F190`) binds the message's `name` and `npcname` parameters before rendering it. Category
 **100**, id **596** resolves to:
 
@@ -150,7 +147,7 @@ behind it (`FUN_0060F190`) binds the message's `name` and `npcname` parameters b
 
 (French *"Effet %s terminé."*, German *"Effekt '%s' beendet."* — `--report ldb-strings --report-arg "id:#596"`.)
 
-⚠️ **This is a reusable way past "the code says nothing".** A numeric `(category, id)` pair pushed at a call site
+**This is a reusable way past "the code says nothing".** A numeric `(category, id)` pair pushed at a call site
 is the client speaking English one indirection away; it does not have to be a `char*` in the function to be read.
 The pair is small integers, not the 28-bit ELF hash the token form uses, so it does not look like a string id at a
 glance.
@@ -174,11 +171,11 @@ The data agrees with both readings, and neither was fitted to it:
 | same-NAME twin without the bit | **1,127 (47%)**, against ~23% catalog-wide | 2,966 (39%) |
 
 The bit-8 twin rate is the same evidence bit 26 was named on: a record that is one half of a same-name pair is a
-derived copy, and it is the copy that stays quiet while its twin speaks. ⚠️ Neither bit is contained in the
+derived copy, and it is the copy that stays quiet while its twin speaks. Neither bit is contained in the
 other (the containment sweep lists no 8 ⊂ 19), so they really are two suppressions sharing one guard rather than
 one flag stated twice.
 
-### ⭐⭐ Bit 14 bypasses a TARGET-GEOMETRY check — and that check is a criteria OPERATOR
+### Bit 14 bypasses a TARGET-GEOMETRY check — and that check is a criteria OPERATOR
 
 All three read sites (`FUN_01141480 / 011417f0 / 01141c30`) have the identical shape:
 
@@ -191,7 +188,7 @@ So a bit-14 spell — or an entity carrying the `+0x171` flag — **skips the ch
 `FUN_006eeea0` is a large float/SIMD function with no strings of its own, which is where a read of the combat
 cluster alone stops.
 
-⭐⭐ **It is not combat-local.** `CriteriaItem_t::CheckCriteria` (`FUN_006dd970`, #790) calls it at **`006e2c26`**,
+**It is not combat-local.** `CriteriaItem_t::CheckCriteria` (`FUN_006dd970`) calls it at **`006e2c26`**,
 and that lands inside criteria operator **115**'s branch — the operator switch puts 115 at `006e2b56` and the
 next entry, operator 10, at `006e2cc4`. So `FUN_006eeea0` **is** operator 115's implementation, and the bit
 exempts a spell from a condition the criteria vocabulary can also state.
@@ -210,7 +207,7 @@ and the cast site passes it `target class == 0xC350 (a Character)` as an argumen
 `Criteria_TargetIsNotACharacter` names. The same `0x12` refusal is raised on the neighbouring branch by
 `FUN_00744580(caster, target, 180, -90)`, an **angle** test.
 
-⚠️ **The bit's FUNCTION is pinned; its NAME is not.** "Bypasses the target-geometry requirement" is what the code
+**The bit's FUNCTION is pinned; its NAME is not.** "Bypasses the target-geometry requirement" is what the code
 says; calling it *line of sight* or *no facing requirement* would be a guess between the members of that family.
 Naming operator 115 names the bit, and vice versa.
 
@@ -242,7 +239,7 @@ nothing that can run — with the nuance that its dead readers are real spell lo
 garbage. Its carriers (Death Penalty, Exhausted, the Formations, the food buffs) presumably mattered to that
 feature, but no reachable code distinguishes them by this bit.
 
-### ⭐ Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
+### Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
 
 `FUN_007EF6B0` tests them **together** — `(flags >> 0x17 | flags >> 0x1E) & 1` — and when NEITHER is set it skips
 a lookup over the target's running buffs entirely, so either bit alone enables it. What that lookup decides needs
@@ -264,16 +261,16 @@ be split; **it can**, and the same function does it — because two of its messa
 "... since its flagged as NoAutomaticStackReplace and the target already have a spell in the stackingline running"
 ```
 
-⭐ **`NoAutomaticStackReplace` is guarded on bit 30 ALONE**, which pins that half directly. The function tests
+**`NoAutomaticStackReplace` is guarded on bit 30 ALONE**, which pins that half directly. The function tests
 exactly three bits of this word — 23, 26 and 30 — and names exactly two flags, so the remaining name goes to the
 remaining bit, and the semantics agree: *Replace* sits on the exact-spell lookup and *StackReplace* on the
 stackingline lookup.
 
-⚠️ **The `NoAutomaticReplace` message itself fires under `bit23 || bit30`**, so its own guard does not separate
+**The `NoAutomaticReplace` message itself fires under `bit23 || bit30`**, so its own guard does not separate
 them. The split rests on bit 30's solo guard plus that elimination — worth stating, because it is a different
 strength of evidence from the two-message symmetry it looks like at a glance.
 
-### ⭐ Bit 26: the propagated COPY of a buff
+### Bit 26: the propagated COPY of a buff
 
 Bit 26 is the third bit `FUN_007EF6B0` reads, and it is not a refusal: it selects which object's `+0x34` is
 compared against the stacking value. Its other site is the end of **`CoreMagicHolder::CastMagicSpell()`**
@@ -286,7 +283,7 @@ if (bit26 == 0) {
 }
 ```
 
-So a bit-26 spell raises **neither** signal. ⭐ **What kind of record that is, the data says** — measured with
+So a bit-26 spell raises **neither** signal. **What kind of record that is, the data says** — measured with
 `--report spell-flags --report-arg 26`:
 
 * 264 records, **258 of them non-hostile** (against a 58% hostile base rate),
@@ -298,11 +295,11 @@ So a bit-26 spell raises **neither** signal. ⭐ **What kind of record that is, 
 So it marks the propagated/derived copy of a buff rather than the cast a player performs — which is exactly why
 the client raises no cast notification for it.
 
-⚠️ **It is not "the untrainable copy"**, and that reading dies on the data: 50 of the 264 are trainable, and the
+**It is not "the untrainable copy"**, and that reading dies on the data: 50 of the 264 are trainable, and the
 twins disagree with each other — `Aura of Infusion`'s bit-26 copy is untrainable while `Divine Vigor`'s is not.
 The twin RATE is the finding; trainability is not.
 
-### ⭐ Bit 11: a hostile spell that raises no hostile-act signal
+### Bit 11: a hostile spell that raises no hostile-act signal
 
 The inner branch of the block above. `emitB` (`FUN_007F8100`) is emitted from exactly **two** places in the whole
 image: that branch, and **DealDamage** (`FUN_0114EFA0`, self-named by its `"Dealdamage (hit N) damage: X (of
@@ -310,7 +307,7 @@ maxdamage: …)"` log on channel `GameCode/Combat`). Both emit it on a target `d
 with the same boolean. A signal emitted by dealing damage and by casting a hostile spell at a character is the
 hostile-act notification, and bit 11 diverts a hostile cast off it onto `emitA`.
 
-⚠️ **It is only OPERATIVE on 523 of its 2,086 records.** The other 1,563 are not hostile, so they take that
+**It is only OPERATIVE on 523 of its 2,086 records.** The other 1,563 are not hostile, so they take that
 branch on bit 15 alone and the bit changes nothing for them. A bit whose effect is confined to a quarter of the
 records that carry it is not a contradiction — the guard is a disjunction — but it does mean the catalog-wide
 counts are the wrong denominator for it.
@@ -321,21 +318,21 @@ Its single read site `FUN_007E0820` writes **5 instead of 1** into one field of 
 same small mode family bit 15 selects from in `FUN_007F4120` (3 vs 5), so bit 4 is a mode selector on the same
 enum — which is not recovered, so this stays a shape rather than a name. 249 records, 81 of them hostile.
 
-⚠️ The same offset `+0xC8` is a protobuf HASBIT mask on several unrelated classes, and a naive scan of the bit
+The same offset `+0xC8` is a protobuf HASBIT mask on several unrelated classes, and a naive scan of the bit
 reads finds a coherent-looking cluster of four sibling functions at `0x01759xxx` reading bits 1/2/5/6/7/8 of
 "the same word". They are `Write(fieldNumber, value, stream)` serializers and the bits are field-presence flags —
 the exact false positive `DumpFlagBitReads.java` warns about. Filter the read sites to the magic/combat address
 ranges before reading anything into them.
 
-⚠️ **Every row above is named from the CLIENT's own reads, not from its predicate score**, and two of them score
+**Every row above is named from the CLIENT's own reads, not from its predicate score**, and two of them score
 badly on purpose: bit 1 is at chance against all twelve predicates because it is about a *tuning line* no column
 knows, and bit 20 scores +9.3 *with* "carries a duration", which reads as a contradiction until you see that a
 record has to state a duration for the bit to have anything to suppress.
 
-### ⚠️ The raw agreement percentage is the wrong measure, and it inverted the answer
+### The raw agreement percentage is the wrong measure, and it inverted the answer
 
 Two mostly-false columns agree on every record that has neither, so a raw percentage **rewards rarity**. The
-report used to warn about that and then print percentages anyway; it now prints the **excess over chance** —
+report prints the **excess over chance** —
 what a bit of this bit's own rarity would score against this predicate's own prevalence, subtracted off. That
 collapses almost the whole table to nothing and leaves two entries:
 
@@ -344,20 +341,20 @@ bit  2 vs mana%     +15.6 points     <- the known definition, the yardstick
 bit 16 vs duration  +48.4 points     <- three times it
 ```
 
-⭐ **So bit 16 is a far stronger signal than the control, not a weaker one.** `mana%` is an 8.5%-prevalence
+**So bit 16 is a far stronger signal than the control, not a weaker one.** `mana%` is an 8.5%-prevalence
 predicate and `duration` a 56% one: 99.07% agreement on a balanced predicate says much more than 100% on a rare
-one. The old rule of thumb — *"99% is a lead, 100% is a definition"* — is only valid between predicates of equal
+one. The rule of thumb *"99% is a lead, 100% is a definition"* is only valid between predicates of equal
 prevalence, and these are not.
 
-⚠️ **It is still not the plain duration predicate.** Broken out, the residual is asymmetric — **62** records set
+**It is still not the plain duration predicate.** Broken out, the residual is asymmetric — **62** records set
 the bit with no duration, and **131** state a duration with the bit CLEAR, which is the direction that
 disproves it (`VisualBuffTest`, `Avert Thine Eyes (Rank 1-3)`, `TRIGGER Environmental Damage: Frost High`). And
 it is not a threshold: field 8's median is 1,550 on the agreeing set against 1,300 on the disagreeing one, over
 the same range. Measured against the record's OWN field 8, so it cannot be a `DurationMs` column blend.
 
-### ⭐ The route in is the CLIENT, and bit 16 is NAMED: it GATES THE DURATION
+### The route in is the CLIENT, and bit 16 is NAMED: it GATES THE DURATION
 
-The client keeps the flags word at `spell + 0xC8`. #789 found bit 24 as `MOV BL, byte ptr [EAX + 0xCB]; AND BL, 1`,
+The client keeps the flags word at `spell + 0xC8`. Bit 24 reads as `MOV BL, byte ptr [EAX + 0xCB]; AND BL, 1`,
 so **bit 16 is `byte [spell + 0xCA] & 1`** — and `FUN_007ee710`'s bit-set branch is what it is for:
 
 ```c
@@ -374,18 +371,18 @@ if (spell != 0 && (*(byte *)(spell + 0xCA) & 1) != 0) {     // <- bit 16
 in a `longlong` — a time. So bit 16 gates the **timed-effect path**: the branch that computes and applies a
 duration at all.
 
-⭐ **That turns the 99.07% from a correlation into a mechanism, and it explains the residual's asymmetry** — the
+**That turns the 99.07% from a correlation into a mechanism, and it explains the residual's asymmetry** — the
 thing the sweep could not do. The **131 records that state a duration with the bit CLEAR** are not
 counterexamples: their field 8 is stored and *never applied*, because the code that would apply it is behind the
 bit. `VisualBuffTest` heading that list is exactly what a never-applied duration looks like. And the 62 the other
 way are a bit set over a zero duration, which multiplies out to nothing.
 
-⚠️ **This is a naming, not a proof of exhaustiveness.** Six functions in the magic subsystem test the byte
+**This is a naming, not a proof of exhaustiveness.** Six functions in the magic subsystem test the byte
 spelling (`FUN_007ea480`, `FUN_007ebe70`, `FUN_007eddc0`, `FUN_007ee710`, `FUN_007f43a0`, `FUN_007f4df0`, plus
 `FUN_008da660`); the duration computation above is in one of them, and the others are guards on the same
 condition rather than second meanings.
 
-### ⭐ How much of a record is actually accounted for: 99.6%
+### How much of a record is actually accounted for: 99.6%
 
 This page's opening measurement — *"the reader accounts for roughly 13% of it; the other ~87% is a fixed struct
 head plus a large trailing region that nothing reads"* — counts only `ReadIncreasingFields`. It is a true statement
@@ -401,11 +398,11 @@ than four overlapping claims:
 | name/description block (`ReadStringBlock`) | 0.2% |
 | **UNATTRIBUTED** | **0.4%** |
 
-⭐ **The "large trailing region that nothing reads" IS the element region, and it is read.** A `Dark Knowledge`
+**The "large trailing region that nothing reads" IS the element region, and it is read.** A `Dark Knowledge`
 record's last 572 bytes decode as repeating element blocks carrying `0xCFE4` (GameAction 53220) with sequential
 ids — exactly what `ParseElements` walks. Only **0.4%** of the catalog's bytes are claimed by no reader at all.
 
-⚠️ **What is least understood is a LEADING region, not a trailing one**: the 49.5% that sits before the property
+**What is least understood is a LEADING region, not a trailing one**: the 49.5% that sits before the property
 run and that no element claims. And that share is inflated by the READER rather than by the format —
 `ReadIncreasingFields` returns the *longest* ascending run, so on a record whose longest run happens to sit late,
 everything before it is counted as "head" regardless of what it is. The "72-byte fixed head" is the head of the
@@ -417,7 +414,7 @@ four records this page sampled, not of the catalog.
 reads, anywhere in the image. That is a different question from the predicate sweep and a more basic one: **a bit
 nothing reads is not a decode gap**, while a bit read in fifteen places is a lead with fifteen contexts attached.
 
-⚠️ **A bit test has two spellings, and a census that knows only one lies.** The client writes both, for the *same*
+**A bit test has two spellings, and a census that knows only one lies.** The client writes both, for the *same*
 bit:
 
 ```
@@ -440,15 +437,15 @@ sweep flagged as a clean 185/185 subset of the duration-carrying records. A bit 
 mean anything to the client, so that entry is a property of the DATA (a subset relation among stored values), not
 of the protocol. (The containment table below says *which* stored values: bit 25 is 100% inside bit 16.)
 
-⚠️ The tool cannot know the base register holds a spell — `+0xC8` is a common displacement — so read the
+The tool cannot know the base register holds a spell — `+0xC8` is a common displacement — so read the
 **addresses**, not the counts. The magic subsystem's own range (`0x0076xxxx`–`0x008Dxxxx`, plus the tooltip
 builder at `0x0149xxxx`–`0x014Axxxx`) is where the known bits 2, 16 and 24 all land, and it is the range a new
 lead has to land in before it is about this word at all.
 
-### ⭐ Read: bit 1 is an OPT-OUT of the global spell modifier
+### Read: bit 1 is an OPT-OUT of the global spell modifier
 
 Bit 1's 17 sites cluster in the magic subsystem and in **the tooltip's own value-modifier helpers**
-(`FUN_014a9f90`, `FUN_014a9da0`) — the pair #782 decoded as
+(`FUN_014a9f90`, `FUN_014a9da0`) — the pair decoded as
 `(GetStat(0x57B) × 0.1 × 0.01 × w + 1) × value`. Stat `0x57B` is **`Ferocity`**. Their gate is:
 
 ```c
@@ -460,11 +457,11 @@ if (spell != 0 && ( onLine(GlobalModExcludedSpellLine)
 and the APPLY side runs the same predicate negated (`FUN_007f5360` adds its `base[i]` term only when the gate
 passes). Two independent code paths, one predicate.
 
-⭐ **`onLine(x)` is a spell-LINE membership test.** `FUN_00768f90` walks eight stat ids on the spell —
+**`onLine(x)` is a spell-LINE membership test.** `FUN_00768f90` walks eight stat ids on the spell —
 `0x80 SpellLine`, `0x50B..0x50E SpellLine2..5`, `0x513..0x515 SpellLine6..8` — and returns whether any equals its
 argument.
 
-⭐ **And its two arguments are named tuning values.** Both are `GameTweak<int>` objects built at first use from a
+**And its two arguments are named tuning values.** Both are `GameTweak<int>` objects built at first use from a
 string, with the value at `object + 8`:
 
 | global | tweak |
@@ -479,7 +476,7 @@ So **bit 1 means "this spell opts out of the global modifier"**, overridable by 
 an excluded line opts out regardless of the bit. It scores nothing against any DB predicate (+2.3 vs `duration`,
 the rest at chance), which is correct: it is about a *tuning line*, and no column knows one.
 
-### ⭐ Read: bit 20 is a duration that is neither DRAWN nor COUNTED DOWN
+### Read: bit 20 is a duration that is neither DRAWN nor COUNTED DOWN
 
 Bit 20's five sites include both of bit 16's own consumers plus the tooltip:
 
@@ -490,7 +487,7 @@ Bit 20's five sites include both of bit 16's own consumers plus the tooltip:
   `"CoreMagicHolder::UpdateBuff <id> remaining time <t>"`; **bit 20 suppresses that warning.**
 * `FUN_007f43a0` — `CoreMagicHolder::Magic` passes it into the apply call beside bit 16.
 
-⚠️ **It scores +9.3 WITH "carries a duration", which reads as a contradiction of "permanent" and is not one.** The
+**It scores +9.3 WITH "carries a duration", which reads as a contradiction of "permanent" and is not one.** The
 bit only has something to suppress on a record that STATES a duration — and `--report spell-flags`'s containment
 table settles the relation structurally: **bit 20 is 98.51% inside bit 16**. It is a modifier on the timed-effect
 path, not a flag of its own.
@@ -499,11 +496,11 @@ That table also places two of this ticket's older leads. **Bit 25 is 100% inside
 subset of the duration-carrying records" was a subset of *bit 16's* set, and since the client reads bit 25
 nowhere it is authoring-side. **Bit 29 is 100% inside bit 2**, the mana-mode bit.
 
-### ⭐ Read: bit 16 gates RE-INSTANTIATING a magic on the SPAWN path
+### Read: bit 16 gates RE-INSTANTIATING a magic on the SPAWN path
 
 `FUN_007f43a0` is `CoreMagicHolder::Magic` (it names itself in its own log channel), and its one caller is
 **`FUN_01458D40` — the SimpleChar spawn apply**, the same function that copies `npc_stats` field by field
-(#797/#800). It is handed the spawn message's magic list and walks it; per magic it looks the spell record up,
+It is handed the spawn message's magic list and walks it; per magic it looks the spell record up,
 logs `SpellItem_t <id> is missing from the RDB` when it cannot, and otherwise:
 
 ```
@@ -517,20 +514,20 @@ The other two consumers take the CLEAR branch, and both are about what the effec
 the **position** entries of a target list to the effect only when the bit is clear (entities are added either
 way), and `FUN_008DA660` aborts on a failed reachability check only when it is clear.
 
-⭐ So the mechanism behind the association is: **bit 16 marks a magic the client RE-CREATES when the entity
+So the mechanism behind the association is: **bit 16 marks a magic the client RE-CREATES when the entity
 streams in** — a persistent effect rather than an instant one. That is why it tracks "carries a duration" so
 closely, and it accounts for the residual going both ways: a permanent effect states no duration and still has to
 be re-applied (the 62), while a timed effect with nothing to re-instantiate states one without the bit (the 131).
 
-⚠️ Still a reading. No predicate partitions the bit, and the reading is inferred from what the three consumers do
+Still a reading. No predicate partitions the bit, and the reading is inferred from what the three consumers do
 with it rather than from a name. What it does settle is that the bit is about the effect's LIFETIME on the
 client, not about its cost, school or targeting.
 
-⚠️ It also bears on Gitea #677 (buffs on an entity streaming into view): the spawn body's magic list is the
-channel a streaming observer needs, and bit 16 is what says which of those magics the client will actually
+It bears on buffs on an entity streaming into view (open work tracked in Gitea #677): the spawn body's magic list
+is the channel a streaming observer needs, and bit 16 is what says which of those magics the client will actually
 re-create from it.
 
-### ⭐ Word 0 is a CLASS TAG — and the whole head is generic, not a spell head
+### Word 0 is a CLASS TAG — and the whole head is generic, not a spell head
 
 `0xC76B` (51051) appears **exactly once** in `AgeOfConan.exe`, in `FUN_0076bef0` — slot 23 of
 `SpellItemIF_c`'s vtable:
@@ -542,7 +539,7 @@ void FUN_0076bef0(int this, undefined4 *out) {
 }
 ```
 
-⭐ **Slot 23 is a `(typeTag, id)` resource-key accessor, swept across every RTTI vtable in the image**
+**Slot 23 is a `(typeTag, id)` resource-key accessor, swept across every RTTI vtable in the image**
 (`DumpVirtualSlotAcrossClasses.java SLOT=0x5c`). Its overriders are the shortcut-bar item-interface family —
 `SpellItemIF_c`, `ACGItemIF_c`, `ACGDynamicItemIF_c`, `ComboItemIF_c`, `SpecialItemIF_c`, `AttackDirectionIF_c`,
 `StatItemIF_c` (pure virtual). `ACGItemIF_c` passes its own `+0x3c` to an item lookup and returns the pair at the
@@ -550,11 +547,11 @@ live item's `+0xC0/+0xC4` — the ACG **template pair** — while `ComboItemIF_c
 `AttackDirectionIF_c` all return the shared zero pair. So `+0x3c` is *the referent's id* and the key is
 `(what kind of thing, which one)`.
 
-⚠️ **That means the key's second word is the SPELL ID, not the record's word 1.** The spell id sits in the RDB
-entry header at body `+4`, outside the record; only word 0 coincides with the tag. The earlier reading —
-"the record opens with exactly those two words, so `a` is a member at `+0x3C`" — does not survive the sweep.
+**That means the key's second word is the SPELL ID, not the record's word 1.** The spell id sits in the RDB
+entry header at body `+4`, outside the record; only word 0 coincides with the tag, so `a` is not a member at
+`+0x3C`.
 
-⭐ **The head is not the spell catalog's.** A FEAT record (RDB type 1000020) has it word for word with a
+**The head is not the spell catalog's.** A FEAT record (RDB type 1000020) has it word for word with a
 different tag:
 
 ```
@@ -563,13 +560,13 @@ different tag:
 ```
 
 `51005` (`0xC73D`) on feats against `51051` on spells, same `15`, same `23`, same frame word, same five leading
-pairs `(76, 30, 0, 298, 88)`. ⭐ And the tag is **not even constant within type 1040005**: 11 records carry
+pairs `(76, 30, 0, 298, 88)`. And the tag is **not even constant within type 1040005**: 11 records carry
 `30047` and all 11 are named `Companion: <creature>`, and one carries `30030` and is named `Test Recipe`. A class
 tag is exactly what varies that way; a file magic is not. (Only `0xC76B` is an instruction immediate anywhere in
 the exe — `0xC73D` / `0x755F` / `0x754E` are not, so the client does not compare these; they are authoring-side
 class ids.)
 
-### ⭐ `a` is a structural COUNT, not a category
+### `a` is a structural COUNT, not a category
 
 Measured by `--report spell-element-lists`, which cross-tabs `a` against what the record actually carries:
 
@@ -581,30 +578,28 @@ So `a` counts the record's **value blocks**: one for the scalar pair region, one
 one per `[2][listId]` element list, and one for the `[22][36]` list-valued pair. Its floor is exactly 2 — a
 record with no element list and no list fields — on 1,995 of the 1,999 such records.
 
-⚠️ **97.10% is a reading, not a definition**, and the cross-tab prints its own residual: 508 records come out one
+**97.10% is a reading, not a definition**, and the cross-tab prints its own residual: 508 records come out one
 short of their `a` (mostly `a=4` with one list and no block detected) and ~106 come out over. Both edges look
 like the *detector* rather than the rule — the block-scan and the element-list tiling each fail on a handful —
 but nothing has attributed them, so the table is printed row by row instead of a single percentage.
 
-⭐ This **replaces** the old reading that `a` splits castables from internal effect records. That split is real
-but derived: an internal effect record carries no element list, so it lands on the floor, and a castable carries
+`a` does not split castables from internal effect records. That split is real but derived: an internal effect record carries no element list, so it lands on the floor, and a castable carries
 several. The correlation was with the record's *content*, not with a kind word.
 
-⚠️ What is left is not bytes but ONE meaning: the flags word's remaining unnamed bits — bits 1, 2, 16, 20 and 24
+What is left is not bytes but ONE meaning: the flags word's remaining unnamed bits — bits 1, 2, 16, 20 and 24
 are named from the client's own reads, 11 more are proven dead, and the rest are enumerated with a site count and
 an address range each. Every byte of `Hellfire Stream` is inside a named region.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the
-`GameAction_*` / LDB-615 runs. `--report rdb-field-coverage` is the live tally; a hard number here goes stale
-(the "45 of 111" this line used to carry was counted against the pre-#632 field set).
+`GameAction_*` / LDB-615 runs. `--report rdb-field-coverage` is the live tally; a hard number here goes stale.
 
 ## Why this is not circular
 
 The names come from two sources that never looked at this record:
 
 - **LDB category 615**, the client's own stat-name table, reached through the feat `SpellStatModifier` /
-  `SpellLineStatModifier` records (#593) — those modifiers target a SPELL's properties through the stat id
+  `SpellLineStatModifier` records — those modifiers target a SPELL's properties through the stat id
   space, which is the direct statement that the two spaces are one.
 - **The client's static stat-name metadata table** (`docs/re/aoc-client-stat-names.tsv`), recovered from
   `AgeOfConan.exe`, for everything at 768 and above.
@@ -625,40 +620,38 @@ A seventh agrees from the value side rather than the name side: field **847** `A
 `808` = `Intelligence` on 482 records — a stat id as its VALUE, which only parses if the space is shared
 (`spell-scaling.md`).
 
-## ⚠️ Field 348 is SPLASH damage, not the spell's damage rating
+## Field 348 is SPLASH damage, not the spell's damage rating
 
 The client names `0x15C` **`SplashDamage`**, and the data says the same thing: 348 occurs on **215** of the
 21,502 records, exactly as many as 349 `SplashDamageMaxTargets`, and nested inside 347 `SplashRadius`'s 231.
 Cross-tabulating 347 against 348 pairs them row for row — 124 records carry `347=0` and `348=0` together.
 
 A property of one percent of the catalog is not "the spell's damage rating"; it is the third member of the
-splash triple. All three are now imported under their own names — `Spell.SplashRadius` (347 ÷ 100, metres),
+splash triple. All three are imported under their own names — `Spell.SplashRadius` (347 ÷ 100, metres),
 `Spell.SplashDamage` (348 ÷ 100, percent) and `Spell.SplashMaxTargets` (349, a raw count) — and `Faolan.Web`
-labels them as such. Nothing in combat reads them; the spell's real damage magnitude stays unsourced (#592).
+labels them as such. Nothing in combat reads them; the spell's own damage magnitude comes from its health element
+(see [spell-scaling.md](spell-scaling.md)).
 
-## ⚠️ The STACKING family — and two of them were columns we shipped under the wrong name
+## The STACKING family
 
-LDB 615 names a whole contiguous family, and it reframed two shipped columns (renamed in #634):
+LDB 615 names a whole contiguous family:
 
 | field | client's name | what we call it |
 |---|---|---|
-| 123 | `GUI Stacking Order` | `Spell.GuiStackingOrder` (renamed from Rank) |
-| 128 | `GUI Stacking Line` | `Spell.GuiStackingLine` (renamed from LineId) |
+| 123 | `GUI Stacking Order` | `Spell.GuiStackingOrder` (not a rank) |
+| 128 | `GUI Stacking Line` | `Spell.GuiStackingLine` |
 | 546-550 | `Stacking Line 2` … `Stacking Line 6` | unread |
-| 551 | `Stacking Order` | unread (was labelled "a rank-scaling magnitude") |
+| 551 | `Stacking Order` | unread (not "a rank-scaling magnitude") |
 
 So a spell sits on up to six stacking LINES and carries an ORDER within them; a higher order supersedes a
 lower one on the same line, which is how an MMO stops two +Strength buffs from stacking.
 
-**This dissolves two mysteries these pages recorded as open.**
-
-*Field 123 is not the rank.* It correlates with rank — a higher rank stacks over a lower one — which is why it
-read as one. But an order only has to be MONOTONE within its own line, and the scale is otherwise free. Of the
+*Field 123 is not the rank.* It correlates with rank — a higher rank stacks over a lower one. But an order only has to be MONOTONE within its own line, and the scale is otherwise free. Of the
 883 spells with a `(Rank N)` suffix, 669 carry 1/2/3 and 214 a clean ×10: `Healing Benediction` is 10/20/30 on
 stacking line **2**, `Wave of Life` is 1/2/3 on lines 24020+. Both are valid orderings. Nothing "discriminates
 the two scales" because neither is a rank.
 
-*Field 128's "far too coarse to be a line" small values are the point.* `Healing Benediction`'s line is `2` —
+*Field 128's small, widely shared values are the point.* `Healing Benediction`'s line is `2` —
 shared with dozens of unrelated spells, which is exactly what a shared stacking line is for. And an id whose
 `/1000` is not a class (`50000`, `440061`) is just a stacking line that is not per-class. The feat join is
 sound throughout: a feat boosting a "spell line" is boosting a stacking line.
@@ -666,13 +659,11 @@ sound throughout: a feat boosting a "spell line" is boosting a stacking line.
 The client's own dev test spells confirm the reading outright — `Strength Buff 1` / `Strength Buff 2` carry
 551 = 1 / 2, and the same 1/2 pairing runs through `Dexterity Buff`, `Stack Debuff`, `Hostile` and `Buff`.
 
-The two columns were renamed to the client's names in #634. The feat side keeps `SpellLineId`: it is the same id
-space, but that name is the CLIENT's too — the GameActions that fill it are `AddSpellLineProc`,
+The feat side keeps `SpellLineId`: it is the same id space, but that name is the CLIENT's too — the GameActions that fill it are `AddSpellLineProc`,
 `SpellLineStatModifier` and `ChangeLineHitPercent`, so renaming it would make the column disagree with the wire
-record it is harvested from. Fields 546-551 are still unread; tracked with the rest of the unread run in Gitea
-#633.
+record it is harvested from. Fields 546-551 are unread; open work tracked in Gitea #633.
 
-## ⚠️ Field 54 is not the level requirement — 125 is
+## Field 54 is not the level requirement — 125 is
 
 Both ids are called `Level` somewhere, and 54 is on **20,186** records to 125's **7,645**, so the narrow one
 reads like an import that missed most of the catalog. It is the other way round.
@@ -706,7 +697,7 @@ and where they disagree an independent scrape backs the **band**: ellatha rates 
 `Chill` rank 1 at level 15, exactly where their rank-1 bands open and eight levels above where 125 puts the
 whole of Chill.
 
-#### ⚠️ Which band — the LOWEST above 1, never the highest
+#### Which band — the LOWEST above 1, never the highest
 
 A record carries one of two shapes, and reading the wrong end of the second one reads its **ceiling**:
 
@@ -720,7 +711,7 @@ So the reading is **the lowest band above 1**, falling back to the lowest of all
 difference is entirely by shape: on the 92 records with four or five bands it is right 71 times and the highest
 reading **twice**.
 
-⚠️ **Even so the band is not a general level source** — 263 of 406 is 65%, because a ramp may legitimately open
+**Even so the band is not a general level source** — 263 of 406 is 65%, because a ramp may legitimately open
 at 1 (a buff scaling from the first level it is castable) or be banded against a different family member's ranks.
 `RdbSpellImporter.RankLadderFromEffectBands` consults it only where 125 has disqualified itself by collapsing
 ranks, and only where the bands then answer for every rank with one value, monotonically, inside the level cap,
@@ -738,9 +729,9 @@ rule *would* separate is still shipped collapsed.
 Every rank of a normal family is granted by a feat (`FeatSpellGrants`): a `<Class> Class Feat NNN` for rank 1 and
 a **`Spell Unlocking <lo>-<hi>`** for ranks 2 and up — whose *name* carries the level band it covers. That band
 independently confirms the effect-band repair: `Lifestrike` ranks 2/3/4/5 are granted by the 20-40, 40-60, 60-80
-and 60-80 feats, which fits the repaired 30/45/60/75 exactly and the old 3/4/4/4 not at all. And
+and 60-80 feats, which fits the repaired 30/45/60/75 exactly and the raw field-125 3/4/4/4 not at all. And
 `Necromancer Class Feat 011` grants rank 1 of **both** `Chill` and `Lifestrike`, so those two cannot unlock at
-different levels — after the repair they do not (15 and 15, against 7 and 2 before).
+different levels — after the repair they do not (15 and 15, against field 125's 7 and 2).
 
 Read against the feats, the 19 residual collapses are two shapes, not one:
 
@@ -749,14 +740,12 @@ Read against the feats, the 19 residual collapses are two shapes, not one:
 | **untaught top rank** — not level-granted at all | no feat grants it while every rank below has one; it repeats the level below; all nine sit in one late id block (`>= 4487431`) nothing else occupies; the captured level-80s know the rank below and never it (`Chill` 1-5 not 6, `Pestilential Blast` 1-6 not 7, `Hellfire Stream` 1-5 not 6, `Shock` 1-4 not 5) | 8 |
 | **rank 1 from a class feat** — level copied from rank 2 | rank 1's only grant is a `<Class> Class Feat`, which states no band, so field 125 had nothing of rank 1's own | 7 |
 
-### ⭐⭐ …and the feat's LEVEL is a fourth, which answers the residue outright (#853)
+### …and the feat's LEVEL is a fourth, which answers the residue outright
 
-The second shape was filed as **not recoverable from the client**, because a `<Class> Class Feat NNN` states no
-level band in its name and "is not a single-level unlock" — `Necromancer Class Feat 001` grants spells rated 1, 5,
-7, 10 and 25.
-
-⭐ That reasoning treated the class feat as ONE feat. It is a **family of ten wire ids**, and the client's
-featclass table (**RDB 1000043**, `FeatClassEntry`, #862) gives each of them its own LEVEL:
+A `<Class> Class Feat NNN` states no level band in its name and is not a single-level unlock —
+`Necromancer Class Feat 001` grants spells rated 1, 5, 7, 10 and 25 — but it is not ONE feat. It is a **family of
+ten wire ids**, and the client's
+featclass table (**RDB 1000043**, `FeatClassEntry`) gives each of them its own LEVEL:
 `Necromancer Class Feat 001` is ranks 0..9 at levels 1..10. So the teaching feat states the level after all — not
 in its name, in the table that schedules it. `RdbFeatImporter.DeriveClassSpellGrantLevels` writes it to
 `ClassSpell.GrantLevel`, which is per class, as this fact has to be.
@@ -775,7 +764,7 @@ capture — `Frenzy` 5 not 25, `Ice Shackle` 5 not 20, `Contract of Protection` 
 `Arcane Abatement (Rank 1)`, which field 125 rates 25 and 30 — two spells retail demonstrably gave him that the
 stated level says he cannot have.
 
-⛔ **The obvious rival is refuted, and the report still prints it.** "Continue the family's own ladder step one
+**The obvious rival is refuted, and the report still prints it.** "Continue the family's own ladder step one
 rung down" is right on only 62% of the families where the answer is already known, and on `Spark of Life` (step 25)
 it produces level **0**. The schedule gives that family 15. `--report spell-level-ladder` prints both columns side
 by side.
@@ -786,7 +775,7 @@ genuinely scrambled by NAME (ranks 2-4 all under 60-80, rank 5 under 20-40) — 
 level: those feats' featclass levels are 30/45/60/75, in order. Its effect bands are still shifted one rank
 (ending at 91, past the level cap), which is why the band repair correctly declined it.
 
-⚠️ `Spells.Level` is left alone. It is the RDB record's own field and stays what it always was — a trainer /
+`Spells.Level` is left alone. It is the RDB record's own field and stays what it always was — a trainer /
 full-power level, a different fact (see `ClassSpell.GrantLevel`'s own remark) — and the grant level is per CLASS,
 which a per-spell column cannot express.
 
@@ -806,12 +795,12 @@ Measured over the shipped data: **432** rows, **363** agree with field 125, **69
 | PriestOfMitra | 68 | 61 | 7 | 4 | 3 |
 | TempestOfSet | 60 | 45 | 15 | 13 | 2 |
 
-⛔ **Those 14 refute "retail grants at or below field 125, never above."** That rule was read off three rows that
-all happened to point the same way; over the whole sweep `Pestilential Blast (Rank 1)` is scheduled at **7** where
+**Those 14 refute "retail grants at or below field 125, never above."** Three rows alone happen to point the same
+way; over the whole sweep `Pestilential Blast (Rank 1)` is scheduled at **7** where
 the record says 1, `Soul of Mitra` at **80** where it says 40, and `Dance: Aquilonian` at **5** where it says 0.
 The two fields are simply independent, and neither bounds the other.
 
-⚠️ **Five classes are missing from that table and their absence is the finding.** The schedule says *nothing* for
+**Five classes are missing from that table and their absence is the finding.** The schedule says *nothing* for
 Barbarian, Guardian, Conqueror, Assassin and Ranger: no feat teaches a combo, and the melee kit is mostly combos.
 So the schedule can CORROBORATE or CORRECT field 125 on the caster classes; it can never replace it wholesale.
 
@@ -858,7 +847,7 @@ Bit 2 of word 13 is set on **995** of the catalog's percent-mode spells and on *
 bit 2 exactly as the client's `>> 2 & 1` says, and it settles `Dark Knowledge`: rank 1 has it set, ranks 2-4
 clear.
 
-⚠️ It disagrees with the old "≤ 100 is a percent" heuristic on **215 of 1,713** records, and the flag is right
+It disagrees with a "≤ 100 is a percent" heuristic on **215 of 1,713** records, and the flag is right
 on every one: they are tiny FLAT costs — mostly a literal `1`, i.e. 0.01 mana — plus the catalog's test spells,
 which the magnitude rule read as 1% costs. The import independently confirms the split: no percent-mode spell
 exceeds **75**, where flat mode spans 1..65500.
@@ -920,7 +909,7 @@ carries neither.
 | 1289 | 0x509 | 1 | `ArtistryRenownModifier` |
 | 1291 | 0x50B | 12 | `SpellLine2` |
 
-⚠️ **A name is evidence, not a citation.** The id space is shared, so a name is genuinely the client's name for
+**A name is evidence, not a citation.** The id space is shared, so a name is genuinely the client's name for
 that id — but what the property MEANS on a spell still has to be checked against values, and `ManaCost` is the
 worked example: its name is right and reading it as an absolute cost would still be wrong (see above).
 
@@ -934,10 +923,9 @@ Flame 1,000 ms, Resting 500 ms — with no disagreement. Gated by `SpellAreaAndC
 
 That also settles the unit: 447's raw `250` on Deathly Blizzard is 2.5 s, not 250 ms.
 
-## ⚠️ Field 210 `Recharge Delay` is NOT the spell's recast
+## Field 210 `Recharge Delay` is NOT the spell's recast
 
-It reads like the recast — a time, on 3,567 records, named `Recharge Delay` — and #633 listed it as "⭐ the
-spell COOLDOWN". It is not. `Spell.RecastCentiseconds` comes from the record's own `SetSpellRecastTime` /
+It reads like the recast — a time, on 3,567 records, named `Recharge Delay`. It is not. `Spell.RecastCentiseconds` comes from the record's own `SetSpellRecastTime` /
 `SetSpellLineRecastTime` GameAction elements (`spell-recast-source.md`), and joining the two per record over the
 whole catalog says they are different numbers:
 
@@ -955,7 +943,7 @@ entirely NPC ability records (`Counterstrike III`, `Molten Steel Slash V`), agre
 not a restatement of any other timing column we already hold: against `CastTime` 6 of 826 agree, against
 `DurationMs` 4 of 453, against `ChannelingIntervalMs` and `DotIntervalMs` 0.
 
-**The unit IS settled**, which is what #633 asked for before importing: stat `0x0D2` sits in the client's
+**The unit IS settled**: stat `0x0D2` sits in the client's
 first percent-divisor set (`StatDisplayScale.Percent1`), so the client draws this field as *value ÷ 100* — the
 same centiseconds every other time field in this run uses. `100` is 1 s, `10` is 0.1 s, `6000` is 60 s, and the
 `500000` / `999999` / `99999999` outliers on 8 records are a "never" sentinel a recast would have no use for.
@@ -964,7 +952,8 @@ What it actually times is not settled. The population it sits on is suggestive r
 it is `Ignite` / `Burning` / `Poisoned` / `Stunned` / `Ice Barrier` / `Omega Shield`, at 0.5 s the `Druid Heal
 25..80` and `Energy Drain` tiers, at 2 s `Conqueror Evade 20..80`, the regen auras and the `Formation:` /
 `Battle Cry:` band — periodic and *triggered* effects rather than casts, which fits an internal re-fire
-throttle on a proc. That is a hypothesis with no client evidence behind it, so nothing imports the column.
+throttle on a proc. That is a hypothesis with no client evidence behind it, so nothing imports the column (open
+work tracked in Gitea #633).
 
 ## The AoE blast radius is NOT in this run — it is a GameAction element key
 
@@ -984,7 +973,7 @@ a blast radius when the element is selecting targets (an `AudioEffect`'s is a so
 `AOERadiusModification`'s adjusts someone else's). 1,023 spells carry one. Dump a record's elements with
 `--report spell-template --report-arg <id>`.
 
-⚠️ Do not read `SplashRadius` (347) as this. Splash is the collateral a SINGLE-target hit spills onto bystanders;
+Do not read `SplashRadius` (347) as this. Splash is the collateral a SINGLE-target hit spills onto bystanders;
 this is the area the spell targets to begin with. They are different fields, different units (metres vs metres
 ×100) and a few spells carry both.
 Some do read straight through (`StaminaCurrent` 7700 on 398 records is a stamina cost;
@@ -1017,11 +1006,11 @@ dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg
 
 # ...and with --out, EVERY carrying record rather than the 14 samples (id / name / value, one TSV per field) -
 # what a histogram cannot answer is "is this the second source for a column we already fill", and that needs the
-# per-record join (#633, field 210).
+# per-record join (e.g. field 210).
 dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:210 --Content:RdbDir <rdb-dir> --out <dir>
 ```
 
-## Which unnamed FLAGS bits the client reads AT ALL (#632)
+## Which unnamed FLAGS bits the client reads AT ALL
 
 The sweep's percentage table asks *which predicate a bit correlates with*. The prior question is whether the
 client reads the bit at all — a bit nothing consumes is not a decode gap, however well it scores. Answered over
@@ -1032,27 +1021,27 @@ OFFSET=c8 WINDOW=12 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
   -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpFlagBitReads.java
 ```
 
-⚠️ **`+0xC8` is a common displacement**, so sites are classified by ADDRESS RANGE, not counted. The magic
+**`+0xC8` is a common displacement**, so sites are classified by ADDRESS RANGE, not counted. The magic
 subsystem is roughly `0x0075xxxx–0x007Fxxxx` with the combat half around `0x0114xxxx` (`FUN_0114efa0` is
 `DealDamage`, self-named). Anything else reading `+0xC8` is a different struct wearing the same offset.
 
 | bit | set | verdict |
 |---|---:|---|
-| **0** | 16,229 (78%) | ⛔ **NOT READ.** Its only hit is `__tolower_l` — a CRT function. The second most common bit in the word has no consumer at all |
-| 3 | 79 | ⛔ NOT READ — `__atof_l` and one CRT-range site |
-| 5, 6, 7 | 4 / 4 / 67 | ⚠️ read only inside `FUN_017594b0 / 01759690 / 01759a70 / 01759e30` — four adjacent functions reading four adjacent bits, i.e. a bitfield of its own. Bit 8 appears there **and** in the magic subsystem, which is what identifies that cluster as the other struct |
-| 8 | 2,389 | ⭐ `FUN_007e9b50` (the feedback-verb builder bit 15 is named from) + `FUN_007ebe70` |
-| 14 | 2,814 | ⭐ **bypasses a target-GEOMETRY check** and the `0x12` cast refusal it raises — see below |
-| 19 | 7,692 | ⭐ `FUN_007ebe70`, sharing **one guard** with bit 8 |
-| 20 | 2,289 | ⭐ `FUN_007ee710` (bit 16's timed-effect path) + `FUN_00769220` (which also reads bit 15) |
-| 21 | 778 | ⭐ `FUN_007f17d0 / FUN_007f1860` |
-| 29 | — | ⭐ `FUN_007d7ee0` |
+| **0** | 16,229 (78%) | **NOT READ.** Its only hit is `__tolower_l` — a CRT function. The second most common bit in the word has no consumer at all |
+| 3 | 79 | NOT READ — `__atof_l` and one CRT-range site |
+| 5, 6, 7 | 4 / 4 / 67 | read only inside `FUN_017594b0 / 01759690 / 01759a70 / 01759e30` — four adjacent functions reading four adjacent bits, i.e. a bitfield of its own. Bit 8 appears there **and** in the magic subsystem, which is what identifies that cluster as the other struct |
+| 8 | 2,389 | `FUN_007e9b50` (the feedback-verb builder bit 15 is named from) + `FUN_007ebe70` |
+| 14 | 2,814 | **bypasses a target-GEOMETRY check** and the `0x12` cast refusal it raises — see below |
+| 19 | 7,692 | `FUN_007ebe70`, sharing **one guard** with bit 8 |
+| 20 | 2,289 | `FUN_007ee710` (bit 16's timed-effect path) + `FUN_00769220` (which also reads bit 15) |
+| 21 | 778 | `FUN_007f17d0 / FUN_007f1860` |
+| 29 | — | `FUN_007d7ee0` |
 | all others | — | no read site anywhere in the image |
 
-⭐ **Bit 0 is the finding.** It is set on 78% of records and would head any hunt for meaning; it has no consumer,
-so its correlations can only be coincidence. That retires the sweep's largest unexplained column.
+**Bit 0 is the finding.** It is set on 78% of records and would head any hunt for meaning; it has no consumer,
+so its correlations can only be coincidence.
 
-⭐ **Bits 8 and 19 share one guard**, which is why they belong together rather than being chased separately. In
+**Bits 8 and 19 share one guard**, which is why they belong together rather than being chased separately. In
 `FUN_007ebe70`:
 
 ```c
@@ -1061,6 +1050,7 @@ if (flagsAt0xDE != 0 && (spell == 0 || ((flags >> 0x13 & 1) == 0 && (flags & 0x1
 }
 ```
 
-Either bit **suppresses** the same block, so they are two reasons for one outcome rather than two properties.
-`FUN_007ebe70` is called from 13 sites across the magic subsystem and from the damage path (`FUN_0114e6b0`), and
-also reads bit 16 — so it sits on the apply route. `[V0: what the block bits 8 and 19 suppress actually does.]`
+Either bit **suppresses** the same block — the *"Effect %s terminated."* line (LDB 100/596), see
+[bits 8 and 19](#bits-8-and-19-split-never-narrated-and-silent-expiry) above. `FUN_007ebe70` is called from 13
+sites across the magic subsystem and from the damage path (`FUN_0114e6b0`), and also reads bit 16 — so it sits on
+the removal/apply route.

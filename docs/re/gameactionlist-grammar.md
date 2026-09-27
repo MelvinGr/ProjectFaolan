@@ -1,8 +1,7 @@
 # GameActionListIIR_t (0xF508F4C1) wire grammar — a property-map action list
 
-Recovered from `AgeOfConan.exe` (Ghidra `tools/ghidra/output`). The "GameActionList" is the per-dynel
-**spell/action list** — a `0x3F1`-framed list of action elements, each a **keyed stat/property map** (not the
-flat "header + verbatim tail" the capture-only model first suggested). Gitea #190.
+Recovered from `AgeOfConan.exe` (Ghidra). The "GameActionList" is the per-dynel **spell/action list** — a
+`0x3F1`-framed list of action elements, each a **keyed stat/property map**, not a flat header + tail.
 
 ## Reader chain
 
@@ -17,16 +16,16 @@ flat "header + verbatim tail" the capture-only model first suggested). Gitea #19
 
 ## Why the bodies looked multi-form
 
-Each action carries a DIFFERENT set of properties (an animation action has a string name property; a
+Each action carries a different set of properties (an animation action has a string name property; a
 positional action has numeric properties), so the element length varies (4–91 B) — it's a property bag, not a
 fixed record. The capture taxonomy (`GameActionListCodecTests`) reflects this: the clean
 `[u16 len][anim name]` form is one string-valued property; the rest are numeric property sets.
 
-## Element deserialize — recovered 2026-07 (`FUN_00899a60`, #271)
+## Element deserialize (`FUN_00899a60`)
 
 The per-element reader is `FUN_00899a60` (called by the list loop in `FUN_00870500` right before the
 `"Something went wrong while reading a GameActionData blob"` guard). `GameActionData` is a 0x68-byte object
-whose ctor (`FUN_008985c0`) sets up **three typed property maps** — so a property's VALUE TYPE is which map its
+whose ctor (`FUN_008985c0`) sets up **three typed property maps** — so a property's value type is which map its
 key lands in:
 
 - `fcVector_x<BinSearchMapKeyValue<uint,int>>`   (+0x1c) — int props
@@ -34,31 +33,30 @@ key lands in:
 - `fcVector_x<BinSearchMapKeyValue<uint,String>>` (+0x3c) — string props (keys `0x4d9`/`0x4da`, e.g. `idle2_emote`)
 
 `FUN_00899a60` reads (`FUN_0048f900` = read u32 from the stream). The layout is **positional, not key-tagged** —
-the KEYS live in a static per-type descriptor, the wire carries only VALUES in that type's order:
+the keys live in a static per-type descriptor, the wire carries only values in that type's order:
 
 ```
-[u32 typeId]    -> obj+0x10   (the GameActionData TYPE; looked up via FUN_008c3910)
+[u32 typeId]    -> obj+0x10   (the GameActionData type; must be 0xcf09..0xd026; looked up via FUN_008c3910)
 [u32 field]     -> obj+0x14
-[u32 == 4]      (validated)
-[u32 subCount]  (< 1001), then subCount × { sub-record: FUN_006e9f20 + FUN_006e70e0 }
-[u32 for 0x2d5][u32 for 0x2d6][u32 for 0x2f2][u32 for 0x2f5]   (four ALWAYS-present int values, positional)
---- then the TYPE-SPECIFIC values ---
+[u32 == 4]      (validated, else "Invalid GameAction data version")
+[u32 subCount]  (< 1001), then subCount × { criterion: FUN_006e9f20 + FUN_006e70e0 }
+[u32 for 0x2d5][u32 for 0x2d6][u32 for 0x2f2][u32 for 0x2f5]   (four always-present int values, positional)
+--- then the type-specific values ---
 descriptor = FUN_008c3910(typeId)         # unknown type -> "Tried to stream unknown GameActionData with type N"
 for each entry in descriptor.keyList (at descriptor+0xc, u32 entries, until an entry == 0xFF):
-    key = statKeyTable[entry & 0xFF]      # DAT_025073c0[] maps the descriptor byte -> the real stat key
+    key = keyTable[entry]                 # DAT_025073c0[] maps the key index -> the property key (see below)
     if key in {0x4d9, 0x4da}:  value = read std::string   (FUN_0048f840)   # the string props (anim names)
     else:                      value = read u32           (FUN_0048f900)
     map[key] = value
 ```
 
-So the wire has **NO keys and NO terminator** — an element is `[typeId][field][4][subCount][sub-records][4 fixed
+So the wire has **no keys and no terminator** — an element is `[typeId][field][4][subCount][criteria][4 fixed
 u32][type-specific values]`, and the whole per-type layout is fixed once you know the type id + its descriptor
-key list. This supersedes the earlier "`[u32 statKey][value]` loop terminated by `0xFF`" sketch (the `0xFF` and
-the keys are in the STATIC descriptor, not on the wire). Read at runtime by the handler via
+key list (the keys and the `0xFF` live in the static descriptor, not on the wire). Read at runtime by the handler via
 `FUN_0089bd80(action, key)` — e.g. SetSpellRecastTime (`FUN_008b0f50`, string `GameCode/GameAction/SetSpellRecastTime`)
 pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
 
-## The key INDEX table — what a key list entry actually names
+## The key index table — what a key list entry names
 
 A descriptor's key list does not hold property keys; it holds an **index** into a 255-slot table the client
 builds at runtime, `DAT_025073c0`, written by `FUN_00897bd0` as a flat run of
@@ -71,15 +69,14 @@ The resolved keys are **ordinary stat ids** — the same id space as `CharacterS
 `GameAction_*` run at `0x300`–`0x50B`. Confirmed against the one pair published independently: index 88 → `0x463`
 and index 39 → `0x2f9` are exactly the two keys `SetSpellRecastTime` is decompiled reading.
 
-⚠️ **An entry of 1305 / 1307 is the key ITSELF, not an index** (both are past the table's 255 slots). They resolve
+**An entry of 1305 / 1307 is the key itself, not an index** (both are past the table's 255 slots). They resolve
 to `0x519 GameAction_FloatValue1` and `0x51B GameAction_FloatMultiplier`, which is precisely what the client's own
-field-name array calls those two slots — so the pass-through is the reading, not a hole in the table. This
-supersedes the `key = statKeyTable[entry & 0xFF]` sketch above: `& 0xFF` would fold 1305 onto index 25 (`0x2eb`).
+field-name array calls those two slots — so the pass-through is the reading, not a hole in the table. (Masking the
+entry with `& 0xFF` would fold 1305 onto index 25, `0x2eb`.)
 
-The 28 keys with no name yet all sit in `0x2D2`–`0x2FE` — below the 768 floor the client's stat-name-table sweep
-excludes as too noisy, so naming them is that sweep's sub-768 half (Gitea #625), not new GameAction work.
+The 28 keys with no name all sit in `0x2D2`–`0x2FE`, in the stat-name table's sub-768 range.
 
-**What it settles for mounted combat (#142):** exactly two of the 260 types ask whether they may be used from the
+**What it settles for mounted combat:** exactly two of the 260 types ask whether they may be used from the
 saddle — `Charge` and `ChargeSpecialAbility`, both carrying key index 245 → `0x4FD GameAction_CanUseIfMounted`.
 There is no general "usable while mounted" property on any other action, so the client does not gate ordinary
 casts on one.
@@ -87,30 +84,26 @@ casts on one.
 ## Decode coverage
 
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.
-- The full element grammar is now recovered (positional, type-descriptor-driven; string vs u32 by key).
-- **Type id + key list: RECOVERED for all 260 types** — statically, from the initialiser `FUN_008bdf40`
-  ([`gameaction-keylists.tsv`](gameaction-keylists.tsv), 2026-08-03; the 2026-07-11 live Frida dump reached 68 of
-  them and is superseded where the two disagree). Any element is byte-constructible.
-- The spell base cooldown is SOURCED from here and gated server-side: it is the spell record's own
-  `SetSpellRecastTime` / `SetSpellLineRecastTime` element ([spell-recast-source.md](spell-recast-source.md)).
-  Its remaining in-client check and the optional override emit are open work tracked in Gitea #271.
+- The full element grammar is recovered (positional, type-descriptor-driven; string vs u32 by key).
+- **Type id + key list: recovered for all 260 types** — statically, from the initialiser `FUN_008bdf40`
+  ([`gameaction-keylists.tsv`](gameaction-keylists.tsv)). Any element is byte-constructible.
+- The spell base cooldown is sourced from here: it is the spell record's own `SetSpellRecastTime` /
+  `SetSpellLineRecastTime` element ([spell-recast-source.md](spell-recast-source.md)).
 
-## RESOLVED 2026-08-03 — the whole descriptor table IS statically recoverable, and it names the RDB modifier record (#591)
+## The descriptor table is statically recoverable, and it names the RDB modifier record
 
-Two things the sections below got wrong, both corrected here:
-
-1. **"Not statically recoverable" was wrong.** The populator is `FUN_008bdf40`, one flat initialiser that writes
-   all 260 descriptors — name, label, key list and (on ~20 types) the key list's own **field names**. It writes
+1. **Read the initialiser, not the table.** The descriptor table (`DAT_025077c8`) and the key-index table
+   (`DAT_025073c0`) are BSS — zero in the static image — so reading `descriptor+0xc` out of the image returns
+   zeros. The populator is `FUN_008bdf40`, one flat initialiser that writes all 260 descriptors — name, label, key list and (on ~20 types) the key list's own **field names**. It writes
    them two ways, which is why a single-form search missed it: the address is constant-folded for most types
    (`MOV [base+8], <enumId>`), and written through a running cursor for the rest
    (`PUSH <name>; MOV ECX,<enumId>; CALL FUN_008bde20` then `MOV [ECX + EAX*4 + 0xc + 4j], <key>`).
    `tools/ghidra/DumpGameActionKeyLists.java` walks it with constant-register tracking and emits
-   [`gameaction-keylists.tsv`](gameaction-keylists.tsv) — **260 types, all with key lists**, against the 68 the
-   live Frida dump reached.
-   ⚠️ Where it disagrees with [`gameaction_types.json`](gameaction_types.json), **the static reading is the right
-   one**: `AddProc` and `AddSpellProc` have SIX keys there, not four, and the RDB record widths (below) confirm six.
-   The descriptor is `0xF4` bytes, not the `0x41` the live dump inferred: key list at `+0x0c`, a parallel field-name
-   array at `+0x5c`, a third (always zero) at `+0xac`.
+   [`gameaction-keylists.tsv`](gameaction-keylists.tsv) — **260 types, all with key lists**. Where it disagrees
+   with [`gameaction_types.json`](gameaction_types.json) (a 68-type live Frida dump), **the static reading is the
+   right one**: `AddProc` and `AddSpellProc` have six keys, not four, and the RDB record widths (below) confirm
+   six. The descriptor's used part is `0xF4` bytes: name pointer at `+0x00`, id at `+0x08`, key list at `+0x0c`, a
+   parallel field-name array at `+0x5c`, a third (always zero) at `+0xac`; the descriptor stride is `0x104`.
 2. **The RDB feat/spell/item "stat-modifier record" IS a GameAction element.** The `[kind][0][4][0][1][0][2][9][…]`
    record that `ItemTemplateStatModifiers` parses is this exact element: `kind` is the GameAction type id, the `4`
    is the version word the deserializer validates, the `0` after it is `subCount`, and **`1,0,2,9` are the four
@@ -133,33 +126,33 @@ initialiser) against measured width (`--report feat-effect-widths`, from single-
 | 53182 | `SpecialAbility` | `39`(Value)`,77`(Hash)`,84`(Level)`,174`(Substate) | 12 |
 | 53213 / 53211 | `AddProc` / `AddSpellProc` | six | 14 |
 
-⚠️ **That measurement is an upper BOUND, not the width** — `recordLength - elementStart` also swallows whatever
+**That measurement is an upper bound, not the width** — `recordLength - elementStart` also swallows whatever
 the record carries after the element list, which is why an exact match on 17 kinds is the strong result and a
 surplus is not automatically a disagreement. `--report feat-effect-widths` prints the surplus words: `Modify`'s
 wide variants are followed by a pair of list frames (`0x7E2`, `0x3F1`), and `AddSkinnedMesh` (measured 12 words,
 predicted 9) by `2 9 207912`.
 
-### Widths measured by TILING — exact, on 27 kinds (#595)
+### Widths measured by tiling — exact, on 27 kinds
 
 The bound above only exists because a single-element record has no end marker but its own. Elements sit **back to
-back with nothing between them**, so a record holding SEVERAL measures the non-final ones *exactly*: the distance
+back with nothing between them**, so a record holding several measures the non-final ones *exactly*: the distance
 from an element's opening type word to the next element's IS its width. The same report now makes that second,
 independent measurement over 15,987 element regions, tallying a width only where the region's own `0x3F1` frame
 count agrees with the elements the signature walk found (15,880 of them do) — agreement being the record's own
 cheap proof that two elements really are adjacent rather than separated by trailing content.
 
-It reaches **27 kinds against the ceiling pass's 17**, all exact, and settles both of that pass's open readings:
+It reaches **27 kinds against the ceiling pass's 17**, all exact, and settles both of that pass's ambiguities:
 
 - `AddSkinnedMesh` tiles at exactly **9 words**, so its 12-word ceiling was trailing record content — *not* the
   string-valued key it looked like.
 - `Charge` never occurs as a non-final element, so its lone 8-word reading stays what it was: probably a
   coincidental signature hit rather than an element.
 
-### The width model has ONE exception: a TEXT slot
+### The width model has one exception: a text slot
 
 `8 + len(keyList)` describes an element whose every slot is a u32. **Keys `209` and `210` (`EventString`) are
 text**, written `[u16 byteLength][bytes]`, which makes any element carrying one variable-width — and variable by
-an ODD number of bytes, so the payload has to be WALKED slot by slot rather than indexed. `SetMorphValue`'s
+an odd number of bytes, so the payload has to be walked slot by slot rather than indexed. `SetMorphValue`'s
 "ASCII mesh name after the element" was this slot *inside* it all along.
 
 **The set is closed, and read out of the client** `[V1: tools/ghidra/DecompileFns.java]`. The deserializer
@@ -168,14 +161,14 @@ table it reads (`&DAT_025073c0`, built by `FUN_00897bd0`, 244 of its 255 slots w
 **209 → `0x4d9`** and **210 → `0x4da`**, and nothing else to either. So a type is variable-width iff its key list
 contains 209 or 210 — `GenerateName` and `NewTextEffect` are the only two carrying both.
 
-**The length word is a u16, not a u32, and there is no second form.** Same source, now settled on BOTH sides of
+**The length word is a u16, not a u32, and there is no second form.** Same source, settled on both sides of
 the stream `[V1: tools/ghidra/DecompileFns.java]`: the read is `FUN_0048f840` → `FUN_00cbf840` mode 0, which
 reads a u16 and treats `>= 0x8000` as an escape into a long form no shipped template uses, and the **writer**
 `FUN_00899440` emits that same u16 with the same escape (`0xFFFF`, then `0x01FF`, then the u32). `FUN_00cbf840`
 *does* have a u32 mode — `param_2 == 2` reads the length through `FUN_0048f900` — but nothing on the GameAction
-path passes it, and neither side branches on the TYPE: the string branch is chosen by the stat key alone. So a
+path passes it, and neither side branches on the type: the string branch is chosen by the stat key alone. So a
 u32-length string cannot be produced or consumed by this client. The records agree — of the 880 text-carrying
-elements in the feat and spell catalogs, **653 tile EXACTLY** under the u16 (the distance to the next element's
+elements in the feat and spell catalogs, **653 tile exactly** under the u16 (the distance to the next element's
 type word equals `32 + 4×fixedSlots + 2 + len`), and the strings come out whole with the slots after them
 aligned:
 
@@ -191,9 +184,9 @@ None of them carries a NUL inside the counted length.
 this; `--report feat-effect-kinds` prints the audit, bucketing every text-carrying element by which length word
 makes it tile to its measured width.
 
-⚠️ **Seven elements do not tile under it** — all of them `HeadText` (53057), reading `[u32 7]["Dimach\0"][u32 3]`
-with the NUL counted, two bytes wider than the u16 form allows. They are **retired data, not a second form**
-(Gitea #596, closed). Three things put them there rather than in the grammar:
+**Seven elements do not tile under it** — all of them `HeadText` (53057), reading `[u32 7]["Dimach\0"][u32 3]`
+with the NUL counted, two bytes wider than the u16 form allows. They are **retired data, not a second form**.
+Three things put them there rather than in the grammar:
 
 - the client has one string branch and it is a u16, on the read side and the write side both (above), so it
   cannot have written these and cannot read them back;
@@ -226,12 +219,12 @@ Tiling leaves exactly two kinds disagreeing, and neither is the model being wron
 - **`ChangeHitPercent` (53030) at 15 words, ×6** — the `Dimach Item k1/k2/k3` crafting entries (e.g. 12362). Its
   three values (43464, 100, 100) are followed by **four `0x000000FF` words** — the key list's own terminator value,
   as padding. Same six templates as the u32-string `HeadText` and the retired kind 53044 above, so it is the third
-  face of one stale authoring vintage rather than a third puzzle (Gitea #596, closed).
+  face of one stale authoring vintage rather than a third puzzle.
 
 Neither is reachable as a stat modifier: the importer rejects both on general rules (a magnitude that is a
 registered GameAction type id was never ours; a stat outside the id range likewise), not by name.
 
-**Key indices that carry a name** (recovered from the types that name their own slots; a name transfers by KEY,
+**Key indices that carry a name** (recovered from the types that name their own slots; a name transfers by key,
 so it resolves that slot on every type that uses it): `0` Stat, `11` Radius, `17..20` AudioEffect*, `24`
 SkillType, `25` TimedLength, `28..30` Rel{X,Y,Z}Pos, `72` TimeExist, `73` Flags, `77` Hash, `84` Level, `103`
 NPCMaster, `174` Substate, `175` Amount, `209` EventString, `1305` FloatValue. Key `39` is deliberately left
@@ -241,7 +234,7 @@ per-spell twin.
 
 ### A key index is not the property id — it indexes into `GameActionStat_e`
 
-A key-list entry is an INDEX, not the property id the client stores under. `FUN_014935c0(byte keyIndex)` maps one
+A key-list entry is an index, not the property id the client stores under. `FUN_014935c0(byte keyIndex)` maps one
 to the other through `DAT_0297cd48` (asserting `newStat != 0`, from
 `CoreGameFramework/GameActions/GameActionStats.h`), and `FUN_0077a510` is `GetIntStat(GameActionStat_e)` — its
 own log line reads *"Tried to GetIntStat for GameActionStat_e … but it did not exist, returning 0"*. The table is
@@ -253,10 +246,10 @@ runtime-built by `FUN_01492c20`, which writes 243 of its 255 slots as constants,
 | 1 | 723 (`0x2d3`) | Line |
 | 39 | 761 (`0x2f9`) | Value |
 | 88 | 1123 (`0x463`) | Spell |
-| 172 | 1204 (`0x4b4`) | ramp low LEVEL |
-| 173 | 1205 (`0x4b5`) | ramp high LEVEL |
-| 174 | 1206 (`0x4b6`) | ramp low VALUE (the client calls it `Substate`) |
-| 175 | 1207 (`0x4b7`) | Amount — and the ramp's high VALUE |
+| 172 | 1204 (`0x4b4`) | ramp low level |
+| 173 | 1205 (`0x4b5`) | ramp high level |
+| 174 | 1206 (`0x4b6`) | ramp low value (the client calls it `Substate`) |
+| 175 | 1207 (`0x4b7`) | Amount — and the ramp's high value |
 
 Indices 172…174 are **derived**, not read out of the table: the interpolation code below reads exactly
 `{0x4b4, 0x4b5, 0x4b6, 0x4b7}` for a type whose key list is exactly `{0, 174, 172, 175, 173}`, so the four map onto
@@ -264,10 +257,10 @@ each other; `175 → 0x4b7` is already known, `0x4b6` is the lerp's low endpoint
 remaining three is the second magnitude is settled by the shipped values), and `0x4b4 < 0x4b5` matches
 `172 < 173` in every record. Verify before leaning on it for a type outside this family.
 
-⚠️ **The `GameActionStat_e` id is NOT an LDB-615 stat id**, however much it looks like one — 722…1269 lands inside
+**The `GameActionStat_e` id is not an LDB-615 stat id**, however much it looks like one — 722…1269 lands inside
 that table's id range and one slot even collides with a real name (`84` → 1119 → "PvP Cold Invulnerability
 Rating"), which makes "just look the id up in LDB 615" a tempting and wrong way to name the remaining unnamed
-slots (`55`, `66`, `67`, `117`, `236`, `237`). What LDB 615 names is the VALUE stored under key `0`, not the key.
+slots (`55`, `66`, `67`, `117`, `236`, `237`). What LDB 615 names is the value stored under key `0`, not the key.
 
 ### What `Value` (39) and `Amount` (175) mean — from the tooltip builder
 
@@ -275,7 +268,7 @@ slots (`55`, `66`, `67`, `117`, `236`, `237`). What LDB 615 names is the VALUE s
 `014a25a6`, reading exactly three of its four slots — `GetIntStat` on `0x2d2`, `0x2f9`, `0x4b7`, i.e. Stat, Value,
 Amount — and branching on `Value == 0`:
 
-- **`Value` set** → the generic stat-delta formatter `FUN_0149a300`, which appends the stat's OWN unit suffix
+- **`Value` set** → the generic stat-delta formatter `FUN_0149a300`, which appends the stat's own unit suffix
   (`FUN_014a6240(stat)`) and divides by a per-stat display scale. So `Value` is an **absolute** delta in the
   stat's units.
 - **`Value == 0`** → an inlined copy of the same routine applied to `Amount`, but with the suffix replaced by the
@@ -286,19 +279,19 @@ Amount — and branching on `Value == 0`:
 The stat id itself is resolved through `GetLocalisedString(615, stat)` — `PUSH 0x267` at `014a2714` — which is
 what ties this word to the ordinary wire stat space (`CharacterStatId`) rather than a spell-local one.
 
-Key `55` (`ChangeHitPercent` / `ChangeLineHitPercent`, values 1 or 2) is read ONLY by the element comparator
+Key `55` (`ChangeHitPercent` / `ChangeLineHitPercent`, values 1 or 2) is read only by the element comparator
 `FUN_014a5670`, never by the tooltip: it participates in sorting/grouping and carries no rendered magnitude, so
 kind 53075's shipped `(line, percent)` decode does not depend on it.
 
-### `UpgradeCombo` (53209) — key `66` is DAMAGE, key `67` is COOLDOWN
+### `UpgradeCombo` (53209) — key `66` is damage, key `67` is cooldown
 
 The client leaves both slots unnamed in its descriptor, and the pair view (payload words 0 and 1) reads
-`(combo, 66)` — which is why 3,235 records looked like "a pure reference: a LIST of what the feat applies to,
-with the magnitude somewhere else". The magnitude was in the slot the pair view could not see.
+`(combo, 66)`, which makes the 3,235 records look like a pure reference list with the magnitude elsewhere; the
+magnitude is in the slot the pair view cannot see.
 
-The item-tooltip builder `FUN_0149e450` names both by RENDERING them. It reads `GameActionStat_e` `0x315` and
+The item-tooltip builder `FUN_0149e450` names both by rendering them. It reads `GameActionStat_e` `0x315` and
 `0x316` — which the key-index table `&DAT_025073c0` maps to key indices **66** and **67** — and branches on each
-value's SIGN to pick a localised string:
+value's sign to pick a localised string:
 
 | slot | `GameActionStat_e` | zero | `> 0` | `< 0` |
 | --- | --- | --- | --- | --- |
@@ -312,43 +305,43 @@ both are **signed hundredths of a percent** — the same scale kind 53075 uses. 
 The shipped catalog agrees: `Dread Lord` ("Reduces the reuse time of all combos") carries key 67 = `-100` on the
 whole `Leech Life` ladder and key 66 = 0, while `Hexer` ("improves the damage inflicted by the Blood for Aid
 combos") carries key 66 = `+100` on the `Blood for Aid` ladder and key 67 = 0. Only 5 of the 3,235 records set
-both. Imported as `FeatComboModifier`; the recast path that would consume the cooldown half is Gitea #271.
+both. Imported as `FeatComboModifier`.
 
-⚠️ **These names are `UpgradeCombo`-scoped and do not transfer.** A key the client NAMES (0 `Stat`, 39 `Value`,
+**These names are `UpgradeCombo`-scoped and do not transfer.** A key the client names (0 `Stat`, 39 `Value`,
 88 `Spell`, 175 `Amount`) means the same thing wherever it appears; an unnamed one carries no such promise, and
-the catalog shows it does not hold. Key `187` is a per-SPELL target on `ChangeRecastTime` (53031) and
-`ChangeHitPercent` (53030) but a per-COMBO one here; key `66` is a follower script group on
-`SetFollowerScriptGroup` (53024) and the proc DIRECTION on the `AddProc` family; and on
-`ChangeInheritedWeaponAttack` (53250) key `67` is the combo attack's CRITICAL CHANCE, not a cooldown. Name an
+the catalog shows it does not hold. Key `187` is a per-spell target on `ChangeRecastTime` (53031) and
+`ChangeHitPercent` (53030) but a per-combo one here; key `66` is a follower script group on
+`SetFollowerScriptGroup` (53024) and the proc direction on the `AddProc` family; and on
+`ChangeInheritedWeaponAttack` (53250) key `67` is the combo attack's critical chance, not a cooldown. Name an
 unnamed key `<Type>_<slot>` and keep it inside that type's parser.
 
-⚠️ **And the SCALE transfers even less than the name does.** 53250 reads keys 66 and 67 from the same two
+**And the scale transfers even less than the name does.** 53250 reads keys 66 and 67 from the same two
 `GameActionStat_e` slots this type does, and renders them through different arithmetic — see below. Same slot,
 one type apart, three different units.
 
-### `ChangeInheritedWeaponAttack` (53250) — one ATTACK of a combo, on four axes
+### `ChangeInheritedWeaponAttack` (53250) — one attack of a combo, on four axes
 
 The sibling of `UpgradeCombo`, and not a variant of it: 53209 moves a combo as a whole, this moves one of its two
-weapon ATTACKS, along axes 53209 has no slot for. 315 records over 12 feats. Its branch of `FUN_0149e450` is at
+weapon attacks, along axes 53209 has no slot for. 315 records over 12 feats. Its branch of `FUN_0149e450` is at
 `014a1dc5`, which reads all six slots up front and then renders one localised string per non-zero magnitude under
 an attack heading:
 
 | slot | `GameActionStat_e` | what it is | rendered |
 | --- | --- | --- | --- |
-| key `187` | `0x4C3` | the COMBO — 110 of the 112 distinct references resolve against `Combos.Id` | a `comboref://` link |
+| key `187` | `0x4C3` | the combo — 110 of the 112 distinct references resolve against `Combos.Id` | a `comboref://` link |
 | key `84` | `0x45F` | **which attack**: `0` → `FinishingComboAttack`, `1` → `OpeningComboAttack` | the heading |
-| key `66` | `0x315` | the attack's **DPS** delta, signed | raw int + `%` — a WHOLE percent |
+| key `66` | `0x315` | the attack's **DPS** delta, signed | raw int + `%` — a whole percent |
 | key `67` | `0x316` | the attack's **critical chance**, signed | `× 0.025` (the float at `0x020b5944`) + `%` |
 | key `68` | `0x317` | the attack's **hate adjustment**, signed | raw int + `%` — a whole percent |
-| key `69` | `0x318` | the attack's **damage TYPE** | `GetLocalisedString(600, value)` — a NAME, not a number |
+| key `69` | `0x318` | the attack's **damage type** | `GetLocalisedString(600, value)` — a name, not a number |
 
 Each magnitude has an `Increase…` / `Decrease…` pair picked on the value's sign (`IncreaseComboDPS`,
 `IncreaseComboCriticalChance`, `IncreaseComboHateAdjustment`), and a zero is skipped by the same `TEST/JZ` idiom
 53209 uses. `[V1: tools/ghidra/DumpStringsInRange.java]` `[V1: tools/ghidra/XrefsTo.java]`
 `[V1: tools/ghidra/DisasmWin.java]`
 
-⚠️ **Key 84's descriptor label is `Level`, and it does not mean a level here.** The branch does
-`TEST EDI,EDI` → `FinishingComboAttack`, `CMP EDI,1` → `OpeningComboAttack`, and **RETURNS** on anything else
+**Key 84's descriptor label is `Level`, and it does not mean a level here.** The branch does
+`TEST EDI,EDI` → `FinishingComboAttack`, `CMP EDI,1` → `OpeningComboAttack`, and **returns** on anything else
 (`JNZ` at `014a1e46`), so it is a two-valued selector: a third value renders nothing at all. The shipped catalog
 corroborates the polarity by name — `Fierce Opening` and `Dual Master`, whose own text is *"increases the
 **opening** damage done by all combos"*, are the ones carrying `1`.
@@ -357,9 +350,9 @@ Exactly one magnitude is non-zero on all 315 records: key 66 on 212 (`Fierce Ope
 `Smash` 10/20/30, `Crushed Bones` 5…25), key 67 on 101 (`Brutal Blows` 400 = +10%, `Brutal Maiming` 1100,
 `Rupture Armor` 4000), and key 68 on the two rows of the Guardian's `Improved Shield Mastery` — the only feat in
 the catalog that touches threat, which is exactly the feat that should. Key 69 is zero throughout. Imported as
-`FeatComboAttackModifier` (#593).
+`FeatComboAttackModifier`.
 
-### The PROC family — key `88` is the CARRIER's spell, key `236` the TARGET's
+### The proc family — key `88` is the carrier's spell, key `236` the target's
 
 `AddComboProc` (53212) and `AddSpellLineProc` (53070) carry two spell slots, and which is which comes from the
 same builder. It reads `GameActionStat_e` `0x463` and `0x4f4` — key **88** and key **236** — tests each for a
@@ -367,24 +360,23 @@ valid spell **independently**, and picks one of three localised strings from the
 
 | key 88 set | key 236 set | string |
 | --- | --- | --- |
-| ✓ | ✓ | `AddComboProcBoth` |
-| ✓ | ✗ | `AddComboProcSelf` |
-| ✗ | ✓ | `AddComboProcOther` |
+| yes | yes | `AddComboProcBoth` |
+| yes | no | `AddComboProcSelf` |
+| no | yes | `AddComboProcOther` |
 
 So key 88 is the spell the proc casts on the **carrier** and key 236 the one it casts on the **target**. Both are
 real in the shipped data — 171 of the 876 records are target-only — which is why a parser may not require key 88.
-Key `117` is the trigger and key `237` the magnitude the builder renders last; neither is pinned further, and
-both are stored raw. `[V1: tools/ghidra/FindSym.java]` `[V1: tools/ghidra/DisasmWin.java]`
+`[V1: tools/ghidra/FindSym.java]` `[V1: tools/ghidra/DisasmWin.java]`
 
-⭐ The neighbouring `AddProc` branch (`FUN_0149e450` at 0x0149ef57, `[V1: tools/ghidra/DisasmWin.java]`) is the
+Key `117` is the trigger: the neighbouring `AddProc` branch (`FUN_0149e450` at 0x0149ef57, `[V1: tools/ghidra/DisasmWin.java]`) is the
 mapping: it reads key `117` into a three-way switch — **0 → `AddProcOnHit`, 1 → `AddProcDamage`, 2 →
 `AddProcSpellDamage`** — and key `66` (`== 1`) into the flag that swaps each for its `AddProcGetting…` twin (the
 defensive side, which neither 53212 nor 53070 carries). Value **3** is the switch's default and has no sentence in
 this family; on 53070 it is named by the feats that carry it, all on healing lines ("after casting the Wave of
 Life…"), so it is **Cast**. The two forms use disjoint halves — 0/1 on combos, 2/3 on lines — and `FeatProcTrigger`
-is the enum (#697). Key `237` is **Procs per Minute**, the client's own label in the composed 53070 sentence.
+is the enum. Key `237` is **Procs per Minute**, the client's own label in the composed 53070 sentence.
 
-### The INTERPOLATED family is a LEVEL RAMP — keys `174`/`172`/`175`/`173`
+### The interpolated family is a level ramp — keys `174`/`172`/`175`/`173`
 
 `InterpolatedModify` (53220), `InterpolatedTempChangeSkill` (53221) and `InterpolatedModifyAsRating` (53068) all
 carry `[0 Stat, 174 Substate, 172, 175 Amount, 173]`, and the client's own names for two of those slots
@@ -413,22 +405,22 @@ FUN_008b2320:                          # the apply
 ```
 
 Stat **150** is `Casting Level` and **965** is `Apprentice Level` (LDB 615, `--report ldb-stat-names`) — both
-effective-LEVEL stats — so the element reads:
+effective-level stats — so the element reads:
 
 > modify `Stat` by a value ramped linearly from `174` at level `172` to `175` at level `173`, clamped at both ends.
 
 The shipped data agrees independently and could not by chance: across all 341 feat and 376 spell elements, keys
-`172`/`173` only ever hold `10`/`20`/`60` and `80`/`100`, and consecutive RANKS of one spell tile the level line
+`172`/`173` only ever hold `10`/`20`/`60` and `80`/`100`, and consecutive ranks of one spell tile the level line
 without gaps or overlaps while their values stay continuous across the seam — `Battle Cry: Marshal the Ranks`
 runs `26@10 → 42@24`, `44@25 → 60@39`, `62@40 → 78@54`, `80@55 → 96@69`
 (`--report feat-effect-kinds --report-arg 1040005/53220`).
 
-This is why an element's magnitude cannot be taken positionally: word 1 is the ramp's LOW endpoint here and the
+This is why an element's magnitude cannot be taken positionally: word 1 is the ramp's low endpoint here and the
 whole magnitude on `Modify`. `ItemTemplateStatModifiers.ParseStatModifiers` reads by key and returns the whole
 ramp beside that endpoint (`Modifier.Ramp`); `LevelRamp.ValueAt` is the lerp above, and `FeatEffect` /
 `SpellStatEffect` carry the other three slots as nullable columns.
 
-### The mode word `element[0x40]` is NOT in the template
+### The mode word `element[0x40]` is not in the template
 
 `FUN_008c3970` picks between stat `150` and stat `965` on `element[0x40]`, and that word is **not a slot of the
 record** — it is word 0 of a **9-word invocation context** the GameAction is constructed with. `GameActionBase`'s
@@ -440,116 +432,29 @@ deserializer `FUN_00899a60` never writes them: everything it reads goes into the
 The word is generic, not interpolation-specific — the plain `ModifySkill` apply `FUN_0089dfd0` reads the same
 `[+0x40]` through the **same** `1→3, 3→2, 4→1, 5→4` switch before calling the stat sink `FUN_007186a0`, and it is
 mode `1` alone that takes the `GetOnCasterModifyPercent` / `GetOnTargetModifyPercent` branch. So mode 1 is the
-CAST path, which is why it is the mode that ramps over `Casting Level` while every other mode uses `Apprentice
+cast path, which is why it is the mode that ramps over `Casting Level` while every other mode uses `Apprentice
 Level`. Both resolve to the character's level on a server that does not model mentoring, so there is nothing to
 import and nothing to store.
 
-## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
+## Descriptor lookup and registration
 
-Decompiled the actual (de)serializer + tables (scripts `tools/ghidra/DumpRecastDescriptor.java`,
-`DumpDescriptorInit.java`; `DecompileFns` on `FUN_00899a60`/`FUN_008c3910`/`FUN_008b0f50`/`FUN_00897bd0`).
+`FUN_008c3910` is the descriptor lookup: `descriptor = 0x025077C8 + (typeId - 0xCF09) * 0x104`; `descriptor+8 == 0`
+means "unknown type". `FUN_00899440` is the serializer and `FUN_00898890` a by-name accessor; both consume the
+table. `FUN_008bde20` is the out-of-line registrar the initialiser calls for 89 of the 260 types: it writes
+`descriptor+8 = typeId` and stashes the descriptor in `DAT_0297d418` (a "currently-registering" global), after which
+the key list is appended at `descriptor+0xc`. A GameAction class's own constructor can have no references at all
+(e.g. `FUN_008b0e10`, the ctor behind the `SetSpellRecastTime` handler `FUN_008b0f50`'s vtable `0x01fd7a88`) —
+objects are created by a data-driven factory — so the initialiser, not the classes, is the route to the table.
 
-**Element wire layout — confirmed byte-for-byte from the deserializer `FUN_00899a60`:**
-```
-[u32 typeId]            # obj+0x10; must be 0xcf09..0xd026 (e_Type_GC_GameAction .. _End)
-[u32 field]            # obj+0x14
-[u32 == 4]             # version, validated (else "Invalid GameAction data version")
-[u32 subCount]         # < 1001; then subCount × { FUN_006e9f20 + FUN_006e70e0 } sub-records
-[u32 v(0x2d5)][u32 v(0x2d6)][u32 v(0x2f2)][u32 v(0x2f5)]   # four ALWAYS-present positional int values
---- then per the type's descriptor keyList (each entry a u32, low byte = index, list ends at u32 == 0xFF):
-    idx = entry & 0xFF ; key = statKeyTable[idx]
-    key in {0x4d9,0x4da} -> std::string value ; else -> u32 value
-```
-Cursor stride is 4 (`local_114 += 4`), terminator is the full u32 `== 0xFF`.
-
-**`FUN_008c3910` (descriptor lookup):** `descriptor = &DAT_025077c8 + (typeId-0xcf09)*0x41` dwords → base
-`0x025077c8`, stride `0x104` bytes; keyList at `descriptor+0xc`; `descriptor+8 == 0` ⇒ "unknown type".
-
-**stat-key table `DAT_025073c0` — recovered from its runtime initializer `FUN_00897bd0`:** a linear map,
-`statKeyTable[i] = 0x2d2 + i` for the low range, so the two keys the handler reads are at
-**`statKeyTable[0x27] = 0x2f9`** (recast, centiseconds) and **`statKeyTable[0x58] = 0x463`** (spell id). So the
-recast type's descriptor keyList must contain the byte indices `0x27` and `0x58`.
-
-**BLOCKER (new, corrects the assumption above):** BOTH `DAT_025073c0` (stat-key table) AND `DAT_025077c8` (the
-descriptor table itself) are **zero in the static exe** — runtime-built (`FUN_00897bd0` lazily fills the stat-key
-table on first use; the descriptor table is populated per-type from each GameAction class's own registration
-data). `FUN_00899440` is the serializer and `FUN_00898890` a by-name accessor — both CONSUME the runtime
-descriptor; neither is the populator, which is per-class and not yet located. So the recast **typeId + keyList
-cannot be read statically** from the descriptor table.
-
-**Cleanest way to finish:** a LIVE memory dump of the running client (gdb/frida attach, no ASLR so Ghidra
-addresses == runtime — see the live-debug memory) reading `DAT_025073c0` + walking `DAT_025077c8` for the type
-whose keyList contains indices `0x27`+`0x58` → that slot's index gives the recast typeId and its full keyList
-order. Alternatively keep tracing the per-class registration statically, or capture a real retail recast cast.
-
-### Static registration path EXHAUSTED (2026-07-10, second RE session)
-
-Chased the per-class registration to confirm whether the typeId+keyList can be read statically. It cannot:
-- **Descriptor registrar = `FUN_008bde20`** — writes `descriptor+8 = typeId` and stashes the descriptor ptr in
-  `DAT_0297d418` (a "currently-registering" global); a follow-up appends the keyList at `descriptor+0xc`. It has
-  60+ callers (one per GameAction type).
-- **SetSpellRecastTime class:** handler `FUN_008b0f50` sits in the vtable at slot `0x01fd7aac`; vtable base
-  `0x01fd7a88` is installed by ctor **`FUN_008b0e10`** (thin — forwards to the shared base ctor `FUN_0089b390`
-  with the type-specific args).
-- **Dead end:** `FUN_008b0e10` has **zero** references — not a call, not a data pointer anywhere in the image
-  (searched memory for its little-endian address: 0 hits). The GameAction objects are created via an
-  inlined/data-driven factory Ghidra can't resolve, so the recast typeId + keyList are **not statically
-  recoverable**. The runtime tables (`DAT_025077c8` / `DAT_025073c0`) are the only source ⇒ a **live client
-  memory dump is the sole remaining path**. Scripts: `tools/ghidra/DumpRecastReg.java`, `DumpRecastDescriptor.java`.
-
-## RESOLVED 2026-07-11 — live Frida dump of the runtime descriptor table (#271)
-
-Attached Frida to the running client (frida-server-under-Wine, no ASLR ⇒ Ghidra VAs == runtime — see the
-`frida_under_wine_client_re` memory) and read the two runtime tables directly. Scripts committed:
-`tools/frida/dump_gameaction_types.py` (walks the descriptor table) + `dump_gameaction_names.py` (resolves
-each descriptor's name pointer). Full catalog: **`docs/re/gameaction_types.json`** (68 named types).
-
-**Descriptor layout — confirmed from live memory** (stride corrected: **`0x41` BYTES per slot**, not `0x104`;
-consecutive named types' `descriptor+8` enum ids increment by exactly 1, which only holds at a 0x41-byte stride):
-```
-descriptor = 0x025077c8 + (wireTypeId - 0xcf09) * 0x41        # wireTypeId is the SLOT id (0xcf09-based)
-  +0x00  char*  name        # "e_Type_GC_GameAction_<Name>"
-  +0x08  u32    enumId       # compact GC enum (0xcf0a..0xcf50); the SLOT id != this
-  +0x0c  u32[]  keyList      # low byte of each entry = index into statKeyTable; ends at entry == 0xFF
-```
-`statKeyTable` (`DAT_025073c0`) read live = the linear map `[i] = 0x2d2 + i` (confirmed indices 0..255).
-
-**The 68 real GameAction types (enumId 0xcf0a..0xcf50) with their wire-value order** are in the JSON. The
-recast-relevant ones:
-
-| wireTypeId | name | keyList (value order after the 4 fixed ints) |
-|---|---|---|
-| `0xcf51` | `e_Type_GC_GameAction_Spell` | `0x2f9` (recast) |
-| `0xcf81` | `e_Type_GC_GameAction_ChangeRecastTime` | `0x4c3`, `0x2f9` |
-| `0xd019` | `e_Type_GC_GameAction_ChangeLineRecastTime` | `0x2d3`(line), `0x2f9` |
-| `0xcfdd` | `e_Type_GC_GameAction_SpellStatModifier` | `0x463`(spell), `0x2d2`, `0x2f9`, `0x4b7` |
-| `0xd009` | `e_Type_GC_GameAction_CoreSpellStatModifier` | `0x463`(spell), `0x2d2`, `0x2f9`, `0x4b7`, `0x2eb` |
-
-The handler `FUN_008b0f50` (log `GameCode/GameAction/SetSpellRecastTime`) reads spell `0x463` + recast `0x2f9`;
-it is the `Apply` of the SpellStatModifier family (`0xcfdd`/`0xd009` — the only slots carrying *both* keys; the
-vtable at `0x1fd7aac` is non-RTTI so the C++ class name isn't recoverable, but the keyList match is decisive).
-A direct per-spell recast override is `ChangeRecastTime` (`0xcf81`); per-line is `ChangeLineRecastTime` (`0xd019`).
-
-**Construction is now fully specified** — the wire is positional and every type's value order is known, so any
-GameAction element is byte-constructible from the grammar above + the JSON. The element is
-`[wireTypeId][field][4][subCount][sub-records][0x2d5,0x2d6,0x2f2,0x2f5 ints][keyList values]`, string for keys
-`0x4d9`/`0x4da` else u32. This removes the "typeId + keyList unknown" blocker permanently for `GameActionListIIR`
-construction (#190, #271).
-
-**Not shipping a recast builder yet, deliberately:** the capture set still contains no recast GameAction, and
-the gameplay-capture analysis (#271 comment 2026-06-22) showed retail does **not** push a recast on a normal
-cast — base cooldowns are client-side. That reading held up: the base is a `SetSpellRecastTime` /
-`SetSpellLineRecastTime` element in the spell's OWN `1040005` record, now imported as `Spell.RecastCentiseconds`
-and gated server-side ([spell-recast-source.md](spell-recast-source.md)). So the remaining `#271` scope is (a) an
-in-client confirmation that a granted spell goes on cooldown with no server emit, and (b) an *optional*,
-low-priority server override emit (cooldown resets / AA reductions) — now constructible via `ChangeRecastTime`
-the moment it's wanted.
+Because the tables are BSS, a live read (Frida under Wine, no ASLR, so Ghidra VAs == runtime:
+`tools/frida/dump_gameaction_types.py` + `dump_gameaction_names.py`) also works, but it reaches only the types
+registered at dump time, and it must use the `0x104` stride (see below).
 
 ## The full type-id catalog — 260 types, and the id space the client asserts
 
 [`gameaction-type-ids.tsv`](gameaction-type-ids.tsv) lists every GameAction type the client registers. It extends
-the 68-entry `gameaction_types.json` in COVERAGE only — the ids are that file's `enumId`, which it agrees with on
-all 68 shared names. (⚠️ That file's **`typeId` column is not a wire id** — see the stride trap below.)
+the 68-entry `gameaction_types.json` in coverage only — the ids are that file's `enumId`, which it agrees with on
+all 68 shared names. (That file's **`typeId` column is not a wire id** — see the stride trap below.)
 
 **The client bounds the id space and asserts it.** Every reader checks
 `i_nGameAction >= e_Type_GC_GameAction && i_nGameAction < e_Type_GC_GameAction_End` (`SpellData.cpp:1577`),
@@ -567,7 +472,7 @@ So the valid ids are **`0xCF09..0xD026`** — 286 slots, of which 260 are regist
 dropped packet: it pops an "Assertion Failed" dialog and takes the client down. `GameActionTypeId.Validate`
 enforces the range before anything is built.
 
-### The other 26 slots are RETIRED ids — the catalog is complete (#596)
+### The other 26 slots are retired ids — the catalog is complete
 
 The table is a flat array indexed by the id, so an in-range id is either registered or a **hole**; there is no
 third state. 26 ids are holes: `53001, 53017, 53039, 53044, 53126, 53127, 53131, 53133, 53142, 53143, 53145,
@@ -593,26 +498,17 @@ the range, so a later re-dump that recovers one of them fails the build rather t
 Reading the id from `descriptor+8` and deriving it from the address both give the same answer for all 171 inline
 registrations; the other 89 register via `CALL FUN_008bde20`, which passes the id in `ECX`.
 
-### ⚠️ The stride trap — `0x104`, not `0x41`
+### The stride trap — `0x104`, not `0x41`
 
-`tools/ghidra/DumpGameActionTypes.java` used a stride of `0x41`. The real stride is `0x104`, and because
-**`0x104 == 4 * 0x41`** a wrong `0x41` index still divides evenly — so "the address lands exactly on a descriptor"
-is worth nothing as a check, and every id derived that way comes out **four times too far up the table**. That is
-also exactly what the JSON's `typeId` column is: `53005 + 4*(enumId - 53002)`.
+The descriptor stride is `0x104` (`FUN_008c3910`: `IMUL EAX,EAX,0x104`). Because **`0x104 == 4 * 0x41`**, a wrong
+`0x41` stride still divides evenly — so "the address lands exactly on a descriptor" is worth nothing as a check, and
+every id derived that way comes out **four times too far up the table**. That is exactly what
+`gameaction_types.json`'s `typeId` column is: `53005 + 4*(enumId - 53002)`. An id derived that way (e.g.
+`StartFlymode` as `0xD12D` instead of `0xCF92`) can pass a cross-check against another derivation sharing the same
+error, and crashes the client when sent; only the client's range assert catches it. For a table index, validate
+against the client's own bounds, never against another derivation of the same quantity.
 
-This was not caught by review. `StartFlymode` came out as `0xD12D` instead of `0xCF92`, sailed past a
-"cross-checked, 0 mismatches" comparison (both sides shared the same 4x error), and **crashed the client** when
-sent (2026-07-29). Only the range assert caught it. The lesson: for a table index, validate against the client's
-own BOUNDS, never against another derivation of the same quantity.
-
-⚠️ **"KeyLists are not recoverable statically" was wrong** — superseded by
-[the 2026-08-03 resolution](#resolved-2026-08-03--the-whole-descriptor-table-is-statically-recoverable-and-it-names-the-rdb-modifier-record-591)
-above. The reasoning that produced it is still worth keeping, because it is a trap: the descriptor table is BSS,
-so *reading* `descriptor+0xc` out of the image returns zeros. What that rules out is reading the DATA — not
-reading the initialiser that writes it. `DumpGameActionKeyLists.java` walks `FUN_008bdf40`'s stores instead and
-reaches all 260, against the 68 the live Frida dump got.
-
-## ⭐ The four fixed ints: `0x2d5` is DURATION and `0x2d6` is INTERVAL (#786)
+## The four fixed ints: `0x2d5` is duration and `0x2d6` is interval
 
 The element's four always-present values are read positionally (`[0x2d5][0x2d6][0x2f2][0x2f5]`), and the first
 two are named by the client itself. `FUN_0089b390` reads `0x2d6`, finds `0x2d5` zero, and logs:
@@ -631,14 +527,13 @@ confirms the pairing: it runs an element inline only when neither is set, and sc
 
 i.e. `interval > 0 || duration > 1`.
 
-⭐ **Duration is a repeat COUNT, not a time.** Over the whole catalog it takes `1` (run once, 56,769 elements),
+**Duration is a repeat count, not a time.** Over the whole catalog it takes `1` (run once, 56,769 elements),
 `-1` (unbounded, 4,389 of the 5,039 elements that carry an interval) and a thin tail of small integers — 2, 3, 4,
 5 … 40. Nothing takes a centisecond-shaped value.
 
 ### What that settles about a chain edge
 
-`CastNano` links that carry an interval split cleanly, and **both readings #786 proposed are right, for different
-rows**:
+`CastNano` links that carry an interval split cleanly into a cadence and a delay, by row:
 
 | | rows | meaning |
 |---|---:|---|
@@ -646,12 +541,12 @@ rows**:
 | `Repeats == 1` | 220 | runs **once**, so the interval is a **delay** |
 | 2 / 4 / 9 | 3 | that many runs |
 
-The interval alone could not have answered it; the duration word, which nothing was reading, is the
-discriminator. `SpellAreaEffect.Repeats` carries it.
+The interval alone cannot answer it; the duration word is the discriminator. `SpellAreaEffect.Repeats` carries
+it.
 
-## ⭐ An RDB spell record holds SEVERAL of these lists, and its elements carry CRITERIA (#785)
+## An RDB spell record holds several of these lists, and its elements carry criteria
 
-The reader chain above is the WIRE one, but the RDB spell template (`1040005`) stores the same shape — and it
+The reader chain above is the wire one, but the RDB spell template (`1040005`) stores the same shape — and it
 stores **more than one list per record**, which is invisible to anything that streams the element region.
 
 ### The list header
@@ -673,15 +568,15 @@ lists per record                  : 1 x 17,746   2 x 1,309   3 x 19   4 x 2
 list ids                          : 0 x 18,738   20 x 1,142   33 x 502   31 x 33   29/14 x 6   30/5 x 1
 ```
 
-⚠️ The list ID is carried, **not** interpreted. It skews hard by kind — `0` is the bulk (57,580 elements),
+The list ID is carried, **not** interpreted. It skews hard by kind — `0` is the bulk (57,580 elements),
 `20` is `StopParticleEffect` / `Fatality` / `CastNano`, `33` is `SetSpellRecastTime` and the area/cone formulas —
 which reads like a trigger (on-expiry, on-hit), but nothing has pinned that, so no consumer branches on it.
 
-⚠️ The remaining 1.74% break on a second structure, not on the header: a recurring 32-byte block
-`[22][36][0x7E2][3][0x7E2][0][id][93]` that sits BETWEEN lists (twice in `Spirit of the Bear (Rank 1)` 146262)
+The remaining 1.74% break on a second structure, not on the header: a recurring 32-byte block
+`[22][36][0x7E2][3][0x7E2][0][id][93]` that sits between lists (twice in `Spirit of the Bear (Rank 1)` 146262)
 and once at the end of `Hellfire Stream` 8600. Undecoded.
 
-### The sub-records are CRITERIA — and they are what an "exact duplicate" really is
+### The sub-records are criteria — and they are what an "exact duplicate" really is
 
 `FUN_00899a60`'s per-element sub-record reader is `FUN_006e9f20`. It reads **three u32s**, bounds the third to
 `0..0x401`, and on failure logs
@@ -690,11 +585,10 @@ and once at the end of `Hellfire Stream` 8600. Undecoded.
 "invalid criterion id/value/operator ("
 ```
 
-so the triple is `[id][value][operator]`, in that order — a CONDITION on the element. `Element.Criteria` is the
+so the triple is `[id][value][operator]`, in that order — a condition on the element. `Element.Criteria` is the
 typed view.
 
-⭐ **This dissolves #785.** That ticket was filed on *"a spell record states the same GameAction element TWICE,
-verbatim"* — 1,117 elements whose decoded slots repeat another element of the same record. Reading their criteria:
+1,117 elements have decoded slots that repeat another element of the same record. Reading their criteria:
 
 ```
 byte-identical incl. their criteria :   130
@@ -702,17 +596,17 @@ the same effect under different conditions : 987
 across two different LISTS          :    42
 ```
 
-So the overwhelming majority were never duplicated data — they are the same effect under different criteria, and a
+So the overwhelming majority are not duplicated data — they are the same effect under different criteria, and a
 reader that stops at the decoded slots cannot tell them apart. `AddProc` at `1006601@480` is the clean case: its
 twin's criteria are identical except that the operators `93` and `103` are swapped between two ids.
 
 Across the catalog: **74,593 criteria over 42 ids and 50 operators**. Half of them (37,540) carry **no operand** —
 `[0][0][op]`.
 
-⭐ **The evaluator is recovered and both vocabularies with it** — `FUN_006dd970` is `CriteriaItem_t::CheckCriteria`,
+**The evaluator is recovered and both vocabularies with it** — `FUN_006dd970` is `CriteriaItem_t::CheckCriteria`,
 it walks the run as a **postfix expression over a boolean stack**, and the no-operand half is exactly its logic
-operators plus a family of SUBJECT SELECTORS that push nothing. A criterion's `id` is an ordinary stat id. The
-whole reading, the 201-value operator switch and how it was pulled out of the exe are in
-[`criteria-grammar.md`](criteria-grammar.md) (#790); `CriteriaOperator` carries the names the client states.
+operators plus a family of subject selectors that push nothing. A criterion's `id` is an ordinary stat id. The
+whole reading, the 201-value operator switch and the method are in
+[`criteria-grammar.md`](criteria-grammar.md); `CriteriaOperator` carries the names the client states.
 `AddProc`'s twin above swapping `93` and `103` reads as what it is with those names: `HasFeat` against
 `HasNotFeat`.

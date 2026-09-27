@@ -1,13 +1,11 @@
 # Multi-realm (multiple game servers)
 
-Project Faolan supports **N realms** (AoC "servers" — Crom/Fury/…), each an isolated world a character belongs
-to, hosted as separate processes (see below). The wire + data model is realm-aware, and the dynamic data is
-scoped per realm.
+Project Faolan supports N realms (AoC "servers" — Crom/Fury/…), each an isolated world a character belongs to,
+hosted as separate processes. The wire + data model is realm-aware, and the dynamic data is scoped per realm.
 
 ## Where a realm is defined
 
-A realm row is **three things wearing one name**, and knowing which is which is what decides where each part
-lives:
+A realm row is three things wearing one name, and knowing which is which decides where each part lives:
 
 | Half | Columns | Owner |
 |---|---|---|
@@ -15,41 +13,36 @@ lives:
 | Live | `OnlineStatus`, `LastSeenUtc`, `LoadStatus` | the host that serves the realm |
 | Relational anchor | `Id` | the four tables that FK it |
 
-The **static half is declared in configuration** and reconciled into the table at startup
-(`FaolanRealms` reads the section, `DatabaseInitializer.ReconcileRealmsAsync` writes it), so a realm’s name,
-address and ports are reviewable in a text file instead of being edited into a committed binary database by hand.
+The static half is declared in configuration and reconciled into the table at startup (`FaolanRealms` reads the
+section, `DatabaseInitializer.ReconcileRealmsAsync` writes it), so a realm's name, address and ports are reviewable
+in a text file.
 
-⚠️ The other two halves **cannot** move to a file, and the reconciler never writes them:
+The other two halves cannot move to a file, and the reconciler never writes them:
 
-- `OnlineStatus` + `LastSeenUtc` are how a login process learns whether a realm host — possibly on another
-  machine — is still serving (#909, #922). A file cannot observe an absence. The invariant that keeps this honest
-  is that the process owning a realm’s **ports** is the only thing that writes its liveness, which is why a
-  realm-role process reconciles **only its own row** (`onlyRealmId`) while the login tier reconciles the whole
-  declared set.
-- `LoadStatus` is the realm’s **population**, which nothing computes yet. Declaring it would be the reason it
-  never could: every restart would overwrite whatever a live count had put there.
+- `OnlineStatus` + `LastSeenUtc` are how a login process learns whether a realm host — possibly on another machine —
+  is still serving. A file cannot observe an absence. The process owning a realm's ports is the only thing that
+  writes its liveness, which is why a realm-role process reconciles only its own row (`onlyRealmId`) while the login
+  tier reconciles the whole declared set.
+- `LoadStatus` is the realm's population, which nothing computes. Declaring it would prevent it ever being computed:
+  every restart would overwrite whatever a live count had put there.
 
-⭐ A deployment that declares **no** realms is left completely alone — the historical “insert the default realm
-if the table is empty, else do nothing” path. Config becomes authoritative only once somebody writes it down, so a
-database whose realm carries some other id never gains a duplicate from a declaration it never made.
+A deployment that declares no realms is left alone — the "insert the default realm if the table is empty, else do
+nothing" path (`EnsureDefaultRealmAsync`). Config is authoritative only once somebody writes it down, so a database
+whose realm carries some other id never gains a duplicate from a declaration it never made.
 
-Two more rules follow from the anchor half. Ids are **explicit and must stay stable**, because `Character.RealmId`
-is persisted — an implicit ordinal would silently repoint every character the day somebody reordered the file. And
-a row the config has dropped is **reported, never deleted**: four tables FK a realm, so removing one is a data
-migration rather than a config edit.
+Two more rules follow from the anchor half. Ids are explicit and must stay stable, because `Character.RealmId` is
+persisted — an implicit ordinal would silently repoint every character the day somebody reordered the file. And a
+row the config has dropped is reported, never deleted: four tables FK a realm, so removing one is a data migration
+rather than a config edit.
 
-⭐ `Language` was called `Country` until #930. That name had no basis at all: "country" does not occur once in the
-34 MB `AgeOfConan.exe`, and it arrived verbatim in a 2021 commit with nothing behind it. The client's vocabulary is
-language throughout — `VerifyLanguageSetting(const int nClientLanguage)`, `DispatchResetLanguage(nNewLanguage)` —
-and the login LDB page carries *"Your account does not have any valid **language flags**"* in the same block as
-every dimension error, so **dimension access is gated on the account's language flags**, which is what a
-per-dimension language is for. ⚠️ The VALUES are still unverified and were carried over unchanged (#932): they
-match neither the client's LDB page order (fr, en, de, es, ru, pl, ko) nor the string code `LoginCharacter` sends,
-and nothing was found reading the slot they land in.
+`Language` is the client's vocabulary: "country" does not occur once in the 34 MB `AgeOfConan.exe`, while the client
+has `VerifyLanguageSetting(const int nClientLanguage)`, `DispatchResetLanguage(nNewLanguage)`, and the login LDB page
+carries *"Your account does not have any valid **language flags**"* in the same block as every dimension error — so
+dimension access is gated on the account's language flags, which is what a per-dimension language is for.
 
-Declarations are validated at config time rather than at wire-write time, which is where the same mistakes used to
-surface — after a player had already picked the realm. A non-IPv4 address (#845), a zero port, a duplicate id or
-name, and two realms sharing a port on one address are all refused, naming the offending key.
+Declarations are validated at config time rather than at wire-write time, where a mistake would surface only after a
+player had picked the realm. A non-IPv4 address (the client is IPv4-only; open work tracked in Gitea #845), a zero
+port, a duplicate id or name, and two realms sharing a port on one address are all refused, naming the offending key.
 
 ## What the client does with the realm list
 
@@ -61,112 +54,116 @@ fields have a consumer:
 |---|---|---|
 | `+0x04` | online status | the row renderer's `== 2` gate |
 | `+0x08` | name | rendered |
-| `+0x24` | **language flags**, a bitfield | resolved to a language id in `FUN_00A69180` |
-| `+0x30` | **load level**, the 0-4 enum | `FUN_011F4490`, display code = value + 1 |
+| `+0x24` | language flags, a bitfield | resolved to a language id in `FUN_00A69180` |
+| `+0x30` | load level, the 0-4 enum | `FUN_011F4490`, display code = value + 1 |
 | `+0x38` | type, high byte | compared against 7 |
-| `+0x40` | language id | tested **non-zero only**, to show the flag-button row |
+| `+0x40` | language id | tested non-zero only, to show the flag-button row |
 
-⚠️ Two of those were being written wrongly, and both are fixed. `+0x30` was receiving a `== Full` **boolean** with
-the real enum in the next slot, which nothing reads — invisible because every realm we serve is `Recommended`,
-making both spellings 0 (#931). And `+0x24` was a hard-coded 1, which sets the English bit: right by accident for
-an English realm and impossible to change for any other (#933).
+`+0x30` takes the load-level enum itself, not a `== Full` boolean (with every realm `Recommended` both spellings are
+0, so a wrong one is invisible). `+0x24` is the realm's language bitfield, not a constant 1 (which sets the English
+bit).
 
-⭐ **The two language fields are not redundant.** `+0x24` says what language a realm IS, as a bitfield: Russian
+**The two language fields are not redundant.** `+0x24` says what language a realm IS, as a bitfield: Russian
 `0x400`, Polish `0x800`, Korean `0x100000`, and bits 0 or 1 for English. `+0x40` only says whether it has one at
-all. French, Spanish and German have **no bit of their own**, and that is the finding rather than a gap in it — the
+all. French, Spanish and German have no bit of their own, and that is the finding rather than a gap in it — the
 widget row this pairs with holds exactly `EnglishFlag`, `GermanFlag`, `FrenchFlag` and `SpanishFlag`, so one
 Western realm serves all four and the player picks with the flag row, while Russian, Polish and Korean get realms
 of their own.
 
 The language **ids** are the client's own, from the table in `FUN_011D7740` that turns the running client's
 two-letter code into the int it sends: `en=0 fr=1 es=2 de=3 pl=4 ru=5 ko=6`, with its inverse feeding
-`DispatchResetLanguage`. The four values that predate the decode turned out to be right; Polish, Russian and Korean
-were added (#932).
+`DispatchResetLanguage`.
 
-⭐ `DimensionList_t`'s hand-written getters say nothing about any of this: all eight have **zero** callers, because
-the client inlines the map lookup at each site instead.
-
-## Realm-ready foundations
-
-Already realm-ready:
-- **`Realm` table** — `Id`, `Name`, `Language`, `Type`, `OnlineStatus`, `LoadStatus`, and crucially its own
-  **`IpAddress` + `Port`** (so a realm can live on any host:port).
-- **`Character.RealmId`** — every character is FK'd to a realm.
-- **`SendRealmList`** (PlayerAgent/Packets.cs) — already **loops all DB realms** (count-prefixed per-realm record);
-  sending N realms is coded, and the config declares 1 by default (`Project Faolan`, 127.0.0.1:7014).
-- **`RequestCharRealmData` / `SendCharacterRealmData` / `CreateCharacter(accountId, realmId)`** — the realm-select
-  wire flow exists.
+`DimensionList_t`'s hand-written getters say nothing about any of this: all eight have zero callers, because the
+client inlines the map lookup at each site instead.
 
 ## Architecture
 
 - **N game worlds, one per realm**, each isolated: its own `WorldSimulation` / `WorldState` / zones / interest /
   persistence. A player on realm A never sees realm B's entities, chat, guilds, or AH.
-- **Shared login/routing tier** (`UniverseAgent` + `PlayerAgent`): authenticates once, shows the realm list, and
-  routes each player to their selected character's realm game service by `Realm.IpAddress:Port`.
-- **Realm-local dynamic data**: characters (already `RealmId`), guilds, AH listings, mail, chat channels.
+- **Shared login/routing tier** (`UniverseAgent` + `PlayerAgent`): authenticates once, shows the realm list
+  (`SendRealmList` loops every realm row), and routes each player to their selected character's realm by
+  `Realm.IpAddress:Port` in the enter-world handoff.
+- **Realm-local dynamic data**: characters (`Character.RealmId`), guilds, AH listings, mail, chat channels.
 - **Shared static content** (realm-agnostic reference): maps, NPC/item/spell templates, RDB assets. One copy,
   read by every realm.
 
 ## Deployment model: process-per-realm
 
-Each realm is its **own Faolan game process** bound to its `Realm.IpAddress:Port` (any host), with a **shared
-login/routing tier** directing players and a **shared `faolan.db`** (per-realm DBs are a later option, P5). True
-isolation + horizontal scale (a realm can live on its own machine; a crash takes only that realm down).
+Each realm is its own Faolan game process bound to its `Realm.IpAddress:Port` (any host), with a shared login/routing
+tier and a shared database. A realm can live on its own machine, and a crash takes only that realm down.
 
-Considered and rejected for now: (A) in-process multi-host (one process loops realms) — simpler ops but shares
-process/resources and couples realm lifecycles. `Realm.IpAddress` already exists precisely to enable B.
+- **Login/router process (one):** `UniverseAgent` (7010, the only fixed port) + `PlayerAgent` — auth, the realm
+  list, the character list, and the enter-world routing that hands the client to the selected character's realm.
+  Owns no world.
+- **Realm game process (one per realm):** `GameServerListener` + `WorldSimulation` + the realm-local chat/guild
+  services (`ChatServerListener`, `CsPlayerAgentListener`), bound to that realm's world/chat/cs ports, with the realm
+  id threaded through the simulation, dispatcher and MCP.
 
-### Process topology under B
+`--role login` runs the router tier; `--role realm=<id>` runs a realm game host; the default is all-in-one. `--role`
+is repeatable (`--role login --role realm=<id>` co-hosts both), but at most one realm role per process (co-hosting
+realms would share chat/session state across them). Role validation is a command-line error, not a crash:
+`ServerCommand.TryParseRoles` (shared by the option's validator and its reader) answers `--role realm=1 --role
+realm=2`, `--role realm=abc` and a plain typo with one line plus usage and exit 1.
 
-- **Login/router process (shared, one):** `UniverseAgent` (7010, the only fixed port) + `PlayerAgent` — auth, the
-  realm list, the character list, and the **EnterWorld routing** that hands the client to the selected character's
-  realm. Owns NO world. Reads `faolan.db` for accounts/characters/realms.
-- **Realm game process (one per realm):** `GameServerListener` + `WorldSimulation` **+ the realm-local chat/guild
-  services** (`ChatServerListener` chat, `CsPlayerAgentListener` guilds/teams) — because chat and guilds are
-  realm-local, they move OUT of the shared tier and INTO each realm process. Bound to that realm's `IpAddress:Port`
-  (+ the per-realm chat/cs ports); reads its own realm id from config/CLI (`--role realm=<id>`). Shares `faolan.db`,
-  scoping every dynamic query by realm.
+One login + 2 realm processes run concurrently against the shared DB, each binding its own realm's ports from its
+`Realm` row (login 7010/7011; realm 2 → 7014/7012/7001; realm 3 → 7024/7022/7021), with no collisions.
 
-So `Program.cs` gains a **role**: `--role login` (or default) runs the router tier; `--role realm=<id>` runs a realm game
-host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), but at most one realm role per process
-(co-hosting realms would share chat/session state across them). One login process + N realm processes, shared DB.
+## Realm-scoped data
 
-### `OnlineStatus` means SERVING, not "began starting" (#909)
+Guild, AH and mail rows carry an explicit `RealmId` — not derived from members: an empty or just-created guild has no
+members to infer a realm from, and a guild's realm is pinned at creation.
 
-The login tier's realm list is driven by `Realm.OnlineStatus`, so a wrong value points players at a realm that
-is not there. Two bugs made that the default outcome:
+- **`Guild`**: `RealmId` set at creation from the founder's realm; the name is unique per `(RealmId, Name)` (Crom and
+  Fury can each have a "Knights"), and `GetGuildByName` is realm-scoped.
+- **`TradepostListing`**: `RealmId` = the seller's realm; every search/list/buy query is realm-scoped.
+- **`Mail`**: `RealmId` = the recipient's realm (no cross-realm mail in retail).
+- **`Character.Name`** is unique per `(RealmId, Name)`, and `GetCharacterByName(name, realmId)` is realm-scoped.
+  Whispers address by id, not name.
+- Character-owned data (inventory, quests, shortcuts, …) is transitively realm-scoped via `Character.RealmId`.
 
-1. the flip was in `RealmStatusService.StartAsync`, i.e. before the host was known to be up — a realm process
-   logged *"Realm 2 marked Online"*, then died on a bind with its ports never listening;
-2. only `StopAsync` flipped it back, and a crash, a `kill -9`, an unhandled exception or a bind failure all skip
-   it — so the row stayed Online indefinitely, including across a reboot.
+`Faolan.Tests/RealmIsolationTests` gates the isolation: it seeds two realms whose rows collide on everything except
+the realm — the same guild name, sale id, seller and bank slot, mail recipient, character name — and asks each
+realm's own reader for its own, reading back a value that differs per realm rather than a count (a missing `WHERE`
+fails quietly, with realm B's rows simply appearing in realm A). Dropping the filter from `GetGuildByName`,
+`GetGuilds` or `DeleteTradepostListing` fails it. The deliberate exceptions are asserted as such:
+`GetCharactersByAccount` spans realms (the selection screen's wire row carries `character.RealmId` per entry), and
+`GetItemSearchCategory` reads the catalog fact across realms by design. The other reads on realm-scoped tables are
+by-unique-id lookups (`GetCharacter(id)`, `GetGuild(id)`, `GetMailByWireId`, `GetTradepostListingBySaleId`) or
+intentionally global (character-id allocation over the shared id space). Runtime isolation holds by construction: a
+realm process holds only its own connected sessions and zones.
 
-Both are fixed by moving the two writes to the moments that actually mean something:
+## `OnlineStatus` means serving, not "began starting"
 
-- **`StartAsync` CLAIMS the row**, writing Offline. That is what clears a stale Online left by this realm's own
-  previous life. ⚠️ It is safe because owning the row means owning the PORTS: the listeners create their sockets
-  in their constructors, and hosted services are constructed before the first `StartAsync` runs, so by then this
-  process has bound the realm's world/chat/cs ports and no other process can be serving that realm. Any Online it
-  finds is stale by construction, not a rival host.
-- **`IHostApplicationLifetime.ApplicationStarted` flips it Online**, which fires only once every hosted service
-  has started *and* the web host (when there is one) has bound.
+The login tier's realm list is driven by `Realm.OnlineStatus`, so a wrong value points players at a realm that is not
+there. `RealmStatusService` (realm role only) writes it at the two moments that mean something:
 
-Verified end to end: realm 2 was `kill -9`'d (leaving its row Online), then restarted into an occupied MCP port —
-it claimed the row, failed the bind, and the row read **Offline** with nothing listening, where before it read
-Online. Gated by `RealmStatusServiceTests`.
+- **`StartAsync` claims the row**, writing Offline. That clears a stale Online left by this realm's own previous
+  life. It is safe because owning the row means owning the ports: the listeners create their sockets in their
+  constructors, and hosted services are constructed before the first `StartAsync` runs, so by then this process has
+  bound the realm's world/chat/cs ports and no other process can be serving that realm.
+- **`IHostApplicationLifetime.ApplicationStarted` flips it Online**, which fires only once every hosted service has
+  started and the web host (when there is one) has bound. Graceful shutdown flips it Offline.
 
-⚠️ **What this does not fix:** a realm that crashes and is never restarted still reads Online, because nothing
-else re-reconciles it. Closing that needs a liveness marker (heartbeat / owning process) rather than a bare
-boolean — a schema question, since `CK_Realm_OnlineStatus` constrains the column to two values today.
+Writes go through `IDatabaseRepository.SetRealmOnlineStatus(realmId, status)`, by id, so hosts on a shared DB never
+touch each other's rows. A realm that is `kill -9`'d and restarted into an occupied port claims the row, fails the
+bind, and reads Offline with nothing listening. Gated by `RealmStatusServiceTests`. The committed `faolan.db` carries
+the stopped-state default, Offline.
 
-### Ports: everything a realm host binds is per-realm
+**A crashed realm decays out of the list.** A hard crash skips `StopAsync`, and with no restart nothing reclaims the
+row, so the absence has to be observed: `Realm.LastSeenUtc` is stamped by the serving host every
+`RealmLiveness.HeartbeatInterval` (30 s) and every reader takes the pair through `RealmLiveness.Effective`, which reads
+Online-but-stale as Offline after `StaleAfter` (2 minutes — four intervals, so three missed stamps do not take a
+healthy realm down). A stamp rather than a lease or a reaper keeps the invariant: a realm process writes only its own
+row, and the login tier only reads. A `NULL` stamp is not serving even with the flag set, and a stamp in the future is
+accepted, since the two processes may be on different machines with some clock skew. Open work tracked in Gitea
+#922.
 
-A realm's world / chat / cs ports come off its own `Realm` row, so two realm processes never collide. The one
-exception was the **MCP endpoint** (#910): `Mcp:Port` is a single global key and MCP runs only in a realm host, so
-every realm process bound the same 7099 and the second died on `address already in use` — naming a port the
-operator never set for that process, after it had already logged that it was hosting realm 2.
+## Ports: everything a realm host binds is per-realm
 
-A realm host now binds `Mcp:Port` **plus its realm's offset from the first realm**:
+A realm's world / chat / cs ports come off its own `Realm` row. The MCP endpoint is derived: `Mcp:Port` is a single
+global key and MCP runs only in a realm host, so a realm host binds `Mcp:Port` plus its realm's offset from the first
+realm:
 
 | realm | MCP endpoint |
 |---:|---|
@@ -174,134 +171,26 @@ A realm host now binds `Mcp:Port` **plus its realm's offset from the first realm
 | 2 | `http://127.0.0.1:7100/mcp` |
 | 3 | `http://127.0.0.1:7101/mcp` |
 
-The offset rather than the raw id is deliberate — realm 1 keeps the configured port exactly, so every existing
-single-realm setup still answers on 7099 and no `claude mcp add` has to change. The process prints its own endpoint
-at startup (`[mcp] http://127.0.0.1:<port>/mcp (realm <id>)`), and a bind failure now says it is the MCP port and
-suggests `--Mcp:Enabled false` / `--Mcp:Port <port>` instead of leaving a bare Kestrel error.
+The offset rather than the raw id keeps realm 1 on the configured port exactly. The process prints its own endpoint at
+startup (`[mcp] http://127.0.0.1:<port>/mcp (realm <id>)`), and a bind failure names the MCP port and suggests
+`--Mcp:Enabled false` / `--Mcp:Port <port>`.
 
-⚠️ Realm ids are not promised to be small or contiguous; an id far enough out to run a `ushort` past its end falls
-back to the base port rather than wrapping into a port that means something else. Set `Mcp:Port` per process there.
+Realm ids are not promised to be small or contiguous; an id far enough out to run a `ushort` past its end falls back
+to the base port rather than wrapping into a port that means something else. Set `Mcp:Port` per process there.
 
-⚠️ `Configuration.McpUrl` is derived from the BASE port, so it is the FIRST realm's endpoint. That is right for
+`Configuration.McpUrl` is derived from the base port, so it is the first realm's endpoint. That is right for
 `Faolan.Web`, which is not realm-aware; anything wanting another realm's endpoint has to derive it the same way.
 
-## How it works
+## Database
 
-- **Realm-routed handoff + realm-scoped char list.**
-  Replace the static `Program.GameServerPort` (Inbound.cs:1264) + the `Configuration.ServerPublicAddress` handoff sends
-  with the *selected character's* `Realm.IpAddress:Port` — look the character's realm up at `EnterWorld` and thread
-  it into the GameServer/CsPlayerAgent/ChatServer handoff addresses. Scope `SendSmallCharList` (and the char-realm
-  counts) to the client's selected realm. Two realm rows pointing at the SAME process proves routing before the
-  process is actually split.
+A shared database across N realm processes needs concurrent access: on SQLite that depends on `journal_mode=WAL`
+(see `CLAUDE.md`), and the Postgres provider is the server-database option. Tests stay on SQLite regardless — they
+validate code-builds-from-data, not the storage engine; `TestDb.ReadOnly` is the single seam for the real-data golden
+fixture.
 
-- **Process role split.** `Program.cs` gains a role: `--role login` (default) starts
-  ONLY `UniverseAgent` + `PlayerAgent` (+ the DB); `--role realm=<id>` starts a realm game host — `GameServerListener` +
-  `WorldSimulation` + the realm-local `ChatServerListener` + `CsPlayerAgentListener` — bound to that realm's ports,
-  with the realm id threaded through the whole world (simulation, dispatcher, MCP). The login tier no longer owns a
-  world; the realm host no longer owns login. Run one login process + one realm process locally to validate.
+## Retail constraints
 
-- **Realm-scope the shared dynamic data.** Add `RealmId` to `Guild`, `TradepostListing`, `Mail` (+ any
-  world-global dynamic table); scope every query by realm; EF migration backfilling existing rows to realm 1. Now
-  that chat/guild services live IN the realm process (P2), they are realm-scoped by construction — but the DB rows
-  they read/write must carry `RealmId` so two realm processes on the shared DB don't cross-read.
-
-  The bits that bite if missed (an **explicit** `RealmId` column, NOT derive-from-members — an empty/just-created
-  guild has no members to infer a realm from, and a guild's realm is pinned at creation, not by transient membership):
-  - **`Guild`**: add `RealmId` (FK), set at creation from the founder's realm. Change the unique index
-    `[Index(Name, IsUnique)]` → **composite `(RealmId, Name)`** (Crom and Fury must each be able to have a "Knights").
-    `CreateGuild(name, leaderCharacterId)` → take/derive `realmId`, and scope its name-uniqueness check + `GetGuildByName`
-    by realm (both are GLOBAL today: `DatabaseRepository.CreateGuild`/`GetGuildByName`).
-  - **`TradepostListing`** (auction house): `RealmId` = the seller's realm; the AH is realm-local (a realm process
-    shows only its own market). Scope every search/list/buy query by realm.
-  - **`Mail`**: `RealmId` = the recipient's realm (no cross-realm mail in retail); scope inbox/send by realm.
-  - **Character-owned data** (inventory, quests, shortcuts, …) is already transitively realm-scoped via
-    `Character.RealmId` — no column needed there.
-  - Migration backfills all existing rows to realm 1 (the current single realm), then a query audit ensures no
-    guild/AH/mail read path is missing the realm filter (the cross-realm-leak risk).
-
-- **Isolation hardening + N processes.** Run N realm processes against the shared DB; audit for
-  cross-realm leakage (dispatch, name/handle lookups, DB queries missing the realm filter); confirm a player on
-  realm A never sees realm B. Config/orchestration for launching the fleet (one login + N realm hosts).
-
-  **Character names per realm:** `Character.Name` is now composite `(RealmId, Name)` unique, and
-  `GetCharacterByName(name, realmId)` is realm-scoped with all 6 callers passing their realm (guild invite, GM
-  resolve, tradepost seller/recipient/sender, create-flow name check). Whispers address by ID, not name.
-
-  **Cross-realm-leak audit (CLEAN):** every query on a realm-scoped table (`Guilds`/`TradepostListings`/
-  `Mails`/`Characters`) was checked. No leaks: the by-name/search queries are realm-scoped (P3/P4); the rest are
-  by-unique-id lookups (`GetCharacter(id)`, `GetGuild(id)`, `GetMailByWireId`, `GetTradepostListingBySaleId`),
-  intentionally-global (character-id allocation over the shared id space; the login tier's cross-realm char list),
-  or realm-agnostic static metadata (the AH item-search-category inference). Runtime isolation also holds by
-  construction: a realm process only holds its own connected sessions/zones (P2).
-
-  ⭐ **That audit is now a GATE, not a reading.** `Faolan.Tests/RealmIsolationTests` seeds two realms whose rows
-  COLLIDE on everything except the realm — the same guild name, the same sale id, the same seller and bank slot,
-  the same mail recipient, the same character name — and then asks each realm's own reader for its own. A missing
-  `WHERE` fails quietly (realm B's guilds simply appear in realm A), so it is checked the way the leak would look:
-  each assertion reads back a value that differs per realm rather than a count. Mutation-checked — dropping the
-  filter from `GetGuildByName`, `GetGuilds` or `DeleteTradepostListing` fails it. The two deliberate exceptions
-  above are asserted as such rather than left silent: `GetCharactersByAccount` must SPAN realms (the selection
-  screen's wire row carries `character.RealmId` per entry), and `GetItemSearchCategory` reads the catalog fact
-  across realms by design.
-
-  **Role validation is a command-line error, not a crash.** `--role` is parsed and validated by the command line
-  itself (`ServerCommand.TryParseRoles`, shared by the option's validator and its reader), so `--role realm=1
-  --role realm=2`, `--role realm=abc` and a plain typo each answer with one line plus usage and exit 1. It used to
-  be two bare `throw new Exception`s in `Program` — reached *after* the command line had already accepted the
-  string — so a typo produced a stack trace and a SIGABRT.
-
-  **Fleet compose:** verified 1 login + 2 realm processes run concurrently against the shared DB, each
-  binding its own realm's ports from its `Realm` row (login 7010/7011; realm 2 → 7014/7012/7001; realm 3 →
-  7024/7022/7021), no collisions. So the process-per-realm topology composes.
-
-  **Realm up/down status:** `RealmStatusService` (`Faolan/Helpers/`, IHostedService, realm role only)
-  flips this realm's `Realm.OnlineStatus` → `Online` on startup and → `Offline` on graceful shutdown, via
-  `IDatabaseRepository.SetRealmOnlineStatus(realmId, status)` (updates by id, so hosts on a shared DB never touch
-  each other's rows). Registered last in the `runRealm` block, so it comes up after the listeners bind and — hosted
-  services stopping in reverse — flips Offline first as shutdown begins. The login tier's `SendRealmList` already
-  reads `OnlineStatus`, so this is what makes the realm list reflect reality. (Committed `faolan.db` carries the
-  stopped-state default, `Offline`.)
-
-  ⭐ **And a crashed realm decays out of the list (#922).** A hard crash / SIGKILL skips `StopAsync`, and #909's
-  claim-on-start only clears the stale `Online` a realm's OWN restart leaves — with no restart the row said
-  `Online` for ever, including across a reboot, and the login tier kept handing clients to a host that was not
-  there. A two-value column cannot decay on its own; the ABSENCE has to be observed. So `Realm.LastSeenUtc` is
-  stamped by the serving host every `RealmLiveness.HeartbeatInterval` (30 s) and every reader takes the pair
-  through `RealmLiveness.Effective`, which reads `Online`-but-stale as `Offline` after `StaleAfter` (2 minutes —
-  four intervals, so three missed stamps do not take a healthy realm down).
-
-  ⚠️ A stamp rather than a lease or a reaper, deliberately: it leaves the invariant above **unchanged** — a realm
-  process writes only its own row, and the login tier only READS. A `NULL` stamp is not serving even with the flag
-  set (a row that predates the heartbeat, or one set by hand, is not evidence that anything is listening), and a
-  stamp in the future is accepted, since the two processes may be on different machines and a little clock skew
-  must not take a live realm down.
-
-- **Per-realm DBs (a later option).** If shared-DB contention or stronger isolation warrants it, give each realm
-  process its own DB (static content cloned/shared read-only, dynamic per-realm) instead of `RealmId` columns.
-
-## Database provider swap (SQLite → Postgres)
-
-SQLite is fine for dev and a single process, but a **shared DB across N realm containers** wants a real server DB
-(Postgres): SQLite's single-writer file locking is awkward for concurrent container access. The swap is **~half a
-day**, not a rewrite — EF Core is code-first and provider-agnostic, and `faolan.db` is *built by the importer*, so
-there's no manual data migration:
-- Add the provider package, swap `UseSqlite` → `UseNpgsql` at the ~4 production call sites (`DatabaseServiceCollectionExtensions`,
-  the `Program.cs` realm probe, the design-time factory, the importer CLI); `DatabasePath` becomes a connection string.
-- **Regenerate migrations** for the new provider (they don't port; squash to one initial migration).
-- **Re-run the importer** against the new DB (it's the source of truth - no export/import).
-- Watch-outs: `ulong` columns → Postgres `bigint` is *signed* (audit large ids; most are already capped to
-  `long.MaxValue`); one SQLite-ism to fix (`INSERT OR IGNORE` at `DatabaseRepository.cs`, → `ON CONFLICT DO NOTHING`).
-
-**Tests stay on SQLite regardless** - they validate code-builds-from-data, not the storage engine. The golden
-tests keep an embedded SQLite fixture (`Faolan.Tests/TestDb.ReadOnly`, the single seam); provider-specific fidelity
-(the ulong/`ON CONFLICT` cases) is a *small* separate Testcontainers-Postgres suite, not the whole golden suite.
-See the `TestDb` doc-comment for the full rationale.
-
-## Retail constraints (retail is leading)
-
-- The realm-select flow (`RequestCharRealmData` → realm list → char-realm-data) already matches retail for 1 realm.
-  **Before advertising >1 realm**, confirm the multi-realm list record format + the char-per-realm counts against a
-  capture (or the client reader in Ghidra) — a guessed list that the client rejects stalls at server-select.
-- The enter-world handoff (0x2002) carrying a per-realm IP:Port is exactly what `Realm.IpAddress:Port` is for;
-  confirm the client honors a non-default host:port in the handoff.
-
+The realm-select flow (`RequestCharRealmData` → realm list → char-realm-data) matches retail for one realm. No capture
+carries a multi-realm list, so the >1-realm list record and the char-per-realm counts are built against the client's
+`Dimension_t` reader above, and the client honouring a non-default host:port in the enter-world handoff (0x2002) is
+not capture-confirmed.

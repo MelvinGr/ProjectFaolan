@@ -1,11 +1,11 @@
-# The shield rose is uploaded BY THE CLIENT (#620)
+# The shield rose is uploaded by the client
 
 Recovered from `AgeOfConan.exe` (Ghidra, `tools/ghidra/ConstScan.java` on the stat id + `tools/ghidra/Callers.java`
-+ `tools/ghidra/DecompAddrs.java`). It answers the one question #20 left open: who owns a *player's*
-directional-combat guard. The answer is the client, and the `CombatShieldIIR` travels **both** ways.
++ `tools/ghidra/DecompAddrs.java`). It answers who owns a *player's* directional-combat guard: the client, and the
+`CombatShieldIIR` travels **both** ways.
 
 The capture corpus cannot show this — all 110 captured `CombatShieldIIR` records are downloads naming an NPC,
-because no captured session ever pressed a shield key — which is exactly why it had to come off the binary.
+because no captured session ever pressed a shield key — so it comes off the binary.
 
 ## The stat
 
@@ -31,7 +31,7 @@ live game documents:
   decrements it and increments the destination (`FUN_01117d60` twice).
 * `stackAll != 0`: zero the stat, then put all three shields on the pressed arc (arc 5 spreads 1/1/1 instead).
 
-It then reads stat `0xA5` back, constructs a `CombatShieldIIR_c` on the stack (the image's ONLY construction of
+It then reads stat `0xA5` back, constructs a `CombatShieldIIR_c` on the stack (the image's only construction of
 that class) and hands it to `FUN_00595f90`, whose own failure string names it:
 
 ```
@@ -52,7 +52,7 @@ The send is gated on a per-entity flag at `+0x378` and rate-limited by the token
 * …and it does not seed one later either. Timing all 110 captured `CombatShieldIIR` against their own
   defender's spawn (`--report shield-rose`): of the 71 first-roses, **none** arrives within 2 s of that handle's
   spawn and the earliest is 2.4 s — an engage, not a catch-up. So a viewer who arrives mid-fight sees no rose
-  until the next change, in retail as in ours, and nothing is sent to plug it (#622).
-* The mitigation the server applies with those numbers is keyed on the **direction the attacker SWINGS**, not on
+  until the next change, in retail as in ours, and nothing is sent to plug it.
+* The mitigation the server applies with those numbers is keyed on the **direction the attacker swings**, not on
   where they stand — see [`../subsystems/combat.md`](../subsystems/combat.md). An NPC carries no direction
-  ability, so the server picks one (#621).
+  ability, so the server picks one.

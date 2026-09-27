@@ -42,22 +42,20 @@ limits follow, and both bound every count below:
   zero and **split any string that spans one**. A string cut this way is recoverable only from another block
   that happened to catch it at a different alignment.
 
-⚠️ **This is a diagnostic view, never a source of content.** Nothing here describes the NPC it arrived on,
+**This is a diagnostic view, never a source of content.** Nothing here describes the NPC it arrived on,
 and none of it may be lifted into a table.
 
-## ⚠️ How to count it without inventing data
+## How to count it without inventing data
 
 Extraction runs **per maximal printable run**, because a run boundary is the only thing that can be a string
 boundary: the bytes either side of it were never part of one C string. Every pattern is anchored on a
 **closing delimiter** (`ScriptGroup '<name>' (id=<n>)` needs both quotes and the paren), so a name the window
 truncated is dropped rather than half-reported.
 
-That is not a stylistic choice. The first pass over this data ran its regexes over the **whole 228-byte
-buffer**, letting a match span the non-printable gaps between one leaked string and the next, and reported
-**133 ScriptGroups, 121 source files, and 26 `key=` values across eight categories**. The honest figures are
-**56, 32 and 9 across eight categories** — the rest were manufactured by matches that crossed a gap
-(`category=` in one string plus `000` from the binary after it reads as category 50000). Roughly half the
-original findings were artifacts.
+That is not a stylistic choice. Running the regexes over the **whole 228-byte buffer** lets a match span the
+non-printable gaps between one leaked string and the next, and reports **133 ScriptGroups, 121 source files, and 26
+`key=` values**. The real figures are **56, 32 and 9 across eight categories** — the rest are manufactured by
+matches that cross a gap (`category=` in one string plus `000` from the binary after it reads as category 50000).
 
 The one field with no closing delimiter is a **source path**, and it shows the failure mode plainly:
 unanchored, `([A-Za-z0-9_/]+\.cpp)` matches from wherever the run begins and yields `and.cpp`, `d.cpp`,
@@ -79,19 +77,19 @@ The leak is dominated by the script engine's error formatter:
 - **32 confirmed C++ source files**, with line numbers — `spawnscriptcommand.cpp(66)`,
   `scriptcommands/dbprintfscriptcommand.cpp(16)`, `Teleport/teleportregionscriptcommand.cpp(50)`,
   `AlternateAdvancement/AddAAPvPXPScriptCommand.cpp(25)`, … plus **15 further paths seen only truncated** and
-  matching no confirmed one, i.e. files that exist and the corpus has not yet named in full.
+  matching no confirmed one, i.e. files that exist and the corpus does not name in full.
 - **55 command names** (`getbrainparameter`, `hatelistquery`, `rungameaction`, `setstat`, `bccemote`,
   `spawn`, `switch`, `waitnseconds`, …) and **90 script names** (`main`, `init`, `combatlogic`,
   `messagelistener`, `playfieldevent`, `idlestatescalled`, `knubot`, …).
 
-⚠️ **`id=` is a per-parent INDEX for `Script` and `Command`**, not a type id — the same command name appears
+**`id=` is a per-parent index for `Script` and `Command`**, not a type id — the same command name appears
 with a dozen different ids (`Command 'dbprintf' (id=1)`, `(id=12)`, `(id=14)`). Only the ScriptGroup id is an
 identity.
 
 A second diagnostic format names the same three levels as a **call stack**:
 `(0:bccswitchstate(33)|main(1)|DefaultIdleStates` = `depth:command(index)|script(index)|group`.
 
-### ⚠️ The ScriptGroup ids resolve against nothing we hold
+### The ScriptGroup ids resolve against nothing we hold
 
 Checked and negative, all three ways:
 
@@ -106,8 +104,6 @@ reconcile them against.
 
 ## The retail server's deployment
 
-Two things the first pass missed entirely, and the most interesting content after the script engine.
-
 **A configuration tree**, rooted at `Universe`:
 
 ```
@@ -116,7 +112,7 @@ Universe[1]/Territory[1]/Dimension[1]/GameServer[12]/GMPasswordEnabled
 Universe[1]/Territory[1]/Dimension[2]/GameServer[5]/GMPasswordEnabled
 ```
 
-The bracketed indices are the find: a **Dimension ran at least 12 GameServer processes**, and one Territory
+The bracketed indices are the finding: a **Dimension ran at least 12 GameServer processes**, and one Territory
 held at least 2 Dimensions. A Dimension is retail's name for what
 [`multi-realm.md`](../subsystems/multi-realm.md) calls a Realm, so this is direct evidence of the shape that
 work targets — one realm is many game hosts, not one.
@@ -134,9 +130,9 @@ column. `:1` is an Oracle positional bind, so retail persisted on Oracle.
 
 ## LDB strings
 
-The server was also holding `remoteformat` XML — the same layer `RemoteFormatXml` builds outbound.
+The server was also holding `remoteformat` XML — the same layer `RemoteFormatScreenCodec` builds outbound.
 
-⚠️ **It appears at two escaping depths, and matching only one costs the entire yield.** A `<remoteformat>`
+**It appears at two escaping depths, and matching only one costs the entire yield.** A `<remoteformat>`
 element held as a standalone string is escaped **once** (`key="a&#92;b"`); one nested inside a `<parameter
 value="…">` attribute is escaped **twice** (`&lt;localized … key=&quot;a&amp;#92;b&quot; &gt;`). Matching only
 the double form finds categories 100 and 51000 — both plaintext — and concludes there is nothing to decrypt.

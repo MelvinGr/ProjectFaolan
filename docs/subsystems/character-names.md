@@ -11,8 +11,8 @@ Two of the three rules come from the client's own text, and one does not.
 | rule | evidence |
 |---|---|
 | 4–16 characters | *"The length of your character name is invalid. The length of the name must be between 4 and 16 characters."* — LDB 211711[2780]. The client enforces this locally, so a stock client never sends a name outside it. |
-| already in use | *"The name %s is already taken, please choose another."* — LDB 211711[2385]. This is `NicknameTaken` and was always implemented. |
-| forbidden content | *"The name %s is not valid, please choose another."* — LDB 211711[2154]. The message exists; **the rule behind it does not appear anywhere**. |
+| already in use | *"The name %s is already taken, please choose another."* — LDB 211711[2385]. This is `NicknameTaken`. |
+| forbidden content | *"The name %s is not valid, please choose another."* — LDB 211711[2154]. The message exists; the rule behind it does not appear anywhere. |
 
 ## The forbidden-word list
 
@@ -27,7 +27,7 @@ dump rather than of two columns. It is genuinely multilingual: German, English, 
 alongside a large Korean block. `RdbNameFilterList` reads it; the chain tiles the record exactly, so a short read
 is an error rather than something to resync past.
 
-Two neighbouring types were checked and are **not** part of this. **1065102** is 1,142 sorted u32s that resolve
+Two neighbouring types were checked and are not part of this. **1065102** is 1,142 sorted u32s that resolve
 against the LDB as *spell* ids (category 50210), not names. **1065101** is 49 fixed 16-byte records keyed by a
 single byte 0x41..0xFE — a per-character table of some kind, unrelated to the word list and still unread.
 
@@ -44,13 +44,13 @@ Import it with `dotnet run --project Faolan.Importer -- --only rdb-name-filter` 
 needing the client install). A server whose database has no rows enforces the length rule alone and says so in
 the log — it does not pass silently.
 
-## The matching rule is OURS, and it was calibrated
+## The matching rule is ours, calibrated against the client's own words
 
 No capture rejects a name, so retail's matching rule is unobservable. Ours: a term of **6 characters or more**
-matches anywhere in the name; a shorter one has to BE the whole name.
+matches anywhere in the name; a shorter one has to be the whole name.
 
 The number is not a guess. The client supplies an oracle — the words in its own NPC and item names are by
-construction acceptable English — so the floor was moved until it stopped refusing them:
+construction acceptable English — so the floor is set where it stops refusing them:
 
 | substring floor | terms matched anywhere | client words refused |
 |---:|---:|---:|

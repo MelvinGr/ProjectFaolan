@@ -3,10 +3,9 @@
 Killing another player makes you a **criminal**: a timed debuff during which normal vendors and the wagoneer /
 ship-captain travel NPCs refuse to deal with you. A worse tier, **Murderer**, adds city guards turning hostile.
 
-## How it was decoded
+## Evidence
 
-The chat-annotated gameplay capture walks the entire mechanic in five annotations, which is why this needed no
-guessing:
+The chat-annotated gameplay capture walks the entire mechanic in five annotations:
 
 ```
 20:15:47  killed player, became criminal 36 murder points
@@ -38,8 +37,8 @@ than our model of them:
 | 3827287 | Criminal | 300 s | "Wagoneers & ship captains will not transport you and normal vendors will not trade with you. You can seek out smugglers at outlaw camps instead." |
 | 3827285 | Murderer | 24 h | "Murderers are attacked by city guards. Wagoneers & ship captains will not transport you and normal vendors will not trade with you. You must seek out smugglers at outlaw camps instead." |
 
-That sentence is the annotated NPC refusal, and it also ties this subsystem to the travel NPCs of Gitea #506 —
-a criminal cannot use them, so the two features meet.
+That sentence is the annotated NPC refusal, and it also ties this subsystem to the travel NPCs
+([local-travel.md](local-travel.md)) — a criminal cannot use them.
 
 The wider shipped set shows the shape of a ladder: `Criminal` also exists at 20 s (3842479) and twice at 1 h
 (3827286, 3827288), alongside `Murderer Protection` / `Criminal Protection` (60 s each) and the
@@ -64,7 +63,7 @@ mechanism.
 - `.criminal [seconds]` is the GM bootstrap — the retail trigger is killing another player, and PvP
   player-versus-player combat is not modelled, so without it the criminal branches are unreachable.
 
-## Team-mates are exempt, and the exemption is a SPELL RESISTANCE (#869)
+## Team-mates are exempt, and the exemption is a spell resistance
 
 Joining a team grants a `Criminal Protection` buff (spell **3880938**), and it never travels alone. In the same
 frame, retail sends `DispatchAddSpellResistance(metaType = 2005, percentage = 100)` — and when the buff ends, the
@@ -85,18 +84,18 @@ The measured sequence (`login_2-clients_group-trade-friend`):
 | 56.9 | s2c | **`DispatchAddSpellResistance(2005, 100)`** — once per client |
 | 116.8 | s2c | `MagicBuffIIR` `Criminal Protection` **(end)** + **`DispatchRemoveSpellResistance(2005, 100)`** |
 
-⚠️ **The remove repeats the percentage the add carried — it does not send 0.** A removal names the resistance being
+**The remove repeats the percentage the add carried — it does not send 0.** A removal names the resistance being
 taken away, not a new value of zero.
 
-⚠️ **A resistance is a THIRD registry**, beside the stat sheet and the buff list. It is added and removed by its own
+**A resistance is a third registry**, beside the stat sheet and the buff list. It is added and removed by its own
 message, so a character's resistances are not visible in either of the places the rest of their state lives. The
 only other metatype the corpus carries is **427 = "Knockback"**, also at 100% — knockback immunity, which is a
-different quantity from the `KnockbackResistance` stat (Gitea #496).
+different quantity from the `KnockbackResistance` stat (open work tracked in Gitea #496).
 
-`SpellResistanceCodec` and `SpellMetaTypes` are shipped, with `.resist` as the GM bootstrap. What is missing is a
-trigger: nothing grants `Criminal Protection` yet, which is the open half below.
+`SpellResistanceCodec` and `SpellMetaTypes` are shipped, with `.resist` as the GM bootstrap. Nothing grants
+`Criminal Protection` on team join.
 
-## What is NOT decoded
+## Not decoded
 
 - **The ladder.** How many murder points promote Criminal to Murderer, and which of the four `Criminal` spells
   a given score selects. The corpus contains exactly one player kill, so there is one point on that curve.

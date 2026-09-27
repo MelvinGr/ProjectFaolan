@@ -1,8 +1,8 @@
 # Sitting on world objects (benches)
 
-Verified working in-client 2026-07-25. The wire sequence is fully decoded from
+Verified in-client. The wire sequence is fully decoded from
 `NecroL80_mage-necromancer_login_path-of-azura_sit-bench`; this page is the model, because the shape is
-counter-intuitive in one important way: **getting up is client-initiated, not something the server infers.**
+counter-intuitive in one important way: getting up is client-initiated, not something the server infers.
 
 ## The sequence
 
@@ -38,7 +38,7 @@ Implemented in `BehaviorAcks`.
   F2795 / F2840). `BenchSitState` builds the `0x12` hold records.
 - `WorldObjectService.TrySitOnObject` runs the sit's two phases; `SeatedHoldConfirmed` is the latch that answers the
   client's confirm exactly once.
-- The **standup request** (`bId=0x01` while seated) is handled in `GameServerListener.Inbound`'s BCC branch: ack it,
+- The **standup request** (`bId=0x01` while seated) is handled in `BehaviorService`'s BCC branch: ack it,
   and on the phase-2 confirm call `WorldObjectService.StandUp`.
 - `StandUpIfMoved` is a **fallback only**, for a player who leaves the seat without asking (a teleport, or a client
   that skips the request). It measures from the position the client PARKS the character at, not from where the player
@@ -49,28 +49,26 @@ Implemented in `BehaviorAcks`.
 
 - **The client re-sends its own sit behaviour** (`0x2A` carrying `chair_sit_calm`) after being seated. It must NOT be
   echoed back - echoing replays the sit, and the animation's 2.6 s blend renders as a progress bar. Retail emits
-  `chair_sit_calm` exactly once per sit, s2c only: across all 111 captures the string appears twice, both s2c
-  (re-measured 2026-07-28 - the corpus has since been curated down from 213, and the claim still holds).
+  `chair_sit_calm` exactly once per sit, s2c only: across all 111 captures the string appears twice, both s2c.
 - **`movement_drunk_sit_chair_idle`** appears in unrelated gameplay captures as an 89-byte non-BCC record. That is a
   tavern NPC's seated idle, not part of the player sit flow.
 - The `key=""` in our feedback `remoteformat` differs from retail's (which carries the object's localized action
   key). It drives the subtitle lookup, not the animation, and sitting works without it.
 
-## Why this took six fixes (#355)
+## Pitfalls
 
-Each defect hid the next, and the first five were only reachable once the one before it was fixed:
+Each of these breaks the sit, and each hides the next, so a partial fix looks like no progress:
 
-1. the `remoteformat`'s length prefix was a baked constant matching only the captured literal, so the client
-   discarded the record whole (`c6e015f3`);
-2. the echo-ack padded every tail with 12 zero bytes - only the attack behaviours `0x0F`/`0x11` pad an ECHOED tail
-   (a replaced `tailOverride` always does), so the standup ack was 8 bytes long and dropped (`063a5a83`);
-3. moves were suppressed while seated, which deadlocked the movement-based standup (`9f559caf`);
-4. the seat was anchored to the click position rather than the parked one (`346ef3e2`);
-5. the client's re-sent sit behaviour was echoed back, replaying the sit (`db9017ec`);
-6. and finally: standup is a client REQUEST, not a movement inference (`34a45e4e`).
+1. the `remoteformat`'s length prefix must be computed, not baked - a constant that matches only the captured
+   literal makes the client discard the record whole;
+2. the echo-ack pads a tail with 12 zero bytes only for the attack behaviours `0x0F`/`0x11` on an ECHOED tail (a
+   replaced `tailOverride` always pads) - a padded standup ack is the wrong length and is dropped;
+3. moves must keep being echoed while seated, or the movement-based fallback deadlocks;
+4. the seat is anchored to the position the client parks the character at, not the click position;
+5. the client's re-sent sit behaviour must not be echoed back, or it replays the sit;
+6. standup is a client REQUEST that must be answered, not a movement inference.
 
-The lesson worth keeping: the symptom "stuck, then gets up after a bit" was the client asking to stand, never being
-answered, and timing out - which is why the server-side latency measured **0.0 s** while the player experienced a
-stall (the timer started at the first move, which only arrived after the client gave up). **Reconstructing the
-complete packet sequence for the window - one query - explained more than six rounds of incremental probing. For any
-interaction with a handshake, build that sequence first.**
+The symptom "stuck, then gets up after a bit" is the client asking to stand, never being answered, and timing out -
+which is why server-side latency measures 0.0 s while the player sees a stall (the timer starts at the first move,
+which only arrives after the client gives up). For any interaction with a handshake, reconstruct the complete packet
+sequence for the window first; it explains more than incremental probing.

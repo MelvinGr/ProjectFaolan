@@ -54,16 +54,16 @@ The length `0x80000005` has the **high bit** (`0x80000000`) set to mark a compre
 stream stays plaintext. Retail only ever sends this server→client, to open the GameServer download stream.
 [V2: Barbarian-login.tshark.json]
 
-Two consequences that have each caused a real bug:
+Two consequences for any reader:
 
 1. **Our server never compresses.** It emits no marker. Our client emits a standalone marker with no compressed
    payload behind it, so the framer *skips the marker and keeps parsing*. The marker can straddle a `recv`
    boundary, so the skip count is carried across pushes.
    [V3: NetworkHardeningTests.Framer_CompressionMarkerSplitAcrossPushes_IsSkipped]
 
-   An earlier reader treated the tag as "decompress from here" and dropped the rest of the receive buffer. When
-   TCP coalesced the marker with the packets behind it, those packets were silently eaten — which is why the
-   post-ready `0x205f` grant-arm packet intermittently arrived with an empty spellbar.
+   A reader that treats the marker as "decompress from here" and drops the rest of the receive buffer silently
+   eats every packet TCP coalesced behind it (the symptom is the post-ready `0x205f` grant-arm packet
+   intermittently arriving with an empty spellbar).
 
 2. **Inflating attacker-controlled input is bounded.** A deflate stream that expands without limit is dropped
    rather than inflated. [V3: NetworkHardeningTests.Framer_DecompressionBomb_IsDroppedNotInflatedToOom]

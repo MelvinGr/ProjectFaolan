@@ -1,4 +1,4 @@
-# Combat + world IIR readers (decode batch, Gitea #233)
+# Combat + world IIR readers
 
 Wire grammars for a batch of combat / world-entity / movement-adjacent `IIR` records, recovered
 from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpVtableReaders.java`, slot 8 →
@@ -51,20 +51,19 @@ if (target_type != 0xC879)  →  [u32 ×6]   # the "full" form fields (0x2c,0x38
 [u32 ×7]                                   # FUN_00897b60 tail (a 7-word block)
 ```
 
-The discriminator `target_type != 0xC879` is read from the linked entity, **not** the wire, so it's
+The discriminator `target_type != 0xC879` is read from the linked entity, **not** the wire, so it is
 not self-describing — but **all 898 captured instances are the long form** (17 u32 = 68 B, total
 85 B), so the long layout is the one in practice.
 
-⚠️ The 7-word tail reader **scatters** rather than storing in order. `FUN_00897b60` is called with
+The 7-word tail reader **scatters** rather than storing in order. `FUN_00897b60` is called with
 `EDI = record + 0x50` and lands wire positions 1..7 at `+0x50, +0x58, +0x54, +0x5c, +0x70, +0x60,
 +0x64` — the last one via `MOVSS`, so that word is a **float**. So `spellBaseId` (`+0x54`) is the
-THIRD tail word on the wire while `idx` (`+0x50`) is the first; reading them in offset order puts
+third tail word on the wire while `idx` (`+0x50`) is the first; reading them in offset order puts
 the spell id in a word nothing reads.
 
 #### Its apply — `FUN_008d5960` (vtable slot 2)
 
-The reader gives the shape; the apply gives the meaning, and here it overturns three readings that
-had been made from a client log instead (#902).
+The reader gives the shape; the apply gives the meaning (a client log alone does not).
 
 ```c
 target = dynamic_cast<CoreCharacter*>(record->carrier);        // else the 0xC879 Destructible branch
@@ -89,11 +88,11 @@ if (record->deathReason) target->vtable[0x278](record->deathReason);
 | `spellBaseId` | `+0x54` | read only inside `if (deathReason == 10)`; gates nothing |
 | `count` | `+0x74` | tweaks the combat-log verb at 5 and 6 |
 
-⛔ **A record naming spell 0 is not voided.** The health write sits below the spell lookup and does
+**A record naming spell 0 is not voided.** The health write sits below the spell lookup and does
 not depend on it. `SpellTemplate_t::GetMagicSpell` (`FUN_0099bef0`) has ~80 callers, so its error
 line appearing next to a `StatDamageIIR` in a log is coincidence, not causation.
 
-⭐ **The delta is on the ×100 vitals scale**, and the corpus proves it without needing an absolute:
+**The delta is on the ×100 vitals scale**, and the corpus proves it without needing an absolute:
 `statValue` equals the same handle's `StatUpdateIIR` stat 27 **exactly** (diff 0 on twelve handles,
 up to 92 records each) and moves by exactly `delta` across 1,015 consecutive pairs.
 
@@ -131,7 +130,7 @@ the kd-tree region is the same shared reader already decoded for SimpleDynel.
 ### The shared bounds/kd-tree struct (`FUN_0080c620`)
 
 Decompiled and checked against every committed `WorldObjects.KdTreeTail` (1052 rows) [V3:
-WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB asset reference:
+WorldObjectDynelColumnTests]. It is not opaque geometry - it opens with an RDB asset reference:
 
 ```
 [u32 assetId][u32 assetType]   # an RDB resource reference, see below
@@ -147,8 +146,8 @@ WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB a
 - `assetType` is one of exactly three RDB types: **1010030** MESHINDEXFILE (628 rows), **1010001** RenderMesh
   geometry (298), **1010201** MONSTERDATA (126) - see [`../rdb/rdb-type-catalog.md`](../rdb/rdb-type-catalog.md).
   `assetId` has 199 distinct values.
-- The node list is almost always EMPTY, and the nodes that exist are **not geometry** (#687). They are a
-  STANDING PARTICLE EFFECT and the bone it hangs on:
+- The node list is almost always empty, and the nodes that exist are **not geometry**. They are a
+  standing particle effect and the bone it hangs on:
 
   ```
   [effect] [0] [0] [0] [0] [attractor]
@@ -161,20 +160,15 @@ WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB a
     and it is **constant per effect id** (4998690 and 3139195 always hang on 34, the other nine always on 35).
     That is what an attachment point is; a coordinate could not be.
 
-  ⚠️ **It is not the visual-change payload with its columns rotated.** That payload's order is client-confirmed
+  **It is not the visual-change payload with its columns rotated.** That payload's order is client-confirmed
   from the reader itself (the `if (attractor < 1)` branch): `[effect][attractor][rotation][x][y][z]`, attractor
   at index **1**. Here it is at index **5**. Two different layouts over the same six semantic fields, not one
-  layout read two ways — which settles the question #687 opened with.
+  layout read two ways.
 
-  ⚠️ **The middle four (ordinals 1–4) are `0` in every one of the 127 shipped nodes**, so which is the rotation
+  **The middle four (ordinals 1–4) are `0` in every one of the 127 shipped nodes**, so which is the rotation
   and which are the offset is **corpus-undecidable**. `[effect][four zeros][attractor]` is the whole of what the
-  data supports.
-
-  ⚠️ The figures above **supersede** "1028 of 1052 rows carry `nodeCount == 0`, the other 24 carry exactly one …
-  just two distinct values … `[id, 0, 0, 0, 0, 34]`". A re-dump grew the corpus: the shipped data now holds
-  **127** nodes over **11** effect ids and **both** 34 and 35. The old sentence read the sample as the
-  population — the id was said to "co-vary with the asset" and to match "no id in the database", which was true
-  of two samples and is not the shape of the thing.
+  data supports. (A smaller corpus — 24 nodes, two effect ids, attractor always 34 — makes the id look like it
+  co-varies with the asset; the full population does not.)
 - An object with no bounds writes the inverted-box sentinel rather than zeros - min `+FLT_MAX` (`0x7f7fffee`),
   max `-FLT_MAX` (`0xff7fff..`).
 - The only name seen in the corpus is `object_closed` (23 rows, all `DoorFullUpdateIIR`-adjacent MONSTERDATA).
@@ -190,15 +184,14 @@ Struct + per-class trailer accounts for the record exactly, which is what makes 
 | `ClimbingDynelFullUpdateIIR` `0x1FD6412B` | `u32 x 1` | 49 |
 | `LootBagFullUpdateIIR` `0xF096251E` | protobuf | 15 |
 
-The container trailer is `[u32 len][ProtoLootBagIIR]` - the chest's loot CONTENTS, not geometry, which is why
+The container trailer is `[u32 len][ProtoLootBagIIR]` - the chest's loot contents, not geometry, which is why
 those 15 rows vary in length so much. It is capture-time session state, so the server does not persist it (a chest
-spawns with a clean empty scaffold and the loot system fills it). What the captures happened to hold was decoded
-before the column was retired and kept as evidence in
+spawns with a clean empty scaffold and the loot system fills it). What the captures held is kept as evidence in
 [`container-loot-observed.json`](container-loot-observed.json) - 15 containers, 45 items, 12 distinct.
 
 ## SimpleDynelVisualChangeIIR (`0xE7F4F8F8`, reader `FUN_007a6910`, applier `FUN_007a6480`)
 
-Changes ONE aspect of a world object's presentation. The reader is a `switch` on a u32 `kind` that selects the
+Changes one aspect of a world object's presentation. The reader is a `switch` on a u32 `kind` that selects the
 payload; the **applier beside it** is the same switch again, and every case logs its own enum name into the
 `GameCode/simpledynel` debug channel before acting - so the meanings below are the client's words, not an
 inference from what a payload looked like [V3: SimpleDynelVisualChangeCodecTests.TheHarvestSequence_MatchesTheCapturedBrick].
@@ -214,7 +207,7 @@ inference from what a payload looked like [V3: SimpleDynelVisualChangeCodecTests
 | 2 | `e_StartParticleEffect` | `[effect][attractor][rot°][x][y][z]` | see below |
 | 3 | `e_StopParticleEffect` | `[u32]` | 0 in all 19 captured records |
 | 4 | `e_ChangeMesh` | `[rdb id][rdb type]` | swaps the geometry; id 0 draws nothing |
-| 5 | `e_SetKDTree` | `[rdb id]` | swaps the COLLISION; id 0 drops it |
+| 5 | `e_SetKDTree` | `[rdb id]` | swaps the collision; id 0 drops it |
 | 6 | `e_SetName` | `[u16 len][ascii]` | |
 | 7 | `e_SetDisplayName` | `[u16 len][ascii]` | |
 | 8 | `e_FadeIn` | `[f32 seconds]` | 2.0 on a harvest, 0.2 / 0.5 elsewhere |
@@ -234,15 +227,13 @@ name:
   `3113735` → `3113739`).
 - **`e_StartParticleEffect`'s first word is an RDB **1010207** record** - the client reads only the id and pairs
   it with `0xF6A1F` itself, and errors as "StartParticleEffect() Invalid particle resource id". The second word
-  is the ATTRACTOR (attachment point): `if (attractor < 1)` the effect is placed free-standing at the trailing
+  is the attractor (attachment point): `if (attractor < 1)` the effect is placed free-standing at the trailing
   position instead, which is the branch retail's quarry harvest takes - its three floats are the dynel's own
   world position to two centimetres. The third word is degrees (the client multiplies by π/180).
 
-⚠️ **The single six-word "node" in the bounds struct above is the same thing.** Its id co-varies with the asset,
-matches nothing in the database, and carries a constant `34` - and 34/35 is precisely the attractor word, while
-every one of those ids (`4998690`, `3198555`, `3198574`, `3139195`, …) is a type-1010207 record. So a signpost's
-"second client-side resource reference" is a standing PARTICLE EFFECT plus the bone it hangs on, not geometry.
-Re-decoding that region as an effect list is Gitea #687.
+**The six-word "node" in the bounds struct above is the same thing:** 34/35 is precisely the attractor word, and
+every node id (`4998690`, `3198555`, `3198574`, `3139195`, …) is a type-1010207 record. So a signpost's "second
+client-side resource reference" is a standing particle effect plus the bone it hangs on, not geometry.
 
 ## No-op / out-of-band readers
 
@@ -252,8 +243,7 @@ Re-decoding that region as an effect list is Gitea #687.
 
 ## Decode coverage
 
-Decoded + dissected (this doc + `BehaviorControlCenterCodec`). Construct/implement (C# codecs +
-golden tests) belongs to the relevant subsystems — [`../subsystems/combat.md`](../subsystems/combat.md)
-for StatDamage/CombatShield/ChainKill/CombatReactive/ThreatLevel/HateList, and the simulation/world
-layer for SetPos/CharInPlay + the dynel full-updates. Where a reader here is recovered but nothing
-emits it yet, that is Gitea #405.
+Decoded + dissected (this doc + `BehaviorControlCenterCodec`). The codecs and their use live with the
+subsystems — [`../subsystems/combat.md`](../subsystems/combat.md) for StatDamage/CombatShield/ChainKill/
+CombatReactive/ThreatLevel/HateList, and the simulation/world layer for SetPos/CharInPlay + the dynel
+full-updates.

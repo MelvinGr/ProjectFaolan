@@ -54,8 +54,8 @@ round-trips each byte-exact. [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTri
 
 ## Construct, don't replay
 
-The direction of travel is to build each record from typed DB columns, not replay a captured blob. Two records
-that already build wholly from typed inputs and are pinned byte-exact:
+Records are built from typed DB columns, not replayed from a captured blob. Two examples that build wholly from
+typed inputs and are pinned byte-exact:
 
 - the death sequence's kill record [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact]
 - the death-pose MoveTask [V3: DeathSequenceTests.BuildDeathPose_ReproducesCapturedRecord_ByteExact]
@@ -65,6 +65,6 @@ V1 rows).
 
 ## See also
 
-- [`gen/iir-types.md`](gen/iir-types.md) — the 74 sub-opcodes with self-verified hashes.
+- [`gen/iir-types.md`](gen/iir-types.md) — every sub-opcode, with its self-verified hash.
 - [`gen/coverage.md`](gen/coverage.md) — which are decoded, and to what verification level.
 - [`04-encoding.md`](04-encoding.md) — how the fields inside a record body are encoded.

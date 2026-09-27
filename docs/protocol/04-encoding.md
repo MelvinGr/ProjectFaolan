@@ -59,5 +59,5 @@ a localized system line without shipping literal text.
 
 ## See also
 
-- [`gen/protobuf.md`](gen/protobuf.md) — per-field wire encoding for all 60 protobuf messages.
+- [`gen/protobuf.md`](gen/protobuf.md) — per-field wire encoding for every protobuf message.
 - [`02-rpc.md`](02-rpc.md) — the one big-endian header with a little-endian field in it.

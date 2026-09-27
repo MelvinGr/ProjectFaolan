@@ -25,7 +25,7 @@ pointer-looking pair on the two Amphitheatre ones), `nTip1..3` are always `0x025
 `cCustomName` is always empty.
 [V2: NecroL80_mage-necromancer_login_enter_king_conan_castle2.tshark.json frame 1957]
 
-### `cText` names the DESTINATION MAP
+### `cText` names the destination map
 
 ```
 <localized id="1090" category="520" flags="" key="%z&#36;n_zw5ComNiHcqoW4j" >
@@ -56,30 +56,30 @@ shows, which is what pins the grammar:
 | `..._leave_king_conan_castle-Dismount` f837 → f848 | `00097F96` / `00000000350713F0` | `1`, same two |
 | `..._conans-castle-exit` f1630 → f1636 | `001FAA9D` / `0000000062872390` | `1`, same two |
 
-### ⚠️ `nAnswer` is the OPTION INDEX, not a boolean — and `2` is a CONFIRM (#511)
+### `nAnswer` is the option index, not a boolean — and `2` is a confirm
 
 The table above is drawn from the door captures, where the player always pressed the first button. The
-chat-annotated corpus carries a **`2`**, and reading it as a decline would be exactly backwards:
+chat-annotated corpus carries a `2`, and reading it as a decline would be exactly backwards:
 
 | time | the player's own `/say` | box | `nAnswer` | what followed |
 |---|---|---|---:|---|
 | 19:56:41 | *"energed normal instance"* | `id=1004` Spider Caverns | `1` | `DispatchTeleportStarted` → `DispatchRedirectToServer :7025` → `Authenticate2` |
 | 19:57:15 | *"enered epic instance"* | `id=1004` Spider Caverns | **`2`** | the same three, to the same port |
 
-Same box, same destination, 34 seconds apart, and **both entered the zone**. So a dungeon's difficulty MODE is
+Same box, same destination, 34 seconds apart, and **both entered the zone**. So a dungeon's difficulty mode is
 which button of the travel box the player presses: the prompt text is the destination's name from category 520
-and the OPTIONS are the modes.
+and the options are the modes.
 
-⭐ **The other end of the same decision is already decoded**, which is what makes this more than one observation:
+The other end of the same decision is decoded too, which is what makes this more than one observation:
 the `PlayfieldProxy` the server sends back carries the mode in its class word — `0xC79C` normal against `0xCABC`
 on that one epic entry, over 183 captured proxies
 ([playfield-instance-ownership.md](playfield-instance-ownership.md)). Option index in, class word back, on the
 same two entries.
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json 19:56:41 / 19:57:15]
 
-⚠️ The DECLINE is still unobserved — no captured player cancels — so `0` is inferred, and inferred the safe way
+The decline is unobserved — no captured player cancels — so `0` is inferred, and inferred the safe way
 round: an unknown option travels (our boxes offer exactly one destination and no difficulty), and only an
-explicit `0` cancels. The handler used to test `!= 1` and would have dropped retail's own epic answer.
+explicit `0` cancels. A handler testing `!= 1` would drop retail's own epic answer. Open work tracked in Gitea #511.
 
 [V2: NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount.tshark.json frame 848 — the `1` case]
 
@@ -93,14 +93,13 @@ Because the answer is a **pure echo**, no script thread is involved on either si
 `SendTravelConfirmation` mints the pair and parks the trip; `ScryMessageBoxAnswer` teleports if the echo
 matches an outstanding box and the answer is not `0`, and drops the trip otherwise.
 
-**Which destinations confirm is harvested, not inferred.** Half the captured door walk-throughs raise no box
-at all, so "the door crosses a map" is not the rule. The corpus splits cleanly by DESTINATION — doors to the
+Which destinations confirm is harvested, not inferred. Half the captured door walk-throughs raise no box
+at all, so "the door crosses a map" is not the rule. The corpus splits cleanly by destination — doors to the
 same map agree, and carry the same key — so `world-teleports` writes `Map.TravelConfirmKey` from the
 `UseObject → DispatchScryShowMessageBox → N3Teleport` sequence, gated on `category == 520` **and** on the
 box's `id` matching the map the same sequence then teleports to. A map no capture raised a box for teleports
-straight through, exactly as before. See [`teleport-changemap.md`](teleport-changemap.md).
+straight through. See [`teleport-changemap.md`](teleport-changemap.md).
 
-⚠️ Two things the corpus does not settle, so neither is modelled: whether a map could confirm from one door
-but not another (none observed), and what a **decline** looks like — no captured player cancels. We treat `0`
-as the decline and anything else as "travel", which is the safe direction now that a `2` is known to be a
-confirm of the second option rather than a refusal.
+Two things the corpus does not settle, so neither is modelled: whether a map could confirm from one door
+but not another (none observed), and what a decline looks like. We treat `0` as the decline and anything else
+as "travel", which is the safe direction given that a `2` confirms the second option.

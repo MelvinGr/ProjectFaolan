@@ -1,7 +1,7 @@
-# Spell effects: what a spell makes the SERVER do (#439)
+# Spell effects: what a spell makes the server do
 
 Most of a spell needs no server logic beyond the wire path: `ApplySpell` carries the buff, `Spell.DurationMs`
-counts it down, and `SpellStatEffect` folds its stat deltas into the carrier (`BuffStatEffects`, #367). A
+counts it down, and `SpellStatEffect` folds its stat deltas into the carrier (`BuffStatEffects`). A
 handful of spells do something none of that can express — they summon a creature, or they arm a proc that
 fires on a later event. Those live in the **`SpellEffects`** table, and `SpellEffectService` dispatches them.
 
@@ -22,11 +22,11 @@ module, which is `Db`-sourced — the facts are decoded, not extracted, so it ru
 
 ## What is in it
 
-- **The 12 necromancer pet summons** (#307): spell id = the `CastSpell` trailer id, template = the name of the
+- **The 12 necromancer pet summons**: spell id = the `CastSpell` trailer id, template = the name of the
   `FA015807` creature that spawned after the channel. Roster from
   `NecroL80_..._mount-horse_all-necro-summons_dismiss-all` (all 12 summoned + mass-dismissed).
   `Pleasurable Company` is the one social companion.
-- **Frozen Hatred's fatality proc** (#140/#434), as two rows on the buff `4377209` that arms it: the 6s
+- **Frozen Hatred's fatality proc**, as two rows on the buff `4377209` that arms it: the 6s
   `3666099` self-buff, then the `Frozen Hatred` pet for 60s capped at 5 minutes. The client states the rule
   itself in that spell's description (LDB 50211), and 21 of the 36 captured fatality bursts carry the proc
   (`xxx_mage-necromancer` beach→city fr1267).
@@ -51,10 +51,13 @@ neighbouring mechanisms are keyed by something else:
 
 `SpellEffectService` loads the table once and answers two questions:
 
-- `ForCast(spellBase)` — the cast resolve (`GameServerListener.Inbound.cs`) runs these INSTEAD of applying a
+- `ForCast(spellBase)` — the cast resolve (`CastService`) runs these instead of applying a
   target effect, so a summon cast summons rather than landing a buff icon.
 - `ForFatality(entity)` — `FatalityService` runs these after the two Fatality buffs, for every live buff on
   the killer that arms one.
 
-The wire side is `ISpellEffectOutbound`, which the listener implements (apply a self-buff, summon a pet,
-summon-or-extend a timed pet), so the service holds a narrow port rather than the listener.
+The wire side is the `ISpellEffectOutbound` port (apply a self-buff, summon a pet, summon-or-extend a timed pet),
+implemented by `SpellEffectOutbound` over `BuffService` and `PetService`, so the service holds a narrow port rather
+than the listener.
+
+Open work tracked in Gitea #307.

@@ -4,11 +4,10 @@
 layouts, encodings — in which **every stated fact carries a verification tag and a citation**, and in which
 the machine-derivable parts are *generated* rather than hand-written.
 
-**Why the constraint matters.** Hand-written protocol docs rot. On 2026-07-09 we found five docs that
-actively contradicted the code: `create-editor-bursts.md` described `WorldPrepBurst` as "decoded + built +
-wired" months after it was deleted; `guilds.md` stated the guild leader's wire rank is 6 when the capture
-proves it is 4. A tidy tree of wrong documents is worse than a messy one — it *looks* authoritative. So the
-method's spine is: **generate what's derivable, cite what isn't, and let a test enforce both.**
+**Why the constraint matters.** Hand-written protocol docs rot: a page can go on describing a builder as
+"decoded + built + wired" long after it was deleted, or state a wire value the capture contradicts. A tidy tree of
+wrong documents is worse than a messy one, because it *looks* authoritative. So the method's spine is: **generate
+what's derivable, cite what isn't, and let a test enforce both.**
 
 ---
 
@@ -16,12 +15,12 @@ method's spine is: **generate what's derivable, cite what isn't, and let a test 
 
 Nothing goes in untagged. Every fact is one of:
 
-| Tag | Means | Cites | We have |
-|-----|-------|-------|---------|
-| **V3** | Byte-exact: a builder reproduces captured bytes | golden test method name | 114 tests |
-| **V2** | Capture-observed: a dissector parses the grammar to packet end | capture file + frame | 36 dissectors |
-| **V1** | Client-RE: recovered from the exe (reader vtables, dispatch tables) | Ghidra script | 67 scripts |
-| **V0** | Assumed / single observation / not proven | — must appear in `gaps.md` | ? |
+| Tag | Means | Cites |
+|-----|-------|-------|
+| **V3** | Byte-exact: a builder reproduces captured bytes | golden test method name |
+| **V2** | Capture-observed: a dissector parses the grammar to packet end | capture file + frame |
+| **V1** | Client-RE: recovered from the exe (reader vtables, dispatch tables) | repo path (usually a Ghidra script) |
+| **V0** | Assumed / single observation / not proven | an entry in `gaps.md` |
 
 Citation format, inline, immediately after the claim:
 
@@ -31,53 +30,48 @@ Guild leader wire rank is 4.                               [V2: DemoL80_mage-dem
 RPC methods are registration indices; a dump renders one as `0x2000 + index`. [V1: tools/ghidra/DumpRpcTables.java]
 ```
 
-These three are linted, not decorative: `ProtocolCitationTests` resolves each against the repo. They are the
-format's own proof — when first written they cited a test deleted with `SendWorldPrepBurst`, a capture whose
-name was literally `DemoL80_..._create-guild`, and a Ghidra script (`DumpRpcMethods.java`) that never existed.
+These are linted, not decorative: `ProtocolCitationTests` resolves each against the repo, so a citation of a
+deleted test or a non-existent script fails the build.
 
-**The distinction that must never blur:** we can enumerate **100% of the 819 opcodes at V1** — they come from
-the client's method tables. But a *message body layout* only exists where a capture does. "The opcode exists"
-must never be presented as "the message is decoded." Today that difference is invisible in our docs.
+**The distinction that must never blur:** every opcode is enumerable at V1 — they come from the client's method
+tables. But a *message body layout* only exists where a capture does. "The opcode exists" must never be presented
+as "the message is decoded"; [`gen/coverage.md`](gen/coverage.md) keeps the two apart.
 
 ---
 
 ## 2. Generate the mechanical parts
 
-`Opcodes.cs` already generates the Wireshark dissector's names. Same source, new targets — all under
+`Opcodes.cs` generates the Wireshark dissector's names. The same source generates these pages, all under
 `docs/protocol/gen/` and **never hand-edited**:
 
 | File | Generated from | Content |
 |------|----------------|---------|
-| `gen/opcodes.md` | `Faolan.Core/Enums/Opcodes.cs` | 17 interfaces × 819 entries, direction + class |
-| `gen/iir-types.md` | same | 75 32-bit sub-opcodes, 74 with their **BKDR-31 hash recomputed from the type name as proof** |
-| `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | 60 messages, **with `ZigZag`/`Default` field flags surfaced** |
+| `gen/opcodes.md` | `Faolan.Core/Enums/Opcodes.cs` | every interface's methods, direction + class |
+| `gen/iir-types.md` | same | the 32-bit sub-opcodes, each with its **BKDR-31 hash recomputed from the type name as proof** |
+| `gen/protobuf.md` | `Faolan.Core/Protobuf/aoc-client-protos.proto` | every message, **with `ZigZag`/`Default` field flags surfaced** |
 | `gen/coverage.md` | the repo | the coverage matrix (below) |
-| `gen/messages.md` | the repo | per-message index: each IIR type → its codec + a cited golden (P5) |
+| `gen/messages.md` | the repo | per-message index: each IIR type → its codec + a cited golden |
 
 Surfacing the ZigZag flags is not cosmetic: field 3 of `ProtoScryScriptIIR` is ZigZag, and reading it as a
 plain varint silently halves every identity value in the character editor.
 
-This plan originally called `aoc-opcode-ids.md`, `aoc-rpc-method-opcodes.md` and `aoc-client-rpc-methods.md`
-"drift factories" to delete once `gen/opcodes.md` landed. **P7 reversed that:** they are referenced from CODE
-(`Opcodes.cs`, `Endpoints.cs`, `IirTypesPage.cs`) as the RE-*derivation* source — the staged writeup of *how*
-the opcode scheme was recovered, which the generated catalog doesn't carry. So they were moved to `re/` (RE
-methodology), not deleted. The generated `gen/opcodes.md` supersedes their *catalog* role only.
+`docs/re/aoc-opcode-ids.md`, `docs/re/aoc-rpc-method-opcodes.md` and `docs/re/aoc-client-rpc-methods.md` are the
+RE-*derivation* record — *how* the opcode scheme was recovered, which the generated catalog does not carry — and are
+referenced from code (`Opcodes.cs`, `Endpoints.cs`, `IirTypesPage.cs`). `gen/opcodes.md` is the catalog.
 
 ---
 
 ## 3. The coverage matrix — how "every piece of info" becomes measurable
 
 For every opcode, generated from the repo: *has a codec? has a golden? has a dissector? highest verification
-level?* This converts the goal from a hope into a burndown — `X of 819 at V3, Y at V2, Z at V1-only, N unverified` —
-and makes gaps **counted, not hand-waved**.
-
-It also drives the migration order (§6): document the V3 areas first, because those are provably correct.
+level?* That turns the goal into a burndown — `X at V3, Y at V2, Z at V1-only, N unverified` — and makes gaps
+**counted, not hand-waved**.
 
 ---
 
 ## 4. Hand-written layer pages
 
-Small in number, high in value — currently scattered across `CLAUDE.md` and agent memory:
+Small in number, high in value:
 
 | Page | Covers |
 |------|--------|
@@ -90,8 +84,8 @@ Small in number, high in value — currently scattered across `CLAUDE.md` and ag
 
 ## 5. Per-message layouts — the long tail
 
-40 codec classes. Skeleton generated from the codec + its golden; semantics hand-filled. **Ordered by verification
-level, V3 first.**
+Each IIR type's layout spec is its codec, indexed with its golden test in [`gen/messages.md`](gen/messages.md).
+Semantics that the codec cannot carry are hand-written in the relevant `docs/subsystems/` page.
 
 ---
 
@@ -105,24 +99,18 @@ Both live in `Faolan.Tests`:
    every `[V2: …]` must be a well-formed capture file name. A bogus citation fails the build.
 
    V2 is the weaker check of the three, on purpose: the corpus lives in the private data repo, so the suite has
-   nothing to resolve a capture name *against*. It used to resolve them against a name index carried in
-   the committed fixture archive, which meant shipping a listing of the private corpus in every clone. Whether a named
-   capture exists is checked by whoever holds it; the linter catches the shape that actually rotted — a payload
-   that is not a capture file name at all.
+   nothing to resolve a capture name *against*, and a name index in the committed fixture archive would ship a
+   listing of the private corpus in every clone. Whether a named capture exists is checked by whoever holds it; the
+   linter catches a payload that is not a capture file name at all.
 
 The linter is the whole difference between a doc that *claims* to be verified and one that *is*.
 
 ---
 
-## 7. `docs/` structure — migrate by verification, not by category
+## 7. `docs/` structure — organised by kind
 
-**Do not** pre-sort the 56 flat docs into a taxonomy. Reasons: (a) moving stale files does not make them true;
-(b) the grammar docs, the four `iir-readers-*` catalogs and `fa015807-spawn-reader.md` **are** this reference's
-raw material — sorting them into `grammars/` + `readers/` while also creating `protocol/` splits the reference
-across three directories, which is the problem we are solving.
-
-Instead: as each area earns a verified page, its old scattered doc is **absorbed and deleted**, or reduced to a
-one-line pointer. The tree then reflects what has actually been verified.
+A doc that describes the wire is verified before it lands in `protocol/`; an older scattered doc on the same area
+is absorbed into the verified page, or reduced to a one-line pointer, rather than sorted into a parallel taxonomy.
 
 **The boundary rule** (this is what stops the pile re-forming):
 

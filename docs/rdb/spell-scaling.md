@@ -62,7 +62,7 @@ the physical twin `FUN_011187f0` has the identical shape — attribute × tweak,
 | `TWK_ArmorAbilityModifier` | 2 | |
 | `TWK_ProtectionAbilityModifier` | 0.5 | |
 
-⚠️ The physical branch does **not** carry the `× 100`; only the magical one does. They are not the same unit.
+The physical branch does **not** carry the `× 100`; only the magical one does. They are not the same unit.
 
 ## The RDB's rule — by SPELL (field 847)
 
@@ -98,9 +98,8 @@ data gap.
 Shipped as `Spell.ScalingAttribute`, imported by `rdb-spells` (`RdbSpellImporter`), resolved per character at
 world entry (`IDatabaseRepository.GetCharacterSpellScalingAttributes`) and applied by `WorldEntity.MagicDamageFor`.
 
-⚠️ Two class ids appear in field 847's data that the class registry does not name — `GuiStackingLine / 1000` of **50**
-(5 records) and **440** (1). The 50 is the same anomaly the feat modifiers show; open work is tracked in Gitea
-#591.
+Two class ids appear in field 847's data that the class registry does not name — `GuiStackingLine / 1000` of **50**
+(5 records) and **440** (1). The 50 is the same anomaly the feat modifiers show.
 
 ## Reproducing it
 
@@ -117,11 +116,11 @@ FAOLAN_GHIDRA_OUT=<dir> /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra a
   -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpSpellScaling.java
 ```
 
-## What this does NOT settle
+## Where the spell's own magnitude comes from
 
-**The spell's own damage rating is still missing.** Field 348 was read as one, and is not: the client names
-`0x15C` `SplashDamage`, and it occurs on 215 of the 21,502 records — the same 215 that carry
-349 `SplashDamageMaxTargets`, inside 347 `SplashRadius`'s 231 (`spell-record-fields.md`). So the attribute
-term has nothing on the record to combine WITH, and how a spell's magnitude is reached is still ours rather
-than retail's. `CombatResolver.ResolveSpellDamage` remains `20 + level × 5 + magicDamage`, with the attribute
-term now inside `magicDamage`. Open work is tracked in Gitea #592, and the mislabelled import in #626.
+Field 348 is not a damage rating: the client names `0x15C` `SplashDamage`, and it occurs on 215 of the 21,502
+records — the same 215 that carry 349 `SplashDamageMaxTargets`, inside 347 `SplashRadius`'s 231
+(`spell-record-fields.md`). The per-spell power is the magnitude the spell's own template states on health, rolled
+within its stated range at the caster's level (`SpellPoolEffects` resolves it; 2,149 spells carry one), and
+`CombatResolver.ResolveSpellDamage` adds the attribute term (inside `magicDamage`) to it. A spell that states no
+hit falls back to a flat `20 + level × 5` placeholder.

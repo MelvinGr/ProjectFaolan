@@ -1,6 +1,6 @@
 # The client's stat-name table (LDB category 615)
 
-The client ships a table that names every wire STAT ID: LDB (RDB type 1030002) **category 615**, an
+The client ships a table that names every wire stat id: LDB (RDB type 1030002) **category 615**, an
 `id -> name` map keyed by the same id space as the `0x96B8DC59` vitals block, the `0x737A6DF9` snapshot stat
 sheet, the item `[2][9]` modifier region and the spell stat effects. It is what let the remaining
 `CharacterStatId.Unknown##` slots be named from the client rather than guessed.
@@ -13,8 +13,8 @@ dotnet run --project Faolan.Importer -- --report ldb-stat-names --Content:RdbDir
 
 ## Reading it
 
-- **The category is LOCALIZED**, like every other LDB category: 7 pages of the same 891 ids, one per shipped
-  language. The English page is CRIBBED, never picked by order - scored against the names `CharacterStatId`
+- **The category is localized**, like every other LDB category: 7 pages of the same 891 ids, one per shipped
+  language. The English page is cribbed, never picked by order - scored against the names `CharacterStatId`
   already carried (English matches 80, every other language 12-15).
 - **Not every stat id is in it.** 891 ids are named; the slots the table skips (e.g. `0x534`, `0x163`,
   `0x0F3`) stay `Unknown##` in the enum rather than getting an invented name.
@@ -26,11 +26,11 @@ dotnet run --project Faolan.Importer -- --report ldb-stat-names --Content:RdbDir
 ## Cross-check against `CharacterStatId`
 
 The report ends with a diff of our enum against this table. Everything we had named the hard way (from
-tooltips, Ghidra, or `.setstat` probing) agrees; the entries it lists as differing are deliberate:
+tooltips, Ghidra, or in-client stat probing) agrees; the entries it lists as differing are deliberate:
 
 - `HealthCurrent`/`HealthMax`, `StaminaCurrent`/`StaminaMax`, `ManaCurrent`/`ManaMax` - the table calls both
   halves of each pair just "Health"/"Stamina"/"Mana"; our names keep the current/max distinction that was
-  proven in-client with `.setstat`.
+  proven in-client.
 - `Exp`/`MaxExp`/`ExpCurrentLevelBase` vs "XP"/"Next XP"/"Last XP", `KillingBlows` vs "Kills",
   `CombatMode` vs "BCC State", `PlayfieldToken` vs "Last Concrete Playfield Instance" - same slot, our name
   says what the server uses it for.
@@ -198,7 +198,7 @@ tooltips, Ghidra, or `.setstat` probing) agrees; the entries it lists as differi
 | 166 | 0x00A6 | Track Frost Damage |
 | 167 | 0x00A7 | Cold Invulnerability |
 | 168 | 0x00A8 | Attackable |
-| 169 | 0x00A9 | ChosenGod  ⚠️ the EXE's registry says `HeroicMode`; see aoc-client-stat-names.md (#625) |
+| 169 | 0x00A9 | ChosenGod  (the exe registry says `HeroicMode`, which is the name we use; see aoc-client-stat-names.md) |
 | 170 | 0x00AA | Hate Modifier |
 | 173 | 0x00AD | Current Movement Mode |
 | 174 | 0x00AE | Previous Movement Mode |

@@ -1,8 +1,8 @@
-# Crafting recipe book — TradeskillRequestIIR / TradeskillReplyIIR (decoded 2026-07-06)
+# Crafting recipe book — TradeskillRequestIIR / TradeskillReplyIIR
 
 Opening the in-client **Crafting → Recipes** window is a request/response on the GameServer connection,
 decoded from `Captures/NecroL80_mage-necromancer_shops_open-crrafting-receipies.tshark.json` (frame 2916 →
-2926) + Ghidra (`AgeOfConan.exe`, project `tools/ghidra/output`).
+2926) + Ghidra (`AgeOfConan.exe`).
 
 ## The exchange
 
@@ -12,8 +12,7 @@ decoded from `Captures/NecroL80_mage-necromancer_shops_open-crrafting-receipies.
 2. **S→C `TradeskillReplyIIR_c`** (sub-opcode **`0x9062D559`**, GameAgent 0x58 → GameInterface `<instance>`)
    — the recipe-book list. In the capture: **603 recipes, 209 309 bytes**.
 
-If the server never answers, the book opens empty / stalls. Our server received the request (0x2000
-sub-opcode) but only logged it → now it replies from the `Recipes` table.
+If the server never answers, the book opens empty / stalls. The server replies from the `Recipes` table.
 
 ## Reply grammar (client readers)
 
@@ -31,7 +30,7 @@ The `0x3F1` (1009) framing is the same list invariant as the quest journal / Gam
 ### Per record (`FUN_0077be70`)
 ```
 [u32 recipeId]                       # the list-key the loop maps by (== RequestRecipeInfo levelId)
-[u32 x3]                             # header (@c = the tradeskill RDB type - 0xf4241/0xf4242/0xf4244)
+[u32 x3]                             # header (@c = the profession id - 0xf4241..0xf4244, see below)
 KEY1 = 0x3F1-list of 18-u32 elements # ingredients: item id + item DecryptionKeys (FUN_0077c4f0 / FUN_005d5150)
 [u32 x4]                             # mid header; word 1 (0x1F4) is the CRAFT DURATION in centiseconds (below)
 KEY2 = 0x3F1-list of u32             # id list (FUN_004d4c70)
@@ -53,28 +52,23 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
   `TradeskillReplyCodecTests`. Parse validates the folded constants (header word 0 == list-key, mid header,
   `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
 
-  ⚠️ Three of those "constants" were not (#811), and each refused a whole recipe book rather than one element.
-  The `ProfessionId` census settles it from the shipped side too: the 708 rows carry **four** rdbTypes -
-  1000001 (99), 1000002 (504), 1000003 (60) and 1000004 (45) - so the gate was already narrower than the data.
-  * the header's **rdbType** was gated to `{0xf4241, 0xf4242}` because those are what NecroL80's two captures
-    carry; DemoL80's uses `0xf4244` (1000004) for all 45 of its records. One type per capture, not a shared
-    vocabulary - and the word is carried, so the gate could never have caught a mis-parse.
-  * the element's **id-dup** and **key-dup** are the ACG **template PAIR** and one TEA key per template
+  Three words that look constant in one capture are carried rather than gated, because each would refuse a whole
+  recipe book rather than one element:
+  * the header's profession id takes four values across the captured books (not one shared
+    vocabulary) — see `ProfessionId` below;
+  * the element's id-dup and key-dup are the ACG template pair and one TEA key per template
     (`ACGItemTemplateID` / `ACGItemTemplateID2`, `keyN <-> templateN`), not an id and a redundant copy. They agree
     on 2411 of 2412 captured elements; the one that does not carries the consecutive `0x3CAE32` / `0x3CAE33` a
     pair's two variants have, with a distinct key each.
-
-  Recovering that book added **105 recipes, 324 recipe items and 96 items** to `faolan.db` - the whole DemoL80
-  book had been unreadable, so the importer had been dropping it silently.
-- **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `ProfessionId`
-  (`0xf4241`/`0xf4242` — see below), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as
-  `RefId0` (always present) + `RefId1` (nullable; every captured record has 1 or 2). No `Data` blob.
+- **`Recipe` table** — fully columnized, no `Data` blob: `Id` (= recipeId = header word 0), `Header1`,
+  `ProfessionId`, `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the decoded ref-id list as `RequiredFeatId`
+  (always present) + `RequiredWorkshopFeatId` (nullable).
 - **Importer** `--only recipes` (`RecipesModule` / `CaptureRecipeImporter`) — scans captures for the reply
-  sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. 708 rows: 603
-  from the NecroL80 captures plus the 105 the DemoL80 book contributes.
-- **Handler** `HandleIirCarrier` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads `Database.GetRecipes()`
-  (ordered by id = capture order, `Items` + their `Items` rows included), maps each via `ToRecord`, and sends the
-  reply on the world framing.
+  sub-opcode, parses records into `Recipe` rows + `RecipeItem` children, upserts them. 708 rows across four
+  captured books.
+- **Handler** `HandleIirCarrier` → `TradeskillService.SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads the
+  recipes (ordered by id = capture order, with their `Items`), filters them to the character's professions
+  (`BookFor`, below), maps each via `RecipeRecords.FromRow`, and sends the reply on the world framing.
 
 ## Element layout
 
@@ -83,13 +77,13 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
 `[0]=[1]=itemId, [2]=0, [3]=Flag, [4]=Hash, [5..8]=[9..12]=key, [13..16]=const, [17]=Trailing (ingredient only)`.
 `ItemId` is a hard FK to `Items` (`Restrict`): the item's per-template TEA key (the key `RequestRecipeInfo`
 0x2090 uses) + hash live **once** in `Items` (harvested there from the recipe element by the importer;
-verified: no itemId ever carries two different non-zero hashes or keys across the 603 records), so they're
-**not** duplicated on `RecipeItem`. `ToRecord` reads them back through the `RecipeItem` → `Items` nav.
+verified: no itemId ever carries two different non-zero hashes or keys across the 603 records), so they are
+not duplicated on `RecipeItem`. `RecipeRecords.FromRow` reads them back through the `RecipeItem` → `Items` nav.
 
 ## Crafting the recipe
 
-The craft itself is a **behavior**, not its own IIR: `BehaviorId.Tradeskill` (`0x27`) over
-`BehaviorControlCenterIIR`, and its trailer is `[u8 flag][u32 recipeId][u32 count]` — **not** the `[from][target]`
+The craft itself is a behavior, not its own IIR: `BehaviorId.Tradeskill` (`0x27`) over
+`BehaviorControlCenterIIR`, and its trailer is `[u8 flag][u32 recipeId][u32 count]` — not the `[from][target]`
 pair the rest of the behavior switch reads. The whole transaction, from
 `NecroL80_mage-necromancer_login_gameplay_annotated_5`:
 
@@ -104,7 +98,7 @@ pair the rest of the behavior switch reads. The whole transaction, from
                DispatchTradeskillComplete  0x0000000F
 ```
 
-`DispatchTradeskillComplete`'s body is the **recipe id** and nothing else, and recipe 15 in our own catalog is
+`DispatchTradeskillComplete`'s body is the recipe id and nothing else, and recipe 15 in our own catalog is
 exactly `Plain Hilt Piece ×1 + Copper ×4 + Silver ×4 → Bloodsilver Khopesh`. The removals corroborate the
 quantities to the unit — his copper stack ran 4 → 0 and his silver stack 6 → 2 — so the shipped rows *are*
 retail's. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json fr17374/17376/17401/17402]
@@ -114,12 +108,12 @@ the product before consuming (a full bag refuses the craft with the materials st
 materials and send the completion. The product carries the crafter through
 `ItemInstance.CreatorName` — see [inventory.md](inventory.md).
 
-Refusals are **silent**, because retail has no failure form here and a completion over a craft that did not happen
+Refusals are silent, because retail has no failure form here and a completion over a craft that did not happen
 would close the client's window on an item it never received.
 
-### The 5-second bar is DATA, and it is server-side
+### The 5-second bar is data, and it is server-side
 
-A tradeskill is a **command-queue command** — `CommandQueue\tradeskillcommand.cpp`, `TradeskillCommand_c` — and
+A tradeskill is a command-queue command — `CommandQueue\tradeskillcommand.cpp`, `TradeskillCommand_c` — and
 the client's duration getter for it (`FUN_0114bf50`) answers per operation:
 
 | operation | duration | where it comes from |
@@ -129,12 +123,12 @@ the client's duration getter for it (`FUN_0114bf50`) answers per operation:
 | take a gem out | 0 | hardcoded — instant |
 | anything else | 100 | hardcoded |
 
-The unit is **centiseconds**, the same as the BCC's `activation_time`/`recharge_time`, so both real values are
-**5.00 s**; it is what sizes the client's `TradeskillProgressBarDesc` bar. ⚠️ Do not read the c2s BCC's
-`activation_time` as the bar: it is **400** on both the craft and the socket record, i.e. the tradeskill
+The unit is centiseconds, the same as the BCC's `activation_time`/`recharge_time`, so both real values are
+5.00 s; it is what sizes the client's `TradeskillProgressBarDesc` bar. Do not read the c2s BCC's
+`activation_time` as the bar: it is 400 on both the craft and the socket record, i.e. the tradeskill
 *animation's* own 4.00 s length, and it is the same on two operations whose durations differ.
 
-The hold is **retail's server**, not a client-side animation — measured on the wire in two captures, corrected for
+The hold is retail's server, not a client-side animation — measured on the wire in two captures, corrected for
 half the ping RTT observed in each:
 
 | | request | grant | RTT/2 | server-side |
@@ -145,100 +139,87 @@ half the ping RTT observed in each:
 [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json fr17374/17402;
 NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8215/8248]
 
-So the inbound handler only acks and **stages** the transaction (`TradeskillService.Stage`); the world tick runs it
+So the inbound handler only acks and stages the transaction (`TradeskillService.Stage`); the world tick runs it
 when the deadline passes (`CompleteDue`, reached through `IWorldOutbound.CompleteDueTradeskills`). Nothing is
 checked, taken or granted until then — which is retail's order too: the *completion* decides, so a player who
 empties their own bag mid-bar is refused at the end of it rather than at its start. A connection that drops
 mid-bar has its staged work thrown away (`Forget`), because the alternative is granting an item to a session that
 has gone.
 
-⚠️ `CraftDurationCentiseconds` is a folded codec constant rather than a `Recipe` column *because every captured
-recipe carries the one value*. `Parse` throws on anything else, so the day a capture disagrees cannot pass
-unnoticed — and that is the day to columnize it.
+`CraftDurationCentiseconds` is a folded codec constant rather than a `Recipe` column because every captured
+recipe carries the one value. `Parse` throws on anything else, so a capture that disagrees cannot pass unnoticed.
 
-## Open / follow-ups
+## Professions
 
-- ⭐ **The profession model, and the gate it drives (#735).** A profession is a **linear chain of feats in
-  `FeatPrereqs`**, seven ranks deep — each rank names the one below it as its single prerequisite — and eleven of
-  them ship, which is exactly AoC's five crafting plus six gathering:
+A profession is a linear chain of feats in `FeatPrereqs`, seven ranks deep — each rank names the one below it as its
+single prerequisite — and eleven of them ship, which is exactly AoC's five crafting plus six gathering:
 
-  | | roots (wire feat id of the Novice rung) |
-  |---|---|
-  | crafting | Weaponsmith `321000` · Armorsmith `321300` · Alchemy `321600` · Architect `321900` · Gemcutter `322200` |
-  | gathering | Woodcutting `323200` · Mining `323300` · Prospecting `323400` · Stonecutting `323500` · Weaver `327200` · Skinner `327500` |
+| | roots (wire feat id of the Novice rung) |
+|---|---|
+| crafting | Weaponsmith `321000` · Armorsmith `321300` · Alchemy `321600` · Architect `321900` · Gemcutter `322200` |
+| gathering | Woodcutting `323200` · Mining `323300` · Prospecting `323400` · Stonecutting `323500` · Weaver `327200` · Skinner `327500` |
 
-  Every one of the 708 recipes states the rung it needs in `RequiredFeatId`, and all of them resolve onto the
-  Weaponsmith and Armorsmith ladders — which is the finding the book itself carries: **our "catalog" is ONE
-  character's book**, harvested from that character's `TradeskillReplyIIR`, so it holds their two professions and
-  no others.
+Every one of the 708 recipes states the rung it needs in `RequiredFeatId`, and they resolve onto four crafting
+ladders — Weaponsmith, Armorsmith, Gemcutter and Alchemy. The catalog is the union of the captured characters'
+own books, harvested from their `TradeskillReplyIIR`s, so it holds their professions and no others (Architect has
+no recipes).
 
-  `TradeskillLadders` walks the chains; `TradeskillService.BookFor` filters the book to the rank the character has
-  reached and `HasProfessionFor` gates the craft. A character who has trained nothing gets an **empty book**, which
-  is retail — the book is what a profession buys. `.tradeskill <profession> [rank]` is the GM bootstrap standing in
-  for the (uncaptured) trainer conversation.
+`TradeskillLadders` walks the chains; `TradeskillService.BookFor` filters the book to the rank the character has
+reached and `HasProfessionFor` gates the craft. A character who has trained nothing gets an empty book, which is
+retail — the book is what a profession buys. `.tradeskill <profession> [rank]` is the GM bootstrap standing in for
+the trainer conversation, which no capture performs (both annotated crafting sessions are L80s who already had one).
+[V3: TradeskillProfessionTests.TheElevenProfessionLadders_WalkOutOfTheShippedPrereqEdges]
 
-  ⚠️ **The RANK is the chain DEPTH, never the feat's NAME.** All six of Gemcutter's trained ranks are named
+- **The rank is the chain depth, never the feat's name.** All six of Gemcutter's trained ranks are named
   `Gemcutter Novice` in the shipped feat table — a fault in the client's own data — so a name-derived rank gives
   that profession seven Novices and no ladder at all.
+- **A character holds several rungs of one ladder, not one.** `AddCharacterFeats` keeps the highest rank per
+  `id / 100` base and a crafting ladder spans three bases (Weaponsmith 3210 / 3211 / 3212), so a Grandmaster holds
+  `321001`, `321101`, `321202` — and holds neither `321000` (the rung 9 recipes name) nor `321201`. Membership tests
+  against the recipe's own `RequiredFeatId` hide most of a character's book; compare depths.
+- **The workshop requirement is not enforced.** 378 of the 708 recipes also carry a `RequiredWorkshopFeatId`
+  (artisan rank and up, one workshop tier per rank), and a workshop is a guild-city building and where the character
+  is standing — not a feat they train.
 
-  ⚠️ **A character holds SEVERAL rungs of one ladder, not one.** `AddCharacterFeats` keeps the highest rank per
-  `id / 100` BASE and a crafting ladder spans three bases (Weaponsmith 3210 / 3211 / 3212), so a Grandmaster holds
-  `321001`, `321101`, `321202` — and holds **neither** `321000` (the rung 9 recipes name) **nor** `321201`.
-  Membership tests against the recipe's own `RequiredFeatId` hide most of a character's book from them; compare
-  depths.
+### Retail's own record of a learned tradeskill is `CharacterSkills`, and it carries the rank
 
-  ⚠️ **The WORKSHOP requirement is not enforced.** 378 of the 708 recipes also carry a `RequiredWorkshopFeatId`
-  (artisan rank and up, one workshop tier per rank), and a workshop is a guild-city BUILDING and where the
-  character is standing — not a feat they train. Blocked on a guild-city model; see Gitea #761.
-  [V3: TradeskillProfessionTests.TheElevenProfessionLadders_WalkOutOfTheShippedPrereqEdges]
+The professions ride the spawn scaffold's feat/ability list — the `[u8 rank][u32 id]` groups after the entry table —
+imported per character from that character's own capture. `SkillId` is a wire feat id, so it resolves straight onto
+a ladder, tier included. `TradeskillService.ProfessionsOf` reads this list and `CharacterFeats` together and takes
+the deepest rung either reaches.
 
-- ⭐ **Retail's own record of a learned tradeskill is `CharacterSkills`, and it carries the RANK.** The professions
-  ride the **spawn scaffold's feat/ability list** — the `[u8 rank][u32 id]` groups after the entry table —
-  imported per character from that character's own capture. **`SkillId` IS a wire feat id**, so it resolves
-  straight onto a ladder, tier included. `TradeskillService.ProfessionsOf` reads this list and `CharacterFeats`
-  together and takes the deepest rung either reaches.
+| | resolved from the scaffold |
+|---|---|
+| NecroL80 | Armorsmith Grandmaster, Woodcutting Master, Stonecutting Master, Skinner Master, Mining Master, Prospecting Master |
+| DemoL80 | Gemcutter Grandmaster, Woodcutting Apprentice, Stonecutting Apprentice, Skinner Novice, Mining Novice, Prospecting Adept |
 
-  | | resolved from the scaffold |
-  |---|---|
-  | NecroL80 | Armorsmith Grandmaster, Woodcutting Master, Stonecutting Master, Skinner Master, Mining Master, Prospecting Master |
-  | DemoL80 | Gemcutter Grandmaster, Woodcutting Apprentice, Stonecutting Apprentice, Skinner Novice, Mining Novice, Prospecting Adept |
+Resolve the id, never the slot: a positional reading ("slot 65–75 is the profession id") files non-profession ids
+under professions — two slots carry ids that are identical on both characters (`328908` → `Expert Bandaging`,
+`326000` → `Destiny Quest`) — and the slot is not stable across characters either (Woodcutting sits at 66 on one and
+67 on the other).
+[V3: TradeskillProfessionTests.AnImportedCharactersScaffold_CarriesTheirProfessionsAndRanks]
 
-  ⚠️ **The earlier reading of this table — "slot 65–75 IS the profession id, and the TIER is not in here" — was a
-  POSITIONAL mis-read and is falsified.** Two of the slots carry ids that are not professions at all and are
-  IDENTICAL on both characters (`328908` → `Expert Bandaging`, `326000` → `Destiny Quest`); filing those under
-  whichever profession their slot was believed to be is what produced "two professions carry a byte-identical
-  SkillId at different tiers", and hence "the tier is recorded somewhere else". Resolve the ID, never the slot:
-  the slot is not stable across characters either (Woodcutting sits at 66 on one and 67 on the other).
-  [V3: TradeskillProfessionTests.AnImportedCharactersScaffold_CarriesTheirProfessionsAndRanks]
+### `ProfessionId`
 
-- ⚠️ **The LEARN path itself is still uncaptured.** No capture teaches a profession — both annotated crafting
-  sessions are L80s who already had one — so the trainer conversation and the rank-up rule are not built, and
-  `.tradeskill` stands in for them.
-
-- `Header1` / `MidFlag` / `Tail` / `TrailingFlag` are stored faithfully but their gameplay meaning is not yet
-  decoded (they reproduce the wire exactly regardless). The ref-id list is decoded — it is the feat requirement.
-
-### ⭐ `ProfessionId` — the column that used to be called `RdbType` (#148)
-
-It takes two values, and they are the two shipped crafting professions. Resolving each recipe's
-`RequiredFeatId` through `FeatIdMaps.WireFeatId` names all twelve ladder ranks, six per value, with **zero
-crossover** — and the `RequiredWorkshopFeatId` families split the same way:
+The header word takes four values, one per crafting profession. Resolving each recipe's `RequiredFeatId` through
+`FeatIdMaps.WireFeatId` names that profession's ladder ranks with zero crossover, and the `RequiredWorkshopFeatId`
+families split the same way:
 
 | value | recipes | feats | workshop feats |
 |---|---:|---|---|
-| `0xF4241` 1000001 | 99 | `321000`/`321001`/`321100`/`321101`/`321200`/`321201` — **Weaponsmith** Novice…Master | `3282xx` |
-| `0xF4242` 1000002 | 504 | `321300`/`321301`/`321400`/`321401`/`321500`/`321501` — **Armorsmith** Novice…Master | `3283xx` |
+| `0xF4241` 1000001 | 99 | `321000`…`321201` — **Weaponsmith** | `3282xx` |
+| `0xF4242` 1000002 | 504 | `321300`…`321501` — **Armorsmith** | `3283xx` |
+| `0xF4243` 1000003 | 60 | `322200`…`322401` — **Gemcutter** | `322301` (3 recipes) |
+| `0xF4244` 1000004 | 45 | `321600`…`321701` — **Alchemy** | `328400` |
 
-⚠️ **The old name was a misreading, and it is positively refuted rather than merely unsupported.** RDB type
-`1000001` is the **playfield** type — its entries are `Davids Test Playplace`, `Conarch Village`,
-`Spider_Caverns` — and type `1000002` does not exist in the client's RDB index at all. The mis-naming had also
-escaped into the issue history as *"recipes imported from RDB 1000001/1000002"*; recipes are **capture-derived**
-(`CaptureRecipeImporter` reads `TradeskillReplyIIR`) and the importer never opens the RDB.
+It is not an RDB type: RDB type `1000001` is the playfield type (entries `Davids Test Playplace`,
+`Conarch Village`, `Spider_Caverns`) and `1000002` does not exist in the client's RDB index. Recipes are
+capture-derived (`CaptureRecipeImporter` reads `TradeskillReplyIIR`) and the importer never opens the RDB.
 
-⚠️ Two values is a cheap partition on its own. What makes this a decode is that the six-rank ladder **and** the
-disjoint workshop-feat family fall on the same split, and that the alternative reading is disproved.
+## Not decoded / not built
 
-⭐ It also sharpens what the missing professions look like: the shipped set is Weaponsmith + Armorsmith because
-that is what the one captured recipe book held, so an Alchemist's book would arrive carrying a **third**
-`ProfessionId`. That is the concrete prediction the alchemy-quest gap (#148, quests 13141/13143/13145) waits on.
-- `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.
+- `Header1` / `MidFlag` / `Tail` / `TrailingFlag` are stored faithfully but their gameplay meaning is not decoded
+  (they reproduce the wire exactly regardless).
+- The `type=1` single-`RecipeLearnt` form and the `LearnRecipe` GameAction (`FUN_0112d750`) are not built.
+
+Open work tracked in Gitea #735.

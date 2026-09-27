@@ -1,7 +1,7 @@
 # Teams, player trade and the friend list
 
 All three decoded from one capture: `login_2-clients_group-trade-friend`, two retail clients on the same host, so
-**both sides of every exchange are on tape in one file** — the dump's `Stream` field separates the ten connections
+both sides of every exchange are on tape in one file — the dump's `Stream` field separates the ten connections
 (five per client). The players narrate each step in chat, which is what labels the phases: *"leave goup now"*,
 *"kick"*, *"trade"*, *";both friends added, friends are one sided, no accept needed"*, *"%set lootoptions, pass on
 loot to rare"*.
@@ -17,7 +17,7 @@ Each subsystem's three tiers matter, because they are not the same tier:
 | team roster | CsPlayerAgent | invite/accept/join/leave/kick/loot options |
 | group membership | GameServer (world) | two IIRs mirroring the roster onto the world connection |
 | player trade | GameServer | the whole flow, one connection each side |
-| friend list | **ChatServer** | not a game-server subsystem at all |
+| friend list | ChatServer | not a game-server subsystem at all |
 
 ## The team member descriptor
 
@@ -31,25 +31,24 @@ once it exists (`TeamMemberRecord`):
 [u32 opaqueA][u32 opaqueB][u32 0][u32 0][u8 0]
 ```
 
-102 bytes for a 10-character name. The first trailing u32 is the **class**: the two captured members carry `0x29`
+102 bytes for a 10-character name. The first trailing u32 is the class: the two captured members carry `0x29`
 and `0x2C`, which are exactly `Class.Necromancer` and `Class.Demonologist`, and the chat server's friend-add reply
-ends with the same byte for the same character — that is how the two corroborate each other. Then the **level**, the
-**map id**, and one more **per-character word** (2 and 3 in the capture — not identifiable from two characters; sex
+ends with the same byte for the same character — that is how the two corroborate each other. Then the level, the
+map id, and one more per-character word (2 and 3 in the capture — not identifiable from two characters; sex
 and race are the remaining candidates).
 
-⚠️ The class field was first read as the LEVEL, because `0x29`/`0x2C` are plausible levels *and* the friend reply
-appeared to confirm it — two independent sightings of the same wrong field. The enum match settles it, and the client
-agrees: fed a level, it accepted the invite record, answered it with `RequestTeamInvite`, and refused to raise the
-invite window, because it cannot build one for a class that does not exist. The real level slot then sat as a
-constant `5` because both captured members happen to be level 5; `DispatchCharacterSearchResult` carries the same
-record for several characters at once and reads 5 / 7 / 8 / 10 across its five captured bodies, which is what
-identified it (#460).
+`0x29`/`0x2C` are also plausible levels, and the friend reply looks like a second sighting of the same field; the
+enum match settles it, and so does the client: fed a level in the class slot, it accepts the invite record, answers it
+with `RequestTeamInvite`, and refuses to raise the invite window, because it cannot build one for a class that does
+not exist. The level slot reads a constant `5` in this capture because both members are level 5;
+`DispatchCharacterSearchResult` carries the same record for several characters at once and reads 5 / 7 / 8 / 10
+across its five captured bodies. (Search criteria are open work tracked in Gitea #460.)
 
-The **third bool GATES the playfield proxy** — the client reads a proxy only when it is set, so a member with no
+The third bool gates the playfield proxy — the client reads a proxy only when it is set, so a member with no
 playfield is a shorter record rather than one carrying a zeroed proxy. The two bools before it are zero in every
 captured record and name nothing on their own.
 
-The four **opaque words** after the proxy appear **nowhere else in the capture** — not in login, not in the
+The four opaque words after the proxy appear nowhere else in the capture — not in login, not in the
 snapshot — so they are CS-tier state that cannot be derived from anything we send, and computing them would be
 invention. The first two differ per character (`0x00000301 0x59EA5C54` / `0x00018181 0x3BC035EC`) and the last two
 and the trailing flag are zero in both. We carry them so a captured member round-trips byte-exact and send zero for
@@ -77,14 +76,13 @@ c2s 0x2009 KickFromTeam                 [ProtoID32 target]         (GAME tier)
 c2s 0x204D SetPassOnLootLevel           [u32 level]                (GAME tier; 0xFFFFFFFF = no threshold)
 ```
 
-`DispatchTeamJoin` / `TeamLeave` / `SetNewTeamLeader` share one layout — the **opcode carries the verb**.
+`DispatchTeamJoin` / `TeamLeave` / `SetNewTeamLeader` share one layout — the method carries the verb.
 
-The roster's member list is **count-framed**: retail's `0x00000BD3` is `3 × 0x3F1`, i.e. two members, not a
-constant. This is the `ListFrame` rule, and this message is a fresh instance of exactly the trap that rule
-documents. The leader's own record comes first in all six captured rosters.
+The roster's member list is count-framed: retail's `0x00000BD3` is `3 × 0x3F1`, i.e. two members, not a constant
+(the `ListFrame` rule). The leader's own record comes first in all six captured rosters.
 
-The trailing **18 bytes are the team's settings block**, and the client's reader (`FUN_00557960`, recovered for
-the raid work) splits them into five fields rather than the one blob they were carried as:
+The trailing 18 bytes are the team's settings block, and the client's reader (`FUN_00557960`, shared with the raid
+records) splits them into five fields:
 
 ```
 [u32 lootMode][u8 useNeedGreed][u8 flag][ProtoID32 masterLooter][u32 lootThreshold]
@@ -97,19 +95,17 @@ slot is read with the ID32 idiom and has `TeamSetMasterLooter(const ID32&)` / `D
 for company, but is `(0, 0)` in every captured roster, so that reading is structural.
 `[V0: the team settings block's master-looter slot and second flag]`
 
-The **member record's own trailing region** is split by the same pass. What was carried as `00 00 01` before the
-playfield proxy is three bools, and the third one **gates the proxy** — a member with no playfield is a shorter
-record, not one with a zeroed proxy. What was carried as two words and nine zero bytes after it is four words and
-a flag. Every captured record still round-trips byte-for-byte; the bytes did not move, they acquired names.
+The same reader splits the member record's trailing region: `00 00 01` before the playfield proxy is three bools
+(the third gating the proxy), and the two words and nine zero bytes after it are four words and a flag. Every
+captured record round-trips byte-for-byte.
 
 Team ids are minted sequentially by the CS tier under class `0x0000DEA9`: the capture's three groupings are
 `0x0051DD9A`, `0x0051DD9B`, `0x0051DD9C`.
 
-⚠️ Two opcode numbers are reused across tiers: `0x2008` is `AcceptTeamInvite` on the CS tier and `LeaveTeam` on the
-game tier; `0x2009` is `KickFromTeam` on the game tier. That is how 16-bit method indices work — per interface — so
-they must not be unified.
+Two method numbers are reused across tiers: `0x2008` is `AcceptTeamInvite` on the CS tier and `LeaveTeam` on the
+game tier; `0x2009` is `KickFromTeam` on the game tier. Method indices are per interface, so they must not be unified.
 
-### Looking for group, and the team search (#889)
+### Looking for group, and the team search
 
 ```
 c2s 0x2012 SetLookingForTeamStatus      [u8 looking][str message]      the CHARACTER's own flag
@@ -125,34 +121,33 @@ c2s 0x2005 TeamApply                    [ProtoID32 team]
 s2c 0x2004 DispatchTeamCharacterApplied [member]
 ```
 
-A row is a **whole `cTeam`** — the same record `DispatchYouJoinedTeam` carries, leader first — followed by the
+A row is a whole `cTeam` — the same record `DispatchYouJoinedTeam` carries, leader first — followed by the
 advert its leader set. The trailing byte is `i_bMoreHits`, the paging flag that answers the request's
-`i_nSkipResults`; it is *not* a list trailer, which is what it was read as for as long as the only bodies
-available were empty ones.
+`i_nSkipResults`, not a list trailer.
 
-⚠️ **Every captured `DispatchTeamSearchResult` is the empty body `000003f1 00`** — six of them, across six
+**Every captured `DispatchTeamSearchResult` is the empty body `000003f1 00`** — six of them, across six
 sessions — because no traced session ever had a team flagged as looking for members. The row grammar above is
-therefore the **client's own reader**, not a decode: `CSPlayerInterfaceDispatch_t::DispatchTeamSearchResult()`
+therefore the client's own reader, not a decode: `CSPlayerInterfaceDispatch_t::DispatchTeamSearchResult()`
 (`FUN_0133de00`, found by its "stream bad after `i_cResult` / `i_bMoreHits`" asserts) reads the vector through
 `FUN_0134e9c0` and then one byte; `FUN_0134e9c0` is the ordinary count-framed list reader and calls, per element,
 `FUN_00557960` (the `cTeam` reader) then `FUN_0048f840` (the string read — the same call the member record makes
 for a NAME). The client's own name for the element is `TeamSearchResultRow_c`, taken from the RTTI of the GUI
 slot that consumes the vector, `Slot2<…, const vector<TeamSearchResultRow_c>&, bool>` bound to
 `TeamAndGuildSearchView_c` — the window that hosts both the team and the guild search tab.
-`[V0: the team-search row's trailing string is the looking-for-members message]`
+`[V0: the team-search row's trailing string is the looking-for-members message]` Open work tracked in Gitea #889.
 
 The two status messages share one body and so share one codec (`LookingForGroupStatusCodec`, `HandledMethods`):
-which side is advertising is the METHOD's job to say, not the body's. The team one is uncaptured too, and its
+which side is advertising is the method's job to say, not the body's. The team one is uncaptured too, and its
 reader `FUN_01340110` reads the same bool-then-string pair in the same order.
 
 `DispatchTeamCharacterApplied` carries a bare member record — its dispatcher `FUN_0133ccf0` calls the member
-reader `FUN_005574d0` — so applying to a team from a search row tells the LEADER who applied, and the leader
+reader `FUN_005574d0` — so applying to a team from a search row tells the leader who applied, and the leader
 invites them through the ordinary invite flow. Applying does not join.
 
 ### Group membership on the world connection
 
 A join *also* pushes an IIR to every member's world connection, and a leave pushes its complement
-(`GroupMembershipCodec`). Both were name-only entries in `Opcodes.cs` until this capture put them on the wire.
+(`GroupMembershipCodec`).
 
 ```
 AddToGroupIIR      0x0DF44B73   [ProtoID32 member][u8 0][ProtoID32 team][ProtoID32 leader]   29-byte body
@@ -164,7 +159,7 @@ One record per member — the joiner *and* the members already in the team — t
 The chat server independently gains a `~Team` channel on both clients the moment the group forms, and drops it on
 leave, which makes a cheap end-to-end check.
 
-### ⭐ `FactionsList` — the invite that carries the inviter's STANDING (#310)
+### `FactionsList` — the invite that carries the inviter's standing
 
 The faction variant of the invite pair exists in this build and carries a whole standing set. Its reader
 (`FUN_0133d5b0`) names its three fields in its own bail-out strings — *"stream bad after `'inviter'`"*, then
@@ -175,19 +170,20 @@ The faction variant of the invite pair exists in this build and carries a whole 
 FactionsList = [u32 (count + 1) * 0x3F1]  then count × { [u32 factionId][u32 points] }
 ```
 
-⭐ It is an ordinary **`ListFrame`** — the reader divides by `0x3F1` and rejects a remainder — over `[key][value]`
-pairs, and the caller builds a 0x18-byte red-black-tree sentinel, so it is a **`std::map<u32,u32>`** the same way
+It is an ordinary `ListFrame` — the reader divides by `0x3F1` and rejects a remainder — over `[key][value]`
+pairs, and the caller builds a 0x18-byte red-black-tree sentinel, so it is a `std::map<u32,u32>` the same way
 the Massive-PvP board is (a u32 key before each element). Nothing new to model: `ListFrame` plus a pair.
 
-That was the last unrecovered wire shape in #310; the two standing pushes (`DispatchApplyFactionRank` 0x4F,
+The two standing pushes (`DispatchApplyFactionRank` 0x4F,
 `DispatchApplyFactionPoints` 0x50) are plain two-scalar bodies.
 
-⚠️ **Zero occurrences in the corpus**, and this client ships none of the twelve Khitai faction identities, so
-there is nothing to fill a `FactionsList` with. The shape is recovered; the content is not in this build.
+**Zero occurrences in the corpus**, and this client ships none of the twelve Khitai faction identities, so there is
+nothing to fill a `FactionsList` with. The shape is recovered; the content is not in this build. Open work tracked in
+Gitea #310.
 
 ## Player trade
 
-All on the game server. One message, one codec (#530 wave 7): the three ProtoID32-bodied messages are
+All on the game server. One message, one codec: the three ProtoID32-bodied messages are
 `EntityIdCodec`, the cash pair `TradeCashCodec`, the added-item pair `TradeAddedItemCodec`, and the client's add
 `AddTradeItemCodec`.
 
@@ -208,11 +204,11 @@ s2c 0x206D (unnamed)                     (empty)                   to BOTH: the 
 
 then the `TradeCompletedSuccessfully` feedback overlay (`0x8D5A8B6B`) to both clients.
 
-⚠️ **c2s `0x2068` is `AddTradeItem` while s2c `0x2068` is `DispatchRequestTrade`** — the same method index on the
+**c2s `0x2068` is `AddTradeItem` while s2c `0x2068` is `DispatchRequestTrade`** — the same method index on the
 two interfaces. The captured container kind is 104 (the backpack) and the owner field is the sender's own character
 id. [V0: the two unnamed trade replies 0x206B and 0x206D]
 
-The capture only exercises the happy path, but the client's recovered method table completes the **c2s** set, and its
+The capture only exercises the happy path, but the client's recovered method table completes the c2s set, and its
 indices line up exactly with the captured ones (`0x2065`/`0x2067`/`0x2068`/`0x206B` all match), so it can be trusted
 here:
 
@@ -224,71 +220,67 @@ c2s 0x206A MoveTradeItemInternal(pos1, pos2)      drag an offered item within th
 c2s 0x206C AbortTrade()                           CANCEL
 ```
 
-⚠️ `AddTradeItem`'s signature is `(ID32 inventory, int itemPos, int destPos)` — **the last field is the trade-window
-slot, not a quantity.** There is no count in the message at all: the whole stack moves. Read as a count it happened to
-work only because the capture's one add carried destPos 1 for a stack of 1; a destPos of 0 would have moved nothing.
+`AddTradeItem`'s signature is `(ID32 inventory, int itemPos, int destPos)` — **the last field is the trade-window
+slot, not a quantity.** There is no count in the message at all: the whole stack moves. (The capture's one add carries
+destPos 1 for a stack of 1, so a count reading happens to fit it.)
 
-The matching s2c REMOVE halves **are** now buildable, and the reason the earlier reading said otherwise is worth
-keeping: it rested on the old string-catalog numbering, which put `DispatchRequestTrade` at `0x205F` where retail
-demonstrably sends `0x2068`. That offset is gone — since #615 a `*Methods` member IS the wire field, recovered from
-the per-class dispatcher SWITCH rather than the string catalog, and the reconciled table puts `DispatchRequestTrade`
-at exactly the `0x68` the capture shows. So:
+The matching s2c remove halves are buildable because a `*Methods` member is the wire field, recovered from the
+per-class dispatcher switch rather than the string catalog (which would put `DispatchRequestTrade` at `0x205F` where
+retail sends `0x2068`):
 
 ```
 s2c 0x2073 DispatchTradePartnerRemovedItem(i_nItemPos)   the OTHER side took an item off
 s2c 0x2074 DispatchTradeRemovedItem(i_nItemPos)          my own removal, echoed back
 ```
 
-One scalar each, written bare and big-endian with no header — the same rule that recovered the guild-bank bodies
-(#132) — and the exact mirror of the captured ADD pair: one body, two opcodes, partner-facing one slot below
+One scalar each, written bare and big-endian with no header — the same rule as the guild-bank bodies — and the exact
+mirror of the captured ADD pair: one body, two opcodes, partner-facing one slot below
 own-facing. Built by `TradeRemovedItemCodec`, gated by `TradeRemovedItemCodecTests`.
 [V1: docs/re/aoc-client-rpc-methods.json]
 
-### ⭐ The no-arg slots around the trade run are named after all (#792)
+### The no-arg slots around the trade run
 
 The client's dispatch table names none of them, and it cannot: its method catalog records a method's ARGUMENT
-signature, and these have none. But a no-arg method's dispatch branch is a bare stub calling one **interface
-vtable slot**, and on this family `slot = (method + 1) * 4` — measured on all eight, with the four that already
+signature, and these have none. But a no-arg method's dispatch branch is a bare stub calling one interface
+vtable slot, and on this family `slot = (method + 1) * 4` — measured on all eight, with the four that already
 have names as the controls. `GamecodeClient_t` is the implementing class (`GameCharInterface_t`'s overrides are
 all empty), so its override IS the semantics:
 
 | method | vtable | what the client does |
 |---|---|---|
 | `0x6A` `DispatchAbortTrade` | `+0x1AC` | `CoreTradeHolder::TradeAbort()` — the client's own assert string |
-| `0x6B` `DispatchClientAcceptedTrade` | `+0x1B0` | sets the LOCAL holder's `accepted` byte and refreshes the window — **byte for byte `0x6C`'s body**, on your own holder instead of the one its ID32 names |
-| `0x6D` `DispatchCompleteTrade` | `+0x1B8` | the holder's own reset: in-trade flag cleared, `accepted` and both cash slots zeroed, both item lists freed, then the trade-ended signal with **1** where `TradeAbort` sends **0** |
+| `0x6B` `DispatchClientAcceptedTrade` | `+0x1B0` | sets the local holder's `accepted` byte and refreshes the window — byte for byte `0x6C`'s body, on your own holder instead of the one its ID32 names |
+| `0x6D` `DispatchCompleteTrade` | `+0x1B8` | the holder's own reset: in-trade flag cleared, `accepted` and both cash slots zeroed, both item lists freed, then the trade-ended signal with 1 where `TradeAbort` sends 0 |
 | `0x71` `DispatchClientNoLongerAcceptedTrade` | `+0x1C8` | the exact inverse of `0x6B` — `accepted` back to 0. Never sent in the corpus |
 | `0x72` | `+0x1CC` | fires the trade-window refresh signal and nothing else. Never sent |
 | `0x75` `DispatchDeleteCachedLDBData` | `+0x1D8` | not trade at all — logs *"DeleteCachedLDBData remote method was called."* Never sent |
 
-⭐ Two of those agree with what the CAPTURES already said, independently: `0x6B` lands on the accepter's own
+Two of those agree with the captures independently: `0x6B` lands on the accepter's own
 connection right after their `AcceptTrade`, and `0x6D` on both connections as the trade commits — which is
 exactly what the two handlers do.
 
-### ⭐ `0x6A`'s trigger is `CloseShop`, and it is measured
+### `0x6A`'s trigger is `CloseShop`, and it is measured
 
-The handler said *what* it does; the corpus says *when* retail sends it. Of the **153** frames across the 132
-captures, **152 are the immediate reply to `CloseShop`** — the odd one out follows an `UpdateQuestMarkerNPC`,
-i.e. a shop closed by walking away rather than by clicking. A vendor session **is** a trade to the client, which
+The handler said *what* it does; the corpus says *when* retail sends it. Of the 153 frames across the 132
+captures, 152 are the immediate reply to `CloseShop` — the odd one out follows an `UpdateQuestMarkerNPC`,
+i.e. a shop closed by walking away rather than by clicking. A vendor session is a trade to the client, which
 is why one message serves both, and it is why the handler's assert string reads *"is closing all trades"*
 (plural) rather than naming a partner.
 
-We answered `CloseShop` with nothing at all; the ack now goes out (`GameServerListener.SendTradeAbort`).
+The server answers `CloseShop` with it (`GameWire.SendTradeAbort`).
 [V2: Hakotep_hox_login_gameplay0.tshark.json fr695 → fr697, and 151 more like it across the corpus]
 
-⚠️ It aborts **every** open trade, not just the shop, so it must not be sent while a player-to-player trade is
-running. Nothing can do that today — a shop and a trade cannot both be open — but that is the reason it is not a
-general "close the window" message.
+It aborts every open trade, not just the shop, so it must not be sent while a player-to-player trade is running (a
+shop and a trade cannot both be open) — which is why it is not a general "close the window" message.
 
-⚠️ Still uncaptured, and NOT built: whether an internal **move** notifies the partner at all, and whether a
-partner going offline mid-trade produces anything. **Cancel is no longer a blank**, though: `0x6A` is
-`TradeAbort`, it takes no body, and it is what closes a window without committing — the shop ack proves the
-message works, but no capture shows retail using it to cancel a *player* trade, so that use stays unbuilt. Open
-work in Gitea #427.
+Uncaptured, and not built: whether an internal move notifies the partner at all, and whether a partner going offline
+mid-trade produces anything. `0x6A` `TradeAbort` takes no body and closes a window without committing — the shop ack
+proves the message works, but no capture shows retail using it to cancel a player trade, so that use is not built.
+Open work tracked in Gitea #427.
 
 ## Friend list
 
-On the **ChatServer** (`FriendStateCodec`, `ChatSenderInfoCodec`, `FriendPresenceCodec`, `FriendRefCodec`). Sweeping the whole capture for a game-tier friend opcode finds only
+On the ChatServer (`FriendStateCodec`, `ChatSenderInfoCodec`, `FriendPresenceCodec`, `FriendRefCodec`). Sweeping the whole capture for a game-tier friend opcode finds only
 `c2s 0x2092 RequestNewJoinHasHostileInFriends`, a team-invite safety check — the list itself is chat-tier:
 
 ```
@@ -305,7 +297,7 @@ everything else uses the character id.
 
 The chat framing is `[u16 opcode][u16 bodyLen][body]`, read from the raw pcap (`0025 001b …`, `0028 000b …`).
 
-An **add is four packets**, and the third is the one that matters:
+An add is four packets, and the third is the one that matters:
 
 ```
 c2s 0x0028  [u32 characterId]                                          add
@@ -314,37 +306,35 @@ s2c 0x0014  [u32 characterId][u32 0][u16 len][name]                     the id -
 s2c 0x0028  [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]  the friend's state
 ```
 
-At **login** the stored list arrives as `0x0014` + `0x0028` **pairs**, one per friend, in the same burst as the channel
-subscriptions and the welcome message — and with **no** presence push. Both message SHAPES are byte-gated
-[V3: TeamTradeFriendCodecTests.Friend_NameBinding_IsByteExact]; the burst PLACEMENT is not, and cannot be read out of
+At login the stored list arrives as `0x0014` + `0x0028` pairs, one per friend, in the same burst as the channel
+subscriptions and the welcome message — and with no presence push. Both message SHAPES are byte-gated
+[V3: TeamTradeFriendCodecTests.Friend_NameBinding_IsByteExact]; the burst placement is not, and cannot be read out of
 the two-client capture — that account had no friends before it added them, so the restore-on-login timing comes from a
 later login-with-friends session (see the note on it in `ChatServerListener`).
 
-⚠️ **Omitting the `0x0014` renders nothing at all** — no entry, no error. The client is left holding an id and a state
-with no name attached. That was the whole reason the list stayed empty while the other two messages were byte-perfect,
-and it cost several rounds of looking at the wrong things.
+**Omitting the `0x0014` renders nothing at all** — no entry, no error. The client is left holding an id and a state
+with no name attached, so the list stays empty while the other two messages are byte-perfect.
 
 **Level and class are both in the state**, which is what the client's hover tooltip shows. Six friends of six different
 levels and classes settled a reading that one capture of two characters could not: every trailing byte is a valid
 `Class` id (`HeraldOfXotli`, `BearShaman`, `Demonologist`, `TempestOfSet`, `Demonologist`, `Barbarian`) while the level
-byte reads 7/10/5/8/10/5. Before that the level had been read as a constant `0x05` and the class byte's identity was
-genuinely ambiguous against levels 41/44.
+byte reads 7/10/5/8/10/5. (A two-character capture alone leaves the class byte ambiguous against levels 41/44.)
 
 **The presence push's u16 is a length**, not a constant: it is `nameLen + 3` (the tag byte plus the length-prefixed
 name), verified across five names — 6→9, 10→13, 7→10, 6→9, 8→11. Read off a single 10-character name it looked like a
 fixed `0x000D`, which left every push for any other name malformed.
 
-**Presence must be PUSHED on login and logout.** After restoring its own list, a character's entry is re-sent to every
+**Presence must be pushed on login and logout.** After restoring its own list, a character's entry is re-sent to every
 online character who has it on theirs (`0x0014` + `0x0028`), and again with `online = 0` when it disconnects. Without
-this a friend's status is frozen at whatever it was when the WATCHER logged in - whoever connects first sees the other
-as offline forever, because the restore can only report who is already connected - and **the client hides offline friends**
-(confirmed in-client), so the panel looks EMPTY even though the entry exists - while the right-click menu still offers
+this a friend's status is frozen at whatever it was when the watcher logged in - whoever connects first sees the other
+as offline forever, because the restore can only report who is already connected - and the client hides offline friends
+(confirmed in-client), so the panel looks empty even though the entry exists - while the right-click menu still offers
 "remove from friends list" for the friend it will not display. That gap between "the client knows the entry" and "the
 client shows it" is the tell. The reverse lookup this needs is a genuinely different query from the forward one,
-because the list is one-sided. ⚠️ The MESSAGE is the captured one; the TRIGGER is inferred - no capture covers a friend
-logging in or out while someone watches. Verified in-client 2026-07-25.
+because the list is one-sided. The message is the captured one; the trigger is inferred - no capture covers a friend
+logging in or out while someone watches. Verified in-client.
 
-**The state's stamp is a union on the online flag** — and both halves are now observed (#888).
+**The state's stamp is a union on the online flag**, and both halves are observed.
 
 *Offline* is a unix **last-seen**: the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken,
 and `NecroL80_..._annotated_9` adds four more decoding to 2011/2016/2021 — dormant friends. We send
@@ -358,12 +348,12 @@ ends in a `PlayfieldProxy` carrying that same `0x01EDA8B2` (same instance), and 
 friends carry values found nowhere else in the capture — friends in another instance. A timestamp reading cannot
 produce any of that (`0x01EDA8B2` is 1971). We source it live from the game tier through `IGameServerDispatcher`.
 
-### Claude is a VIRTUAL friend (#100)
+### Claude is a virtual friend
 
 Because the list is one-sided and server-pushed, an entry needs no character behind it: there is no accept step and
 no roster the client validates against, so an entry simply *is* the `0x0014` + `0x0028` pair. `ChatServerListener`
 sends one for the synthetic Claude identity (`0xC1A0DE05`) right after the stored list, gated on `McpEnabled` — the
-same gate as the Claude channel, since an entry nobody can answer would be a lie. It reports **online**, which puts
+same gate as the Claude channel, since an entry nobody can answer would be a lie. It reports online, which puts
 the stamp on the playfield-token branch, and Claude is in no playfield, so it sends `FriendStateCodec.OnlineStamp` —
 exactly the case that fallback exists for. Level and class have no "none" encoding on this message and are a choice
 rather than a decode.
@@ -377,18 +367,18 @@ produce. The payoff is presence plus one-click access: a tell to that id already
 
 `TeamService` is a composed collaborator of the **CsPlayerAgent listener**, like `GuildService`: the CS tier owns the
 roster and every roster dispatch, and takes the cross-connection client lookup as a delegate seam. A team is
-**ephemeral** — nothing is persisted, deliberately, because a retail team does not survive a logout, so a table would
+ephemeral — nothing is persisted, deliberately, because a retail team does not survive a logout, so a table would
 be state with no owner (and there is no migration to carry).
 
-`LeaveTeam` / `KickFromTeam` arrive on the player's **world** connection, so the world listener reaches the roster
+`LeaveTeam` / `KickFromTeam` arrive on the player's world connection, so the world listener reaches the roster
 through `ICsPlayerAgentDispatcher` — the same seam shape as `IGameServerDispatcher` and `IChatServerDispatcher`, and
-for the same reason: the relationship is mutual (the roster pushes group-membership IIRs *back* onto world
+for the same reason: the relationship is mutual (the roster pushes group-membership IIRs back onto world
 connections via `IGameServerDispatcher.SendGroupMembership`), and a listener only exists once the host starts it.
 
 A logout leaves the team too, or the roster keeps a member nobody can reach and the next broadcast pushes at a dead
 connection.
 
-The **LFG registry** lives on the same service: a per-character "looking for team" flag and, on each live team, its
+The LFG registry lives on the same service: a per-character "looking for team" flag and, on each live team, its
 leader's "looking for members" advert. Both are live state and neither is persisted, for the roster's own reason - a
 team does not outlive the session, and an advert for a connection that has ended is worse than no advert, so a
 disconnect drops the character's flag alongside its matchmaking and group-finder signups. `SearchForTeam` is answered
@@ -400,36 +390,27 @@ bytes, including that an empty result is still retail's exact five.
 `TeamServiceTests` gates the roster transitions (accept/leave/kick/promote/dissolve, and that an accept with no
 pending invite does nothing — the inviter is taken from the server's pending-invite table, not the client's body).
 
-Three requests the client sends around a join get **no reply from retail either** — `SetPassOnLootLevel` (`0x204D`)
-and `RequestNewJoinHasHostileInFriends` (`0x2092`) on the game tier, `TeamSetLootOption` (`0x2006`) on the CS tier.
-Checked against the capture: nothing follows them on the same stream. They are fire-and-forget, so leaving them
-unanswered is retail-faithful; what remains is to APPLY the loot settings rather than only accept them.
-
-Still to do: the trade and friend HANDLERS (the codecs and their byte-exact gates are in place; open work in Gitea
-#101 / #99).
+Two requests the client sends around a join get no reply from retail — `SetPassOnLootLevel` (`0x204D`) and
+`RequestNewJoinHasHostileInFriends` (`0x2092`) on the game tier: nothing follows them on the same stream, so leaving
+them unanswered is retail-faithful. `TeamSetLootOption` (`0x2006`, CS tier) is held on the live team and echoed to
+every member as `DispatchTeamLootOptionChanged` (the same three fields; the echo is not capture-confirmed); nothing
+reads the setting, because the server does not arbitrate loot rolls.
 
 ### Addressing and the header, which is what actually made the invite work
 
-Verified in-client 2026-07-25: invite, accept, leave and kick all work.
+Verified in-client: invite, accept, leave and kick all work.
 
-**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) goes out with a trailing `0x01`,
-the same byte `KeepAliveService`'s `DispatchPong` puts on this interface. It is not a field of its own: method 0x9F
-is >= 128, so `method_instance` needs a second varint group and that group is the byte
-([`02-rpc.md`](../protocol/02-rpc.md) — it is written automatically now, see #610). Retail carries it on both the
-request and the reply (`f682`, `f683`) while the CS-tier invite dispatches carry none — which is why the invite itself
-was always accepted. Without it the client **discards the reply**, and since the reply is what raises the window, the
-symptom is: the client takes the invite, echoes it back in `RequestTeamInvite`, and nothing happens. Replaying
-retail's own captured bytes for both messages changed nothing, which is what finally pointed at the header rather
-than the body.
-
-Nothing here passes that byte any more — `Rpc` derives it from `(receiver class, opcode)` (#609), and it is not a
-per-method quirk at all: the opcode and the tail are one protobuf varint naming the method, and `0x209F` is method
-159, which needs two varint groups (see [`../protocol/02-rpc.md`](../protocol/02-rpc.md)). That is also why the
-`0x01` tail appears on exactly `0x2082`, `0x2092`, `0x209F`, `0x20AC`, `0x20AD`, `0x20C5` and `0x20D0` in this
-capture — all ≥ `0x2080`, none below.
+**The reply's method needs two varint bytes.** `DispatchReplyTeamInvite` is method 159 (`0x209F` in a dump), which is
+≥ 128, so `method_instance` needs a second varint group — the trailing `0x01` a dump shows after the method, the same
+byte `KeepAliveService`'s `DispatchPong` carries on this interface ([`../protocol/02-rpc.md`](../protocol/02-rpc.md)).
+`Rpc` writes the method as a varint, so nothing passes that byte by hand. Retail carries it on both the request and the
+reply (`f682`, `f683`), and it is why the `0x01` tail appears on exactly `0x2082`, `0x2092`, `0x209F`, `0x20AC`,
+`0x20AD`, `0x20C5` and `0x20D0` in this capture — all ≥ `0x2080`, none below. A reply missing it is discarded, and since
+the reply is what raises the window, the symptom is: the client takes the invite, echoes it back in
+`RequestTeamInvite`, and nothing happens — even with a byte-exact body.
 
 
-Every CsPlayerAgent s2c packet is addressed to the **recipient's own** `CSPlayerInterface` instance — its character
+Every CsPlayerAgent s2c packet is addressed to the recipient's own `CSPlayerInterface` instance — its character
 id — and sent from the server object (`CSPlayerAgent`, instance `0x04`). Retail does this on every one: `f678` carries
 the inviter's id, `f680` the target's. A push addressed to instance `0` arrives and is dropped, and the failure is
 quiet in exactly the way that costs time: the invited client received `DispatchTeamInvite`, answered it with
@@ -438,3 +419,5 @@ quiet in exactly the way that costs time: the invited client received `DispatchT
 The game tier's `DispatchReplyTeamInvite` likewise replies from the `GameCharAgent` object (instance `0x10`), not from
 the world sender endpoint the rest of that listener uses — a reply belongs to the interface pair its request arrived
 on.
+
+Open work on team quests tracked in Gitea #101.

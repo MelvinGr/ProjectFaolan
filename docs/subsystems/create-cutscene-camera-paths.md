@@ -1,10 +1,10 @@
-# Create-flow intro cutscenes — camera-path / playfield mechanism (Ghidra, 2026-06-15)
+# Create-flow intro cutscenes — camera-path / playfield mechanism
 
 > Related: `docs/subsystems/create-editor-bursts.md` decodes the create-editor `0x2000` IIR stream itself (framing +
-> record grammars); this doc covers the cutscene/camera-path mechanism layered on top of it. Both feed #189.
+> record grammars); this doc covers the cutscene/camera-path mechanism layered on top of it.
 
 The post-create intro is **two separate cutscenes on two separate playfields**, each on its own
-GameServer connection. This is confirmed across four create captures (editor/world MapChange map ids):
+GameServer connection, confirmed across four create captures (editor/world MapChange map ids):
 
 | Cutscene | Connection | Playfield (MapChange `0x5D85BFC7`) | Arming packet |
 |---|---|---|---|
@@ -14,7 +14,7 @@ GameServer connection. This is confirmed across four create captures (editor/wor
 Captures: hoxxling editor=:7018→4000 / world=:7012→4010; stricken998 create-no-worldenter editor :7030→4000;
 randochar :7016→4000 / :7015→4010; strickenen :7012→4000 / :7013→4010.
 
-## Camera paths are PLAYFIELD-SCOPED (the "invalid camera path" root cause)
+## Camera paths are playfield-scoped (the "invalid camera path" cause)
 
 From `AgeOfConan.exe` (Ghidra, project `tools/ghidra/output`, scripts in `tools/ghidra/`):
 
@@ -27,24 +27,23 @@ From `AgeOfConan.exe` (Ghidra, project `tools/ghidra/output`, scripts in `tools/
   `CameraPathScriptCommand.cpp` (`FUN_013b09b0`).
 
 **Therefore:** the drowning cutscene's `CC_Drowning_*` paths live in **playfield 4000's** camera-path
-resource. They only resolve while the client is in playfield 4000. The historical
-`invalid camera path "CC_Drowning_*"` / `"Kalanthes"` errors were the client being on the **wrong
-playfield** when `InitPath` ran — not a data/animation bug.
+resource. They only resolve while the client is in playfield 4000. An
+`invalid camera path "CC_Drowning_*"` / `"Kalanthes"` error means the client is on the **wrong
+playfield** when `InitPath` runs — not a data/animation bug.
 
-## Our flow already satisfies this
+## Our flow
 
-- `SendRetailCreateEditorInitialBurst` (`CreateFlowService.cs`) sends MapChange → **4000**
-  (`0x0FA0`) on the editor connection — CONSTRUCTED via `PlayfieldFCodec` from
+- `SendRetailCreateEditorInitialBurst` (`CreateEditorBursts.cs`) sends MapChange → **4000**
+  (`0x0FA0`) on the editor connection — constructed via `PlayfieldFCodec` from
   `StartingData.EditorMapId` (= 4000), not a verbatim blob — and `SendRetailCreateEditorCreationScriptBurst`
-  sends the `NEW_character_creation Slave Galley` playorskip on that same connection. So the editor IS on
+  sends the `NEW_character_creation Slave Galley` playorskip on that same connection. So the editor is on
   playfield 4000 with the drowning cutscene armed.
-- The drowning cutscene is **client-autonomous**: in every capture the server sends NO packets between the
+- The drowning cutscene is **client-autonomous**: in every capture the server sends no packets between the
   `playorskip` and the client's `IntroDone` — the client plays the whole drowning sequence itself. Our
   verbatim editor burst (from `create-no-worldenter`) is byte-identical to the cutscene-played captures for
   this stretch, so the delivered data is complete.
 
-This matches the last in-client result (camera + audio correct; no more `invalid camera path`). **The
-camera-path/playfield theory is resolved and is no longer the blocker.**
+In-client, camera and audio are correct and there is no `invalid camera path`.
 
 ## Actor animation is client-side content, not server packets
 
@@ -56,17 +55,14 @@ drowning cutscene is client-autonomous, there is no server directive to add — 
   `"object"` reference identifying which character the cinematic controls. This is the server-driven path
   used by the **Kalanthes** beach cutscene (`ThisIsKalanthes`/`Kneel`), not the autonomous drowning one.
 
-> **Caveat — evidence provenance.** The actor-animation conclusion above comes from earlier in-client
-> sessions (memory `createworld_cutscene_diagnosis`), not the latest `AgeOfConan.log` (2026-06-14 22:51),
-> which is a **failed login** (`Authentication Failure (14)` 4 s after boot), not a create-flow run. Its
-> `1010004:<id> does not exist` lines are **boot-time texture loads**, unrelated to the cutscene manifest —
-> not evidence of a content gap.
+`1010004:<id> does not exist` lines in `AgeOfConan.log` at boot are texture loads, unrelated to the cutscene
+manifest — not evidence of a content gap.
 
 Reproduce the RE: `tools/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
 (`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `tools/ghidra/output` (see
 `tools/ghidra/README.md`).
 
-## An IN-WORLD cutscene: the achievement VISTA (#740)
+## An in-world cutscene: the achievement vista
 
 The create-flow intro is not the only cutscene. Interacting with the right world object plays a camera fly-through
 and awards an achievement, and the whole trigger chain is captured in one 50-second window
@@ -77,13 +73,13 @@ and awards an achievement, and the whole trigger chain is captured in one 50-sec
 | 17:41:03.9 | c2s | `BccIIR` `UseDynel` (0x12) | the player interacts with the object |
 | 17:41:04.0 | s2c | `BccIIR` ack | |
 | 17:41:04.2 | s2c | `SimpleDynelVisualChangeIIR` `object_opened` | the lid opens |
-| 17:41:04.2 | s2c | `BccIIR` `ObjectInteraction` + a `remoteformat` | ⭐ names the mechanism, below |
+| 17:41:04.2 | s2c | `BccIIR` `ObjectInteraction` + a `remoteformat` | names the mechanism, below |
 | 17:41:09.2 | s2c | `MagicBuffIIR` spell `0x4C45` | a buff for the duration of the scene |
-| 17:41:09.2 | s2c | **`GameActionListIIR` type 53260** | ⭐ the cutscene itself, below |
-| 17:41:09.2 | c2s | `CinematicTransition` `…01` | the client says it ENTERED the cinematic |
+| 17:41:09.2 | s2c | **`GameActionListIIR` type 53260** | the cutscene itself, below |
+| 17:41:09.2 | c2s | `CinematicTransition` `…01` | the client says it entered the cinematic |
 | 17:41:10.9 | s2c | `SimpleDynelVisualChangeIIR` `object_closed` | the lid shuts |
 | *…41 s of fly-through…* | | | |
-| 17:41:50.3 | c2s | `CinematicTransition` `…00` | the client says it LEFT |
+| 17:41:50.3 | c2s | `CinematicTransition` `…00` | the client says it left |
 | 17:41:53.1 | s2c | `ScryScriptIIR` `"EndPath"` | |
 | 17:41:54.5 | s2c | `GameActionListIIR` type **53231** | |
 | 17:41:54.8 | s2c | `DispatchAddTag` **716** = *Old Tarantia Docks* | the achievement |
@@ -99,7 +95,7 @@ and awards an achievement, and the whole trigger chain is captured in one 50-sec
   The camera path, its length in seconds, and an RDB reference. That the script is **client-side** is exactly why
   the client reports its own `CinematicTransition` bracket rather than the server driving the camera.
 - **53231 = `e_Type_GC_GameAction_StopScryScript`** closes it (the same body with an empty params string).
-- **53228 = `e_Type_GC_GameAction_VisualLocation`** is what the OBJECT's own handle carries either side.
+- **53228 = `e_Type_GC_GameAction_VisualLocation`** is what the object's own handle carries either side.
 - and the object-action feedback spells the interaction out:
 
   ```
@@ -112,7 +108,7 @@ and awards an achievement, and the whole trigger chain is captured in one 50-sec
 `CinematicTransition` is `[u32 0xC350][u32 player][u8 state]`, `01` entering and `00` leaving; the three in this
 capture bracket the scene exactly.
 
-### What the server sends (#780)
+### What the server sends
 
 Wired end to end, and every record is byte-exact against the capture (`Faolan.Tests/AchievementVistaTests.cs`):
 
@@ -122,8 +118,8 @@ Wired end to end, and every record is byte-exact against the capture (`Faolan.Te
 | " | `BccIIR` `ObjectInteraction`, the 5 s `social_item_accept_2` gesture + the feedback remoteformat | `BehaviorAnimations.PlayerViewVista` |
 | the gesture's blend later | `MagicBuffIIR` apply, **casterless** | `MagicBuffDatas.ApplyNowNoCaster` |
 | " | `GameActionListIIR` **0xD00C** `StartClientSideScryScriptWithParams` | `VistaScryActions.Start` |
-| client says it ENTERED | `SimpleDynelVisualChangeIIR` `SetBaseAnim "object_closed"` | — |
-| client says it LEFT | `ScryScriptIIR "EndPath"`, `GameActionListIIR` **0xCFEF**, the buff's END twin, `DispatchAddTag` | `VistaScryActions.Stop` / `GrantTag` |
+| client says it entered | `SimpleDynelVisualChangeIIR` `SetBaseAnim "object_closed"` | — |
+| client says it left | `ScryScriptIIR "EndPath"`, `GameActionListIIR` **0xCFEF**, the buff's END twin, `DispatchAddTag` | `VistaScryActions.Stop` / `GrantTag` |
 
 Two things about it are worth writing down:
 
@@ -134,8 +130,8 @@ Two things about it are worth writing down:
   alone, with no `ScriptParams` behind it, so reading it as "the start with a zero length prefix" eats two bytes of the
   `ReadSubClass` trailer. The captured pair is 21 and 79 tail bytes.
 
-⚠️ **One row of DATA is proven and only one** (`VistaCatalog`): the camera path, its duration, the scry script, the
-scene buff and the tag are per-object CONTENT, and the corpus holds one instance — the Old Tarantia Docks viewpoint,
+**One row of data is proven and only one** (`VistaCatalog`): the camera path, its duration, the scry script, the
+scene buff and the tag are per-object content, and the corpus holds one instance — the Old Tarantia Docks viewpoint,
 `WorldObjects` 1546994545 on map 2000. Its three RDB ids sit in one contiguous block with its display string (script
 4998682, buff 4998650, display 4998751), which is what a second vista's block would look like; nothing derives one.
-Open work — a second captured vista — tracked in Gitea #780.
+Open work tracked in Gitea #780 (a second captured vista).

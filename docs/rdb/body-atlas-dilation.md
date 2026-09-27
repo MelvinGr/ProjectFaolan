@@ -11,9 +11,9 @@ box-blur the gutter at growing radii, re-pinning the island texels after each pa
 
 ## "Gutter" is the mesh's UV coverage, not a colour test
 
-The dilator originally decided gutter from the pixels themselves: near the sampled background colour **and**
-locally flat, flood-filled inward from the image border. Both guards are needed because the tan background is
-close to tan skin — and both are still not enough, which is what Gitea #294 was opened for.
+A colour test can decide gutter from the pixels themselves: near the sampled background colour **and** locally
+flat, flood-filled inward from the image border. Both guards are needed because the tan background is close to tan
+skin — and both together are still not enough.
 
 `BodyAtlasUvCoverage.TryRasterize` answers the same question from the mesh. A texel a UV triangle covers is
 drawn on the character, so it is skin by definition; a texel no triangle covers is never drawn, so filling it
@@ -25,7 +25,7 @@ Rasterization is deliberately **conservative**: a texel counts as covered if a t
 (centre-inside fill plus the three edges walked), because the two errors are not symmetric. A missed island
 texel gets blurred away and shows; an extra covered texel merely goes unfilled in a region nothing samples.
 
-⚠️ A triangle's UV tile is a property of the **triangle**, not of each corner. Wrapping the three corners
+A triangle's UV tile is a property of the **triangle**, not of each corner. Wrapping the three corners
 independently tears a triangle that straddles a tile boundary into one spanning the whole atlas — visible as
 long straight scars across the mask. All three corners shift by the same whole-tile offset instead.
 
@@ -45,10 +45,9 @@ On the Aquilonian female body (1024×1024 atlas):
 | **heuristic gutter the mesh actually draws** | **24.3%** |
 | heuristic island the mesh never draws | 3.6% |
 
-So the colour test was flattening a quarter of the atlas that the character is textured with. The rendered
-artifact was mild — filling smooth skin with a blur of its own neighbours mostly reproduces it — which is
-exactly why it survived as a "faint residual blotch" rather than looking obviously broken. The mask images make
-it plain: the UV coverage is a clean body unwrap, while the heuristic's island mask is moth-eaten across the
+So the colour test flattens a quarter of the atlas that the character is textured with. The rendered artifact
+is mild — filling smooth skin with a blur of its own neighbours mostly reproduces it — so it reads as a faint
+residual blotch rather than looking obviously broken. The mask images make it plain: the UV coverage is a clean body unwrap, while the heuristic's island mask is moth-eaten across the
 whole torso and upper arms.
 
 The last 3.6% is not a defect: an atlas can carry islands this particular mesh does not use, and the diffuse is

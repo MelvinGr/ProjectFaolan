@@ -9,7 +9,7 @@ Recovered from the client's own log strings - method **names**,
 
 
 - **client->server** = `<Iface>AgentProxy_t::Method(...)`, signature is authoritative (typed params).
-- **server->client** = `<Iface>InterfaceDispatch_t::DispatchMethod()`; `fields` are the param NAMES in
+- **server->client** = `<Iface>InterfaceDispatch_t::DispatchMethod()`; `fields` are the param names in
   wire/read order (from the per-field `stream bad after '<field>'` strings); types aren't in the string.
 
 

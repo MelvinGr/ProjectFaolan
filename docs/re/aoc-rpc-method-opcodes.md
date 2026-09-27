@@ -1,26 +1,43 @@
-# AoC RPC method opcodes — recovered from AgeOfConan.exe (Ghidra, 2026-06-13)
+# AoC RPC method opcodes — recovered from AgeOfConan.exe
 
-Ground-truth RPC method ids, recovered by RE'ing the client. **`wire rendering = 0x2000 + method
-registration index`**, and the registration index is per-interface and contiguous from 0. The base is
-`0x2000` for every interface EXCEPT PlayerAgent/PlayerInterface (see the note at the end).
+Ground-truth RPC method ids, recovered by RE'ing the client. On every interface except PlayerAgent/PlayerInterface
+the method id is the **registration index**, per-interface and contiguous from 0, and a dump renders it as
+`0x2000 + index`. PlayerAgent/PlayerInterface use a derived 32-bit id instead (see the last sections).
 
-> **Live on the wire (2026-07-08):** the Wireshark plugin resolves these names per packet
-> (`faolan.pkt.method`, COL_INFO `GameCharAgent TryLootItem`) via tables generated at build time from
-> the curated C# catalogs in `Faolan.Core/Enums/Opcodes.cs` — that file, not this doc's
-> tables, is the canonical machine-readable form (`Faolan.Wireshark/scripts/gen_opcode_names.py`).
-> Regenerated `*.tshark.json` dumps carry the name as an additive `Method` key.
+The Wireshark plugin resolves these names per packet (`faolan.pkt.method`, COL_INFO `GameCharAgent TryLootItem`)
+via tables generated at build time from the curated C# catalogs in `Faolan.Core/Enums/Opcodes.cs` — that file, not
+this doc's tables, is the canonical machine-readable form (`Faolan.Wireshark/scripts/gen_opcode_names.py`).
+`*.tshark.json` dumps carry the name as a `Method` key.
 
-Recovery method (reproducible — scripts in `tools/ghidra/`):
+Recovery method (scripts in `tools/ghidra/`):
 - **c2s (Agent/Proxy):** each `<Class>AgentProxy_t` constructor registers its methods in order via repeated
   `register(); setName("Method", len)` calls (decompiled from the `"...Proxy_t::called with a too low id!
   min allowed"` constructors). The registration order is identical to the address order of the
-  `"<Class>Proxy_t::<Method>(...) streamed payload of size"` log strings — i.e. **identical to the order
-  already in `aoc-client-rpc-methods.json`**. Confirmed for all 7 c2s interfaces.
+  `"<Class>Proxy_t::<Method>(...) streamed payload of size"` log strings — i.e. **identical to the order in
+  `aoc-client-rpc-methods.json`**. Confirmed for all 7 c2s interfaces.
 - **s2c (Interface/Dispatch):** each `<Class>InterfaceDispatch_t::DispatchMethod(idx)` is a `switch(idx)`;
   case N -> handler N. Each handler references its own `"<Class>Dispatch_t::<Method>() ... stream bad after"`
-  string, giving case->name. **This is the fix for the s2c "drift":** the live build inserts extra
-  dispatch methods (mostly no-arg, so they emit no `stream bad` string and were missing from the string-
-  extracted catalog), which shifted every later method. The switch is the authoritative table.
+  string, giving case->name. The live build has extra dispatch methods beyond the string-extracted catalog (mostly
+  no-arg, so they emit no `stream bad` string), which shift every later method; the switch is the authoritative
+  table.
+- **Names for every method, no-arg ones included:** each interface's dispatch constructor registers
+  `index -> name` for all of its methods as a run of `<slot field> = N ;  <ctor helper>() ;
+  FUN_0040ec10("<Name>", <len>)`:
+
+  | interface | constructor | entries |
+  |---|---|---:|
+  | `CSPlayerInterface` | `FUN_01338690` | 211 |
+  | `GameCharInterface` | `FUN_004BABB0` | 180 |
+  | `GameInterface` | `FUN_004919C0` | 15 |
+  | `GameCharInterfaceProject` | `FUN_00493800` | 16 |
+
+  Find one by taking any method name you already have (`DumpStringXrefs STR=ReplyDebugGetSpellProcData`) — the
+  constructor is the function that references it that is not the dispatcher. The tables carry their own control:
+  on the members named by the `stream bad` strings, **178 of 183** CSPlayerInterface and **157 of 161**
+  GameCharInterface agree exactly with the constructor; the others were behaviour-derived names, and the
+  constructor's are the ones in `Opcodes.cs`. The per-argument assert strings cannot name a no-arg method: they
+  are one per argument, in one address-ordered table in registration order, with nothing between the neighbours
+  of a no-arg gap, and the same names appear in `AgeOfConan.exe`, `AgeOfConan.exe.bak` and `AgeOfConanDX10.exe`.
 
 ## Validation anchors (all match ground truth)
 - c2s GameCharAgent: shop CloseShop/BuyItem/SellItem = 0x2032/33/34; loot TryLootAll/CloseLootBag/
@@ -29,27 +46,30 @@ Recovery method (reproducible — scripts in `tools/ghidra/`):
 - s2c GameCharInterface: DispatchUpdateBindLocation=0x2002, **DispatchUpdateCash=0x2005**, DispatchShopData
   =0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility=0x2052, DispatchPong=0x2082 — all match
   the in-client-verified server behavior.
+- Two corroborations of constructor names from captures: `GameCharInterface 0x1B` = **`TeleportStarted`** — 114
+  frames over 63 captures, each immediately before an `IntendedTeleportIIR` (create world-entry, zone-line doors,
+  revive and ACG teleport alike; we send it from `SendTeleportPending`); `CSPlayerInterface 0x81` =
+  **`PvPMatchMakingRemovedFromMatchMaking`**, the answer to `PvPMatchMakingRemoveFromMatchMaking` (~200 ms after
+  each).
 
-## ⭐ A `<no-arg>` slot IS nameable — through the interface VTABLE (#737, #792)
+## What a no-arg method does: the interface vtable
 
-`<no-arg>` methods have no name in the string catalog because the catalog records a method's ARGUMENT
-signature and these have none. That is a property of the *catalog*, not of the client — the implementation is
-still there, and it is one virtual call away:
+A no-arg method has no argument signature, but its implementation is one virtual call away:
 
 ```
 JMP dword ptr [EAX*4 + <targets>]        the dispatcher's dense switch, indexed by the method id
   -> MOV ECX,[EAX]; MOV ECX,[ECX+0xc]; ADD ECX,EAX; MOV EAX,[ECX]; MOV EDX,[EAX+<slot>]; CALL EDX
 ```
 
-A method WITH arguments reads them off the stream first, so its branch is a long function; a **no-arg method's
+A method with arguments reads them off the stream first, so its branch is a long function; a **no-arg method's
 branch is a bare stub** whose single job is that virtual call. The `[ECX+0xc]` hop is a **vbtable** lookup —
 the call goes through a virtual-base subobject's table, not the primary one, so a naive slot sweep answers about
 the wrong table.
 
-⭐ **`slot = (method id + 1) * 4`** on the GameChar/Game interface family — one leading slot, then one per method
+**`slot = (method id + 1) * 4`** on the GameChar/Game interface family — one leading slot, then one per method
 in id order. Measured on eight GameCharInterface methods (`0x1B`, `0x6A`, `0x6B`, `0x6C`, `0x6D`, `0x71`, `0x72`,
-`0x75`), with the ones that already have names as controls, and on `GameInterface` `0x04`. So any method's client
-implementation is directly addressable from its id.
+`0x75`), with named ones as controls, and on `GameInterface` `0x04`. So any method's client implementation is
+directly addressable from its id.
 
 The implementing class is the one whose override is not empty: `GamecodeClient_t` for GameChar/GameInterface and
 `CSClientIncoming_c` for CSPlayerInterface — `GameCharInterface_t` / `CSPlayerInterface_t` are the empty defaults.
@@ -57,141 +77,65 @@ Recipe: `DisasmFn.java` on the dispatcher for the jump table, `ReadVals.java` on
 `DisasmFn.java` on the stub for the slot, then `DumpVirtualSlotAcrossClasses.java SLOT=<slot> MINSIZE=<slot+8>`
 and `DecompAddrs.java` on the implementing class's override.
 
-⚠️ **An EMPTY override is an answer, not a failure.** `GameCharInterface 0x1B` — 102 frames across 59 of 132
-captures, sent immediately before every `IntendedTeleportIIR` — resolves to an empty `GamecodeClient_t` override,
-so the client does nothing with it and the zone-change handshake is not missing a step.
+**An empty override is an answer, not a failure.** `GameCharInterface 0x1B` (`TeleportStarted`) resolves to an
+empty `GamecodeClient_t` override, so the client does nothing with it and the zone-change handshake is not missing
+a step.
 
-⚠️ **And read the DISASSEMBLY, not the decompilation, on a one-line override.** `CSPlayerInterface` `0xC3`
-(+0x310) and `0xC8` (+0x324) decompile to the identical two-line body — `FUN_005385e0(); FUN_00443c70();` — and
-were written off as indistinguishable on that basis. They are not: the decompiler drops the `LEA ECX` that
-selects WHICH signal is fired, and the two fire different ones (`instance+0x7c` vs `instance+0x84`) off the
-`CSIncoming.cpp` singleton. `FUN_005385e0` is only its `s_pcInstance != NULL` accessor and `FUN_00443c70` the
-generic signal-emit loop, so on those two functions the whole difference sits in the dropped instruction.
+**Read the disassembly, not the decompilation, on a one-line override.** `CSPlayerInterface` `0xC3` (+0x310) and
+`0xC8` (+0x324) decompile to the identical two-line body — `FUN_005385e0(); FUN_00443c70();` — but the decompiler
+drops the `LEA ECX` that selects which signal is fired, and the two fire different ones (`instance+0x7c` vs
+`instance+0x84`) off the `CSIncoming.cpp` singleton. `FUN_005385e0` is only its `s_pcInstance != NULL` accessor
+and `FUN_00443c70` the generic signal-emit loop.
 
-## ⭐ …and the SUBSCRIBER names it — through the Scaleform signal table (#801)
+A no-arg override usually says something the cheap way: 25 of the 28 CSPlayerInterface no-arg slots push a
+feedback token by address — `DumpVtableBodies VT=1fa4524` over `CSClientIncoming_c`, then `DumpStringsAt` on the
+`0x1FAxxxx` pointer each body carries. 19 of those 25 match the constructor's name exactly; the other 6 are the
+token the method raises rather than the method's own name (`0xAC` raises `SomeoneBoughtYouritem` and is called
+`ItemSoldNotification`). So the token names the behaviour reliably and the method only usually. Check this route on
+each slot separately: `0xC7`'s override is 400 bytes that fetch an LDB category-100 token and draw it
+(`PUSH 0x64; MOV ESI,0x1fa406c` = `VoteRetreatStarted`), then arm the vote's timer, even though its neighbours
+`0xC3`/`0xC8` are signal-only stubs.
 
-An override that only fires a signal has said what it *does* nowhere; the meaning is in the GUI code that
-subscribed. Two steps, both mechanical:
+### A signal-only override: the subscriber names it
+
+An override that only fires a signal says what it does nowhere; the meaning is in the GUI code that subscribed.
 
 1. **Map every method to its signal field.** `DumpVtableBodies.java VT=<vtable base> FROM= TO=` dumps each slot's
    body (following the `SUB ECX,[ECX-4]; JMP` adjustor thunk), and `LEA ECX,[EAX + <off>]` after the singleton
-   getter IS the field. For `CSClientIncoming_c` (vtable `0x01fa4524`, `slot = (id + 1) * 4`) that gives the whole
+   getter is the field. For `CSClientIncoming_c` (vtable `0x01fa4524`, `slot = (id + 1) * 4`) that gives the whole
    group-finder block: `0xC2`→`+0x78`, `0xC3`→`+0x7c`, `0xC4`→`+0x80`, `0xC8`→`+0x84`, `0xC5`→`+0x88`, … up to
    `0xD0`→`+0xac`. `DumpSignalSlots.java` prints the same map one line per slot.
-2. **Find the subscriber, and read the name it registered.** ⚠️ Sweeping the singleton's own xrefs finds nothing —
-   the subscriber calls the getter ONCE and keeps the pointer in a register, so the `+0x7c` never appears near a
-   getter call. Sweep the getter's CALLERS instead (`Callers.java FN=5385e0`): `FUN_014ecd80` is the group-finder
+2. **Find the subscriber, and read the name it registered.** Sweeping the singleton's own xrefs finds nothing —
+   the subscriber calls the getter once and keeps the pointer in a register, so the `+0x7c` never appears near a
+   getter call. Sweep the getter's callers instead (`Callers.java FN=5385e0`): `FUN_014ecd80` is the group-finder
    GUI's connect block, `CALL <getter>; MOV ESI,EAX` then `LEA EAX,[ESI + <off>]; … PUSH <handler>; CALL <connect>`
-   once per signal — **including both of the two that had no name**.
+   once per signal.
 
-The handlers then name themselves, because the client's UI is **Scaleform/ActionScript** and every signal it
-raises is registered by NAME. `FUN_014ebb80` / `FUN_014ebcc0` / `FUN_014ebe40` are the group finder's registration
-fragments: `MOV [<record>],<name string>; MOV [<record>+4],EAX`. **The signal object sits 8 bytes BEFORE its name
+The handlers name themselves, because the client's UI is **Scaleform/ActionScript** and every signal it raises is
+registered by name. `FUN_014ebb80` / `FUN_014ebcc0` / `FUN_014ebe40` are the group finder's registration
+fragments: `MOV [<record>],<name string>; MOV [<record>+4],EAX`. **The signal object sits 8 bytes before its name
 record** — a record is `{ SignalTarget vtable(4), list head(4), name(4), target(4) }` and the emit
 (`FUN_00b51820`) reads its `this + 0xC`, which is that same record's target field. Controls that pin the −8 and
 would all shift one entry under +8: `DispatchGroupFinderRemoved` → `SignalClientLeftGroupFinder`,
 `DispatchGroupFinderReadyCheckRejected` → `SignalGroupFinderReadyCheckRejected`,
 `DispatchGroupFinderFeaturedRaidNeededRoleUpdated` → `SignalGroupFinderFeaturedRaidNeededRoleUpdated`.
 
-So:
-
 | method | signal | handler | what it does | name |
 |---|---|---|---|---|
-| `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderSelectRoles` (ours — the window's, not the catalog's) |
+| `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderSelectRoles` |
 | `0xC8` | `+0x84` | `FUN_014f07c0` | sets the "in an activity" flag `DAT_0297d14d` and raises `SignalClientStartedGroupFinderActivity` | `DispatchGroupFinderStartActivity` |
 
-⚠️ **And the third `Reserved` in the same block did NOT need any of this.** `0xC7`'s override is not a signal-only
-stub at all — 400 bytes that fetch an LDB **category-100** token and draw it (`PUSH 0x64; MOV ESI,0x1fa406c` =
-`VoteRetreatStarted`), then arm the vote's timer. That is the ORDINARY route from #737/#792, and it was never
-tried on `0xC7` because `0xC3`/`0xC8` sitting either side of it made the whole block look like one problem.
-Sweeping every `Reserved*` slot of this interface for the same `PUSH 0x64` + token shape finds only this one, so
-the remaining `Reserved` members really do put nothing on screen — **check the cheap route on each slot
-separately before concluding a block needs the expensive one.**
+Both agree with where the two sit in the capture: `0xC3` between a successful `QueueGroupFinder` and the client's
+`SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTeam`. A control from the same block:
+`0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
+`groupFinder_readyPrompt`, matching its name.
 
-Both readings agree with where the two sit in the capture: `0xC3` between a successful `QueueGroupFinder` and the
-client's `SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTeam`. A control from the same
-block: `0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
-`groupFinder_readyPrompt` — the name it already had, reproduced by the same read.
-
-### ⭐⭐ …and then the DISPATCH CONSTRUCTOR named every one of them (#876, closed 2026-08-22)
-
-**`Opcodes.cs` now carries no `Reserved0xNN` at all.** Every no-arg slot on all four s2c interfaces is named, in
-the client's own words, and the census below turned out to be bounding the wrong route.
-
-The assert-string route really is one-per-ARGUMENT and really does skip a no-arg method — everything the section
-below measures is correct. It was simply **the wrong table**. Each interface's dispatch CONSTRUCTOR registers
-`index -> name` for all of its methods, no-arg ones included, as a run of
-
-```
-<slot field> = N ;  <ctor helper>() ;  FUN_0040ec10("<Name>", <len>)
-```
-
-| interface | constructor | entries |
-|---|---|---:|
-| `CSPlayerInterface` | `FUN_01338690` | 211 |
-| `GameCharInterface` | `FUN_004BABB0` | 180 |
-| `GameInterface` | `FUN_004919C0` | 15 |
-| `GameCharInterfaceProject` | `FUN_00493800` | 16 |
-
-Find one by taking any method name you already have (`DumpStringXrefs STR=ReplyDebugGetSpellProcData`) — the
-constructor is the function that references it that is not the dispatcher.
-
-⭐ **The tables carry their own control.** On the members that already had names, **178 of 183** CSPlayerInterface
-and **157 of 161** GameCharInterface agree exactly with the constructor. The few that differed were ours-by-
-behaviour and have been replaced by the client's — including the three group-finder slots the signal-subscriber
-route named (`DispatchGroupFinderRoleSelect` → `DispatchGroupFinderSelectRoles`, `DispatchVoteRetreatStarted` →
-`DispatchGroupFinderVoteRetreatStarted`, `DispatchGroupFinderActivityStarted` → `DispatchGroupFinderStartActivity`),
-which is the same answer arrived at twice. One was a genuine **mis-assignment**: `GameInterface` 0x0E was carrying
-`ClearKnownRecipes`, which is `GameCharInterface`'s 0x0E; this slot is `Kicked`.
-
-⭐ Two independent corroborations of the recovered names, from opposite directions:
-
-* `GameCharInterface 0x1B` = **`TeleportStarted`**, which is exactly what the corpus said it was without a name —
-  114 frames, each immediately before an `IntendedTeleportIIR`.
-* `CSPlayerInterface 0x81` = **`PvPMatchMakingRemovedFromMatchMaking`**, which is what we were already sending it
-  as: the answer to `PvPMatchMakingRemoveFromMatchMaking`.
-
-⚠️ **A cheaper half-route, worth knowing because it works without the constructor**: a no-arg override still has
-to SAY something, and 25 of the 28 CSPlayerInterface slots push a FEEDBACK TOKEN by address — `DumpVtableBodies
-VT=1fa4524` over `CSClientIncoming_c`, then `DumpStringsAt` on the `0x1FAxxxx` pointer each body carries. 19 of
-those 25 matched the constructor's name exactly; the other 6 were the token the method RAISES rather than the
-method's own name (`0xAC` raises `SomeoneBoughtYouritem` and is called `ItemSoldNotification`). So the token names
-the BEHAVIOUR reliably and the method only usually — use the constructor when you can.
-
-### Which `Reserved` slots are worth the vtable route — the census, and the route that is exhausted
-
-⛔ **Superseded by the section above** — kept because its measurements are sound and its reasoning about the
-assert-string table is still the reason that table cannot answer this. The counts below predate the naming.
-
-
-`Opcodes.cs` carries **55** `Reserved0xNN` members. Two facts bound the work (Gitea #876, measured 2026-08-21):
-
-**Only 2 of the 55 appear in the corpus at all** (`--report method-census`), and both are already named by
-BEHAVIOUR rather than by a recovered string:
-
-| slot | frames / captures | body | what the corpus says it is |
-|---|---:|---|---|
-| `GameCharInterface 0x1B` | 114 / 63 | empty | the next s2c frame is an `IntendedTeleportIIR` **114 times with no exceptions** — create world-entry, zone-line doors, revive and ACG teleport alike. The client's handler is an EMPTY function, so it is a no-op on the receiving end; we send it from `SendTeleportPending` for byte-stream fidelity. |
-| `CSPlayerInterface 0x81` | 4 / 1 | empty | the answer to `PvPMatchMakingRemoveFromMatchMaking` — 4 sends for that capture's 4 removals, ~200 ms after each (#882). |
-
-The other 53 have **zero** frames, so nothing can be checked against a capture and only static RE can name them.
-
-**And the string route is exhausted, which is now measured rather than assumed.** The client's only per-method
-strings are the `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors — one per
-ARGUMENT, so a no-arg method emits none. They sit in one address-ordered table that runs in registration-index
-order, and dumping the window across a known gap (`DispatchGuildNotEnoughCash` 0x03 → `DispatchUpdateCash` 0x05,
-i.e. across `DispatchGuildErrorWithTransfer`) shows the two neighbours and **nothing between them**. The same 157 GameCharInterface
-and 178 CSPlayerInterface names appear in `AgeOfConan.exe`, `AgeOfConan.exe.bak` and `AgeOfConanDX10.exe`, so
-there is no second build to diff either. Naming one of these needs its dispatcher case, and only where the
-overriding function is not empty — which for `0x1B`, the one with real traffic, it is.
-
-One thing the same sweep did find: diffing every enum member against the client's own spelling turned up exactly
-one mismatch, `DispatchUpdateSprintBar` where the client writes **`DispatchUpdateSprintbar`**
-(`(energyValue, forceUpdate)`). Corrected.
+The client's own spelling is authoritative for every member: e.g. **`DispatchUpdateSprintbar`**
+(`(energyValue, forceUpdate)`), lower-case `b`.
 
 ## s2c (server->client) tables
-`<no-arg>` = an inserted method with no body fields (no `stream bad` string); its opcode slot is known
-but its name is not recoverable FROM STRINGS (catalog also missed it) — see the vtable route above.
+`(no-arg)` marks a method with no body fields (no `stream bad` string), absent from the string-extracted catalog;
+its name comes from the interface's dispatch constructor (see above).
 
 ### UniverseInterface — 6 methods (catalog had 6; +0 inserted)
 ```
@@ -208,8 +152,8 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2000  DispatchPassBlob
 0x2001  DispatchAckAuthenticate
 0x2002  DispatchRedirectToServer
-0x2003  <no-arg>
-0x2004  DispatchQuitGame   (#792: GameInterface_t::OnQuitGame)
+0x2003  DispatchOnDisconnectGame  (no-arg)
+0x2004  DispatchQuitGame   (GameInterface_t::OnQuitGame)
 0x2005  DispatchPong
 0x2006  DispatchPongWithPacketTiming
 0x2007  DispatchInfoToUser
@@ -219,7 +163,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x200B  DispatchReportDimesionID
 0x200C  DispatchReportServerID
 0x200D  DispatchDataSink
-0x200E  <no-arg>
+0x200E  DispatchKicked  (no-arg)
 0x200F  DispatchDisplayPlayfieldAccessPopup
 ```
 
@@ -227,7 +171,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 ```
 0x2000  DispatchUpdateAggroStatus
 0x2001  DispatchGuildBankData
-0x2002  <no-arg>
+0x2002  DispatchGuildBankReply  (no-arg)
 0x2003  DispatchRequestApprentice
 0x2004  DispatchAddApprenticeEntry
 0x2005  DispatchRemoveApprenticeEntry
@@ -246,7 +190,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 ### TradepostInterface — 8 methods (catalog had 7; +1 inserted)
 ```
 0x2000  DispatchOpenTradepost
-0x2001  DispatchClose        (inserted slot; name later recovered from the TradepostInterface dispatch RE)
+0x2001  DispatchClose        (no-arg)
 0x2002  DispatchMailMessage
 0x2003  DispatchSendMailResult
 0x2004  DispatchRetrieveMailResult
@@ -261,7 +205,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2001  DispatchUpdateName
 0x2002  DispatchUpdateBindLocation
 0x2003  DispatchGuildNotEnoughCash
-0x2004  <no-arg>
+0x2004  DispatchGuildErrorWithTransfer  (no-arg)
 0x2005  DispatchUpdateCash
 0x2006  DispatchUpdateCashRepository
 0x2007  DispatchMoveInventoryItemToOrFromGuildBank
@@ -269,14 +213,14 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2009  DispatchChangeItemStackSize
 0x200A  DispatchLearnSpell
 0x200B  DispatchForgetSpell
-0x200C  <no-arg>
+0x200C  DispatchSpellInterrupted  (no-arg)
 0x200D  DispatchTradeskillComplete
-0x200E  <no-arg>
+0x200E  DispatchClearKnownRecipes  (no-arg)
 0x200F  DispatchClearRecipe
 0x2010  DispatchRemoveRecipesByGroupClient
 0x2011  DispatchUntrainSingleFeat
 0x2012  DispatchDisplayItemLootChatMessage
-0x2013  <no-arg>
+0x2013  DispatchItemMovedToOverflowBag  (no-arg)
 0x2014  DispatchSendNPCAutoTradeCashAmount
 0x2015  DispatchSetDialogueCamera
 0x2016  DispatchAddTag
@@ -284,7 +228,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2018  DispatchResurrectRequest
 0x2019  DispatchSetDbDebugCategory
 0x201A  DispatchSetDbDebugLevel
-0x201B  <no-arg>  (#792: resolved - GamecodeClient_t's override of vtable +0x70 is EMPTY, a client no-op)
+0x201B  DispatchTeleportStarted  (no-arg)
 0x201C  DispatchSetItemStat
 0x201D  DispatchAddToItemSlot
 0x201E  DispatchRemoveFromItemSlot
@@ -294,7 +238,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2022  DispatchMoveInventoryItemFromGuildBank
 0x2023  DispatchCharacterNameReply
 0x2024  DispatchValidResurrectionSpots
-0x2025  <no-arg>
+0x2025  DispatchToggleSpellRecharge  (no-arg)
 0x2026  DispatchReplyPCDebugData
 0x2027  DispatchReplyLootForCharacter
 0x2028  DispatchReplyLootForCharacterAddHash
@@ -306,7 +250,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x202E  DispatchFormationClaimPosition
 0x202F  DispatchFormationUpdatePosition
 0x2030  DispatchFormationClearPosition
-0x2031  <no-arg>
+0x2031  DispatchFormationClear  (no-arg)
 0x2032  DispatchFormationUpdatePosRot
 0x2033  DispatchShopData
 0x2034  DispatchCloseShop
@@ -338,7 +282,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x204E  DispatchLockTemplate
 0x204F  DispatchApplyFactionRank
 0x2050  DispatchApplyFactionPoints
-0x2051  <no-arg>
+0x2051  DispatchRequestResetStanding  (no-arg)
 0x2052  DispatchAddSpecialAbility
 0x2053  DispatchRemoveSpecialAbility
 0x2054  DispatchPerformSpecialAction
@@ -346,7 +290,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2056  DispatchACGTeleportChoice
 0x2057  DispatchACGSelfInstanceCleared
 0x2058  DispatchACGTeamBindChanged
-0x2059  <no-arg>
+0x2059  DispatchACGTeleportCloseChoice  (no-arg)
 0x205A  DispatchOverrideJumpHeight
 0x205B  DispatchOverrideJumpSpeed
 0x205C  DispatchVisualSimulateNpc
@@ -371,14 +315,14 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x206F  DispatchTradePartnerAddedItem
 0x2070  DispatchTradeAddedItem
 0x2071  DispatchClientNoLongerAcceptedTrade
-0x2072  <no-arg>
+0x2072  DispatchPartnerNoLongerAcceptedTrade  (no-arg)
 0x2073  DispatchTradePartnerRemovedItem
 0x2074  DispatchTradeRemovedItem
 0x2075  DispatchDeleteCachedLDBData
 0x2076  DispatchShortcutBarReply
-0x2077  <no-arg>
-0x2078  <no-arg>
-0x2079  <no-arg>
+0x2077  DispatchShortcutBarValidate  (no-arg)
+0x2078  DispatchEnableAutotrain  (no-arg)
+0x2079  DispatchDisableAutotrain  (no-arg)
 0x207A  DispatchAddWayPoint
 0x207B  DispatchRemoveWayPoint
 0x207C  DispatchReplyWaveRespawnTimerUpdate
@@ -391,10 +335,10 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2083  DispatchUpdateTeamMemberPosList
 0x2084  DispatchDynamicSpaceDebugInfo
 0x2085  DispatchSetGameTweakValue
-0x2086  <no-arg>
+0x2086  DispatchReloadGameTweakValues  (no-arg)
 0x2087  DispatchMinigameScoreChanged
 0x2088  DispatchMinigameFullScore
-0x2089  <no-arg>
+0x2089  DispatchMinigameMatchPrepareStarted  (no-arg)
 0x208A  DispatchMinigameMatchStarted
 0x208B  DispatchMinigameMatchEnded
 0x208C  DispatchMinigameCaptureZoneUpdate
@@ -403,13 +347,13 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x208F  DispatchForceStopMinigame
 0x2090  DispatchSetMinigameTime
 0x2091  DispatchMinigameStartsInXSeconds
-0x2092  <no-arg>
+0x2092  DispatchPreMinigameStartsInXSeconds  (no-arg)
 0x2093  DispatchMassivePvPFullScoreUpdate
 0x2094  DispatchMassivePvPGuildScoreUpdate
 0x2095  DispatchMassivePvPPlayerScoreUpdate
 0x2096  DispatchMassivePvPScoreNames
-0x2097  <no-arg>
-0x2098  <no-arg>
+0x2097  DispatchMassivePvPLeftBattleArea  (no-arg)
+0x2098  DispatchMassivePvPEnteredBattleArea  (no-arg)
 0x2099  DispatchShowVulnerabilityWindowGui
 0x209A  DispatchPassiveAbilityEquip
 0x209B  DispatchPassiveAbilityUnequip
@@ -418,7 +362,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x209E  DispatchEnterExitGamingRoom
 0x209F  DispatchReplyTeamInvite
 0x20A0  DispatchReplyNewJoinHasHostileInFriends
-0x20A1  <no-arg>
+0x20A1  DispatchKickedByGM  (no-arg)
 0x20A2  DispatchReplyItemForCashSaleSetData
 0x20A3  DispatchReplyItemForCashSaleUpdateData
 0x20A4  DispatchItemSaleResult
@@ -475,7 +419,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x201E  DispatchTeamSummonRequestFailedInvalidPF
 0x201F  DispatchTeamSummonRequestFailedAlreadyInSameInstance
 0x2020  DispatchWarningTeamSizeTooLarge
-0x2021  <no-arg>
+0x2021  DispatchTeamIsFull  (no-arg)
 0x2022  DispatchYouGotKickedFromTeam
 0x2023  DispatchVoteKickStarted
 0x2024  DispatchVoteKickFailed
@@ -485,9 +429,9 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2028  DispatchDeleteCanceledMail
 0x2029  DispatchDeleteCanceledMailItem
 0x202A  DispatchGuildInvite
-0x202B  <no-arg>
-0x202C  <no-arg>
-0x202D  <no-arg>
+0x202B  DispatchGuildKick  (no-arg)
+0x202C  DispatchGuildDisbanded  (no-arg)
+0x202D  DispatchGuildLeave  (no-arg)
 0x202E  DispatchGuildMemberLeft
 0x202F  DispatchGuildMemberJoined
 0x2030  DispatchGuildMemberUpdate
@@ -495,7 +439,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2032  DispatchGuildGMPromoteFeedback
 0x2033  DispatchGuildGMDemoteFeedback
 0x2034  DispatchGuildInviteNoSuchName
-0x2035  <no-arg>
+0x2035  DispatchGuildInviteTargetOffline  (no-arg)
 0x2036  DispatchGuildPvPPointInfo
 0x2037  DispatchGuildRenownInfo
 0x2038  DispatchGuildRankingsUpdate
@@ -512,25 +456,25 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2043  DispatchGuildUpdateOther
 0x2044  DispatchGuildCreated
 0x2045  DispatchGuildNonAlphanumericName
-0x2046  <no-arg>
-0x2047  <no-arg>
+0x2046  DispatchGuildWrongLengthName  (no-arg)
+0x2047  DispatchGuildTakenName  (no-arg)
 0x2048  DispatchGuildBadName
 0x2049  DispatchGuildNameWaitTime
-0x204A  <no-arg>
-0x204B  <no-arg>
-0x204C  <no-arg>
-0x204D  <no-arg>
+0x204A  DispatchGuildCurrentlyInGuild  (no-arg)
+0x204B  DispatchGuildLevelRequirementFailed  (no-arg)
+0x204C  DispatchGuildStandingInvitation  (no-arg)
+0x204D  DispatchGuildAlreadyGuilded  (no-arg)
 0x204E  DispatchGuildOnInviteCooldown
-0x204F  <no-arg>
+0x204F  DispatchGuildCantDemote  (no-arg)
 0x2050  DispatchGuildTaxError
 0x2051  DispatchGuildInvalidGoverningForm
 0x2052  DispatchGuildUpdateCash
-0x2053  <no-arg>
+0x2053  DispatchSubscriptionRequirementFailed  (no-arg)
 0x2054  DispatchGuildTaxChanged
 0x2055  DispatchGuildGoverningFormChanged
 0x2056  DispatchGuildRecruitmentModeChanged
 0x2057  DispatchGuildMessageOfTheDayChanged
-0x2058  <no-arg>
+0x2058  DispatchGuildDescriptionChanged  (no-arg)
 0x2059  DispatchGuildNameChanged
 0x205A  DispatchGMGuildNameChanged
 0x205B  DispatchGuildMemberList
@@ -545,20 +489,20 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2064  DispatchRemoveGuildFeat
 0x2065  DispatchGuildRankChanged
 0x2066  DispatchGuildApplicationRequest
-0x2067  <no-arg>
+0x2067  DispatchGuildNoInvitersOnline  (no-arg)
 0x2068  DispatchGuildApplicationRejected
 0x2069  DispatchGuildMergeRequest
 0x206A  DispatchGuildMergeRequestFailed
 0x206B  DispatchGuildCityBooked
 0x206C  DispatchGuildCityBookingFailed
 0x206D  DispatchNewVulnerabilityWindowData
-0x206E  <no-arg>
+0x206E  DispatchGuildCityReachedTier3  (no-arg)
 0x206F  DispatchGuildIsMassivePvPCityOwner
 0x2070  DispatchGuildIsMassivePvPCityAttacker
 0x2071  DispatchFeedbackMessage
 0x2072  DispatchRequestBattleKeepInformation
 0x2073  DispatchGMReplyGuildInfoFromChar
-0x2074  <no-arg>
+0x2074  DispatchGMReplyNoGuildInfoFromChar  (no-arg)
 0x2075  DispatchPvPMatchMakingWantsToStart
 0x2076  DispatchPvPMatchMakingPlayerJoined
 0x2077  DispatchPvPMatchMakingPlayerChangedSide
@@ -566,28 +510,28 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2079  DispatchPvPMatchMakingPlayerKicked
 0x207A  DispatchPvPMatchMakingErrorCode
 0x207B  DispatchPvPMatchMakingYouJoinedMatch
-0x207C  <no-arg>
+0x207C  DispatchPvPMatchMakingMatchRemoved  (no-arg)
 0x207D  DispatchPvPMatchMakingMatchInfo
 0x207E  DispatchPvPMatchMakingSearchResult
 0x207F  DispatchPvPMatchMakingStartClicked
 0x2080  DispatchPvPMatchMakingYouAreInMatchMaking
-0x2081  <no-arg>
-0x2082  <no-arg>
+0x2081  DispatchPvPMatchMakingRemovedFromMatchMaking  (no-arg)
+0x2082  DispatchPvPMatchMakingCowardRemovedFromMatchMaking  (no-arg)
 0x2083  DispatchPvPMatchMakingMatchSay
 0x2084  DispatchPvPMatchMakingCollectingMorePlayers
 0x2085  DispatchPvPMatchMakingNewMatchLeader
 0x2086  DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking
-0x2087  <no-arg>
-0x2088  <no-arg>
+0x2087  DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier  (no-arg)
+0x2088  DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader  (no-arg)
 0x2089  DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide
 0x208A  DispatchPvPMatchMakingCantLockToSideMustPickASideFirst
 0x208B  DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide
 0x208C  DispatchPvPMatchMakingCharacterNowLockedToSide
 0x208D  DispatchPvPMatchMakingCharacterNoLongerLockedToSide
-0x208E  <no-arg>
-0x208F  <no-arg>
-0x2090  <no-arg>
-0x2091  <no-arg>
+0x208E  DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch  (no-arg)
+0x208F  DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier  (no-arg)
+0x2090  DispatchPvPMatchMakingTeamJoined  (no-arg)
+0x2091  DispatchPvPMatchMakingRaidJoined  (no-arg)
 0x2092  DispatchPvPMatchMakingInfoRequestReturn
 0x2093  DispatchYouJoinedRaid
 0x2094  DispatchRaidTeamJoined
@@ -603,9 +547,9 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x209E  DispatchRaidInvitationTimedOut
 0x209F  DispatchRaidTargetDeclinedRaidInvite
 0x20A0  DispatchRaidYouAreNoLongerInvited
-0x20A1  <no-arg>
+0x20A1  DispatchRaidYouWereKickedFromRaid  (no-arg)
 0x20A2  DispatchRaidCantInviteInvalidSubscriptionFlags
-0x20A3  <no-arg>
+0x20A3  DispatchRaidCantJoinInvalidSubscriptionFlags  (no-arg)
 0x20A4  DispatchRaidCantCreateInvalidMemberSubscriptionFlags
 0x20A5  DispatchMassivePvpInfoRequestReturn
 0x20A6  DispatchMassivePvPBattleQueueFeedback
@@ -614,7 +558,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20A9  DispatchBattleKeepInfoRequestReturnPhase1And2
 0x20AA  DispatchBattleKeepInfoRequestReturnPhase3And4
 0x20AB  DispatchYouGotMailNotification
-0x20AC  <no-arg>
+0x20AC  DispatchItemSoldNotification  (no-arg)
 0x20AD  DispatchDebugFullGameServerList
 0x20AE  DispatchDebugGameServerConnected
 0x20AF  DispatchDebugGameServerDisconnected
@@ -634,15 +578,15 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20BD  DispatchDebugRemoveIDFromMatchMaking
 0x20BE  DispatchItemSalesUpdateBalance
 0x20BF  DispatchItemSalesCoupons
-0x20C0  <no-arg>
+0x20C0  DispatchItemSalesReportNoConnectionToBillingServer  (no-arg)
 0x20C1  DispatchCSFeedback
 0x20C2  DispatchGroupFinderSignupFailed
-0x20C3  <no-arg>  (#801: resolved - opens `groupFinder_roleSelect`; `DispatchGroupFinderSelectRoles`)
+0x20C3  DispatchGroupFinderSelectRoles  (no-arg)
 0x20C4  DispatchGroupFinderSignupSuccess
 0x20C5  DispatchGroupFinderRemoved
 0x20C6  DispatchGroupFinderReadyCheck
-0x20C7  <no-arg>  (#801: resolved - its handler puts the LDB-100 token `VoteRetreatStarted` on screen; `DispatchGroupFinderVoteRetreatStarted`)
-0x20C8  <no-arg>  (#801: resolved - raises `SignalClientStartedGroupFinderActivity`; `DispatchGroupFinderStartActivity`)
+0x20C7  DispatchGroupFinderVoteRetreatStarted  (no-arg)
+0x20C8  DispatchGroupFinderStartActivity  (no-arg)
 0x20C9  DispatchGroupFinderReadyCheckStatus
 0x20CA  DispatchGroupFinderReadyCheckRejected
 0x20CB  DispatchGroupFinderPlayfieldInfo
@@ -655,135 +599,56 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20D2  DispatchInvalidWorldStat
 ```
 
-### PlayerInterface / PlayerAgent — DIFFERENT dispatch scheme (hash id ON THE WIRE), #320
+## PlayerAgent / PlayerInterface: a different dispatch scheme
 
-**Corrected 2026-07 (verified against the wire + Ghidra; supersedes the earlier "hash not recovered" note).**
+The header carries one id, `method_instance` (a varint), as on every interface — but here it is long because the
+constant behind it is a 32-bit registration value rather than a small index. The server writes it the same way
+(e.g. `AuthenticateAck` = `[0x93,0x86,0xee,0x05]`). The client dispatches on that id, never on the two bytes a
+dump renders.
 
-Unlike every other interface, PlayerAgent/PlayerInterface looked like it carried **two** ids in its header:
-`[endpoints][u16 opcode][u32 method-id]`, with that trailing `u32` **empty for all 16 other interfaces** and present
-only here. ⚠️ Superseded by #610: the header carries ONE id, `method_instance` (a varint), and the "two" were that
-varint cut after its first group — long here because these constants are 32-bit hashes rather than small indices. Confirmed on all 13 PlayerAgent/PlayerInterface packets (both
-directions) of `Barbarian-login` — e.g. EnterWorld = opcode `0x20B6` + id `0xDD85FB0E`; RequestSmallCharList =
-`0x20C1` + `0xDAD1D206`. The server already emits it (`WriteHeader(..., InitAuth, [0x93,0x86,0xee,0x05])` =
-`0x9386ee05`). So the `//0x…`-style comments in `Opcodes.cs` are the **wire** id, not a client-internal value.
-The two bytes a dump shows are the usual `0x2000 + first varint group` (readings 0x2083..0x20EF) carried alongside; the client dispatches
-on the 32-bit id.
+- **c2s:** the `PlayerAgentProxy_t` constructor (`FUN_00493c40`) registers all **25** methods as
+  `key = 0x…; register(); setName("Method", len)`. `register` (`FUN_00487900`) inserts the method into a **binary
+  tree keyed by that constant**, and each proxy method passes its constant to `rpc::Proxy_t::SendMethodInvocation`
+  (`FUN_0046c910`), which builds the `RpcHeader`. The proxy send itself only marshals params
+  (`DumpPlayerAgentProxy.java`).
+- **s2c:** `PlayerInterfaceDispatch_t::DispatchMethod` (`FUN_00484270`) is a binary-search tree over the 32-bit
+  constants (`DumpDispatch.java` + `DumpHandlerNames.java`). It gates on an is-authenticated flag and errors
+  `"not possible before being authenticated"` otherwise; the login methods are dispatched by a separate pre-auth
+  path.
+- **Neither the constants nor the wire ids are plain name hashes**: 25 clean name→constant anchors tested against
+  crc32 / djb2(±xor) / sdbm / fnv1(a) / jenkins / oat / elf / bkdr (11 seeds) × 5 string forms give zero matches.
+- **Live cross-check:** hooking `SendMethodInvocation` (`0x0046C910`) with Frida during a real login
+  (`tools/frida/`) logs each call's constant, and correlating by send order with a simultaneous capture gives the
+  wire id per method. For PlayerAgent the hook sees the 32-bit constant, for the other interfaces the small
+  method index. The seven login c2s methods (`Authenticate`, `GetStartupData`, `FinishGetStartupData`,
+  `LoadFacebookToken`, `VerifyLanguageSetting`, `LoginCharacter`, `ReceivedCharacterSettings`) all match the
+  tables below.
 
-**s2c POST-AUTH table recovered** (`PlayerInterfaceDispatch_t::DispatchMethod` = `FUN_00484270`, a binary-search
-tree over 32-bit constants; `DumpDispatch.java` + `DumpHandlerNames.java`). 26 methods, e.g. `0x5DC18991`
-DispatchAuthenticateAck, `0xA7C86A29` DispatchSetStats, `0xF899B14C` DispatchSetDimensionList. Full table:
-`$FAOLAN_GHIDRA_OUT/playerinterface_postauth_s2c.json` (external, not committed - the scripts write to
-that env var, falling back to the system temp dir).
+### The method id is derived: `constant >> 7`
 
-**c2s method list recovered** (`PlayerAgentProxy_t`, registration order, `DumpRpcTables.java`): 25 methods —
-Authenticate, AuthenticateLoggedIn, LoginFromCrash, CreateCharacter, LoginCharacter (= our EnterWorld),
-RenameCharacter, RequestDeleteCharacter, … The per-method opcode/hash are NOT inline in the proxy send
-(`DumpPlayerAgentProxy.java` shows the send only marshals params) — they come from the RPC registration.
+1. **It is a protobuf varint, not a fixed `u32`.** All 22 distinct header ids in the corpus are valid varints —
+   including the 1-byte `0x01` and the 3-byte `0x94A760`. The last byte of a 4-byte id is always `0x02`–`0x0F`:
+   those are the top bits of a 25-bit varint, not the low byte of a hash.
+2. **The value is computed, not stored.** No id appears anywhere in `AgeOfConan.exe` (absent as instruction
+   immediates and as static data in either endianness). The client registers each method with a 32-bit constant
+   and the wire carries **`constant >> 7`**. That rule reproduces every observed id — 13 c2s and 9 s2c, 22 of 22,
+   no exception.
 
-**The login (pre-auth) id encoding is the remaining open piece.** The 26-method tree above is **post-auth only**
-(`DispatchMethod` gates on an is-authenticated flag and errors `"not possible before being authenticated"`
-otherwise), so the login methods we actually use (Authenticate/EnterWorld/InitAuth/SendCharacterList/…) are
-dispatched by a separate pre-auth path and their wire ids (`0x9386EE05`, `0xDAD1D206`, …) appear in **none** of
-the 26 tree constants. Two hard facts about those login ids:
-- They are **not stored anywhere in `AgeOfConan.exe`** — absent as instruction immediates (`FindConst.java`,
-  0 hits) and as static data in either endianness (raw byte scan, 0 hits). So they are **computed at runtime**.
-- They are **not a plain name-hash**: 25 clean (name→id) anchors from the post-auth table were tested against
-  crc32 / djb2(±xor) / sdbm / fnv1(a) / jenkins / elf / bkdr(9 seeds) over 5 string forms — **zero** matches
-  (not even 2/25). And every login id has a **small final wire byte** (`…09,…06,…0d,…0e,…05,…0c,…0f,…04,…02`;
-  13/13 in `[0x02,0x0F]`) — statistically impossible for a uniform hash, so the id is structured
-  `[24-bit hash][small tag byte]`, not a raw hash.
-
-**c2s catalog + dispatch MECHANISM recovered** (Ghidra 2026-07, `DumpPlayerAgentProxy.java` +
-`DumpPlayerAgentCtor.java`). The `PlayerAgentProxy_t` constructor (`FUN_00493c40`) registers all **25** c2s
-methods, each as `key = 0x…; register(); setName("Method", len)`:
-
-| method | internal key | | method | internal key |
-|---|---|---|---|---|
-| Authenticate | `0x9CB2CB03` | | RequestSuggestNickname | `0xDBE172E5` |
-| AuthenticateLoggedIn | `0x9D991E6C` | | GetStartupData | `0x6A546D41` |
-| LoginFromCrash | `0xCBDE126E` | | LoadFacebookToken | `0xD3907026` |
-| CreateCharacter | `0xBE735486` | | SaveFacebookToken | `0xD8AD362B` |
-| CreateCharacterWithData | `0xCA2C4E5E` | | UpdateFacebookFriends | `0x3A96B2B3` |
-| LoginCharacter | `0xEF616EB6` | | RecruitFacebookFriends | `0x5B51044B` |
-| RenameCharacter | `0x1B2CF268` | | UpdateSubscriptionSettings | `0x516C9EF5` |
-| RequestDeleteCharacter | `0xC3C5C31D` | | UpdateCharacterSettings | `0x01035784` |
-| VerifyLanguageSetting | `0x9847AED6` | | UpdateCharacterPreview | `0x4D661656` |
-| AddOfflineLevel | `0x2976E1B7` | | FinishGetStartupData | `0xDFD8518E` |
-| UnlockCharacter | `0x9C370D1E` | | ReceivedCharacterSettings | `0x3C7C926C` |
-| SetHardcoreLevel | `0x6A6B621C` | | ClientReplyKeepCookie | `0x43D90C1B` |
-| GetDimensionList | `0x43476328` | | | |
-
-(Full JSON: `$FAOLAN_GHIDRA_OUT/playeragent_c2s_catalog.json`, external.) The **mechanism**: `register`
-(`FUN_00487900`) inserts the method into a **binary tree keyed by that internal key**; the proxy send passes the
-key to `rpc::Proxy_t::SendMethodInvocation` (`FUN_0046c910`), which builds the `RpcHeader`. The **internal key is
-what each proxy method passes at its send call** (matches the constants dumped from the method bodies).
-
-**The wire (opcode, id) ← key/name transform is the ONE remaining unknown, and it is genuinely obscured:**
-- The internal **key is itself not a standard name-hash** (25 clean name→key anchors tested against crc32/djb2±/
-  sdbm/fnv1(a)/jenkins/oat/elf/bkdr(11 seeds) × 5 string forms — 0 matches, not even 2/25).
-- The **wire id is neither the key nor a name-hash**, is not stored in the exe, and carries the small tag byte;
-  it is assembled inside `SendMethodInvocation`/`RpcHeader` construction from the tree-node data, not a one-liner.
-- So enumerating the *unobserved* methods' wire (opcode, id) needs a deeper trace of `RpcHeader` construction
-  (`FUN_0046c910` → the tree-node fields it reads), or a per-method in-client capture. The **observed** wire
-  (opcode, id) pairs are already in `Opcodes.cs` / `PlayerAgentMethodIds` (capture-verified, what we use).
-
-Until the transform is cracked the login opcodes+ids stay behavior-derived (they work); the names above are the
-proven client method set but their name↔opcode link is not yet established (so no rename — #320).
-
-**SOLVED for the login flow 2026-07 (Frida-under-Wine).** Static RE stalled on the key→wire transform, so instead
-we hooked `SendMethodInvocation` (`FUN_0046c910` @ `0x0046C910`) with Frida during a real login and logged each
-call's internal key (→ name via the constructor table above), then correlated by SEND ORDER with the wire
-`(opcode, id)` from a simultaneous loopback capture. `SendMethodInvocation` is the GENERAL proxy send — for
-PlayerAgent it passes the 32-bit key, for the other interfaces the small method index — so the PlayerAgent calls
-fall out cleanly. The login exercised 7 c2s methods, giving a **proven `name → (opcode, wire-id)`** table:
-
-| client method | opcode | wire id | (our old name) |
-|---|---|---|---|
-| `Authenticate` | `0x2083` | `0x96CBE509` | RequestAuth |
-| `GetStartupData` | `0x20C1` | `0xDAD1D206` | RequestSmallCharList — **was wrong** |
-| `FinishGetStartupData` | `0x208E` | `0xA3E1FE0D` | RequestCharRealmData — **was wrong** |
-| `LoadFacebookToken` | `0x20A6` | `0xE0C19C0D` | Ox20A6 |
-| `VerifyLanguageSetting` | `0x20D6` | `0xDD9EC209` | Ox20D6 |
-| `LoginCharacter` | `0x20B6` | `0xDD85FB0E` | EnterWorld |
-| `ReceivedCharacterSettings` | `0x20EC` | `0xA4F2E303` | Ox20EC |
-
-All seven wire ids matched the capture-derived enum exactly (independent confirmation), and `Opcodes.cs` +
-`PlayerAgentMethodIds` are renamed to these proven client names. Method: `tools/frida/` pattern + a hook on
-`0x0046C910`; the c2s names come from the `PlayerAgentProxy_t` constructor keys above.
-
-**Remaining:** the c2s methods NOT sent during a plain login (CreateCharacter/RenameCharacter/Delete/Facebook-
-save/hardcore/offline-level/…) — re-run the same Frida hook while performing those actions in-client — and the
-**s2c PlayerInterface** login response names (hook the client's pre-auth receive dispatch). Both are more of the
-same technique; the login path (what we implement) is now proven.
-
-## PlayerAgent / PlayerInterface: the method id is DERIVED (#320, 2026-08-03)
-
-This interface pair carries a method id in its RPC header after the 16-bit opcode. Two things about it kept the
-interface from being enumerated, and both were wrong:
-
-1. **It is a protobuf VARINT, not a fixed `u32`.** All 22 distinct header tails in the corpus are valid varints —
-   including the 1-byte `0x01` and the 3-byte `0x94A760` that the grammar listed as separate "constant" cases. The
-   giveaway is that the last byte of a 4-byte tail is always `0x02`–`0x0F`: those are the top bits of a 25-bit
-   varint, not the low byte of a hash.
-2. **The value is computed, not stored.** No id appears anywhere in `AgeOfConan.exe`, which is why searching for a
-   table found nothing. The client registers each method with a 32-bit constant and the wire carries
-   **`constant >> 7`**. That rule reproduces every observed id — 13 c2s and 9 s2c, 22 of 22, no exception.
-
-⚠️ **The 16-bit opcode is a per-CONNECTION registration index on this interface, not a method key.** The corpus shows
-it directly: on a second PlayerAgent connection retail sends `0x20EC` for `AuthenticateLoggedIn` and `0x20D6` for
-`UpdateCharacterPreview`, where the login connection used those same opcodes for `ReceivedCharacterSettings` and
-`VerifyLanguageSetting`. The client dispatches on the id. The "observed opcode" column below is therefore what
-retail's login connection happened to use, not a general mapping.
+**The rendered 16-bit value is not a method key on this interface.** The same rendering names different methods on
+different connections: on a second PlayerAgent connection the dumps show `0x20EC` for `AuthenticateLoggedIn` and
+`0x20D6` for `UpdateCharacterPreview`, where the login connection shows those same values for
+`ReceivedCharacterSettings` and `VerifyLanguageSetting`. The client dispatches on the id. The "observed opcode"
+column below is what the dumps show on retail's login connection, not a mapping.
 
 Re-derive both tables from the client:
 
 ```zsh
 GH=<data-repo>/Ghidra
 # c2s - PlayerAgentProxy_t's constructor
-/opt/ghidra/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
+<ghidra>/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
   -scriptPath tools/ghidra -postScript DumpPlayerAgentCtor.java
 # s2c - the PlayerInterface registration block
-STR=AuthenticateAck MAX=3 /opt/ghidra/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
+STR=AuthenticateAck MAX=3 <ghidra>/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
   -scriptPath tools/ghidra -postScript StrXrefs.java
 ```
 
@@ -850,22 +715,9 @@ Both print the registration idiom `<constant>; FUN_00487900(); FUN_0040ec10("<Na
 | `TeleportProblem` | `0xE33EBAE1` | `f5fa990e` | — |
 | `ResetLanguage` | `0xD4C59816` | `b096a60d` | — |
 
-### Names this corrected
+### Request/response corroboration
 
-The recovered constants also give the client's own METHOD NAMES, replacing nine that had been invented from observed
-behaviour. Each correction is independently corroborated by request/response pairing in the captures — c2s
-`UnlockCharacter` (`0x209E`) is answered by s2c `CharacterUnlocked` (`0x2093`), and c2s `LoadFacebookToken`
-(`0x20A6`) by s2c `OnFacebookTokenResult` (`0x209C`).
-
-| was | is | note |
-|---|---|---|
-| `InitAuth` | `AuthenticateAck` | |
-| `SendCharacterRealmData` | `PlayerSetupComplete` | |
-| `Ox2093` | `CharacterUnlocked` | the reply to c2s `UnlockCharacter` |
-| `Ox209C` | `OnFacebookTokenResult` | the reply to c2s `LoadFacebookToken` |
-| `SmallCharList` | `SendCharacterSettingsCheckSumMap` | its "constant" 3-byte tail is just its id |
-| `Ox20B9` | `SendCharacterSettings` | |
-| `SendRealmList` | `SetDimensionList` | a dimension IS a realm |
-| `Ox20E5` | `SendCharacterPreview` | |
-| `SendCharacterList` | `UpdateClientPlayerData` | |
-| `CreateCharacter` (`0x20DE`) | `CreateCharacterWithData` | the client has both; plain `CreateCharacter` is never sent |
+The client's names pair up in the captures: c2s `UnlockCharacter` (`0x209E`) is answered by s2c `CharacterUnlocked`
+(`0x2093`), and c2s `LoadFacebookToken` (`0x20A6`) by s2c `OnFacebookTokenResult` (`0x209C`). A dimension is a
+realm (`SetDimensionList`), and the client has both `CreateCharacter` and `CreateCharacterWithData`; only the
+latter is sent.

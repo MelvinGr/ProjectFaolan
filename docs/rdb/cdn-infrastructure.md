@@ -1,8 +1,8 @@
 # AoC Content CDN — infrastructure fingerprint
 
-Reconnaissance of the live Age of Conan content-distribution ("UPM") hosts, captured **2026-07-02**.
-Complements `docs/` CDN notes and the agent memory `aoc-content-cdn-mirror` (host roles + the
-`Faolan.Web.Content` store-and-forward mirror). All probing was header/DNS fingerprinting of public hosts.
+Reconnaissance of the live Age of Conan content-distribution ("UPM") hosts — the upstream the
+`Faolan.Web.Content` store-and-forward mirror fronts. All probing is header/DNS fingerprinting of public hosts, so
+addresses and edge versions are a snapshot of what the hosts answered when probed.
 
 ## Hosts (from `<AoC install>/LocalConfig.xml`)
 
@@ -65,7 +65,7 @@ Akamai config slot **`1705`**, CP code **`1557746`** front this property.
 
 ## What the control host serves (`cdn-web-nj4.funcom.com`)
 
-Probed directly 2026-07-02. Project folder = `AoCLiveEU` (`<HttpPatchFolder>`). Only two files respond 200;
+Probed directly. Project folder = `AoCLiveEU` (`<HttpPatchFolder>`). Only two files respond 200;
 everything else is 403 (dir listing) / 404 (unknown file).
 
 **`/upm/AoCLiveEU/PatchInfoClient.txt`** — the manifest root:

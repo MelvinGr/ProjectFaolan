@@ -1,17 +1,15 @@
 # AoC wire-id decode (BKDR-31 name hash) - all servers
 
-The client id hash is **BKDR-31** (`h = h*31 + c`, Java's
-`String.hashCode`), cracked in Stage 2 (18/18 known anchors). Ids below are resolved by hashing every
-identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes to it (name not in binary, or
-a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes — **RESOLVED 2026-06-12**
-(see Stage 3b below).
+The client id hash is **BKDR-31** (`h = h*31 + c`, Java's `String.hashCode`), verified on 18/18 known anchors.
+Ids below are resolved by hashing every identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes
+to it (name not in binary, or a collision picked wrong). RpcHeader method ids are registration indices (or, on
+PlayerAgent/PlayerInterface, registration hashes), not name hashes — see the last section.
 
-**Update 2026-06-14 (#192):** `0x33A56FB0 = DoorFullUpdateIIR_c` (the last unidentified beach-burst type —
-the map's doors); `0x00000000` is a null/terminator, not a type. The remaining GameServer `[?]` rows below
-in the `0x013xxxxx` family plus `0x02165EFF` / `0x08006F31` / `0x0802E5D4` are **NOT IIR type hashes** — they
-are per-character **instance ids** (ProtoEndpoint.instance), which the analyzer surfaces as a "sub-opcode"
-because in-world the client streams 0x2000 packets keyed by its own instance (e.g. `0x01316E71` = hoxxling,
-`0x02165EFF` = Strie). No name hashes to them because they aren't names.
+`0x33A56FB0 = DoorFullUpdateIIR_c` (the map's doors); `0x00000000` is a null/terminator, not a type. The GameServer
+`[?]` rows below in the `0x013xxxxx` family plus `0x02165EFF` / `0x08006F31` / `0x0802E5D4` are **not IIR type
+hashes** — they are per-character **instance ids** (ProtoEndpoint.instance), which a naive dissector surfaces as a
+"sub-opcode" because in-world the client streams 0x2000 packets keyed by its own instance (e.g. `0x01316E71` =
+hoxxling, `0x02165EFF` = Strie). No name hashes to them because they aren't names.
 
 
 ## ProtoEndpoint.type ids (object-class / interface names)
@@ -37,11 +35,9 @@ because in-world the client streams 0x2000 packets keyed by its own instance (e.
 
 ## 32-bit sub-opcodes inside 0x2000 (IIR / message type names)
 
-> **Live on the wire (2026-07-08):** the Wireshark plugin dissects the IIR id out of
-> GameAgent/GameInterface `0x2000` PassBlob bodies (`faolan.pkt.iir`, COL_INFO
-> `DispatchPassBlob:MoveTaskIIR`), names generated from the `IirTypes` catalog in
-> `Opcodes.cs`. Regenerated `*.tshark.json` dumps carry the id as an additive `Iir` key — decode
-> scripts no longer need to re-parse `BodyHex` for it.
+The Wireshark plugin dissects the IIR id out of GameAgent/GameInterface `0x2000` PassBlob bodies
+(`faolan.pkt.iir`, COL_INFO `DispatchPassBlob:MoveTaskIIR`), names generated from the `IirTypes` catalog in
+`Opcodes.cs`. `*.tshark.json` dumps carry the id as an `Iir` key, so decode scripts need not re-parse `BodyHex`.
 
 
 | sub-opcode | count | resolved name | servers |
@@ -553,36 +549,35 @@ because in-world the client streams 0x2000 packets keyed by its own instance (e.
 | 0x351A6F73 | 1 | [?] | CsPlayerAgent |
 | 0x6505EEC3 | 1 | [?] | CsPlayerAgent |
 
-## 16-bit RpcHeader opcodes per server (method indices - Stage 3b, NOT hashes)
+## RpcHeader method ids per server (registration indices, not hashes)
 
-**RESOLVED (2026-06-12, guild work):** the method IS the method's position in the recovered
-client→server RPC table (`docs/re/aoc-client-rpc-methods.json`) — registration order = table order. Anchored on
-CSPlayerAgent `0x201C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept click) and bulk-verified
-by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (independent semantic hits:
-`SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`, `GameCharAgent.Ping`, the
-tradepost methods). On the multiplexed GameServer connection the dispatch key is `(class id, opcode)`; the
-small class tables top out early (TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any value
-`>= 0x2014` is unambiguously GameCharAgent. Full per-class catalogs: `Faolan.Core/Enums/Opcodes.cs`.
+An RPC message is identified by its `method_instance` (RpcHeader field 4, one varint). On every interface except
+PlayerAgent/PlayerInterface it is the method's **registration index**: c2s registration order is identical to
+`docs/re/aoc-client-rpc-methods.json` (the proxy constructors register methods in that exact order). The
+`0x2NNN` a dump shows is the wire rendering (the field's tag `0x20` plus the varint's first group), not the
+identity. On the multiplexed GameServer connection the dispatch key is `(class id, method)`; the small class tables
+top out early (TradepostAgent `0x13`, project `0x0C`, GameAgent `0x0A`), so any value `>= 0x14` is unambiguously
+GameCharAgent. Anchored on CSPlayerAgent `0x1C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept
+click) and bulk-verified by tabulating `(RpcHeader caller class, method)` across all capture JSONs (independent
+semantic hits: `SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`,
+`GameCharAgent.Ping`, the tradepost methods). Full per-class catalogs: `Faolan.Core/Enums/Opcodes.cs`.
 
-**s2c tables RESOLVED (2026-06-13, Ghidra):** the server→client "drift" is now fully explained and the true
-tables recovered from `AgeOfConan.exe`. The base is `0x2000` for every interface **except PlayerAgent/
-PlayerInterface** (login; observed c2s wire `0x2083..0x20F5`, base ≠ 0x2000 — those opcodes stay
-behavior-derived). For all others, the method IS the registration index (a dump renders it `0x2000 + index`). c2s registration order is *identical*
-to `aoc-client-rpc-methods.json` (proven: the proxy constructors register methods in that exact order). The s2c
-drift was caused by the live build inserting extra dispatch methods — mostly **no-arg** methods that emit no
-`stream bad` string, so the string-extracted catalog missed them and every later method shifted. Recovered by
-decompiling each `<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`; case N → handler N, named by
-the handler's own `Dispatch_t::<Method>` string). True s2c sizes vs catalog: UniverseInterface 6 (=), GameInterface
-16 (+3), GameCharInterfaceProject 16 (+1), TradepostInterface 8 (+1), GameCharInterface **181 (+24)**,
-CSPlayerInterface **211 (+33)**. Full tables: **`docs/re/aoc-rpc-method-opcodes.md`**; recovery scripts:
-`tools/ghidra/`. In-client-verified anchors all match: s2c GameCharInterface DispatchUpdateBindLocation=0x2002,
-**DispatchUpdateCash=0x2005**, DispatchShopData=0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility
-=0x2052, DispatchPong=0x2082. NOTE corrections to old content-guesses: GameServer s2c `0x2009`=DispatchChangeItem
-StackSize (not "Pong" — real per-char Pong is `0x2082`), `0x2008`=DispatchSetQuestMarker, and `0x2020`=
-**DispatchAddItem** exists. PlayerInterface s2c is still open (its dispatcher isn't a flat switch). Methodology:
-README "Client reverse-engineering"; verification corpus: `GuildPacketTests` + `tools/ghidra/`.
+The s2c tables are recovered from `AgeOfConan.exe` by decompiling each
+`<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`; case N → handler N, named by the handler's own
+`Dispatch_t::<Method>` string). They are longer than the string-extracted catalog because the live build has
+extra dispatch methods — mostly **no-arg** methods that emit no `stream bad` string — which shift every later
+method. True s2c sizes vs catalog: UniverseInterface 6 (=), GameInterface 16 (+3), GameCharInterfaceProject 16
+(+1), TradepostInterface 8 (+1), GameCharInterface **181 (+24)**, CSPlayerInterface **211 (+33)**. Full tables:
+**`docs/re/aoc-rpc-method-opcodes.md`**; recovery scripts: `tools/ghidra/`. In-client-verified anchors all match:
+s2c GameCharInterface DispatchUpdateBindLocation=0x2002, **DispatchUpdateCash=0x2005**, DispatchShopData=0x2033,
+DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility=0x2052, DispatchPong=0x2082. GameServer s2c `0x2009` is
+DispatchChangeItemStackSize (the per-character Pong is `0x2082`), `0x2008` is DispatchSetQuestMarker, and `0x2020`
+is **DispatchAddItem**.
 
-The raw per-server counts below are kept as the original observation record:
+PlayerAgent/PlayerInterface (login) use a 32-bit registration hash as the method id; see
+`docs/re/aoc-rpc-method-opcodes.md`. Verification corpus: `GuildPacketTests` + `tools/ghidra/`.
+
+Raw per-server counts of the wire-rendered ids (`0x2NNN`) observed in the captures:
 
 
 **CsPlayerAgent**: 0x201E(76) 0x2077(57) 0x20A5(56) 0x2030(48) 0x2000(47) 0x2040(34) 0x2041(34) 0x2038(33) 0x20D0(23) 0x20C5(23) 0x202F(18) 0x2043(18) 0x203A(10) 0x2042(8) 0x203F(4) 0x2039(3) 0x202E(1) 0x203D(1) 0x202A(1) 0x201C(1) 0x20AB(1)

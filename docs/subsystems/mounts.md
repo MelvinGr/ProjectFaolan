@@ -27,7 +27,7 @@ Four rows are the game's own dev markers (`XX Test Bear Mount 3`, `XX Putharjath
 rather than filtered: their records are named and well-formed, so dropping them would be our rule, not the
 client's, and no client ever sends their id.
 
-## There is no mount SPEED field
+## There is no mount speed field
 
 `MountSpeed` (stat `0x0BB`) is a flat **100** because the client's mount record has nowhere else for it to
 come from. Comparing the three variants of one horse settles it — every field of *Fading Black Horse*,
@@ -65,7 +65,7 @@ dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg
 
 ## The wire sequence
 
-Both directions are **server-timed channels** and both start with the same `SummonMount` press — it toggles.
+Both directions are server-timed channels and both start with the same `SummonMount` press — it toggles.
 They differ only in how long the server holds the state.
 
 | | mount | dismount |
@@ -75,13 +75,13 @@ They differ only in how long the server holds the state.
 | buff | ride buff `0x31EB1500`, 24 h | end twin `0x31EB1501`, empty payload |
 | stats | `Mount` = the creature id, `MountSpeed` = 100 | `Mount` = 0 |
 
-The dismount duration is measured from the server's OWN ack, not from the press, so it carries no client RTT:
+The dismount duration is measured from the server's own ack, not from the press, so it carries no client RTT:
 press frame 1231 (t+19.609) → ack frame 1253 (t+19.968) → end twin frame 1449 (t+24.759). Every
 player-initiated dismount in the corpus lands 5.0–5.7 s after the press, so it is one duration and not
-per-mount. (This was once read as "the server responds immediately, frame 1449" — frame 1449 is the response to
-frame 1231, 5.15 s earlier, and clearing `Mount` at once drops the rider to run speed for the whole animation.)
+per-mount. Frame 1449 is the response to frame 1231, 5.15 s earlier; clearing `Mount` at once instead drops the
+rider to run speed for the whole animation.
 
-Retail sends **no summon `ApplySpell` and spawns no horse entity** — the client animates the whole run-up and
+Retail sends no summon `ApplySpell` and spawns no horse entity — the client animates the whole run-up and
 mount from the ride buff plus the `Mount` stat. The 545 ms is measured (summon frame 498 → ride buff frame
 520); applying the buff instantly mounts with no visible run-up.
 [V2: NecroL80_mage-necromancer_login_mount_move_dismount.tshark.json]
@@ -99,34 +99,34 @@ id and nonce, so there is no "silent" variant to reconstruct inside the snapshot
 
 `SummonMount` is not the only way a mount ends. Sweeping every capture carrying the ride buff — **27 mounted
 windows, ~55 minutes mounted** — and classifying each dismount by whether a c2s `SummonMount` precedes it
-separates the player's toggle from the three the SERVER owns:
+separates the player's toggle from the three the server owns:
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json]
 
 | cause | count | what retail sends |
 |---|---|---|
 | the player's press | 23 | end twin + `StatUpd(Mount=0)`, `DismountChannelMs` after the ack |
-| **death** | 2 | the same two records, within two frames of the player's own `RespawnMe` |
-| **thrown off by damage** | 1 | the same two records, in the same frame as a hit, with no press |
+| death | 2 | the same two records, within two frames of the player's own `RespawnMe` |
+| thrown off by damage | 1 | the same two records, in the same frame as a hit, with no press |
 | a playfield the map does not allow mounts in | 1 | the same two records (frame 10036; no damage near it) |
 
 So a dismount is always those same two records and the only question is what triggered them — which is why
-`SendDismount` is one method every path reaches.
+`MountService.Dismount` is one method every path reaches.
 
-Death unseats you on the **respawn**, not at the moment of death: in both captured cases the end twin follows
+Death unseats you on the respawn, not at the moment of death: in both captured cases the end twin follows
 the player's own `RespawnMe` (frames 9103→9108, and 15045→15047 after a lava death).
 
-⚠️ The damage throw-off is **real but unmeasured**. The rider takes 58 hits across those 27 windows and is
+The damage throw-off is real but unmeasured. The rider takes 58 hits across those 27 windows and is
 thrown exactly once, and that single sample defeats every threshold: the throwing hit is 10,944 while hits of
 24,744 and 200,496 elsewhere leave the rider seated, and the throw lands at 157,669 accumulated damage while
 742,185 accumulates in a window with no throw at all. Neither the client's tweak table (RDB 1000516) nor the
 `Mounted` spell record (3271445) carries a mount entry, and the throw-off is server-side, so there is nothing to
-reverse out of the client. It ships as a damage METER with a **placeholder** ceiling
+reverse out of the client. It ships as a damage meter with a placeholder ceiling
 (`MountCatalog.ThrowOffDamage`) — open work tracked in Gitea #653.
 
 ## Mounted combat
 
-The client's data says a surprising amount about this, and all of it points the same way: **the saddle gate is
-a lance charge and nothing else**, and **no magnitude for a charge exists anywhere in the client**.
+The client's data says a surprising amount about this: the saddle gate is a lance charge and nothing else, and
+the charge magnitudes are ordinary spell-stat effects.
 
 **The gate.** Exactly two of the client's 260 GameAction types ask whether they may be used from the saddle —
 `Charge` (type 53009) and `ChargeSpecialAbility` (53253), both carrying key index 245 →
@@ -146,7 +146,7 @@ the client never asks the question of an ordinary cast. [V1: docs/re/gameaction-
 `Tiger Charge` is also the only one whose `GameAction_TemplateID` is 0. Its ability twin is
 `Mount Ability: Tiger Charge` (4707293), an adjacent id.
 
-**The abilities exist and are already granted.** The catalog holds 14 `Mount Ability: …` rows, and six of them
+**The abilities exist and are granted.** The catalog holds 14 `Mount Ability: …` rows, and six of them
 carry real captured grant keys and bar slots — so retail's own `AddSpecialAbility` grant for them was observed:
 
 | slot | ability |
@@ -164,21 +164,21 @@ which is random.
 
 Those six ids appear in the **login** burst of many unrelated captures, not in the three mount captures. So
 retail grants the mount abilities like every other ability, at world entry, and the client itself decides
-whether the button is usable — which is what `GameAction_CanUseIfMounted` is for. Our server already sends
+whether the button is usable — which is what `GameAction_CanUseIfMounted` is for. Our server sends
 them on the same path as every other ability; nothing mounted-specific is needed to put them on the bar.
 
-⚠️ They currently sit in `ClassAbilities` under Necromancer and Demonologist at level 80 because those are the
-captured characters. That is a **capture artifact**, not a rule the data states — a mount ability comes with
+They sit in `ClassAbilities` under Necromancer and Demonologist at level 80 because those are the
+captured characters. That is a capture artifact, not a rule the data states — a mount ability comes with
 the mount, not the class. Widening it is the class-aware ability coverage problem, not mounted combat — and the
-universal pass that fixed Search / Hide / Path of Asura ([player-actions.md](player-actions.md)) deliberately
+universal pass for Search / Hide / Path of Asura ([player-actions.md](player-actions.md)) deliberately
 leaves these alone, because the only witnesses are that one pair of casters and "held by both captured casters"
 is not evidence of universality.
 
-### ⭐ CORRECTION (2026-08-11): the magnitudes ARE in the client, and imported
+### Charge magnitudes are in the client
 
-The paragraph below said a charge's magnitude is server-GDB-only. **It is not** — six of the `Mount Ability: …`
-spell rows carry a full level-interpolated damage curve on stat **27 (Health)**, `EffectKind` **53219**, which is
-`InterpolatedHit`, the kind `SpellPoolEffects` already applies for every other damaging ability:
+Six of the `Mount Ability: …` spell rows carry a full level-interpolated damage curve on stat **27 (Health)**,
+`EffectKind` **53219**, which is `InterpolatedHit`, the kind `SpellPoolEffects` applies for every other damaging
+ability:
 
 | ability | @L40 | @L100 | max @L40 | max @L100 |
 |---|---:|---:|---:|---:|
@@ -190,34 +190,19 @@ spell rows carry a full level-interpolated damage curve on stat **27 (Health)**,
 | Hind Leg Kick | −144.18 | −352.70 | −240.30 | −587.83 |
 
 (`LowLevel` 40 → `HighLevel` 100; the stored numbers are ×100, the ordinary wire scale.) Each charge has two spell
-rows — an "ability twin" pair — and only one of the two carries the effect, which is why a lookup on the wrong id
-of the pair finds nothing.
+rows — an "ability twin" pair — and only one of the two carries the effect, so a lookup on the wrong id of the pair
+finds nothing. The `Charge` GameAction element itself carries only `TemplateID`, `TemplateID2`, `CanUseIfMounted`,
+`BccEvent` and `PoseEvent` — a presentation action with no damage, knockback or radius — so the magnitude is found
+only through the spell-stat-effect import. A negative measured against a partial import is not a fact about the
+client.
 
-⚠️ **Why the original reading was wrong is worth keeping**: it was measured before the spell-stat-effect import
-was complete. `SpellStatEffects` moved **1,714 → 5,637 rows** on a later reimport with nothing in the change
-touching that parse (Gitea #468, item 4) — so the "no `[2][9]` region" finding was true of the shipped data at the
-time and false of the client. A negative measured against a partial import is not a fact about the client.
-
-**What is still genuinely missing is the PACKETS, not the numbers.** The `Charge` element carries only
-`TemplateID`, `TemplateID2`, `CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action with no
-knockback and no radius on it — and the corpus has zero records of a mounted player as an attacker. So the
-charge's *damage* needs no invention (same numbers, same effect kind, same wire records as any other damaging
-ability), while its *knockback* and its mounted BCC/animation sequence still do. Gitea #667.
-
-<details><summary>The original paragraph, kept for the record</summary>
-
-**What is missing is a capture, not a decode.** The `Charge` element carries only `TemplateID`, `TemplateID2`,
-`CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action. There is no damage, no knockback, no
-radius on it, none of the mount-ability ids has a spell record at all, and none of the 16 charge spells carries
-a `[2][9]` stat-effect region. So a charge's magnitude is server-GDB-only, exactly like ordinary spell
-magnitudes (`stat-engine.md`). Implementing trample damage or a charge knockback today would mean inventing
-both the numbers and the packets.
-
-</details>
+What is missing is the packets, not the numbers: the corpus has zero records of a mounted player as an attacker.
+A charge's damage needs no invention (same numbers, same effect kind, same wire records as any other damaging
+ability), while its knockback and its mounted BCC/animation sequence do.
 
 **The rider never attacks.** The corpus is not silent about mounted characters in combat — those 27 mounted
-windows carry 168 `DamageResultIIR` and 147 `StatDamageIIR` records, and the mounted player is the TARGET of
-58 of them. They are the ATTACKER in **zero**. That is the client's `GameAction_CanUseIfMounted` gate doing its
+windows carry 168 `DamageResultIIR` and 147 `StatDamageIIR` records, and the mounted player is the target of
+58 of them. They are the attacker in zero. That is the client's `GameAction_CanUseIfMounted` gate doing its
 job: the only action it ever asks the question of is `Charge`, and the captured character (a necromancer) has
 none. So there is no "attack from the saddle" packet the server is failing to answer — attacking while mounted
 is refused before anything reaches the wire.
@@ -231,12 +216,12 @@ Open work tracked in Gitea #667 (the capture a charge needs).
 | the catalog rows | `Mount` (`Mounts`), imported by `RdbSpellImporter` in the `rdb-spells` module |
 | lookups | `IDatabaseRepository.GetMount` / `GetMounts` |
 | the protocol constants | `MountCatalog` — channel, ride/dismount spell ids, `MountSpeed`, the buff payload |
-| the summon/dismount handler | `GameServerListener.Inbound.cs`, `BehaviorId.Mount` |
-| the one unseat path | `GameServerListener.Outbound.cs`, `SendDismount` (press, throw-off and death all reach it) |
+| the summon/dismount handler | `BehaviorService`, `BehaviorId.Mount`, into `MountService` |
+| the one unseat path | `MountService.Dismount` (press, throw-off, death and no-mount volumes all reach it) |
 | the throw-off meter | `NpcCombatService.ThrowFromMountIfBattered` / `WorldEntity.MountDamageTaken` |
 | the entry re-seat | `WorldEntryService.cs`, `RestoreMount` |
 | the mount creature model | `CaptureMountImporter` lifts it onto an `NpcTemplate` from the captures |
 
-A **known cosmetic** during dismount: the character briefly dips into the floor and re-grounds at animation
+A known cosmetic during dismount: the character briefly dips into the floor and re-grounds at animation
 end. Confirmed not server-side — retail sends nothing during the dismount window beyond the end twin and the
 `StatUpd`, and both immediate and timer-deferred dismount show it.

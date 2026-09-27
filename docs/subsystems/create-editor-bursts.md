@@ -1,28 +1,16 @@
-# Character-create editor bursts (issue #189)
+# Character-create editor bursts
 
 RE notes for the **create-editor download stream** — the burst the GameServer streams to the client
-while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). The goal of #189
-is to construct it from scratch like the login path instead of replaying `RetailCreateEditor*Burst.cs`
-verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*IIR` types in
-`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4; #223 closed).
+while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). The server constructs
+it from typed data like the login path (`Faolan/GameServer/CreateFlow/CreateEditorBursts.cs`): the initial burst
+and the creation-script burst are built record by record through their codecs (see §4).
 
-> **`WorldPrepBurst` has since been REMOVED entirely** (`0683e84d`). It replayed the guardian capture's
-> starting-kit grants (0x2052 abilities, `ComboBookIIR` combos, `SetItemStat`, `CharacterAction`/`Stat`/`Energy`
-> records) during creation — all proven redundant in-client: a created necromancer is fully functional without
-> it, because every grant is re-emitted class-driven by the creation-time loadout seed (`CharacterLoadout.Seed`:
-> `ClassAbilities` + `GetStartingBarSpells` + `GrantCharacterCombos`), which the create flow already reaches via
-> `SendBurstlessWorldEntry`. Its only unique effect was the live create-session quickbar placement of the 3 basic
-> attacks, which the shared bar-seed covers for a fresh character. The §4/§5 notes below describe the decode work
-> as it stood while the burst existed — kept as the record of what those record types are.
-
-The remaining
-verbatim burst is the intro-cutscene world-entry
-`RetailCreateWorldEntryBurst`, whose construction is now tracked separately under **#234** (its ScryScript +
-despawn + regen + BehaviorCC records — 146 in all — are already constructed; the FA015807 spawns + MoveTask/AI
-choreography remain, gated on #185/#190). The former verbatim beach NPC intro conversation
-(`RetailNpcConversationBurst`/`SendNpcIntroConversation`) has since been retired — the beach click now routes
-through the live constructed `ConversationService` (#188, `d208fc82`). This doc is the decode that makes the
-construction possible.
+Retail's create stream also carries the new character's starting-kit grants (0x2052 abilities, `ComboBookIIR`
+combos, `SetItemStat`, `CharacterAction`/`Stat`/`Energy` records). The server does not send them during creation:
+every grant is emitted class-driven by the creation-time loadout seed (`CharacterLoadout.Seed`: `ClassAbilities` +
+`GetStartingBarSpells` + `GrantCharacterCombos`), which the create flow reaches via `SendBurstlessWorldEntry`, and a
+created character is fully functional in-client without the creation-time copy. The record grammars in §4 cover
+those types too. The beach NPC intro conversation routes through the constructed `ConversationService`.
 
 Dissector: `CreateEditorRecordTests` (default-globs and validates across every `*create*.tshark.json` capture).
 
@@ -41,9 +29,8 @@ editor stream these distinct sub-protocols ride `0x2000`:
 | `6dd55614 → bbd560c8` | ack | `[u32 0x00000001]` |
 
 So the first filter is the class pair, **not** the opcode. Reading `body[4:8]` as an "iirType" on the wrong
-pair yields garbage that looks like entity handles (`0x0009FF9x`) — that was the initial red herring, and the
-server fell for it too: the `RequestAggroStatus` poll was handled as a "create-editor instance echo" whose
-"subopcode" was the `self` id and whose "requestId" was the polled target, until it was retired in #564.
+pair yields garbage that looks like entity handles (`0x0009FF9x`) — and misreads the `RequestAggroStatus` poll as a
+"create-editor instance echo" whose "subopcode" is the `self` id and whose "requestId" is the polled target.
 
 ## 2. IIR record inventory (create-no-worldenter, 98 carrier records, 15 types)
 
@@ -54,7 +41,7 @@ server fell for it too: the `RequestAggroStatus` poll was handled as a "create-e
 
 ## 3. Decoded grammars
 
-### Fully decoded (constructive builders + golden tests landed)
+### Fully decoded (constructive builders + golden tests)
 The per-IIR codecs under `Faolan.Core.Network/Codecs/`, locked by `Faolan.Tests/CreateEditorRecordTests.cs`.
 
 - **StatIIR** (`0xF98E10B3`), 17 bytes — a single stat set on an entity:
@@ -65,7 +52,7 @@ The per-IIR codecs under `Faolan.Core.Network/Codecs/`, locked by `Faolan.Tests/
 
 ### Decoded grammar, construction deferred to the existing spawn builders
 The two entity full-updates are the **same grammar as the login/world-entry spawns** — there is nothing
-create-specific to decode, only builder wiring to do:
+create-specific to decode:
 
 - **SimpleDynelFullUpdateIIR** (`0x66AEDD50`) and **SimpleCharFullUpdateIIR** (`0xFA015807`) both start:
   `[u32 type][u32 handle][u32 0]` then an embedded **ProtoGameCodeDynelIIR** transform
@@ -77,16 +64,15 @@ create-specific to decode, only builder wiring to do:
   - `SimpleChar` then carries the big **ProtoCoreCharacterIIR**/`ProtoFullCharacterIIR`-family message
     (the chosen looks: `"Stygian Female"` race/sex string, body/looks/stat tables) — the same family the
     FullChar snapshot and `NpcSpawnBuilder` already construct.
-- **Key finding for #189:** the editor avatar is just a `SimpleCharFullUpdate` spawn of the player with the
-  chosen looks — `NpcSpawnBuilder` + the appearance work ([[character_appearance_morphs_unused]]) already
-  cover its construction. The remaining work is **wiring**, not new decoders.
+- The editor avatar is just a `SimpleCharFullUpdate` spawn of the player with the chosen looks —
+  `NpcSpawnBuilder` and the appearance model cover its construction.
 - **Fixed editor pose:** the avatar's transform is **byte-identical across the create captures** —
   `pos=(262.931, 6.014, 280.970)`, `rot=(0, 0.98769, 0, 0.15643)` (≈18° about Y). The editor always spawns
   the avatar on the same pedestal; only `playfield_instance` (session) and the embedded looks differ.
 
-### Fully decoded + constructive builders (added 2026-06-15)
+### Fully decoded + constructive builders
 `PlayfieldFCodec` / `GameTimeCodec`, locked by `CreateEditorRecordTests`.
-- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes. Framed the way the CLIENT reads it (#451) — its
+- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes. Framed the way the client reads it — its
   reader is `PlayfieldFIIR_c`'s `ReadSubClass` = `FUN_008f36e0`, which calls the base `FUN_013d0a20` and then
   reads the four trailing words:
 
@@ -103,12 +89,11 @@ create-specific to decode, only builder wiring to do:
   version byte at `@21`, and its blob-length word reads exactly 24, so `59 + 4 + 24 + 16 == 103`. Zero failures.
   [V1: tools/ghidra/DecompileWithCallees.java — `FNS=008f36e0` then `FNS=013d0a20 DEPTH=2`]
 
-  Two things this framing corrected. The builder used to write the proxy's trailing bool as the first byte of a
-  leading zero word, which pushed everything after it one byte out: `sceneWord` was therefore modelled as a
-  `field58 = 0x01000000`, a u32 whose only meaningful byte was its **top** one, and `blobLastWord` (`fieldB`) was
-  modelled as a top-level word when it is really the last word **inside** the blob. Read aligned, `sceneWord` is a
-  plain 0 or 1 (54 / 97 across the captures). The bytes were always right — which is exactly why the goldens
-  never caught it.
+  The proxy's trailing bool is its own byte, not the first byte of a leading zero word; framed the second way
+  everything after it shifts one byte, `sceneWord` reads as a u32 `0x01000000` whose only meaningful byte is its
+  top one, and `blobLastWord` reads as a top-level word when it is the last word **inside** the blob. The bytes
+  come out identical either way, so a golden cannot tell the two framings apart — only the client's reader can.
+  Read aligned, `sceneWord` is a plain 0 or 1 (54 / 97 across the captures).
 
   Neither `sceneWord` nor `blobLastWord` is semantically pinned [V0]: `sceneWord` is 0 on maps 4020/4022 and 1 on
   1000/1010/2000/2010/2040/3000/5007/11040, while 4000 and 4010 carry both; `blobLastWord` takes 0/1/2/3 *within*
@@ -117,77 +102,68 @@ create-specific to decode, only builder wiring to do:
 - **GameTimeIIR** (`0x4F57DC08`), 29 bytes:
   `[u32 0][u32 0][u8 isToBePassed][f32 dayTime][u32 word][u32 gameDay][u32 unixSeconds][f32 rate=1.0]`. Byte-exact.
   `dayTime` is a **float** count of game seconds (86400 to a game day, advancing 5 per real second) and the anchor is
-  `[unix / 17280][unix epoch seconds]` — see [`../re/gametime-clock.md`](../re/gametime-clock.md), including why the
-  earlier `[u64 dayTime][u8 flag]` reading produced the same bytes and still broke the clock. The editor burst keeps
+  `[unix / 17280][unix epoch seconds]` — see [`../re/gametime-clock.md`](../re/gametime-clock.md), including why a
+  `[u64 dayTime][u8 flag]` reading produces the same bytes and still breaks the clock. The editor burst keeps
   its captured `dayTime` (`0x47929B00` = 75062s; the creation backdrop has no day/night to track, and it keeps the
   burst golden byte-exact); the world clock is live.
-- **SetMorphValueIIR** (`0xBADF5A4B`), 36–37 bytes — `[type][handle]… "hairmesh_207920" … <float weight>`; the
-  morph wiring itself is already covered by [[character_appearance_morphs_unused]].
+- **SetMorphValueIIR** (`0xBADF5A4B`), 36–37 bytes — `[type][handle]… "hairmesh_207920" … <float weight>`.
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/subsystems/create-cutscene-camera-paths.md`.
 
 ## 4. Burst record construction
 
-Every record in `RetailCreateEditorInitialBurst` is constructed from typed data (byte-exact vs `InitialBurst.bin`).
+Every record in the initial burst (`CreateEditorBursts.SendRetailCreateEditorInitialBurst`) is constructed from typed data (byte-exact vs `InitialBurst.bin`).
 
-- **`SimpleCharFullUpdate` (editor scene characters)** — **typed DATA**, in
+- **`SimpleCharFullUpdate` (editor scene characters)** — **typed data**, in
    [`CreateEditorScene`](../../Faolan.Core.Network/Constants/CreateEditorScene.cs), built through the ordinary
    `SimpleCharFullUpdateCodec` like any other spawn. The five pedestals (the "Stygian Female" avatar + Saddur /
    Male+Female Template / Stygian Slaver) and the live `Character…` preview are all emitted from it, with the
    **playfield instance** set on the model — and, for the preview, the session's client instance as its handle.
 
-   That file is **generated from the captured burst** and re-generated by
+   That file is **generated from the captured burst** and regenerated by
    `FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'`, so its values are a parse
    of the capture rather than a transcription. `CreateEditorSceneCharTests` builds each record from it and requires
    the captured bytes back exactly, which is what makes hand-editing it unnecessary and unsafe.
 
-   This closed #364. The path it replaced was `CreateEditorCharBuilder.Reconstruct`, which parsed each pedestal out
-   of **its own captured bytes** and re-emitted it: real construction, but the data was still the capture, and the
-   bytes sat inline in `CreateFlowService` as five hex blobs. Those are gone, `Reconstruct`/`LivePreview` are
-   deleted, and `CreateEditorCharBuilder` is now just the playfield token. The pre-IIR is `SpawnPreIir`'s 53 named
-   stat words and the post-IIR is `SpawnPostIir`'s typed stream, both decoded whole by #466/#475/#477 — which is
-   what made the typed emit possible at all. The full burst still equals `InitialBurst.bin` (`BurstGoldenTests`).
+   `CreateEditorCharBuilder` holds only the playfield token. The pre-IIR is `SpawnPreIir`'s 53 named stat words and
+   the post-IIR is `SpawnPostIir`'s typed stream, both decoded whole — which is what makes the typed emit possible.
+   The full burst equals `InitialBurst.bin` (`BurstGoldenTests`).
 
-   ⚠️ **The pedestals' pre-IIR words are the RETAIL server's uninitialised memory, not data.** Resolving the
+   **The pedestals' pre-IIR words are the retail server's uninitialised memory, not data.** Resolving the
    slots they occupy names them `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`,
    `Onslaught2SpecialsKilled`…, and a create-editor pedestal has no seasonal PvP record: `0x7151E7E0` in a stat
    slot is a leaked pointer. The live avatar in the same burst carries none of them — only the category word and
-   the 15.0 constant, which is exactly `SpawnPreIirs.Minimal`. So the reading that these were irreducible
-   per-session values blocking a from-data build was wrong. What is still open (#364) is SOURCING the scene from
-   rows rather than from these bytes.
+   the 15.0 constant, which is exactly `SpawnPreIirs.Minimal`. So these are not irreducible per-session values
+   blocking a from-data build.
 - **Editor-scene `SimpleDynel` props** — the 18 props are `WorldObjects` rows on map
-   4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
-   `IDatabaseRepository` and SOURCES each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
+   4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` takes the
+   `IDatabaseRepository` and sources each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
    `WorldObjects` keyed by **display id** — the prop's LDB string reference, which is placement truth and unique
    across the map — then the burst loops `EditorSceneDynels`, which pairs each captured WIRE handle with the display
    id that finds its row, and builds each byte-exact via
    `WorldObjectCodec.Build(row, handle, playfieldInstance)` (the playfield-instance overload),
    re-addressing every prop to the captured handle + the editor playfield instance
    (`CreateEditorCharBuilder.EditorPlayfieldInstance`); a no-DB run simply omits them (no verbatim fallback).
-   The lookup used to key on a `WorldObjects.CapturedHandle` column — a session-volatile value as a persistence key.
-   Importing a capture whose session re-observed the editor scene renumbered all 18 and the props silently vanished
-   from the burst (36 frames → 18), which is why the column is gone entirely: a world object's wire handle is now
-   minted by its zone (`LiveWorldObject`).
+   The lookup must not key on a captured wire handle — a session-volatile value as a persistence key: importing a
+   capture whose session re-observed the editor scene renumbers all 18 and the props silently vanish from the burst.
+   A world object's wire handle is minted by its zone (`LiveWorldObject`).
    `CreateEditorSceneDynelTests` proves **all 18 reconstruct
-   byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. (Until Gitea #222 the 18th —
-   localized `3072626`, handle `0x0002A7FE` — had no DB row: it shares an exact position with `347659` and the
-   importer's position-keyed `WorldObject` dedup dropped it. Fixed by keying world objects by (position,
-   `display_name` identity) in the dedup + replay + coverage; `3072626` now has its own row.)
+   byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. World objects are keyed by
+   (position, `display_name` identity): the 18th — localized `3072626`, handle `0x0002A7FE` — shares an exact
+   position with `347659`, so a position-only key drops it.
 - **`PlayfieldFIIR`/`GameTimeIIR`** — both are constructed in the burst
    via `PlayfieldFCodec`/`GameTimeCodec`. MapChange is built from the editor
    map id + the session playfield token (carried twice); GameTime from the captured day-time/timestamp/rate.
-   Wiring `InitialBurst.bin` surfaced an un-pinned u32 near PlayfieldFIIR `[58:62]` (0 in the test capture,
-   `0x01000000` here) — added as a pass-through param. It is now framed as the client reads it, a plain `0`/`1`
-   word at `[55:59]` (`sceneWord`, see the table above). Locked by `BurstGoldenTests`.
+   The per-capture word is `sceneWord`, a plain `0`/`1` at `[55:59]` (see the table above), passed through.
+   Locked by `BurstGoldenTests`.
 - **The avatar's FullChar snapshot** — the create editor sends the new character its own `0x737A6DF9`
    `FullPlayerCharacterIIR` on a `DispatchPassBlob`. It is **constructed whole from typed data**
-   (`CreateEditorAvatar.Snapshot`), and the 8,078-byte `CreateEditorAvatarSnapshot.bin` that used to be replayed
-   with the character id spliced into it is **deleted**. Byte-exact against the captured record for the first, last
-   and a mid-range character id; pinned by SHA-256 now that the blob is gone.
+   (`CreateEditorAvatar.Snapshot`), not replayed. Byte-exact against the captured record for the first, last and a
+   mid-range character id; pinned by SHA-256.
    [V3: EditorAvatarSnapshotTests.TheConstructedRecord_IsTheCapturedOne]
 
    | region | source |
    |---|---|
-   | root | `subscription_flags = 769` + four EMPTY containers (`0x65` 1028, `0x68` 24, `0x70` 48/12 disabled, `0x71` 48) owned by the live character |
+   | root | `subscription_flags = 769` + four empty containers (`0x65` 1028, `0x68` 24, `0x70` 48/12 disabled, `0x71` 48) owned by the live character |
    | quest regions | all three empty — an unnamed avatar has no journal |
    | access window | `AccessWindowCatalog`, the same game-static 86 entries every character gets |
    | stat block | `CreateEditorAvatarSheet` — 17 displayed + 148 sheet pairs, the only captured VALUES left |
@@ -201,81 +177,55 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    absent list have to agree, which is why this does not just call `SnapshotTails.FromScratch` — that always emits
    the list, correctly, for world entry.
 
-   ⚠️ `CreateEditorAvatarSheet` is a baseline in its own right and is **not** `SubClassStatBlock.FreshSheet()`: same
+   `CreateEditorAvatarSheet` is a baseline in its own right and is **not** `SubClassStatBlock.FreshSheet()`: same
    stat ids in the same order, ~15 different values (the health/stamina/mana pools, `0x113`, `0x3A`/`0x3B`, `0x6A`,
    the `0x398..0x39D` resist run at −300, `0x25F`). The beach baseline is a level-1 character standing in the world;
    this one is the editor pedestal avatar. The playfield token in it is the named
    `CreateEditorCharBuilder.EditorPlayfieldInstance`, not a literal lifted out of a capture.
-- **Record coverage** — no record is left verbatim, and since #364 none is capture-shaped either: the scene
-   characters are typed data (above), the live `Character…` preview included. Across `WorldPrepBurst` +
-   `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
-   + wired** (the two dissectors were retired with the burst - they read the retired `WorldPrepBurst` golden,
-   deleted in `0683e84d`; builders in
-   the per-IIR codecs, locked by `CreateEditorRecordTests` + the burst goldens):
+- **Record coverage** — no record is capture-shaped: the scene characters are typed data (above), the live
+   `Character…` preview included. **Every `*IIR` record type with structured per-record variation in the create
+   stream is decoded and has a builder** in the per-IIR codecs, locked by `CreateEditorRecordTests` + the burst
+   goldens:
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
    - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).
    - `StatUpdateIIR` (0x96B8DC59) — `(statId,value)` batch.
    - `SetMorphValueIIR` (0xBADF5A4B) — hair/texture resource morph.
    - `BehaviorControlCenterIIR` (0x642CD3D6) **short form** — behavior register (6 records).
-   - `BehaviorControlCenterIIR` (0x642CD3D6) **116-byte long form** (×3, #223) — the 28-byte short-form head plus
+   - `BehaviorControlCenterIIR` (0x642CD3D6) **116-byte long form** (×3) — the 28-byte short-form head plus
      an 88-byte tail that binds the behavior to an **equipped item**: `[u32 index][u32 someId][u32 itemHandle×2]
      [u32 0][u32 1][char[4] tag][byte[16] transform×2][8 nullIdentity×2][12 zero]`. The item handle, the 4-char
      entity tag (`OPC1`/`M9W9`/`CUP5`) and the 16-byte transform (the item's pose as four big-endian u32) all
      match the paired `DispatchAddItem` equipment piece earlier in the same burst. The two 8-byte slots are the
      `NullIdentity` sentinel (`B290805C 29E627CA`) — two *unset identity* slots, matching the doubling of every
-     field before them, rather than the "creator/timestamp pair" this was read as while the value had a different
-     name in each of the four codecs that write it. Decoded by
-     the retired `decode_create_iir_records.py` (see above), built by `BehaviorAnimations.ItemRegistration`.
-   - `RegenIIR` (0x28D0AC99, #223) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
+     field before them, not a creator/timestamp pair. Built by `BehaviorAnimations.ItemRegistration`.
+   - `RegenIIR` (0x28D0AC99) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
      grammar was pinned by harvesting **590 records across all `*.tshark.json`** captures (it's ×1 in the create
      burst but recurs throughout login/gameplay) and confirmed in the client: `RegenIIR_c::ReadSubClass`
      (Ghidra `FUN_0079dea0`, vtable slot 8) reads exactly three big-endian u32 into +0x2c/+0x30/+0x34 — the three
-     resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
-     the retired `decode_create_iir_records.py` + `tools/ghidra/DumpRegenReader.java`, built by
-     `RegenCodec`.
-   - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
-     c2611b23 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
-     `WorldPrepBurst` are now built via their codecs too (the per-class StatIIR runs as loops). The
-     unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
-     The verbatim carriers of this family that are **avatar-directed** (frame = the live `id`) were converted
-     the same way (#304): 18× StatIIR in `Post205FBurst` (that burst has since been removed entirely as a dead,
-     never-firing path, `022c0ca1`); in `WorldEntryBurst` 5× StatIIR (+2× StatIIR /
-     2× StatUpdateIIR / 1× EnergyIIR / 1× FeedbackIIR / 1× CharInPlayIIR) + the live-cutscene EnergyIIR in
-     `CreateWorldCutsceneScripts`; plus the 3 `id`-frame `GameActionListIIR` (0xF508F4C1) via
-     `GameActionListCodec` and `CharInPlayIIR` in `PostReadyBurst`. **Correction:** an earlier claim of "no
-     StatIIR/… verbatim carrier remains in ANY burst" was WRONG — it was blind to the byte-per-line carriers.
-     `RetailCreateWorldEntryBurst` (now a test-support replay under `Faolan.Tests/Support/`) still emits
-     **decoded-record carriers with capture-specific NPC/dynel handles** — 7× StatUpdateIIR (frames
-     0x00017E2x/ED0, built via `StatUpdateCodec`) — plus the larger verbatim
-     FA015807-spawn / MoveTask blobs; those belong to the **#234 intro-cutscene reconstruction** (they must be
-     re-addressed to live entities, not merely reframed), not this header-residue cleanup, so they are left
-     as-is. (The lone `WorldEntryBurst` GameActionListIIR is now the constructed `id`-frame record counted
-     above, not a capture-handle carrier.)
+     resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Reader recovered with
+     `tools/ghidra/DumpRegenReader.java`, built by `RegenCodec`.
+   - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — built via their codecs
+     (the per-class StatIIR runs as loops), as are `PlayfieldFIIR`/`GameTimeIIR`, the `id`-frame
+     `GameActionListIIR` (0xF508F4C1, `GameActionListCodec`) and `CharInPlayIIR`.
 
-   **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
+   **`ScryScriptIIR` is constructed:** the two CreationScript records (the "Slave Galley" PreloadAssets
    step + "PlayOrSkip") are built by `ScryScriptCodec.Build`, and the post-morph `StartScriptGroupOnClient`
-   callback by its script-group `Build` overload (the NicknameOk/CharCreationFinished callbacks were already
-   built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
-   long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
+   callback by its script-group `Build` overload (the NicknameOk/CharCreationFinished callbacks are built by
+   `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`).
 
-   **The post-morph class-base `StatUpdateIIR` is PER CLASS (2026-07-29).** The trio the editor sends once the
+   **The post-morph class-base `StatUpdateIIR` is per class.** The trio the editor sends once the
    customization batch drains is `StatIIR` + `StartScriptGroupOnClient` + a `StatUpdateIIR` carrying the three
-   base pools — stat `0x0001` health, `0x01F9` stamina, `0x01FB` mana. That third record used to be a verbatim
-   captured blob, `11000 / 17200 / 0`, and it is **RDB 1000511's Barbarian row**: harvested from a barbarian
-   create dump and then replayed at every class alike. Retail sends the character's OWN base there — the guardian
-   create carries `12000 / 17250 / 0`, the Guardian row to the unit
+   base pools — stat `0x0001` health, `0x01F9` stamina, `0x01FB` mana. A barbarian create dump carries
+   `11000 / 17200 / 0`, which is **RDB 1000511's Barbarian row**, not an editor-wide constant: retail sends the
+   character's own base there — the guardian create carries `12000 / 17250 / 0`, the Guardian row to the unit
    [V2: Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json frame 2613].
-   It is now built from `CharacterMaxStats.ClassBaseHundredths`, the same table the snapshot's own max slots use
+   It is built from `CharacterMaxStats.ClassBaseHundredths`, the same table the snapshot's own max slots use
    [V3: CreateEditorClassBaseTests.GuardianLevel1_ReproducesTheCapturedEditorPush_ByteExact].
 
-   ⚠️ **`0x96B8DC59` carries a HANDLE at body offset 12 and it must be filtered on.** The create captures are
+   **`0x96B8DC59` carries a handle at body offset 12 and it must be filtered on.** The create captures are
    full of `HpCur/StamCur/ManaCur = 6300` triples that read as the player's vitals being overwritten; they go to a
-   different handle each time and are **scene NPCs**. Reading them as the avatar's is what made a per-class
-   constant look like an editor-wide one.
+   different handle each time and are **scene NPCs**. Reading them as the avatar's makes a per-class constant look
+   like an editor-wide one.
 
-   **Still verbatim** (deferred): `ApplySpell` (the `MagicBuffIIR` setup blob still emitted verbatim in the
-   CreationScript burst, `CreateFlowService` line 930). (The former verbatim beach NPC intro conversation,
-   `RetailNpcConversationBurst`/`SendNpcIntroConversation`, was retired — the beach click now routes through the
-   live constructed `ConversationService`, #188/`d208fc82`.) The intro-cutscene `RetailCreateWorldEntryBurst` is now constructed
-   record-by-record under **#234** (ScryScript + despawn + regen + BehaviorCC done; FA015807 spawns + MoveTask/AI
-   remain, gated on #185/#190) — end-to-end in-client validation still pends the cutscene arming (#1).
+   **Still verbatim:** the 54-byte `MagicBuffIIR` apply payload (spell `0xB90`) in the creation-script burst
+   (`CreateEditorBursts.cs`) — the record is built by `MagicBuffCodec`, its payload bytes are the capture's.

@@ -1,4 +1,4 @@
-# Skeleton + attractors (RDB types 1010002 / 1010200) — #275 Phase 3
+# Skeleton + attractors (RDB types 1010002 / 1010200)
 
 The bind-pose skeleton a skinned character mesh / animation system references. Decoded + validated against the
 71-bone player skeleton (id 14853) by the C# `SkeletonReader` (`Faolan.Core.Rdb/Assets/SkeletonReader.cs`) and the
@@ -34,17 +34,15 @@ ANIMSYS is XML: `<animsys skeleton="ID">` + a list of `<attractor name=".." type
 `rig_bone_Spine2` + (0, 0.1, 0.13), `eyes` → `rig_bone_eye_right`. So an equipment mesh's world placement =
 attractor bone's world transform (from the skeleton above) ∘ the attractor's local offset.
 
-## Using it for character assembly (#275 Phase 3 remaining)
+## Using it for character assembly
 
 - **Head**: place the head mesh at `rig_bone_Head` (or Neck) world transform. (A geometric fallback — aligning the
   body's top ring to the head's base — also works for a static view.)
 - **Equipment**: place each worn item mesh at its ANIMSYS attractor (bone world transform ∘ offset).
-- **Caveat**: the player BODY skin-cluster bone names (`neck`, `chest`, `L_elbow`, from the mesh's CLUS section)
-  differ from the rig names (`rig_bone_Neck`, …) — the body→rig bone-name mapping still needs to be established to
-  drive skinning from this skeleton (not needed for a static bind-pose assembly).
-```
+- The body's CLUS cluster names (`neck`, `chest`, `L_elbow`) are body-part visibility groups, not bones (see
+  [body-morph-re.md](body-morph-re.md)); skinning resolves bones through the mesh's own `g_BoneN=` palette below.
 
-## Rig import — binding the mesh to the skeleton (#275 Phase 10)
+## Rig import — binding the mesh to the skeleton
 
 A skinned RenderMesh (`<RenderSkinnedMesh>`, type 1010001) carries, per vertex, `BLENDINDICES` (UBYTE4 @ decl
 offset 32) and `BLENDWEIGHT` (UBYTE4N @ 36, each `/255`, four summing to ~255). It does **not** index the skeleton
@@ -68,5 +66,5 @@ and per-primitive `JOINTS_0` (UNSIGNED_BYTE VEC4, name-remapped) + `WEIGHTS_0` (
 inverse-bind matrix is written in `System.Numerics.Matrix4x4` natural field order, which is exactly glTF's
 column-major encoding of the equivalent column-vector matrix. Because the skeleton's bind-pose world and the mesh's
 bind-pose vertices share one frame and scale, the skinned mesh at rest is pixel-identical to the static extract
-(validated err 6e-7) — and now posable. Tooling: `--report rdb-rig --report-arg <meshIndexId> [--skeleton <id>]`,
+(validated err 6e-7) — and posable. Tooling: `--report rdb-rig --report-arg <meshIndexId> [--skeleton <id>]`,
 web `/api/model/{id}.glb?rig=1`, test `Faolan.Tests/RigSkinningTests.cs`.

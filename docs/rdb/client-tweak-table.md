@@ -32,13 +32,13 @@ Two constants independently confirm the parse, because we decoded them from else
 
 A misaligned or wrongly-typed read could not land on either.
 
-## ⭐ Over HALF the sheet is the SERVER's, and the decisive test is the exe's string table
+## Over HALF the sheet is the SERVER's, and the decisive test is the exe's string table
 
 A tweak the client uses is **registered by name**: a 5-instruction thunk that pushes the name string, binds it to
 a global slot and installs an initialiser (see `tools/ghidra/TweakGlobals.java`). So a key whose NAME does not
 occur in `AgeOfConan.exe` at all is never registered, never bound to a client global, and cannot be named by any
 client code. That is a stronger test than counting references — it needs no Ghidra and cannot produce the
-slot-vs-slot+8 false negative described above:
+slot-vs-slot+8 false negative described below:
 
 ```zsh
 dotnet run --project Faolan.Importer -- --report rdb-tweaks | grep '^  ' | awk '{print $1}' | sort -u > /tmp/keys
@@ -48,9 +48,8 @@ comm -23 /tmp/keys /tmp/exe        # the keys no client code can name
 
 **158 of the 294 keys — 54% — are absent.** RDB 1000516 is not "the client's tuning sheet with some server
 numbers in it"; it is the **game's** tuning sheet, shipped inside the client's data, and most of it is knobs the
-client cannot even name. That is the general form of the argument this page already makes for
-`Combat_{PvE,PvP}{0..3}ShieldBonus` and the recast constants, and it settles the question for the whole table at
-once: **when a key is in the absent set, its value is ours to apply.**
+client cannot even name. That settles the question for the whole table at once (the same argument covers
+`Combat_{PvE,PvP}{0..3}ShieldBonus` and the recast constants): **when a key is in the absent set, its value is ours to apply.**
 
 What the absent set is, by cluster:
 
@@ -66,7 +65,7 @@ What the absent set is, by cluster:
 | `Renown*` | 2 | `RenownCacheLimit` 1000, `RenownSaveInterval` 300 — plainly a server cache and its flush period |
 | the rest | 47 | event/season switches (`EventDoubleXP`, `EventHalloween`, `Anniversary2020`, `IsPvPServer`, `IsTestLive`, `EventServer`), account gates (`Account_FreePlayerEffect`, `PvPBundleVendor`, `EnableVeteranVendor`), the AA unused-token caps, `MailTimeout` 30, `HackerTracker_Enabled` 1, and a handful of spell ids (`TWK_Combat_ActiveBlockingBuffID`, `TWK_WeaponSwapBuffClearTemplate`, `TWK_SpellToCastOnCrouchExit`, `TWK_PvPTournamentBuff`) |
 
-⚠️ **"Absent" is not a synonym for "server-side" in every case.** Five `TWK_*CombatText*` display constants
+**"Absent" is not a synonym for "server-side" in every case.** Five `TWK_*CombatText*` display constants
 (velocity, time-to-live, stack distance, max entries, offsets) are in the absent set too, and a floating-number
 renderer is plainly the client's job — so those read as **stale keys** for a consumer that no longer looks them
 up here. What the test supports exactly is *no native client code names this key*; a `TweakPanel_c` /
@@ -80,13 +79,13 @@ either absent from the exe or registered with zero references**, `TWK_PvPCowardB
 | key | value | what it settles |
 |---|---:|---|
 | `TWK_PvpDamagePercent` | 1 | PvP damage is **100%** of the PvE figure — there is no separate PvP damage scale to apply |
-| `Combat_PvP{0..3}ShieldBonus` | 0.2 / 0 / -0.15 / -0.30 | the shield-rose arcs against a PLAYER defender (already implemented) |
+| `Combat_PvP{0..3}ShieldBonus` | 0.2 / 0 / -0.15 / -0.30 | the shield-rose arcs against a PLAYER defender |
 | `Combat_PvPDamageReductionMainOnSplash` | 1 | a no-op under any reading, as the melee-cleave comment records |
 | `TWK_PvpMaxAbsorbAmount` | 0.2 | the absorb cap in PvP |
 | `PvPLevelExpModifier` | 0.05 | XP for a player kill |
 | `PvPLootChance` / `PvPLootTable` | 0.25 / 1 | a player kill drops loot a quarter of the time |
 | `PvPCashDropValue` / `PvPGenerateCashValue` | 0.05 / 325 | and cash |
-| `DailyPvPKillsCap` | 20 | ⭐ the same 20 the daily-kill counter 1000070 is clamped at, from a second source |
+| `DailyPvPKillsCap` | 20 | the same 20 the daily-kill counter 1000070 is clamped at, from a second source |
 | `GuildRenown_PVPKillMultiplier` | 0.5 | a player kill feeds guild renown at half rate |
 | `HardcorePvPXPModifier` | 1.5 | |
 | `IsPvPServer` | 0 | the server-type switch — absent from the exe entirely |
@@ -94,7 +93,7 @@ either absent from the exe or registered with zero references**, `TWK_PvPCowardB
 
 `GuildRenown_LevelingGainBase` 115 and `GuildRenown_LevelingGainMultiplier` 0.05 are the levelling half of the
 same ladder, registered and unreferenced. What none of them states is the FORMULA the base and multiplier go
-into, so nothing computes renown gain yet (Gitea #147).
+into, so nothing computes renown gain; open work tracked in Gitea #147.
 
 ## Out-of-combat regen: the attribute modifiers
 
@@ -116,14 +115,13 @@ So a pool's regen is driven by ATTRIBUTES, not by a fraction of its maximum. The
 confirmed against retail's own wire values** — see [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md)
 for the formulas, the per-character verification and how the flat terms were pinned.
 
-⚠️ **`TweakGlobals.java` once reported these three as "CLIENT NEVER READS IT", and that verdict was a false
-negative** — the client reads all of them. The script reported references to the registration slot, which holds a
-POINTER to the tweak object; the float lives at **slot + 8**, and that is the address the consuming code names. For
-`TWK_OOCHealthRegenStrModifier` the slot is `0x02D24498` and the regen routine (`FUN_0111a520`) reads `0x02D244A0`,
-which reads 0.15 in the running process. The script counts **both** addresses now, so its "never read" is sound
-again — but the section below is a test that does not depend on it at all.
+**A tweak's float lives at slot + 8.** The registration slot holds a POINTER to the tweak object, and the consuming
+code names the float at **slot + 8** — so counting references to the slot alone reports a read tweak as never read.
+For `TWK_OOCHealthRegenStrModifier` the slot is `0x02D24498` and the regen routine (`FUN_0111a520`) reads
+`0x02D244A0`, which reads 0.15 in the running process. `TweakGlobals.java` counts both addresses; the string-table
+test above does not depend on it at all.
 
-The `Natural*` modifiers are the in-combat twins and are NOT yet solved: there is no `TWK_NaturalHealthRegen*` at
+The `Natural*` modifiers are the in-combat twins and are not solved: there is no `TWK_NaturalHealthRegen*` at
 all, matching the sheet showing `Natural Health Regen = 0` for every captured character, but the mana/stamina ones
 (0.07 / 0.05) have no captured delta to check against, since every captured `RegenIIR` is out of combat.
 
@@ -137,7 +135,7 @@ all, matching the sheet showing `Natural Health Regen = 0` for every captured ch
 | `TWK_ProtectionAbilityModifier` | 0.5 |
 
 These are the per-level *targets* the itemization budget is scaled against, which is what template-scaled items
-(the ones carrying no explicit `[2][9]` stat records) need — open work tracked in Gitea #441.
+(the ones carrying no explicit `[2][9]` stat records) need.
 
 ## Spell / buff ids the SERVER is expected to own
 
@@ -168,29 +166,22 @@ the per-class/level curve `CharacterMaxStats.For` builds from RDB 1000511 (base 
 `MaxMovementModifierRate` 1.85 · `Quest_MaxGetDistance` 5 · `AIDefaults_MaximumChaseRadius` 45 ·
 `AIDefaults_ChaseDeaggroDelayTime` 5 · `Combat_PvE0ShieldBonus` 0.2 (PvE1 0.0, PvE2 −0.33, PvE3 −0.66).
 
-⭐ **All three `AIDefaults_*` are adopted** — our NPC chase/leash values were tunable guesses and this is what
-retail used. `WorldState.NpcLeashRange` is the sheet's 45 (it was 40), `NpcIrritationForgetSeconds` its 4 and
-`NpcChaseDeaggroDelaySeconds` its 5.
+**All three `AIDefaults_*` are adopted**: `WorldState.NpcLeashRange` is the sheet's 45, `NpcIrritationForgetSeconds`
+its 4 and `NpcChaseDeaggroDelaySeconds` its 5. They are separate clocks from `NpcAntiWhittleSeconds` (10), which is
+**ours**: the sheet says nothing about an anti-whittle rule, and the number has to cover the gap between two casts of
+a slow spell so a heal cannot land mid-fight. One shared constant for engagement memory, hold-ground time and the
+anti-whittle gate would couple three behaviours that retail tunes independently.
 
-The two TIMERS needed the constant they replaced to be SPLIT first (#804). One `NpcCombatMemorySeconds` of 10 was
-doing three jobs at once — how long a mob stays engaged with whoever hit it, how long it holds its ground after
-losing its target, and the gate on the anti-whittle full heal — so adopting either retail number would have
-changed the other two behaviours by accident. Split into the two clocks above plus `NpcAntiWhittleSeconds`, which
-stays 10 and is **ours**: the sheet says nothing about an anti-whittle rule, and the number has to cover the gap
-between two casts of a slow spell so a heal cannot land mid-fight.
-
-⭐ **Two whole subsystems' numbers live here and were looked for everywhere else first**, which is the reason to
-check this sheet before deciding a number is missing from the client:
+**Check this sheet before deciding a number is missing from the client.** Two whole subsystems' numbers live here:
 
 - **Khitai faction ranks** — `FactionValueRank1..4` = 50,000 / 200,000 / 450,000 / 1,000,000, with
-  `MaxFactionPoints` ±1,100,000 and a `Neutral{Min,Max}FactionPoints` band of ±5,000. `#310` and
-  [factions.md](../subsystems/factions.md) had recorded the thresholds as *"not in the client"*.
+  `MaxFactionPoints` ±1,100,000 and a `Neutral{Min,Max}FactionPoints` band of ±5,000
+  ([factions.md](../subsystems/factions.md)).
 - **Daily challenges** — `DailyPvEKillsCap` 5, `DailyPvPKillsCap` 20, `DailyMinigameWinsCap` 1,
   `DailyQuestsCompletedCap` 3, `DailyUnchainedDungeonsCompletedCap` 1, and the meta caps `DailyMetaCap` 3 /
-  `WeeklyMetaCap` 15 / `MonthlyMetaCap` 60 (#656/#509).
+  `WeeklyMetaCap` 15 / `MonthlyMetaCap` 60.
 
-  ⭐ **Each cap has exactly one COUNTER stat, and the two families pair one-to-one** — which is what turns two
-  half-answers into a specification of the whole subsystem (#656). The counters are a contiguous run in the
+  **Each cap has exactly one COUNTER stat, and the two families pair one-to-one. The counters are a contiguous run in the
   client's own stat-name registry (`docs/re/aoc-client-stat-names.tsv`):
 
   | counter stat | id | its cap | value |
@@ -204,49 +195,29 @@ check this sheet before deciding a number is missing from the client:
   | `DailyWeeklyCounter` | 1000075 | `WeeklyMetaCap` | 15 |
   | `DailyMonthlyCounter` | 1000076 | `MonthlyMetaCap` | 60 |
 
-  ⚠️ **A cap is paired with its counter by NAME - it does not follow that each cap CLAMPS its counter, and for
-  the PvE one it demonstrably does not (#887).** Time-ordered in `xxx_..._play1_beach-to-enter-tortage_city`, the
-  two behave completely differently:
+  **A cap is paired with its counter by NAME; a cap is a daily-challenge COMPLETION target, not a clamp.** Crossing
+  it fires the challenge-completion burst (see [daily-challenges.md](../subsystems/daily-challenges.md) and
+  `--report daily-kills`):
 
-  * `1000070` rises to **20** at frame 6039 and never moves again, while the capture runs on to frame 11692 and
-    its sibling keeps counting. That is a real clamp, and it is the SERVER's.
-  * `1000069` passes its stated cap of 5 at frame 3936 and carries on to **13** with no stall.
+  * **`1000070` is a witnessed-NPC-death counter, clamped at 20.** Where a capture's deaths stay under 20, its
+    increments EQUAL the death count exactly (9=9, 10=10, 11=11, … on 7 of 15 captures); four captures run
+    **29 / 34 / 37 / 39** deaths and the counter stops dead on **20** in every one (in
+    `xxx_..._play1_beach-to-enter-tortage_city` it reaches 20 at frame 6039 and never moves again while the capture
+    runs to frame 11692). That clamp is the SERVER's. It advances under a PvP name in a corpus with no PvP.
+  * **`1000069` is the FATALITY count.** Each of its bumps pairs with the two Fatality self-buffs the server applies
+    to the killer (5070797 + 791221): 49 of 49 bumps within twelve packets after a fatality apply on the player, 49
+    of 49 applies followed by a bump, with the lifetime `1379 PvEFatalities` pushed in the same burst. It passes its
+    stated cap of 5 and carries on (to **13** in the capture above) with no stall; crossing 5 is the daily fatality
+    challenge's completion.
 
-  Both are fed by ordinary PvE kills in a corpus with no PvP in it, sometimes advancing on the same frame, with
-  `1000070` advancing about half again as often. The id↔name pairing is not the doubtful part - the client's own
-  registration (`FUN_01df7df0`) writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before
-  `DailyPvPKills`, and registers each id again under sub-indices 1/2/5/8 that carry no name at all.
-
-  ### ⭐ `1000070` is a witnessed-NPC-death counter, clamped at 20 (`--report daily-kills`)
-
-  Counting each capture's INCREMENTS against the NPC deaths in the same capture separates two facts the frame
-  read above could state only qualitatively:
-
-  * **what it counts** - where a capture's deaths stay under 20, `1000070`'s increments EQUAL the death count
-    exactly (9=9, 10=10, 11=11, … on 7 of 15 captures);
-  * **where it stops** - four captures run **29 / 34 / 37 / 39** deaths and the counter stops dead on **20** in
-    every one.
-
-  So it advances once per NPC death the client is told about, under a PvP name, in a corpus with no PvP.
-
-  ⭐⭐ **And `1000069` is the FATALITY count.** The same report pairs each of its bumps directly with the two
-  Fatality self-buffs the server applies to the killer (5070797 + 791221): 49 of 49 bumps within twelve packets
-  after a fatality apply on the player, 49 of 49 applies followed by a bump, with the lifetime `1379
-  PvEFatalities` pushed in the same burst. "About a third" was the fatality roll, and a mob counted one time and
-  not the next was a fatality one time and not the next.
-
-  ⚠️ **Correction to the note above**: the defaults registry `FUN_010CB540` is *not* the only reference. The
-  client also builds a global tweak accessor for `DailyPvPKillsCap` - a `SignalTarget` at `0x02D243D8`,
-  constructed at `0x01DF61A0` inside the PvP-XP economy run of static initializers
-  (`PvPXPFromPvPCapMultiplier`, `MinigamePvEXPMultiplier`, `PvEXPFromPvPGroupPenalty`, `TWK_MinLevelForPvPXP`) -
-  and builds **none** for `DailyPvEKillsCap`. ⛔ That is not a second consumer: nothing reads the global but its
-  own ctor and its atexit, so any consumer reaches it through the signal and the address route ends there. What
-  it does establish is that the two caps are not interchangeable in the client, which is the shape the clamp
-  asymmetry has.
-
-  RESOLVED (#887, 2026-08-31): `DailyPvEKillsCap` = 5 is the daily fatality challenge's COMPLETION target —
-  crossing it fires the challenge-completion burst; see
-  [daily-challenges.md](../subsystems/daily-challenges.md).
+  The id↔name pairing is the client's own: its registration (`FUN_01df7df0`) writes `0xF4285` before naming
+  `DailyPvEKills` and `0xF4286` before `DailyPvPKills`, and registers each id again under sub-indices 1/2/5/8 that
+  carry no name. Besides the defaults registry `FUN_010CB540`, the client builds a global tweak accessor for
+  `DailyPvPKillsCap` — a `SignalTarget` at `0x02D243D8`, constructed at `0x01DF61A0` inside the PvP-XP economy run
+  of static initializers (`PvPXPFromPvPCapMultiplier`, `MinigamePvEXPMultiplier`, `PvEXPFromPvPGroupPenalty`,
+  `TWK_MinLevelForPvPXP`) — and builds **none** for `DailyPvEKillsCap`. Nothing reads that global but its own ctor
+  and its atexit, so it is not a second consumer; it does establish that the two caps are not interchangeable in
+  the client, which is the shape the clamp asymmetry has.
 
   …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
   (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is
@@ -255,12 +226,12 @@ check this sheet before deciding a number is missing from the client:
   The meta ladder reads straight off the numbers: five capped activities feed a daily meta of **3**, which feeds
   **15** a week (5 days × 3) and **60** a month (4 weeks × 15).
 
-  ⚠️ **Stat `106` is NOT one of these.** The live observation behind #656 — 106 counting 20→19→18 while
-  `DailyPvPKills` counts 0→1→2 — is `PowerSessionRemaining` (0x06A) being spent, a separate quota that happens
+  **Stat `106` is NOT one of these.** 106 counting 20→19→18 while `DailyPvPKills` counts 0→1→2 is
+  `PowerSessionRemaining` (0x06A) being spent, a separate quota that happens
   to start at 20 as well; the captured snapshot ships `0x14` for it. Its own reset stat is
   `NextPowersessionReset` (105). Two systems, one coincidence of size.
 
-⚠️ **The exe registers a fallback for every tweak and the shipped sheet overrides them**, so the binary's
+**The exe registers a fallback for every tweak and the shipped sheet overrides them**, so the binary's
 constants are not the game's numbers: all eight daily caps differ between the two. `FUN_010CB540` is the registry
 (`name`, then a `double`); this table is what actually ships.
 
@@ -278,7 +249,7 @@ lookup. `--report rdb-tweaks --report-arg <substring>` filters by name.
 | `Combat_Pv[EP]{n}ShieldBonus` | 8 | the directional-shield bonus per difficulty tier: PvE `+0.2 / 0 / −0.33 / −0.66`, PvP `+0.2 / 0 / −0.15 / −0.3` |
 | `AlternateAdvancement_*` | 6 | `XPCap` 1,000,000, the three unused-token caps at 100 each, `PvPModifier` 5, `SpecificTokensAwarded` 3, `GenericTokensAwarded` 1 |
 | `Faction*` | 8 | the Khitai rank ladder — see [factions.md](../subsystems/factions.md) |
-| `Daily*Cap`, `WeeklyMetaCap`, `MonthlyMetaCap` | 8 | the daily-challenge caps (#656/#509) |
+| `Daily*Cap`, `WeeklyMetaCap`, `MonthlyMetaCap` | 8 | the daily-challenge caps |
 | `Quest_*` | 6 | the quest system's limits, below |
 | `Inventory_*`, `ExpandInventories_*` | 5 | container sizing, below |
 | `PvP*`, `Hardcore*`, `Arena*` | 10 | loot chance 0.25, `PvPCashDropValue` 0.05, `PvPGenerateCashValue` 325, `PvPLevelExpModifier` 0.05, `HardcorePvPXPModifier` 1.5, `IsPvPServer` 0 |
@@ -286,7 +257,7 @@ lookup. `--report rdb-tweaks --report-arg <substring>` filters by name.
 | `Event*`, `Anniversary*`, `Saga*` | 13 | seasonal toggles, all off on this sheet |
 | `AIDefaults_*` | 3 | `MaximumChaseRadius` 45, `ChaseDeaggroDelayTime` 5, `IrritationForgetPeriod` 4 |
 
-### ⭐ The one-offs worth knowing
+### The one-offs worth knowing
 
 | tweak | value | why it matters |
 |---|---:|---|
@@ -297,18 +268,17 @@ lookup. `--report rdb-tweaks --report-arg <substring>` filters by name.
 | `Inventory_DisabledBankSlots` | 30 | of the bank's slots, how many start locked |
 | `ExpandInventories_MaxBankSlots` | 300 | the bank's ceiling once expanded |
 | `Inventory_DisabledResourceSlots` | 12 | the resource bag's locked slots |
-| `RequiredTagForPFAccessTeleport` | **2063** | a concrete TAG id — playfield-access teleport is gated on holding it (#748's tag space) |
-| `Character_SetupDefaultStatsScript` | **17581** | the script the server runs to stat a NEW character (#346) |
+| `RequiredTagForPFAccessTeleport` | **2063** | a concrete TAG id (the achievement tag space) — playfield-access teleport is gated on holding it |
+| `Character_SetupDefaultStatsScript` | **17581** | the script the server runs to stat a NEW character |
 | `Energy_RegenDelayTimer` | 1 | seconds of no spend before the energy pool refills |
 | `MailTimeout` | 30 | mail's own timeout (days on retail's rules) |
 | `MaxMovementModifierRate` | 1.85 | the ceiling on stacked movement buffs |
-| `Achievements_Vistas_Enabled` / `Achievements_Lore_Enabled` | 1 / 1 | the vista and lore achievement subsystems are ON (#780) |
+| `Achievements_Vistas_Enabled` / `Achievements_Lore_Enabled` | 1 / 1 | the vista and lore achievement subsystems are ON |
 | `NPCsWithNoNormalsetsAllowed` | 0 | an NPC without a `normalset` is a content error, not a valid state |
 | `GlobalModIncludedSpellLine` / `Excluded` | −1 / −1 | a global spell-line override, unused on this sheet |
 | `WaterSplashTextureID` | 3728533 | an RDB id, i.e. the sheet also carries RESOURCE references |
 
-⚠️ Several of these are values other tickets recorded as *"nothing in the client says"*. Check this sheet before
-concluding a number is absent — it has now answered that twice (the Khitai rank thresholds and the daily caps).
+Check this sheet before concluding a number is absent from the client.
 
 ## Sibling tables (same single-entry family, NOT this grammar)
 
@@ -319,9 +289,9 @@ each `[u32 classId][u32 level][0][u32 value][0][u32 tag]`. Its class ids are exa
 (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44) and its `value` column is **0 for all 80 levels of classes 24,
 28, 41 and 44** — precisely the four classes with no stamina pool — while the other eight grow linearly with
 level (class 34: 90 at L1 → 25082 at L80, ~316/level). Its L1 value for the Assassin is even 90, exactly the
-`HpBaseL1` anchor — which is why it looked like the vitals table. It is NOT: 56 does not divide its payload, and the
+`HpBaseL1` anchor — which makes it look like the vitals table. It is NOT: 56 does not divide its payload, and the
 real one (1000511) reproduces the captured sheet exactly. Check a parser's record-size assert before believing a
-shape; that is what disproved this one.
+shape.
 
 ## `CHARACTER_HP_MANA_STAMINA` = RDB type 1000511 — DECODED
 
@@ -350,7 +320,7 @@ Each record is keyed `[race][class]`, and all 95 are `5 races × 19 class slots`
 | 1 | class — all 12 AoC class ids, plus 0–4 and 26/42 (archetype / unused slots) |
 | 2, 3, 4 | **base** health, mana, stamina — ÷100 |
 | 5, 6, 7 | **per-level growth** of the same three — ÷1000 |
-| 8–13 | further per-class constants (8 is always 8000; 9/10 are 0 or 3000; 11–13 are 0 or 2000) |
+| 8–13 | per-attribute-point weights for the three pools, in thousandths (8 is always 8000 = 8 health per Constitution; 9/10 are 0 or 3000; 11–13 are 0 or 2000) — see `CharacterMaxStats` |
 
 The coefficients depend only on CLASS — except class 20 (Guardian), which has two race-dependent variants.
 
@@ -370,22 +340,21 @@ captured character — at four different levels across four classes:
 | DemoL80 | 80 | class 44 | 2371 / 2610 / 0 | 2371 / 2610 / 0 |
 | Hakotep | 24 | class 43 | 839 / 930 / 414 | 839 / 930 / 414 |
 
-### What it fixes, and what it does NOT
+### Where it is used
 
-It settles the **base curve** `CharacterMaxStats.Archetype` only guessed at. Its L1 base health matches our
-retail-anchored `HpBaseL1` for all 12 classes, and its mana/stamina bases are our displayed L1 values **minus 6** —
-independently confirming `SnapshotVitals`'s "mana base = displayed − 6". But the **per-level growth we invented is
-wrong across the board**, e.g. (ours → real) Guardian hp 60 → 40, Assassin hp 53 → 31, Priest of Mitra hp 45 → 10,
-Bear Shaman stamina 39 → 17.
+`CharacterMaxStats.ClassBaseHundredths` is this curve (in wire hundredths: `baseWord + growthWord × (level − 1) / 10`),
+and the attribute weights above are its attribute term. Its L1 base health matches the retail-anchored `HpBaseL1` for
+all 12 classes, and its mana/stamina bases are the displayed L1 values **minus 6** (the "mana base = displayed − 6"
+that `SnapshotVitals` observes).
 
-⚠️ It is **not** the displayed maximum. The curve yields the sheet's `1`/`505`/`507`; the per-character values at
+It is **not** the displayed maximum. The curve yields the sheet's `1`/`505`/`507`; the per-character values at
 `27`/`504`/`506` are larger (NecroL80 6518 health vs the curve's 2371) and vary between two level-80 characters of
-different classes, so the remaining factor is per-character — gear, which is Gitea #441. Wiring this curve straight
-into `CharacterMaxStats` would LOWER a geared character's maximum, so the mapping needs #441 first. Open work: #3.
+different classes: the client tops the class base up with the attribute term plus gear and feats. Using the class
+base as the ceiling would LOWER every geared character's maximum; the ceiling is `CharacterMaxStats.For`.
 
 Dump it with `--report rdb-dump --report-arg 1000511`.
 
-## Where the armour constants land in the client (2026-07-28, #401)
+## Where the armour constants land in the client
 
 The mitigation routine `FUN_0113ba00` (log tag `GameCode/ArmorMitigation`) reads four globals that are **0.0 in
 the image**, and `XrefsTo` finds only READS of them — no writer, which is the tell that a computed pointer fills
@@ -399,7 +368,7 @@ forced by which branch of the routine uses which:
 | `0x02d24724` | magical ability weight — `(Int/Wis − 10) × 0.1 × C` | `TWK_ProtectionAbilityModifier` | 0.5 |
 | `0x02d24734` | physical ability weight — `(Strength − 10) × 0.1 × C` | `TWK_ArmorAbilityModifier` | 2.0 |
 
-`CombatResolver.MitigationFraction` already computes with exactly these, which is why its trace points reproduce
+`CombatResolver.MitigationFraction` computes with exactly these, which is why its trace points reproduce
 retail's numbers — the formula is retail's, not a fit. Tools: `tools/ghidra/DumpFloatsAt.java` reads a global's
 value (a 0.0 says "runtime-filled"), `tools/ghidra/XrefsTo.java` shows whether anything writes it.
 

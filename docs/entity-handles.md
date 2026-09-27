@@ -16,20 +16,17 @@ Rule (CLAUDE.md): **session-volatile handles must never be persistence keys.** P
 
 ## Players: handle == ClientInstance == Character.Id (on purpose)
 
-For a player these are one value. Login resolves the character *by* the client instance
-(`GetCharacterForAccount(accountId, clientInstance)`) and for a normal (non-create-flow) login
-`resolvedCharacter.Id == clientInstance` (the mismatch case is only logged, for the create-flow temporary
-instance — `GameServerListener.Inbound.cs:852`); `WorldSimulation.RegisterPlayerInWorld` seeds
-`WorldEntity.Handle` from `ClientInstance` (`WorldSimulation.cs:105`). DB
-character ids are the **real AoC ids** (e.g. `20016753` = `0x01316E71`, `134407638` = `0x0802E5D6`), not small
-autoincrements, so the persistent id already sits in a client-tracked range. Retail unifies these too — the
-player's `FA015807` spawn handle, the combat `DamageResult`/vitals target, and the RPC endpoint instance are all
-the same `0x0802xxxx`-class value across the captures, and our player-spawn + combat goldens are byte-exact
-against that. See memory `player_handle_equals_character_id`.
+For a player these are one value. The GameServer hello resolves the character *by* the client instance
+(`GetCharacterForAccount(accountId, clientInstance)` in `LoginHandshakeService`), and
+`WorldSimulation.RegisterPlayerInWorld` seeds `WorldEntity.Handle` from that character's `Id`. DB character ids are
+the **real AoC ids** (e.g. `20016753` = `0x01316E71`, `134407638` = `0x0802E5D6`), not small autoincrements, so the
+persistent id already sits in a client-tracked range. Retail unifies these too: the player's `FA015807` spawn
+handle, the combat `DamageResult`/vitals target, and the RPC endpoint instance are all the same `0x0802xxxx`-class
+value across the captures, and our player-spawn + combat goldens are byte-exact against that.
 
-Do **not** split them for the player: the client self-correlates the char-id-keyed UI (GameCharAgent endpoint)
-with the in-world dynel addressed by combat/vitals. Assigning the player a separate synthetic handle risks the
-client not binding the two, and diverges from the captures we mirror.
+Do not split them for the player: the client self-correlates the char-id-keyed UI (GameCharAgent endpoint) with
+the in-world dynel addressed by combat/vitals. A separate synthetic player handle risks the client not binding the
+two, and diverges from the captures.
 
 ## NPCs / loot / dynels: session-allocated handles in the low tracked range
 
@@ -40,25 +37,24 @@ and `RuntimeHandleAllocator`):
 |---|---|
 | mid-session dynels (mount, interest NPCs) | `0x000286xx` |
 | world-burst NPCs | `0x000818xx` |
-| our loot / summon allocator (`RuntimeHandleAllocator`) | starts `0x00090000` — just above the burst NPCs, below the char-id range |
+| our loot / summon / pet / ambient allocator (`RuntimeHandleAllocator`) | starts `0x00090000`, just above the burst NPCs, below the char-id range |
 | player / char-id | `~0x0131xxxx` … `0x0802xxxx` (`0x02000000+`) |
 
-**The failure mode:** the client only polls/tracks handles inside this band. A handle far above it — the old
-`0x40000000`, or even `0x0F000000` — is never polled (`client → 0x2020`), so the server never reaches
-`SpawnCheck 0x2008`, and the entity **never renders**. That is exactly why `RuntimeHandleAllocator` starts at
-`0x00090000` and not an arbitrary large number.
+**The failure mode:** the client only polls/tracks handles inside this band. A handle far above it (`0x40000000`,
+or even `0x0F000000`) is never polled (`client → 0x2020`), so the server never reaches `SpawnCheck 0x2008`, and
+the entity **never renders**. That is why `RuntimeHandleAllocator` starts at `0x00090000`. It is one allocator per
+game host, shared by every runtime spawner: two counters would hand out the same handle and one entity would
+silently replace the other in the zone's handle map.
 
-**Necessary but not sufficient.** Being in-range only makes a mid-session spawn *eligible*. Our pushed
-mid-session spawns still don't render because the client refuses to poll for entities it didn't learn about
-during the world-entry load — a load-vs-play gate, not a range problem. Full writeup:
-`docs/subsystems/mid-session-spawn-blocker.md`, memory `protocol_midsession_spawn_blocked`.
+**Necessary but not sufficient.** Being in range only makes a mid-session spawn *eligible*. The spawn must also
+carry the live playfield-instance token (below): the client looks the spawn's playfield up in its loaded-playfield
+map and silently drops a miss before it ever polls the handle. See `docs/subsystems/mid-session-spawn-blocker.md`.
 
 ## Don't confuse with the playfield-instance token
 
-Separate namespace: each `Zone` mints a **playfield-instance token** (`WorldState.cs:85`, starts `0x00A00000`;
-beach replay overrides it with the burst's own, e.g. `0x01ea985c`) that is stamped into every despawn so the
-client scopes the removal to the right playfield. It is *not* an entity handle. See memory
-`protocol_despawn_n3toclientquit`.
+Separate namespace: each `Zone` mints a **playfield-instance token** (`WorldState.NextPlayfieldToken`, starting at
+`0x00A00000`, clear of the observed retail pools `~0x004F..` / `~0x01EA..`) that is stamped into every spawn and
+despawn so the client scopes it to the right playfield. It is *not* an entity handle.
 
 ## Practical rules
 

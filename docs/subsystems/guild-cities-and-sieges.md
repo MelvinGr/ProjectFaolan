@@ -5,24 +5,18 @@ mostly records is the **ruleset**, which retail states almost entirely **in its 
 user-facing LDB text: the preconditions, the timers, the party sizes and the win condition. The decision layer
 built from it is in [What is implemented](#what-is-implemented) below.
 
-⚠️ **One siege message IS captured, though**, correcting the older "not one occurs anywhere in the corpus":
-`NecroL80_..._gameplay_annotated_9` carries the Border Kingdoms **battlekeep-info query** — c2s
+**One siege message is captured**: `NecroL80_..._gameplay_annotated_9` carries the Border Kingdoms **battlekeep-info query** — c2s
 `RequestBattleKeepInformation` (0x2042) and its s2c reply `DispatchBattleKeepInfoRequestReturnPhase3And4` (0x20AA),
 four pairs, each reply followed by the owning guild's name. It is decoded and byte-exact
-([Battlekeep-info query](#battlekeep-info-query) below). What is still absent is everything with *state* — building,
-capturing, scoring — so the ruleset stands as the record for those.
-
-Earlier sweeps of this subsystem searched the **wire** and the **RDB data tables** and concluded the corpus
-contains zero siege traffic; the battlekeep-info pair above shows that was slightly too strong (it is on the
-CSPlayerInterface, beside the guild-ranking board), but the conclusion holds for the build/siege lifecycle. The
-LDB is where the *ruleset* lives, and it is the source those sweeps had not read.
+([Battlekeep-info query](#battlekeep-info-query) below). It is on the CSPlayerInterface, beside the guild-ranking board. What is absent is everything with *state* —
+building, capturing, scoring — and no RDB data table carries it either. The LDB is where the *ruleset* lives.
 
 ## Battlekeep-info query
 
 The client opens the Border Kingdoms siege panel and queries one keep at a time. Byte-exact against all four
 captured replies (`BattleKeepInfoCodec`, `BattleKeepInfoCodecTests`). Our server answers the query: with no
 siege layer every keep is unowned, and an unowned keep's encoding is uncaptured (every retail entry names an
-owning guild), so `CsPlayerAgentListener` sends the honest EMPTY list (`BattleKeepInfo.Empty`) — the same shape
+owning guild), so `CsPlayerAgentListener` sends the honest empty list (`BattleKeepInfo.Empty`) — the same shape
 as the zero-guild Massive-PvP board:
 
 ```
@@ -32,14 +26,14 @@ s2c ...ReturnPhase3And4          (0x20AA)   [u32 (count+1)*0x3F1]
       ID32 = [u32 class][u32 instance]; class = 0xDEB7 (EntityClass.Guild), or [0][0] for the null ID32
 ```
 
-⭐ **Every column is named from the client's own keep window, not from the values.** The reader `FUN_0134f280`
+**Every column is named from the client's own keep window, not from the values.** The reader `FUN_0134f280`
 scatters the seven words into a 0x1c struct (slot order `[0][1][2][5][6][4][3]`) and the window's filler
 `FUN_01315130` (`Views/MassivePvP/MassivePvPBattleKeepView.xml`, `FUN_01313f70`) reads that struct field by field:
 
 | wire | struct | name | how the view uses it |
 |---|---|---|---|
 | word 1 | `[0]` | **keep id** | compared against the window's `AreaID` config before anything is drawn. It is the `pvp_area` id that LDB **50100** (`city_name`) names: 1 Fort Bane · 2 Stonehammer · 3 Caelnach · 4 Burnheim · 5 Sturmgarde · 6 Oakenhome · 7 Amut'Anun · 8 Gardak — so the captured keeps 2 and 4 are Stonehammer and Burnheim. The same category resolves `i_nFeedbackValue` in the battle-queue feedback below |
-| words 2–3 | `[1],[2]` | **owning guild ID32** | passed as ONE ID32 to the guild-name lookup, rendered under `MassivePvP_BattleKeepView_DefendingGuild`. The `0xDEB7` this page used to call a "zone word" is the guild ID32's class word — the same pair `GuildRankingsCodec` writes |
+| words 2–3 | `[1],[2]` | **owning guild ID32** | passed as one ID32 to the guild-name lookup, rendered under `MassivePvP_BattleKeepView_DefendingGuild`. The `0xDEB7` is the guild ID32's class word, not a zone word — the same pair `GuildRankingsCodec` writes |
 | words 4–5 | `[5],[6]` | **attacking guild ID32** | compared against the null ID32 (`FUN_00453280`) and, when set, rendered as `MassivePvP_BattleKeepView_AttackingGuild` / `..._UnknownGuildName`. `[0][0]` on every captured keep — no war declared |
 | word 6 | `[4]` | **next-phase time** (unix) | `localtime` → weekday + `hh:mm` under `MassivePvP_BattleKeepView_NextPhase`; in phase War it drives the `TimeDisplay` countdown instead |
 | word 7 | `[3]` | **phase** | named from LDB category 10032 (`FUN_0060f190(0x2730, phase, 0)`) under `MassivePvP_BattleKeepView_Phase` |
@@ -47,13 +41,12 @@ scatters the seven words into a 0x1c struct (slot order `[0][1][2][5][6][4][3]`)
 The phase enumeration (LDB 10032, `--report ldb-search --report-arg 10032:<letter>`): **0 War Declaration, 1
 Skirmish, 2 Silence before the storm, 3 War, 4 Aftermath**. Every captured keep is in phase 2, and the owning
 guild is cross-corroborated three ways: keep 4's `0x7B726` is *Vendetta*'s guild id and keep 2's `0x7C6A6` is
-*Hand of Stygia*'s, both matching the `guildId` column of the same session's Massive-PvP board and the guild NAME
+*Hand of Stygia*'s, both matching the `guildId` column of the same session's Massive-PvP board and the guild name
 in the `DispatchGuildRankingsUpdate` (0x2041) that follows each reply.
 
-**The `Phase1And2` twin (0x20A9) is recovered from the client but has no captured body.** (An earlier version of
-this page called a frame in `Strie_rogue-assassin_login` its single sample; that frame is GameCharInterface
-`0x29`, `DispatchReplyLootForCharacterTemplateClusterOk`, on the GameServer stream — `0x20A9` is only the lossy
-wire rendering.) Its reader `FUN_0134f1f0` → `FUN_013b1680` fills a 0x28 struct:
+**The `Phase1And2` twin (0x20A9) is recovered from the client but has no captured body.** (A `0x20A9` in
+`Strie_rogue-assassin_login` is GameCharInterface `0x29`, `DispatchReplyLootForCharacterTemplateClusterOk`, on the
+GameServer stream — `0x20A9` is only the lossy wire rendering.) Its reader `FUN_0134f1f0` → `FUN_013b1680` fills a 0x28 struct:
 
 ```
 s2c ...ReturnPhase1And2 (0x20A9)   [u32 (count+1)*0x3F1]
@@ -108,7 +101,7 @@ For types 0–9 `i_nFeedbackValue` is unused; for 10–17 it is the **keep id**,
 below (city → Tier 3 → one keep per guild → the vulnerability window), and 10/11/13 are how the queue tells a
 guild it leads, has won, or has been overtaken.
 
-⚠️ **This is text, not protocol.** Every rule below is retail describing its own game to a player. It pins what
+**This is text, not protocol.** Every rule below is retail describing its own game to a player. It pins what
 the server must *decide*; it says nothing about which bytes carry the decision, and no capture in the corpus
 performs any of it.
 
@@ -130,7 +123,7 @@ City-spot booking has its own refusal set, which is what a bookable finite resou
 There are no more free city spots."*, *"…Your guild already has a city spot."*, *"Booking succeeded. Your guild
 has been assigned a city spot."* (100/20200, 20201, 129749027).
 
-⭐ Gate 4 is what ties this page to the **renown ladder** already decoded from RDB 1000521 — 57 rewards over
+Gate 4 is what ties this page to the **renown ladder** decoded from RDB 1000521 — 57 rewards over
 renown levels 1–20, each with its own description
 ([client-data-tables.md](../rdb/client-data-tables.md)). The ladder is the *content* of a guild city; the chain
 above is how a guild becomes eligible for it.
@@ -148,8 +141,8 @@ above is how a guild becomes eligible for it.
 [LDB 50020/691, 100/14454, 100/245141412; the permission bit is the guild rank ladder's, see
 [client-data-tables.md](../rdb/client-data-tables.md) § 1000518]
 
-⭐ The permission bit and the window text corroborate each other from two unrelated sources: `0x800` was
-recovered from the client's guild-management view (#799) with no siege context, and the window text names exactly
+The permission bit and the window text corroborate each other from two unrelated sources: `0x800` is recovered
+from the client's guild-management view with no siege context, and the window text names exactly
 that right (*"Can Change Vulnerability Window"*, LDB 100/109915575).
 
 ## The battle
@@ -159,14 +152,14 @@ that right (*"Can Change Vulnerability Window"*, LDB 100/109915575).
 * The invader establishes a **Siege Camp** at one of several marked sites around the Battlekeep — right-click the
   marker stone, and with the necessary **construction materials and blueprints** build siege weapons and
   temporary structures. The defender right-clicks the Battlekeep itself to build anti-siege weaponry. (50020/693)
-* ⚠️ **One weapon per camp**: *"This siege camp already has an active siege weapon!"* (50018/116771712), and a
+* **One weapon per camp**: *"This siege camp already has an active siege weapon!"* (50018/116771712), and a
   camp may only be raised while the target is vulnerable: *"You can only build a siege camp while the city is
   vulnerable."* (50018/116765824)
 * **Resurrection is asymmetric** — *"fallen defenders will resurrect at the defenders' Battlekeep. Invading
   army-members will resurrect at the playfield's common resurrection point"*, so attackers pay a travel cost the
   defenders do not. (50020/693)
 * **Scoring**: points for destroying opponents, enemy structures and siege weapons. (50020/694)
-* ⭐ **Win condition**: *"an invading army must destroy the defending army's Keep — the defensive heart of the
+* **Win condition**: *"an invading army must destroy the defending army's Keep — the defensive heart of the
   Battlekeep — within the 2 hour vulnerability window."* (50020/694)
 * **During the battle, repair and construction are both refused**: *"You are not allowed to repair during siege
   battle."* / *"You are not allowed to build during siege battle."* (100/14456, 100/14457)
@@ -184,12 +177,12 @@ LDB category 270 names them, in one contiguous id run (3833647–3833677):
 | Amut'Anun Siege Camp | Gardak Siege Camp | Burnheim Siege Camp | Sturmgarde Siege Camp |
 | Oakenhome Siege Camp | Stonehammer Siege Camp | Caelnach Siege Camp | Fort Bane Siege Camp |
 
-⛔ **None of the eight resolves against anything we hold** — no `Maps` row, no `MapRegions` row. They are Border
+**None of the eight resolves against anything we hold** — no `Maps` row, no `MapRegions` row. They are Border
 Kingdoms content that no capture in the corpus visits.
 
 What we *do* hold is the three playfields they sit in — `Border Kingdoms, Cimmerian End` (11040), `Border
 Kingdoms, Aquilonian End` (12070) and `Border to Kush` (13050) — which is the same set RDB 1000509 files under
-PvP ruleset 6 and the same set the Massive-PvP board's `areaId` column carries. ⭐ The LDB agrees independently:
+PvP ruleset 6 and the same set the Massive-PvP board's `areaId` column carries. The LDB agrees independently:
 *"This is the area ID of the battlekeep."* (10002/9303006), so an `areaId` is a **playfield id**, from a third
 source.
 
@@ -200,7 +193,7 @@ repair Battlekeeps… PvP resources have to be converted into building materials
 to construct Battlekeeps."* — and harvesting one may flag you on the region map for competitors to rob
 (50020/845).
 
-⚠️ That is the concrete form of this subsystem's dependency on tradeskills: the Architect profession is not a
+That is the concrete form of this subsystem's dependency on tradeskills: the Architect profession is not a
 nice-to-have prerequisite, it is the only stated route from a harvested PvP resource to a building material.
 
 Queue position for the right to attack is itself PvP-earned: *"there will be a queue of guilds waiting for the
@@ -209,7 +202,7 @@ through minigames like Annihilation"* (50020/691) — which is the link to the m
 
 ## What is implemented
 
-⚠️ **The decision layer only, and nothing that touches the wire.** Apart from the battlekeep-info query above,
+**The decision layer only, and nothing that touches the wire.** Apart from the battlekeep-info query above,
 no siege or city message occurs in the corpus, so every body that would carry a build/capture/score outcome is
 unknown and none is sent. What is encoded is what the
 server has to *decide*:
@@ -217,15 +210,15 @@ server has to *decide*:
 * **`GuildCityRules`** — the precondition chain (`CanBookCitySpot`, `CanBuild`, `CanApplyForBattlekeep`), the
   window arithmetic (`IsVulnerable`, `CanMoveVulnerabilityWindow`) and the two battle-time rules
   (`CanRaiseSiegeCamp`, `CanRepairOrBuildDuringBattle`). Every constant is a quoted string, cited in place.
-* **`GuildCityRefusal`** — one member per real client refusal, each carrying the LDB id it comes from. So when
-  the message that delivers one is finally captured, there is already a decision to attach it to.
+* **`GuildCityRefusal`** — one member per real client refusal, each carrying the LDB id it comes from, so a
+  captured delivery message has a decision to attach to.
 * **`GuildCityState`** — the guild snapshot the rules read, passed in rather than fetched, because nothing
-  persists a city yet. When something does, that is the shape it has to produce.
+  persists a city. It is the shape a persisted city has to produce.
 
 Gated by `GuildCityRulesTests`, which asserts the quoted numbers and — more usefully — the **boundaries**: 23 vs
 24 members, tier 2 vs 3, the half-open two-hour window, and minute 15 vs 16 of the move grace.
 
-⚠️ Two values are deliberately **not** hard-coded, because retail states the rule and not the number: how many
+Two values are deliberately not hard-coded, because retail states the rule and not the number: how many
 free city spots a realm has, and how many window changes a guild gets (*"There are no more changes left…"* names
 the cap without giving it). Both are caller-supplied. `[V0: how many window changes a guild gets.]`
 

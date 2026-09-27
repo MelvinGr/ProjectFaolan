@@ -33,7 +33,7 @@ HELPER=104d760 analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe \
   -noanalysis -scriptPath tools/ghidra -postScript DumpDataTableRegistry.java
 ```
 
-⚠️ `LoadStaticData` is virtual on some of these classes and not on others. It IS a vtable slot on
+`LoadStaticData` is virtual on some of these classes and not on others. It IS a vtable slot on
 `RDBComboLookup_c`; on the two tables the sweep cannot name it is not, and dumping their vftable shows only the
 `DataTable_c<T>` scaffolding. So the vtable is a route in, not *the* route in — a miss there says nothing.
 
@@ -49,18 +49,18 @@ from what the table appears to hold.
 
 | RDB type | loader | class |
 |---|---|---|
-| 1000042 | `FUN_00788e20` | `Feat_t` — the wire-id ↔ template-id map + prereq graph (#467) |
+| 1000042 | `FUN_00788e20` | `Feat_t` — the wire-id ↔ template-id map + prereq graph |
 | 1000043, 1000099, 1000506, 1065101 | `FUN_0078de40` | `FeatClassTable_c` |
 | 1000044 | `FUN_00844890` | `FeatPointsTable_c` — the FEATPOINTS per-level table |
 | 1000071 | `FUN_00d8fab0` | `TexScriptMeshGroupValues_c` (named elsewhere; not in a vtable) |
 | 1000076 | `FUN_0103f2d0` | `RDBMorphNameIDs_c` — the morph-target registry |
-| 1010203, 1010501 | `FUN_00603d70` | **`BCCTree_c`** — the behaviour-control-centre trees. ⭐ **1010203 is plain-text XML**, 1010501 its merged binary twin; `Load` tries the binary and falls back to the text. 29 trees, `<state>`/`<substate>` with `id`/`name`/`priority` — the substate table the BCC IIR's wire phases `0x0B`/`0x0C` index into (#810, #812, `--report bcc-trees`) |
+| 1010203, 1010501 | `FUN_00603d70` | **`BCCTree_c`** — the behaviour-control-centre trees. **1010203 is plain-text XML**, 1010501 its merged binary twin; `Load` tries the binary and falls back to the text. 29 trees, `<state>`/`<substate>` with `id`/`name`/`priority` — the substate table the BCC IIR's wire phases `0x0B`/`0x0C` index into (`--report bcc-trees`) |
 | 1000080, 1000081 | `FUN_0100d220` | **`RDBHairReplacement`** — named from its asserts' source path, not RTTI (decoded below) |
 | 1000505–1000508 | `FUN_00708690` | `RDBPlayerClassData_c` |
 | 1000509, 1000510, 1000512 | `FUN_00911930` | `PlayfieldPvPData_c` |
-| 1000511 | `FUN_0113e170` | `HitsManaAndStamina_c` — the per-class/level vitals curve (#3) |
+| 1000511 | `FUN_0113e170` | `HitsManaAndStamina_c` — the per-class/level vitals curve |
 | 1000513 | `FUN_00846490` | **`RDBComboLookup_c`** — the per-class/level combo DPS + stamina curve (see below) |
-| **1000514** | `FUN_0145eb70` | **`ArmorMitigation_c`** (#401) — **EMPTY on this build** |
+| **1000514** | `FUN_0145eb70` | **`ArmorMitigation_c`** — **EMPTY on this build** |
 | 1000517 | `FUN_0057e330` | `GuildGoverningFormDataTable` |
 | 1000518 | `FUN_0057edb0` | `GuildRankDataTable` |
 | 1000520 | `FUN_00813d20` | `CoreTokenHolder` |
@@ -88,7 +88,7 @@ scratch and the value discarded.
 So this is the authoritative source for the class id space, and it confirms `ConanClass` independently: Barbarian
 `0x12`, Assassin `0x22`, Necromancer `0x29`, Herald of Xotli `0x2B`, Demonologist `0x2C` all match.
 
-⚠️ **The registry row above over-claims its range.** `1000505–1000508` is written as a span, but only **1000505**
+**The registry row above over-claims its range.** `1000505–1000508` is written as a span, but only **1000505**
 carries this string-keyed shape. `1000506` is listed *again* on the `FeatClassTable_c` row and does not parse as
 class data; `1000507` is a different shape entirely — plain `[u32][u32]` pairs whose second word is a class id and
 whose first runs 1, 2, 3, 10, i.e. a race × class combination table (a lead, not a decode). Treat the loader→type
@@ -113,16 +113,17 @@ Record 1 is a wider set including ids the class registry (1000505) does not name
 `0x19`, `0x1A`, `0x1B`, `0x1E`, `0x21`, `0x23`, `0x24`, `0x2A` — so it is probably the DESIGN-time table and
 record 0 the shipped one. Undecided which the client actually uses. [V0]
 
-### ⚠️ It disagrees with our `Race` enum, and we cannot settle it from our own data
+### It fixes the `Race` enum's ids
 
-`Faolan.Core/Enums/Race.cs` is `Aquilonian = 1, Cimmerian = 2, Stygian = 3`.
+`Faolan.Core/Enums/Race.cs` is `Cimmerian = 1, Aquilonian = 2, Stygian = 3, Khitan = 10`, and this table is what
+pins it:
 
 - **Race 3 is confirmed Stygian**, both ways: the table gives it Tempest of Set / Necromancer / Herald of Xotli /
   Demonologist, and all four shipped characters are race 3 carrying `0x22`/`0x29`/`0x2B`/`0x2C`, every one of
   which the table allows for race 3.
-- **Races 1 and 2 are SWAPPED**, and our own hand-written table corroborates it. `StartingData
-  .RaceArchClassCombinations` lists the class set per race, and matching those sets to 1000507's ignores the
-  names entirely:
+- **Race 1 is Cimmerian and race 2 Aquilonian**, and our own hand-written table corroborates it.
+  `StartingData.RaceArchClassCombinations` lists the class set per race, and matching those sets to 1000507's
+  ignores the names entirely:
 
   | our label | our classes | 1000507 |
   |---|---|---|
@@ -130,15 +131,13 @@ record 0 the shipped one. Undecided which the client actually uses. [V0]
   | Cimmerian | Bear Shaman, Conqueror, Dark Templar, Guardian, Barbarian, Ranger | **race 1** (+ Assassin) |
   | Stygian | Tempest of Set, Ranger, Assassin, Herald of Xotli, Demonologist, Necromancer | **race 3** (+ Dark Templar) |
 
-  The sets we hand-authored are right; the ids the enum attaches to them are not. `Race.Aquilonian` should be 2
-  and `Race.Cimmerian` 1.
-- **A captured character confirms it, so this is settled and the enum has been flipped.** `Dikketest`
+  The class sets match with race 1 ↔ Cimmerian and race 2 ↔ Aquilonian.
+- **A captured character confirms it.** `Dikketest`
   (`Dikketest_rogue-barbarian_create`) is female, carries head mesh **1142847** and race byte **1** — and that
   head occurs in exactly one appearance list, the female heads under CHARACTERCREATOR's `<cimmerian>` element.
-  That ties wire race 1 to Cimmerian without going through our enum at all. `CaptureCharacterImporterTests`
-  asserted `Aquilonian` here purely because the expectation had been written from the enum; it is now the gate on
-  the corrected value.
-- **Race `10` is a fourth race we do not model at all** — Khitan, by its class set (Rise of the Godslayer).
+  That ties wire race 1 to Cimmerian without going through the enum at all; `CaptureCharacterImporterTests` gates
+  it.
+- **Race `10` is Khitan**, by its class set (Rise of the Godslayer).
 
 ## Decoded: 1000508 — the CREATURE RACE table
 
@@ -153,14 +152,13 @@ count × [u32 raceId][u32 nameLength][utf8 name]   the id PRECEDES its name
 
 Parses to EOF in exactly 109 entries with zero trailing bytes, and the ids are a dense `1..109` with no gaps.
 
-### ⚠️ The first decode of this was wrong, and it parsed cleanly
+### A shifted grammar parses cleanly too
 
-Worth recording, because the failure is not one a "does it parse?" check can catch. Reading the entry as
-`[nameLength][name][raceId]` from offset 20 also runs to EOF and also yields sensible-looking `id → name` pairs —
-but it pairs every name with the id of the entry **after** it, shifting the whole table by one row (`Crocodile`
-took Hyperborian's 9, `Dog` took Living Plant's 66). It additionally swallowed the first entry's `raceId` (96,
-Panther's) as the record's count, which is where the since-retracted claim that "the declared count under-reports
-by 12, parse to EOF rather than to the count" came from. The count was a fact all along; the anomaly was ours.
+A "does it parse?" check cannot choose the grammar. Reading the entry as `[nameLength][name][raceId]` from offset 20
+also runs to EOF and also yields sensible-looking `id → name` pairs — but it pairs every name with the id of the
+entry **after** it, shifting the whole table by one row (`Crocodile` would take Hyperborian's 9, `Dog` Living
+Plant's 66), and it swallows the first entry's `raceId` (96, Panther's) as the record's count, making the declared
+count look 12 short.
 
 **What settled it is an external join, not the parse.** A `Race`-category spawn group in RDB 1010506 carries a
 numeric race id *and* a human-readable group name, from different places in that record, so folding the name onto
@@ -178,7 +176,7 @@ prints this cross-check and the declared-count/trailing-byte agreement on every 
 The 28 residual disagreements are genuine content, not decode error — a group named for one creature tagged with
 a neighbouring race (`Deer 1` declares 74 = Elk).
 
-**It is not the creature catalog #518 wants**: a race carries no level, health, faction, name or equipment, so it
+**It is not a creature catalog**: a race carries no level, health, faction, name or equipment, so it
 cannot stand a creature up. What it is is the vocabulary the open-world spawn groups are named in — see
 [npc-spawn-layout-1010506.md](npc-spawn-layout-1010506.md).
 
@@ -214,7 +212,7 @@ one above.
   `0 ⊂ 30 ⊂ 286 ⊂ 6430 ⊂ 7518 ⊂ 0x7FFFFFFF` (each is a superset of the one before), which is what a rank ladder
   looks like. The top rank of **every** form carries `0x7FFFFFFF`, i.e. everything.
 
-  ⭐ **And the bits are named** (#799). The client's guild-management view builds its permission list by pairing
+  **And the bits are named**. The client's guild-management view builds its permission list by pairing
   each bit with the LDB token that labels it, handing the bit itself to `com.GameInterface.Guild.GuildPermission`
   as `m_permissionId` — so the constant and the name come out of one instruction window:
 
@@ -229,7 +227,7 @@ one above.
 
   [V1: tools/ghidra/DumpGuildRankPermissions.java]
 
-  ⚠️ `0x020` is **absent from the list and set in the shipped masks**, so it is a right the management window does
+  `0x020` is **absent from the list and set in the shipped masks**, so it is a right the management window does
   not render rather than an unused bit — as is everything above `0x800` inside the leader's `0x7FFFFFFF`. Do not
   read an unnamed bit as unused.
 
@@ -261,10 +259,8 @@ Taxiarchos / Strategos · **Harem** Trollop / Harlot / Concubine / Courtesan / M
 `GuildRankLadder` carries the names and the permission column; the `limit` column is still unread (nothing
 enforces per-rank member caps).
 
-Two corrections the sweep made to the names this table used to carry, both from guessing at a loader by what it
-sat next to: 1000042 is `Feat_t`, not `FeatTable_t`, and 1000044 is `FeatPointsTable_c` — the `FeatClassTable_c`
-name belongs to the 1000043 loader, not to it, so there was never anything ironic about a "class table" holding
-feat points.
+Name a table from its own loader, not from what it sits next to: 1000042 is `Feat_t` (not `FeatTable_t`), and
+1000044 is `FeatPointsTable_c` — the `FeatClassTable_c` name belongs to the 1000043 loader.
 
 `RDBComboLookup_c` is the only `*Lookup_c` in the binary; the rest of the `RDB*` RTTI names (there are ~70) are
 asset classes — meshes, textures, playfields, heightmaps — not data tables.
@@ -278,7 +274,7 @@ count — a **16-byte** header, then `count` entries:
 [u32 type][u32 id][u32 version][u32 count]  then count entries
 ```
 
-⚠️ The header is not uniformly 16 bytes and the count is not always the fourth word. Four tables carry one
+The header is not uniformly 16 bytes and the count is not always the fourth word. Four tables carry one
 extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the count in the FIFTH word instead
 (1000511's header reads `[1000511][0][1][2][95]`). So always **solve** the shape — the one interpretation where
 `header + count × stride == length` with a sane stride — rather than assuming a header size:
@@ -311,14 +307,14 @@ String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 10005
 (29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
 Decoded past their shape: 1000042 (layout), 1000043, 1000071, 1000099, 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
-1000517, 1000518, 1000520, 1000521, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
-work is tracked in Gitea #469.
+1000517, 1000518, 1000520, 1000521, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides
+only.
 
-⭐ **`--report data-table --report-arg <type>[:<id>]` renders any of the fixed-width ones as ROWS**, with
+**`--report data-table --report-arg <type>[:<id>]` renders any of the fixed-width ones as ROWS**, with
 `raceId`/`classId`/`archetypeId` columns resolved to names through 1000508 and 1000505. It SOLVES the count word
 and the header length rather than assuming them, because the two vary independently: most tables are
 count-in-word-3 with a 16-byte header, 1000511 is count-in-word-4 with 20, and **1000071 is count-in-word-3 with
-20**. ⚠️ A table where no candidate divides the body is REFUSED rather than rendered - 1000505 does not divide
+20**. A table where no candidate divides the body is REFUSED rather than rendered - 1000505 does not divide
 because it is variable-width, and printing it as fixed-width rows yields a plausible table of nonsense.
 
 ## Decoded: 1000071 `TexScriptMeshGroupValues_c` — a mesh GROUP membership list
@@ -338,7 +334,7 @@ has for archetypes.
 | -5 | 45 |
 | 0 | 1 |
 
-⚠️ **What the five groups MEAN is not decoded** - that needs the consumer side (the TexScript the class is named
+**What the five groups MEAN is not decoded** - that needs the consumer side (the TexScript the class is named
 for), which is this page's step-3 method rather than its step-1 one.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
@@ -380,7 +376,7 @@ An em dash is a pool the class does not have — the base is a literal 0 and the
 The table is keyed by (race, class) and is race-INVARIANT with one exception: race 4's Guardian carries a health
 growth of **59** where every other race carries 40. Nothing else differs across the five races.
 
-⚠️ **The base is NOT the displayed maximum.** Retail routinely sends a base *below* the current in the same
+**The base is NOT the displayed maximum.** Retail routinely sends a base *below* the current in the same
 packet, and the client tops it up: an L23 Assassin whose character sheet reads 1270 health has a class base of
 772. So this curve is one term of the sum, not the sum, and swapping it in as the max would LOWER every
 character's ceiling. `CharacterMaxStats.ClassBaseHundredths` exposes it and says so; the whole sum is
@@ -401,7 +397,7 @@ without a pool carries zeroes in that pool's columns (an Assassin's row is `8000
 pool(level) = base(level) + Σ weight[i] × attribute[i] / 10 + the class ClassAttributeBases pool row
 ```
 
-✅ **Both the sets and the column ORDER come from the client (#587), not from inference.** The table alone shows
+**Both the sets and the column ORDER come from the client, not from inference.** The table alone shows
 neither, because every class's weights are equal within a pool. But each pool has its own accessor, and the stat
 ids it reads *are* its attribute set:
 
@@ -417,8 +413,7 @@ wire being 1 display — and divides the result by 100 on the way out.
 So **health = Constitution**, **mana = Intelligence + Wisdom**, **stamina = Strength + Dexterity + Constitution**,
 and the weight columns are `[8]` Constitution, `[9]` Intelligence, `[10]` Wisdom.
 
-⚠️ Mana used to be the one term with slack, and this is what removed it: every captured caster happens to carry
-equal Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus could not separate
+The corpus alone cannot settle mana: every captured caster happens to carry equal Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus could not separate
 "mana scales off Wisdom" from "mana scales off Dexterity" — and there is no `0x32E` anywhere in the mana accessor.
 The captures still corroborate the sets independently (AssassinL23's 448-point health gap is 8 × 56 exactly; their
 310-point stamina gap is 2 × 155, the only triple of the five that makes it).
@@ -432,31 +427,29 @@ captured 179); and, at level, the four captured characters' world-entry pushes �
 (Demonologist L80) 5830 mana. Ten of the eleven measurable pools land exactly; the eleventh (DemoL80's health) is
 177 low because our item data for that character is short.
 
-⚠️ That 177 is now narrowed, and it is not one thing (#588). `ActiveWeaponSet` is never set by the character
-importer, so every imported character defaults to `Primary` — and DemoL80's SECONDARY set (Jagged Cut +12
+That 177 is not one thing. `ActiveWeaponSet` is never set by the character importer, so every imported character defaults to `Primary` — and DemoL80's SECONDARY set (Jagged Cut +12
 Constitution and Fetish of Caged Fiends +35, against Mindraker's +34) is worth 13 more Constitution, i.e. 104 more
 health, taking the shortfall to **73**. The remaining 73 is **not** Constitution — 73 is not a multiple of the
 health weight 8, so no attribute total produces it — so it is a flat `HealthMax` record our item data does not
 carry. It is not the vanity slots either, which is worth recording because they look like the obvious candidate:
 DemoL80's Canvas Belt (+4 Con) and Northfur Cloak (+23 Con) would add 216 health, overshooting by 143, so excluding
-them is right. Feats were ruled out separately (#589).
+them is right. Feats are ruled out separately.
 
-Which weapon set was actually drawn is **not recoverable from the corpus**, and that is now MEASURED rather than
-asserted (`--report weapon-set-drawn`, #588). The swap is observable — the server stamps the newly-active main slot
+Which weapon set was actually drawn is **not recoverable from the corpus**, measured by `--report weapon-set-drawn`. The swap is observable — the server stamps the newly-active main slot
 on a `SwitchWeaponsButton` — but a login carries no such event, and the obvious second route does not work either:
 a spawn's worn list is what every other client renders the character from, so if it carried one set at a time it
 would state the answer. It does not. Across the 10,990 captured spawns carrying a weapon slot, **138 carry a
 primary (6/8) and a secondary (20/21) at once**, and DemoL80's own spawns are among them (`[6, 20, 21]`). The list
 is the whole equipment container, exactly as the client-side-display reading says.
 
-⚠️ The same report explains why NecroL80 landing exactly validates nothing: **NecroL80's spawns carry slot 6 and
+The same report explains why NecroL80 landing exactly validates nothing: **NecroL80's spawns carry slot 6 and
 nothing else**, so she owns no second set and the `Primary` default is right for her by construction. So the
 177 → 73 is arithmetic that fits, not a measurement.
 [V3: CharacterMaxStatsTests.EveryClass_AtLevelOne_ReproducesItsCapturedSheet]
 [V3: EntityVitalsGearTests.AssassinL23_AtLevel23_MatchesTheCapturedRetailPools]
 
-This is also what explains the old hand-read offsets: the mana and stamina bases sat "6 below the sheet" for
-every class because at level 1 every attribute is 1, and 3+3 and 2+2+2 are both 6.
+This is also why the mana and stamina bases sit "6 below the sheet" for every class at level 1: every attribute
+is 1 there, and 3+3 and 2+2+2 are both 6.
 
 ## 1000513 `RDBComboLookup_c` — the combo damage/stamina curve
 
@@ -486,7 +479,7 @@ min(comboLevel, stat 0x3C5 = ApprenticeLevel))`, and it logs
 is a real gameplay constraint and not just a tooltip number. Both consumers substitute **1.0** and log a
 `MISSING …` line when their value is `<= 0`.
 
-⚠️ **The two halves are not equally load-bearing, and the call graph says which is which.** `FUN_007d7cc0` (the DPS
+**The two halves are not equally load-bearing, and the call graph says which is which.** `FUN_007d7cc0` (the DPS
 chain) has **exactly one caller** — `FUN_007d6c10`, which computes it, computes the stamina cost beside it, and
 hands both to `FUN_005efbc0`, the builder that emits the `ComboStarter` / `ComboFinisher` description lines; and
 `FUN_007d6c10`'s own callers are the combo-book list and `GetComboTooltip`. So the DPS number is **displayed, never
@@ -550,31 +543,30 @@ So the subsystem is "what your hair turns into when something is on your head" �
 mechanism — with a default per hair type and a table of exceptions per (hair type, head asset).
 
 Nothing imports it. It is client-side appearance: the client already loads both tables and owns the mesh swap, and
-the server never names a hair mesh. Recorded here because #469 asks what the tables ARE, and because these two were
+the server never names a hair mesh. Recorded here because these two were
 the only ones with no name at all.
 
-## ⭐ Decoded: 1065101 + 1000043 `FeatClassTable_c` — the feat-tree registry, and the ALTERNATE ADVANCEMENT trees
+## Decoded: 1065101 + 1000043 `FeatClassTable_c` — the feat-tree registry, and the ALTERNATE ADVANCEMENT trees
 
 Two tables of the `FeatClassTable_c` cluster, and together they are the **whole feat-tree structure** — including
-the AA trees Gitea #150 had been unable to find anywhere.
+the ALTERNATE ADVANCEMENT trees.
 
 ```
 1065101   49 records   [u32 treeId][u32 classId][u32 0][u32 0]
 1000043 9916 records   [rowId][classId][level][wireFeatId][autotrain][treeId][column][flag][tier][pointsRequired]
 ```
 
-⚠️ **1000043's columns were mis-assigned here until #862**, and the mistake mattered: word 0 was read as the
-feat id and word 3 as a "line id". Word 0 is the row's OWN id — which is why it "matches neither `Feats.Id` nor
-`FeatIdMaps.WireFeatId`, 0 of 9,916" — and **word 3 is the wire feat id**, resolving on 9,907 of 9,916. Word 4
-was read as a constant zero because the AA rows this section was written from are uniformly trainable; over the
-whole table it is the **auto-train flag** (`FeatClassEntry.Autotrain`, true on 3,839 rows). See
+**Word 0 is the row's OWN id**, not a feat id — it matches neither `Feats.Id` nor `FeatIdMaps.WireFeatId`, 0 of
+9,916 — and **word 3 is the wire feat id**, resolving on 9,907 of 9,916. Word 4 looks like a constant zero on the AA
+rows, which are uniformly trainable; over the whole table it is the **auto-train flag**
+(`FeatClassEntry.Autotrain`, true on 3,839 rows). See
 [feats.md](../subsystems/feats.md) for the full column table and what the flag settles.
 
 `1065101` is the **registry**: 48 trees plus one zero row, and exactly **4 trees per class** across the twelve
 playable `ConanClass` values. `1000043` is the **membership**, and its own `classId` agrees with the registry's
 on every row.
 
-### ⭐ Twelve of the 48 are the AA trees, and they separate on three independent axes
+### Twelve of the 48 are the AA trees, and they separate on three independent axes
 
 | | the other 36 | trees `1000177`–`1000190` |
 |---|---|---|
@@ -582,7 +574,7 @@ on every row.
 | line ids | 120,000–431,901 | **≥ 1,020,000** |
 | level gates | 10 / 15 / 20 / 25 / 30 | **20 and 80** |
 
-⭐ **80 is the level cap**, which is exactly what post-80 progression means — and there are twelve of them, one
+**80 is the level cap**, which is exactly what post-80 progression means — and there are twelve of them, one
 per playable class:
 
 ```
@@ -591,10 +583,10 @@ per playable class:
 1000186 TempestOfSet  1000188 HeraldOfXotli 1000189 PriestOfMitra 1000190 Ranger
 ```
 
-### ⭐⭐ And each AA tree's 240 lines reproduce the client's three PERK LINES, from the data
+### And each AA tree's 240 lines reproduce the client's three PERK LINES, from the data
 
 The client asserts `"PerkLine is not 1, 2 or 3 on spell id %d"` and names them `PerkGeneral` / `PerkArchetype` /
-`PerkClass` (#150). Bucketing each tree's line ids by prefix and asking **who else has the same set** produces
+`PerkClass`. Bucketing each tree's line ids by prefix and asking **who else has the same set** produces
 exactly that, with no fitting:
 
 | bucket | lines | shared by | reads as |
@@ -603,22 +595,20 @@ exactly that, with no fitting:
 | `140xxxx` | **62** | the **3** classes of one archetype — Assassin/Barbarian/Ranger, Conqueror/DarkTemplar/Guardian, BearShaman/PriestOfMitra/TempestOfSet, Demonologist/HeraldOfXotli/Necromancer | `PerkLine 2` — **Archetype** |
 | `10xxxxx` | **73** | **one** class (`102xxxx` Guardian, `107xxxx` DarkTemplar, `112xxxx` Barbarian, …) | `PerkLine 3` — **Class** |
 
-`105 + 62 + 73 = 240`. ⭐ The four archetype groups are AoC's own Rogue / Soldier / Priest / Mage, three classes
+`105 + 62 + 73 = 240`. The four archetype groups are AoC's own Rogue / Soldier / Priest / Mage, three classes
 each, recovered here from nothing but which line ids two trees have in common.
 
-⚠️ **Which bucket is PerkLine 1 versus 3 is an inference** from the client's naming (`1 = PerkGeneral`,
+**Which bucket is PerkLine 1 versus 3 is an inference** from the client's naming (`1 = PerkGeneral`,
 `3 = PerkClass`) laid over the sharing structure. The structure is measured; the numbering is read onto it.
 
-⭐ **The perk names ARE reachable** — this section used to say they were not, on the mis-assigned column above.
-Resolving word 3 through `FeatIdMap` names **all 2,880** AA rows (268 distinct perks), and words 8/9 place each
+**The perk names are reachable.** Resolving word 3 through `FeatIdMap` names **all 2,880** AA rows (268 distinct perks), and words 8/9 place each
 one in its tree: `Electric Wards`, `Fire Wards` and `Pressing Strikes` sit at tier 1 columns 2/3/4 of the
 Necromancer's `1000184`, five ranks each. RDB **1000099** ("feat point cost info") then gives each of those rows
 its point cost — 2,880 placements, priced in the two AA point pools at 1..50 — and it covers the AA trees and
-*nothing else*. All of that is imported: `FeatClassEntry` for the placement, `FeatPerkCost` for the price. So
-#150 has the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the
-AA UI or of a perk being bought.
+*nothing else*. All of that is imported: `FeatClassEntry` for the placement, `FeatPerkCost` for the price. What
+is missing is a capture of the AA UI or of a perk being bought; open work tracked in Gitea #150.
 
-### ⭐ And the AA CURRENCY is named too — by the tuning sheet
+### And the AA CURRENCY is named too — by the tuning sheet
 
 The half the tree tables do not carry is how a perk is *paid for*, and RDB **1000516** states it outright
 (`--report rdb-tweaks --report-arg AlternateAdvancement`):
@@ -636,20 +626,20 @@ AlternateAdvancement_PvPModifier                  5
 So the economy reads: fill a **1,000,000**-point pool, receive **1 generic + 3 specific** tokens, spend them
 against the 1..30 costs of 1000099, holding at most **100** unspent of each kind.
 
-⭐ **And one of the pool stats is CAPTURED.** `AAPvEXP` (stat **1000007**) occurs in the corpus — 136 records
+**And one of the pool stats is CAPTURED.** `AAPvEXP` (stat **1000007**) occurs in the corpus — 136 records
 over 12 (capture, handle) runs, all on the one level-80 character, running **535,035 … 862,514**, i.e. inside
 that 1,000,000 ceiling, which corroborates the cap being this stat's. Its eight AA siblings
 (`AACurrentFeatPerfected`, `AAFeatPerfectionTimeStamp`, `AATimeSpentPerfectingFeats`,
 `AAFeatPerfectionTimeRemaining`, `AAPvPXP`, `PerkLine`, `PerkSize`, `AATokensGainedSeasonal`) are **absent from
 the corpus entirely** — every capture is a low-level character except that one.
 
-⚠️ What is still missing is therefore narrower than "the wire": it is **how much a kill pays into the pool**
+What is still missing is therefore narrower than "the wire": it is **how much a kill pays into the pool**
 (the observed within-session steps are 2, 27, 27, 57, 91, 258 on one character, with nothing in the corpus
 naming what was killed for each), and the purchase message itself. Both need a capture of an endgame character.
 
 ## Decoded: 1000627 `GroupFinderActivitiesTable` — the group-finder activity catalog
 
-**12,012 bytes, decoded BY HAND from the bytes** (#469) — the parse callback resists a static read
+**12,012 bytes, decoded BY HAND from the bytes** — the parse callback resists a static read
 (`FUN_013B21C0` drives a reflective `std::tr1::_Bind` walk with no transcribable `read()` sequence), so the
 grammar below comes from aligning the records against each other, and the SEMANTICS from every id resolving in
 our own `Maps` table (26 of 26 distinct candidates).
@@ -678,10 +668,10 @@ our own `Maps` table (26 of 26 distinct candidates).
 [352 u32 tail]                              un-walked
 ```
 
-⚠️ **The record is LITTLE-endian**, unlike most of the wire. An earlier reading of this table quoted its words
-byte-swapped (`0x0EDDE941` for the prelude's `0x41E9DD0E`); the field VALUES above are the LE ones.
+**The record is LITTLE-endian**, unlike most of the wire: the prelude's word is `0x41E9DD0E`, not the
+byte-swapped `0x0EDDE941`. The field VALUES above are the LE ones.
 
-### ⭐ The ActivityId is the record's 1-based SEQUENCE — and the capture, not the table, is what proves it
+### The ActivityId is the record's 1-based SEQUENCE — and the capture, not the table, is what proves it
 
 The scry script that starts an entry carries `CategoryId=4;ActivityId=38`, and the natural reading of the
 94-entry section is that an activity is indexed *within* its category. **The corpus refutes that.** Record
@@ -696,7 +686,7 @@ the UI lists under each tab — rather than the id→record mapping, and the ser
 `GroupFinderActivityCatalog` (ten coordinate-carrying activities, all ten resolving in our own `Maps`), gated
 by `GroupFinderActivityCatalogTests`, including the rival-keying control.
 
-⚠️ The catalog holds only the rows that state an explicit `[x][y][z][heading]`. The rest of the six-man block
+The catalog holds only the rows that state an explicit `[x][y][z][heading]`. The rest of the six-man block
 addresses its destination by a **landmark name** (`Frost_Swamp_Zone_In`, `Imirian_Ravine_Zone_In`,
 `Oasis_of_Zaara_Zone_In`, `StartPlace`), which needs a per-playfield landmark table we do not hold — those
 activities are left out rather than entered at an invented point.
@@ -715,13 +705,12 @@ The content, every id resolved through `Maps`:
   (3033), The Scorpion Cave (3035) — `E` = the playfield, `D` = a 5,078,5xx location id (unresolved), the
   destination in the record's own `[x][y][z][heading]`.
 
-⚠️ Left unnamed: `idB`/`idC` (no LDB category resolves them; the style matches the prelude ids), the
+Left unnamed: `idB`/`idC` (no LDB category resolves them; the style matches the prelude ids), the
 5,078,5xx `D` ids on coordinate rows, the exact meaning of the six party-shape words past "24-man vs 6-man",
-and the 352-word tail. Naming those needs the reflective consumer at runtime — content for the group-finder
-tier (#669's neighbourhood), not a table decode. ⭐ The `activity -> teleport` mapping that used to sit on this
-list is **no longer open**: it is the record sequence, established above.
+and the 352-word tail. Naming those needs the reflective consumer at runtime, not a table decode. The
+`activity -> teleport` mapping is the record sequence, established above.
 
-## ⭐ Decoded: 1000521 `GuildRenownRewardDataTable` — the guild-city reward ladder, in retail's own words
+## Decoded: 1000521 `GuildRenownRewardDataTable` — the guild-city reward ladder, in retail's own words
 
 **57 records × 12 bytes**, a 20-byte header with the count in word 3:
 
@@ -729,7 +718,7 @@ list is **no longer open**: it is the record sequence, established above.
 [u32 rewardId][u32 guildRenownLevel][u32 ldbDescriptionId]
 ```
 
-⭐ **The third column is an LDB id in category `10021`**, which is what turns a table of numbers into content: it
+**The third column is an LDB id in category `10021`**, which is what turns a table of numbers into content: it
 is the reward's own description text. All **57 resolve**, and the scan behind that was complete over the
 plaintext LDB (0 unreadable, and category 10021 is not among the encrypted ones), so this is the whole ladder
 rather than the part that happened to resolve.
@@ -798,11 +787,11 @@ decoration tiers, Border Kingdom PvP vendors, per-archetype companions, the aren
 | 20 | 56 | 142662386 | Vendors sell recipes to weave the Commander's Haversack. |
 | 20 | 57 | 142662387 | Some decoration vendors upgrade their wares. |
 
-⚠️ The reward is a DESCRIPTION, not a grant: the row carries no item, recipe or spell id, so what actually
+The reward is a DESCRIPTION, not a grant: the row carries no item, recipe or spell id, so what actually
 becomes available is stated in prose and would have to be wired per line. That is a content statement about the
 table, not a decode gap — there is no fourth column.
 
-Related: #147 (guild cities), #335 (the renown block on the guild full-update).
+Related: guild cities (open work tracked in Gitea #147) and the renown block on the guild full-update (Gitea #335).
 
 ## Decoded: 1000520 `CoreTokenHolder` — the alternate-CURRENCY catalog
 
@@ -817,10 +806,10 @@ count, and every record is variable-width:
 count × [u8 tokenId][u16 nameLen][name][u8 group][u32 ldbNameId][u32 ldbDescriptionId]
 ```
 
-⚠️ **The name is gated on `fileVersion`** — the callback reads it only `if (1 < version)`, so a v1 file has no
+**The name is gated on `fileVersion`** — the callback reads it only `if (1 < version)`, so a v1 file has no
 names at all and a reader that assumes them would desync on one. This build ships v2.
 
-⭐ **The two u32s are LDB ids, and they are COMPUTED from the name**: `elf28("<name>_Name")` and
+**The two u32s are LDB ids, and they are COMPUTED from the name**: `elf28("<name>_Name")` and
 `elf28("<name>_Description")`, the same 28-bit hash the bark tokens use (see
 [ldb-string-index.md](ldb-string-index.md)). It reproduces **26 of the 29 rows exactly**, and the three misses
 are the AltAdvancement family, whose LDB tokens are the SHORT spelling — `AAPvEToken`, `AAPvPToken`,
@@ -845,7 +834,7 @@ index. `group` is an unnamed classification byte, and its clusters are legible:
 | 7 | `TeleportCoins` (50) |
 | 8 | `AtlanteanShard` (60) |
 
-⚠️ The group byte is the one field with no independent evidence for its MEANING. The loader stores it at the map
+The group byte is the one field with no independent evidence for its MEANING. The loader stores it at the map
 entry's `+0x1c` and the clusters read as a kind (AA tokens together, relics together, trophies together, the PvP
 currencies together) — but "kind" is a description of the grouping, not a decode of the column.
 
@@ -865,10 +854,10 @@ byte with nothing left over:
 [u32 fileVersion = 1][u32 languageCount = 6]
 languageCount × [str langCode][u32 wordCount][wordCount × str]
 
-str = [u32 byteLength][bytes]                # ⚠️ UTF-8, not Latin-1
+str = [u32 byteLength][bytes]                # UTF-8, not Latin-1
 ```
 
-⚠️ **The strings are UTF-8 and u32-length-prefixed**, both unlike the wire (`[u16][Latin-1]`). The length is a
+**The strings are UTF-8 and u32-length-prefixed**, both unlike the wire (`[u16][Latin-1]`). The length is a
 BYTE count rather than a character count — `Abscheißer` is 10 characters and 11 bytes — and the 707 Korean
 entries settle the encoding beyond the one German case.
 
@@ -883,7 +872,7 @@ entries settle the encoding beyond the one German case.
 | **total** | **920** |
 
 The list itself is not reproduced here. Nothing on our side filters chat; this is the catalog a filter would
-read, and its shape is what #469 wanted.
+read.
 
 ## Decoded: 1000509 / 1000510 / 1000512 `PlayfieldPvPData_c` — playfield → PvP RULESET
 
@@ -901,16 +890,16 @@ So two of them are **lookups** and one is the **ruleset table** they point into.
 | `1000512` | 5 | `[u32 playfieldId][u32 rulesetId]` |
 | `1000510` | 13 | the RULESETS, 21 × u32 each |
 
-⭐ **The foreign key holds**: every ruleset id either lookup names — `1, 2, 3, 6, 7, 8, 11, 12` from 1000509 and
+**The foreign key holds**: every ruleset id either lookup names — `1, 2, 3, 6, 7, 8, 11, 12` from 1000509 and
 `4, 5, 13` from 1000512 — exists in 1000510, which is exactly the condition that assert fires on. And **235 of
 1000509's 243 playfield ids are in our `Maps`** (`1010` Conall's Valley, `1020` Field of the Dead, `2020`
 Tarantia Common District, …), which is what says column 0 is a playfield rather than an index.
 
-⭐ **1000512's five are the PvP MINIGAME maps** — `5201` Blood Ravine, `5006` The Call of Jhebbal Sag, `5012`
+**1000512's five are the PvP MINIGAME maps** — `5201` Blood Ravine, `5006` The Call of Jhebbal Sag, `5012`
 Lost Temple, `5005` Hallowed Vaults, `5002` Totem Torrent — and they are the only three rulesets (4, 5, 13) that
 1000509 never names. So it is the minigame table, not an override of the same rows.
 
-⚠️ The **alternate** column is structural, not named. 186 of the 243 rows are ruleset `7` with no alternate, 36
+The **alternate** column is structural, not named. 186 of the 243 rows are ruleset `7` with no alternate, 36
 are ruleset `1` with alternate `8`, and the rest have none. Rulesets 1 and 8 are the only pair that shares a
 trailing `[20] = 1`, so the alternate is a variant of the same rule rather than an unrelated one — a PvE/PvP
 dimension split is the obvious reading (the login handshake does offer `Saga of Blood` beside `Crom`) and is
@@ -936,16 +925,16 @@ The 13 rulesets, columns `[1]`, `[5..7]`, `[9..13]` and `[15..19]` being zero on
 ```
 
 `[4]` is `[3] × 200` wherever both are set, so one is derived from the other (6 / 1200 and 12 / 2400 read as a
-duration in two units). ⚠️ Ruleset **1** — the ordinary open-world one — also carries `[3] = 6` with `[4] = 0`,
+duration in two units). Ruleset **1** — the ordinary open-world one — also carries `[3] = 6` with `[4] = 0`,
 so `[3]` is not minigame-specific and neither column is named here. `[14]` is a reference of some kind —
 `269317` twice, `144407` and `4230307` once each — and it resolves to **nothing**: not a `Spells` or `Items`
 row, and `--report rdb-id` finds **0 entries** for any of the three anywhere in the RDB index. So it is not a
 resource id, and naming it needs the accessor's consumers rather than the table.
 
-### ⭐ What the rulesets turn out to BE, read through the playfields that use them
+### What the rulesets turn out to BE, read through the playfields that use them
 
-Resolving every playfield id against `Maps` partitions the 13 rulesets along exactly the PvP zone types
-(Gitea #146 / #503):
+Resolving every playfield id against `Maps` partitions the 13 rulesets along exactly the PvP zone types (open
+PvP work tracked in Gitea #146 / #503):
 
 | ruleset | used by |
 |---:|---|
@@ -957,7 +946,7 @@ Resolving every playfield id against `Maps` partitions the 13 rulesets along exa
 | **11** | `The Pit Master's Arena (Fighting Pits)` (1043) |
 | **12** | `Khemi's Sparring Arena`, `Coils of the Serpent`, `Feast Hall`, `Council Forum`, `Ritual Chambers`, `The Lion's Maw` |
 
-⚠️ Three playfields that look like they belong here are in **neither** table: `5003 PvP - TEAM DEATHMATCH`,
+Three playfields that look like they belong here are in **neither** table: `5003 PvP - TEAM DEATHMATCH`,
 `5200 PvP CTF 1` and `5100 Border Kingdoms - Massive PvP`. The shipped rules cover the five live minigame maps
 and the Border Kingdoms ends, not those.
 
@@ -976,7 +965,7 @@ It bounds that word to `1..512` and stores the second one **indexed by it**, int
 if (level - 1U < 0x200)  vector[level - 1] = conRating;      // else the error above
 ```
 
-⚠️ **Each level appears TWICE, and the second entry wins.** The file is interleaved per level — first a
+**Each level appears TWICE, and the second entry wins.** The file is interleaved per level — first a
 decade-BANDED value, then a flat `9`:
 
 | levels | banded value (first entry) | second entry |
@@ -1005,21 +994,19 @@ would be a column nothing could act on. Reproduce with:
 dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1065103 --out <dir> --Content:RdbDir <rdb-dir>
 ```
 
-## ⚠️ ARMOR_MITIGATION is empty
+## ARMOR_MITIGATION is empty
 
 Type 1000514 is 16 bytes: `[1000514][0][1][0]` - a valid header declaring **zero entries**. The table ships
 but carries no rows on this build.
 
-This CONFIRMS #401's blocker rather than removing it. `CombatResolver` notes the client uses its closed-form
-mitigation formula "when its ARMOR_MITIGATION table has no matching row"; there are no rows at all, so that
-path is always taken, and the formula's `C1/C3/C4` coefficients really do have to come from the runtime
-balance config (a live Frida dump). The table route is closed, and now provably so rather than by assumption.
+The client uses its closed-form mitigation formula when its ARMOR_MITIGATION table has no matching row; there are no
+rows at all, so that path is always taken. Its coefficients are tuning-sheet constants (`TWK_TargetPerLevelArmor`
+and friends, see [client-tweak-table.md](client-tweak-table.md)), and `CombatResolver.MitigationFraction` computes it.
 
 
-## ⭐ Decoded: 1000506 `FeatClassTable_c` — the archetype → class MEMBERSHIP table
+## Decoded: 1000506 `FeatClassTable_c` — the archetype → class MEMBERSHIP table
 
-The registry table above files 1000506 under `RDBPlayerClassData_c` because 1000505–1000508 is written there as a
-span. It is not: `DumpDataTableRegistry` puts 1000506 on the **`FeatClassTable_c`** loader (`FUN_0078de40`), whose
+The registry row above writes 1000505–1000508 as a span, but 1000506 is not `RDBPlayerClassData_c`: `DumpDataTableRegistry` puts 1000506 on the **`FeatClassTable_c`** loader (`FUN_0078de40`), whose
 own bail-out names it — *"Could not load classmembership info. This will cause gui to loose parent class feats"*.
 
 ```
@@ -1051,12 +1038,10 @@ Entry 1, in full:
 Entry 0 adds `21, 23, 30` to Soldier, `25, 26, 27` to Priest, `19, 33, 35, 36` to Rogue and `42` to Mage — ten ids
 1000505 does not name, i.e. cut classes.
 
-⭐ **This retires a wiki citation.** `ConanArchetypes` stated that "the client ships the archetype IDS (1000505 tier
-1) but no MEMBERSHIP table … so the membership is taken from the game's own published documentation". The
-documentation was right, and it is now corroboration rather than the source: all twelve placements agree with entry
-1 exactly. `--report class-hierarchy` re-runs that comparison and fails loudly on any drift.
+So the client ships the membership table, and `ConanArchetypes` agrees with entry 1 on all twelve placements.
+`--report class-hierarchy` re-runs that comparison and fails loudly on any drift.
 
-## ⭐ Decoded: 1000099 `FeatClassTable_c` — the feat POINT COST table
+## Decoded: 1000099 `FeatClassTable_c` — the feat POINT COST table
 
 Named by its loader's two error strings — *"Could not load feat point cost info."* and, in the parse callback
 (`FUN_0078e560`), *"Invalid class point cost data size -- Expected[…] Got[…]"*. The callback also rejects any
@@ -1078,7 +1063,7 @@ Measured over the shipped 3,096 records:
 | `kind` | `2` or `3`, exactly 1,548 of each |
 | `cost` | 1–50, 26 distinct values |
 
-### ⭐ `kind` is the AA POINT POOL, and the client names it
+### `kind` is the AA POINT POOL, and the client names it
 
 The consumer settles it. `GetPointCost` — the `com.GameInterface.FeatWindows.AAFeatTree` API, `FUN_01506700`
 — walks this exact vector (`for (p = begin; p != end; p += 0xC)`), reads the **cost at `+8`** and switches on
@@ -1093,26 +1078,24 @@ the **`kind` at `+4`** into three GUI keys:
 The middle column is the client's own enum, registered by the same GameInterface (`FUN_01504bf0`) with those
 literal values — so the three ids are the AA half of the token table, not a coincidence of small numbers.
 
-⚠️ **This corrects an earlier reading here.** The 216 keys that appear **twice**, once under each `kind` and
-at the **same cost**, were taken as proof that *"`kind` is not a currency — a currency would give every feat both
-rows"*. That premise is wrong: a perk priced in one pool only is a perk that pool's players alone may buy, which
+The 216 keys that appear **twice**, once under each `kind` and at the **same cost**, do not argue against `kind`
+being a currency: a perk priced in one pool only is a perk that pool's players alone may buy, which
 is exactly what the split looks like. Of the 22 perks every class carries, the crowd-control resistances
 (`Root` / `Snare` / `Stun` / `Fear` / `Stagger Resistance`, `Quick Steps`, `Precise Strikes`, `Field of War`) are
 priced in **PvP** points and the elemental wards (`Fire` / `Frost` / `Electric` / `Unholy` / `Holy Wards`,
 `Pressing` / `Decisive Strikes`, `Immeasurable Empowerment`) in **PvE** ones. The dual rows are the handful
 either side may buy, and their equal cost means the pool is a restriction on the buyer, never a discount.
 
-⚠️ The shipped table never uses `kind` 4, though the client handles it — no perk is priced in the generic
+The shipped table never uses `kind` 4, though the client handles it — no perk is priced in the generic
 token, which is consistent with `AlternateAdvancement_GenericTokensAwarded` being 1 against 3 specific.
 
-Imported as `FeatPerkCost` (#150), keyed `(FeatClassEntryId, PointType)` and gated by `AaPerkCostTests`.
+Imported as `FeatPerkCost`, keyed `(FeatClassEntryId, PointType)` and gated by `AaPerkCostTests`.
 
-⭐ **The key is 1000043's ROW ID** (#862) — its word 0, the column that section used to read as a feat id. All
-3,096 rows resolve, and joining through it names every one: the key is a `(class, level, feat, tree, tier)` row,
-so a cost is attached to a feat's PLACEMENT in a tree rather than to the feat. It joined to nothing before
-because the search was for a feat id, and word 0 is not one.
+**The key is 1000043's ROW ID** — its word 0. All 3,096 rows resolve, and joining through it names every one: the
+key is a `(class, level, feat, tree, tier)` row, so a cost is attached to a feat's PLACEMENT in a tree rather than
+to the feat. Searched as a feat id it joins to nothing.
 
-⭐ **And what it covers is the answer to "where does a feat's point cost come from?"** — every one of the 2,880
+**And what it covers is the answer to "where does a feat's point cost come from?"** — every one of the 2,880
 rows it names sits in the twelve level-20/80 ALTERNATE-ADVANCEMENT trees (`treeId` 1000177–1000190 — the
 range is not dense; 1000185 and 1000187 do not exist), and no ordinary tree
 feat has a row at all. Ordinary feats have no cost table because they do not need one: they cost **one point per
@@ -1134,20 +1117,20 @@ and a per-record loop of ten unconditional reads plus two conditional ones:
 |---:|---|
 | 0 | kept, and **also divided by 100** into a second slot |
 | 1–6 | kept |
-| **7** | ⚠️ **read and discarded** |
+| **7** | **read and discarded** |
 | 8 | kept |
-| **9** | ⚠️ **read and discarded** |
+| **9** | **read and discarded** |
 | 10, 11 | read as a pair; **which one is used depends on the header's MODE word** — mode 1 takes word 11, mode 2 takes word 10, and the taken value **replaces** word 0's `/100` |
 
 so nine of the twelve reach `FUN_0078B490`, the row constructor, and two never leave the stream.
 
-⭐ The arithmetic corroborates the column count independently: the decompressed resource is **316,484 B**, and
+The arithmetic corroborates the column count independently: the decompressed resource is **316,484 B**, and
 `20 + 6593 × 48` is exactly that — 12 words per record, 6,593 records, a 20-byte header.
 
-⚠️ Two consequences for anyone reading this table by stride. The `/100` slot means **word 0 is not in the units it
+Two consequences for anyone reading this table by stride. The `/100` slot means **word 0 is not in the units it
 looks like**, and the mode-selected pair means **the last two columns are not both live** — one of them is dead on
 any given build, and which one is not a property of the record at all. `RdbFeatImporter.ReadIdMapAndPrereqs`
 currently reads words 0, 1 and 10 (`(wireId, templateId)` and the base index) and is unaffected by either.
 
-What the nine kept columns MEAN is still open — that is step 3 of the method above (`DumpXrefsTo` on the
-accessor, then the consumers' log strings), and it is what Gitea #469 tracks for this table.
+What the nine kept columns MEAN is not decoded — that is step 3 of the method above (`DumpXrefsTo` on the
+accessor, then the consumers' log strings).

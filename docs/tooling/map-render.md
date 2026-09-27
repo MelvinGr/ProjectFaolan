@@ -66,36 +66,35 @@ unrotated case is ruled out. The full-resolution visual overlay decides it in on
   slot 4 would fail the all-pairs floors against slot 2 anyway. The `.txt` table carries the same provenance in
   a `via` column (`name` / `containment` / `id-prop` / `manual` / `unresolved`).
 
-  This encoding is what surfaced #489: id-propagation used to run without requiring the creature to have been
-  seen on the target map, so 319 of 329 propagations (3697 NPCs across 17 maps) were unsupported — Poitain's 29
-  groups all read `Panther` from a `(Superfamily, 4)` key whose only captured panthers are in Tortage, while
-  Poitain's own captures say Wild Pig and Wild Cow. With the same-map evidence gate the tier is down to 10 areas
-  and Poitain renders its containment-resolved groups against honest unknowns.
+  Id-propagation requires the creature to have been seen on the target map (a same-map evidence gate). Without
+  it the propagation tier is mostly unsupported: a `(Superfamily, 4)` key whose only captured panthers are in
+  Tortage would label all of Poitain's groups `Panther`, while Poitain's own captures say Wild Pig and Wild Cow.
+  The dashed edge is what makes such an inference visible on the render.
 - Each group's label is `<name> ×<MaxCount>` — its population. `MaxCount` equals the group's anchor-point count
-  for all 2664 areas in the DB, so the one number says both. Because group boxes overlap and abut, labels are
+  for every area in the DB, so the one number says both. Because group boxes overlap and abut, labels are
   decluttered by nudging each one down (into its own box) until it clears the already-placed ones and the
   character marker; extents are approximated from the font size, since measuring them would need a draw pass.
 - `NpcSpawnArea` and `NpcSpawn` are drawn as distinct layers because they are distinct populations: the former
   is the RDB-authoritative ambient roam group, the latter an exact entity observed in a retail capture.
 
-## Reading it as #363 migration progress
+## Reading it as graduation progress
 
-The `NpcSpawn` layer is EVERY row of that table for the map, **not** the subset lacking an area — and that table
-is transitional. `NpcSpawn.NpcSpawnAreaId` is a temporary MEMBERSHIP marker on the way out of it (#363):
+The `NpcSpawn` layer is EVERY row of that table for the map, **not** the subset lacking an area. Captured spawns
+that belong to an ambient group are graduated out of `NpcSpawn` into the group's pool, and
+`NpcSpawn.NpcSpawnAreaId` is the membership marker for that:
 
 | stage | mechanism |
 |---|---|
 | resolve the area's creature | `.setnpcgroup` → `DatabaseRepository.SetNpcSpawnAreaCreature` (`ResolvedBy = Manual`) |
 | link its captured spawns | `SpawnAreaResolver.LinkCapturedSpawns` (creature match + bounds ±5u) or `.setnpcgroup`; reversible via `UnlinkNpcSpawnsFromArea` |
 | graduate | `.graduatenpcgroup` → `GraduateSpawnArea` **deletes** the linked `NpcSpawn` rows |
-| spawn from then on | a resolved area becomes an `AmbientPool` (`AmbientPoolService.LoadAsync`) holding ~`MaxCount` on the group's points, wandering (#266), fading on death, refilled by `AmbientPoolService.Replenish` |
+| spawn from then on | a resolved area becomes an `AmbientPool` (`AmbientPoolService.LoadAsync`) holding ~`MaxCount` on the group's points, wandering, fading on death, refilled by `AmbientPoolService.Replenish` |
 
-Linking is already non-duplicating **at runtime** — `AmbientPoolService` treats a linked captured spawn as a member
-of that area's pool rather than a separate entity, so there is no captured/ambient overlap in the live world.
-Graduation makes that permanent in the data and drops the frozen captured position in favour of the pool's wander.
+Linking is non-duplicating **at runtime** — `AmbientPoolService` treats a linked captured spawn as a member of that
+area's pool rather than a separate entity, so there is no captured/ambient overlap in the live world. Graduation
+makes that permanent in the data and drops the frozen captured position in favour of the pool's wander.
 
 So the render doubles as a progress view: an **unresolved** (orange) group is work remaining; a diamond **inside**
 a resolved group is linked-or-linkable, i.e. ready to graduate; a diamond **outside** every group is a genuine
 independent placement (named/quest NPC) that should survive. As graduation proceeds the diamonds drain away and
-`NpcSpawns` shrinks toward only that last category. It is null for all 1228 rows on every map today, so nothing
-has graduated yet and the two layers are currently disjoint.
+`NpcSpawns` shrinks toward only that last category.

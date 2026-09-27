@@ -1,16 +1,16 @@
-# Minigames + Massive PvP: the message surface (Gitea #146, #147)
+# Minigames + Massive PvP: the message surface
 
 AoC's instanced PvP **minigames**, the open-world **Massive PvP** (Border Kingdom battlekeep) scoring layer, and
-the **guild city / siege** tier that shares its area-id space. None of them is implemented. This page is the
-wire surface for all three: what the 120 capture dumps actually contain, and what the client's own code says
-about everything they do not.
+the **guild city / siege** tier that shares its area-id space. This page is the wire surface for all three: what
+the capture dumps contain, and what the client's own code says about everything they do not. What our server
+implements is [`../subsystems/pvp-minigames.md`](../subsystems/pvp-minigames.md) and
+[`../subsystems/guild-cities-and-sieges.md`](../subsystems/guild-cities-and-sieges.md).
 
 Two sources, kept apart on purpose:
 
-* **Captured** — seen in `<data-repo>/Captures/*.tshark.json`. The login polls, **plus the whole minigame QUEUE**:
-  a 2026-08-20 capture (`…_annotated_group-finder_pvp-matchmaking`) signs up for four different minigames, brings
-  the board to life and dequeues again, with the player annotating each step as they take it. Every one is
-  handled today.
+* **Captured** — seen in `<data-repo>/Captures/*.tshark.json`. The login polls, **plus the whole minigame queue**:
+  a capture (`…_annotated_group-finder_pvp-matchmaking`) signs up for four different minigames, brings the board to
+  life and dequeues again, with the player annotating each step as they take it.
 * **Client-recovered** — the rest. Method names and parameter types come from
   [`aoc-client-rpc-methods.json`](aoc-client-rpc-methods.json); field widths come from each
   `<Class>InterfaceDispatch_t::<Method>` reader in `AgeOfConan.exe`, which bails out per field with a string
@@ -36,12 +36,12 @@ Swept over all 137 dumps, both directions, for every opcode in the two systems' 
 | s2c | CSPlayerInterface `0xA5` | `DispatchMassivePvpInfoRequestReturn` | 147 | the guild board, below |
 
 **Nothing beyond the queue appears anywhere in the corpus** — no match creation, no side picking, no capture zone,
-no score update. Queueing is now captured; a match forming out of the queue is not. Note also that retail answers
+no score update. Queueing is captured; a match forming out of the queue is not. Note also that retail answers
 `PvPMatchMakingIsInMatchMaking` and `RequestMassivePvPScoreData` with **no packet at all** when there is nothing
 to report — and it answers the former with silence *even in the capture where the player was queued*, which is
 what says the silence is the answer rather than a gap.
 
-## The minigame QUEUE (Gitea #882)
+## The minigame queue
 
 The four c2s messages and their two replies, walked end to end at t=1057…1150 of
 `NecroL80_mage-necromancer_login_gameplay_annotated_group-finder_pvp-matchmaking` — seven signups, four removals,
@@ -61,15 +61,14 @@ c PvPMatchMakingRequestInfo [u32 i_QueueType]   -> s the board:
   [u32 i_nNumberOfAnyApplies]
 ```
 
-⭐ **The board is LIVE state, and the capture proves it by moving.** Until this capture the message was on record
-here as "captured empty" — `[0x3F1][u32 0]` in every login dump — and the server shipped that constant. It is the
-EMPTY BOARD, not the message's shape: across the 43 bodies every field tracks the player's own signups second by
-second. All 43 parse to the packet end under the grammar above, and the board *constructed* from a live registry
+**The board is live state, and the capture proves it by moving.** Every login dump carries `[0x3F1][u32 0]`; that
+is the empty board, not the message's shape: across the 43 bodies every field tracks the player's own signups
+second by second. All 43 parse to the packet end under the grammar above, and the board *constructed* from a live registry
 reproduces a captured body byte for byte (`Board_BuiltFromLiveSignupsIsTheCapturedBody`).
 
 Three things fall out of watching it move:
 
-* **A character holds exactly ONE signup.** Every `PutIntoMatchMaking` raises its own map's count by one *and*
+* **A character holds exactly one signup.** Every `PutIntoMatchMaking` raises its own map's count by one *and*
   drops the previously chosen map's by one, in the same board — which is also why
   `PvPMatchMakingRemoveFromMatchMaking` needs no argument.
 * **The registry is sticky.** A map appears the first time anyone queues for it and stays listed at 0 afterwards,
@@ -80,23 +79,23 @@ Three things fall out of watching it move:
   removal annotated *"disabled join first avaialbl"*. Those signups are counted there and are deliberately **not**
   listed as a type-0 group.
 
-⭐ **Both leading words of a signup resolve outside this message.** `i_nMap` is a PLAYFIELD id — the four captured
+**Both leading words of a signup resolve outside this message.** `i_nMap` is a playfield id — the four captured
 maps are 5006 / 5201 / 5012 / 5005, which are `The Call of Jhebbal Sag` / `Blood Ravine` / `Lost Temple` /
 `Hallowed Vaults` in `Maps`, a table harvested from a file that knows nothing about this message. And `i_nType` is
 the **LDB 802 objective id**: the player annotated *"signed up for conquest pvp"* over the type-4 signup and
 *"signed up for capture the skull"* over the type-5 ones, and LDB 802 key 4 is `Conquest`, key 5 is
 `Capture The Skull`. Same corroboration pattern as the Massive-PvP board's `areaId`.
 
-⚠️ `0x7E2` here is the ONE-ELEMENT list frame, not a constant: the innermost frame is `0x7E2` in all 43 bodies
-because every captured signup carries `i_QueueType` 0, so each map has exactly one queue. The innermost KEY is 0
+`0x7E2` here is the one-element list frame, not a constant: the innermost frame is `0x7E2` in all 43 bodies
+because every captured signup carries `i_QueueType` 0, so each map has exactly one queue. The innermost key is 0
 throughout for the same reason, so reading it as `queueType` is inference from the two messages that carry that
 field rather than measurement. `[V0: the innermost map key of the matchmaking board]`
 
-⚠️ `i_bBringTeam` is 0 and `i_AsTeamMember` is 0 in every captured frame — the session was solo, so the corpus
+`i_bBringTeam` is 0 and `i_AsTeamMember` is 0 in every captured frame — the session was solo, so the corpus
 shows only one side of each. `[V0: i_AsTeamMember with a team]`
 
-⛔ **Matchmaking PROPER is still uncaptured.** Nothing pops out of the queue in this capture: no
-`WantsToStart`, no `YouJoinedMatch`, no minigame instance. That needs enough players to fill one.
+**Matchmaking proper is uncaptured.** Nothing pops out of the queue in this capture: no `WantsToStart`, no
+`YouJoinedMatch`, no minigame instance. That needs enough players to fill one.
 
 ## `DispatchMassivePvpInfoRequestReturn` (0x20A5) — the battlekeep board
 
@@ -111,7 +110,7 @@ entry = [u32 key][u32 rank][u32 areaId][u32 7200][u32 900][u32 scoreA][u32 score
 ```
 
 The three top-level fields are the client's own names for them. **The list is a `std::map`, not a vector**: the
-reader (`FUN_0134f090`) takes a u32 KEY off the stream before each element, which is why every captured entry
+reader (`FUN_0134f090`) takes a u32 key off the stream before each element, which is why every captured entry
 carries its rank twice.
 
 Two readings that a corpus alone cannot separate, and one it can:
@@ -120,18 +119,18 @@ Two readings that a corpus alone cannot separate, and one it can:
   so "the trailing count" and "a small constant offset" are the same number here. The client names it, so the
   name wins; the value we send for the empty board (1) satisfies both readings.
 * `otherName` is **empty in 990 of the 1000 captured rows**, and an empty `[u16 0]` followed by the `[u32][u8]`
-  tail is seven zero bytes — indistinguishable from padding. The grammar carried in the server until #146 read
-  exactly that ("[u16 len][name][7 zero bytes]") and therefore parsed 122 of the 125 bodies. The other three
-  carry `"Fury (Dead)"` / `"Yellow Lotus (RP)"` there and are 17–19 bytes longer. This is the 0x3F1 trap's string
+  tail is seven zero bytes — indistinguishable from padding. A `[u16 len][name][7 zero bytes]` grammar parses
+  122 of the 125 bodies; the other three carry `"Fury (Dead)"` / `"Yellow Lotus (RP)"` there and are 17–19 bytes
+  longer. This is the 0x3F1 trap's string
   cousin: **a length prefix that is zero in almost every capture reads as padding.**
 * `areaId` takes three values (11040 / 12070 / 13050) in contiguous runs over the eight rows, and the 7200 / 900
   columns are constant in every entry of every body — 2 hours and 15 minutes in seconds.
-* ⭐ **`areaId` is a PLAYFIELD id, corroborated from a file that knows nothing about this message.** All three
+* **`areaId` is a playfield id, corroborated from a file that knows nothing about this message.** All three
   are in `Maps` — `Border Kingdoms, Cimmerian End` (11040), `Border Kingdoms, Aquilonian End` (12070) and
   `Border to Kush` (13050) — and RDB **1000509** (`PlayfieldPvPData_c`, [client-data-tables.md](../rdb/client-data-tables.md))
   files exactly those three, plus `Massive Pvp Test` and `Minigames (General)`, under **PvP ruleset 6** and
   nothing else under it. So the wire's area id space and the client's own massive-PvP ruleset pick out the same
-  set, from a capture and from an asset file respectively. Gitea #146 / #147.
+  set, from a capture and from an asset file respectively.
 
 `otherName` and the `tail`/`tailFlag` pair vary **together**: the ten rows with a non-empty `otherName` are
 exactly the ten with a non-zero tail. What either means is not recoverable from the corpus.
@@ -164,7 +163,7 @@ sensor-volume ids — the same trigger-volume family as RDB 1000053 (see
 [`../rdb/bounded-areas-1000053.md`](../rdb/bounded-areas-1000053.md)), which is where a real implementation would have to source
 them.
 
-### ⭐ The match's own STATE, and the two enums the end carries
+### The match's own state, and the two enums the end carries
 
 The minigame messages all land on one singleton, `PvPMatchMaking_c` at `DAT_0297d358`, and the fields they
 write are what the Flash API and the two match views read back. Three of its words are the whole end of a
@@ -176,7 +175,7 @@ match:
 | `+0x1b8` | `MatchStarted` (`FUN_00546510`: `gameTime − i_nSecondsSinceStarted`), zeroed by `MatchEnded` | `GetTimeLeft` = `matchStart + timeLimit@+0xc8 − now` |
 | `+0x1d0` / `+0x1d4` | `MatchEnded` (`FUN_005465b0`) | `GetWinningSide` / the results page |
 
-⭐ **`i_eYourResult` is named by the page that renders it.** The status view copies `+0x1d4` onto its own
+**`i_eYourResult` is named by the page that renders it.** The status view copies `+0x1d4` onto its own
 `+0x484` (`FUN_01737080` @`01737f2a`, with `+0x1d0` going to `+0x488` right after), and `FUN_01738490`
 branches on it to pick an LDB-100 header token — `TEST EAX,EAX` @`0173880c`, then `CMP EAX,0x1`:
 
@@ -203,7 +202,7 @@ status accessor's twin `FUN_00b66320` names `PvPMinigameStatus_e` the same way).
 | 3 | `MatchStarted` (`FUN_00546510`) | the running match |
 | 4 | `MatchEnded` (`FUN_005465b0`) | the **Results** page |
 
-### ⭐ `MinigameScore_c` — the score record, carved from its reader
+### `MinigameScore_c` — the score record, carved from its reader
 
 `FUN_00559940`, field by field (`FUN_0048f900` is the u32 primitive; the two list readers are the ordinary
 `0x3F1`-framed ones):
@@ -216,13 +215,13 @@ MinigameScore_c =
     sideMapA                          # FUN_004d5900 into +0x2c
     sideMapB                          # FUN_004d5900 into +0x3c
     [u32 → +0x4c]
-    sideMapB again                    # FUN_004d5900 into +0x3c a SECOND time - same container
+    sideMapB again                    # FUN_004d5900 into +0x3c a second time - same container
 
 scoreMap  = [u32 (count+1) * 0x3F1]  { count × [u32 key0][u32 key1] [u32 side][u32 kills][u32 deaths][u32 score][u32 ?] }
 sideMap   = [u32 (count+1) * 0x3F1]  { count × [u32 key][u32 value] }
 ```
 
-⭐ **The record is stored at `PvPMatchMaking_c + 0x16C`, and four independent offsets say so** — the accessors
+**The record is stored at `PvPMatchMaking_c + 0x16C`, and four independent offsets say so** — the accessors
 read `+0x180` (`= 0x16C + 0x14`, the score map `GetTotalCharacterScore` walks), `+0x198` and `+0x1a8`
 (`= +0x2c` / `+0x3c`, the two maps `GetSideScore(side, 0|1)` looks a side up in), and `+0x1b8` (`= +0x4c`) —
 which is the **match-start clock** `GetTimeLeft` reads. So the score record carries the match start time.
@@ -234,8 +233,8 @@ own "kills reduce the enemy's score" rule. The two `key` words are an ID32 (the 
 them, `FUN_00bf7ad0`); the fifth value word is the one `GetTotalCharacterScore(side, 1)` sums and is unnamed.
 `[V0: the MinigameScore_c scalars at +0x04/+0x08/+0x0c/+0x10/+0x24/+0x28 and the entry's fifth value word]`
 
-⚠️ **Nothing builds this yet.** The server ends a match on the clock/score limit and sends only
-`DispatchMinigameMatchEnded`; the six unnamed scalars are why the score PUSH is not built (Gitea #146).
+Our server does not build this record: it ends a match on the clock/score limit and sends only
+`DispatchMinigameMatchEnded`, because the six scalars above are unnamed.
 
 ## Client-recovered: matchmaking (`CSPlayerAgent` c2s / `CSPlayerInterface` s2c)
 
@@ -254,21 +253,21 @@ Scalar bodies, complete:
 | c2s | `0x59` | `PvPMatchMakingForceSide` | `[ID32 character][u32 side]` |
 | c2s | `0x46` / `0x47` | `Apply/WithdrawFromMassivePVPBattleQueue` | `[ID32 character][ID32 guild][u32 area]` |
 | s2c | `0x75` | `DispatchPvPMatchMakingWantsToStart` | `[u32 i_nKickedInSeconds]` |
-| s2c | `0x76` | `DispatchPvPMatchMakingPlayerJoined` | ⚠️ `[cCharacter i_cPlayer][u32 i_nSide]` — the WHOLE member record (its reader `FUN_01346780` calls the roster's own `FUN_005574d0`), not the ID32 this table first carved; a 12-byte form is discarded as stream-bad (found live, 2026-08-26) |
+| s2c | `0x76` | `DispatchPvPMatchMakingPlayerJoined` | `[cCharacter i_cPlayer][u32 i_nSide]` — the whole member record (its reader `FUN_01346780` calls the roster's own `FUN_005574d0`), not an ID32; a 12-byte ID32 form is silently discarded as stream-bad |
 | s2c | `0x77` | `DispatchPvPMatchMakingPlayerChangedSide` | `[ID32 i_cPlayer][u32 i_nNewSide]` (reader `FUN_01346920`: three scalar words) |
-| s2c | `0x78` | `DispatchPvPMatchMakingPlayerLeft` | ⚠️ `[cCharacter i_cCharacterID]` — the whole record (`FUN_01346aa0`) |
-| s2c | `0x79` | `DispatchPvPMatchMakingPlayerKicked` | ⚠️ `[cCharacter i_cCharacterID][str i_cMessage]` — the whole record (`FUN_01346be0`) |
+| s2c | `0x78` | `DispatchPvPMatchMakingPlayerLeft` | `[cCharacter i_cCharacterID]` — the whole record (`FUN_01346aa0`) |
+| s2c | `0x79` | `DispatchPvPMatchMakingPlayerKicked` | `[cCharacter i_cCharacterID][str i_cMessage]` — the whole record (`FUN_01346be0`) |
 | s2c | `0x7A` | `DispatchPvPMatchMakingErrorCode` | `[u32 i_nErrorCode]` |
 | s2c | `0x7F` | `DispatchPvPMatchMakingStartClicked` | `[u32 i_nTeleportInSeconds]` |
 | s2c | `0x80` | `DispatchPvPMatchMakingYouAreInMatchMaking` | `[u32 i_nMap][u32 i_nType][u8 i_ShowFifo][u8 i_AsTeamMember][u32 i_queueType]` |
 | s2c | `0x83` | `DispatchPvPMatchMakingMatchSay` | `[str i_cFrom][str i_cMessage][u8 i_bFifo]` |
 | s2c | `0x84` | `DispatchPvPMatchMakingCollectingMorePlayers` | `[u32 i_nSecondsUntilForcedStart]` |
-| s2c | `0x85` | `DispatchPvPMatchMakingNewMatchLeader` | `[ID32 i_cNewMatchLeader]` (reader `FUN_01347b50`: two words — an `i_c` name does NOT decide record-vs-ID32; check each reader) |
+| s2c | `0x85` | `DispatchPvPMatchMakingNewMatchLeader` | `[ID32 i_cNewMatchLeader]` (reader `FUN_01347b50`: two words — an `i_c` name does not decide record-vs-ID32; check each reader) |
 | s2c | `0x86` | `…TeamLeaderSignedUpForMatchMaking` | `[u32 i_nMap][u32 i_nType]` |
 | s2c | `0x8B` | `…CantChangeSideYouHaveBeenLockedToSide` | `[u32 i_nSide]` |
 | s2c | `0x8C` | `…CharacterNowLockedToSide` | `[ID32 i_cCharID][u32 i_nSide]` |
 | s2c | `0x8D` | `…CharacterNoLongerLockedToSide` | `[ID32 i_cCharID]` |
-| s2c | `0x92` | `DispatchPvPMatchMakingInfoRequestReturn` | `[list i_cList][u32 i_nNumberOfAnyApplies]` — captured empty |
+| s2c | `0x92` | `DispatchPvPMatchMakingInfoRequestReturn` | `[list i_cList][u32 i_nNumberOfAnyApplies]` — the queue board above |
 | s2c | `0xA6` | `DispatchMassivePvPBattleQueueFeedback` | `[u32 i_nFeedbackType][u32 i_nFeedbackValue]` — the 18 types and their texts are tabled in `docs/subsystems/guild-cities-and-sieges.md` |
 | s2c | `0xA7` | `DispatchMassivePvpStartCountDown` | `[u32 i_cEndTime]` |
 | s2c | `0xA8` | `DispatchMassivePvpBattleQueueStatusUpdate` | `[u32 i_nArea][u8 i_inQueue]` |
@@ -276,10 +275,10 @@ Scalar bodies, complete:
 `const ID32&` is two words (`[u32 class][u32 instance]`), per
 [`../protocol/02-rpc.md`](../protocol/02-rpc.md).
 
-### ⭐ `i_cMatch` — the whole-match payload, recovered field-by-field from the client
+### `i_cMatch` — the whole-match payload, recovered field-by-field from the client
 
 The three messages carrying a whole match — `YouJoinedMatch` / `MatchInfo` (`i_cMatch`) and `SearchResult`
-(`i_cMatches`) — still have **zero captured instances**, because no captured queue ever filled. Their layout is
+(`i_cMatches`) — have **zero captured instances**, because no captured queue ever filled. Their layout is
 nevertheless pinned, because the client contains all three halves of it and they agree:
 
 | what | function | what it establishes |
@@ -302,10 +301,9 @@ PvPMatchRules_c  =  [u32 A]  [u32 B]  [u32 C]  [u32 D]  [u32 E]     # struct +0x
                     [u32 I]                                         # +0x40
 ```
 
-⭐ **The roster entries are `cCharacter` — the SAME record the team subsystem carries.** `FUN_0055bdb0` walks a
+**The roster entries are `cCharacter` — the same record the team subsystem carries.** `FUN_0055bdb0` walks a
 0x7c-stride vector calling `FUN_005574d0`, which is the reader
-[`TeamMemberRecordCodec`](../../Faolan.Core.Network/Codecs/Team/TeamMemberRecordCodec.cs) was decoded against
-(#669). So the match's player list needs no new record type; it is a `TeamMemberRecord` vector.
+[`TeamMemberRecordCodec`](../../Faolan.Core.Network/Codecs/Team/TeamMemberRecordCodec.cs) was decoded against. So the match's player list needs no new record type; it is a `TeamMemberRecord` vector.
 
 Three independent checks that the split above is right rather than a plausible carve:
 
@@ -317,8 +315,8 @@ Three independent checks that the split above is right rather than a plausible c
 * The conditional pair is gated on the byte at element `+0x3D` — i.e. `FlagB` — in **both** the single-match
   reader and the list reader.
 
-⭐ **Eight of the twelve fields are NAMED from the client — not from a capture (there is still none), but from the
-code that DISPLAYS a match.** The reader takes the words straight into the struct with no per-field bail-out
+**Eight of the twelve fields are named from the client — not from a capture (there is none), but from the code
+that displays a match.** The reader takes the words straight into the struct with no per-field bail-out
 string, so a search for names on the wire path finds nothing; the names are on the *consumer* side, in three
 places that agree:
 
@@ -333,24 +331,24 @@ places that agree:
 | `FlagB` | `+0x3D` | *behaviour, not a name*: when **0**, the client announces the match with fifo text (`PvPMatchMakingYouCreatedMatch` / `YouJoinedMatch` in `FUN_00547070`, `PvPMatchMakingPlayerJoined` in `FUN_005471b0`) and the record carries the two extra tail words; when 1 it stays silent | the same byte gates both, in the wire reader and in the copier |
 | roster count | — | **Players** | the debug view's second column is `(roster.end − roster.begin) / 0x7c` |
 
-Sources, so the next reader does not re-find them: the **community-server debug view**
+Sources: the **community-server debug view**
 `Views/CommunityServerDebugGUI/pvpmatchmaking.xml` (`FUN_016b6020`; its match-list row filler `FUN_016b6bd0`
 takes the 0x70 record and labels the columns ID / Players / Map / Ruleset / QueueType / Server), the **Flash API**
 `com.GameInterface.PvPMinigame` (`FUN_00b64c30` registers `GetMatchType` / `GetSideScore` / `GetTotalCharacterScore`
 / `InMatchPlayfield` / `GetMinigameStatus` / `GetWinningSide` / `GetCaptureZoneName` / `GetTimeLeft` /
 `GetToGameTimeLeft` / `GetScoreLimit` / `PlantCTFFlags`, each a one-line thunk off the `PvPMatchMaking_c` singleton
 at `DAT_0297d358`), and the **match views** under `Views/TeamGUI/` (`PVPMatchStatusView.xml`,
-`PvPMatchBuildupView.xml` with its `MatchTypeView` / `TimeLimitView` / `ScoreLimitView`). `tools/ghidra/DecompileXrefsTo.java`
-(every function that touches the singleton) and `DecompileRange.java` (a whole GUI band) are the two scripts the
-hunt needed.
+`PvPMatchBuildupView.xml` with its `MatchTypeView` / `TimeLimitView` / `ScoreLimitView`). Scripts:
+`tools/ghidra/DecompileXrefsTo.java` (every function that touches the singleton) and `DecompileRange.java` (a whole
+GUI band).
 
-⚠️ **The other four words and the string are still only INFERRED**, and the reason is a negative worth recording:
+**The other four words and the string are only inferred**, and the reason is a negative worth recording:
 the one view that would have named them — `Views/TeamGUI/PvPSearchResultView.xml` (`PvPSearchResultView_c`,
 `FUN_01733610`) — declares ten columns, **Leader / Match / Region / NumTeams / TeamSize / BCoins / Tier / Pwd /
 Time / Applied**, and its row class `PvPSearchResultItem_c` has typed setters for them (`NumTeams` = `"%d(%d)"`,
-`TeamSize` = `"%d-%d"` — a RANGE — `BCoins` = one integer, `Pwd` = a **bool** that opens the `PasswordPrompt`
+`TeamSize` = `"%d-%d"` — a range — `BCoins` = one integer, `Pwd` = a **bool** that opens the `PasswordPrompt`
 before `JoinMatch`, `Time` = seconds as `mm:ss`, `Applied` = a 64-bit `time_t`). **The whole search feature is
-dead in this build, on both ends of the wire** (Gitea #894, where the scans are listed):
+dead in this build, on both ends of the wire**:
 
 * **No row is ever built.** Raw scans over every initialized byte of the image (`tools/ghidra/ScanRelCalls.java`
   `ALL=1`, E8 + E9; `tools/ghidra/FindAddrOperand.java`, absolute addresses) find no call, jump, immediate or
@@ -362,8 +360,8 @@ dead in this build, on both ends of the wire** (Gitea #894, where the scans are 
   `FUN_016652c0` (0 `PVPMatchmaking.xml`, 1 this view, 2 `PvPMatchBuildupView.xml`, 3 `PVPMatchStatusView.xml`).
   Pages 0, 2 and 3 are built by the window's live init `FUN_01664da0` (called from `FUN_0158cce0`) and by the
   slots it connects (`FUN_01665500`, `FUN_016656a0`, `FUN_01665a00`); page 1 is built only by `FUN_016655d0` and
-  by the generic switch, and nothing in the image calls, jumps to or takes the address of either. ⚠️ A zero-caller
-  count is not the proof on its own — two LIVE pages also have zero-caller `Show*` methods (`FUN_01665430`,
+  by the generic switch, and nothing in the image calls, jumps to or takes the address of either. A zero-caller
+  count is not the proof on its own — two live pages also have zero-caller `Show*` methods (`FUN_01665430`,
   `FUN_016658b0`); the proof is that page 1 has no live route at all.
 * **The client cannot even ask.** `CSPlayerAgentProxy_t::PvPMatchMakingSearchForMatches` (`FUN_013647b0`, method
   `0x4f`) is virtual — slot 82 (`+0x148`) of the proxy vtable at `02072334` — so no direct-call scan can see its
@@ -373,7 +371,7 @@ dead in this build, on both ends of the wire** (Gitea #894, where the scans are 
   request — which is why `PvPMatchMakingSearchForMatches` appears in no capture, and why a `SearchResult` body
   cannot be captured by playing.
 * **Nothing outside the exe fills it.** The GUI ships as XML; the client's `Data/Gui/PythonModules` directory is
-  EMPTY; the view's XML declares only the `MultiColListView` and its two buttons, and none of the 41 shipped SWFs
+  empty; the view's XML declares only the `MultiColListView` and its two buttons, and none of the 41 shipped SWFs
   belongs to it. The embedded Lua (luabind 0.9.1, Funcom fork) registers exactly twelve classes — Vector,
   Quaternion, ID32, Engine, Playfield, Dynel, Character, Item, Spell, Camera, Callback and a resource-dependency
   namespace — none of them PvP; the Flash bridge (`com.GameInterface.PvPMinigame`, `FUN_00b64c30` / `FUN_00b64930`)
@@ -382,8 +380,8 @@ dead in this build, on both ends of the wire** (Gitea #894, where the scans are 
 
 The linker kept the class because the refresh slot the view connects, `FUN_017341d0` — itself a vestigial loop that
 dynamic_casts each row and does nothing with the result — references its RTTI. So there is no filler mapping record
-offsets onto those columns, and the remaining route to `C`/`D`/`E`/`H` is the element's OTHER carriers,
-`YouJoinedMatch` / `MatchInfo`: a capture in which a queue fills. What the column TYPES and the debug command's
+offsets onto those columns, and the remaining route to `C`/`D`/`E`/`H` is the element's other carriers,
+`YouJoinedMatch` / `MatchInfo`: a capture in which a queue fills. What the column types and the debug command's
 defaults support, without a consumer to prove it:
 
 | field | struct | reading | evidence |
@@ -392,22 +390,25 @@ defaults support, without a consumer to prove it:
 | `D`, `E` | `+0x0C`, `+0x10` | team size min / max (`3`–`6`) | `TeamSize` is rendered `"%d-%d"`, a range; the debug defaults are `3` and `6` |
 | the string, `FlagA` | `+0x14`, `+0x3C` | password, has-password | the debug command sets both together from its one optional string argument; `Pwd` is a bool column and gates the password prompt |
 | `H` | `+0x38` | unnamed | never set by the debug command, read by nothing found |
-| ~~`tail1`/`tail2`~~ | `+0x68`, `+0x6C` | **the match LEADER's ID32** — named 2026-08-26 by the copier's fifo chooser (`00547117..2f`): the stored pair is compared against the LOCAL PLAYER's ID32, a match raising `PvPMatchMakingYouCreatedMatch` and a mismatch `PvPMatchMakingYouJoinedMatch`. Not the `Applied` time this row first guessed. | the chooser reads both words as one identity and the two fifo tokens are its two outcomes |
+| `tail1`/`tail2` | `+0x68`, `+0x6C` | **the match leader's ID32** — named by the copier's fifo chooser (`00547117..2f`): the stored pair is compared against the local player's ID32, a match raising `PvPMatchMakingYouCreatedMatch` and a mismatch `PvPMatchMakingYouJoinedMatch`. Not the `Applied` time. | the chooser reads both words as one identity and the two fifo tokens are its two outcomes |
 
-⚠️ **The chooser's "local player" is the client's OWN CHARACTER world ID32, so two clients on ONE account both read "You created a match".** The identity is `n3EngineClient` singleton slot `+0x28` (`FUN_00596160` = `*(engineClient+0xb0)+0x1b8`, the local player dynel's ID32) — per-character. The server broadcasts ONE `YouJoinedMatch` naming a single leader (byte-identical to every member), so exactly ONE client should match; two clients dual-boxed under one account resolve the same local identity and both show "created". A same-account CLIENT artifact, not a wire fault — the leader we send is correct and singular (verified in-client 2026-08-26; confirm with a second account).
+The chooser's "local player" is the client's own character world ID32 (`n3EngineClient` singleton slot `+0x28`,
+`FUN_00596160` = `*(engineClient+0xb0)+0x1b8`, the local player dynel's ID32). The server broadcasts one
+`YouJoinedMatch` naming a single leader (byte-identical to every member), so exactly one client matches; two
+clients dual-boxed under one account resolve the same local identity and both show "You created a match" — a
+same-account client artifact, not a wire fault.
 
 `[V0: the PvPMatchRules_c C/D/E/H columns]`
 
-⛔ **The search filter is NOT this element.** `PvPMatchMakingSearchForMatches(const PvPMatchMakingSearchFilter_c&)`
-has a writer of its own — `FUN_00558f50`, reached from `FUN_013647b0` — and it writes just
-**`[u32][u8]`**. (An earlier note here said the element reader was shared with the filter; it is not.)
+**The search filter is not this element.** `PvPMatchMakingSearchForMatches(const PvPMatchMakingSearchFilter_c&)`
+has a writer of its own — `FUN_00558f50`, reached from `FUN_013647b0` — and it writes just **`[u32][u8]`**.
 
-## Client-recovered: guild cities + battlekeeps (Gitea #147)
+## Client-recovered: guild cities + battlekeeps
 
 The siege layer sits on the same tier and shares the board's area-id space — `RequestBattleKeepInformation`
 takes a vector of area ids, and the board's `areaId` column is where those ids show up with values
-(11040 / 12070 / 13050). **Not one of these eleven messages appears in any of the 120 dumps**: no captured
-session ever opened the guild-city or battlekeep UI.
+(11040 / 12070 / 13050). Apart from the Phase3And4 reply below, none of these messages appears in the dumps: no
+captured session opened the guild-city UI.
 
 | dir | opcode | method | body |
 |---|---|---|---|
@@ -433,14 +434,14 @@ Phase1And2:  [u32 (n + 1) * 0x3F1]  { n × keep }                               
 keep      =  [keepId]  [u32 (m + 1) * 0x3F1] { m × [ID32 guild][kills][total] }  [ID32 a][ID32 owner][nextPhaseUnix][phase]
 ```
 
-⭐ The columns are named from the keep window's filler (`FUN_01315130`, `MassivePvPBattleKeepView.xml`), which
+The columns are named from the keep window's filler (`FUN_01315130`, `MassivePvPBattleKeepView.xml`), which
 reads the struct both readers fill — the whole derivation, the LDB 10032 phase names (War Declaration / Skirmish /
 Silence before the storm / War / Aftermath) and the attacker-ranking columns (kills, total, minigame = total −
 kills) are in [`../subsystems/guild-cities-and-sieges.md`](../subsystems/guild-cities-and-sieges.md). Phase3And4
-is captured (four replies, `BattleKeepInfoCodec`); Phase1And2 is not — the frame once taken for its single sample
-is a GameCharInterface loot reply wearing the same lossy `0x20A9` wire rendering.
+is captured (four replies, `BattleKeepInfoCodec`); Phase1And2 is not — a GameCharInterface loot reply wears the same
+lossy `0x20A9` wire rendering and is not a sample of it.
 
-## ⭐ The minigame ROSTER, from the LDB
+## The minigame roster, from the LDB
 
 The message catalogue above was recovered from the client's method tables; what it could not say is *which
 minigames exist and what each one's objective is*. The LDB says both, in two small enumerable catalogs:
@@ -457,12 +458,12 @@ minigames exist and what each one's objective is*. The LDB says both, in two sma
 | 9 | — | Training Capture The Skull |
 | 13 | Annihilation | Annihilate Opposing Team |
 
-⚠️ **The two are separate id spaces, not a pair** — key 2 is *"Capture the Skull"* in 800 and *"Conquest"* in
-802 — so 800 reads as the minigame/arena NAME and 802 as the RULE SET, each keyed by its own index. Do not join
+**The two are separate id spaces, not a pair** — key 2 is *"Capture the Skull"* in 800 and *"Conquest"* in
+802 — so 800 reads as the minigame/arena name and 802 as the rule set, each keyed by its own index. Do not join
 them on the key. The `Training …` variants in 802 are their own entries, which is what a practice queue looks
 like.
 
-⭐ **And one map's whole ruleset is written out.** LDB 10015 carries per-arena rules text; `500200` is Totem
+**One map's whole ruleset is written out.** LDB 10015 carries per-arena rules text; `500200` is Totem
 Torrent (playfield 5002, one of the five RDB 1000512 minigame maps):
 
 > Team annihilation: The goal of the game is kill all members of the opposing force. Join one of two teams, red
@@ -475,7 +476,7 @@ So Totem Torrent is a respawn-anchor mode with capture points that harden the an
 a complete, implementable ruleset with no invention. `10015/5201` likewise pins **Blood Ravine** to *Capture the
 Skull*. The other three 1000512 maps have no 10015 entry.
 
-## The per-minigame CAREER is a stat block, and we already carry it
+## The per-minigame career is a stat block, and we already carry it
 
 Stat ids `0x290..0x29F` are one contiguous PvP/minigame career, and the client names every member:
 
@@ -488,33 +489,29 @@ Stat ids `0x290..0x29F` are one contiguous PvP/minigame career, and the client n
 | `0x295` | `PvPMatchesPlayed` | | `0x29E`/`0x29F` | `PvPSiegeMatchesWon` / `…Lost` |
 | `0x296`/`0x297` | `PvPFlagsCaptured` / `PvPFlagsReturned` | | | |
 
-⭐ Every one of the win/loss pairs is **already in the player spawn scaffold's word list**
-(`SpawnPreIir.WordStatIds`), so the career counters ride the wire on every player spawn today — at zero, because
-nothing moves them. The two immediately after the block, `0x2A0 GuildWarID` and `0x2A1 DefendingGuildWarID`, are
-the siege side's pairing (#147).
+Every one of the win/loss pairs is **in the player spawn scaffold's word list** (`SpawnPreIir.WordStatIds`), so the
+career counters ride the wire on every player spawn. The two immediately after the block, `0x2A0 GuildWarID` and
+`0x2A1 DefendingGuildWarID`, are the siege side's pairing.
 
-⚠️ `NPCKills`/`NPCDeaths` are the only two ids of the run that retail does **not** populate, and they are
+`NPCKills`/`NPCDeaths` are the only two ids of the run that retail does **not** populate, and they are
 deliberately not sent — see `Character`'s remark and `SnapshotStatSheet`.
 
-## What is built, and what still blocks the rest
+## Wire facts from live in-client runs
 
-The **match loop is built and verified in-client** (2026-08-26, two live clients, four minigame maps) — the
-implementation is [`../subsystems/pvp-minigames.md`](../subsystems/pvp-minigames.md); this page stays the wire
-reference. In one line: queue → capacity-gated formation → locked sides → server-driven countdown teleport →
-one match-owned playfield instance → leave/relog round trips. Three wire facts the live runs settled belong
-here rather than there:
+The match loop (queue → capacity-gated formation → locked sides → server-driven countdown teleport → one
+match-owned playfield instance → leave/relog round trips) is implemented and verified in-client; see
+[`../subsystems/pvp-minigames.md`](../subsystems/pvp-minigames.md). Wire facts established by those runs:
 
-* **the countdown move is SERVER-initiated** — after `StartClicked` the client displays *"Entering minigame in
+* **the countdown move is server-initiated** — after `StartClicked` the client displays *"Entering minigame in
   about 10 seconds"* and sends nothing; the c2s `PvPMatchMakingTeleportToMinigame` is the manual rejoin, not
   the countdown's completion;
 * **`DispatchPvPMatchMakingMatchRemoved` (0x207C, empty body) resets the client's match state** — pressing the
   stale buildup view's Start button after a server restart sends `StartMatch`, and answering it with 0x207C
-  visibly cleared the window (the no-arg feedback-override reading, confirmed live);
-* the `PlayerJoined`/`PlayerLeft`/`PlayerKicked` record-vs-ID32 corrections in the table above were found by
-  the same runs (a 12-byte ID32 form is silently discarded as stream-bad).
+  clears the window;
+* `PlayerJoined`/`PlayerLeft`/`PlayerKicked` carry the whole member record (a 12-byte ID32 form is silently
+  discarded as stream-bad).
 
-What still blocks the REST is content and systems, not the wire: the sensor-volume capture zones (#513) and
-scoring for a playable minigame, the battlekeep areas behind `areaId`, and — for guild cities — a
-building/object-persistence model and the Architect tradeskill that feeds it. Open work tracked in Gitea #146
-(minigames / Massive PvP) and #147 (sieges / battlekeeps / guild cities); #498 covers the city plots the
-captures DO carry, as destructibles.
+What remains is content and systems, not the wire: the sensor-volume capture zones and scoring for a playable
+minigame, the battlekeep areas behind `areaId`, and — for guild cities — a building/object-persistence model and
+the Architect tradeskill that feeds it. Open work tracked in Gitea #146 (minigames / Massive PvP) and #147
+(sieges / battlekeeps / guild cities).

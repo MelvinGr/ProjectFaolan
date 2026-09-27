@@ -3,7 +3,7 @@
 One authoritative reference for the protocol, in which **every stated fact carries a verification tag and a
 citation** that a test resolves against the repo. The machine-derivable parts are *generated*, not hand-written.
 
-Read [`methodology.md`](methodology.md) for the method (the verification ladder, the anti-drift tests, the migration order).
+Read [`methodology.md`](methodology.md) for the method (the verification ladder, the anti-drift tests, the boundary rule).
 
 ## Layer pages (hand-written, every fact tagged)
 
@@ -22,7 +22,7 @@ Read top-down; each assumes the one above it.
 
 Regenerated from the compiled types; a test fails if they drift. See [`gen/README.md`](gen/README.md).
 
-- [`gen/opcodes.md`](gen/opcodes.md) — 819 opcodes across 16 interfaces, direction + class id
+- [`gen/opcodes.md`](gen/opcodes.md) — every RPC method across the interfaces, direction + class id
 - [`gen/iir-types.md`](gen/iir-types.md) — the 32-bit IIR sub-opcodes, each with its BKDR-31 hash recomputed as proof
 - [`gen/protobuf.md`](gen/protobuf.md) — every protobuf message, per-field wire encoding (zigzag/fixed surfaced)
 - [`gen/coverage.md`](gen/coverage.md) — how much of the protocol is actually decoded (V3/V2/V1 burndown)

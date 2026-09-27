@@ -1,4 +1,4 @@
-# `CharacterStats.flags` — the client's "Flags" stat (Gitea #648)
+# `CharacterStats.flags` — the client's "Flags" stat
 
 Raw RE artifact. What the client does with `ProtoCoreCharacterIIR.CharacterStats.flags` (protobuf field 16),
 recovered statically from `AgeOfConan.exe`.
@@ -10,7 +10,7 @@ corpus slice, 17,400 NPC records all carry it and all 317 player records do not,
 That is gated by `NpcStatCoreColumnsTests.CharacterStatsFlags_Bit28_IsTheNpcBit`.
 
 Two further bits appear only on players and only transiently: **3 (`0x8`)** and **5 (`0x20`)**. Seven characters
-each appear with two different values, so they are STATE rather than identity, and the two never co-occur.
+each appear with two different values, so they are state rather than identity, and the two never co-occur.
 
 ## The client's name for the word: stat `0x000` "Flags"
 
@@ -64,14 +64,12 @@ For `CoreCharacterFullUpdateIIR` that delta is **`0x44` on every pairing** (`0x5
 - `firstname` / `lastname` (fields 2 and 3, message + 0x0c / + 0x10) are read with the MSVC `std::string` SSO
   idiom (`CMP [p+0x14],0x10 / JC / MOV EAX,[p]`), and they are the only adjacent string pair in the message.
 
-`CharacterStats.flags` is field 16 → `stats() + 0x44`. ✔
+`CharacterStats.flags` is field 16 → `stats() + 0x44`.
 
-⚠️ This also **retracts** the earlier reading of `this + 0x40` as the flags word (commit `14450786`). IIR + 0x40 is
-the word *immediately before* the embedded message, i.e. a member of the IIR itself; the bits read there
-(`>> 1` → stat `0xC2` "In Play", `>> 3` → stat `0xDF` "Can Change Clothes", `>> 0x1b` → stat `0x300` "Has Knubot
-Data") are **not** `CharacterStats.flags` bits and say nothing about the wire word. Those three names are
-withdrawn. The anomaly that flagged the reading as suspect — no captured NPC sets bit 27 although dialogue NPCs
-plainly have knubot data — was the correct instinct.
+`this + 0x40` is **not** the flags word. IIR + 0x40 is the word *immediately before* the embedded message, i.e. a
+member of the IIR itself; the bits read there (`>> 1` → stat `0xC2` "In Play", `>> 3` → stat `0xDF` "Can Change
+Clothes", `>> 0x1b` → stat `0x300` "Has Knubot Data") are not `CharacterStats.flags` bits and say nothing about the
+wire word. The corpus agrees: no captured NPC sets wire bit 27 although dialogue NPCs plainly have knubot data.
 
 ## The bits, named from their consumers
 
@@ -91,7 +89,7 @@ Bits 3 and 5 fit their corpus evidence exactly: transient, players only, mutuall
 mid-teleport and mid-trade), and NPCs have neither. Almost every non-`0x1` sighting is in one busy-city capture,
 which is where trades and zone-ins happen.
 
-**No bit of this word is ever SET by the client** — the only `OR` into `+ 0x374` is the generic
+**No bit of this word is ever set by the client** — the only `OR` into `+ 0x374` is the generic
 `CoreCharacter::SetFlagBits(mask)` (`FUN_006ea720`, `flags |= mask; SetStat(0, flags)`), whose companion is
 `CoreCharacter::HasFlag(mask)` (`FUN_006ea750`, `(flags & mask) != 0`); both are virtual and have no direct
 callers. Every literal site clears. So the word is **server-owned state pushed down**, which the client only ever
@@ -104,14 +102,14 @@ and bit 28 is the only bit we assert anything about. Bits 3 and 5 would only eve
 models trade sessions and teleports, and retail is authoritative about when that happens, so nothing is invented
 here.
 
-## Also recovered along the way
+## Related
 
 `NpcStats.community` (field 6, `npc_stats() + 0x1c`) is pushed under stat `0x1C7` (455) — LDB "Monster Type".
 
 ## Method notes
 
-- Do not const-scan for a bit MASK: the client compiles these as C++ bitfields (`>> n & 1`), and the 249 hits for
+- Do not const-scan for a bit mask: the client compiles these as C++ bitfields (`>> n & 1`), and the 249 hits for
   `0x10000000` are all the statically-linked MSVC CRT's `printf` format flags.
-- Ghidra's decompiler mis-attributed the base register at several of these sites, rendering both `[EBX + 0x40]`
-  and `[EDI + 0x374]` as `*(uint *)(in_ECX + 0x40)`. **Check the disassembly before naming a bit** — the whole
-  retracted reading above came from trusting the decompiled form.
+- Ghidra's decompiler mis-attributes the base register at several of these sites, rendering both `[EBX + 0x40]`
+  and `[EDI + 0x374]` as `*(uint *)(in_ECX + 0x40)`. **Check the disassembly before naming a bit** — the
+  decompiled form alone makes IIR + 0x40 look like the flags word.

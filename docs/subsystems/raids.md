@@ -1,11 +1,11 @@
 # Raids
 
-A raid is the **team system one level up**: a set of TEAMS rather than a set of characters. Everything follows from
+A raid is the team system one level up: a set of teams rather than a set of characters. Everything follows from
 that — its leader is a team, its roster messages carry whole teams, and the two messages that have no team
 counterpart (move a member between teams, swap two members) exist precisely because a team has no sub-teams.
 
-⚠️ **Nothing on this page was observed.** A sweep of all 120 dumps finds **zero raid traffic of any kind** — no
-captured session ever formed a raid — so waiting for a capture is waiting forever. Every method, parameter list and
+**Nothing on this page was observed.** A sweep of all 120 dumps finds zero raid traffic of any kind — no
+captured session ever formed a raid. Every method, parameter list and
 body layout here comes from the client: `docs/re/aoc-client-rpc-methods.json` for the signatures and the
 `CSPlayerInterfaceDispatch_t` readers for the bodies. That is why the page keeps saying which reader; a raid message
 is only as good as the function that reads it. The gaps are registered in
@@ -13,7 +13,7 @@ is only as good as the function that reads it. The gaps are registered in
 
 ## Why the bodies are not guesses
 
-Every raid body is built out of records retail DID send, byte-exactly, in
+Every raid body is built out of records retail did send, byte-exactly, in
 [`teams-trade-friends.md`](teams-trade-friends.md):
 
 | client type | what it is | pinned by |
@@ -76,7 +76,7 @@ captured team bytes.
 0xA4 DispatchRaidCantCreateInvalidMemberSubscriptionFlags(cCharacter)
 ```
 
-⚠️ **`i_cWho` is the whole member RECORD, not an id.** Nine of the sixteen carry a `cCharacter`, which reads like an
+**`i_cWho` is the whole member record, not an id.** Nine of the sixteen carry a `cCharacter`, which reads like an
 ID32 from the name and is not — the client calls `FUN_005574d0` on every one of them. A raid message answered with
 eight bytes would desync the stream on the tenth field.
 
@@ -126,7 +126,7 @@ Two rules are the raid's own:
   for a standalone group and wrong for a raid slot, so the move/swap path goes through `TeamService.MoveMember`,
   which does not dissolve.
 
-There is **no `~Raid` chat channel**. Only `~Guild` and `~Team` appear anywhere in the corpus (#663), so adding one
+There is no `~Raid` chat channel. Only `~Guild` and `~Team` appear anywhere in the corpus, so adding one
 would be inventing a channel retail does not have.
 
 ## Gates

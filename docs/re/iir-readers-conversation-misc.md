@@ -1,4 +1,4 @@
-# Knubot-conversation + misc IIR readers (decode batch 3, Gitea #233)
+# Knubot-conversation + misc IIR readers
 
 Wire grammars for the Knubot conversation records plus a batch of misc combat/world IIR records,
 recovered from `AgeOfConan.exe` via vtable-xref (`tools/ghidra/DumpVtableReaders.java`, slot 8)
@@ -57,13 +57,13 @@ The Knubot conversation carrier nests **both** endpoints: the player is the carr
 (`FUN_009A4EC0`) logs *"NPC %d speaking with Character %d: TextType %d, Text length = %d"*. It is 1 on 897 of the
 907 captured dialogue lines and 6 on the other 10; what those select is undecoded.
 
-⚠️ **`KnubotCloseChatWindow` is NOT the AnswerList body** (#809). The two are indistinguishable on all 179
+**`KnubotCloseChatWindow` is not the AnswerList body.** The two are indistinguishable on all 179
 captured s2c closes, every one of which carries `[00000001][005F][<a 95-byte empty remoteformat>]` — identical
-bytes whether the leading 1 is a list COUNT with one string after it, or a `TextType` with one string after it.
+bytes whether the leading 1 is a list count with one string after it, or a `TextType` with one string after it.
 The readers settle it: `9a3a10` validates `nAnswerCount` into 1..1000 **by name** and then loops, while `9a58d0`
-reads one `u32` into `this+0x34` and ONE `std::string` into `this+0x38` with no loop — and its `WriteSubClass`
-logs that string as *"Text length"*. Reading the close as a list is what refused the 7 captured **c2s** records,
-whose `[00000000][0000]` is a `TextType` of 0 and an EMPTY text.
+reads one `u32` into `this+0x34` and one `std::string` into `this+0x38` with no loop — and its `WriteSubClass`
+logs that string as *"Text length"*. Reading the close as a list refuses the 7 captured **c2s** records, whose
+`[00000000][0000]` is a `TextType` of 0 and an empty text.
 
 **`KnubotAppendTextIIR_c`** is the NPC dialogue line: its length-prefixed string is the
 `remoteformat` **XML dialogue payload**, e.g.
@@ -77,24 +77,23 @@ whose `[00000000][0000]` is a `TextType` of 0 and an EMPTY text.
 ```
 
 i.e. the same dialogue content the higher-level [ConversationService](../../Faolan/GameServer/Dialogue/)
-+ [knubot-conversation-packets.md](../subsystems/knubot-conversation-packets.md) already drive — this just pins the
-exact reader framing (header + u16-length string).
++ [knubot-conversation-packets.md](../subsystems/knubot-conversation-packets.md) drive — this pins the exact reader
+framing (header + u16-length string).
 
 ## No-op / out-of-band readers
 
 - `MoveInventoryItemIIR_t` (`0x2A8A1B49`, `FUN_005b9230`) — `ReadSubClass` returns 0; the move is
   carried out-of-band by the `ProtoMoveInventoryItemIIR` message, not this IIR reader.
 
-## Partially-mapped (sub-reader bodies, structure noted)
+## Sub-reader bodies (structure noted)
 
 - `SpellBookIIR_t` (`0x6BA10936`, `FUN_00795ba0`) — delegates the whole body to `FUN_0077af90`
-  (the spell-list reader); only 1 captured sample.
+  (the spell-list reader).
 - `TemplateActionIIR_t` (`0x6C300937`, `FUN_007a0b00`) — `FUN_005d5150` sub-record then `[u32×6]`.
 - `KnubotStartTradeIIR_c` (`0x4B2A47BF`, `FUN_009a63a0`) — Knubot header + `[u64]` + a count-prefixed
-  list of `TradeItem_c` (string + 4 u32 each); only 2 captured samples.
+  list of `TradeItem_c` (string + 4 u32 each).
 
-These have their readers located but their variable sub-bodies are left for the subsystem that needs
-them (trade UI / spellbook), since capture coverage is thin.
+Their codecs carry the variable sub-bodies verbatim, byte-exact; see [v1-iir-readers.md](v1-iir-readers.md).
 
 ## Decode coverage
 

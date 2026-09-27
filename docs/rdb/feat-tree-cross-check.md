@@ -1,11 +1,10 @@
 # Feat trees: an external cross-check of our decode
 
-Our feat data is decoded from the client's own records by `RdbFeatImporter`, and until now nothing outside this
-repo had ever agreed or disagreed with it. A community feat planner — <https://joharaoc.eu/feat>, one page per
-class — turns out to publish the same structure in a form that **joins to our ids**, which makes it usable as an
-independent oracle for feat-tree layout and effect magnitudes.
+Our feat data is decoded from the client's own records by `RdbFeatImporter`. A community feat planner —
+<https://joharaoc.eu/feat>, one page per class — publishes the same structure in a form that **joins to our ids**,
+which makes it usable as an independent oracle for feat-tree layout and effect magnitudes.
 
-⛔ **It is not a wire source and never licenses sending anything.** Retail leads: the captures and the client are
+**It is not a wire source and never licenses sending anything.** Retail leads: the captures and the client are
 the truth for anything that goes on the wire, and this is a third party's rendering of a client build that is not
 necessarily ours. Its value is exactly one thing — telling us where our *content* decode disagrees with somebody
 who did it independently, so the disagreement can be taken back to the client.
@@ -57,12 +56,12 @@ ours linearly to **level 80** reproduces the planner exactly — worked through 
 So three things are confirmed at once: the stored per-rank values, the linear interpolation between the two
 level anchors, and that the planner renders at level 80.
 
-## ⭐ It independently confirms `StatDisplayScale` — 19 stats, zero disagreements
+## It independently confirms `StatDisplayScale` — 19 stats, zero disagreements
 
 The `÷100` above is not universal: armour-type stats render at **×1**, and Spiritual Armament's per-rank values
 equal our stored numbers with no division at all. That looks at first like the planner is an oracle for *which*
 stat takes which scale — but we already have that answer from a better source. `StatDisplayScale`
-(`Faolan.Core/Enums/StatDisplayScale.cs`) is the client's own divisor, read out of its formatter in #775.
+(`Faolan.Core/Enums/StatDisplayScale.cs`) is the client's own divisor, read out of its formatter.
 
 So the planner is not a source here, it is a **check on that decode**, and it passes cleanly. Taking every feat
 whose planner entry states per-rank numbers and which joins unambiguously to one `FeatEffects` row per rank
@@ -78,7 +77,7 @@ whose planner entry states per-rank numbers and which joins unambiguously to one
 client — one from the binary's formatter, one from a third party's rendering — landing on the same divisor for
 nineteen stats is the strongest corroboration `StatDisplayScale` has.
 
-⚠️ `0x0AA` (hate modifier) comes out at **−1**: the magnitude matches at ×1, but we store it negative where the
+`0x0AA` (hate modifier) comes out at **−1**: the magnitude matches at ×1, but we store it negative where the
 planner prints it positive with the minus in the surrounding prose. That is a sign convention, not a scale.
 
 
@@ -90,78 +89,59 @@ forty feats whose planner entry states per-rank numbers have nothing in `FeatEff
 `FeatPerkCosts`: Grim Corruptor, Gluttonous Reaper, Empower Archmagus, Ravenous Souls, Embrace Death, The
 Devourer, Wretched Heart Curse, Quickened Iron, Unleashed Power, and Ability - Tome of Erlik.
 
-⚠️ Note what this is and is not. Of the forty, only eight sit in `FeatEffects`; the other twenty-two are in the
+Note what this is and is not. Of the forty, only eight sit in `FeatEffects`; the other twenty-two are in the
 spell-modifier and proc tables, which is expected — most feats modify a spell rather than a stat. The ten are the
 residue that is in none of them, and they are candidates for a gap, not proof of one.
 
-**Name differences: 30 of 710**, in three groups that must be separated before any of them is acted on:
+## Feat names: the authoring name and the displayed label
 
-* **2 are spacing only** — `Spell- Dark Meditation` for their `Spell - Dark Meditation`, and a `To`/`to` case
-  difference. Cosmetic on one side or the other.
-* **14 are ours cut short**, and every one of them stops at an **ASCII apostrophe**: `Devourer's Might` stored as
-  `Devourer`, `Don't Fear the Reaver` as `Don`, `At Death's Door` as `At Death`, `Smash 'n Crush` as `Smash `,
-  and so on through `Ability - Cat's Paw`, `Combo - Grave's Blossom`, `Spell - Set's Life Spark`.
-* the remaining **14 are genuinely different text** — some the planner's own typos where ours is right
-  (Desecreation, Rejuvenanting Spirit, Copper Strom Chains), some a different name entirely (Improved Discipline
-  vs Improved Fire Weave), some a `Spell -` vs `Ability -` prefix. Most likely a build difference.
+The RDB feat template carries an **authoring name**; the client renders a feat's name from **LDB category 50220**,
+keyed by the feat template id — the same id `Feats.Id` uses, so the join is direct. Where the two coincide (most
+feats) nothing differs; where the displayed name carries a possessive, the authoring name is the stem before the
+apostrophe:
 
-⭐ **The cause is ours: we store the RDB template's INTERNAL name, not the client's display name.**
-
-The client renders a feat's name from **LDB category 50220**, keyed by the feat template id — the same id
-`Feats.Id` uses, so the join is direct:
-
-| feat template id | LDB 50220 (displayed) | our `Feats.Name` |
+| feat template id | LDB 50220 (displayed) | RDB authoring name |
 |---|---|---|
 | 780379–780383 | `Devourer's Might` | `Devourer` |
 | 873300 | `At Death's Door` | `At Death` |
 | 3514944–3514945 | `Don't Fear the Reaver` | the stem before the apostrophe |
 
-`RdbFeatImporter.ReadNameAndDescription` is reading correctly — the RDB template really does carry the short
-string. That string is an **authoring name**; where it coincides with the display name (most feats) nothing looks
-wrong, and where the display name carries a possessive the authoring name is the stem, which is what made this
-read as truncation at an apostrophe. There is nothing cutting anything.
+`RdbFeatImporter.ReadNameAndDescription` reads the RDB string correctly; nothing is cut. A scan of RDB type 1000020
+alone finds the long names absent — *absent from the type searched* is not *absent from the client*; they live in
+the LDB.
 
-⚠️ **A negative result is only as wide as the scope it was measured in.** This was first reported here as "our
-build ships the short names, the planner is on a later build" on the strength of a scan of RDB type 1000020 that
-found the long names absent — with `Nature's Revenge` as a present control. Both halves were true and the
-conclusion still did not follow: *absent from the type searched* is not *absent from the client*, and the client
-we ship against is the latest. The type scope that made the scan fast is exactly what narrowed its negative.
-
-Scale, so far: LDB 50220 holds 84 entries containing `'s ` (≈17 feats, each rank being its own id) against 20
-rows / 6 distinct names in `Feats`. The possessives are only the visible subset — any feat whose display name
-differs from its authoring name at all is affected. Open work tracked in Gitea #925.
-
-## ⭐ Why most name differences are NOT defects: the LDB label is deliberately shared
+### Why the LDB label is not always preferred
 
 `--report feat-name-check` compares every shipped feat name against LDB 50220 and classifies what differs. The
-result matters because the obvious fix — prefer the LDB string — is wrong on 96% of the population it touches:
+obvious rule — always prefer the LDB string — is wrong on 96% of the population it touches:
 
-| pairs / rows | pattern | verdict |
+| pairs / rows | pattern | shipped name |
 |---|---|---|
-| 34 / 83 | ours is a strict **stem** of theirs (`Devourer` / `Devourer's Might`) | adopt theirs — **done** |
-| 7 / 16 | differ only by a `Spell - ` / `Ability - ` / `Combo - ` prefix | adopt theirs — **done** |
-| 88 / 91 | the **LDB entry is truncated** (`Spell - Dark Han` for `Spell - Dark Hand`) | keep ours |
-| 778 / — | the LDB label is **shared by several feat ids** | keep ours |
-| 15 | a **unique** LDB label that genuinely disagrees | adopt theirs — **done** |
+| 34 / 83 | ours is a strict **stem** of theirs (`Devourer` / `Devourer's Might`) | the LDB label |
+| 7 / 16 | differ only by a `Spell - ` / `Ability - ` / `Combo - ` prefix | the LDB label |
+| 88 / 91 | the **LDB entry is truncated** (`Spell - Dark Han` for `Spell - Dark Hand`) | ours |
+| 778 / — | the LDB label is **shared by several feat ids** | ours |
+| 15 | a **unique** LDB label that genuinely disagrees | the LDB label |
 
-⛔ **The shared-label group is the important one, and it is by design.** A generic feat's authoring name encodes
-class, subject, level band and rank — `Core Training: 1HB 20-40 3`, `Soldier: Shield Training 1` — while its
-displayed label is short and reused across every rank, band and often class: `Basic One-Hand Blunt Training`
-covers four ids, `Advanced Riding` eighteen, `HP` thirty. Adopting the label would collapse thirty distinct feats
-onto one name and destroy exactly the distinctions our names carry. **Ours is the more informative string there,
-and that is why the rule is a containment test rather than a preference.**
+**The shared-label group is by design.** A generic feat's authoring name encodes class, subject, level band and
+rank — `Core Training: 1HB 20-40 3`, `Soldier: Shield Training 1` — while its displayed label is short and reused
+across every rank, band and often class: `Basic One-Hand Blunt Training` covers four ids, `Advanced Riding`
+eighteen, `HP` thirty. Adopting the label would collapse thirty distinct feats onto one name. The same shape, one
+level down, is why the rank tag must survive: our `HP 20-40 1`…`13` are thirteen rows the displayed `HP 20-40`
+cannot tell apart, and `ParseName` reads the `Rank` column from that suffix.
 
-⚠️ The same shape, one level down, is why the rank tag must survive: our `HP 20-40 1`…`13` are thirteen rows the
-displayed `HP 20-40` cannot tell apart, and `ParseName` reads the `Rank` column from that suffix.
+The 15 unique-label disagreements are adopted because the client draws the LDB label, so it is the only name a
+player sees, and a label no other id carries cannot collapse anything: six `Gemcutter Novice` rows carry the
+client's per-tier names (`Apprentice`, `Adept`, `Artisan`, `Expert`, `Master`, `Grandmaster`), and the rest are
+renames (`Illumination` → `Vindicator`, `Improved Shield Bash` → `Improved Evasive Action`, `Tactical Mastery` →
+`Hemorrhage`). `RdbFeatImporter.PreferDisplayName` takes the LDB-wide label census (`LabelCounts`) for the
+uniqueness test, and `--report feat-name-check` reports the two buckets separately (`label UNIQUE to it` /
+`label SHARED`).
 
-The 15 unique-label disagreements were the last residue, and they are adopted too (2026-09-03): six
-`Gemcutter Novice` rows carried one name where the client names each crafting tier separately (`Apprentice`,
-`Adept`, `Artisan`, `Expert`, `Master`, `Grandmaster`), and the rest are renames (`Illumination` → `Vindicator`,
-`Improved Shield Bash` → `Improved Evasive Action`, `Tactical Mastery` → `Hemorrhage`). The call: the client draws
-the LDB label, so it is the only name a player ever saw, and a label no other id carries cannot collapse anything
-— which is exactly the property the shared-label rule protects. `RdbFeatImporter.PreferDisplayName` takes the
-LDB-wide label census (`LabelCounts`) for that test, and `--report feat-name-check` reports the two disjoint
-buckets separately (`label UNIQUE to it` / `label SHARED`). Closed in Gitea #925.
+Against the planner, 30 of 710 names differ in the raw RDB names: 2 spacing/case only, 14 the possessive stems
+above, and 14 genuinely different text — some the planner's own typos where ours is right (Desecreation,
+Rejuvenanting Spirit, Copper Strom Chains), some a different name entirely (Improved Discipline vs Improved Fire
+Weave), some a `Spell -` vs `Ability -` prefix.
 
 ## Reproducing
 
@@ -177,13 +157,13 @@ FROM FeatIdMaps m JOIN FeatEffects e ON e.FeatId = m.TemplateId
 WHERE m.BaseIndex = <WireFeatId / 100> ORDER BY m.Rank, e.Sequence;
 ```
 
-⚠️ Joining `CharacterFeats.FeatId` straight to `FeatEffects.FeatId` matches nothing — they are different id
+Joining `CharacterFeats.FeatId` straight to `FeatEffects.FeatId` matches nothing — they are different id
 spaces and it returns zero rows rather than erroring. Go through `FeatIdMaps`.
 
 The full 710-row comparison is committed beside this page as
 [`feat-tree-cross-check.tsv`](feat-tree-cross-check.tsv) — one row per feat, carrying both sides' identifiers and
 the per-field verdict, so the agreement figures above can be re-read without re-scraping.
 
-Source: the JoharAoC feat planner (<https://joharaoc.eu/feat>), read 2026-09-02. Only the structural fields we
+Source: the JoharAoC feat planner (<https://joharaoc.eu/feat>). Only the structural fields we
 compare against are reproduced here; the numbers are facts about the game client, and the planner is credited as
 the independent reading they were checked against.

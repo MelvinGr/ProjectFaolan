@@ -1,10 +1,9 @@
-# Item value / vendor pricing (Gitea #137)
+# Item value / vendor pricing
 
-Goal: replace the provisional vendor pricing (`ShopService.VendorPriceTin = level×2×count`,
-`VendorBuyPriceTin = TailLevel×2×count×4`) with the item's **real value** from the RDB item template, so
-every item is priced — not just captured wares, and not from the (mostly-0) `Items.Level`.
+Vendor prices come from the item's **value** in the RDB item template, so every item is priced — not just
+captured wares, and not from the (mostly-0) `Items.Level`.
 
-## Confirmed: sell price = value-per-item × count
+## Sell price = value-per-item × count
 
 Ground truth from `Captures/NecroL80_mage-necromancer_login_sell_items_to_trader-intract-with-auctionhouse`:
 
@@ -12,7 +11,7 @@ Ground truth from `Captures/NecroL80_mage-necromancer_login_sell_items_to_trader
   (GameCharAgent `UpdateCash`), whose body is exactly 12 bytes `[u64 balanceTin][u32 reason]`. The other
   `0x2005` sizes (1272 / 2246 / 14500 B …) are a different class on the same 16-bit opcode.
 - The reason=3 (gain) balance sequence is 19 / 42 / 134 / 526 / 573 / 594 / 658 → **deltas = sell prices
-  19, 23, 92, 392, 47, 21, 64 tin** (the issue's anchors).
+  19, 23, 92, 392, 47, 21, 64 tin**.
 - Each sale's `0x2034` sell request (`UP`, 20 B) = `[0xc75b shop-type][shopId 0x1e7e][container 0x68=backpack][0x8006f31 seller][u32 slot]`
   — the last u32 is the inventory slot (verified against frames 1282/1291/1301/1325/1339/1365/1369, body e.g. `0000c75b00001e7e0000006808006f3100000005`).
 - slot → (template, count) comes from the FullChar snapshot (`0x737A6DF9`, frame 66) via the C#
@@ -34,10 +33,9 @@ Combined oracle (`...sell_items_to_trader...`), **value-per-item = delta / count
 
 Slot 9 (count 7, total 392 → 56/item) is the proof that price scales with count.
 
-## SOLVED 2026-06-17: value = property-table field 74
+## Value = property-table field 74
 
-The earlier "no multiplier matches" search failed because it scanned **raw offsets**. The body is an RDB
-**property table** — a run of `[fieldId u32][value u32]` LE pairs with strictly-decreasing fieldId after the
+A scan of raw template offsets finds no multiplier that matches: the body is an RDB **property table** — a run of `[fieldId u32][value u32]` LE pairs with strictly-decreasing fieldId after the
 header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and the
 **vendor sell-per-unit = round(value / 10)** (integer `(value+5)/10`):
 
@@ -51,11 +49,10 @@ header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and 
 | 3719048 | 637 | 64 |
 | 3514741 | **0** | — (no field 74 value → **unsellable**, the Totem of Origins) |
 
-`Items.SearchCategory` (= `template[12..16]`) was already mapped; field 74 is the second mapped property.
+`Items.SearchCategory` is `template[12..16]`, the word ahead of the property table.
 
-## Implemented
-- `Item.Value` column (part of the squashed `InitialCreate` migration; the standalone `AddItemValue`
-  migration no longer exists); `RdbItemImporter.TryReadPropertyField` extracts field 74
+## Implementation
+- `Item.Value` column; `RdbItemImporter.TryReadPropertyField` extracts field 74
   (1677/2453 keyed items populated).
 - `ShopService`: `VendorPriceTin(value, count) = round(value/10)×count`; `VendorBuyPriceTin = ×4 markup`
   (a stand-in over the real sell value, with no captured anchor);
@@ -65,6 +62,6 @@ header (same grammar as `DispatchAddItemTests`). The value is **field 74**, and 
 ## Reproduce
 - RDB install: the client's `RDB/` folder (`<rdb-dir>`; the concrete path is in the
   `client_rdb_install_path` agent memory).
-- Dump decrypted templates: `dotnet run --project Faolan.Importer -- --only rdb-items --rdb "<RDB>" --dump-templates /tmp/itpl`
+- Dump decrypted templates: `dotnet run --project Faolan.Importer -- --only rdb-items --Content:RdbDir <rdb-dir> --dump-templates <out-dir>`
   (`rdb-items` is an opt-in module; `--dump-templates` is its disk-write sub-option — stop the server first,
   it holds `faolan.db`).

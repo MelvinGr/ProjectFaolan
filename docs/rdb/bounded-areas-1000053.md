@@ -1,4 +1,4 @@
-# Bounded-area trigger volumes (RDB type 1000053) — #504
+# Bounded-area trigger volumes (RDB type 1000053)
 
 The client's **trigger-volume table**: one record per playfield holding every named region the playfield reacts
 to — hazards, spawn camps, resurrection points, encounter triggers, collision blockers, audio regions. **478
@@ -6,26 +6,21 @@ records holding 9,692 regions; 8,917 of them over the 393 records whose id is a 
 the variant `0x40000000`-based numbering). The RDB record id **== the playfield id** (== `Map.Id`), the same
 convention [type 1010506](npc-spawn-layout-1010506.md) uses.
 
-This matters because the project had assumed regions like these were server-side and therefore only
-reconstructible from captures. That is **false** — the client needs them to draw the lava, block the camera and
-start its own scripts, so it ships them exactly.
+These regions are not server-side data reconstructible only from captures: the client needs them to draw the lava,
+block the camera and start its own scripts, so it ships them exactly.
 
-⚠️ For **area banners** the assumption does not survive at all, and it is worth being exact about what is whose,
-because this has been stated wrongly twice:
+For **area banners**, what is whose:
 
 - **The TEXT is the client's.** The server sends an `AreaNameId` and nothing else; the client renders the string.
   "The West Gate" is in English LDB page 974162.
-- **The GEOMETRY is the client's too** — it ships the trigger volumes, and 116 are now imported and driving the
-  banners. See [the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name).
-- **The LINK is RECOVERABLE from the client as well** (#679), which is newer and was not expected: the banner id
-  is a parameter inside the localized token, so the hash that keys the string INVERTS, and the client's own region
-  names are those strings. What stays ours is deciding which area a player is in and sending the id.
+- **The GEOMETRY is the client's too** — it ships the trigger volumes that fire the banners. See
+  [the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name).
+- **The LINK is recoverable from the client as well**: the banner id is a parameter inside the localized token,
+  so the hash that keys the string INVERTS, and the client's own region names are those strings. What stays ours is
+  deciding which area a player is in and sending the id.
 
-The old evidence for "the text is server-side" does not support it. Scanning all 410,433 local RDB records for a
-banner's text id found chance collisions, and none of the 22 `AreaNameId`s resolves through our LDB page index —
-but the second half is a statement about our **id → (page, index) lookup** applied to a number that was never an
-LDB id in the first place. Searched by content the strings are plainly there; searched by the hash of their token
-the ids are too.
+An `AreaNameId` does not resolve through the LDB **id → (page, index)** lookup because it was never an LDB id; searched
+by content the strings are plainly there, and searched by the hash of their token the ids are too.
 
 ## Format
 
@@ -77,7 +72,7 @@ lava-named areas include exactly three with a script — `Lava` on maps 917/942 
 `BA_Lava_music` on 1090 (`scryid` 1112698), all of them tall ambient/audio companion regions — while every
 **damage** volume carries `scryid 0`.
 
-⚠️ The converse does not hold: `scryid 0` is the common case for *every* kind of region (an ordinary spawn camp
+The converse does not hold: `scryid 0` is the common case for *every* kind of region (an ordinary spawn camp
 has it too), so it excludes rather than includes. Name is still the only thing that says what a region is *for*.
 
 ## What the server side looks like
@@ -114,9 +109,9 @@ tolerance at all**. [V3: MapHazardGeometryTests.CapturedTrack_CrossesTheClientPo
 
 ## What is in the 8,917 areas
 
-Classified by name. Only the **lava** row gets hazard behaviour today (see `MapHazard` for why the rest are deliberately
+Classified by name. Only the **lava** row gets hazard behaviour (see `MapHazard` for why the rest are deliberately
 left out — they are hazard-shaped by name with no wire evidence, and a mis-guessed kill volume is worse than a
-missing one). The remaining buckets each touch an open subsystem.
+missing one).
 
 The table is **generated**, not maintained by hand — `BoundedAreaClassifier` is the classification and
 `--report bounded-areas` prints it, so it is recomputed from the real parser rather than from a script nobody can
@@ -132,26 +127,25 @@ space, which are not `Map.Id`s. 544 of the regions carry fewer than 3 vertices a
 
 | bucket | areas | maps | related |
 |---|---:|---:|---|
-| `collision` | 2,205 | 252 | collision / line-of-sight (#284) |
-| `encounter` — encounter + event start triggers | 625 | 138 | scripted encounters (#502) — retail's real trigger volumes, where ours are hand-seeded radii |
+| `collision` | 2,205 | 252 | collision / line-of-sight |
+| `encounter` — encounter + event start triggers | 625 | 138 | scripted encounters — **checked, see below** |
 | `audio` — SFX / music regions | 600 | 161 | — |
-| `spawn-camp` | 198 | 55 | ambient spawns (#332/#363) — **checked, see below** |
-| `hazard-fire-death` | 147 | 31 | #504 |
-| **`hazard-lava`** | **111** | **24** | **#504 — imported** |
-| `resurrection` | 108 | 51 | resurrection spots (#372) — **checked, see below**; 68 imported as discovery volumes |
-| `hazard-trap` | 79 | 8 | #504 |
-| `quest-goal` | 51 | 29 | `ReachArea` goals (#262) |
-| `teleport` | 43 | 24 | local travel + zone lines (#506) |
-| **`dismount`** | **14** | **4** | **#681 — imported** |
-| `hazard-drown` | 7 | 5 | #504 |
+| `spawn-camp` | 198 | 55 | ambient spawns — **checked, see below** |
+| `hazard-fire-death` | 147 | 31 | environmental hazards |
+| **`hazard-lava`** | **111** | **24** | **imported** |
+| `resurrection` | 108 | 51 | resurrection spots — **checked, see below**; 68 imported as discovery volumes |
+| `hazard-trap` | 79 | 8 | environmental hazards |
+| `quest-goal` | 51 | 29 | `ReachArea` goals |
+| `teleport` | 43 | 24 | local travel + zone lines (open work tracked in Gitea #506) |
+| **`dismount`** | **14** | **4** | **imported** |
+| `hazard-drown` | 7 | 5 | environmental hazards |
 | `uncategorised` | 4,729 | 326 | — |
 
-⚠️ **First match wins, so a rule that cannot match hands its family to a later rule.** The resurrection rule was
-anchored `\brez`, and `_` is a word character — so every `*_RezDiscovery` fell through to `quest-goal`'s
-`discovery`, and the discovery family this bucket is most about was counted as quest regions (#682). Anchored on
-`(?<![a-z])` since; that is the 96 → 108 / 57 → 51 in the table above, and no region changed, only its label.
+**First match wins, so a rule that cannot match hands its family to a later rule.** `_` is a word character, so a
+`\brez` anchor never matches `*_RezDiscovery` and the whole discovery family falls through to `quest-goal`'s
+`discovery`. The rules anchor on `(?<![a-z])` instead.
 
-⚠️ The buckets are a **naming heuristic**, and the ordering is load-bearing: rules are applied in the order above
+The buckets are a **naming heuristic**, and the ordering is load-bearing: rules are applied in the order above
 and first match wins, so an audio twin (`Vanir_camp_music`, `BA_Lava_music`) is audio rather than the thing it is
 named after, a resurrection pad named for its camp (`ShadyCampRezz`) is a resurrection point rather than a camp,
 and an ambush inside a camp (`TacticianCampAmbush`) is a trigger. `BoundedAreaClassifierTests` gates exactly those
@@ -159,9 +153,8 @@ contested names, since a mis-ordered rule silently mis-sorts a whole family.
 
 There is deliberately **no rule for a "zone / area names" family**. Those regions are named after the place
 (`Acheronian Ruins`, `The Iron Tower`, `Onyx Chambers`), so identifying one means matching the name against the
-place-name catalog — a data lookup, not a pattern. Identifying them is #348's job; a regex here would have
-matched nothing and printed a zero row that reads as "the client ships none", which is the opposite of the truth.
-That is #348's job.
+place-name catalog — a data lookup, not a pattern (see the area-name section below). A regex here would match
+nothing and print a zero row that reads as "the client ships none", which is the opposite of the truth.
 
 ## The client also ships a purpose-built table for two of these buckets
 
@@ -221,7 +214,7 @@ That is also where the ceiling is. Only 22 of those 179 explicitly-named groups 
 creature absent from `NpcTemplate`, which is 1,018 capture-derived rows. Map 1050's 87 groups are all unresolved
 because `Mammoth`, `Cannibal`, `Ice Worm` and `White Hand` are simply not in it. The ambient spawner
 (`AmbientPoolService.LoadAsync`) spawns at the 1010506 **points** and needs a resolved `NpcTemplateId`, so more geometry
-cannot populate a single one of them — the blocker is the creature CATALOG (tracked in Gitea #518).
+cannot populate a single one of them — the blocker is the creature CATALOG.
 
 **Nothing from this bucket is imported.** It is checked, and the check is the result.
 
@@ -247,14 +240,14 @@ worked example, where the name carries creature + location + a lettered series:
 VanirAmbushGormleyA/B/C   SpiderAmbushGormleyD/E/F   WolfAmbushA/B/C/D   VanirAmbushA/B/E/F/G
 ```
 
-### ⚠️ They are NOT the radii behind our proximity encounters
+### They are NOT the radii behind our proximity encounters
 
 The obvious hope — that these supply retail's real volumes where `NpcEncounter` carries hand-seeded radii — does
 **not** hold, and the two encounters we know about both say so:
 
 | encounter | map | contained by |
 |---|---|---|
-| `Damsel in Distress` (the #502 lure, at 1130.1, 1141.7) | Poitain 2070 — 24 regions total | `PlayfieldBorder` only, i.e. the whole playfield. The nearest region of ANY kind is **166 units away**. |
+| `Damsel in Distress` (the proximity lure, at 1130.1, 1141.7) | Poitain 2070 — 24 regions total | `PlayfieldBorder` only, i.e. the whole playfield. The nearest region of ANY kind is **166 units away**. |
 | `Saddur` tpl 9500 (Tortage beach, at 521.4, 757.2) | Tortage Island 4010 — 51 regions | `Headless Hollow`, `Jungle Main`, `TutorialLockedGate`, `Flies_Roam2`, `Jungle Main Music` — place-name, gate and audio regions. No trigger volume. |
 
 Both fire on **distance to an NPC**, not on entering a region, so their radii were never going to be in a table of
@@ -265,7 +258,7 @@ Saddur is the sharper of the two tests, because he is a *known* proximity encoun
 playfield**: Tortage Island carries 51 regions including ambush volumes elsewhere on the map (`BA_PictAmbush`,
 44 units away), so the table is clearly populated there — it simply has nothing for him.
 
-### ⚠️ Nor can they be composed with the 1010506 spawn groups
+### Nor can they be composed with the 1010506 spawn groups
 
 The other hope, and it fails harder. If an ambush volume CONTAINED the spawn group it fires, the two client
 sources would compose into a real volume-triggered encounter with nothing invented — the region giving the
@@ -295,39 +288,28 @@ all 1,018 rows**, so nothing in our data currently describes the NPC-side mechan
 57 regions over 30 maps by name, holding four different things:
 
 - **Named quest regions** — `QUEST Threat of the Vanir`, `Quest_TheCowardWay`, `Quest_Who_Is_Wretched`,
-  `BA_CasildaScreamAndQuestNPCTutorial` (our #261 Casilda tutorial, on Tortage Island).
+  `BA_CasildaScreamAndQuestNPCTutorial` (the Casilda tutorial, on Tortage Island).
 - **Quest FAIL volumes** — `FailQuestBetrayer`, `FailQuestToungues` on Gateway to Khitai. Leaving a region fails
   the quest; we have no such mechanic.
 - **Discovery volumes** — `BA_*_RezDiscovery`, `FrostFields_Discovery`, `FotD_Discovery`, `BA_CampDiscovery`.
 - A generic `BA_Quest_GenericPlayerSolveGoal` on Conarch Village.
 
-⚠️ **The bucket under-counts the real quest regions**, because retail names a region after the PLACE, not the
+**The bucket under-counts the real quest regions**, because retail names a region after the PLACE, not the
 quest — the "enter the jungle" region below is called `Jungle Main` and classifies as uncategorised. Name-based
 bucketing finds the ones a designer happened to label `Quest*`; it cannot find the rest.
 
-### ReachArea goals: one real match, and no id link
+### ReachArea goals: resolved by id, not by geometry
 
 We hold 10 `QuestGoalType.ReachArea` goals, but **only one is a retail region goal**: quest 10238 goal 1448
 ("Enter the jungle") carries `TrailingRefId 180` in `TrailingCategory 51200`, a region reference. The other nine
 are our own seeds, marked by the `TrailingCategory = 100` we assign, so there is nothing retail to look up for
 them.
 
-For that one goal the client's region is obvious and our approximation is poor:
-
-| | trigger |
-|---|---|
-| ours | a **40-unit radius** around the goal's marker (416, 701) |
-| the client | `Jungle Main`, a 13-vertex polygon spanning **392 × 529** units |
-
-The marker sits inside it, and so does Saddur (521, 757) — the quest's *second* goal — further into the same
-jungle, which is the order the quest is played in. So the marker is a **map pin**, not the trigger; the trigger is
-a named region many times larger.
-
-⚠️ **Superseded — there IS an id link**, found later via the client's category descriptor table; see "LDB
-category 51200" below. `TrailingRefId 180` resolves to the region named **`Trappers Haven`**, which is one of the
-four regions containing the marker, and is 96 × 82 rather than `Jungle Main`'s 392 × 529. What follows was the
-reading before that: the regions carry no `<Guid>`, and `BoundedAreaID` is a per-playfield index (`Jungle Main` is
-`-65516`, low word 20) rather than the goal's `180`, so matching looked like geometry plus a judgement call.
+The regions carry no `<Guid>` link and `BoundedAreaID` is a per-playfield index (`Jungle Main` is `-65516`, low word
+20), so a geometric pick would be a judgement call — the goal's marker (416, 701) sits inside four regions,
+including `Jungle Main` (392 × 529). The reference resolves it mechanically instead: `LDB[51200][180]` is
+**`Trappers Haven`** (96 × 82), one of those four; see "LDB category 51200" below. Either way the marker is a **map
+pin**, not the trigger — a 40-unit radius around it is a poor approximation of the named region.
 
 ### The discovery volumes DO map onto data we hold
 
@@ -336,17 +318,17 @@ discovery-named regions contain one of our `RespawnPoint` rows**, by name as wel
 `BA_MountainGlade_RezDiscovery`, `BA_CascadeFalls_RezDiscovery`, `BA_CimmerianSettlement_RezDiscovery` on Conall's
 Valley, `BA_HoCRezDiscovery` on House of Crom and its three instance copies.
 
-And they say our radius is wrong. `WorldSimulation.RespawnDiscoveryRange` is a hardcoded **30 units** — a 60 × 60
-box with no vertical bound — while the real volumes are:
+And they are much tighter than a radius. The fallback `RespawnDiscoveryRange` (`PlayerDeathService`) is **30
+units** — a 60 × 60 box with no vertical bound — while the real volumes are:
 
 | kind | footprint | prism height |
 |---|---|---|
 | res-point discovery (11 regions) | **16 × 20 to 29 × 33** | ~10 units |
 | area discovery (`FrostFields_Discovery`, `FotD_Discovery`) | 157 × 185, 114 × 74 | 50–60 units |
 
-So we discover a resurrection point from roughly **twice** the distance retail requires, ignoring height entirely
-— and the two large ones are a different mechanic (zone discovery) that we do not implement at all. Tracked in
-Gitea #519.
+So the radius discovers a resurrection point from roughly **twice** the distance retail requires, ignoring height
+entirely, which is why the volumes are imported (see Import below). The two large ones are a different mechanic
+(zone discovery) that is not implemented.
 
 ## The `teleport` bucket is a WALK-IN mechanism we do not have
 
@@ -355,7 +337,7 @@ transitions we cannot currently express.
 
 **It is not our doors.** Our zone lines are `UseObject` on a `WorldObject` (`DoorFullUpdateIIR`/SimpleDynel),
 **141** of them configured with a destination — over 19 source maps to 42 destinations, each with an exact arrival
-position and its confirmation-box key where it raises one (#637). The two sets are **disjoint**: only map 1020 has both, and there the door
+position and its confirmation-box key where it raises one. The two sets are **disjoint**: only map 1020 has both, and there the door
 (`To Ymir's Pass`, at 1149/226) and the region (`ArenaTeleport`, at 232/554) are nowhere near each other. **No
 door falls inside any teleport region.** These are additional transitions, and they fire on *entering a volume*
 rather than on interacting with an object.
@@ -377,7 +359,7 @@ Four sub-families:
 One reciprocal pair spans two playfields and confirms the family is two-ended: `BA_Teleport_TheMaze` on Wild
 Lands of Zelata (2080) and `BA_Teleport_WLoZ` on The Maze (2082).
 
-### ⚠️ The blocker: a region says where you LEAVE, never where you ARRIVE
+### The blocker: a region says where you LEAVE, never where you ARRIVE
 
 The `<boundedarea>` element carries no destination field of any kind — its whole attribute set is collision
 behaviour and editor cosmetics. So even where the name gives the destination *map*, the arrival **position** is
@@ -392,17 +374,17 @@ point, so `A_1`↔`A_2` is complete information with no capture and no name reso
 1026 but `BA_Teleport_WLoZ` on the 967 audio variant — the same geometry with two different claimed
 destinations. Trust the real playfield.)
 
-### ⚠️ Resolving the destination NAME is looser than it looks
+### Resolving the destination NAME is looser than it looks
 
 Three rules reach a `Map` row: the map's **name** (`BA_Teleport_ChosainProvince`), its **acronym** — initials with
 lowercase connectives, `FotD` → Field of the Dead and `WLoZ` → Wild Lands of Zelata — and its **first word**
 (`BA_TeleportToConarch` → Conarch Village). The acronym is a different convention from the prefix-abbreviations the
-area banners use (#680), and it has to be gated or it invents: an ungated pass resolved **17 of 36 and 10 were
+area banners use, and it has to be gated or it invents: an ungated pass resolved **17 of 36 and 10 were
 junk**, because a 1–2 letter "acronym" matches anything (`TeleportArea` → "Area" → `A` → map 330 `AntonA`;
 `Audio Portal` → `Asgardian Pass`; `BoundedArea_teleport` → `backdrops`). Requiring ≥3 characters with two
 capitals, and excluding the dev playfields from the candidate set, leaves **7**.
 
-⚠️ **`Map.Name` is not unique**, which caps what any name rule can do here. Three rows are called
+**`Map.Name` is not unique**, which caps what any name rule can do here. Three rows are called
 `Wild Lands of Zelata` (507, 939, **2080**), so `BA_Teleport_WLoZ` on The Maze cannot be resolved by name at all —
 even though the 2080 ↔ 2082 pair above is real and readable by eye. Any name → map resolution in this table needs
 a tiebreak beyond the string.
@@ -411,8 +393,8 @@ a tiebreak beyond the string.
 
 This page declines to classify a `zone-name` bucket by regex, because the regions are named after the PLACE. That
 makes them invisible to a name rule but **not** invisible: they can be found from the other end, by asking which
-region contains a banner we have already observed. The captured harvest (#348) is exactly that observation set — 22 banners over
-7 playfields, each an `AreaNameId` plus a hull over the positions the banner was seen firing at.
+region contains a banner we have already observed. The captured banner harvest is exactly that observation set — 22
+banners over 7 playfields, each an `AreaNameId` plus a hull over the positions the banner was seen firing at.
 
 **Every one of the 22 hulls falls inside a region, and 18 of them inside a recognisably PLACE-NAMED one:**
 
@@ -426,24 +408,20 @@ region contains a banner we have already observed. The captured harvest (#348) i
 | 277763 / 277804 / 277805 | Field of the Dead 1020 | `Clan Laeda Burial Mounds` / `Scout Camp` / `Clan Gaud Burial Party Camp` |
 | 269294 | Ymir's Pass 1090 | `POI A - The Last Cimmerian House` — the client's own "point of interest" prefix |
 
-Those read exactly like the banners the client shows on entry, which is the substantive result: **the area-banner
-regions do ship with the client**, so #348's note that they are "server-side and only reconstructible from
-captures" is wrong about the geometry. It is not right about the text either — the client renders that from its
-own LDB. What is genuinely ours is the LINK from a region to its `AreaNameId`, and nothing else.
+Those read exactly like the banners the client shows on entry: **the area-banner regions ship with the client**,
+and the text is in its own LDB. What is genuinely ours is the LINK from a region to its `AreaNameId`.
 
-### Both blockers are gone: the scry script, and the banner id itself
+### Two client mechanisms make the link exact: the scry script, and the banner id itself
 
-- **~~Containment is ambiguous~~ — SOLVED.** The ambiguity was entirely the audio and collision regions, and the
-  client separates those itself: a region's `<scryid>` says which client script it runs, and **220656 is the
+- **Containment is disambiguated by the crossing notifier.** Containment alone is ambiguous only because of the
+  audio and collision regions, and the client separates those itself: a region's `<scryid>` says which client script it runs, and **220656 is the
   crossing NOTIFIER** — the script that tells the server the player entered. A region that never notifies the
   server cannot be what fires a server-sent banner, so filtering on it is not a heuristic but a statement of
   mechanism.
-- **~~No id link for the banner~~ — SOLVED (#679).** The old reading was that the banner's `AreaNameId` is not the
-  ELF-28 hash of the region name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits)
-  and that **none of the 22 ids resolves through our LDB page index** — so nothing could join a region to a banner
-  id and the match could only ever be geometric. The second half is true and means nothing, because the id is not
-  an LDB key at all. It is a **parameter inside the localized token**, and the LDB key is the hash of the whole
-  token string:
+- **The banner id inverts through its token hash.** The `AreaNameId` is not the ELF-28 hash of the region name
+  (13 spellings of all 5,308 distinct region names against all 22 captured ids — zero hits), and none of the 22
+  resolves through the LDB page index, because the id is not an LDB key at all. It is a **parameter inside the
+  localized token**, and the LDB key is the hash of the whole token string:
 
   ```
   <localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|3474586'>
@@ -464,11 +442,11 @@ test.]
 [V1: Faolan.Importer/Rdb/AreaBannerNames.cs — the sweep and the join; `--report area-banner-names` prints both.
 `AreaBannerNamesTests.ABannerIdsToken_HashesToItsLdbKey` pins the arithmetic above with no client RDB present.]
 
-⚠️ The scry id is **not** "the banner script". 4 dismount volumes, 5 fire hazards, a respawn-discovery area and 3
+The scry id is **not** "the banner script". 4 dismount volumes, 5 fire hazards, a respawn-discovery area and 3
 encounter triggers carry it too — it means *this volume talks to the server*, which is a weaker and more useful
 claim than identification. It is a FILTER; what identifies one is a captured banner or a name match.
 
-⚠️ And a hash hit is **not** a banner on its own. ELF-28 has 2^28 buckets, so sweeping 40M candidates against
+And a hash hit is **not** a banner on its own. ELF-28 has 2^28 buckets, so sweeping 40M candidates against
 3,808 category-50025 ids yields ~567 chance collisions — roughly half the hits — and a collision's text is drawn
 from the same table of place names, so it looks exactly as plausible as a real one.
 
@@ -486,7 +464,7 @@ two different strings of words never collapse together under any of them:
 | `Atzels Approach`, `Souleaters Pass` | Atzel's Approach, Souleaters' Pass | punctuation |
 | `BA_EastGate`, `BA_GreatLibrary` | The East Gate, The Great Library | a leading article |
 | `BA_LionMarket`, `BA_TraitorCommon` | The Lion's Market, Traitor's Common | the possessive **s**, which the client keeps on some places (`Ymirs Tongue`) and drops on others — so it is offered as an ALTERNATIVE spelling, never normalised away, or fixing one breaks the other |
-| `Camp23 Atzels Bandits (Burned Farms)` | Burned Farms | the **parenthetical**. Ymir's Pass names every one of its areas this way, so the join could not see that playfield at all until it was read |
+| `Camp23 Atzels Bandits (Burned Farms)` | Burned Farms | the **parenthetical**. Ymir's Pass names every one of its areas this way, so without this rule the join cannot see that playfield at all |
 | `POI A - The Last Cimmerian House` | The Last Cimmerian House | the `POI x -` prefix |
 
 That alone is not enough, because the name is ambiguous far more often than not: 41 different ids render "Outlaw
@@ -502,7 +480,7 @@ copy of these places:
 - **A one-anchor cluster**, unless that anchor is captured. Wire truth needs no corroboration, a lone name match
   does. This rejects map 1010's `Fifo-CimmerianSettlement`, whose name matches "Cimmerian Settlement" exactly once
   in the whole client, at 711411, while every other banner on that playfield is 37098xx.
-- ⚠️ **Any cluster with no captured anchor, once the playfield has captured ids at all.** The wire has then already
+- **Any cluster with no captured anchor, once the playfield has captured ids at all.** The wire has then already
   said where this playfield's numbering lives. Ymir's Pass is the case that proves it: its region names match a
   perfectly coherent cluster at `3908476..3908749` — eight of them — while the two banners retail was actually
   captured sending there are `269294` and `269449`. The same places exist under 269xxx, 3822xxx *and* 3908xxx.
@@ -530,67 +508,62 @@ none. It refuses rather than picks where it cannot: `BA_Bridge` abbreviates both
 Bridge", so it is left to the geometric route, which independently lands it on 3373519. Every accepted pair is
 reported by the importer, because a rule this loose should be readable without re-deriving it.
 
-### What that produces: 142 areas over 14 playfields, from 22 over 7
+### What that produces: 150 areas over 14 playfields
 
 | | banners | playfields | with the client's real trigger volume |
 |---|---|---|---|
-| captured only (before #679) | 22 | 7 | 12 |
-| now | **140** | **14** | **140** |
+| captured banners alone | 22 | 7 | 12 |
+| with the client-name join | **150** | **14** | **150** |
 
-Provenance is on the row (`MapRegion.AreaNameSource`): **5 captured** (the wire saw the id; region matched geometrically or
-not at all), **120 client-name** (recovered from the client, on playfields including several no capture has ever
-visited), and **15 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
+Provenance is on the row (`MapRegion.AreaNameSource`): **4 captured** (the wire saw the id; region matched
+geometrically), **125 client-name** (recovered from the client, on playfields including several no capture has ever
+visited), and **21 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
 one is a position track against a wire packet and the other a hash inversion against a string table. **Nothing
-produces a disagreement**: 14 of the 15 captured hulls sit inside the box of the region their name picked, the
-other two 1.6 and 1.4 units outside it, against a 549-unit counter-example below.
+produces a disagreement**: the captured hulls sit inside the box of the region their name picked, or within 1.6 units
+of it, against a 549-unit counter-example below.
 
 ### Where a banner lives
 
 `MapRegion.AreaNameId` — a nullable column on the trigger volume, plus `AreaNameSource` for which route bound it.
 
-It was a table of its own, `MapArea`, keyed by (playfield, banner) and carrying a **hull** over the positions retail
-was captured firing that banner at. The hull was the region data, and it was an approximation by construction: it
-covers only ground a captured player actually walked, so `WorldSimulation` had to widen it with a slack radius, and
-with one sighting it was a point. Once the client's own volume was recoverable for effectively every banner there
-was nothing left for it to do, and a banner is simply a property OF a volume. The captured sightings are still
-harvested — they PIN each playfield's id numbering, and their hulls are the geometric route's only handle — but
-they are a derivation input now, not stored state.
+A banner is a property OF a volume. A hull over the positions retail was captured firing a banner at is an
+approximation by construction — it covers only ground a captured player walked, needs a slack radius, and with one
+sighting is a point — so the client's own volume is what is stored. The captured sightings are still harvested: they
+PIN each playfield's id numbering, and their hulls are the geometric route's only handle, but they are a
+derivation input, not stored state.
 
 **Imported** by `RdbRegionImporter` (`rdb-regions`). The geometric route still runs, on the banners the name join
 cannot reach, under three gates: the scry filter, containment of the banner's captured hull, and SEPARATION — a
 region holding two banners' samples cannot be what distinguishes them, so it is rejected for both. It is the only
 route left for Old Tarantia, whose volumes are named `BA_Bridge`/`BA_EastGate` rather than the "Bridge of Vilerus
-I" / "The East Gate" the banner renders. `WorldSimulation` then tests the polygon with no slack where a region is
-linked, and falls back to the hull elsewhere.
+I" / "The East Gate" the banner renders. The runtime tests the linked polygon with no slack.
 
-⚠️ Its separation gate is measured against the banners still *arguing* for a region — not just the unplaced ones,
-and not the ones an identity has already settled. Both halves were wrong once: scoping it to the unplaced let a
-region that swallows another banner's samples through, and widening it to every banner then rejected
-`Fifo-CimmerianSettlement` on the strength of the misplaced sample described below.
+Its separation gate is measured against the banners still *arguing* for a region — not just the unplaced ones, and
+not the ones an identity has already settled. Scoped to the unplaced only, it lets through a region that swallows
+another banner's samples; widened to every banner, it rejects `Fifo-CimmerianSettlement` on the strength of the
+misplaced sample described below.
 
-⚠️ **No tolerance on the geometric containment test, deliberately.** A banner fires ON ENTRY, so its sample sits
+**No tolerance on the geometric containment test, deliberately.** A banner fires ON ENTRY, so its sample sits
 right at the boundary and a near-miss is expected. Padding until they match would be fitting the answer. **2 banners** reach
 no volume by either route, both on Ymir's Pass (`269294` "Clan Maugh
 Encampment" and `269449` "Amphitheatre of Karutonia"). That playfield's 1000053 record contains **no notifier volume
 named after either**, and both captured samples land inside the same one, `POI A - The Last Cimmerian House`, so
-nothing separates them. **They are DROPPED** (#680): a banner is a property of the volume that fires it, and there
-is no longer anywhere for one with no volume to live. The wire saw them; nothing can say where.
+nothing separates them. **They are DROPPED**: a banner is a property of the volume that fires it, and there
+is nowhere for one with no volume to live. The wire saw them; nothing can say where.
 
-⚠️ A one-sighting hull is weaker evidence than it looks, and the name join is what showed it. Map 1010's "Pass to
+A one-sighting hull is weaker evidence than it looks. Map 1010's "Pass to
 Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` at x 53..110, while its single captured sample sits
 at (659, 537) — 600 units away, inside `Fifo-CimmerianSettlement`, which is also where the *other* banner captured
 on that playfield was sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there —
 which is also why the separation gate ignores a banner an identity has already settled.
 
-⚠️ The hull-versus-volume checks are no longer gates on the SEED, because the hull is not in it: they are checks on
-the evidence, and the evidence is the corpus. `--report area-banner-names` prints them. What the seed can be held
-to is the assignment itself, which is what `MapRegionGeometryTests` now does.
+The hull-versus-volume checks are checks on the evidence, not gates on the seed (the hull is not in it), and the
+evidence is the corpus: `--report area-banner-names` prints them. What the seed is held to is the assignment itself
+(`MapRegionGeometryTests`).
 
-⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
-unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language
-record — see [`ldb-string-index.md`](ldb-string-index.md)) names 50300 as `main_quest_templates.name`, and the
-bounded-area names are category **51200 `bounded_areas.bounded_area`, which is not encrypted at all**. Decoding
-50300 would yield quest names and would still never name a banner.
+The area titles are not in LDB category 50300: the client's own category descriptor table (recovered from the
+language record — see [`ldb-string-index.md`](ldb-string-index.md)) names 50300 as `main_quest_templates.name`, and
+the bounded-area names are category **51200 `bounded_areas.bounded_area`, which is not encrypted at all**.
 
 ## The client's own name table for these regions: LDB category 51200
 
@@ -608,10 +581,6 @@ So a `ReachArea` goal's real trigger volume resolves **mechanically**, with no g
 goal.TrailingRefId --(LDB cat 51200)--> region name --(that playfield's 1000053 record)--> the polygon
 ```
 
-That supersedes the "no id link, pick a region by judgement" reading in the quest-goal section above — which was
-reached before the category table was known, and which guessed `Jungle Main` where the client actually says
-`Trappers Haven` (a 96 × 82 region rather than a 392 × 529 one).
-
 **Only three goals in the whole catalog carry a 51200 reference**, and all three regions exist:
 
 | goal | quest | map | count | region | on playfield |
@@ -620,11 +589,11 @@ reached before the category table was known, and which guessed `Jungle Main` whe
 | 11712 | 17608 | 6400 | 3 | `NightmareRoomBA` | 6400 ✓ |
 | 14073 | 19364 | — | 1 | `BossRoom` | 2027 ✓ (the goal has no MapId; the name is unique to one playfield) |
 
-⚠️ A 51200 reference does **not** by itself make a goal a reach objective — 11712 wants **3** of something, so
-its region reads as a *scope* ("3 of something in the Nightmare Room") rather than the objective. Settling that
-is answered by the goal's own objective text, readable since #520: 11712 is *"Overcome the Emperor's Manifested
-nightmares"*, a defeat objective the region merely scopes, while 1448 is *"Enter the jungle"* — a true reach. So
-both halves are now mechanical: the kind from the text, the polygon from the reference.
+A 51200 reference does **not** by itself make a goal a reach objective — 11712 wants **3** of something, so its
+region reads as a *scope* ("3 of something in the Nightmare Room") rather than the objective. The goal's own
+objective text answers that: 11712 is *"Overcome the Emperor's Manifested nightmares"*, a defeat objective the
+region merely scopes, while 1448 is *"Enter the jungle"* — a true reach. So both halves are mechanical: the kind
+from the text, the polygon from the reference.
 
 ## Import
 
@@ -632,58 +601,55 @@ both halves are now mechanical: the kind from the text, the polygon from the ref
 actually consumes. The server has no RDB access, so anything the runtime needs has to come through here; what
 nothing reads stays out.
 
-`RdbRegionImporter` (the opt-in `rdb-regions` module) imports **235 regions / 6,899 vertices** into `MapRegion` +
+`RdbRegionImporter` (the opt-in `rdb-regions` module) imports **340 regions / 8,064 vertices** into `MapRegion` +
 `MapRegionVertex` and links each to its consumer:
 
-- **68 resurrection-point discovery volumes** (#519/#682) → `RespawnPoint.DiscoveryRegionId`, the smallest region
+- **68 resurrection-point discovery volumes** → `RespawnPoint.DiscoveryRegionId`, the smallest region
   containing the point that passes three gates: the resurrection family's own **vocabulary**, a pad **footprint**
   (≤ 3000 u² — the shipped ones are 147 to 1,658), and **`scryid 0`**, i.e. server-owned behaviour, which is what
-  discovery is. `WorldSimulation` then tests the polygon instead of its 30-unit radius, which is a 60 × 60 box with
-  no vertical bound against volumes of 16 × 20 to 29 × 33 and ~10 units tall — so the radius discovers a point from
-  roughly twice retail's distance and from any height. The RDB carries **no radius at all**, so these volumes are
-  the only source there is.
-  ⚠️ The name gate is the weakest of the three and is dangerous alone: `FrostFields_Discovery` and `FotD_Discovery`
+  discovery is. `PlayerDeathService` tests the polygon, falling back to its 30-unit radius only for a point with no
+  volume. The RDB carries **no radius at all**, so these volumes are the only source there is.
+  The name gate is the weakest of the three and is dangerous alone: `FrostFields_Discovery` and `FotD_Discovery`
   are **area** discovery — the zone-codex mechanic, 157 × 185 and 114 × 74 — and each contains a respawn point of
   the *same name*, so containment plus a loose `_Discovery` happily links them and widens two points' discovery to
-  a box 25× the size. The **size** gate is what keeps them out, not the vocabulary.
-  ⚠️ It widened from 11 to 68 only once the `\brez` anchor was fixed — see the classifier note below.
-- **3 quest goal regions** (#521) → `QuestGoalDefinition.RegionId`, resolved through the goal's typed LDB
+  a box 25× the size. The **size** gate is what keeps them out, not the vocabulary. (The `(?<![a-z])` anchor in the
+  classifier is what lets the vocabulary gate see the `*_RezDiscovery` family at all.)
+- **3 quest goal regions** → `QuestGoalDefinition.RegionId`, resolved through the goal's typed LDB
   reference (see below). `BossRoom` resolves even though goal 14073 carries no `MapId`, because the name occurs on
   exactly one hosted playfield; ambiguity is reported rather than guessed.
 
-- **140 area banners** (#513/#348/#679/#680) → `MapRegion.AreaNameId`, by the name join and the id blocks above,
+- **150 area banners** → `MapRegion.AreaNameId`, by the name join and the id blocks above,
   with geometry as the fallback for the banners whose region carries an internal name.
-- **14 no-mount volumes** (#681) → `MapRegion.NoMount`, the settlements and palaces retail makes you walk
+- **14 no-mount volumes** → `MapRegion.NoMount`, the settlements and palaces retail makes you walk
   (`HeavensLake_DismountArea`, `BA_NoMount_Fengdu`, `No_mount_shaulun`). The one other family whose behaviour is
   not a guess: `SendDismount` is capture-decoded and is the single path retail ends every dismount through, so all
   that was missing was which ground. A FLAG rather than a side table because the behaviour has no parameters —
   contrast `MapHazard`, which has three. `Map.PlayfieldFlags` gates riding per playfield; this is the
   sub-playfield version, and the two are independent.
-  ⚠️ Taken at ANY scryid, unlike lava: 4 of the 14 run the crossing notifier (220656), which is evidence FOR the
+  Taken at ANY scryid, unlike lava: 4 of the 14 run the crossing notifier (220656), which is evidence FOR the
   family, and there is no such thing as an ambient audio twin of a no-mount area.
-  ⚠️ `_` is a WORD character, so a `\bno.?mount` anchor matches neither `BA_NoMount_Fengdu` nor
-  `No_mount_shaulun` — it takes 11 of the 14 and drops all of Kara Korum's, silently. The rule anchors on
+  `_` is a WORD character, so a `\bno.?mount` anchor matches neither `BA_NoMount_Fengdu` nor
+  `No_mount_shaulun` — it would take 11 of the 14 and drop all of Kara Korum's, silently. The rule anchors on
   `(?<![a-z])` instead. [V3: MapRegionGeometryTests.TheNoMountVolumes_AreTheOnesTheClientNames]
-- **105 lava hazards** (#504) → a `MapHazard` row *on the region*, over 22 playfields, from Tortage Volcano and the
+- **105 lava hazards** → a `MapHazard` row *on the region*, over 22 playfields, from Tortage Volcano and the
   Acheronian Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.
-  ⚠️ Only the GEOMETRY comes from the client. What a hazard does — which spell, how much damage, whether it kills —
-  is server data, and since #679 that split is structural: `MapHazard` is a 1:1 BEHAVIOUR side table keyed to the
-  region, not a second copy of the prism. It used to be a table of its own with its own `MapHazardVertex` ring and
-  its own `rdb-hazards` module; both are gone, and importing a volume's geometry no longer implies it hurts anybody.
+  Only the GEOMETRY comes from the client. What a hazard does — which spell, how much damage, whether it kills —
+  is server data, and the split is structural: `MapHazard` is a 1:1 BEHAVIOUR side table keyed to the region, not a
+  second copy of the prism, so importing a volume's geometry does not imply it hurts anybody.
 
 Seven lava-named areas are skipped and the importer prints why for each — all seven are the scripted ambient
 companions (`Lava` on 917/942/5012, `Lava Area` on 944/4010, `LavaUpper` on 5012, `BA_Lava_music` on 1090). A
 further 85 whole records are skipped as a counted summary: they sit in the `0x40000000`-based variant playfield
 numbering, which is not a `Map.Id`.
 
-⚠️ Two traps cost real time here and are worth knowing before touching the parser:
+Two parser traps:
 
 - **A record holds several sibling ROOT blocks**, not one (Ymir's Pass has ten). Scanning from the first
   `<boundedareas>` to the first `</boundedareas>` yields 7 of that map's 121 areas — and none of its lava.
 - **There are two export dialects.** Newer records open the element with attributes (`<boundedarea Static… >`),
   older ones write a bare `<boundedarea>`. Anchoring on the string `"<boundedarea "` parses the first perfectly
-  and returns **zero** areas for the second — which silently lost 9 playfields including Tortage Volcano's 7
-  volumes, while every other number in the import looked healthy.
+  and returns **zero** areas for the second — silently losing 9 playfields including Tortage Volcano's 7 volumes,
+  while every other number in the import looks healthy.
 
 Both are gated by `BoundedAreaCollectionTests`.
 
@@ -717,7 +683,7 @@ the wire uses, in a client asset.
 **5,569 of them are already in 1000053** (97.2%), while 1000053 holds **3,110 that 1000055 does not**, over 135
 playfields 1000055 has no record for at all. The 162 that are only in 1000055 are mostly generated siblings
 (`<name>_boundedareafixed3d_1`) of an area 1000053 already names. So it is the compiled twin, carrying strictly
-less coverage, and there is nothing to import: read 1000053. Tracked in Gitea #885.
+less coverage, and there is nothing to import: read 1000053.
 
 ## Type 1000050 — territories, and why they are NOT a naming source
 
@@ -743,12 +709,11 @@ adds is therefore not vocabulary but **shape** (a polygon with a height, where `
 axis-aligned box) and **coverage**: 47 playfields have territories and no spawn areas at all, carrying 24
 `Name`-category groups we do not hold.
 
-⛔ **The coverage half is answered, and it is NOT an import bug (#886).** The suspicion was that playfields with
-territories and no `NpcSpawnArea` might have a 1010506 record the importer drops. They do have one, and it is
-**empty**: taking every 1000050 record whose id is a real `Maps` row (506 of them), 318 have no spawn-area row of
+**The coverage gap is not an import bug.** Playfields with territories and no `NpcSpawnArea` do have a 1010506
+record, and it is **empty**: taking every 1000050 record whose id is a real `Maps` row (506 of them), 318 have no spawn-area row of
 ours, 237 of those carry a 1010506 record, and **every one of those 237 records is exactly 8 bytes** — a header
 with no entries. The playfields we do import areas for carry 118 B to 1.3 MB (median 5.7 KB). So the client ships
 territories for a playfield whose spawn LAYOUT is genuinely empty, and there is nothing being dropped.
 
 That makes the consumer for it the ambient-spawn work, which is blocked on the creature catalog rather than on
-placement — so it stays unimported. Tracked in Gitea #885/#886.
+placement — so it stays unimported.

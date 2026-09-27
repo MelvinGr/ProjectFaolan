@@ -29,12 +29,10 @@ What happens to that unpatched client is decided by `Server:PrivateKey` alone (`
 `AnswerChallenge` handler): **no key → accepted**, on its account name; **a key → refused**. The refusal is the
 same `InvalidLogin` reason a wrong password gets, and the server log names the real cause.
 
-⚠️ **It is a DERIVATION, not a setting.** It used to be one — `Login:AllowUnpatchedClients`, default true — and it
-could not actually hold both of its values. Without a key there is nothing to decrypt with, so every client reads
-as unpatched and a deny would have refused the lot; the setting had to be forced back on, explicit `false`
-included, and it then read as applied while it was not. And a deployment that goes and generates a key does so
-precisely to make the password required. So the key is the switch, and there is no second setting to leave in a
-state the operator did not choose.
+**It is a derivation, not a setting.** A separate allow/deny switch could not hold both of its values: without a
+key there is nothing to decrypt with, so every client reads as unpatched and a deny would refuse them all. And a
+deployment generates a key precisely to make the password required. So the key is the switch, and there is no
+second setting to leave in a state the operator did not choose.
 
 The server's public key is exactly `g^serverPrivate mod N` — this is the value the launcher patches into the
 client.
@@ -49,11 +47,10 @@ their defaults live in the settings catalog (`Faolan.Core/Cli/FaolanSettings.cs`
 | `Server:PrivateKey` | the **server** — the only half it needs, and the switch above | **none** — a server has no key unless given one |
 | `Server:PublicKey` | the **launcher**, as what to patch IN | `g^PrivateKey mod N`, i.e. derived |
 
-⚠️ **`Server:PrivateKey` has no default, and that is the point.** It used to default to the historical CellAO key,
-which made the shipped configuration and the "secure" one the same keypair — a key everybody has is not a
-credential, and nothing at startup distinguished a server running on it from one running on its own. Unset now
-means *no server identity*: nothing decrypts, no password is ever checked, and every client is accepted on its
-account name. The startup line says which of the two states the server came up in.
+**`Server:PrivateKey` has no default, on purpose.** A shipped default key (such as the well-known CellAO key)
+would make the default configuration and the "secure" one the same keypair, and a key everybody has is not a
+credential. Unset means *no server identity*: nothing decrypts, no password is ever checked, and every client is
+accepted on its account name. The startup line says which of the two states the server came up in.
 
 There is deliberately no setting for the key the launcher SEARCHES for. It finds the 256-hex slot in the exe by
 shape — the NUL-delimited run of that width which is not the DH prime — so it can re-patch a client it already
@@ -97,9 +94,8 @@ derived public key, and the server half recovers the exact `username|challenge|p
 - `ClientLoginEncryption.Encrypt` simulates the patched client (DH + TEA-CBC encrypt) to produce the
   exact `AnswerChallenge` body. The **server never calls it** — it exists for tests and launcher work.
 - The DH parameters and the key handling live on `ClientLoginEncryption` itself, and it holds **no state**: the private
-  key is a parameter of `Decrypt`, and the public half is derived on demand by `PublicHexFor`. They used to be a
-  separate `DhKeys` class whose configured key was static, applied by a `Configure(IConfiguration)` every
-  executable had to remember to call — forget it and every login silently degraded to accept-any.
+  key is a parameter of `Decrypt`, and the public half is derived on demand by `PublicHexFor`. No executable has to
+  remember to configure a static key before the first login.
 - Static-initializer order still matters within the class: `N` and `G` must initialize before anything calls
   `ModPow`, or it sees `N = 0` and throws. Nothing derived from them is a field initializer for that reason.
 - Patch tooling: the launcher's `--patch-login` (`Faolan.ClientLauncher/ClientExePatcher.cs`).

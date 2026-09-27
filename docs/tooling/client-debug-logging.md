@@ -1,13 +1,11 @@
-# Client debug logging — SOLVED (the channels work; the 2026-06-15 "dead end" was the wrong knob)
+# Client debug logging
 
-**Status:** SOLVED 2026-07-26, verified live. The 2026-06-15 conclusion below ("the verbose sites don't fire on
-this build") is **wrong** — they fire fine. The knob is not the log gate at all: it is the logger's **per-channel
-level threshold**, and the client takes it from a plain config FILE. Enable it with
-`Faolan.ClientLauncher --debug-channels`, which writes `dbDebug.conf` (`ClientDebugChannels`) — no exe change, no
-process memory.
+The client's verbose debug channels work on this build. The knob is the logger's **per-channel level threshold**,
+and the client takes it from a plain config FILE. Enable it with `Faolan.ClientLauncher --debug-channels`, which
+writes `dbDebug.conf` (`ClientDebugChannels`) — no exe change, no process memory.
 
-Measured proof: dropping the default threshold produced **117,044 log lines in seconds**, including the
-`RECEIVED IIR: class MoveTaskIIR_c` trace this doc previously recorded as never firing.
+Dropping the default threshold produces **117,044 log lines in seconds**, including the
+`RECEIVED IIR: class MoveTaskIIR_c` trace.
 
 ## `dbDebug.conf` — the client's logger config
 
@@ -53,13 +51,12 @@ A line is emitted when `threshold <= level`. The debug sites log at level **0–
 default of 3 is exactly what hides them — and a channel absent from the table falls back to that default. A name at
 threshold 0 opens **that channel and nothing else**.
 
-⚠️ Do NOT simply drop `DebugLevel` to 0: `GameCode.Movement` alone logs per entity per frame (99k lines of the
-117k). Per-channel is the usable form. ⚠️ The table holds `0x80` names of at most 47 characters, and a channel name
-cannot contain a space or `=` (the parser's tokenizer would split it). ⚠️ A name that is not a real channel opens
+Do not simply drop `DebugLevel` to 0: `GameCode.Movement` alone logs per entity per frame (99k lines of the
+117k). Per-channel is the usable form. The table holds `0x80` names of at most 47 characters, and a channel name
+cannot contain a space or `=` (the parser's tokenizer would split it). A name that is not a real channel opens
 nothing at all, silently — the sink prints channels with a DOT (`GameCode.Stats`) while the call sites and the
 table use a SLASH, so **install the slash form** and check it exists:
-`strings -n 3 AgeOfConan.exe | grep -xF 'N3/IIR'`. (`N3.IIR` shipped in the default set for one commit and logged
-nothing; only `N3/IIR` exists.) ⚠️ Pass `-n 3`: `strings` prints runs of **4+** printable characters by default, so a
+`strings -n 3 AgeOfConan.exe | grep -xF 'N3/IIR'` (`N3.IIR` logs nothing; only `N3/IIR` exists). Pass `-n 3`: `strings` prints runs of **4+** printable characters by default, so a
 three-character channel name is invisible to it — `BCC` is a real channel (6 sites) that a plain `strings` search
 reports as missing. The call-site scan below has no such blind spot.
 
@@ -88,18 +85,16 @@ every channel is named `GameCode/*`: **`ClientInterface`** is the most useful on
 
 `ClientInterface_t::CMsg_StatChange()..(<statId> <new> old:<old>)` (`FUN_006dbc30`, level 1). This is strictly more
 than `GameCode/Stats`, which only reports server-driven sets: it also catches everything the client computes or
-derives locally, which is what makes the attribute pipeline readable (#442/#444). A world entry shows:
+derives locally, which is what makes the attribute pipeline readable. A world entry shows:
 
 1. the client seeding the five attributes to a hardcoded **10** (`(804 10 old:0)` …),
 2. then one write per contributing item template, so — read alongside `GameCode/ItemData`, which names the template
    being loaded — **each delta is attributed to an item id**,
 3. and `278`/`279`/`280` (Non Combat Health/Stamina/Mana Regen) seeded to `2000`/`1000`/`2000`.
 
-Step 2 is what **solved #441**. Comparing the client's per-item stats against ours showed a clean split — items whose
-region our parser found agreed exactly, items where it found nothing were empty on our side while the client applied a
-full list. That looked like a missing scaling formula, and it was not: the stats were in the template all along, and
-the parser could not see them because it scanned only 4-byte-aligned offsets while most regions are unaligned. The
-channel is what made the discrepancy measurable per item, which is how the real cause was found.
+Step 2 makes a per-item comparison against our own item-stat parse possible. An item where the client applies a full
+list while our side is empty is a parse miss, not a missing scaling formula: item-template stat regions are mostly
+unaligned, so a parser that scans only 4-byte-aligned offsets misses them.
 
 ## The channel catalog, and which ones pay
 
@@ -133,77 +128,19 @@ that drives them (a cast, a fatality, opening the auction house, talking to an N
 `GameCode/ArmorMitigation` look dead until someone opened the character sheet.
 
 Notable per-task channels beyond the default set: `GameCode/Magic/Metaline` for spellweaving,
-`GameCode/Magic/Recast` for #271, `Tradepost`/`Mail`/`GuildBank`/`GameCode/Shops` for the economy subsystems,
-`Knubot` + `GameCode/Criteria` + `CharacterTag` for dialogue gating, `GameCode/Pets` for #307, and
+`GameCode/Magic/Recast` for recast timers, `Tradepost`/`Mail`/`GuildBank`/`GameCode/Shops` for the economy
+subsystems, `Knubot` + `GameCode/Criteria` + `CharacterTag` for dialogue gating, `GameCode/Pets` for pets, and
 `BassiNet/Proxy` (every RPC through the proxy, 768 sites) when the question is which call the client made.
 
-⚠️ **`Control/*` and `Control/Data/*` are the client's DATA-LOADING layer, not runtime traces.**
+**`Control/*` and `Control/Data/*` are the client's DATA-LOADING layer, not runtime traces.**
 `Control/Data/Movementset` emits all 106 of its lines during startup and never again, and `Control/Data/Fatality`
 (9 sites, level 1) stayed silent through a live retail session that included a kill which DID enter the fatality
 path — so its emit sites are edge/error branches in fatality data parsing rather than a per-fatality trace. Do not
 read the name as "a channel that reports fatalities"; measured against a live session it reports nothing about one.
 
-**A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
-because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.
+## The log gate and sink (why memory patching is the wrong knob)
 
-Everything below is the original 2026-06-15 write-up, kept because its measurements are sound and only its
-conclusion was wrong.
-
-## What we tried
-
-The hook DLL's mechanism #1 (and a short-lived `Faolan.ClientLauncher --debug-log` flag that did the same via a
-live `/proc/<pid>/mem` write) set two globals to open the client's internal
-`LogBase` trace:
-
-- `DAT_021a2c29 = 1` (master log-enable, 1 byte)
-- `DAT_029864f8 = 0` (per-channel filter bypass, 4 bytes)
-
-The premise (from the hook README) was the gate `DAT_021a2c29 != 0 && (DAT_029864f8 == 0 || perChannel(channel))`
-— so forcing the second operand true would make every channel log its full debug trace
-(`got quest [id]`, `Wrong IIR_t version`, dispatch/inventory/combat, …) to `AgeOfConan.log`.
-
-## What the predicate actually is
-
-`FUN_004a8c50(level, channel)` is the per-line "should output" predicate (disassembled from the exe;
-`file_off = VA − 0x400C00`, i.e. `0x004A8C50 → 0xA8050`):
-
-```asm
-push ebp ; mov ebp,esp
-cmp byte [0x21a2c29], 0     ; master enable
-je  ret_false
-mov eax,[ebp+8]            ; level
-test eax,eax / js ret_false ; level < 0 -> false
-cmp dword [0x29864f8], 0    ; the filter bypass
-jne per_channel_lookup      ; != 0 -> consult per-channel table (FUN_004a8070)
-mov al,1 / pop ebp / ret    ; == 0 -> return TRUE for everything
-per_channel_lookup: ...     ; cdecl, returns the table result
-ret_false: xor al,al / pop ebp / ret
-```
-
-So the README formula was **correct**: `DAT_029864f8 == 0` does force the predicate true. The mechanism wasn't
-wrong about the gate. It's wrong about the *outcome*.
-
-## Why it produces nothing — three measured facts
-
-Verified live against a running client (`ptrace_scope=0`, reads/writes via `/proc/<pid>/mem`):
-
-1. **`DAT_021a2c29` is already `1` by default**, in every run, patched or not. Writing `1` is a no-op.
-2. **The client zeroes `DAT_029864f8` itself by world-entry.** Read at early startup = `1`; read in-world on an
-   **unpatched** run = `0`. So `FUN_004a8c50` already returns true for everything once you're in the world —
-   without any patch.
-3. **With the predicate wide open, the log does not flood.** In-world idle: `+0 lines / 15 s`, `0` `RECEIVED IIR`.
-   The saved patched run that reached playfield-load (571 lines) contained `0` `RECEIVED IIR` / `DEBUG:` /
-   `VERBOSE:` / `TRACE:` lines. The verbose `LogBase` sites simply don't fire on this build — they're release-
-   compiled out or guarded further — so opening the gate changes nothing.
-
-The lines `AgeOfConan.log` *does* carry (`ERROR` / `WARNING` / `IMPORTANT`, RDB-miss, `Playfield.Loading`
-timings) are emitted by the stock client regardless of the gate. That's the same content
-`Faolan.ClientLauncher --console` already tails into the terminal.
-
-## What the sink actually does (2026-07-26 — this is the correction)
-
-Decompiling the log CALL and the SINK, rather than only the predicate, shows why the log file stayed quiet. Every
-channel site looks like this (here `FUN_0113ba00`, the armour-mitigation computation):
+Every channel site compiles to the same shape (here `FUN_0113ba00`, the armour-mitigation computation):
 
 ```c
 if (DAT_021a2c29 != 0 && (DAT_029864f8 == 0 || FUN_004b2cc0(&DAT_02984ac0, 2, "GameCode/ArmorMitigation")))
@@ -211,7 +148,9 @@ if (DAT_021a2c29 != 0 && (DAT_029864f8 == 0 || FUN_004b2cc0(&DAT_02984ac0, 2, "G
     FUN_004a8b90(2, "GameCode/ArmorMitigation", "%s", msg);
 ```
 
-and the sink `FUN_004a8b90(level, channel, fmt, ...)` is:
+`FUN_004a8c50(level, channel)` is the per-line predicate (`file_off = VA − 0x400C00`, i.e. `0x004A8C50 → 0xA8050`):
+master enable `DAT_021a2c29`, `level < 0` → false, then `DAT_029864f8 == 0` → true for everything, else the
+per-channel table (`FUN_004a8070`). The sink `FUN_004a8b90(level, channel, fmt, ...)` is:
 
 ```c
 if (level >= 0) {
@@ -224,50 +163,23 @@ if (level >= 0) {
 }
 ```
 
-`__iob_func() + 0x40` is `_iob[2]` = **stderr**. So `DAT_029864f8` is not just a filter bypass, it is also the
-**output ROUTE**: zero sends every line to stderr, non-zero sends it to the log file. The 2026-06-15 patch forced
-it to zero and then measured `AgeOfConan.log` — which is exactly the combination that shows nothing. Fact 2 above
-(the client zeroes it itself by world-entry) means the stock in-world client is *already* logging these channels,
-to a stream nothing captures.
+`__iob_func() + 0x40` is `_iob[2]` = **stderr**. So `DAT_029864f8` is both a filter bypass and the **output route**:
+zero sends every line to stderr, non-zero to the log file. Measured live (`/proc/<pid>/mem` reads):
+`DAT_021a2c29` is already `1` in every run, and the client zeroes `DAT_029864f8` itself by world entry — so forcing
+either global and watching `AgeOfConan.log` shows nothing, because the lines go to a stream nothing captures.
 
-### The configuration that should actually work
+With `DAT_029864f8` non-zero, `FUN_004b2cc0(&DAT_02984ac0, level, channel)` decides: `[0]` = minimum level,
+`[7]` = output mode, `[8]…` = the channel-name table (up to 0x80 entries, 0xC words apart), and mode 2 reads
+per-channel thresholds at `[idx + 0x608]`. That is exactly the table `dbDebug.conf` fills at startup, which is why
+the config file is the knob: nothing has to be timed against world entry and no memory is written.
 
-1. `DAT_029864f8` **non-zero** in-world (the opposite of the old patch), so the sink takes the file-writer branch.
-   The client zeroes it at world entry, so it has to be re-written *after* that — periodically, or by hooking the
-   write.
-2. With it non-zero the per-channel predicate `FUN_004b2cc0(&DAT_02984ac0, level, channel)` now decides. That
-   object is `[0]` = minimum level, `[7]` = output mode, `[8]…` = a channel-name table (up to 0x80 entries, 0xC
-   words apart), and mode 2 additionally reads per-channel thresholds at `[idx + 0x608]`:
-   - **mode 0 = whitelist** — logs a channel only if its name is IN the table. The low-noise choice: put
-     `GameCode/ArmorMitigation`, `GameCode/Stats`, `GameCode/ItemData` in it and get only those.
-   - **mode 1 = blacklist** — logs unless the name is in the table, so an all-zero table logs everything.
-   - Either way `[0]` must be `<= level`, and these sites log at level 2.
-3. `DAT_029864e0` non-zero additionally forces an `fflush` per line, which is what makes tailing usable.
+- A **static** patch of those tables is impossible: they are in the BSS tail of `.data` (raw bytes end at VA
+  `0x02238200`, the tables are at `0x02984AC0`), so there is nothing on disk to edit, and the client memsets and
+  fills them at startup regardless.
+- A PE-subsystem GUI→CUI flip does not help: the stderr branch of the sink only runs while the logger is
+  uninitialised, and it never is in-world.
+- The lines `AgeOfConan.log` carries with the stock config (`ERROR` / `WARNING` / `IMPORTANT`, RDB-miss,
+  `Playfield.Loading` timings) are what `Faolan.ClientLauncher --console` tails.
 
-The alternative route — flipping the PE subsystem GUI→CUI so Wine gives the process a real console and stderr
-becomes valid — also works in principle and needs no live memory writes, but it changes the exe (and so the
-`-clienthash` md5, which `Faolan.ClientLauncher` already recomputes after patching).
-
-Both of those were superseded: point 2's table is written from `dbDebug.conf` at startup, per the top of this doc,
-so nothing has to be timed against world entry and no memory is written at all. A note on why a *static* patch of
-those tables is impossible, should anyone try: they are in the BSS tail of `.data` (raw bytes end at VA
-`0x02238200`, the tables are at `0x02984AC0`), so there is nothing on disk to edit, and the client memsets and
-fills them at startup regardless.
-
-## Takeaways
-
-- The gate formula in the original README was right, the measurement was right, and the CONCLUSION was wrong:
-  don't cite this doc as "client logging is impossible". Cite it as "`DAT_029864f8 = 0` sends it to stderr".
-- What these channels would give us is real ground truth: `GameCode/ArmorMitigation` prints
-  `TotalArmorValue`, `ApprenticeLevel Adjusted ArmorValue`, `Mitigation Modification`, `MinMitigation`/
-  `MaxMitigation` and `Final Mitigation` per hit — which is exactly what #401 needs, and the same trick applies
-  to `GameCode/Stats` (#3) and `GameCode/ItemData` (#441).
-- For in-client ground truth the `Faolan.ClientHook` project's other mechanisms were used — the **dispatcher
-  hooks** (per-interface server→client packet feed) and **field hooks** (e.g. `QuestFullUpdateIIR::Activate`),
-  logging to `faolan_hook.log` via inline detours — but that project is no longer in the repo; Frida-under-Wine
-  ([[frida_under_wine_client_re]]) is now the live-RE tool.
-- The patch *mechanism* (find the client pid, write+verify `/proc/<pid>/mem`) is sound and still lives in
-  `ClientExePatcher` for the DH-key patch; it was only the debug-log *target* that was useless.
-- Before reaching for memory or exe patching, look for a config file the client already parses. `dbDebug.conf`
-  had been sitting in the install dir the whole time, and its `DebugLevel=3` is literally the default threshold
-  the first working patch wrote by hand.
+Before reaching for memory or exe patching, look for a config file the client already parses: `dbDebug.conf` sits
+in the install dir, and its `DebugLevel=3` is the default threshold.

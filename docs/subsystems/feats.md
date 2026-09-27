@@ -1,4 +1,4 @@
-# Feats subsystem (Gitea #251)
+# Feats subsystem
 
 Feats are **a live subsystem**: the catalog, the wire↔template id map, the prerequisite graph and the
 per-level point budget all come off the client's own RDB, a character's trained set round-trips through the
@@ -9,72 +9,66 @@ data comes from.
 ## TL;DR
 
 - **`FeatIIR` (`0x28DA68A0`) is the feat train/unlock record** — a handshake carrying a `0x3F1`-framed list
-  of feat ids. Decoded; added to `Opcodes.cs`.
-- **The full unlocked-feat set IS in the captures — it rides the player spawn (`FA015807`), NOT the FullChar
+  of feat ids. Decoded; in `Opcodes.cs`.
+- **The full unlocked-feat set is in the captures — it rides the player spawn (`FA015807`), not the FullChar
   snapshot.** It lives in the spawn's **pre-IIR** region (the block `parse_spawn_scaffold.py` keeps raw), as a
-  `0x3F1`-framed `u32` feat-id list. Decoded 2026-07-14 by `tools/capture/decode_unlocked_feats.py`. **This
-  retires the former "#1 blocker".** Every high-level captured char yields a stable set (NecroL80 necro 25, DemoL80
+  `0x3F1`-framed `u32` feat-id list, decoded by `tools/capture/decode_unlocked_feats.py`. Every high-level captured
+  char yields a stable set (NecroL80 necro 25, DemoL80
   demo 25, Hakotep hox 6); every fresh/create char yields the empty `0x3F1` marker.
   Read in C# by `PlayerSpawnScaffoldRows.ExtractPreFrameFeats` (at a fixed offset in the parsed frame) and written
-  back from `CharacterFeat` rows by `FreshPreFrame`. `SpawnFeatListTests` gates that over the WHOLE corpus: **109 of
+  back from `CharacterFeat` rows by `FreshPreFrame`. `SpawnFeatListTests` gates that over the whole corpus: **109 of
   the 259 captured player-scaffold spawns carry feats, 150 frame an empty list, 204 distinct feat ids**, with the
   frame length (a fixed basis + 4 bytes per feat) corroborating every count independently.
-- **The spawn scaffold is NOT feats.** `CharacterSkill` / `PlayerSpawnScaffoldRows` / `decode_skill_scaffold.py` read the
+- **The spawn scaffold is not feats.** `CharacterSkill` / `PlayerSpawnScaffoldRows` / `decode_skill_scaffold.py` read the
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
-  different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
-  conflated the two; that has been corrected across code + memories.
-- ⭐ **A feat's point cost is ONE PER RANK, and an AUTO-TRAINED feat is never on the wire** (#862). The client's
+  different id-space. It gates spell *usability* but is unrelated to the feat tree.
+- **A feat's point cost is one per rank, and an auto-trained feat is never on the wire.** The client's
   own featclass table (RDB 1000043, imported as `FeatClassEntry`) marks 3,839 of its 9,916 rows auto-trained and
   hands them over itself at the level it names; all 56 captured feat ids are on the other side of that flag, and
   summing `rank + 1` over each captured feat list reproduces its level's point budget exactly (79/79/16). See the
   last section of this page.
-- **The feat CATALOG now exists** (#251): `Feat` (**19,777** rows from the RDB 1000020 plaintext templates - id, name,
+- **The feat catalog**: `Feat` (**19,777** rows from the RDB 1000020 plaintext templates - id, name,
   description, tree, group, rank) + `FeatEffect` (**23,033** stat modifiers, 161 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
-- **Feats, spells and items are the SAME RDB record layout** - `[u32 type][u32 id][u32 1000000][...]` - so they
-  share the stat-modifier region AND its parser, `ItemTemplateStatModifiers.Parse(body[12..])`. (The "TB magic" that
-  identifies a plaintext feat record is simply the TYPE word 1000020: `0x000F4254` renders as `TB\x0f\x00`.)
-  That parser anchors on the 6-word signature `4,0,1,0,2,9` inside the 10-word record rather than on a stride, which
-  is what makes it right where five hand-rolled attempts were wrong (fixed stride 3.1% bad, kind-range delimiter
-  24.2%, measured per-kind width table 7.2%). It scores **2.2% on MORE rows**, and it carries the effect KIND that
-  the hand-rolled version dropped - 53045 flat vs 53067 percent-stored-x100.
-- **Why items score 0.00% and feats 0.35%**: `RdbItemImporter` WHITELISTS (`ApplicableStatIds.Contains`), accepting
+- **Feats, spells and items are the same RDB record layout** - `[u32 type][u32 id][u32 1000000][...]` - so they
+  share the stat-modifier region and its parser, `ItemTemplateStatModifiers.Parse(body[12..])`. (The "TB magic" that
+  identifies a plaintext feat record is simply the type word 1000020: `0x000F4254` renders as `TB\x0f\x00`.)
+  That parser anchors on the constant prefix `4,0,1,0,2,9` rather than on a stride (a fixed stride reads 3.1% bad,
+  a kind-range delimiter 24.2%, a measured per-kind width table 7.2%), and it carries the effect kind - 53045 flat
+  vs 53067 percent-stored-x100.
+- **Why items score 0.00% and feats 0.35%**: `RdbItemImporter` whitelists (`ApplicableStatIds.Contains`), accepting
   only the 17 stats it can name; feats touch 173, so that curated list does not transfer.
-  **Kind 53182 is excluded** - decoded, and it is NOT a stat modifier: its element is `(index, FOURCC)`, the "amount"
+  **Kind 53182 is excluded** - decoded, and it is not a stat modifier: its element is `(index, FOURCC)`, the "amount"
   being four ASCII characters identical across a feat family (`0x4450434E` "DPCN" on every Perception feat,
-  `0x5633534D` "V3SM" on Hide In Shadows, `0x454F4854` "EOHT" on the crafting ranks). It carried 480 of the 561 bad
-  rows; dropping the whole KIND rather than the rows that failed a stat lookup took the residue to **81 rows**.
-  The 1,145 of its rows that landed on named stats were just as bogus - a small index is often a valid stat id.
-  ⚠️ 17 stat ids remain unnamed by LDB 615, including the `1084..1094` family (values 100..900) which looks
+  `0x5633534D` "V3SM" on Hide In Shadows, `0x454F4854` "EOHT" on the crafting ranks). It accounts for 480 of 561
+  bad rows; dropping the whole kind rather than the rows that fail a stat lookup leaves a residue of **81 rows**.
+  The 1,145 of its rows that land on named stats are just as bogus - a small index is often a valid stat id.
+  17 stat ids remain unnamed by LDB 615, including the `1084..1094` family (values 100..900) which looks
   deliberate - identify those before anyone adds a whitelist, which would silence exactly them.
-- **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
-  `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
-- **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042
-  points at is a feat by definition; Hellfire (3187268) carries Flags `0x5` rather than `0x10000005` and was
-  silently excluded while the heuristic was the only gate.
-- **The PREREQUISITE GRAPH is in the RDB** - in the 1000042 feat TABLE, not the 1000020 template. Columns 2/3/4 of
+- **Two record shapes carry the name**, and every feat the captured characters hold uses the second:
+  `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the tooltip.
+- **The feat/item discriminator is the client's own feat table, not the Flags word.** A template that RDB 1000042
+  points at is a feat by definition; Hellfire (3187268) carries Flags `0x5` rather than `0x10000005`, so a Flags
+  heuristic silently excludes it.
+- **The prerequisite graph is in the RDB** - in the 1000042 feat table, not the 1000020 template. Columns 2/3/4 of
   each entry are up to three prerequisite wire feat ids: `FeatPrereq`, **5,501 edges over 5,489 feats**, and the
   chains resolve end to end (`Equip: One Handed Edged Weapons 2` requires `... 1`). Together with `FeatIdMap` this is
-  the tree's shape. (An earlier pass concluded prereqs were not in the RDB at all - that was true of the 1000020
-  TEMPLATE, which is what it diffed, and wrong about the client's data as a whole.)
-- **One row per feat BASE.** A feat id is composite (`base*100 + rank`) and retail stores only the current rank -
-  no captured character carries two ranks of one base. So `AddCharacterFeats` REPLACES on rank-up (keeping the
+  the tree's shape.
+- **One row per feat base.** A feat id is composite (`base*100 + rank`) and retail stores only the current rank -
+  no captured character carries two ranks of one base. So `AddCharacterFeats` replaces on rank-up (keeping the
   feat's original `Sequence`, since the wire order is train order) and ignores a request at or below the rank held.
-  It used to dedup on the exact id, which would have put an entry on the spawn's list that retail never sends.
-- **Feats GRANT their stats.** `MaxStatAggregator.AggregateFeatBonuses` sums `FeatEffect` into the same additive
+- **Feats grant their stats.** `MaxStatAggregator.AggregateFeatBonuses` sums `FeatEffect` into the same additive
   bonus table gear feeds, applied at world entry (`WorldEntryService`).
-  ⛔ **It DOES divide by `GetScale()`, exactly like the gear path** — `FeatEffect.Value` is the RAW WIRE value,
-  the same as `ItemStatModifier.Amount`. This page said the opposite until #865, and the code matched it, so a
-  HealthMax feat granted a hundred times what it should and an attribute feat ten. The old reasoning
-  ("Strength carries 1..9, HealthMax 100..700") was measured on a subset; over the whole table HealthMax runs to
-  99,000 and Strength to 2,300. See the section below for the three things that settle it.
-  **2,720 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
-  their feats name a real feat - but only 6 of those 56 carry stat effects.
-- ⚠️ **The other 50 are NOT feats "whose record has no modifier region" — that claim was wrong (#590).** Their
-  records carry a modifier record in the ordinary place, with the ordinary `4,0,1,0,2,9` signature; the parser
-  finds it and then **drops it**, because `ItemTemplateStatModifiers.Parse` bounds the payload's first word to
-  `< 0x1000` on the reasoning that it is a stat id. For these it is not a stat id — it is a REFERENCE to whatever
-  the feat modifies, and the second word is the magnitude:
+  It **divides by `GetScale()`, exactly like the gear path** — `FeatEffect.Value` is the raw wire value, the same
+  as `ItemStatModifier.Amount`. Undivided, a HealthMax feat grants a hundred times what it should and an attribute
+  feat ten; a subset ("Strength carries 1..9, HealthMax 100..700") hides that, while over the whole table HealthMax
+  runs to 99,000 and Strength to 2,300. See the section below for the three things that settle it.
+  **2,720 of the 6,593 mapped feats have readable effects.** All 56 of the captured characters' feats name a real
+  feat, but only 6 of those 56 carry stat effects.
+- **The other 50 are not feats "whose record has no modifier region".** Their records carry a modifier record in
+  the ordinary place, with the ordinary `4,0,1,0,2,9` prefix; `ItemTemplateStatModifiers.Parse` bounds the
+  payload's first word to `< 0x1000` on the reasoning that it is a stat id, and drops these. For them it is not a
+  stat id — it is a reference to whatever the feat modifies, and the second word is the magnitude:
 
   | | |
   |---|---|
@@ -87,21 +81,20 @@ data comes from.
   in-client tooltip shows for rank 5. The reference (`41000`) is constant across ranks, which is what a target
   should be.
 
-  **The reference is a SPELL-LINE id**, and it decodes as:
+  **The reference is a spell-line id**, and it decodes as:
 
   ```
   spellLineId = ConanClass x 1000 + lineIndex        41000 = Necromancer (41), line 0 = Flesh to Worms
   ```
 
-  It is carried by the SPELL templates themselves, in **property-table field 128** — so a feat names a whole
-  GROUP of spells, and therefore all of a spell's ranks at once, which is exactly what a feat needs to do.
-  ⚠️ That group is a STACKING line, not a "spell line": the client names field 128 `GUI Stacking Line`
-  (Gitea #634). Nothing about the behaviour here changes — a feat boosting a stacking line boosts the same set
-  of spells — only the name. Resolve one with
+  It is carried by the spell templates themselves, in **property-table field 128** — so a feat names a whole
+  group of spells, and therefore all of a spell's ranks at once, which is exactly what a feat needs to do.
+  That group is a stacking line, not a "spell line": the client names field 128 `GUI Stacking Line`. A feat
+  boosting a stacking line boosts the same set of spells either way. Resolve one with
   `--report spell-line-ids --report-arg <lineId>`: 41000 returns the five `Flesh to Worms` ranks (144674–144677 +
   1206011) and nothing else. 3,158 of the 21,502 spell templates carry the field.
 
-  ⚠️ **A spell template's property table ASCENDS**, where an item's strictly DESCENDS
+  **A spell template's property table ascends**, where an item's strictly descends
   (`RdbItemImporter.TryReadPropertyField`). Same `[fieldId][value]` grammar, opposite direction — the item reader
   finds nothing at all on a spell.
 
@@ -122,14 +115,14 @@ data comes from.
   each class are that class's own. (The 5 exceptions all use `50000`, a class 50 that does not exist — unresolved.)
 
   Catalog-wide **2,789 feat templates** carry an out-of-stat-range record, across 30 kinds — every one of them
-  now named and read by slot (see the kind table below). Survey with
+  named and read by slot (see the kind table below). Survey with
   `--report feat-spell-modifiers [--report-arg <kind>]`; dump and diff a feat's ranks with
-  `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that MOVES across ranks is the
+  `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that moves across ranks is the
   magnitude, the one that stays is the target).
 
   **Imported and applied**, for kind 53075 only. `FeatSpellModifier` holds `(feat → spell line, percent × 100)`;
-  `Spell.GuiStackingLine` holds field 128 (the client's `GUI Stacking Line`, #634); `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
-  to every RANK, giving `spellId → percent × 100` in ONE query at world entry (`WorldEntity.SpellBoosts`), so the
+  `Spell.GuiStackingLine` holds field 128 (the client's `GUI Stacking Line`); `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
+  to every rank, giving `spellId → percent × 100` in one query at world entry (`WorldEntity.SpellBoosts`), so the
   cast path is a dictionary lookup rather than a per-cast query. `CombatResolver.ResolveSpellDamage` applies it
   last, over the finished number including Magic Damage — the client's wording is "Increase to damage or healing on
   <spell>", not a bonus to one term.
@@ -137,103 +130,102 @@ data comes from.
   End to end on the captured Necromancer: NecroL80's `Decomposition` (wire 80004, rank 5) gives **+35.0% on all five
   Flesh to Worms ranks**, which is what the in-client tooltip reads; 52 of her spells are boosted in total.
 
-  **Also imported** (#593), each into a table shaped like what it IS rather than like the record it shares:
+  **Also imported**, each into a table shaped like what it is rather than like the record it shares:
 
   | table | kinds | rows | holds |
   |---|---|---:|---|
   | `FeatSpellStatModifier` | 53054 + 53062 | 1,078 | a stat scoped to one spell, or to a whole line |
 
-  ⭐ The same two kinds appear on **spell** records too, and the spell-sourced half is `SpellSpellStatModifier`
-  (#710) — one mechanism with two sources, sharing this parser and the `SpellModifierService` consumer. See
+  The same two kinds appear on **spell** records too, and the spell-sourced half is `SpellSpellStatModifier`
+  — one mechanism with two sources, sharing this parser and the `SpellModifierService` consumer. See
   [spell-stat-effects.md](../rdb/spell-stat-effects.md).
-  | `FeatSpellGrant` | 53019 | 1,510 | a spell the feat TEACHES |
+  | `FeatSpellGrant` | 53019 | 1,510 | a spell the feat teaches |
 
   All three resolve completely against the shipped catalogs — 1,510/1,510 grants and 485/485 line targets and
   593/593 spell targets — which is the check that makes a reference space decodable at all: resolve the ref and see
   whether it hits.
 
-  ⚠️ **A grant is not a boost**, which is why 53019 gets its own table rather than a row in the modifier one.
-  Filing it as a modifier would record a spell the feat GIVES you as a boost to one you already have.
+  **A grant is not a boost**, which is why 53019 gets its own table rather than a row in the modifier one.
+  Filing it as a modifier would record a spell the feat gives you as a boost to one you already have.
 
-  ⚠️ **`Value` and `Amount` are alternatives, not a pair** — exactly one is set on all 1,078 rows, so they are two
-  NULLABLE columns rather than a magnitude plus a mode flag. What they MEAN comes from the client's own item-tooltip
+  **`Value` and `Amount` are alternatives, not a pair** — exactly one is set on all 1,078 rows, so they are two
+  nullable columns rather than a magnitude plus a mode flag. What they mean comes from the client's own item-tooltip
   builder (`Misc\ItemInfoCreator.cpp`, the 53054/53062/53283 branch at `014a25a6`), which reads the three slots as
   `GetIntStat(0x2d2 / 0x2f9 / 0x4b7)` — the `GameActionStat_e` ids that key indices 0 / 39 / 175 map to through
   `DAT_0297cd48`, so the binding is the client's, not an inference from slot order:
 
-  - **`Value` (key 39) is an ABSOLUTE delta** in the stat's own units. The tooltip renders it through the generic
-    stat formatter (`FUN_0149a300`), which appends the STAT'S own unit suffix.
-  - **`Amount` (key 175) is a PERCENTAGE**, in hundredths of a percent. The tooltip renders it through an inlined
+  - **`Value` (key 39) is an absolute delta** in the stat's own units. The tooltip renders it through the generic
+    stat formatter (`FUN_0149a300`), which appends the stat's own unit suffix.
+  - **`Amount` (key 175) is a percentage**, in hundredths of a percent. The tooltip renders it through an inlined
     copy of the same formatter that appends a hardcoded `"%"` — the literal at `0x01fbcf18`, on all three of that
     branch's print paths. For `CastingTimeSeconds` it takes a separate path that prints `abs(amount) * 0.01` under
     a `"%.1f%%"` format, and the shipped values are a clean ladder off exactly that scale
     (-1000 / -2000 / -3300 / -5000 / -6600 / -10000 = -10%…-100%).
 
   The stat id is the ordinary wire stat space — the tooltip resolves it through **LDB category 615** (`0x267`, the
-  literal it pushes at `014a2714`), the one stat-name table — but the ids the spell half uses name SPELL
+  literal it pushes at `014a2714`), the one stat-name table — but the ids the spell half uses name spell
   properties: `ManaCost`, `CastingTimeSeconds`, `SplashRadius`, `SpellCriticalChance`, `Duration`. Two of the
   fourteen were already in `CharacterStatId` from elsewhere (`SpellColumnRadius`, `AttackRange`), which is what
   says it is one space and not a parallel one; the other twelve were added from the client's names.
 
-  ⚠️ Seven elements are REJECTED as mis-sliced, and counted rather than dropped silently: a `Value`/`Amount` slot
+  Seven elements are rejected as mis-sliced, and counted rather than dropped silently: a `Value`/`Amount` slot
   holding a registered GameAction type id is the next element's opening word, read as ours. `Swift Pathing`
-  (5031395..5031401) is the case — its 53054 elements tile the record at TEN words, not the twelve its key list
-  predicts. Open as Gitea #595.
+  (5031395..5031401) is the case — its 53054 elements tile the record at ten words, not the twelve its key list
+  predicts.
 
-- **`UpgradeCombo` (53209) — 3,214 rows in `FeatComboModifier`** (#593). Its two unnamed slots are named by the
-  client's own tooltip builder, which branches on each one's SIGN to pick between `UpgradeCombo_IncreaseDamage` /
+- **`UpgradeCombo` (53209) — 3,214 rows in `FeatComboModifier`.** Its two unnamed slots are named by the
+  client's own tooltip builder, which branches on each one's sign to pick between `UpgradeCombo_IncreaseDamage` /
   `_DecreaseDamage` (key `66`) and `UpgradeCombo_IncreaseCooldown` / `_DecreaseCooldown` (key `67`) — so 66 is the
-  combo's DAMAGE delta and 67 its REUSE-TIME delta, both signed hundredths of a percent
+  combo's damage delta and 67 its reuse-time delta, both signed hundredths of a percent
   ([gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Every reference resolves against `Combos.Id`.
   `Dread Lord` carries `-100` cooldown across the whole `Leech Life` ladder and `Hexer` `+100` damage across
-  `Blood for Aid`, matching each feat's own description. Nothing consumes the cooldown half yet — the recast path
-  is Gitea #271.
+  `Blood for Aid`, matching each feat's own description. Nothing consumes the cooldown half; open work tracked in
+  Gitea #271.
 
-- **The PROC family — 876 rows in `FeatProc`** (#593). 53212 `AddComboProc` and 53070 `AddSpellLineProc` are one
+- **The proc family — 876 rows in `FeatProc`.** 53212 `AddComboProc` and 53070 `AddSpellLineProc` are one
   shape with the target space swapped (a combo vs a spell line), so they share a table the way 53054/53062 and
-  53075/53030 do. The two SPELL slots are named by the client's tooltip, which tests keys 88 and 236
+  53075/53030 do. The two spell slots are named by the client's tooltip, which tests keys 88 and 236
   independently and renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` — so 88 is the proc cast
-  on the CARRIER and 236 the one cast on the TARGET. Both are real in the data: 171 of the 876 rows are
+  on the carrier and 236 the one cast on the target. Both are real in the data: 171 of the 876 rows are
   target-only. The trigger (key 117) is `FeatProcTrigger` — 0 Hit / 1 Damage on the combo form, 2 SpellDamage /
   3 Cast on the line form — named by the client's generic proc tooltip switch (`FUN_0149e450` at 0x0149ef57 reads
   key 117 into `AddProcOnHit` / `AddProcDamage` / `AddProcSpellDamage`, key 66 picking the `Getting` twin) and, for
-  the value that switch defaults on, by the feats carrying it (every one hangs off a HEALING line and reads "after
-  casting the Wave of Life…"). The magnitude (key 237) is PROCS PER MINUTE — the client's own label in the composed
+  the value that switch defaults on, by the feats carrying it (every one hangs off a healing line and reads "after
+  casting the Wave of Life…"). The magnitude (key 237) is procs per minute — the client's own label in the composed
   `AddSpellLineProc` sentence — converted to a per-event chance over the event's length by `ProcRules.Chance`.
-  **Consumed (#697):** `ProcService` resolves a character's rows at world entry into `WorldEntity.Procs` and fires
+  **Consumed:** `ProcService` resolves a character's rows at world entry into `WorldEntity.Procs` and fires
   them from `ComboFinisher` (a combo landing: both combo triggers) and `CastService` (a cast completing: Cast on
   any cast, SpellDamage on an offensive one), each firing an ordinary `ApplySpell` of the self and/or target spell.
   Two stated approximations: an offensive cast counts as "spell damage" whether or not the spell states a hit, and
-  an instant cast's event length is floored at 1 s. Awaiting an in-client run.
+  an instant cast's event length is floored at 1 s. Not verified in-client; open work tracked in Gitea #697.
 
-- **53030 `ChangeHitPercent` — 954 rows, folded into `FeatSpellModifier`** (#593). The per-SPELL twin of 53075:
+- **53030 `ChangeHitPercent` — 954 rows, folded into `FeatSpellModifier`.** The per-spell twin of 53075:
   the same three slots with the line slot (key 1) replaced by the spell slot (key 187), the same signed percent
-  ×100. 238 of the 240 distinct references resolve against `Spells.Id`, so `FeatSpellModifier` grew a nullable
-  `SpellId` beside its now-nullable `SpellLineId` and the kind picks the column.
+  ×100. 238 of the 240 distinct references resolve against `Spells.Id`, so `FeatSpellModifier` has a nullable
+  `SpellId` beside a nullable `SpellLineId` and the kind picks the column.
 
-  ⚠️ This kind was written off in the code as "not a player feat at all — the `Dimach Item` crafting entries, all
-  pointing at one constant ref (43464) with value 100". That was the first SAMPLE, not the census: the Dimach rows
-  sort first by feat id, and behind them sit 239 other targets and 55 distinct values including a −20/−40/−60%
-  ladder.
+  The first rows by feat id are the `Dimach Item` crafting entries, all pointing at one constant ref (43464) with
+  value 100 — a sample, not the census: behind them sit 239 other targets and 55 distinct values including a
+  −20/−40/−60% ladder.
 
-- **`ChangeInheritedWeaponAttack` (53250) — 315 rows in `FeatComboAttackModifier`** (#593). The SIBLING of
-  `UpgradeCombo`, not a variant: 53209 moves a combo as a whole, this moves one of its two weapon ATTACKS, along
-  axes 53209 has no slot for. It DOES have a tooltip branch (`014a1dc5`), which names every slot — key `84` picks
+- **`ChangeInheritedWeaponAttack` (53250) — 315 rows in `FeatComboAttackModifier`.** The sibling of
+  `UpgradeCombo`, not a variant: 53209 moves a combo as a whole, this moves one of its two weapon attacks, along
+  axes 53209 has no slot for. It does have a tooltip branch (`014a1dc5`), which names every slot — key `84` picks
   `FinishingComboAttack` (0) or `OpeningComboAttack` (1) and the client refuses to render any other value; keys
   `66`/`67`/`68` are the attack's DPS, critical chance and hate adjustment, each with an Increase/Decrease string
-  chosen on its sign; key `69` is a damage TYPE the client resolves through a name table rather than printing.
+  chosen on its sign; key `69` is a damage type the client resolves through a name table rather than printing.
   Exactly one magnitude is set on all 315 records.
 
-  ⚠️ **The SCALES are not `UpgradeCombo`'s, even though keys 66/67 are the same two `GameActionStat_e` slots.**
-  53209 renders both `× 0.01`; 53250 renders key 66 and key 68 as RAW whole percents and key 67 as a crit RATING
+  **The scales are not `UpgradeCombo`'s, even though keys 66/67 are the same two `GameActionStat_e` slots.**
+  53209 renders both `× 0.01`; 53250 renders key 66 and key 68 as raw whole percents and key 67 as a crit rating
   (`× 0.025`, 40 points to the point). Carrying the neighbour's units across would report `Fierce Opening`'s +30%
   opening damage as +0.30%. A name transfers by key; an arithmetic does not transfer at all.
 
   The feats corroborate the reading by their own text: `Fierce Opening` and `Dual Master` ("increases the
   **opening** damage done by all combos") carry attack 1, and the only two hate rows in the catalog are the
   Guardian's `Improved Shield Mastery`.
-- **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
-  (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
+- **The "kind" is not a private id space — it is a GameAction type id, and the record is a GameAction element**
+  ([gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
   grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
   positional values 1,0,2,9][one u32 per key-list entry]`. So:
 
@@ -241,72 +233,68 @@ data comes from.
   - **a record is `8 + len(keyList)` words wide**, not a fixed 10 — and the key list comes from the client
     ([`gameaction-keylists.tsv`](../re/gameaction-keylists.tsv), all 260 types, recovered statically by
     `tools/ghidra/DumpGameActionKeyLists.java`);
-  - **a payload word is addressed by KEY, not by position.** `ItemTemplateStatModifiers.ParseElements` returns the
+  - **a payload word is addressed by key, not by position.** `ItemTemplateStatModifiers.ParseElements` returns the
     whole element and `Element.Value(key)` picks a slot; `GameActionTypes` holds the table.
 
-  Every kind the feat catalog uses now reads as named fields (`--report feat-spell-modifiers`, which prints them
-  that way), and three of the old open questions dissolve because they were artifacts of the fixed-10-word read:
+  Every kind the feat catalog uses reads as named fields (`--report feat-spell-modifiers`, which prints them
+  that way); a fixed-10-word read produces artifacts the notes column explains:
 
   | kind | name | payload | note |
   |---|---|---|---|
-  | 53209 x3235 | `UpgradeCombo` | **combo, damage %, cooldown %** | `k66` is the DAMAGE delta and `k67` the REUSE-TIME one, both signed ×100 — named off the tooltip's Increase/Decrease string pairs. The old "value 0 throughout" was `k66` on a cooldown-only feat. IMPORTED (#593) |
-  | 53019 x1749 | `Spell` | spell template id | a GRANT, and the **only** payload word. The old "its value repeats its own KIND" was the NEXT element's type id, read past the end of a 9-word record |
-  | 53030 x962 | `ChangeHitPercent` | **spell, signed % ×100, `k55`** | the per-spell twin of 53075 — same payload, `Spell.Id` where 53075 has a line. IMPORTED (#593) |
-  | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)". IMPORTED (#593) |
-  | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id. IMPORTED (#593) |
-  | 53212 x421 | `AddComboProc` | **self proc spell, target proc spell, combo, trigger, amount** | the "grant" reading was the pair view: the feat is named for its key-88 spell and key 236 is empty on most records. IMPORTED (#593) |
-  | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | the decoded one; `k55` (1 or 2) was never read before |
-  | 53250 x315 | `ChangeInheritedWeaponAttack` | **combo, attack (finishing/opening), DPS %, crit rating, hate %, damage type** | the sibling of 53209, one level down: one ATTACK of the combo rather than the combo. Its branch is at `014a1dc5`; note the scales are NOT 53209's. IMPORTED (#593) |
-  | 53070 x289 | `AddSpellLineProc` | **self proc spell, target proc spell, line, trigger, amount, `k73`** | 53212's per-LINE twin; `k73` `Flags` is 0 on every shipped row. IMPORTED (#593) |
+  | 53209 x3235 | `UpgradeCombo` | **combo, damage %, cooldown %** | `k66` is the damage delta and `k67` the reuse-time one, both signed ×100 — named off the tooltip's Increase/Decrease string pairs. An apparent "value 0 throughout" is `k66` on a cooldown-only feat. Imported |
+  | 53019 x1749 | `Spell` | spell template id | a grant, and the **only** payload word. An apparent "value repeats its own kind" is the next element's type id, read past the end of a 9-word record |
+  | 53030 x962 | `ChangeHitPercent` | **spell, signed % ×100, `k55`** | the per-spell twin of 53075 — same payload, `Spell.Id` where 53075 has a line. Imported |
+  | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a stat id. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — hence several records per (feat, spell). Imported |
+  | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — 147 is the stat id, not a percent. Imported |
+  | 53212 x421 | `AddComboProc` | **self proc spell, target proc spell, combo, trigger, amount** | not a grant (that is the pair view): the feat is named for its key-88 spell and key 236 is empty on most records. Imported |
+  | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | `k55` is 1 or 2 |
+  | 53250 x315 | `ChangeInheritedWeaponAttack` | **combo, attack (finishing/opening), DPS %, crit rating, hate %, damage type** | the sibling of 53209, one level down: one attack of the combo rather than the combo. Its branch is at `014a1dc5`; note the scales are not 53209's. Imported |
+  | 53070 x289 | `AddSpellLineProc` | **self proc spell, target proc spell, line, trigger, amount, `k73`** | 53212's per-line twin; `k73` `Flags` is 0 on every shipped row. Imported |
   | 53213 / 53211 | `AddProc` / `AddSpellProc` | six words | the live-Frida catalog says four; the RDB widths say six |
 
-  ⚠️ **The magnitude is SIGNED.** `Set's Chosen` carries -2000/-4000/-6000/-8000/-10000 across its five ranks on
+  **The magnitude is signed.** `Set's Chosen` carries -2000/-4000/-6000/-8000/-10000 across its five ranks on
   Demonologist lines 44100/44101 — a clean -20%…-100% ladder, and unmistakably a rank ladder rather than a
   misread. The column is `uint` and every consumer casts to `int`, which recovers it; the DB text does not.
-- **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
-  (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
-  ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph
-  links adjacent ranks (`80004` requires `80003`) while a character's wire list carries only the HIGHEST rank per
+- **Training enforces the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
+  (`FeatRules.MissingPrerequisites`), alongside the point-budget check.
+  A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph
+  links adjacent ranks (`80004` requires `80003`) while a character's wire list carries only the highest rank per
   base - retail never stores the intermediate ones. An exact-id check would reject every captured retail character
   (NecroL80 19 unmet, DemoL80 18, Hakotep 3); the same-base rule clears all three at zero. The lower ranks are not
   missing data to backfill: rank 4 IS ranks 1-4.
-- **Feat POINTS per level: RDB type 1000044 id 1**, 71 entries of `[level 10..80][points][tsPoints]`. Levels
+- **Feat points per level: RDB type 1000044 id 1**, 71 entries of `[level 10..80][points][tsPoints]`. Levels
   20/30/40/50/60/70/75/80 grant **two** points, so the level-80 budget is **79**, not the 71 that `1 per level from
-  10` implies. `FeatRules.PointBudget` was wrong until it was checked against this table.
-- **The wire<->catalog id map is SOLVED** (#467): the client does not derive it, it LOADS it.
+  10` implies. `FeatRules.PointBudget` reads this table.
+- **The wire<->catalog id map**: the client does not derive it, it loads it.
   `FeatTable_t::LoadStaticData()` (`FUN_00788e20`) reads **RDB type 1000042, id 1** - a 20-byte header
   `[type][id][1][count][version]` then `count` 48-byte entries whose first two words are `(wireId, templateId)`.
   Imported as `FeatIdMap` (6,593 rows); it resolves **56 of 56** captured `CharacterFeat` ids.
 - **`FeatIdMap.Rank` is the trustworthy rank** - `WireFeatId % 100`, the other half of the split `BaseIndex` tops,
-  and **0-BASED** (the first rank is 0: "Corrupted Soul" is 84100..84104 = ranks 0..4). ⚠️ NOT `Feat.Rank`, which is
-  parsed from the NAME: the name's trailing number is a rank sometimes ("Thrown Weapons 5") and an INDEX other times
+  and **0-based** (the first rank is 0: "Corrupted Soul" is 84100..84104 = ranks 0..4). Not `Feat.Rank`, which is
+  parsed from the name: the name's trailing number is a rank sometimes ("Thrown Weapons 5") and an index other times
   ("Guardian Class Feat 011" parses as 11), so the two disagree on 2394 of the 2491 feats where both have a value.
-  ⚠️ `FeatIdMap.Rank` is only a RANK below **10**, and that bound is the client's: `FUN_007850c0` computes
+  `FeatIdMap.Rank` is only a rank below **10**, and that bound is the client's: `FUN_007850c0` computes
   `(id / 100) * 100 + 10` and requires `id <` it. 5,742 of 6,593 entries fit; the other 851 are "<Class> Class Feat
   071"-style rows whose low digits index a family (24779 reads as 79). `HasRank` gates it.
-- **The id encodes the class.** Each entry's 11th word is `wireId / 100`, and for the ROOT feats that value is the
+- **The id encodes the class.** Each entry's 11th word is `wireId / 100`, and for the root feats that value is the
   `ConanClass` enum value: wire 1800 = Barbarian (0x12), 2000 = Guardian (0x14), 2200 = Conqueror (0x16),
-  2900 = BearShaman (0x1D), 3100 = DarkTemplar (0x1F). Below them sit the four ARCHETYPE roots -
+  2900 = BearShaman (0x1D), 3100 = DarkTemplar (0x1F). Below them sit the four archetype roots -
   100 `Core Soldier Knowledge`, 200 `Priest`, 300 `Rogue`, 400 `Mage`.
-- **Root feats are AUTO-GRANTED, never sent.** `FeatIdMap.RootFlag` (word 8 of a 1000042 entry) marks a ROOT feat - 1 for all twelve
+- **Root feats are auto-granted, never sent.** `FeatIdMap.RootFlag` (word 8 of a 1000042 entry) marks a root feat - 1 for all twelve
   archetype/class roots (100 `Core Soldier Knowledge`, 1800 `Barbarian`, 4100 `Necromancer`, ...) and for the feat
-  TREE roots (`Lich`, `Scion of Set`); 563 entries carry it. `ClassAutotrainLevelMap` is COMPUTED by the client
-  (`FUN_0078d6a0`) from that table plus the character's class - it is not an RDB resource, which is why searching
-  for one finds nothing. So the server neither grants nor transmits them, and `CharacterFeat` correctly holds only
-  what was TRAINED.
-- ⚠️ **No captured character carries its own class-root feat** (NecroL80/Necromancer has no 4100, Hakotep/HeraldOfXotli
-  no 4300), and every id they DO carry is rank-bearing. So the roots look **auto-granted rather than trained** -
-  which is what `ClassAutotrainLevelMap` (33,830 entries, via the client's `GameCode/Feats` debug channel) would
-  encode. Not yet verified.
+  tree roots (`Lich`, `Scion of Set`); 563 entries carry it. `ClassAutotrainLevelMap` (33,830 entries, visible on the
+  client's `GameCode/Feats` debug channel) is computed by the client (`FUN_0078d6a0`) from its tables plus the
+  character's class - see the autotrain section at the end of this page. No captured character carries its own
+  class-root feat (NecroL80/Necromancer has no 4100, Hakotep/HeraldOfXotli no 4300), and every id they do carry is
+  rank-bearing. So the server neither grants nor transmits them, and `CharacterFeat` holds only what was trained.
 - **Every mapped feat resolves to a catalog row** — all 6,593 `FeatIdMap` entries name a `Feat`, and so do all 56
-  ids the captured characters carry (`1173628` = `Decomposition`). An earlier pass reported the opposite, because
-  it only knew the `[u32 len][name]` record shape and every one of those feats uses the `[u16 nameLen][u16 descLen]`
-  one. What the catalog still does not cover is EFFECTS: 2,720 of the 6,593 mapped feats carry a readable
+  ids the captured characters carry (`1173628` = `Decomposition`), through the `[u16 nameLen][u16 descLen]` record
+  shape. What the catalog does not cover is effects: 2,720 of the 6,593 mapped feats carry a readable
   stat-modifier region, so a trained feat naming no bonus is the norm rather than a decode failure.
 
 ## Feats vs. skills — the key distinction
 
-AoC has two separate systems, and the codebase's naming predates the distinction:
+AoC has two separate systems:
 
 | | what it is | where it lives on the wire | in our code |
 |---|---|---|---|
@@ -338,13 +326,11 @@ The `(count+1)*0x3F1` word is the standard `0x3F1`-framed list marker (`0x7E2` =
 - `Captures/faolan-account-login-hakotep-hox-lvl24-unlock-feat-hellfire.tshark.json` — 1-feat train (`112700`).
 - `Captures/Hakotep_hox_login_gameplay_untrain-feats-(causes_loading_screen)_train-feats_delete-quests.tshark.json` — 3-feat list.
 
-## Full unlocked-feat set — DELIVERED IN THE PLAYER SPAWN (`FA015807`)
+## Full unlocked-feat set — delivered in the player spawn (`FA015807`)
 
-**The former #1 blocker ("the full unlocked-feat set at login is not in any capture") was wrong.** The set ships
-in the char's own **player spawn** (`FA015807`), in the spawn's **pre-IIR** region — the block that
-`tools/capture/parse_spawn_scaffold.py` deliberately keeps RAW ("its internal structure is analyzed
-separately"), which is why earlier passes never saw it: `decode_skill_scaffold.py` reads the *post-IIR* skill id-list, a
-different region.
+The full set at login ships in the char's own **player spawn** (`FA015807`), in the spawn's **pre-IIR** region —
+the block that `tools/capture/parse_spawn_scaffold.py` deliberately keeps raw ("its internal structure is analyzed
+separately"); `decode_skill_scaffold.py` reads the *post-IIR* skill id-list, a different region.
 
 Grammar (body-relative; a constant `0x07E2` landmark sits 9 zero bytes before the count marker):
 
@@ -370,105 +356,97 @@ sets recovered:
   post-training gameplay spawn carries the same 5 **+ 112700** (= 6).
 - **Same id-space as `FeatIIR`:** Hoxxling's spawn list == its `FeatIIR` list == `[110000, 112700, 410600]`.
 - **Rank rides the low digits:** hakotep trained feat base `1100` to rank 4 → its spawn shows `110004`, while a
-  rank-0 char (and the `FeatIIR` train *request*) shows `110000`. Working hypothesis: `featId = featBase*100 + rank`.
+  rank-0 char (and the `FeatIIR` train *request*) shows `110000`: `featId = featBase*100 + rank` (see the id map
+  above).
 
 ## What the dumps contain (and don't)
 
-- **`FeatIIR` appears ONLY on train ACTIONS**, never on a plain login. Swept all captures for `FeatIIR` and for the
+- **`FeatIIR` appears only on train actions**, never on a plain login. Swept all captures for `FeatIIR` and for the
   candidate login-delivery records `ClonedFeatsIIR` (`0xF7BF33DC`) and `SkillIIR` (`0xD558FF16`): **zero occurrences.**
-  The full-set login delivery we hunted for is not a separate record — it is folded into the player spawn (above).
-  ⚠️ `SkillIIR` has since turned up in an annotated capture and is **not** a feat record at all — it is the
-  skillpoint spend, see [`skillpoints.md`](skillpoints.md).
+  The full-set login delivery is not a separate record — it is folded into the player spawn (above).
+  `SkillIIR` does occur in an annotated capture and is not a feat record at all — it is the skillpoint spend, see [`skillpoints.md`](skillpoints.md).
 - Across all captures the only other feat traffic is a single untrain **confirm dialog** (`DispatchFeatUntrainMessageBox`
   → `FeatUntrainAnswer`), carrying no feat data.
 
-The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemented and unobserved: `GMRequestFeatData`
+The feat-window request/reply opcodes exist in `Opcodes.cs`; these are unobserved: `GMRequestFeatData`
 (`0x202C`), `GMRequestFeatClassData` (`0x202D`), `AdjustSkill` (`0x202E`, train), `UntrainFeat` (`0x2041`),
 `FeatUntrainAnswer` (`0x203E`), `DoSkillSellback` (`0x205C`), s2c `DispatchUntrainSingleFeat` (`0x2011`).
 
-## Current server state
+## Server state
 
-- **Per-character unlocked-feat list: modeled + generated (2026-07-14).** `CharacterFeat` rows carry each char's
-  trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`).
-- **Train + reset: implemented (2026-07-14).** `GameServerListener.Feats.cs`:
-  - **Train** — c2s `FeatIIR` state `0x04` → `Database.AddCharacterFeats` (REPLACES the row for that feat BASE,
+- **Per-character unlocked-feat list.** `CharacterFeat` rows carry each char's trained feats; the player spawn
+  regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`).
+- **Train + reset** (`FeatService`, routed from `GameServerListener.Inbound.cs`):
+  - **Train** — c2s `FeatIIR` state `0x04` → `AddCharacterFeats` (replaces the row for that feat base,
     keeping its original `Sequence`, because retail carries exactly one id per base at the current rank) → s2c
     `FeatIIR` state `0x05` ack (echoes the list, byte-exact via `FeatCodec`).
   - **Reset** (untrain-all) — c2s `UntrainFeat` (`0x2041`) → server sends the **confirm dialog**
     `DispatchFeatUntrainMessageBox` (`0x2064`, `FeatUntrainMessageBoxCodec`, byte-exact) → client confirms with
-    `FeatUntrainAnswer` (`0x203E`, echoes the dialog's 16-byte payload + a leading `0x01`) → `Database.ClearCharacterFeats`
+    `FeatUntrainAnswer` (`0x203E`, echoes the dialog's 16-byte payload + a leading `0x01`) → `ClearCharacterFeats`
     → world reload (`DoTeleport` to the current spot), so the fresh spawn carries the cleared list (retail's "loading
     screen"). A session token in the dialog is matched against the answer so a stray answer can't reset.
   - **Prerequisite guard** — `FeatService` rejects a train that would exceed the character's feat-point budget
     (`FeatRules.PointBudget`, off the client's own RDB 1000044 per-level table: 79 points at L80, not the 71 a
     flat 1/level from L10 gives) **or** leave a prerequisite unmet (`FeatRules.MissingPrerequisites` over
-    `FeatPrereq`, satisfied by the same BASE at an equal-or-higher rank — see the rank note above).
+    `FeatPrereq`, satisfied by the same base at an equal-or-higher rank — see the rank note above).
   - GM command `.feat list | train <id>... | reset` is the test bootstrap (the retail trigger is the client's Feats
     window + its point economy, which the server can't drive).
-- `AdjustSkill` (`0x202E`) and `DoSkillSellback` (`0x205C`) belong to the SKILLPOINT pool, not to feats: the spend
+- `AdjustSkill` (`0x202E`) and `DoSkillSellback` (`0x205C`) belong to the skillpoint pool, not to feats: the spend
   arrives as the `SkillIIR` record rather than the RPC, and is implemented — see [`skillpoints.md`](skillpoints.md).
   `DoSkillSellback` remains a debug-log stub because its refund amount is unrecoverable without a capture.
 - The skills scaffold (`CharacterSkill`) is imported per captured char by `CaptureCharacterImporter` (via
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
-  learned spells become castable (#298). **This is skills, not feats** — it just happens to share the `0x3F1`-list shape.
-- ⚠️ **What a transcribed scaffold may carry is the class's CONTENT, never the captured player's own state.** A
-  captured id list mixes the two, and granting it wholesale stated one player's facts about everybody else. Two bands
+  learned spells become castable. **This is skills, not feats** — it just happens to share the `0x3F1`-list shape.
+- **What a transcribed scaffold may carry is the class's content, never the captured player's own state.** A
+  captured id list mixes the two, and granting it wholesale states one player's facts about everybody else. Two bands
   are therefore held out of `FullSkillIdsFor`:
-  - **The class-PROGRESSION entry**, which is the character's **level**. Every class has exactly one 80-long
+  - **The class-progression entry**, which is the character's **level**. Every class has exactly one 80-long
     progression run in `FeatIdMaps` (`MaxRank >= 79`), and a character carries **exactly one** id from its own run, at
     `base + (level - 1)` — measured across five captured spawns at four levels: two fresh at rank 0, Hoxxling at
     `114804` (L5), and the Necro/Demo at `85279`/`104579` (L80). It resolves to that level's
     `<Class> Class Feat NNN` template, i.e. the class/level **attribute base**, which is where the client gets the
     five attributes and the MaxHealth it draws. So it is **derived per character** at spawn time
     (`PlayerSpawnScaffoldRows.ClassProgressionIdFor`) and never replayed from a row — a stored copy goes stale on
-    every ding. This is the same exclusion the feat grant below already applies, arrived at from the other side.
-  - **The tradeskill PROFESSION rungs**, which are what that player had **trained** (`.tradeskill` →
-    `AddCharacterFeats`, [#735](tradeskill-recipes.md)). The captured Necromancer's were `Weaponsmith`/`Armorsmith
-    Grandmaster` and four Masters; the Demonologist's eight more at its own ranks; the Assassin's a lone
+    every ding.
+  - **The tradeskill profession rungs**, which are what that player had **trained** (`.tradeskill` →
+    `AddCharacterFeats`, [tradeskill-recipes.md](tradeskill-recipes.md); open work tracked in Gitea #735). The
+    captured Necromancer's were `Weaponsmith`/`Armorsmith Grandmaster` and four Masters; the Demonologist's eight more at its own ranks; the Assassin's a lone
     `Mining Apprentice`.
 
-  Both reached the client together: a level-2 Necromancer's first relog after a ding rendered a level-80 attribute
+  Replaying either shows in-client: a level-2 Necromancer relogging after a ding renders a level-80 attribute
   sheet (Str 71 / Int 231 / Con 61, health max 984) **and** a Grandmaster smith's crafting tab. Gated by
   `PlayerSpawnScaffoldRowsTests.ClassProgressionEntry_IsTheCharactersLevel` and
   `FullSkillScaffold_CarriesNoCapturedCharactersOwnState`.
-- **The teaching feat is granted with the spell (2026-08-04, #298).** `FeatSpellGrants` (1,510 rows, 915 feats,
-  667 spells — GameAction element kind `53019 Spell` on a feat template) is read *backwards* by
-  `IDatabaseRepository.GetFeatsTeachingSpells`, so both level-up paths train exactly the feats that teach the
-  spells just learned. That comes from the client RDB rather than a capture, so it covers all twelve classes
-  instead of the four with a high-level player-spawn capture.
-  ⚠️ **PROGRESSION TRACKS are excluded from that grant** — the bases whose low digits run past the client's own
-  rank ceiling (`FeatIdMap.MaxRank`), so the digits index a family instead of naming a rank: the twelve
-  `<Class> Class Feat 001` tracks with one entry per character level, plus `2HE 60-80`, `Bow 60-80` and
-  `Class Specific HP 60-80`. Retail never puts one in a character's feat list — none appears across the four
-  captured lists, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of them her
-  class track. The feat list goes on the wire, so training one would be inventing content to satisfy a criterion
-  that demonstrably does not need it.
-- **…and the spell is granted with the TRAINED feat (2026-08-16, #847)** — the same table read forwards,
-  `IDatabaseRepository.GetSpellsTaughtByFeats`, so `FeatService` hands over what a feat teaches at the moment it
+- **The level-up path trains no feat.** A spell learned on a ding does not bring its teaching feat with it: the
+  feats that teach level-granted spells are auto-trained by the client itself (see the autotrain section at the end
+  of this page), and a progression track (the bases whose low digits run past `FeatIdMap.MaxRank`, e.g. the twelve
+  `<Class> Class Feat 001` tracks) never appears in a character's feat list — a level-80 Necromancer casts all 109
+  of her spells carrying 25 feats, none of them her class track.
+- **The spell is granted with the trained feat** — `FeatSpellGrants` (1,510 rows, 915 feats, 667 spells —
+  GameAction element kind `53019 Spell` on a feat template) read forwards, `GetSpellsTaughtByFeats`, so `FeatService` hands over what a feat teaches at the moment it
   is trained. The two directions are not redundant, because `FeatSpellGrants` carries **two grant mechanisms** and
   they are separated by `Feat.AutomaticUnlockCategory` (7063):
 
   | category | feats | names | how the spell arrives |
   |---:|---:|---:|---|
-  | **7063** | 271 | 24 — `Spell Unlocking <lo>-<hi>`, `<Class> Class Feat NNN`, `Pet Mastery` | on a LEVEL, from the ding path |
-  | **8072** | 675 | 238, every one `Spell - <the spell's own name>` | on a TRAIN, from here |
+  | **7063** | 271 | 24 — `Spell Unlocking <lo>-<hi>`, `<Class> Class Feat NNN`, `Pet Mastery` | on a level, from the ding path |
+  | **8072** | 675 | 238, every one `Spell - <the spell's own name>` | on a train, from here |
 
   Measured over the 946 feats that grant a spell, with zero overlap. The captures settle which is which: gating
   the level path on the automatic category reproduces the captured spellbooks exactly (the level-80 Necromancer
   88 offered / 88 known, the Demonologist 95 / 95), while including the tree leaves 20 extra on the Necromancer —
-  `Ritual of the Lich`, `Despoil the Soul`, `One with Death` — and the three of the same kind she DOES hold
+  `Ritual of the Lich`, `Despoil the Soul`, `One with Death` — and the three of the same kind she does hold
   (`Cannibalism`, `No Rest For the Dead`, `Mark of the Devourer`) are 8072 too. What separates the two
   populations is a point spend, not a property of the spell. Standing measurement: `--report spell-grant-check`.
 
-  ⚠️ Idempotent by construction — `AddCharacterSpell` reports whether the row was new and only a new one is
+  Idempotent by construction — `AddCharacterSpell` reports whether the row was new and only a new one is
   announced — so re-training a feat re-toasts nothing.
 
-## `FeatProcs.Amount` is a percent CHANCE, and >100 means "always" (#697)
+## `FeatProcs.Amount` is a percent chance, and >100 means "always"
 
-`FeatProcs` is the last of #697's four feat-modifier tables with no reader: 876 rows over 159 feats, hanging a
-proc spell off a combo (`EffectKind` 53212) or a spell line (53070). Before any of it can fire, `Amount` has to
-mean something.
+`FeatProcs` holds 876 rows over 159 feats, hanging a proc spell off a combo (`EffectKind` 53212) or a spell line
+(53070).
 
 It is a **percent chance**. The evidence is a controlled association against the client's own feat descriptions,
 not a reading of a few rows — a feat whose proc really rolls says so (*"Improves all the dark templar's combos
@@ -480,16 +458,16 @@ with **a chance of** reducing the target"*, `Amount` 10), and one that always fi
 | `Amount <= 100` | 41 | 31 (**75.6%**) | **×2.61** |
 | `Amount > 100` | 118 | 15 (12.7%) | ×0.44 |
 
-⚠️ **The control is what makes this a finding.** Among all 159 proc-carrying feats, 28.9% use the word "chance"
+**The control is what makes this a finding.** Among all 159 proc-carrying feats, 28.9% use the word "chance"
 at all — so "the >100 rows mostly don't say chance" is worth nothing by itself, because most feat text does not.
 What counts is the lift running **both ways** from that base rate. 120 and 200 are what a >100% chance looks
 like once the client clamps it.
 
 Reproduce: `dotnet run --project Faolan.Importer -- --report feat-procs`.
 
-### ⛔ `Trigger` is still not named
+### What `Trigger` constrains
 
-It is not free, which narrows it: **0 and 1 occur only with `EffectKind` 53212** (a proc on a combo) and **2 and
+`Trigger` is named by the client's proc tooltip switch (see the proc family above). The data narrows it further: **0 and 1 occur only with `EffectKind` 53212** (a proc on a combo) and **2 and
 3 only with 53070** (a proc on a spell line). Within each pair, one value carries every chance-bearing row and
 the other carries only always-fire amounts:
 
@@ -502,58 +480,52 @@ the other carries only always-fire amounts:
 
 That says `Trigger` refines *when* within a hook `EffectKind` has already chosen — it does not say into what.
 
-**Two offline routes are closed off**, so nobody spends the time again:
+Two things the key lists cannot do:
 
-1. ⛔ **"A name transfers BY KEY" (#593's plan) does not work here.** Only **21 of the 150** keys in
+1. **A slot name does not transfer by key.** Only **21 of the 150** keys in
    [`../re/gameaction-keylists.tsv`](../re/gameaction-keylists.tsv) are named by *any* of the 260 types, and key
    117 is named by **none** of the five that use it (`AddSpellLineProc`, `AddSpellProc`, `AddComboProc`,
-   `AddProc`, `OpenDialog`). Every other unknown slot #593 listed — 236, 237, 88, 187, 1, 66, 67, 55 — is
-   likewise unnamed everywhere.
-   ⚠️ **And the premise itself is unsafe.** Key `39` is named `Type`, `Tier`, `Value` *and* `ScriptID` by
-   different types, and key `209` is both `EventString` and `ScriptParams`. A name is per-TYPE, not per-key, so
-   transferring one would have been a guess even where a name existed.
-2. ⛔ **Key 73 — the client's `Flags`** — is the one named slot anywhere in the proc family (it is on 53070's key
-   list and the importer drops it). It is **0 on all 320 of its occurrences**. It carries nothing, and it is not
-   the trigger.
+   `AddProc`, `OpenDialog`); 236, 237, 88, 187, 1, 66, 67 and 55 are likewise unnamed everywhere. The premise is
+   unsafe anyway: key `39` is named `Type`, `Tier`, `Value` *and* `ScriptID` by different types, and key `209` is
+   both `EventString` and `ScriptParams`. A name is per-type, not per-key; the tooltip builder is what names a slot.
+2. **Key 73 — the client's `Flags`** — is the one named slot in the proc family (it is on 53070's key list and the
+   importer drops it). It is **0 on all 320 of its occurrences**. It carries nothing, and it is not the trigger.
 
-So naming it needs the client rather than the data: hover a proc feat with GM Level = -1, which renders the
-feat's wire ids and the client's own text in the tooltip. **Nothing should fire a proc until it is named**: a
-proc on the wrong event is worse than a proc that does not exist, because it looks like it works.
+In-client, a proc feat hovered with GM Level = -1 renders the feat's wire ids and the client's own text in the
+tooltip, which is the check for a proc firing on the right event.
 
-## An untrain takes back the spell the feat TAUGHT (#920)
+## An untrain takes back the spell the feat taught
 
-`GrantSpellsTaughtBy` hands a spell over when a feat that teaches one is trained (#847). The reverse now runs on
-the untrain-all: `ResetFeats` reads the held set **before** clearing it, and revokes what those feats taught —
-`RemoveCharacterSpell` plus a `DispatchForgetSpell` (0x200B) per spell, the primitive #915 built. Without it a
-tree-bought spell survived the untrain for ever, because world entry re-grants the whole `CharacterSpells` set.
+`GrantSpellsTaughtBy` hands a spell over when a feat that teaches one is trained. The reverse runs on the
+untrain-all: `ResetFeats` reads the held set **before** clearing it, and revokes what those feats taught —
+`RemoveCharacterSpell` plus a `DispatchForgetSpell` (0x200B) per spell. Without it a tree-bought spell survives
+the untrain for ever, because world entry re-grants the whole `CharacterSpells` set.
 
-⚠️ **A spell the character's LEVEL also grants is kept.** Retail's untrain-all refunds spent points; it does not
+**A spell the character's level also grants is kept.** Retail's untrain-all refunds spent points; it does not
 un-grant what levelling handed over, and the two paths can name the same spell. The guard asks
 `GetClassSpellsUnlockedBetween(class, 0, level)` — the very query the ding path teaches from, so it cannot drift
 from what the next ding would do.
 
-⛔ The blocker this was filed under — *"`ClearCharacterFeats` wipes every feat row including the AUTOMATIC ones,
-so revoking every feat-taught spell would strip the level-earned ones too"* — is answered twice over, which is
-why no untrain-path change was needed first:
+`ClearCharacterFeats` wiping every feat row does not strip level-earned spells, for two reasons:
 
-1. since #862 an auto-trained feat is **never written to `CharacterFeat` at all** (0 of the 56 rows in the
-   shipped database are autotrained), so "every feat row" and "every purchased feat" are already the same set;
+1. an auto-trained feat is **never written to `CharacterFeat` at all** (0 of the 56 rows in the shipped database
+   are autotrained), so "every feat row" and "every purchased feat" are the same set;
 2. and `GetSpellsTaughtByFeats` excludes `Feat.AutomaticUnlockCategory` grants in its own `where` — **798 of the
-   1,548** grants are automatic, so a query that had forgotten the filter would be visibly wrong.
+   1,548** grants are automatic, so a query missing the filter would be visibly wrong.
 
 The level check is therefore not that guard restated: it covers the *other* overlap, a tree feat teaching a spell
-the class ladder hands out anyway.
+the class ladder hands out anyway. Open work tracked in Gitea #920 and #915.
 
 ## Why a learned spell may still refuse to cast — the feat criterion
 
-⚠️ **This is not a reason for the server to grant a feat** (#862). The criterion runs against the client's own
+**This is not a reason for the server to grant a feat.** The criterion runs against the client's own
 `FeatHolder`, which already carries every auto-trained feat — the client puts them there itself, off RDB 1000043.
 See the section at the end of this page.
 
 A spell in the book is not a castable spell. The client runs a generic criteria evaluator
-(`FUN_006dd970`, log channel `GameCode/Criteria`) on an actual action attempt, and **case `0x5d` is the FEAT
-criterion**: it asks the character's feat holder whether it carries feat *F*, with **no level comparison of any
-kind**. On failure it picks one of three LDB messages by what it can say about *F*:
+(`FUN_006dd970`, log channel `GameCode/Criteria`) on an actual action attempt, and **case `0x5d` is the feat
+criterion**: it asks the character's feat holder whether it carries feat *F*, with no level comparison of any
+kind. On failure it picks one of three LDB messages by what it can say about *F*:
 
 | token | LDB | English text |
 |---|---|---|
@@ -561,17 +533,14 @@ kind**. On failure it picks one of three LDB messages by what it can say about *
 | `CriteriaMissingFeat` | cat 100, id 194997716 | *"You must have trained the feat: %s"* |
 | `YouCanNotUseYet` | cat 130, id 5372612 | *"Your class cannot use this item until level %d"* |
 
-⚠️ **The third one reads like a level gate and is not.** The `%d` is a number the message carries about the
-FEAT; the criterion that produced it compared nothing to the player's level. #298 spent a month on that reading
-— at character level 15 a Dark Templar was told "until level 10", which looked like a third, undiscovered
-player-level field stuck at 1, and the whole `.setstat` sweep of `0x00`–`0x600` that followed found nothing
-because there was nothing to find. A real stat requirement is a *different* case (`2`) with a *different*
+**The third one reads like a level gate and is not.** The `%d` is a number the message carries about the
+feat; the criterion that produced it compared nothing to the player's level. A character at level 15 told "until
+level 10" is missing a feat, not stuck on some player-level field — a `.setstat` sweep of `0x00`–`0x600` finds
+nothing because there is nothing to find. A real stat requirement is a *different* case (`2`) with a *different*
 message, `Criteria_IsRequiredToBeAtLeast` = *"%s %s must be at least %d"*.
 
-The one datum the level-gate reading rested on — "`GameAction_MinLevel` is stat `0x45B`" — was also wrong:
-`CharacterStatId` carried an inherited label block there that the client's own LDB 615 table contradicts on all
-seven slots at once (`0x45B`–`0x461` are the **PvP invulnerability ratings**, one per damage school). Corrected
-2026-08-05; nothing had ever read one.
+Stat `0x45B` is not `GameAction_MinLevel`: the client's own LDB 615 table names `0x45B`–`0x461` the **PvP
+invulnerability ratings**, one per damage school.
 
 Resolving those tokens needs no live client — an LDB string id is the 28-bit ELF hash of the token name
 (`LdbStringIndex.TokenId`), so any `FUN_0061f640(<cat>, "<Token>")` in the exe resolves statically:
@@ -589,32 +558,19 @@ dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <r
   region; self-IDs class from the profession id (`featId // 100 == Class` enum value). Modes: per-class / `discover` /
   `dump` / `json`. NB it reads skills, not feats (documented in its header).
 - `OpcodesSource` — sweeps captures for IIR hashes/opcodes missing from `Opcodes.cs` and
-  enumerates client IIR classes we've never named/seen. This is how `FeatIIR` was found.
+  enumerates client IIR classes not yet named/seen.
 - `tools/ghidra/DumpVtableReaders.java` — recovers any IIR's `ReadSubClass` reader (vtable slot 8) → authoritative
-  hash + grammar. Run headless via the `#`-free symlink (see the `ghidra_hash_path_symlink` memory).
+  hash + grammar. Run headless from a project path without a `#` in it.
 - RDB feat catalog: type 1000020, **19,777** readable feat templates (id + name + description + tree + rank).
   The remainder of that type is TEA-encrypted with server-only keys, but that costs the feat tree nothing:
   prerequisites and the wire↔template map come from type **1000042** and the point budget from **1000044**,
-  both plaintext (see the `feat_trees_decode_251` memory).
+  both plaintext.
 
-## References
+## An automatic feat costs no points — and is never in a feat list at all
 
-- The subsystem tracker **#251 is closed**; the remaining feat work is tracked per gap: **#593** (the modifier
-  kinds still unimported — `ChangeInheritedWeaponAttack`, and the unnamed trigger/magnitude slots on the proc
-  family), **#595** (the seven mis-sliced `Swift Pathing` elements), **#271** (nothing consumes
-  `FeatComboModifier`'s reuse-time half yet), **#298** (skills scaffold gates spell usability), **#313**
-  (create-flow combos, same server-held-key class).
-- Memories: `feat_trees_decode_251` (the correction + FeatIIR), `snapshot_known_spell_list`, `player_spawn_scaffold_generated`.
-
-## An AUTOMATIC feat costs no points (#850) — and is never in a feat list at all (#862)
-
-`FeatRules.PointCost` used to be a placeholder — `max(1, the rank baked into the id's low two digits)` — and it
-was charging for the feats a character never chose. Two paths disagreed about them: `LevelUpService.
-GrantCastabilityFor` trained the feats that teach a newly learned spell with **no** budget check, and
-`FeatService.TrainWithinBudget` then counted the character's whole feat set against `FeatRules.PointBudget`.
-
-⛔ **The interaction was not marginal, it was fatal.** Measured over the shipped catalog, the automatic feats a
-level-80 accumulated cost:
+The feats the client trains by itself are not the server's to grant or to charge for. `FeatService.TrainWithinBudget`
+counts a character's feat set against `FeatRules.PointBudget`, exempting the auto-trained ones. Charged, the
+automatic feats a level-80 accumulates would cost:
 
 | class | automatic feats | points | budget at 80 |
 |---|---|---|---|
@@ -622,11 +578,10 @@ level-80 accumulated cost:
 | 44 | 54 | **97** | 79 |
 | 24 | 47 | **89** | 79 |
 
-So three classes overspent the entire tree budget before the player picked anything, and every train request was
-rejected outright. Exempting them (#850) removed the interaction. **#862 removed the cause**: those feats are not
-the server's to grant, and both halves of that ticket resolve to the same client table.
+— three classes would overspend the entire tree budget before the player picked anything, and every train request
+would be rejected. Which feats are automatic comes from one client table.
 
-### The client trains them ITSELF — RDB 1000043, the featclass table
+### The client trains them itself — RDB 1000043, the featclass table
 
 `FeatClassTable_c` loads **RDB type 1000043 id 1** at startup ("Could not load featclass info" is its own error
 string). Imported as `FeatClassEntry` (**9,916** rows), it is a 20-byte header then 40-byte entries of ten words:
@@ -636,37 +591,36 @@ string). Imported as `FeatClassEntry` (**9,916** rows), it is a 20-byte header t
 | 0 | `Id` | the client's own row id (106..738078) — a natural key, so a re-import renumbers nothing |
 | 1 | `Class` | the `ConanClass` value, or 0 (→ `null`) on the 188 rows that name no class |
 | 2 | `Level` | the character level the row applies at, 1..80 |
-| 3 | `FeatId` | the **WIRE** feat id — 9,907 of 9,916 resolve through `FeatIdMap` |
-| 4 | `Autotrain` | ⭐ **the client trains this feat by itself**; true on 3,839 rows |
+| 3 | `FeatId` | the **wire** feat id — 9,907 of 9,916 resolve through `FeatIdMap` |
+| 4 | `Autotrain` | **the client trains this feat by itself**; true on 3,839 rows |
 | 5 | `TreeId` | 1000001..1000190 for a real tree, `900` innate, `9000` the class progression track |
 | 6 | `TreeColumn` | the feat's column within its tier row in the tree UI |
 | 7 | `Flag` | undecoded — see the column's own comment for the census |
 | 8 | `Tier` | its tier (row) in the tree, 1..9 |
-| 9 | `TreePointsRequired` | points that must already be spent IN THAT TREE — `(Tier - 1) * 5` on all but 57 of 3,197 ordinary-tree rows |
+| 9 | `TreePointsRequired` | points that must already be spent in that tree — `(Tier - 1) * 5` on all but 57 of 3,197 ordinary-tree rows |
 
-⭐ **`Autotrain` is why a captured feat list is so short.** The client builds a per-class level→feat map from these
+**`Autotrain` is why a captured feat list is so short.** The client builds a per-class level→feat map from these
 rows (`FUN_0078c990`, which logs *"Autotrain feat: `<id>` for class: `<class>` at level: `<level>`"*) and trains
-them with no server involvement. Everything the old level-up grant handed out is one of them: the
+them with no server involvement: the
 `Spell Unlocking <lo>-<hi>` bands, the `<Class> Class Feat NNN` tracks and `Pet Mastery`. Read straight off the
 table, the Necromancer's schedule is `Necromancer Class Feat 001` ranks 0..9 at levels 1..10, then
 `Spell Unlocking 20-40` at 20/25/30/35, `40-60` at 40/45/50/55 and `60-80` at 60/65/70/75/80.
 
 **The captures agree without exception**: all **56** feat ids across the four captured characters are
-`Autotrain = false`. Not one automatic feat is on the wire anywhere in the corpus, and the characters that DID
+`Autotrain = false`. Not one automatic feat is on the wire anywhere in the corpus, and the characters that did
 level up during a capture (Blablabla, Blablatest, Stihetfv) end with an empty feat list despite learning spells.
 
-⛔ **And sending one is not merely redundant.** `FeatHolder::TrainFeat` (`FUN_01135e20`, `Feat\FeatHolder.cpp:74`)
+**And sending one is not merely redundant.** `FeatHolder::TrainFeat` (`FUN_01135e20`, `Feat\FeatHolder.cpp:74`)
 refuses a class feat outright, asserting `pcFeat->GetCategory() != e_ClassFeat` and logging *"Character:%d called
-TrainFeat on class feat : %d ( will break feats! )"*. So `LevelUpService.GrantCastabilityFor` no longer trains
-anything; it grants the class skill scaffold and nothing else, and `GetAutotrainedFeatWireIds` (the client's flag,
-replacing the `Feat.AutomaticUnlockCategory` proxy, which disagrees with it on 204 of 9,907 rows) is what the
-budget exempts. The spellbook offer is unaffected — `--report spell-grant-check` is unchanged at 97/96/5 matched,
+TrainFeat on class feat : %d ( will break feats! )"*. So `LevelUpService.GrantCastabilityFor` trains nothing; it grants
+the class skill scaffold and nothing else, and `GetAutotrainedFeatWireIds` (the client's flag — the
+`Feat.AutomaticUnlockCategory` proxy disagrees with it on 204 of 9,907 rows) is what the budget exempts. The spellbook offer is unaffected — `--report spell-grant-check` is unchanged at 97/96/5 matched,
 EXTRA 0, DROPPED 0.
 
-⚠️ The bug was visible in one line once the table was read: a level-4 test character was carrying
-`Spell Unlocking 20-40`, `40-60` and `60-80` — feats retail hands over at 30, 45 and 75.
+The table also dates each one: a level-4 character carrying `Spell Unlocking 20-40`, `40-60` or `60-80` is wrong
+— retail hands those over at 30, 45 and 75.
 
-### ⭐ The schedule is a MEMBERSHIP source as well as a level one (#864)
+### The schedule is a membership source as well as a level one
 
 The same derivation answers a second question. A feat the client auto-trains **for a class**, teaching a spell,
 says that class has access to that spell — so `ClassSpells` gains a row where it had none. It adds **12**, and
@@ -674,36 +628,35 @@ what makes them interesting is *which*: the Herald of Xotli's `Arcane Abatement`
 and `Exultation of Xotli` 1–4, plus the Tempest of Set's `Lightning Sparks`.
 
 Every one carries a `GuiStackingLine` of **71 / 76 / 232** — not the `ConanClass * 1000 + index` form membership
-is normally derived from, so the class map was blind to them by construction. `Arcane Abatement` **rank 1** did
-have a row, from the captured-spellbook source; ranks 2–5 had no source at all, which is why a Herald could never
-have been offered them.
+is normally derived from, so the class map is blind to them by construction. `Arcane Abatement` **rank 1** has a
+row from the captured-spellbook source; ranks 2–5 have no other source.
 
-⛔ **`Level > 0` only, and that exclusion is the whole safety of it.** Every class auto-trains the four `Dance:`
+**`Level > 0` only, and that exclusion is the whole safety of it.** Every class auto-trains the four `Dance:`
 emotes at level 5, and a Level-0 record belongs to no class — mounts, pets, emotes and travel unlocks are
 restored from the character's own rows on login, never from a class query. It is the difference between 12 rows
 and 57.
 
-⚠️ No captured character can be over-offered by this: the Herald spells all gate at 30+ and the only captured
+No captured character can be over-offered by this: the Herald spells all gate at 30+ and the only captured
 Herald is level 24, and no captured character is a Tempest of Set. `--report spell-grant-check` is unchanged at
 EXTRA 0 / DROPPED 0 on every character.
 
-⛔ **And it refutes a documented rule in passing.** `ClassSpell.GrantLevel` carried *"retail grants at or BELOW
-`Spells.Level`, never above"*, written from three rows that all pointed the same way. Over the **432** rows that
-now carry a grant level, **363 agree, 69 differ, and 14 differ UPWARD** — including `Pestilential Blast (Rank 1)`,
+**And it refutes "retail grants at or below `Spells.Level`, never above"** (a rule three rows all pointing the
+same way suggest). Over the **432** rows that carry a grant level (`ClassSpell.GrantLevel`), **363 agree, 69
+differ, and 14 differ upward** — including `Pestilential Blast (Rank 1)`,
 granted at **7** where the record says **1**, which is one of the *capture-proven* rows rather than a derived one.
-The two fields are independent. **1,242** `ClassSpells` rows with a real (`Level > 0`) gate still have no grant
-level and so still ride `Spells.Level`; that is the residue #864 tracks.
+The two fields are independent. **1,242** `ClassSpells` rows with a real (`Level > 0`) gate have no grant
+level and so ride `Spells.Level`.
 
-### ⭐⭐ The auto-trained STAT effects: a ladder PICK, never a sum (#863)
+### The auto-trained stat effects: a ladder pick, never a sum
 
 An auto-trained feat is in no character's feat list, so `GetCharacterFeatEffects` — which joins `CharacterFeats`
 → `FeatIdMap` → `FeatEffect` — contributes nothing for one. The client applies them all the same, off (class,
-level), and so does the server now: `GetClassAutoTrainedFeatEffects` is a second, derived source folded in beside
+level), and so does the server: `GetClassAutoTrainedFeatEffects` is a second, derived source folded in beside
 the trained one by `CharacterStatBonuses`. No wire change; these are server-side stat contributions only.
 
 Two rules carry the whole correctness of it.
 
-⭐⭐ **The ladders state TOTALS, not increments.** One stat's ladder runs across four differently NAMED feats —
+**The ladders state totals, not increments.** One stat's ladder runs across four differently named feats —
 `Climbing Skill` → `Basic Climbing` → `Advanced Climbing` → `Expert Climbing`, reading 100 / 200 / 300 … 900 at
 levels 1, 10, 23 … 78 — and the value at each rung is the character's whole score. A level-80 has passed every
 rung, so summing them gives **4500** where the client's answer is **900**. `AutoTrainedFeatLadder.Select` takes
@@ -715,63 +668,61 @@ The proof is not that the numbers look cumulative — it is an independent path 
 parser rather than the feat catalog; it takes the value **at** the level rather than a sum; and it reproduces all
 four captured characters' pools exactly. A sum could not.
 
-⛔ **The class PROGRESSION track is excluded, because it is already applied.** `<Class> Class Feat NNN` *is* what
+**The class progression track is excluded, because it is already applied.** `<Class> Class Feat NNN` *is* what
 `ClassAttributeBases` holds, so folding it in again would double every attribute and the health base — a level-80
-Necromancer's 38,600 health base counted twice. The marker is a NAME (`FeatRules.ClassProgressionTrackMarker`)
+Necromancer's 38,600 health base counted twice. The marker is a name (`FeatRules.ClassProgressionTrackMarker`)
 and not a tree id: the client files the track under `TreeId` 9000, but so are `Spell Unlocking`, the
 `Light Weapon Combos` bands and `Pet Mastery` — and Pet Mastery is the one auto-trained feat outside the track
 that carries stat effects, so a tree-id filter would drop precisely the rows this exists to apply.
 
-⚠️ **The check #863 asked for passes structurally, which is stronger than numerically.** The worry was that
-folding in 70–80 effect rows per class would move a captured stat sheet. What remains after the exclusion touches
+**Folding them in cannot move a captured stat sheet, structurally rather than numerically.** Of the 70–80 effect
+rows per class, what remains after the exclusion touches
 **no pool and no attribute at all** — not HealthMax, not one of the five attributes — so there is nothing for it
 to move. `--report feat-autotrain-check` asserts that direction.
 
-⭐ **And it sources three retail numbers that were previously only observed.** `RegenRates` recorded the
-out-of-combat mana base (stat 280) as *0 for a level-23 Assassin, 2000 for a level-24 Herald of Xotli, 2200 for
-both level-80 mages* with no explanation. The auto-trained `Mage` feat grants 2000 to the Necromancer, Herald of
+**And it sources three retail numbers the captures show without explaining:** the out-of-combat mana base
+(stat 280) is *0 for a level-23 Assassin, 2000 for a level-24 Herald of Xotli, 2200 for both level-80 mages*. The auto-trained `Mage` feat grants 2000 to the Necromancer, Herald of
 Xotli and Demonologist, its `Priest` twin grants 2000 to the three priest classes, and the class base adds 200
 where the class templates carry a 280 row:
 
 | class | class base | auto-trained feat | total | retail |
 |---|---:|---:|---:|---|
-| Assassin | 0 | 0 | **0** | ✅ 0 |
-| Herald of Xotli | 0 | 2000 | **2000** | ✅ 2000 |
-| Necromancer | 200 | 2000 | **2200** | ✅ 2200 |
-| Demonologist | 200 | 2000 | **2200** | ✅ 2200 |
+| Assassin | 0 | 0 | **0** | 0 |
+| Herald of Xotli | 0 | 2000 | **2000** | 2000 |
+| Necromancer | 200 | 2000 | **2200** | 2200 |
+| Demonologist | 200 | 2000 | **2200** | 2200 |
 
 Four for four, against a derivation that was not fitted to them. `WorldEntity.NonCombatManaRegenBase` is the sum
-and `WorldSimulation` passes it to `RegenRates.ManaPerSecond`, which had been defaulting it to 0.
+and `WorldSimulation` passes it to `RegenRates.ManaPerSecond`.
 
-### ⛔ `FeatEffect.Value` is RAW WIRE, not display (#865)
+### `FeatEffect.Value` is raw wire, not display
 
 The same bytes are read twice under two conventions, and that is the proof. `ClassAttributeBase.Amount` and
 `FeatEffect.Value` are **both** `ItemTemplateStatModifiers.Modifier.WireAmount`, off the same
 `<Class> Class Feat NNN` templates: `Necromancer Class Feat 071` carries HealthMax **38,600** and the
 `ClassAttributeBases` row for (Necromancer, 80) is **38,600**. `CharacterMaxStats.Pool` adds that one in
-HUNDREDTHS and divides by 100, giving the `+386` health it documents and that is verified against every captured
+hundredths and divides by 100, giving the `+386` health it documents and that is verified against every captured
 pool. One number, one parser, two readings — and the verified reading divides.
 
 Two more, each sufficient alone:
 
 * `Barbarian: HP (1) 10` carries **26,800** and `Vitality`'s top rank ramps to **80,000**, against a level-80's
   *whole* pool of ~6,300. No display reading survives that; as wire values they are +268 and +800 health.
-* The unexplained flat health term #588 is hunting for is **73** — tens, not thousands.
+* The unexplained flat health term is **73** — tens, not thousands.
 
-⚠️ **SPELLS keep their own convention and that is not an inconsistency.** `BuffStatEffects.SpellScale` holds
+**Spells keep their own convention and that is not an inconsistency.** `BuffStatEffects.SpellScale` holds
 attributes at scale 1 because the spell record really does store those in display units. Three sources, three
-conventions, and the PARSER a source goes through is what says which one it uses.
+conventions, and the parser a source goes through is what says which one it uses.
 
-⚠️ Accumulation happens in WIRE units with the scale applied **once per stat**, the way `CharacterMaxStats.Pool`
+Accumulation happens in wire units with the scale applied **once per stat**, the way `CharacterMaxStats.Pool`
 does it — dividing each row first discards every row's remainder.
 
-⛔ **`FeatEffect.Value` is SIGNED**, as of this work. It was a `uint`, and 44 shipped rows held a word the client
-states as negative and we stored as its 2³² complement — `Pet Mastery`'s Pet Damage Coefficient ladder
-(−550 per rank to −4400), the caster classes' Weapon Damage Ranged (−3000), `Mind Phase`, `Subtlety`. Every one
-is summed by `MaxStatAggregator`, so a feat that LOWERED a stat raised it by four billion instead. The word on
-the wire was always signed; only the column was not.
+**`FeatEffect.Value` is signed.** 44 shipped rows hold a word the client states as negative — `Pet Mastery`'s Pet
+Damage Coefficient ladder (−550 per rank to −4400), the caster classes' Weapon Damage Ranged (−3000),
+`Mind Phase`, `Subtlety`. Every one is summed by `MaxStatAggregator`, so an unsigned column would make a feat that
+lowers a stat raise it by four billion instead.
 
-### A feat costs ONE POINT PER RANK, and the captures pin it exactly
+### A feat costs one point per rank, and the captures pin it exactly
 
 `FeatRules.PointCost` is `rank + 1` — the rank baked into the wire id's low two digits is 0-based, so holding
 rank 4 means five points were spent walking it up. Summing that over each captured character's feat list
@@ -784,19 +735,18 @@ reproduces `PointBudget` for its level **to the point**:
 | Hakotep (Herald of Xotli) | 24 | 6 | **16** | 16 |
 
 Three characters at two different levels, each spending its budget to the last point, against a budget that comes
-from the client's own `FeatPointsTable` and feat lists that come off the wire. Nothing was fitted. Under the old
-`max(1, rank)` all three had points left over (60, 61, 13) — headroom that never binds, which is precisely why the
-wrong cost survived so long (the same trap `PointBudget` itself fell into).
+from the client's own `FeatPointsTable` and feat lists that come off the wire. Nothing was fitted. A `max(1, rank)` cost leaves all three with points left over (60, 61, 13) — headroom that
+never binds, so a wrong cost is invisible without this check.
 
-⚠️ **There is no per-feat cost table for an ordinary feat, and that is a finding rather than a gap.** RDB
+**There is no per-feat cost table for an ordinary feat, and that is a finding rather than a gap.** RDB
 **1000099** *does* exist — the client calls it "feat point cost info" and it is a flat vector of
 `(featclassRowId, pointType, cost)` triples — but all **2,880** of the placements it prices belong to the twelve
-level-20/80 ALTERNATE-ADVANCEMENT perk trees (`TreeId` 1000177..1000190), and those are paid for in AA tokens,
+level-20/80 alternate-advancement perk trees (`TreeId` 1000177..1000190), and those are paid for in AA tokens,
 not in feat points: `pointType` is the client's `AAFeatPlannerPointType` (2 = PvP, 3 = PvE, 1,548 rows each),
 which is why the costs run past a level-80 feat budget of 79 without contradicting it. Not one feat any captured
-character holds has a row in it. Imported as `FeatPerkCost` (#150); `--report feat-autotrain-check` is the
+character holds has a row in it. Imported as `FeatPerkCost` (see [alternate-advancement.md](alternate-advancement.md)); `--report feat-autotrain-check` is the
 standing measurement for both halves of this section.
 
 The client's other feat resources, found the same way (`FUN_0078de40` loads all four before building the
 auto-train map): **1000506** id 1 "classmembership info" and **1065101** id 0 "featspecializedtrees info" — both
-present in the RDB, neither yet read.
+present in the RDB, neither read.

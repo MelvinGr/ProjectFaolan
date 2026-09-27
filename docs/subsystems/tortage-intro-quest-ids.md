@@ -7,9 +7,9 @@ right after the 17-byte header, and that record starts with `questId`, so the +1
 id there; `QuestIIR` puts `questId` at **+21** and holds `state` at +17, so the uniform +17 read on a
 `QuestIIR` catches the `state` value (2/4), not the id (this is what surfaces the "2, 4" noted below).
 
-## Conclusion: the beach Casilda chain is SHARED, not per-class
+## The beach Casilda chain is shared, not per-class
 
-The Tortage **beach** Casilda chain is the **same quest ids for every class**:
+The Tortage beach Casilda chain uses the same quest ids for every class:
 
 | Stage | Quest id | Goal |
 |------:|---------|------|
@@ -28,47 +28,46 @@ Verified across all captures that reach the chain — **3 archetypes, 5 classes*
 | `Strie_rogue-assassin_login_randomActions` | Assassin (rogue) | 13479, 13563, 13480, 12407 |
 | `Stihetfv_soldier-conqueror_login_…compeltefirstquest` | Conqueror (soldier) | 13480, 13563, 12407 (capture starts mid-chain) |
 
-⟹ **Do NOT key the chain (or its triggers) on class.** It is one shared chain. The server already drives it
-data-driven (`QuestProgressionService`, name-keyed goals), which is correct.
+So the chain (and its triggers) must not be keyed on class. The server drives it data-driven
+(`QuestProgressionService`, name-keyed goals).
 
 ## Other shared early-beach quest ids (appear in every beach capture)
 
 - **10238** — `QuestContent.BeachStarterQuestId` (the wash-ashore starter, seeded on first beach entry).
-- **5744, 5745, 5867** — shared early quests present in every beach login (purpose not yet pinned; same ids
+- **5744, 5745, 5867** — shared early quests present in every beach login (purpose not pinned; same ids
   for guardian/necro/herald/assassin/conqueror, so also not per-class).
 - **2, 4** — not quest ids (framing/state values the decoder's +17 read catches; ignore).
 
-## Post-beach / Tortage city destiny quests (DIFFERENT id band)
+## Post-beach / Tortage city destiny quests (a different id band)
 
-These appear AFTER the beach chain, once the player is heading into / inside Tortage city. They are a separate id
-set from the beach chain — this is what was briefly mis-read as "the chain is per-class" (it is not; these are
-just the *next* quests):
+These appear after the beach chain, once the player is heading into / inside Tortage city. They are a separate id
+set from the beach chain, not a per-class variant of it — they are the next quests:
 
 - `Hoxxling_…_login_gameplay` (late): **12369**, **12373**
 - `Hoxxling_…_login_gameplay2`: **10286** (@idx 5565), **10287**, **14020**, **14014**, **14012**, **13041**,
   **10915**
 
-Whether the *city* destiny quests vary by class is **not determined** — only the Hoxxling (herald) playthrough
-captures the city, so there's no cross-class city sample yet. If that matters later, capture a second class's
-city run and compare this 10286/10287/14012… set.
+Whether the city destiny quests vary by class is not determined: only the Hoxxling (herald) playthrough
+captures the city, so there is no cross-class city sample. A second class's city run compared against this
+10286/10287/14012… set would settle it.
 
-## Destiny Scry steps (related; see also [[casilda_destiny_scry_steps]])
+## Destiny Scry steps
 
 `ScryScriptIIR` (0xA36D3B74) named steps from the Hoxxling dumps:
 `StartFixed3d, StartScriptGroup(385910), WelcomeTutorial, ApproachCasilda, LeaveCasilda, CombatTutorial, Level,
 QuestRewards` (beach), then `ShacklesOff, StartScriptGroup(2012264), GoingInside, GoingOutside` (free/escort).
 
-- `ApproachCasilda`/`LeaveCasilda` are **cycling tutorial-camera waypoints** (fire repeatedly, before she's
-  freed) — NOT the wall lift. In-client their whole visible effect is a couple of tip **message boxes**, not a
+- `ApproachCasilda`/`LeaveCasilda` are cycling tutorial-camera waypoints (fire repeatedly, before she's
+  freed) — not the wall lift. In-client their whole visible effect is a couple of tip **message boxes**, not a
   scripted camera tutorial.
 
-### The beach step tail is EVENT-driven, not a sequence
+### The beach step tail is event-driven, not a sequence
 
 Corpus census of the beach tail (occurrences / captures carrying it): `ApproachCasilda` 25 / 17,
 `CombatTutorial` 12 / 9, `LeaveCasilda` 8 / 8, `Level` 8 / 7, `QuestRewards` 7 / 7. `WelcomeTutorial` (55 / 45)
 and `StartFixed3d` (44 / 44) are the intro proper and appear in essentially every beach capture.
 
-The tail is **not a fixed order** — two captures disagree, so it is driven by what the player does, not by a
+The tail is not a fixed order — two captures disagree, so it is driven by what the player does, not by a
 script the server plays out:
 
 | capture | order (`--report timeline`) |
@@ -76,21 +75,21 @@ script the server plays out:
 | `Hoxxling_…_login_gameplay` | ApproachCasilda → LeaveCasilda → CombatTutorial → Level ×2 → ApproachCasilda → QuestRewards |
 | `Blablabla_soldier-guardian_create_…` | CombatTutorial → ApproachCasilda → LeaveCasilda → CombatTutorial → Level → ApproachCasilda → QuestRewards → ApproachCasilda |
 
-⚠️ **No captured c2s packet triggers any of them.** Each is a bare server push, and the frames immediately
+No captured c2s packet triggers any of them. Each is a bare server push, and the frames immediately
 before it are ordinary interest-stream traffic (`0x2020`, despawns, BCC) — retail is evaluating them from its
 own game state (proximity to Casilda, entering combat, level-up, quest turn-in), which the capture does not
 carry. So the *step bytes* are fully constructible (`ScryScriptCodec`) but the *trigger conditions* are not
-recoverable from the corpus; picking radii and conditions would be invention, not construction. Open work
-tracked in Gitea #234.
+recoverable from the corpus; picking radii and conditions would be invention, not construction.
 
 `--report timeline` decodes these inline (type, step token, zigzag-decoded script group, bound entity), which is
 how the orderings above were read off.
-- **`ShacklesOff`** is the **PLAYER's** manacle removal (the player washes ashore in Slave Manacles, #220), and it
-  happens in **Tortage CITY, not on the beach**. PROVEN: `ShacklesOff` occurs in only one capture
-  (`Hoxxling_..._login_gameplay2` @5579), and that whole capture is in the city — it references maps 4020/4022 from
-  the very start and NEVER the beach (4010); the prior quest grant is the city quest 10286. So it fires AFTER the
-  beach→city transition. It is **NOT** the beach wall lift (a city packet can't lift a beach wall). The earlier
-  #267 wiring that sent `ShacklesOff` on the beach Casilda-free was WRONG and was reverted (in-client: the wall
-  stayed up). The beach "invisible wall" is still unsolved — most likely the beach→city transition itself (the
-  destiny confinement releases when you take the exit to the city), which overlaps with #262 (escort to city); it
-  is not a standalone "wall down" packet on the beach.
+
+### `ShacklesOff`
+
+`ShacklesOff` is the player's manacle removal (the player washes ashore in Slave Manacles), and it happens in
+Tortage city, not on the beach. It occurs in only one capture (`Hoxxling_..._login_gameplay2` @5579), and that
+whole capture is in the city — it references maps 4020/4022 from the very start and never the beach (4010); the
+prior quest grant is the city quest 10286. So it fires after the beach→city transition, and it is not the beach
+wall lift: sending it on the beach Casilda-free leaves the wall up in-client. The beach "invisible wall" is not a
+standalone "wall down" packet on the beach; the most likely release is the beach→city transition itself (the
+destiny confinement ending when the player takes the exit to the city).

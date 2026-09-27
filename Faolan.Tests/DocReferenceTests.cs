@@ -19,22 +19,13 @@ namespace Faolan.Tests
 	//
 	// It is deliberately narrow to avoid false positives: only backtick symbols ending in a strong type suffix (broad
 	// nouns are usually not types), and only paths under a repo top-dir (relative doc links are out of scope here).
-	// Genuinely-retired references are allowlisted below with the reason.
 	public class DocReferenceTests
 	{
-		// References intentionally kept for the historical record, each with its reason. A doc that documents removed
-		// code (a before/after narrative) legitimately names symbols and paths that are not in the tree.
-		private static readonly HashSet<string> Allowlist = new HashSet<string>(StringComparer.Ordinal)
-		{
-			// docs/re/spawn-dissection.md documents the retired Faolan.PacketAnalyzer approach as the
-			// before-state of the construct-don't-replay work - these name that removed project's types/paths on purpose.
-			"ArchetypeHarvester",
-			"ArchiveDataImporter",
-			"MapWorldBurstExtractor",
-			"Faolan.PacketAnalyzer.Tests/ArchiveDataImporterTests.cs",
-			"Faolan/Helpers/ArchiveDataImporter.cs",
-			"tools/capture/extract_conversations.py"
-		};
+		/// <summary>
+		///     References a doc may name although they do not resolve, each with its reason. Currently empty: docs describe
+		///     the current system, so a retired name in a doc is a stale reference to fix, not an entry to add here.
+		/// </summary>
+		private static readonly HashSet<string> Allowlist = new HashSet<string>(StringComparer.Ordinal);
 
 		private static readonly Regex TypeDef = new Regex(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);
 

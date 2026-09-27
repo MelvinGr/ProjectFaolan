@@ -1,14 +1,14 @@
 # Quest sharing
 
-Offering a quest you are on to your team-mates, and accepting one offered to you (Gitea #101). It is the one
-two-player subsystem in the server that **no capture performs** — teams, trade and the friend list all came off
+Offering a quest you are on to your team-mates, and accepting one offered to you. It is the one
+two-player subsystem in the server that no capture performs — teams, trade and the friend list all came off
 `login_2-clients_group-trade-friend`, but neither client in it ever shares a quest.
 
 So every byte here is recovered from `AgeOfConan.exe` instead: each dispatch's field widths come from the client's
-own reader, and each RULE the server applies comes from the client code that applies the matching one. Nothing is
+own reader, and each rule the server applies comes from the client code that applies the matching one. Nothing is
 gated against retail bytes, and nothing here claims to be — the tags below are `[V0]` for exactly that reason.
 
-The **one** exception is `RequestTeamQuestList` → `DispatchCancelTeamQuestList`, which that same capture performs
+The one exception is `RequestTeamQuestList` → `DispatchCancelTeamQuestList`, which that same capture performs
 twice ([below](#the-team-quest-list)) — and it is worth more than one method, because it is the only observation of
 the endpoint pair the whole family is addressed with.
 
@@ -48,9 +48,9 @@ about to read (*"stream bad after 'i_nStartTaskTemplate'"*), so the order is not
 | `DispatchQuestShareIndividualFeedback` | `FUN_004c5a50` | u32 → string |
 | `DispatchCancelTeamQuestList` | `FUN_004c5fa0` | u32 |
 
-⚠️ **`i_cFeedbackValue` is a STRING, not an ID32**, despite the `i_c` prefix that marks an object everywhere else.
+**`i_cFeedbackValue` is a string, not an ID32**, despite the `i_c` prefix that marks an object everywhere else.
 `FUN_004c5a50` calls the string primitive (`FUN_0048f840`) — the same one `i_cQuestName` uses — and never the id
-reader. The handler substitutes it into the message as the player NAME parameter, which is what it is for.
+reader. The handler substitutes it into the message as the player name parameter, which is what it is for.
 [V0: the quest-share message bodies]
 
 ## The feedback codes
@@ -95,7 +95,7 @@ Its per-second tick (`FUN_01220bb0`) is where two server rules come from:
 * it counts down and closes with `QuestShareTimeOut` when it runs out.
 
 So the server's range test is the client's own leash: offering a quest to someone further away raises a window that
-immediately cancels itself. `QuestSharingService.ShareRadius` is that 60. The TIMEOUT needs nothing server-side —
+immediately cancels itself. `QuestSharingService.ShareRadius` is that 60. The timeout needs nothing server-side —
 the client closes its own window, and a stale offer is dropped when the target disconnects.
 [V0: the quest-share range and timeout]
 
@@ -116,7 +116,7 @@ On `ShareQuest`:
    for `OutOfRangeTargets`; else the `DispatchQuestShareRequest` goes out;
 5. then the counts: `LegitTargets` and/or `OutOfRangeTargets`, or `NoLegitTargets` when neither.
 
-On `ShareQuestAccepted` the quest granted is the one **we** offered, taken from the server's own pending map — the
+On `ShareQuestAccepted` the quest granted is the one we offered, taken from the server's own pending map — the
 body's echoed id is only checked against it, so a forged accept cannot hand its sender an arbitrary quest. The grant
 itself is `QuestProgressionService.Grant` + `SendGrantPackets`, the same pair the dialogue path uses. Retail has no
 "accepted" feedback code, so the sharer is told nothing; `ShareQuestDeclined` / `ShareQuestBusy` relay
@@ -127,9 +127,9 @@ client's reader.
 
 ## Not built
 
-* **`LevelTooLow` / `LevelTooHigh` (codes 3, 4).** The codes are known; the level BAND they compare against is not —
+* **`LevelTooLow` / `LevelTooHigh` (codes 3, 4).** The codes are known; the level band they compare against is not —
   no field of `QuestDefinition` states a min/max, and inventing one would be a rule of ours wearing retail's message.
-  A quest is offered regardless of the target's level until that band is sourced.
+  A quest is offered regardless of the target's level.
 * **`DoesNotHaveExpansion` (code 11).** We model no per-account expansion entitlement.
 * **`DispatchUpdateTeamQuestList` (0x204B).** The real list. Its single field is one opaque object with no capture to
   shape it, so it is not built — which costs nothing while we model no shared team quests, because retail does not
@@ -138,7 +138,7 @@ client's reader.
 ## The team quest list
 
 The journal asks for the team's shared quests with `RequestTeamQuestList` (0x2054, empty body). Retail's answer,
-when the asker has no such list, is **not** the list method — it is `DispatchCancelTeamQuestList` (0x204C) carrying
+when the asker has no such list, is not the list method — it is `DispatchCancelTeamQuestList` (0x204C) carrying
 one u32 share code of **2**:
 
 ```
@@ -148,16 +148,16 @@ one u32 share code of **2**:
 2853  s2c 0x204c DispatchCancelTeamQuestList 00000002         12:33:25.871
 ```
 
-Two requests, two replies, ~100–250 ms apart, and those two are the **only** occurrences of 0x204C in the corpus.
+Two requests, two replies, ~100–250 ms apart, and those two are the only occurrences of 0x204C in the corpus.
 [V2: login_2-clients_group-trade-friend.tshark.json] `CancelTeamQuestListCodec` builds it and the server answers with
-it, so the client's question is no longer met with silence. [V3: QuestShareCodecTests.CancelTeamQuestList_IsRetailsFourCapturedBytes]
+it. [V3: QuestShareCodecTests.CancelTeamQuestList_IsRetailsFourCapturedBytes]
 
-The **endpoints** ride along, and they are why this one capture matters beyond its own method: the reply is sent from
+The endpoints ride along, and they are why this one capture matters beyond its own method: the reply is sent from
 `GameCharAgent` instance `0x10` to `GameCharInterface` on the asking character — exactly the pair `SendQuestShareRpc`
-addresses every other dispatch in this family with. That pair was `[V0]`, chosen by analogy with the trade set; it is
-now observed for one member of the family.
+addresses every other dispatch in this family with, so the pair is observed for one member of the family rather than
+only chosen by analogy with the trade set.
 
-⚠️ The share CODE itself is still undecoded. The client's handler for this method is a **signal emitter**
+The share code itself is undecoded. The client's handler for this method is a **signal emitter**
 (`FUN_0139cce0` → `FUN_013998c0` → `FUN_0044b1c0`, a generic slot dispatcher), not a jump table like the two feedback
 methods, so there is no per-value branch in the binary to read a name off. `CancelTeamQuestListCodec.RetailNoList`
 ships the observed constant and does not claim to know what 2 means.

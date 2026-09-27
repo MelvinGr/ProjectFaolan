@@ -1,13 +1,12 @@
 # Factions & reputation (Khitai)
 
 The *Rise of the Godslayer* faction system: twelve Khitai factions in six rival pairs, four player ranks each,
-reputation earned by killing the rival's NPCs. **None of it is implemented** — this page is the decode, so the
-implementation has data to build against. Open work is tracked in Gitea #310.
+reputation earned by killing the rival's NPCs. This page is the decode and what the server builds from it.
 
-## It is not blocked on captures, and never was
+## It is not blocked on captures
 
-#310 filed the system as *"blocked on expansion (Khitai) content + captures of the faction UI/standing packets to
-decode the wire form — none today."* Both halves are false against the shipped client:
+The corpus has no Khitai play and no capture of the faction UI or standing packets, but the shipped client carries
+everything the system needs:
 
 | what | where | state |
 |---|---|---|
@@ -15,14 +14,11 @@ decode the wire form — none today."* Both halves are false against the shipped
 | the faction ids, icons and payout matrix | RDB `1010701`/1 — `data/FactionRelations.xml`, 15.9 KB of plaintext | decoded |
 | the display names + the four rank titles per faction | `LDB[254]` | decoded |
 | the standing gain/loss message | `LDB[254]` id `27066916` | decoded |
-| the point thresholds between ranks | RDB `1000516` — the tuning sheet | **decoded** |
+| the point thresholds between ranks | RDB `1000516` — the tuning sheet | decoded |
 
 `--report factions` prints the whole thing and re-derives the joins on every run.
 
-⚠️ RDB 1010701 had been opened once before and set aside — [combat.md](combat.md) records it as *"chased for [NPC
-disposition] and is player REPUTATION in a different id space."* That was the right verdict for **that** question
-and exactly the wrong thing to carry forward: a table that is not what one ticket wanted is still the table
-another ticket is blocked on.
+RDB 1010701 is not NPC disposition ([combat.md](combat.md)): it is player reputation, in a different id space.
 
 ## The catalog (RDB 1010701/1)
 
@@ -48,7 +44,7 @@ standing with them and earns the same amount with their rival.
 | 320 | Lord Stoll / Pit Masters PvP | — | 5037454 |
 | 330 | Clan Vigdis | — | 5038906 |
 
-## The payout is per ENCOUNTER TIER
+## The payout is per encounter tier
 
 A relation id is `factionBase + tier`, so `id=13` is faction 10 at tier 3. Only the twelve Khitai factions carry
 the override set; the other four have the standard rate only.
@@ -106,10 +102,9 @@ by its own bail-out strings (`inviter`, `message`, `factionPoints`); the reader 
 remainder, and the caller builds a red-black-tree sentinel, so it is a `std::map<u32,u32>` behind the list frame.
 Zero occurrences in the capture corpus.
 
-## ⭐ The rank thresholds — in the tuning sheet all along
+## The rank thresholds — in the tuning sheet
 
-This page used to end on *"the client ships the four rank names and the per-kill payouts and nothing that says
-what Rank 2 costs"*. It does say, in the place the balance numbers always are: the client's own tweak table
+What each rank costs is in the place the balance numbers always are: the client's own tweak table
 (RDB **1000516**, [client-tweak-table.md](../rdb/client-tweak-table.md)).
 
 | tweak | value | what it fixes |
@@ -119,50 +114,52 @@ what Rank 2 costs"*. It does say, in the place the balance numbers always are: t
 | `FactionValueRank3` | **450,000** | rank 3 |
 | `FactionValueRank4` | **1,000,000** | rank 4 — the top title |
 | `MaxFactionPoints` | **1,100,000** | the ceiling standing is clamped to |
-| `MinFactionPoints` | **−1,100,000** | the floor, so the scale is SIGNED and symmetric |
+| `MinFactionPoints` | **−1,100,000** | the floor, so the scale is signed and symmetric |
 | `NeutralMaxFactionPoints` | **5,000** | the top of the neutral band |
 | `NeutralMinFactionPoints` | **−5,000** | its bottom |
 
 `dotnet run --project Faolan.Importer -- --report rdb-tweaks --report-arg Faction`.
 
-⭐ **The negative half is the part nothing else stated.** The ladder is not 0→1,000,000; it is
+**The negative half is the part nothing else states.** The ladder is not 0→1,000,000; it is
 −1,100,000→+1,100,000 with a ±5,000 **neutral band** in the middle, which is what makes "killing one side's NPC
 costs you standing with them and earns it with their rival" expressible: a faction you have farmed against sits
 below the band and is hostile.
 
-⭐ **The payout matrix and the thresholds agree with each other**, which is the check that they belong to the same
+**The payout matrix and the thresholds agree with each other**, which is the check that they belong to the same
 system: at 120 points for a solo normal kill, rank 1 is ~417 kills and rank 4 ~8,333 — and on the group-boss row
 (1,800) rank 4 is 556. That is the order of magnitude Khitai reputation is remembered for, and a threshold set
 that belonged to something else would have no reason to land there.
 
-⚠️ The thresholds are absolute point counts, not deltas, and the tweak names carry no per-faction dimension — one
+The thresholds are absolute point counts, not deltas, and the tweak names carry no per-faction dimension — one
 ladder for all sixteen.
 
 ## What we implement
 
-The catalog, the ladder and the kill payout are shipped and wired (#310).
+The catalog, the ladder and the kill payout are shipped and wired.
 
 | piece | where |
 |---|---|
 | catalog + payout matrix, imported from the two client sources | `--report`-free module `rdb-factions` → `Faction` / `FactionKillAward` |
-| the ladder — bounds, neutral band, rank thresholds | `FactionLadder` (`Faolan.Core/Rules`), every number from RDB 1000516 |
-| per-character standing | `CharacterFactionStanding` (signed points; the RANK is derived, never stored) |
+| the ladder — bounds, neutral band, rank thresholds | `FactionLadder` (`Faolan.Core/Progression`), every number from RDB 1000516 |
+| per-character standing | `CharacterFactionStanding` (signed points; the rank is derived, never stored) |
 | the two dispatches | `ApplyFactionPointsCodec` 0x50 / `ApplyFactionRankCodec` 0x4F |
 | award on a kill | `FactionService.AwardForKill`, from `CombatService.OnNpcKilled` |
 | restore at world entry | `FactionService.SendAll`, after the burst-less entry |
 
-⭐ **A kill moves SEVERAL factions, not one** — the payout list costs the victim's own faction and grants the same
+**A kill moves several factions, not one** — the payout list costs the victim's own faction and grants the same
 amount to its rival, which is why the award path takes a list rather than a delta. A standing already pinned at a
 bound is neither written nor sent, so a grind at the ceiling stops churning the row.
 
-⚠️ **Both dispatches go out together.** The client keeps the two halves in different places — the bar off the
-POINTS, the rank title off the RANK — so a server that moved only one leaves the other showing whatever it was
+**Both dispatches go out together.** The client keeps the two halves in different places — the bar off the
+points, the rank title off the rank — so a server that moved only one leaves the other showing whatever it was
 last told. Points first, then rank, since a rank is a threshold *on* the points.
 
-## What is still missing
+## What is not built
 
-- **The encounter TIER.** Tiers 1–5 (solo boss, group normal/boss, raid normal/boss) are imported and only tier 0
-  is selectable, because the tier is a property of the ENCOUNTER — how many players engaged it, and whether the
+Open work tracked in Gitea #310.
+
+- **The encounter tier.** Tiers 1–5 (solo boss, group normal/boss, raid normal/boss) are imported and only tier 0
+  is selectable, because the tier is a property of the encounter — how many players engaged it, and whether the
   creature is a boss — and the simulation models neither. Paying tier 0 for everything **under**-grants a group
   kill rather than over-granting it, which is the safe direction, and the file's own "proportional to 60" rule
   makes tier 0 exactly one player's share of the group rate.
@@ -170,7 +167,7 @@ last told. Points first, then rank, since a rank is a threshold *on* the points.
   `changefactionrank`) and from an `ApplyFactionRankGameAction` element, i.e. quests. That machinery exists and
   has no faction consumer yet.
 - **Standing-gated faction vendors** — the shop path with a standing predicate on it.
-- ⚠️ **Nothing is verifiable in-client**, and will not be: the corpus has no Khitai play, and neither dispatch has
-  ever been observed. The bodies follow the client's own method table and #132's scalar rule, and the tests assert
+- **Nothing is verifiable against a capture**: the corpus has no Khitai play, and neither dispatch has
+  been observed. The bodies follow the client's own method table and its scalar-argument rule, and the tests assert
   round-trips and the client's own numbers rather than a golden byte string — a self-authored golden here would
   only be testing our encoder against itself.

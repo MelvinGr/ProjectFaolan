@@ -2,15 +2,14 @@
 
 The **LDB** (Language DataBase) is the client's localized-text store: spell/item/area names, descriptions,
 dialogue, UI strings. It ships as RDB type `1030002` "TDC2" pages (and, for the login/patcher categories, as
-loose `Data/text/<lang>/NNNNNNNN.tdbc` files in the same format). Cracking it backfills the handful of
-records whose own template carries no embedded name (#291, #300).
+loose `Data/text/<lang>/NNNNNNNN.tdbc` files in the same format). It backfills the records whose own template
+carries no embedded name.
 
 ## Page grammar — recovered from the client loader `FUN_0060e5c0`
 
-Each page carries an **explicit per-string id index** *after* the string blob. This corrects the earlier
-reading that the pages were flat positional arrays with "no per-string id, unsolvable offline" — that mis-parse
-saw the blob as NUL-separated strings and never found the trailing id table, which is why the
-`textId = pageBase + ordinal` model only ever worked in scattered coincidental id-blocks.
+Each page carries an **explicit per-string id index** *after* the string blob. Reading the blob as a flat,
+NUL-separated positional array misses that trailing id table; a `textId = pageBase + ordinal` model then works only
+in scattered coincidental id-blocks.
 
 All fields little-endian:
 
@@ -64,18 +63,18 @@ ASCII and listing **the 152 LDB pages that belong to it**:
           then a table of { u32 pageId, u32 } pairs — this language's pages
 ```
 
-⚠️ **The page table is not word-aligned in every record.** The leading strings differ in length per language, so
+**The page table is not word-aligned in every record.** The leading strings differ in length per language, so
 the table starts at a byte offset that is a multiple of 4 only sometimes (it is in the French and Spanish records;
 it is *not* in the English one). Read it byte-granularly, anchored on "this value is a real `1030002` page id".
 `LdbLanguageIndex` does exactly that and returns page → language; 1,064 of the 1,103 local pages are claimed.
 
 ### Do not sniff the language from the text
 
-An earlier version scored each page's prose for English function words. That is not merely approximate — it is
-**wrong on this data**: whole pages ship **untranslated**, so the Polish and Korean pages of the spell-description
-category (`50211`) contain English sentences and score as English. Unioning every "English-looking" page then lets
-the last write per id win, which is how **1,991 of 3,380** imported spell descriptions came out Spanish
-(`Aumenta en 1 la Fuerza`), caught in-client. Take the client's word for it.
+Scoring each page's prose for English function words is **wrong on this data**: whole pages ship
+**untranslated**, so the Polish and Korean pages of the spell-description category (`50211`) contain English
+sentences and score as English. Unioning every "English-looking" page then lets the last write per id win, which
+turns **1,991 of 3,380** imported spell descriptions Spanish (`Aumenta en 1 la Fuerza`). Take the client's word for
+it.
 
 The name **crib** (score a page against the names the catalog already holds — English matches ~97 %, every other
 language < 30 %) is kept on top of the language index as a *check*, not as the way the language is chosen.
@@ -98,14 +97,11 @@ resource id itself — there is no indirection through a separate "name id":
 **4** of 96,209 ids, and on all 4 they carry the *same* string (`126183` → "Zealot: HP Regeneration (1)" in
 both). Between them they name **95,894 of the 98,048** type-1000020 templates.
 
-### ⭐ …and the halves split by KIND: `50200` is ITEMS, `50220` is FEATS (#415)
+### …and the halves split by KIND: `50200` is ITEMS, `50220` is FEATS
 
-⚠️ **This section used to call both halves "item names", and the observation that gave it away was already
-written down here**: `50220`'s half was described as *"the training/proficiency items — `Basic Cloth Armor`,
-`Equip: Cloth Armor`, `1HB Damage and Combos 40-60`"*, and *"every one of our named catalog items fell in
-`50200`'s half, and none in `50220`'s"*. Those are not items. `Feats.Id` **7124** *is* `Basic Cloth Armor`, and
-7126–7128 are `Equip: Cloth Armor`. RDB 1000020 holds items, feats **and** abilities in one id space, and the
-two categories are how the client tells the first two apart.
+`50220`'s half holds `Basic Cloth Armor`, `Equip: Cloth Armor`, `1HB Damage and Combos 40-60` — not items:
+`Feats.Id` **7124** *is* `Basic Cloth Armor`, and 7126–7128 are `Equip: Cloth Armor`. RDB 1000020 holds items,
+feats **and** abilities in one id space, and the two categories are how the client tells the first two apart.
 
 `--report ldb-name-categories` measures it over every row of every catalog rather than over samples:
 
@@ -116,7 +112,7 @@ two categories are how the client tells the first two apart.
 | `50220` | 19,359 | **0 / 4,761** | **19,163 / 19,777** | 0 | 0 |
 | `50210` | 20,337 | 0 | 0 | **265 / 265** | 19,446 / 20,848 |
 
-⭐ **And a second, independent witness agrees**: the RDB's own encryption. An `RDBH` entry is TEA-encrypted and
+**A second, independent witness agrees**: the RDB's own encryption. An `RDBH` entry is TEA-encrypted and
 needs a per-template key; a non-RDBH one needs none. Nothing about the LDB pages knows anything about that, and
 yet the two splits line up almost exactly —
 
@@ -129,24 +125,21 @@ named by neither:  1,373 encrypted       785 plaintext
 So **1000020 is the ITEM templates (encrypted, named by 50200) plus the FEAT templates (plaintext, named by
 50220)**, and that is why the feat importer reads "the plaintext templates" while items need a harvested key.
 
-⚠️ It also retires "per-category %-of-total is impossible because the RDBH header carries no category tag". The
-header does not carry it; the **LDB name category does**, for all 98,048 entries and with no key. The item
-denominator is 76,546, not 98,048 — so the catalog gap #415 tracks is against that number.
+The RDBH header carries no category tag, but the **LDB name category does**, for all 98,048 entries and with no
+key. So the item denominator is 76,546, not 98,048.
 
-⭐ `50210` names all **265** abilities as well as the spells, so abilities are named in the 1040005-keyed
+`50210` names all **265** abilities as well as the spells, so abilities are named in the 1040005-keyed
 category and not in either 1000020 one.
 
 So `LDB[50200][item.Id]` on the English page **is** the localized, player-facing name — it is not shadowed by a
 polished name elsewhere. Cross-checking the English page (226593) against the French one (226589): **84 %** of
 the 76,841 entries genuinely differ (translated), and the 16 % that are byte-identical are the dev codenames for
 NPC-only gear (`NPC_Stygia_splintmail_medium_chest_(A0013/A0118)`) — untranslated because retail displayed them
-as-is. Restricted to our own items the split was 2,176 translated / 1,064 dev codenames.
+as-is. Over a 3,240-name catalog the split was 2,176 translated / 1,064 dev codenames.
 
-⚠️ **Every catalog-side figure in this section was measured against a 3,240-name catalog and has NOT been
-re-measured since.** `Items` now holds 4,225 rows, 3,922 of them named — so the 50200/50220 split, the
-translated/codename ratio and the disagreement count below all describe a subset of today's catalog. The LDB
-side (its own entry counts and the two-halves finding) is a property of the client's asset files and does not
-move; what drifts is *our* denominator, every time the item catalog grows.
+The catalog-side figures in this section (the translated/codename ratio and the disagreement count below) were
+measured against that 3,240-name catalog; the LDB side (its entry counts and the two-halves finding) is a property
+of the client's asset files and does not move. Re-measure a catalog ratio rather than quoting it.
 
 Where the catalog and the LDB disagreed (**9** items) the LDB is the *fuller* string, because the template's
 embedded `ExtractName` is an internal short name: template `716360` embeds `Hathor-Ka`, the LDB says
@@ -164,15 +157,13 @@ by `LdbLanguageIndex` from the client's language records — and backfills **onl
 (`≥ 80 %` over `≥ 50` shared ids) still runs on top as a check, and a page that fails it contributes nothing. Run:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --only rdb-ldb-names --rdb <RDB> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --only rdb-ldb-names --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 ```
-
-Result on the current data: **1 spell** (222675) and **1015 items** backfilled (item empties `1020 → 5`).
 
 Diagnostic: `--report ldb-resolve` dumps the whole id→string map, the per-category / per-language breakdown, and
 the spell + item crib scores.
 
-### `253` is the NPC profession / shop-kind table (2026-08-04)
+### `253` is the NPC profession / shop-kind table
 
 `NpcStatCore.ProfessionName` (`ProtoCoreCharacterIIR.NpcStats.profession_name`, field 11) is an id into
 **category 253**, and every one of the 88 distinct values in the shipped data resolves there — 88/88, with nothing
@@ -185,7 +176,7 @@ It sits BESIDE `profession_type`, which is the coarse ROLE (`NpcProfession`): 58
 name across every one of its templates, that name **is** the role — which is how `Auctioneer`, `Guard` and
 `WayfarerOfAsura` are named. [V3: NpcProfessionTests.EveryTemplateOfANamedProfession_CarriesAProfessionName]
 
-⚠️ **This id space is not uniformly hashed.** Most ids are the ELF hash of the string
+**This id space is not uniformly hashed.** Most ids are the ELF hash of the string
 (`elf("Merchant") == 210363236`, `elf("Trainer") == 193463442`), but eight are small and sequential — `1`, `2`,
 `22`, `28`, `44`, `46`, `53`, `56` — and resolve in the same category. `Guard` carries both kinds at once: ids
 `246974048` and `28` both resolve to `"Guard"`, so the client duplicates that entry. Distinct ids are therefore not
@@ -195,7 +186,7 @@ evidence of distinct professions.
 small-id residue called out. The resolved string is deliberately **not** stored on `NpcStatCore` — pages are
 per-language while the id is not, so persisting the English text would bake a language into the seed.
 
-## The client names every category itself — the descriptor table in `TDL1` (2026-07-30)
+## The client names every category itself — the descriptor table in `TDL1`
 
 Each language record (`1030001`) carries **1,603 trailing bytes after its page table** that the grammar above did
 not account for. They are a **category descriptor table**: `u32 count` (47), then per entry `u32 category` plus
@@ -206,13 +197,13 @@ So a category's meaning is not something to infer by intersecting id spaces; the
 
 | cat | table | field | | cat | table | field |
 |---|---|---|---|---|---|---|
-| `50000` | `nc_stockphrases` | stockphrasetext 🔒 | | `50300` | `main_quest_templates` | name 🔒 |
-| `50001` | `nc_questions` | questiontext 🔒 | | `50301` | `quest_templates` | task_name 🔒 |
-| `50002` | `nc_text` | text 🔒 | | `50302` | `quest_templates` | description 🔒 |
-| `50003` | `nc_trade` | tradename 🔒 | | `50303` | `quest_templates` | solvedtext 🔒 |
-| `50013`–`50026` | `showsubtitle`, `sayinchat`, `showfifomessage`, … | the feedback channels | | `50304` | `quest_goal_templates` | goal_name 🔒 |
-| `50100` | `pvp_area` | city_name | | `50305` | `quest_cooldown_template` | cooldown_text 🔒 |
-| `50200`/`50201` | `item` | name / description | | `50306` | `QUEST_MISSION_TYPES` | name 🔒 |
+| `50000` | `nc_stockphrases` | stockphrasetext (E) | | `50300` | `main_quest_templates` | name (E) |
+| `50001` | `nc_questions` | questiontext (E) | | `50301` | `quest_templates` | task_name (E) |
+| `50002` | `nc_text` | text (E) | | `50302` | `quest_templates` | description (E) |
+| `50003` | `nc_trade` | tradename (E) | | `50303` | `quest_templates` | solvedtext (E) |
+| `50013`–`50026` | `showsubtitle`, `sayinchat`, `showfifomessage`, … | the feedback channels | | `50304` | `quest_goal_templates` | goal_name (E) |
+| `50100` | `pvp_area` | city_name | | `50305` | `quest_cooldown_template` | cooldown_text (E) |
+| `50200`/`50201` | `item` | name / description | | `50306` | `QUEST_MISSION_TYPES` | name (E) |
 | `50210`/`50211` | `special` | name / description | | `51000` | `npc_template` | name |
 | `50220`/`50221` | `feat` | name / — | | **`51200`** | **`bounded_areas`** | **bounded_area** |
 | `53000` | `feat_specialized_trees` | name | | **`52000`** | **`regions`** | **region** |
@@ -220,9 +211,8 @@ So a category's meaning is not something to infer by intersecting id spaces; the
 | `55100`/`55150` | `tradeskill_groups` / `tradeskill` | name / group_name | | `55200`/`55300` | `stackinglines` / `spelllines` | linename |
 | `51100` | `categorytree` | description | | `55500` | `doorgroup_door` | name |
 
-🔒 = encrypted, see below. Note this corrects the earlier reading of `50210`/`50211` as *spell* name/description:
-the client calls that table `special`, and the id space is the spell id, which is why the intersection test landed
-on `1040005`.
+(E) = encrypted, see below. The client calls the `50210`/`50211` table `special`; its id space is the spell id, which
+is why the intersection test lands on `1040005`.
 
 ### `51200` is the bounded-area name table, and quest goals reference it
 
@@ -257,7 +247,7 @@ Pelt`, `Gormley's Buried Treasure`, `Quarry Stonebrick`, `Taskmaster Olaf`, `Van
 `TargetTemplateId` are filled from (see [`../subsystems/quests.md`](../subsystems/quests.md)). (Use the **English** pages — the language record names them — and decode **UTF-8**; merging
 all seven languages silently yields French.)
 
-⚠️ **A 51200 reference does NOT by itself mean the goal is a `ReachArea`.** Only three goals carry one:
+**A 51200 reference does NOT by itself mean the goal is a `ReachArea`.** Only three goals carry one:
 
 | goal | quest | map | count | region | objective text | reading |
 |---|---|---|---|---|---|---|
@@ -265,9 +255,8 @@ all seven languages silently yields French.)
 | 11712 | 17608 | 6400 | **3** | `NightmareRoomBA` | "Overcome the Emperor's Manifested Nightmares" | the region *scopes* the objective — 3 things to overcome inside it, not a place to walk into |
 | 14073 | 19364 | (none) | 1 | `BossRoom` | "Locate the Red-Hand Leader" | the goal carries no MapId, yet the name is unique to playfield 2027, so it still resolves |
 
-**Settled: only 1448 is a reach goal**, and the objective text is what settles it — the column that used to be
-blocked on #520. That is also why the kind value `9` is `RegionScoped` and not `ReachRegion`: two of its three
-goals are not reaches.
+**Only 1448 is a reach goal**, and the objective text is what settles it. That is also why the kind value `9` is
+`RegionScoped` and not `ReachRegion`: two of its three goals are not reaches.
 
 ### The goal's reserved slots are a third, typed reference
 
@@ -287,21 +276,19 @@ four are gated over every shipped goal by `QuestGoalReferenceSlotTests`:
 - the three `50003` slots hold the goal's **own `TrailingRefId` verbatim** — the Rosetta stone, since it is the
   one case where the slot is spelled in a vocabulary we already read;
 - the token is a **bijection** with the referenced object — 70 tokens ↔ 70 items, 23 ↔ 23 NPCs — so it identifies
-  the object rather than the entry (which is what the earlier "random per-entry key" reading had it as);
+  the object, not a random per-entry key;
 - **every** `51000` NPC goal carries `[5..6]`;
 - the only **item** goals that carry `[5..6]` are all twelve `Separator` 20 **Deliver** goals — exactly the goals
   that need a recipient.
 
-⚠️ **This does not replace the objective text as the importer's source for a Deliver recipient, and it never
-will.** The reference is by ACGHash token, and a global token → object map is CLOSED as not recoverable (#547):
-the client never dereferences a token, it is absent from the item template, and it is not plaintext in the RDB.
+**This does not replace the objective text as the importer's source for a Deliver recipient.** The reference is
+by ACGHash token, and a global token → object map is not recoverable: the client never dereferences a token, it is absent from the item template, and it is not plaintext in the RDB.
 The only map that exists is the 23 pairs from goals that *also* state the NPC's LDB refId, and none of the twelve
 Deliver recipients is in it. So reading those recipients out of the objective text is by design, not a stopgap.
 
 ### The lead word `[0]` is the goal's PROGRESS, not definition data
 
-`reserved[0]` is **`QuestGoal_c::SolvedTimes`** — how many of the goal's `RequiredCount` the character has done
-(#550). It is per-character state, which is why it has no column: `QuestObjectiveRegions.ForQuest` takes it from
+`reserved[0]` is **`QuestGoal_c::SolvedTimes`** — how many of the goal's `RequiredCount` the character has done. It is per-character state, which is why it has no column: `QuestObjectiveRegions.ForQuest` takes it from
 the live character, and the byte-exact verifiers feed in the reading of the capture they compare against.
 
 The client settles it, reader and consumer agreeing:
@@ -315,28 +302,24 @@ The client settles it, reader and consumer agreeing:
 The corpus agrees on every one of its 4742 snapshot goal readings: the word never exceeds the goal's
 `RequiredCount`, it lands exactly **on** it for the goals the captured character had finished (4 of 4, 2 of 2,
 1 of 1 ×12) and short of it where they had not (6 of 13, 1 of 5) — and all 118 goal records carried by a live
-`QuestFullUpdate`, which is the quest **grant**, carry 0. The values that used to read as an unexplained
-`1/2/4/6` spread are simply four characters' half-finished collect-and-destroy objectives: quest 16004's
+`QuestFullUpdate`, which is the quest **grant**, carry 0. The `1/2/4/6` values are four characters' half-finished
+collect-and-destroy objectives: quest 16004's
 "collect 7", with 6 done; quest 13473's seven `Destroy Bowl of Set`, with 4 done.
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 
-The largest slice of the trailing references is `item.name`, and it described a whole family of quests we did not
-run: when this was written, **72 of the 74 sat at the fresh-harvest default with no `QuestItemId` and no
-`TargetName`**, i.e. never wired, and only the Quarry Stonebrick pair (`CollectItem` + a `TalkToNpc` hand-in) was
-live. Most are wired now — 42 `CollectItem`, 12 `TalkToNpc` hand-ins, 1 `ReachArea` — and the remaining **19 are
-`GoalType.None`**: the `Craft` / `Use` / `DestroyObject` verbs, which have no trigger (see
+The largest slice of the trailing references is `item.name`: 42 `CollectItem`, 12 `TalkToNpc` hand-ins, 1
+`ReachArea`, and **19 `GoalType.None`** — the `Craft` / `Use` / `DestroyObject` verbs, which have no trigger (see
 [`../subsystems/quests.md`](../subsystems/quests.md)).
 
 They are unmistakably gather objectives once named, and `RequiredCount` is real and varied (1, 3, 4, 7, 8, 10,
 20): *Stolen Goods* ×8, *Poisonous Gland* ×20, *Shadeleaf* ×10, *Grey Wolf Pelt* ×7, *Vanir Weapons* ×4,
 *Mangy Yeti Pelt*, *Akil-Atsu's Head*, *Vulture Brain*, *Scorpion Heart*, *Hyena Testicles*, *Bowl of Set*.
 
-⚠️ **The category says the ref is an item; it does not say how the item is obtained.** The set mixes at least
-three mechanics — mob drops (pelts, glands, heads, organs → `LootFromNpc`), world pickups (*Quarry Stonebrick*,
-the one already wired → `CollectItem`), and consumables that read as bought or gathered (*Soothing Remedy*,
-*Pink Salt*, *Visionwine*). Telling them apart needs the goal's objective text — which is now readable, so
-`--report ldb-quest-text` answers it: the *Visionwine* family are `Make <item>` **crafting** goals (kind `5`),
+**The category says the ref is an item; it does not say how the item is obtained.** The set mixes at least
+three mechanics — mob drops (pelts, glands, heads, organs → `LootFromNpc`), world pickups (*Quarry Stonebrick* →
+`CollectItem`), and consumables that read as bought or gathered (*Soothing Remedy*, *Pink Salt*, *Visionwine*).
+The goal's objective text tells them apart (`--report ldb-quest-text`): the *Visionwine* family are `Make <item>` **crafting** goals (kind `5`),
 and the `Deliver` goals (kind `20`) name their **recipient** in the text, which is what wires them.
 
 Two facts bound what could be wired even with the type known:
@@ -344,14 +327,12 @@ Two facts bound what could be wired even with the type known:
 - **Only 23 of the 74 referenced items are in the `Items` catalog**, and `QuestItemId` is a foreign key to it.
 - The other 51 **do ship** — 12 of 12 sampled have an RDB `1000020` template — but the template is `RDBH`-wrapped,
   i.e. TEA-encrypted with a per-item key that only a capture yields. So the catalog gap is a KEY gap, not a data
-  gap, and it is the same one that leaves 76,546 LDB-named templates against 3,245 catalog rows.
+  gap — the same one that separates the 76,546 LDB-named templates from the catalog.
 
-✅ **Inert, and no longer in the kill-matching pool at all.** They used to sit at `GoalType.Kill` — because that
-was enum value `0`, the un-typed default — where `MatchingKillGoal` matches `TrailingRefId == templateId` before
-falling back to a name, so an item ref there could in principle have been advanced by killing an NPC whose
-template id collided. It could not in practice: NPC template ids span **38–22,982** and these item refs
-**110,891–4,675,657**, disjoint. The default is `GoalType.None` now, so the collision is impossible rather than
-merely unobserved. Fixing the remaining 19 is a feature gap, not a bug.
+**The un-typed default is `GoalType.None`, not `Kill`.** `MatchingKillGoal` matches `TrailingRefId == templateId`
+before falling back to a name, so an item ref sitting at `Kill` could in principle be advanced by killing an NPC
+whose template id collides (NPC template ids span **38–22,982**, these item refs **110,891–4,675,657** — disjoint,
+but only by luck). With `None` as the default the collision is impossible.
 
 ### …and the 24 NPC goals (`51000`) already work
 
@@ -359,13 +340,13 @@ Worth recording so nobody "fixes" them: all 24 are `GoalType.Kill` referencing a
 client's own kill verb, not inherited from a default — and `MatchingKillGoal` resolves by the target template
 first. So the kill matches on the template id the goal already carries, and writing `TargetName` from the LDB is
 **cosmetic** for these, not enabling. (It does validate the decode: on the two goals where a human did set it —
-Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for that exact ref. Those same refs are now what
+Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for that exact ref. Those same refs are what
 `ResolveGoalTargetTemplates` reads as its strongest source.)
 
-## Eleven categories are ENCRYPTED — SOLVED: the server sends a per-string key
+## Eleven categories are ENCRYPTED: the server sends a per-string key
 
-The page header's `flags` word is an **encryption flag** — the earlier note that it "is `0` on every page" was
-written from plaintext categories only. It separates the two sets perfectly:
+The page header's `flags` word is an **encryption flag** (it is `0` on every plaintext page). It separates the two
+sets perfectly:
 
 | `flags` | categories | strings | length ≡ 0 (mod 8) | printable ASCII |
 |---|---|---|---|---|
@@ -407,12 +388,11 @@ screen 16905  cat 50002  Have a pleasant eve.{social vixen_stand_squirming3}
 
 ### Why this is a *server* secret, not a client one
 
-The key never lives in the client, which is why searching for it there failed: a stride-1 TEA/XTEA scan of both
-exes, the patcher, 2,612 decompressed RDB records and 95 MB of decoded wire payloads found nothing, and the
-scanner was positive-controlled. It was looking for a 16-byte binary constant; the key is a **20-character
-base-85 string, different for every string, delivered per reference**.
+The key never lives in the client: a positive-controlled stride-1 TEA/XTEA scan of both exes, the patcher, 2,612
+decompressed RDB records and 95 MB of decoded wire payloads finds no 16-byte key constant, because the key is a
+**20-character base-85 string, different for every string, delivered per reference**.
 
-⚠️ **We already hold 27,037 of these keys**, harvested from captures across eleven columns — the QUEST half
+**We hold 27,037 of these keys**, harvested from captures across eleven columns — the QUEST half
 (`QuestGoalDefinition.ObjectiveKey`/`TrailingKey`, `QuestTextRef.KeyText`, `QuestLine.TitleKey`/`MapKey`/
 `RegionKey`) and the DIALOGUE half (`ConversationScreen.Key`, `ConversationScreenParameter.ContentKey`,
 `StockPhrase.FormatKey`, `NpcChatter.FormatKey`, `WorldObject.DisplayKey`). They are stored as
@@ -421,7 +401,7 @@ string: the string is a pure base-85 rendering of those four words and `LdbKey.T
 escaping included. That is also why the retail client renders our quest journal correctly — we replay the
 captured keys, so it can decrypt its own LDB.
 
-### ⚠️ A key on a PLAINTEXT category is inert — the client never reads it
+### A key on a PLAINTEXT category is inert — the client never reads it
 
 `NpcChatter.FormatKey` is in the list above, and that is misleading: the ambient barks it belongs to are
 **category 50015 (`sayinchat`), whose page carries `flags=0`**. Its 1,277 strings are plain UTF-8 and need no key
@@ -441,7 +421,7 @@ The first condition is the string's own encrypted flag — the page's `flags`, c
 the second is the 20-character length check. **A string that is not marked encrypted never reaches the decrypt at
 all**, so on a `flags=0` page the key is dead weight in the payload.
 
-That has a practical consequence for anything harvested rather than captured (#331): a bark line pulled straight
+That has a practical consequence for anything harvested rather than captured: a bark line pulled straight
 out of the LDB can be served without a captured key for it, because the client will not look at one. It does
 **not** generalise to the encrypted eleven, where the key is the only thing that makes the text readable.
 
@@ -470,31 +450,26 @@ the same content model item templates already use: an item enters the catalog wh
 `Data1..4`, and an LDB string becomes readable when a capture yields its `key=`. Same axis, and a friendlier one
 here, since a captured quest carries the keys for its own text along with it.
 
-## Still open
+## Coverage limits
 
-- **Descriptions are imported, nothing reads them** — cat `50201` (item id → tooltip text) fills
-  `Items.Description` and cat `50211` (spell id → tooltip text) fills `Spells.Description`, but no armory,
-  tooltip or MCP path queries either (Gitea #414).
-- **Catalog coverage** — the LDB names **76,546** item templates but `Items` holds **4,225** rows (3,922 named),
-  because an item only enters it when a capture yields its TEA key quad. The ~72k named-but-uncataloged templates
-  are a name source for whatever fills that gap. ⚠️ This ratio moves whenever the catalog grows — re-measure with
-  `sqlite3 faolan.db "SELECT COUNT(*), SUM(Name<>'') FROM Items;"` rather than quoting it. Gitea #415.
-- **Missing catalog rows** — e.g. spell `222682` is absent from `Spells` entirely (an extraction gap, #402), so
-  there is no row to name; that is separate from the name *source* this solved.
-- **Appearance (hair) names** (#291's original target) — the hair LDB page holds only ~15 internal art codenames,
-  and a hair meshid maps to a style-group not present in the registry/XML, so the localized hair names this issue
-  hoped for don't exist in a usable form. Face/head/tattoo/beard/piercing already resolve from their own `name=`.
+- **Catalog coverage** — the LDB names **76,546** item templates, but an item only enters `Items` when a capture
+  yields its TEA key quad, so the named-but-uncataloged templates are a name source for whatever fills that gap.
+  The ratio moves whenever the catalog grows — re-measure with
+  `sqlite3 faolan.db "SELECT COUNT(*), SUM(Name<>'') FROM Items;"` rather than quoting it.
+- **Appearance (hair) names** — the hair LDB page holds only ~15 internal art codenames, and a hair meshid maps to a
+  style-group not present in the registry/XML, so localized hair names do not exist in a usable form.
+  Face/head/tattoo/beard/piercing resolve from their own `name=`.
 
-## String ids are ELF hashes of the token name (2026-07-29)
+## String ids are ELF hashes of the token name
 
 A string id in the LDB is not opaque: it is the **28-bit ELF hash of the token name** the client looks the
 string up by. The exe is full of `FUN_0061f640(<category>, "<Token>")` calls whose second argument is a literal
 token name, so **any of them can be resolved to its actual string with no live client** - hash the token, look
 the id up in the category.
 
-⚠️ And where the token carries a NUMBER, the hash **inverts**: sweep the parameter, hash each candidate, keep the
+And where the token carries a NUMBER, the hash **inverts**: sweep the parameter, hash each candidate, keep the
 ones landing on a real id. That is what recovered the area-banner ids
-([bounded-areas-1000053.md](bounded-areas-1000053.md#both-blockers-are-gone-the-scry-script-and-the-banner-id-itself)),
+([bounded-areas-1000053.md](bounded-areas-1000053.md#two-client-mechanisms-make-the-link-exact-the-scry-script-and-the-banner-id-itself)),
 and it works because 28 bits is small enough to sweep and the varying part is the tail, so the prefix is hashed
 once. It also means a hit is only a candidate: 2^28 buckets against a few thousand ids collide by chance.
 
@@ -520,10 +495,10 @@ dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <r
 #   YouCanNotUseYet -> 5372612  cat 130 page 222116 [English]: 'Your class cannot use this item until level %d '
 ```
 
-⭐ **`--report ldb-strings --report-arg "id:#<n>,<n>,..."` resolves SEVERAL ids in ONE pass**, which is what a
+**`--report ldb-strings --report-arg "id:#<n>,<n>,..."` resolves SEVERAL ids in ONE pass**, which is what a
 decoded table wants: the scan reads all 1,026 pages / 1.4 M entries once, so asking id by id costs that pass per
-id. The guild-renown ladder's 57 rows (#469) resolved in a single run that way. ⚠️ Two different id spaces live
-in that table and only one is a hash: a `(category, id)` pair pushed at a call site carries a SMALL integer
+id (the guild-renown ladder's 57 rows resolve in a single run). Two different id spaces live in that table and only
+one is a hash: a `(category, id)` pair pushed at a call site carries a SMALL integer
 (`Effect %s terminated.` is `(100, 596)`), while the token form is the 28-bit ELF hash below.
 
 Verified on 21 independent token/value pairs: `SkywalkingCommand_Description` → 97813470
@@ -539,6 +514,6 @@ commands with no default hotkey and no GM gate.
 The whole page is committed as [`../re/ldb-chat-command-page.tsv`](../re/ldb-chat-command-page.tsv) (514 rows,
 `id` + `value`), so a token can be resolved by hashing it and grepping that file.
 
-This is what identified the fly command: `SkywalkingCommand_Name` hashes to 47110773, whose value is **`luke`**
-(as in Luke *Skywalker*) - a verb no amount of grepping for "fly" or "skywalk" would have found. See
+That is how the fly command is found: `SkywalkingCommand_Name` hashes to 47110773, whose value is **`luke`** (as in
+Luke *Skywalker*) - a verb no grep for "fly" or "skywalk" finds. See
 [`gm-commands.md`](../subsystems/gm-commands.md).

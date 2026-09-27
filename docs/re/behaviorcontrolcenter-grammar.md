@@ -1,7 +1,7 @@
 # BehaviorControlCenterIIR_c (0x642CD3D6) wire grammar — "BccIIR"
 
 Recovered from `AgeOfConan.exe` (Ghidra). The Behavior Control Center IIR is the NPC/player **behavior
-command** carrier (the combat/interact "BccAck"). Gitea #190.
+command** carrier (the combat/interact "BccAck").
 
 ## Reader — `BehaviorControlCenterIIR_c::ReadSubClass` (`FUN_005e24e0`)
 
@@ -18,18 +18,17 @@ switch (behaviorType):
 
 So a BccIIR = `[u8 type][u32 delay?][u32 commandId?][command-specific data]`, where the command data is read by
 the looked-up Command object's reader (another vtable hop). The combat-relevant forms (the attack/interact ack)
-are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
+are built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
 
-⚠️ **Type `0x0E` is the one branch that puts an extra word in front of the commandId** — see "The delay phase"
-below. Most other types the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) go straight to the commandId, which
-is why reading them all one way looked right for so long.
+**Type `0x0E` is the one branch that puts an extra word in front of the commandId** — see "The delay phase"
+below. The other types the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) go straight to the commandId.
 
-⭐ **`0x0B` ENTERS a substate and `0x0C` LEAVES it; the bare `u32` is the SUBSTATE ID** (#810). Both carry NO
-command at all — the corpus has nine, 18-byte records that `BehaviorControlCenterCodec` refused outright until
-#809, running out of bytes looking for an `argsLen` that is not there. The writer (`FUN_005e2650`) mirrors the
-reader exactly: its `case 0xb: case 0xc:` writes one word and returns.
+**`0x0B` enters a substate and `0x0C` leaves it; the bare `u32` is the substate id.** Both carry no command at
+all — the corpus has nine such 18-byte records; a reader that expects an `argsLen` after the word runs out of
+bytes. The writer (`FUN_005e2650`) mirrors the reader exactly: its `case 0xb: case 0xc:` writes one word and
+returns.
 
-The client names the field itself, and the route in is a FIELD-xref rather than a call-xref — all nine records are
+The client names the field itself, and the route in is a field-xref rather than a call-xref — all nine records are
 s2c, so no client-side *call* site names it. `ReadSubClass` stores the word at `this+0x28`, and exactly one other
 function in the image touches that offset on this object: **`BccIIR`'s vtable slot 2, `FUN_005E1C70`, the
 executor**. Its two arms are one predicate and its negation:
@@ -48,15 +47,15 @@ argument:
 ```
 
 On neither, it inserts the id into the list in priority order and activates it. The same list is what the
-`:: Substate list ::` debug dump walks, printing ` %2d : %s` per entry — an id and a NAME.
+`:: Substate list ::` debug dump walks, printing ` %2d : %s` per entry — an id and a name.
 
 Two independent corroborations: `FUN_005EB5C0` reads stats `0x14` and `0x15`, whose client-side names are
 **`BCCState`** and **`BCC`**; and **`Substate` is already a known GameAction key** (174 / `0x4B6`) across ten
 GameAction kinds in [`gameaction-keylists.tsv`](gameaction-keylists.tsv).
 
-### ⭐ The substate table: RDB 1010203 is plain-text XML
+### The substate table: RDB 1010203 is plain-text XML
 
-There was nothing to decode. `BCCTree_c::Load` (`FUN_00603D70`) tries the **merged binary** resource **1010501**
+`BCCTree_c::Load` (`FUN_00603D70`) tries the **merged binary** resource **1010501**
 (`0xF6B45`) first, and in its own words falls "back to text XML" — the individual **1010203** (`0xF6A1B`) entries.
 Both carry the same 29 trees, and the text half reads straight out:
 
@@ -85,10 +84,10 @@ prints the whole table; the 20 substates across the 29 shipped trees are:
 
 **All four captured values resolve**: 60 `FrenzyStance` ×4, 84 `Charged` ×3 on one Tortage NPC (`0x0B` once then
 `0x0C` twice over the ~15 s before it dies — enter, leave, and a redundant leave that finds nothing in the list),
-33 `DefensiveStance` and 83 `Crouching` once each. The recurring 60 is a combat STANCE, which is why four
+33 `DefensiveStance` and 83 `Crouching` once each. The recurring 60 is a combat stance, which is why four
 unrelated actors carry it — not a default.
 
-⚠️ **Substate ids are per-BCC by the client's RULE, but do not collide in the shipped DATA — and state ids DO.**
+**Substate ids are per-BCC by the client's rule, but do not collide in the shipped data — and state ids do.**
 The error says an id is resolved *"in this bcc"*, so scoping is per-tree by construction. Measured over all 29
 trees the two halves come apart: every substate id that appears in more than one tree carries the **same name and
 the same priority** in all of them (zero collisions over 20 ids), while **state** id 11 is `LoopingEmote` in one
@@ -98,15 +97,15 @@ patch could break the substate half — the ids being consistent is a fact about
 guarantee from the format.
 
 
-⚠️ **The `default:` arm reads nothing**, so an unlisted phase byte ends the record at the phase word exactly like
-the explicitly terminal `6/8/9/0xD/0x11` do. `CommandPhases` in the codec is therefore a POSITIVE list: guessing
+**The `default:` arm reads nothing**, so an unlisted phase byte ends the record at the phase word exactly like
+the explicitly terminal `6/8/9/0xD/0x11` do. `CommandPhases` in the codec is therefore a positive list: guessing
 the other way round would make an unseen phase parse as a command and swallow whatever followed it.
 
-## The Command catalog — `InstantiateCommand::classmap` (#536)
+## The Command catalog — `InstantiateCommand::classmap`
 
-`FUN_007dcd60` is `InstantiateCommand` (named by its own error string, *"InstantiateCommand::classmap is NOT
+`FUN_007dcd60` is `InstantiateCommand` (named by its own error string, *"InstantiateCommand::classmap is not
 initialized!"*, log channel `Control`). The `commandId` above is a key into that map, and **two registration
-functions populate it, pushing each command's NAME STRING next to its id** — so the whole catalog is readable
+functions populate it, pushing each command's name string next to its id** — so the whole catalog is readable
 off the binary rather than inferred from behaviour:
 
 * `FUN_007375b0` — 22 commands, the interaction/animation set.
@@ -125,28 +124,21 @@ a 12-byte tail (a class+handle reference), `UseCharacter` (0x16) four (a handle)
 *variable* 10–39 (an animation name), and `Emote` (0x05), `BccAction` (0x07) and `Limbo/Death` (0x1F) none at
 all — those three alone are 55,443 of the 65,877 captured records.
 
-⚠️ Two names this codebase had invented are corrected by it: `0x0F` is **Combat:Melee**, not "NormalAttack", and
-`0x07` is **BccAction**, not "the idle pulse". `0x12` is **UseDynel**, not "an object-hold state".
+The client's names settle three readings: `0x0F` is **Combat:Melee** (not a generic "NormalAttack"), `0x07` is
+**BccAction** (not an idle pulse), and `0x12` is **UseDynel** (not an object-hold state).
 
 ## Tail census (all 65,877 captured records)
 
-⚠️ **This section said 67,307/55,699/3,687 until 2026-08-05. The corpus holds 65,877, and always did** — that
-figure was never reproducible against the committed dumps (#666, resolved). Verified four ways: the same census
-code from 2026-07-31 gives 65,877 against today's captures; the pre-re-dump dumps in the data repo's git history
-give 65,877 too, with all 419,297 packet counts identical per capture; every BCC packet carries **exactly one**
-record, so packet-vs-record counting cannot explain a gap; and no capture has ever been deleted. The likeliest
-source is a pre-reassembly count off the raw pcaps — 1,430 is ~2.2%, a plausible retransmission rate — but the
-original measurement predates `--report bcc-census` and cannot be re-run.
+Every BCC packet carries exactly one record. The grammar is proven per-record, not by totals; re-derive any figure
+here with `--report bcc-census` rather than quoting it (the figures on this page were measured at different corpus
+sizes).
 
-The **grammar is unaffected**: it is proven per-record, not by totals. Re-derive any figure here with
-`--report bcc-census` rather than quoting it.
-
-Most commands have a FIXED tail length: `Transition` (0x01) 20, `UseCharacter` 4, `UseDynel` 12, `Equip` (0x09)
+Most commands have a fixed tail length: `Transition` (0x01) 20, `UseCharacter` 4, `UseDynel` 12, `Equip` (0x09)
 88, and the three above 0. What varies is `Magic:Attack` (0x04), `PlayAnimation`, `ObjectInteraction` (0x2A) and
 the three attack commands.
 
 The three attack commands — `Combat:Melee` (0x0F), `Combat:Ranged` (0x10), `Combat:Unarmed` (0x11) — share one
-tail family whose first word is a COUNT, and the stride differs by direction:
+tail family whose first word is a count, and the stride differs by direction:
 
 ```
 c2s request : base 28|32  + 8  x count      (counts 0..2 observed)
@@ -157,13 +149,13 @@ Subtracting `49 x count` collapses every one of the s2c attack tails onto those 
 themselves differ by 41 (81 = 40+41, 82 = 41+41, 85 = 44+41), i.e. one optional 41-byte block on a 40/41/44
 head. `BehaviorAcks.HitResultBlock` builds the single-hit s2c form and is byte-exact against the capture.
 
-## Per-Command readers — the hop, and the ones that are done (#536)
+## Per-Command readers
 
 Each command's wire reader is **vtable slot 32** (byte offset `0x80`) of its Command class.
 `CLASSES=<Class> SLOT=32 tools/ghidra/DumpVtableReaders.java` resolves and decompiles it in one run.
 
-⚠️ Getting from the registration to the class is **two hops, not one**: the address the registration stores
-(`MOV [EAX],<addr>`) is a **factory FUNCTION**, not a vtable — it disassembles as a prologue. Decompiling the
+Getting from the registration to the class is **two hops, not one**: the address the registration stores
+(`MOV [EAX],<addr>`) is a **factory function**, not a vtable — it disassembles as a prologue. Decompiling the
 factory names the class through its RTTI (`*puVar1 = AttackCommandMelee_c::vftable`) *and* re-states the command
 id in its base-ctor call (`FUN_0114c4d0(0xf)`), which cross-checks the whole catalog: every id embedded in a
 factory matches the id its registration pushed.
@@ -197,50 +189,47 @@ factory matches the id its registration pushed.
 | `0x11` | Combat:Unarmed | `AttackCommandUnarmed_c` | `FUN_01151170` | *(same reader)* | varies |
 | `0x10` | Combat:Ranged | `AttackCommandRanged_c` | `FUN_01146af0` | the same + one trailing `0x00` | varies |
 
-Run over the corpus, these account for **every** captured BCC record with **zero mismatches** — the last ten
-came in with the delay phase below (#549). Re-derive the numbers with
+Run over the corpus, these account for **every** captured BCC record with **zero mismatches** (including the
+delay phase below). Re-derive the numbers with
 `dotnet run --project Faolan.Importer -- --report bcc-census`, which is this census.
 
-⚠️ `PlayAnimation`'s string is the animation name (`sad`, `approve`, `social_conversation_gesticulate`) and
+`PlayAnimation`'s string is the animation name (`sad`, `approve`, `social_conversation_gesticulate`) and
 `ObjectInteraction`'s two are the action name plus its remoteformat (`lootbag_open`,
 `<remoteformat token="startobjectaction(18)|onuse(2)|Treasure…`) — which is why those two were the
 variable-length outliers in the census.
 
 Two results fall straight out of that table:
 
-* **The empty tail is STRUCTURAL, not incidental.** The three commands the census shows with no tail share ONE
+* **The empty tail is structural, not incidental.** The three commands the census shows with no tail share one
   reader, and it is a 3-byte `return;`. Those three are 55,443 of the 65,877 captured records.
 * **Melee and Unarmed share a reader**, which is why `BehaviorAcks` measured exactly those two padding an echoed
   tail, and why the attack tail lengths form one family across `0x0F`/`0x10`/`0x11`.
 
 ### The attack tail — `Combat:Melee` / `:Ranged` / `:Unarmed`
 
-The reader takes a base read, seven u32, then a COUNT and a per-record loop. Decoded against the corpus:
+The reader takes a base read, seven u32, then a count and a per-record loop. Decoded against the corpus:
 
 ```
-[u32 targetCount][targetCount x (u32 class, u32 handle)]   the entities the swing REACHED
+[u32 targetCount][targetCount x (u32 class, u32 handle)]   the entities the swing reached
 [8 x u32]                                                  the middle block - decoded below
 [u32 resultCount][resultCount x 41-byte result]            one per entity actually affected
 [Combat:Ranged only: u8 0x00]
 ```
 
-so `len = 40 + 8*targets + 41*results` (+1 for Ranged). That accounts for **every** captured s2c attack tail
-(3,313 today; 3,687 when the split below was measured). ⚠️ The middle is **8 words usually and 9 sometimes**, selected by its own second word — `1` → eight
-(3659 tails), `2` or `3` → nine (28). Missing that selector leaves 11 bodies stubbornly unexplained, because a
-mis-sized middle puts the result count one word out and the length then fits nothing. The 41-byte result is
+so `len = 40 + 8*targets + 41*results` (+1 for Ranged). That accounts for **every** captured s2c attack tail.
+The middle is **8 words usually and 9 sometimes**, selected by its own second word — `1` → eight, `2` or `3` →
+nine (28 tails when measured). Without that selector a mis-sized middle puts the result count one word out and the
+length fits nothing. The 41-byte result is
 `[u32 class][u32 handle][u32 0][u8 0x06][u32 resultType][u32 0][u32 k1][u32 damage][u32 k2][u32 0][u32 0]` —
-exactly what `BehaviorAcks.HitResultBlock` builds, which is 81 bytes (a 40-byte head plus one result), not the
-"132-byte result block" the code called it for years.
+exactly what `BehaviorAcks.HitResultBlock` builds, which is 81 bytes (a 40-byte head plus one result).
 
-⚠️ **The two counts move together in most captures** — one extra target produces one extra result — so the
-lengths look like a single 49-byte stride. **49 is 8 + 41, not one record.** Reading it as one stride is what
-made this tail look unmodellable, and it is why the `0x1b4` conditional in the decompiled loop never had to be
-resolved: the arithmetic closes without it.
+**The two counts move together in most captures** — one extra target produces one extra result — so the
+lengths look like a single 49-byte stride. **49 is 8 + 41, not one record.** The arithmetic closes without
+resolving the `0x1b4` conditional in the decompiled loop.
 
-The AIR SWING is a real captured shape, not just our workaround for #228: 130 tails carry zero targets *and*
-zero results.
+The air swing is a real captured shape: 130 tails carry zero targets *and* zero results.
 
-### The middle block, word by word (#661)
+### The middle block, word by word
 
 The client's reader is what places these: `FUN_0084d5f0` reads the target list and then words 0–1 (plus the
 extra word when the selector says so), and `FUN_01151170` — the reader `Combat:Melee` and `:Unarmed` share,
@@ -251,16 +240,16 @@ the Command object, and `--report bcc-attack-tail` prints what 3,313 captured s2
 |---:|---|---|
 | 0 | `+0x164` | a **float**, 0.02–0.93, 322 distinct values, zero on 2,899 — the swing's charge |
 | 1 | `+0x144` | the **selector**: `1` ×3285, `2` ×19, `3` ×9. `> 1` inserts one extra word → `+0x148` |
-| 2 | bits → `+0x1A0` (b4), `+0x1A1` (b5), `+0x198` (b6) | `0x00` ×2692, `0x20` ×602, `0x30` ×18, `0x70` ×1 — **no other bit is ever set**, which is what confirms the split. **Bit 5 tracks the swing's ARC** — see below |
+| 2 | bits → `+0x1A0` (b4), `+0x1A1` (b5), `+0x198` (b6) | `0x00` ×2692, `0x20` ×602, `0x30` ×18, `0x70` ×1 — **no other bit is ever set**, which is what confirms the split. **Bit 5 tracks the swing's arc** — see below |
 | 3 | `+0x19C` | zero on 3,312 of 3,313; one sighting of `0x6BE` |
 | 4 | `+0x44` | `0xC9`/`0xCA`/`0xCB` on 292 tails — the alphabet below, but **independent** of both word 5 and the result type (all nine combinations occur) |
-| 5 | `+0xD0` | ⭐ the swing's **DIRECTION**, as an `Abilities` id |
+| 5 | `+0xD0` | the swing's **direction**, as an `Abilities` id |
 | 6 / 7 | `+0x188` / `+0x18C` | read back together by one accessor (`FUN_011457f0`), so **one pair**; four sightings of `(0x003C7D4B, 2)` |
 
-The bit split is not inferred from the values: the c2s WRITER (`FUN_01151030`) builds the same word as
+The bit split is not inferred from the values: the c2s writer (`FUN_01151030`) builds the same word as
 `+0x198 ? 0x40 : 0`, and `FUN_011516a0` (the copy) moves `+0x1A0`/`+0x1A1`/`+0x198` as three **bytes**.
 
-#### ⭐ Word 2's bit 5 fires only on the three UPPER arcs (#661)
+#### Word 2's bit 5 fires only on the three upper arcs
 
 Cross-tabbed against everything else the tail states, bit 5 (`0x20`) is near-independent of the actor, the
 target count, the result count, the charge float and whether a direction *ability* is present — all of those
@@ -277,9 +266,9 @@ sit in a flat 15–27 % band. Against the **result type**, which is the swing's 
 Four sightings in 757 lower-arc swings against 598 in 2,539 upper-arc ones — a **30× split** on the one axis
 that is not flat. So whatever bit 5 marks, it is something only an upper-arc swing can produce.
 
-#### ⭐ …and WORD 4 does the same thing, absolutely (#661)
+#### …and word 4 does the same thing, absolutely
 
-Word 4's alphabet is `0xC9`/`0xCA`/`0xCB` — the three UPPER arcs and nothing else — and it is not merely
+Word 4's alphabet is `0xC9`/`0xCA`/`0xCB` — the three upper arcs and nothing else — and it is not merely
 *correlated* with the arc, it is **never present at all on a lower one**:
 
 | result type | rows | word 4 present |
@@ -288,29 +277,29 @@ Word 4's alphabet is `0xC9`/`0xCA`/`0xCB` — the three UPPER arcs and nothing e
 | `0xCC` Lower Left | 393 | **0** |
 | `0xCD` Lower Right | 399 | **0** |
 
-⚠️ That is a real constraint on top of "independent of the result type" in the table above, which is true only
+That is a real constraint on top of "independent of the result type" in the table above, which is true only
 *within* the upper three: all nine `(word 4, result type)` combinations occur there, and none at all outside.
 
-⭐ **So `0xCC` and `0xCD` are structurally apart from the upper three**, on two independent fields, and the
+**So `0xCC` and `0xCD` are structurally apart from the upper three**, on two independent fields, and the
 client says why: `FUN_005edd90` rewrites `0xCC → 0xC9` and `0xCD → 0xCA` whenever the combo definition's level
 is below `0x28` (40). The lower arcs are the later addition, and the code paths that fill word 4 and bit 5
 predate them.
 
-⚠️ **What it IS remains unnamed.** The shape fits a defender-side outcome — a guard meeting the swing — because
+**What it is remains unnamed.** The shape fits a defender-side outcome — a guard meeting the swing — because
 the rose has three guards and the two lower codes are the two arcs the captured players never had unlocked; a
 block flag could then only ever fire where a guard could be. That is a hypothesis the corpus is consistent with,
 not a decode: nothing here separates "blocked" from "critical", "glancing", or any other per-hit outcome, and
-the 1-in-3 rate does not by itself pick one. #661 wanted this block decoded precisely because it is where a
-crit/block/evade distinction would live; this narrows *where* to look without closing it.
+the 1-in-3 rate does not by itself pick one. This block is where a crit/block/evade distinction would live; the
+arc constraint narrows where to look without closing it.
 
 Reproduce with `--report bcc-attack-tail`, whose *"word 2 against everything else the tail states"* block prints
 the whole cross-tab over all 3,313 captured tails.
 
-### ⭐ The result's "result type" is the swing's DIRECTION
+### The result's "result type" is the swing's direction
 
 Word 5's ids resolve in the client's own `Abilities` catalog — 769094 `Upper Left Attack`, 769095
-`Upper Right Attack`, 769099 `Overhead Attack` — and the 41-byte result's own type word, long carried as an
-opaque capture-derived code, is a **perfect function of it**, with zero exceptions:
+`Upper Right Attack`, 769099 `Overhead Attack` — and the 41-byte result's own type word is a **perfect function
+of it**, with zero exceptions:
 
 | direction ability | result type | agreement |
 |---|---|---|
@@ -322,7 +311,7 @@ The corpus carries `0xCC` and `0xCD` as well, on swings with no direction abilit
 two more of these abilities — 769096 `Lower Left Attack` and 769097 `Lower Right Attack` — so the alphabet is the
 five-zone rose.
 
-Split by ACTOR — classified per capture by whether the actor handle is a known NPC spawn, since a retail
+Split by actor — classified per capture by whether the actor handle is a known NPC spawn, since a retail
 character id (~`0x0131xxxx`) sits *below* `EntityHandles.CharacterInstanceBase` and the handle number line cannot
 answer it:
 
@@ -333,10 +322,10 @@ answer it:
 
 So a mob names no ability — it has none — but it **does** state its swing's direction, in the result type, and it
 uses all five zones where the captured players use the three they had unlocked. The arc is therefore observable,
-which is what `CombatShieldRose`'s "nothing observes it" note was wrong about (#673): the ack now states
-the direction the mitigation charged for, via `BehaviorAcks.SwingDirectionCode`.
+and our ack states the direction the mitigation charged for, via `BehaviorAcks.SwingDirectionCode` (open work
+tracked in Gitea #673).
 
-### ⭐ The whole five-zone alphabet, from the exe [V1: tools/ghidra/DecompileFns.java]
+### The whole five-zone alphabet, from the exe [V1: tools/ghidra/DecompileFns.java]
 
 The corpus pins three of the five codes and can never pin the other two — no captured player swings them, so no
 ability id is ever carried beside them. The client settles it three independent ways:
@@ -349,7 +338,7 @@ ability id is ever carried beside them. The client settles it three independent 
 
 The first two give the order — the same 1..5, and its first three members are exactly the codes the corpus pins,
 so the remaining two follow. The third is the stronger argument and does not depend on the order at all: the fold
-sends each lower code to the **upper code on its own side**, so `0xCC` is a LEFT zone and `0xCD` a RIGHT one.
+sends each lower code to the **upper code on its own side**, so `0xCC` is a left zone and `0xCD` a right one.
 
 That fold is retail's own progression rule — a character swings in three directions and unlocks the two lower
 zones later — and it is why every captured player swing carries only `0xC9`/`0xCA`/`0xCB` while mobs, which are
@@ -374,10 +363,10 @@ counts is the *height* axis, which the three-digit rose does not model: within t
 1,056 upper / 757 lower, i.e. **58.2 % upper** (n = 1,813, ~7σ off an even split). Why it leans upper is not
 explained — it is measured, not derived.
 
-⚠️ It is **not** a per-mob repertoire: 55 of the 56 templates with ≥ 8 captured swings use all five zones, so
+It is **not** a per-mob repertoire: 55 of the 56 templates with ≥ 8 captured swings use all five zones, so
 there is no "this archetype only swings three" rule to key it on.
 
-### The delay phase — behaviorType `0x0E` (#549)
+### The delay phase — behaviorType `0x0E`
 
 `case 0xe` reads a u32 into `this+0x24` *before* the commandId, and the IIR's apply pass (`FUN_005e1c70`) spends
 it like this:
@@ -399,82 +388,65 @@ Ten records carry it, all s2c, all on a command the client is mid-way through: s
 three treasure-chest `ObjectInteraction`s, at 50, 53, 57, 58 and 71 (0.50–0.71 s).
 `--report bcc-census --report-arg 0E` prints all ten in full; `BehaviorDelayPhaseTests` locks two of them.
 
-⚠️ **This is what the "five unregistered command ids" were.** Read without the extra word, the delay lands where
-the commandId belongs, so the ten records showed up as commands `0x32`, `0x35`, `0x39`, `0x3A` and `0x47` —
-values nothing in the client registers, which is the "third registration site" #549 was opened to find. There is
-no third site. Re-split, all ten are `Magic:Attack` (a 22-byte `f == 1` tail) or `ObjectInteraction` (185 bytes),
-both lengths the corpus already showed on the ordinary phases — the arithmetic closing on grammars decoded
-*before* this was found is what makes the split right rather than merely plausible.
+Read without the extra word, the delay lands where the commandId belongs, and the ten records appear as commands
+`0x32`, `0x35`, `0x39`, `0x3A` and `0x47` — values nothing in the client registers. Split correctly, all ten are
+`Magic:Attack` (a 22-byte `f == 1` tail) or `ObjectInteraction` (185 bytes), both lengths the corpus shows on the
+ordinary phases — the arithmetic closing on independently decoded grammars is what makes the split right rather
+than merely plausible.
 
 ## Decode coverage
 
-Grammar SHAPE decoded (type switch + optional delay + commandId + per-command reader); the commandId → COMMAND
+Grammar shape decoded (type switch + optional delay + commandId + per-command reader); the commandId → command
 map is enumerated with the client's own names and shown to be complete; and every per-command reader the corpus
-exercises is walked — **100% of captured records, zero mismatches**. The attack block's eight middle
-words are decoded too (#661) — each to the Command slot the client stores it in, with word 5 and the result type
-resolving to the client's directional-attack abilities. What is left there is word 4's alphabet and the
-`+0x188`/`+0x18C` pair, both of which are four sightings or fewer.
+exercises is walked — **100% of captured records, zero mismatches**. The attack block's eight middle words are
+decoded to the Command slot the client stores each in, with word 5 and the result type resolving to the client's
+directional-attack abilities.
 
-⚠️ **The SCOPE test does not apply to word 4, and the control is what says so.** The obvious next move is the
-method that settled the MagicBuff payload's two level slots — *whose field is it? group the value by each
-candidate owner and see which grouping it is stable within* — with word 4 as "the defender's guard arc" against
-"a second attacker property". `--report bcc-attack-tail` runs it, **with word 5 (a known attacker-side swing
+**The scope test does not apply to word 4, and the control is what says so.** The method that settles the
+MagicBuff payload's two level slots — *whose field is it? group the value by each candidate owner and see which
+grouping it is stable within* — would test word 4 as "the defender's guard arc" against "a second attacker
+property". `--report bcc-attack-tail` runs it, **with word 5 (a known attacker-side swing
 direction) as the control**, and word 5 comes out just as unstable per attacker (68.4% of 19) as per defender
 (66.7% of 18). A control that cannot find its own answer measures nothing, so neither reading is supported or
-refuted: both words are rolled **per SWING**, not held as a property of an entity, which is the shape scope
+refuted: both words are rolled **per swing**, not held as a property of an entity, which is the shape scope
 stability cannot see. The populations are also far too small for it either way.
 
-**The client route was then run, and it narrows rather than answers.** `FindOffAccess` (`OFF=44 MODE=r`) over the
-whole image gives 14,961 hits — `+0x44` is a ubiquitous struct offset — but restricted to the Command class's own
-address neighbourhood (`0x0114xxxx`–`0x0115xxxx`) and to REGISTER-relative accesses (a stack local at `[ESP+0x44]`
-is not this field), the only three functions that touch it on this object are:
+### The client route: name the class, then sweep the class
 
-| function | what it does with `+0x44` |
-|---|---|
-| `FUN_01151170` | the s2c tail READER — `MOV [ECX+0x44],EAX`, i.e. the only writer |
-| `FUN_01151030` | the c2s WRITER — reads it back and puts it on the wire, third of four, between `+0x19c` and `+0xd0` |
-| `FUN_011516a0` | the copy — `MOV EAX,[EDI+0x44]; MOV [ESI+0x44],EAX`, a plain dword |
+`FindOffAccess` (`OFF=44 MODE=r`) over the whole image gives 14,961 hits — `+0x44` is a ubiquitous struct offset —
+so an offset sweep must be scoped. Scoping it to the derived class's address band (`0x0114xxxx`–`0x0115xxxx`)
+misses the field's base-class methods; scope by class instead.
 
-So the field is **stored, transported both ways and copied, and nothing in the Command's own module reads it for
-behaviour.** (The other `[reg+0x44]` hits in range belong to unrelated objects — `FUN_01150340` and `FUN_0115277x`
-show the `MOV EDX,[EDX+0x44]` / `LEA ECX,[ESI+0x44]` pair that is a string or container member, not this.)
-
-### ⭐ The class is `AttackCommandMelee_c`, and the by-class route ELIMINATES one of the two readings
-
-The step above was taken. The tail reader `FUN_01151170` is referenced from exactly one data address —
+The tail reader `FUN_01151170` is referenced from exactly one data address —
 `0x0204255c`, a vtable slot — and that vtable starts at `0x020424dc`, whose RTTI CompleteObjectLocator names
 `.?AVAttackCommandMelee_c@@`. Its siblings, from the slot sweep below, are `AttackCommandBase_c`,
 `AttackCommandBaseArmed_c`, `AttackCommandRanged_c` and `AttackCommandUnarmed_c`.
 
-⚠️ **And the earlier restriction was the flaw in the previous pass.** `+0x44` is a field of the BASE, not of the
-derived class — the Command base constructor `FUN_007dc7a0` zeroes it (`MOV [ESI+0x44],EBX`) alongside `+0x48`,
-`+0xb4`, `+0xbc` and `+0xf4`. The base's methods live at `0x007dxxxx`–`0x007exxxx`, which the offset sweep above
-had dismissed as "unrelated objects". So the negative result was measured over the wrong band.
-
-Redone properly — **all 68 functions in the class's vtable decompiled**, plus every register-relative `[reg+0x44]`
-access in *both* bands:
+`+0x44` is a field of the base, not of the derived class — the Command base constructor `FUN_007dc7a0` zeroes it
+(`MOV [ESI+0x44],EBX`) alongside `+0x48`, `+0xb4`, `+0xbc` and `+0xf4`, and the base's methods live at
+`0x007dxxxx`–`0x007exxxx`. With **all 68 functions in the class's vtable decompiled**, plus every register-relative
+`[reg+0x44]` access in *both* bands:
 
 | what touches `Command + 0x44` | |
 |---|---|
-| `FUN_01151170` | the s2c tail READER — the only writer |
+| `FUN_01151170` | the s2c tail reader — the only writer (`MOV [ECX+0x44],EAX`) |
 | `FUN_01151030` | the c2s writer — reads it back onto the wire |
-| `FUN_011516a0` | the copy |
+| `FUN_011516a0` | the copy (`MOV EAX,[EDI+0x44]; MOV [ESI+0x44],EAX`, a plain dword) |
 | everything else in range | a **virtual call at vtable offset `0x44`** (`(**(code **)(*obj + 0x44))(…)`, which is slot 17 and has nothing to do with the field), or a `LEA` of a sub-object on a different struct |
 
-⭐ **So the "consumer behind a virtual call" reading is eliminated: the class's entire virtual surface has now been
-read and none of it consumes the field.** What stands is that the client only ECHOES the word — it is a value the
-SERVER decides and the client is a courier for.
+**So no consumer hides behind a virtual call: the class's entire virtual surface is read and none of it consumes
+the field.** The client only echoes the word — it is a value the server decides and the client is a courier for.
 
-That retro-explains every corpus test on this ticket at once. The scope-stability test failed even on its own
-control because word 4 has no client-side owner to be stable within; "independent of word 5 and the result type"
-is what a server-chosen value looks like from the client side.
+That explains the corpus tests at once: the scope-stability test fails even on its own control because word 4 has
+no client-side owner to be stable within, and "independent of word 5 and the result type" is what a server-chosen
+value looks like from the client side.
 
-### ⭐ Word 3 is echo-only too, and words 6/7 are an OPTIONAL two-word reference
+### Word 3 is echo-only too, and words 6/7 are an optional two-word reference
 
 The same sweep over the class settles the other two open slots:
 
 * **word 3 (`+0x19C`)** — read by the c2s writer and by nothing else. Same answer as word 4.
-* **words 6/7 (`+0x188` / `+0x18C`)** — the class exposes them through a matched accessor PAIR:
+* **words 6/7 (`+0x188` / `+0x18C`)** — the class exposes them through a matched accessor pair:
 
 ```c
 slot 0x9C  FUN_011457e0:  return *(int *)(this + 0x188) != 0;              // a presence test
@@ -487,7 +459,7 @@ only the five Attack commands override it to return the field. So it is an **opt
 only an attack carries**, which corroborates the `(class, handle)` shape the corpus's four `(0x003C7D4B, 2)`
 sightings suggested, from the client's own structure rather than from the value.
 
-⚠️ **And nothing calls it.** There are **eight** `CALL dword ptr [reg + 0xa0]` sites in the whole image and not
+**And nothing calls it.** There are **eight** `CALL dword ptr [reg + 0xa0]` sites in the whole image and not
 one is in the combat module. So the pair is written, exposed and never consumed either.
 
 ### The block, split by whether the client uses it
@@ -497,18 +469,17 @@ one is in the combat module. So the pair is written, exposed and never consumed 
 | 0, 1, 2, 5 | **consumed** — the charge float, the selector, the three bit flags, the direction ability |
 | 3, 4, 6, 7 | **stored, transported both ways, copied, exposed through accessors, and never read** |
 
-That is as far as the client can take these four. A meaning for them is a SERVER-side fact, and the only evidence
+That is as far as the client can take these four. A meaning for them is a server-side fact, and the only evidence
 that could carry it is a capture where one of them varies against something observable — the corpus has 1, 292
 and 4 sightings respectively.
 
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into
-`+0x28` and no commandId. `BehaviorControlCenterCodec` does not special-case them — it would throw rather than
-misread, because both shapes run out of bytes where it expects the args length.
+`+0x28` and no commandId.
 
-## Registration form (the create-burst / world-entry BccIIR) — #234
+## Registration form (the create-burst / world-entry BccIIR)
 
-Distinct from the combat BccAck above: the create-world cutscene and world-entry bursts REGISTER behaviors on
+Distinct from the combat BccAck above: the create-world cutscene and world-entry bursts register behaviors on
 scene entities with a fixed-shape record (decoded by `tools/capture/decode_behaviorcc.py`, built by
 `BehaviorAnimations.Registration`):
 
@@ -523,37 +494,36 @@ scene entities with a fixed-shape record (decoded by `tools/capture/decode_behav
 Form census across the hoxxling create-world cutscene (90 records): 41x {1,3,5,6,12} no-tail, 34x {1,3,5,6}
 no-tail, 7x {1,3,5,6,12}+bound20, 4x {1,3,5,6,11,12}+bound20, 1x {1,3,5,6}+bound20, 1x {1,2,3,5,6,12}+bound20,
 1x {1,3,5,6}+long88, 1x form=0x0007. `BehaviorAnimations.Registration` constructs every form-0x0004 record (base + optional 2/4/11/12 + 20-byte bound
-tail) AND the 0x0007 subtype (via `form: 0x0007` + `field4`); `BehaviorAnimations.ItemRegistration` builds the
+tail) and the 0x0007 subtype (via `form: 0x0007` + `field4`); `BehaviorAnimations.ItemRegistration` builds the
 88-byte item-bound form (its trailing 3 u32 parameterized for the cutscene's non-zero state). All 90 cutscene
-records are now constructed byte-exact (the #234 golden harness locks them).
+records are constructed byte-exact (`CreateEditorRecordTests`).
 
-## The two AMBIENT commands — what makes a standing NPC look alive (#766 / #225)
+## The two ambient commands — what makes a standing NPC look alive
 
 `Emote` (0x05) and `BccAction` (0x07) are between them **63,743 of the corpus' 76,262 BCC records** — more than
 everything else on this channel put together. Both carry a `CommandMessage` and, per the table above, **no tail**,
 so a record is completely described by its command, its `bcc_action_id` and its timing. `--report
 ambient-animation` measures both.
 
-They are **not** two spellings of one thing, which is what this codebase assumed for a long time:
+They are **not** two spellings of one thing:
 
 | | `BccAction` 0x07 | `Emote` 0x05 |
 |---|---|---|
 | records / actors | 37,965 over 7,969 | 25,778 over 2,909 |
-| records per ACTOR | **p50 1**, p90 2 | p50 3, p90 15 |
+| records per actor | **p50 1**, p90 2 | p50 3, p90 15 |
 | seconds between one actor's | p50 0.0 (they arrive in a burst) | **p50 9.4** (p10 3.6, p90 36.9) |
 | `bcc_action_id` | 16 distinct, 41413 dominant | **126 distinct**, p50 3 per creature (max 21) |
 | `activation_time` | on 84 of 37,965 | on **25,562** of 25,778 |
 | while the actor is standing | 35,617 of 37,858 | 24,432 of 25,750 |
 
 So **`BccAction` is a one-shot assert** — retail states the fixed idle behaviour once as an entity comes into view
-and then leaves it alone. It was modelled here as a ~1/s *heartbeat* per visible NPC, which is a shape retail never
-sends (#716 capped the resulting flood; this is why it existed).
+and then leaves it alone. A ~1/s per-NPC heartbeat is a shape retail never sends.
 
 **`Emote` is the recurring one**, and it is the ambient random animation: a citizen leaning on a wall, scratching,
 looking round. Its cadence is stated in the data rather than chosen by the sender — over 22,696 consecutive pairs
 of one actor's records, `gap / previous activation_time-as-centiseconds` has **p10 exactly 1.0** and falls below 0.9
-on 121 (0.5%), i.e. the next animation never starts before the last has finished. The creature then STANDS for
-p10 0.1s / **p50 2.2s** / p90 19.0s and plays another. `activation_time` is therefore the animation's own LENGTH,
+on 121 (0.5%), i.e. the next animation never starts before the last has finished. The creature then stands for
+p10 0.1s / **p50 2.2s** / p90 19.0s and plays another. `activation_time` is therefore the animation's own length,
 and it belongs to the animation: of the 118 ids, 76 state exactly one value and none states more than two.
 
 The animation ids are per creature and in the same space as `NpcStatCore.AnimIdleId` (41-42k, 62k, 126k, 216k).
@@ -561,4 +531,4 @@ The animation ids are per creature and in the same space as `NpcStatCore.AnimIdl
 
 Built by `BehaviorAnimations.AmbientEmote` (byte-exact against frame 90 of `NecroL80_..._chat-annotated-3`), stored
 per creature type as `NpcAmbientAnimation` (harvested by the `npc-ambient-animations` module), and driven by
-`WorldState.Tick`.
+`WorldState.Tick`. Open work tracked in Gitea #766.

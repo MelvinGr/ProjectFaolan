@@ -28,9 +28,9 @@ fields, and `Rpc` is written field-for-field against it:
 | 4 | `0x20` | `required uint32 method_instance` | `Method` |
 | 5 | `0x2A` | `repeated ProtoEndpoint routing_destination` | — (no captured frame carries it) |
 
-### What used to be read as `[u16 opcode][headerData]`
+### It is not `[u16 opcode][headerData]`
 
-The two fields above were read for a long time as a big-endian `u16` opcode followed by an optional trailing
+A hex dump invites reading the method field as a big-endian `u16` opcode followed by an optional trailing
 `headerData` blob, because for most methods that split lands in exactly the same place:
 
 | bytes on the wire | read as | actually |
@@ -41,8 +41,7 @@ The two fields above were read for a long time as a big-endian `u16` opcode foll
 
 A varint's first group is `constant & 0x7F`, with the continuation bit set when more groups follow. So the "opcode"
 is `0x2000 | (constant & 0x7F)` for a one-group value and `0x2080 | (constant & 0x7F)` for a longer one, and the
-"headerData" is the remaining groups. That is the whole of it, and it explains every oddity the old reading had to
-list as a special case:
+"headerData" is the remaining groups. That explains every oddity the `u16` reading has to treat as a special case:
 
 - **`0x01` is not a marker, a flag or a latency bit.** It is the second group of a two-group varint, which is why it
   is *always* exactly `0x01` (12,056 sightings, never `0x00`, never `0x02`) and why it is on **100%** of the packets
@@ -73,9 +72,9 @@ header length of `0xDDDDDDF2`. Their `0x20A8`/`0x20A9` opcodes are coincidence
 [0x0A sender][0x12 receiver][0x1A][len 7][0x0D 0x7D155738 0x10 0x01][0x20][method: varint]
 ```
 
-These are the four login handoffs, and the old reading called all four "opcode `0x1A07` = `OverrideGameTweaks`
-with an opaque 13-byte session blob" — `0x1A07` being the field-3 tag plus its length byte, and the "blob" being
-the endpoint plus the method varint. Decoded, the four are `ChatServerConnectReady`, `CSServerConnectReady`,
+These are the four login handoffs. Read as a `u16` they all look like "opcode `0x1A07` with an opaque 13-byte
+blob" — `0x1A07` being the field-3 tag plus its length byte, and the "blob" being the endpoint plus the method
+varint. Decoded, the four are `ChatServerConnectReady`, `CSServerConnectReady`,
 `LoginConnectReady` and `OverrideGameTweaks` (118 sightings each) — exactly the four the login handoff sends, in
 the order it sends them [V3: RpcHeaderTests.TheLoginHandoffs_ReproduceTheCapturedHeaders]. They address the
 ServiceConnection, so the routing context restates the `PlayerInterface` object the method fires on — instance 1
@@ -90,31 +89,26 @@ constant** — `GameCharInterfaceMethods.DispatchPong = 0x82`, `PlayerInterfaceM
 so a send is a widening convert with no arithmetic anywhere, and a dispatch is
 `switch ((GameCharInterfaceMethods)packet.Method)` [V3: RpcHeaderTests.AMethodEnumMemberIsTheWireField].
 
-The twelve index-registered enums used to be written as `0x2000 + index` — the two bytes a hex dump shows — with an
-`Rpc.Opcode` view converting between the two. #615 renumbered them onto the index itself and deleted `Rpc.Opcode`,
-`Rpc.HasOpcode`, `Rpc.MethodIndexBase` and the `ushort` constructor overloads with it, because "exact on most
-classes" is precisely the property that let a lossy value be used as a key:
-
-⚠️ **On the hash-registered pair those two bytes keep 7 of the constant's 32 bits and name two methods at once**
-[V3: RpcHeaderTests.OneOpcode_CanNameTwoMethods], so there is no opcode to key on and there is no
-`PlayerAgentOpcodes` / `PlayerInterfaceOpcodes` enum — which is exactly how an opcode-keyed dispatch ran the wrong
-handler (#608). Dispatch, the packet trace, the timeline report and the
-generated docs all read `Method`, on every class. `WireOpcode.Of(method)` computes the dump reading when a human
-needs to find a frame in a capture, and `gen/opcodes.md` prints it in a **Reads as** column beside every method
-(#613/#615).
+The enums are keyed on the constant itself, never on the two bytes a hex dump shows, because those two bytes are
+exact on most classes and lossy on the rest — exactly the property that lets a lossy value be mistaken for a key.
+**On the hash-registered pair those two bytes keep 7 of the constant's 32 bits and name two methods at once**
+[V3: RpcHeaderTests.OneOpcode_CanNameTwoMethods], so there is no opcode to key on, and there is no
+`PlayerAgentOpcodes` / `PlayerInterfaceOpcodes` enum; an opcode-keyed dispatch runs the wrong handler. Dispatch,
+the packet trace, the timeline report and the generated docs all read `Method`, on every class.
+`WireOpcode.Of(method)` computes the dump reading when a human needs to find a frame in a capture, and
+`gen/opcodes.md` prints it in a **Reads as** column beside every method.
 
 The header is read **strictly**: an unknown tag, a repeated singular field or a missing required one throws
 `InvalidDataException` at the frame boundary, which the receive loop logs against the peer and disconnects. That is
 affordable only because `Method` holds the whole identity — re-serializing a parsed frame reproduces it byte for
-byte, which is what the old opaque tail was buying
+byte, with no opaque tail to carry along
 [V3: RpcHeaderTests.EveryCapturedFrame_ParsesStrictlyAndReSerializes]. `Rpc.cs` records why the header is written
 by hand rather than through the generated `RpcHeader` contract.
 
-⚠️ The asymmetry is worth knowing when reading pre-#610 sends: an **extra** tail byte was harmless (the varint ends
-at the first group without a continuation bit, and the stray byte is inside the header's own length, so the body is
-unaffected), while a **missing** one truncates a varint mid-continuation. That is why a spurious `0x01` on the
-trade replies went unnoticed for so long, and why omitting one on a ping would not have. Both are now unrepresentable
-— and both are rejected on the way in.
+The two ways a hand-built header can be wrong are asymmetric on the client: an **extra** tail byte is harmless (the
+varint ends at the first group without a continuation bit, and the stray byte is inside the header's own length,
+so the body is unaffected), while a **missing** one truncates a varint mid-continuation. `Rpc` cannot represent
+either, and the strict reader rejects both on the way in.
 
 ## ProtoEndpoint
 
@@ -131,7 +125,7 @@ Both sender and receiver are a `ProtoEndpoint` — the addressing primitive of t
 
 Encoding note: `0x0D`/`0x10` are protobuf fixed32 and varint tags, so the class id is **little-endian** here even
 though the rest of the protocol is big-endian (see [`04-encoding.md`](04-encoding.md)). The typed
-`WriteHeader(ProtoEndpoint, …)` overload serializes byte-identically to the hand-rolled arrays it replaced.
+`WriteHeader(ProtoEndpoint, …)` overload serializes byte-identically to the hand-built header bytes.
 [V3: ProtoEndpointGoldenTests.Endpoint_SerializesToHandRolledHeaderBytes]
 
 ## Methods are registration indices
@@ -140,7 +134,7 @@ For every interface except one, `method_instance` is a **method index** — the 
 per-class RPC registration. Both directions were recovered from the client: c2s order is the registration order;
 s2c "Dispatch" indices are the per-class dispatcher switch indices. [V1: tools/ghidra/DumpRpcTables.java]
 
-⚠️ **Two number spaces, and this document uses both.** A method's identity is the index (`0x20` =
+**Two number spaces, and this document uses both.** A method's identity is the index (`0x20` =
 `DispatchAddItem`), and that is what `Opcodes.cs`, the codecs and the dissector's tables are keyed by. What a hex
 dump, the Wireshark plugin's `Opcode` column and a `.tshark.json`'s `"Opcode"` field show is its **wire rendering**
 — the method field's tag byte then the varint's first group:
@@ -152,7 +146,7 @@ wire rendering = 0x2000 | first varint group of the method   (= 0x2000 + index, 
 So `0x2020` and `DispatchAddItem = 0x20` are the same method. Prose below that quotes a `0x2NNN` is quoting bytes
 seen in a capture and stays literally true; `gen/opcodes.md` lists both columns for every method.
 
-The full per-interface catalog — 860 entries across 16 enums, with direction and class id — is **generated** from
+The full per-interface catalog, with direction and class id, is **generated** from
 `Opcodes.cs`, not written here: [`gen/opcodes.md`](gen/opcodes.md).
 
 > A named method is **not** a decoded message. `gen/opcodes.md` enumerates every method (V1); whether its body is
@@ -164,22 +158,21 @@ PlayerAgent/PlayerInterface registers its methods with a 32-bit HASH rather than
 field carries a 4–5 group value and the wire rendering above collapses 32 bits into 7. Nothing else about the
 header differs.
 
-⚠️ **The 16-bit "opcode" is not a method key on this interface** — but not because it is per-connection, which is
-what the wire looks like until the varint is reassembled. It is `0x2080 | (constant & 0x7F)`, so two methods whose
+**The 16-bit "opcode" is not a method key on this interface** — not because it is per-connection (which is what the
+wire looks like until the varint is reassembled), but because of how it is built. It is `0x2080 | (constant & 0x7F)`, so two methods whose
 constants share their low 7 bits share an opcode: `0x20EC` is `ReceivedCharacterSettings` (`0x3C7C926C`) *and*
 `AuthenticateLoggedIn` (`0x9D991E6C`); `0x20D6` is `VerifyLanguageSetting` (`0x9847AED6`) *and*
 `UpdateCharacterPreview` (`0x4D661656`). Both pairs appear in the corpus. A dispatcher keyed on the opcode alone
-therefore cannot tell them apart — it has to read the whole varint (Gitea #610).
+therefore cannot tell them apart — it has to read the whole varint.
 
-**The constants are DERIVED, not tabulated.** None of the wire values appears anywhere in `AgeOfConan.exe`, which is
-what made "dump the table" a dead end: the wire carries the registration constant varint-encoded, and the varint's
+**The constants are derived, not tabulated.** None of the wire values appears anywhere in `AgeOfConan.exe`, so
+dumping a table cannot find them: the wire carries the registration constant varint-encoded, and the varint's
 groups are not a substring of the constant. Reassembling the varint reproduces **all 28** observed methods, 14 c2s
 and 14 s2c, with no exception. Both registration tables (25 c2s + 26 s2c methods, the complete interface) are in
 `PlayerAgentMethodIds` [V1: Faolan.Core.Network/Constants/PlayerAgentMethodIds.cs].
 
-Recovering the constants also gave the interface its real NAMES, replacing nine invented ones — `InitAuth` is
-`AuthenticateAck`, `SendRealmList` is `SetDimensionList`, `SmallCharList` is `SendCharacterSettingsCheckSumMap`, and
-the opcode we called `CreateCharacter` is `CreateCharacterWithData`. See
+The recovered constants carry the client's own method names (e.g. `AuthenticateAck`, `SetDimensionList`,
+`SendCharacterSettingsCheckSumMap`, `CreateCharacterWithData`). See
 [`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md).
 
 ## Multiplexing
@@ -221,7 +214,7 @@ contains it:
 | `PlayerAgent.LoginCharacter(nCharInstance, dataMap, cClientLanguage, regionCode, ageCode, genderCode, igrID, userType, serviceType)` | `[u32 charId][ListFrame 0][string "en"][u16 0][u16 0][u16 0][string "_"][u32 0][u32 0]` — everything after the id is a constant the retail client always sends: empty dataMap, UI language, zeroed age-gate fields, the `"_"` placeholder IGR (internet-gaming-room) id, `userType`/`serviceType` 0 [V2: Barbarian-login.tshark.json frame 33] |
 | `CSPlayerAgent.Authenticate(nCharacterInstance, nCookie, communityVersion)` | `[u32 charInstance][u32 cookie][u32 1]` — `cookie` is the `uCookie` from `UniverseInterface.DispatchAckAuthenticate` [V2: Barbarian-login.tshark.json frame 95] |
 | ChatServer `Hello` | `[u32 1][u32 charInstance][u32 cookie][string "English"]` — the same instance+cookie pair as the CSPlayerAgent `Authenticate`, byte for byte [V2: Barbarian-login.tshark.json frame 94] |
-| `GameCharInterface.DispatchPong(i_nSequence, i_nServerTime)` | `[u32 sequence echoed][u32 serverTime HIGH][u32 serverTime LOW]` — the last two words are ONE **64-bit microsecond** counter, high word first, and its value is the server's **uptime**: `(hi << 32 | lo)` advances at exactly wall-clock rate across every captured pong (182/186 and 23/23 in the two NecroL80 sessions), giving 2.60 and 4.73 days. The client's own signature has two args, not three, which is why. ⚠️ The high word therefore looks like a per-session constant inside any one capture (it only ticks once per 71.6 min) and takes 83 different values across the corpus — reading it as a constant is the trap. The client sends `LatencyCheck` (`0x2085`, a bare `[u32 counter]`) every ~5s and retail answers in ~117ms [V2: NecroL80_mage-necromancer_login_actions-described-in-chat.tshark.json] |
+| `GameCharInterface.DispatchPong(i_nSequence, i_nServerTime)` | `[u32 sequence echoed][u32 serverTime HIGH][u32 serverTime LOW]` — the last two words are ONE **64-bit microsecond** counter, high word first, and its value is the server's **uptime**: `(hi << 32 | lo)` advances at exactly wall-clock rate across every captured pong (182/186 and 23/23 in the two NecroL80 sessions), giving 2.60 and 4.73 days. The client's own signature has two args, not three, which is why. The high word therefore looks like a per-session constant inside any one capture (it only ticks once per 71.6 min) and takes 83 different values across the corpus — reading it as a constant is the trap. The client sends `LatencyCheck` (`0x2085`, a bare `[u32 counter]`) every ~5s and retail answers in ~117ms [V2: NecroL80_mage-necromancer_login_actions-described-in-chat.tshark.json] |
 
 And the in-world ones that had unnamed reads:
 
@@ -247,8 +240,8 @@ dump is whatever `Opcodes.cs` was called when the dump was written.
 
 It is a lead generator, not a verdict: it follows one level of delegation by name, and skips any handler that
 reaches a variable-length read rather than guessing. Confirm each hit by opening the handler, then look the
-method up in the signature catalog above rather than inventing a grammar. The first pass found nine real
-cases; a clean run reports zero. [V1: tools/capture/audit_unread_bodies.py]
+method up in the signature catalog above rather than inventing a grammar. A clean run reports zero.
+[V1: tools/capture/audit_unread_bodies.py]
 
 ## GameServerStats: what retail's server frame rate actually was
 

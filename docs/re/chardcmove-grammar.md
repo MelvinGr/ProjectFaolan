@@ -3,7 +3,7 @@
 The per-tick **dead-reckoning movement update**: every moving entity (players + NPCs) streams its
 position, facing and (optionally) velocity/acceleration each tick. It is the single
 highest-volume GameServer world record — **13,289 instances across 11 captures** — and the core of
-the simulation/movement layer (Gitea #190 / #53).
+the simulation/movement layer.
 
 Recovered from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpVtableReaders.java`,
 slot 8 → `CharDCMoveIIR_t::ReadSubClass = FUN_007adae0`, which delegates to the inner reader
@@ -26,11 +26,11 @@ slot 8 → `CharDCMoveIIR_t::ReadSubClass = FUN_007adae0`, which delegates to th
 
 ```
 [u8 flag1]                       bitfield (see below)
-[float x3]   position            ALWAYS — world (x, y=height, z), big-endian floats
- bit4 set  → [float qy]             collapsed rotation: the ONE non-zero vector component of a yaw-only facing
+[float x3]   position            always — world (x, y=height, z), big-endian floats
+ bit4 set  → [float qy]             collapsed rotation: the one non-zero vector component of a yaw-only facing
  bit4 clear→ [float x3]             the full rotation vector part (qx, qy, qz)
 [float]      qw                  the rotation's scalar part (the decompile's `param6`)
-[u8 flag2]                       move mode; the block below is read ONLY when flag2 < 8:
+[u8 flag2]                       move mode; the block below is read only when flag2 < 8:
    bit2 clear→ [float x3]        velocity      (param10..12)
    bit3 clear→ [float x3]        acceleration  (param13..15)
    [float]     param16           speed/scalar
@@ -51,24 +51,24 @@ All multi-byte numbers are **big-endian** (`FUN_0048f900` = ReadU32-BE; raw byte
 | 3 | 0x08 | `local_e` | clear ⇒ read the `param13..15` acceleration vector |
 | 4 | 0x10 | — | set ⇒ send the rotation as `(qy, qw)` instead of `(qx, qy, qz, qw)` |
 | 5 | 0x20 | — | stored as bool `param[0x12]` |
-| 6 | 0x40 | — | stored as bool — **AIRBORNE (a jump)** |
+| 6 | 0x40 | — | stored as bool — **airborne (a jump)** |
 
 **Bit 6 (`0x40`) is a jump**, pinned by `xxx_2clients_jumping` — a session recorded for nothing else. It appears in
-c2s moves ONLY there (20 records; none in a comparable non-jumping capture), and retail RELAYS it: both clients
+c2s moves only there (20 records; none in a comparable non-jumping capture), and retail relays it: both clients
 received `0x40` moves naming the *other* subject, plus five further characters including a passer-by who happened to
 jump nearby. Walking is `0x1E`; jumping is `0x56` — the same minus `NoAccelerationVector`, plus this bit, which fits
 an acceleration vector arriving exactly as the character leaves the ground. So a viewer renders someone else's jump
 from the ordinary move record, with no separate animation needed.
 [V1: tools/capture/tshark_dump.sh]
 
-It stayed unnamed until that capture for a good reason: the old invented enum paired `0x52`/`0x56` with a "jump" label
-while those same values occur while SEATED, so the pair was not diagnostic. Isolating a jumping session is what makes
-this bit diagnostic on its own — the bits either side of it (`0x20`, and `flag2`) are still only "stored as bool".
+Whole `flag1` values are not diagnostic of a jump: `0x52`/`0x56` also occur while seated. Only the isolated jumping
+session makes this one bit diagnostic — the bits either side of it (`0x20`, and `flag2`) are still only "stored as
+bool".
 
 `bit0 (0x01)` toggles freely and does not affect the layout (the `0x1a`/`0x1b` twins are the same
 length). When `flag2 >= 8` the velocity/accel/heading block is skipped entirely (the short forms).
 
-## The relay is VERBATIM — the c2s record with its env byte cleared
+## The relay is verbatim — the c2s record with its env byte cleared
 
 A move is forwarded to the mover's own client (the echo) **and** to every other client that can see the mover as the
 **same bytes**, changing only `env` (`0x01` → `0x00`, "I am the controlling client"). Measured over the whole corpus:
@@ -81,7 +81,7 @@ makes the flag-gated layout a non-issue on the relay path — a rebuild has to k
 where the jump's acceleration vector sits; forwarding does not.
 [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover]
 
-## The post-position floats are a ROTATION QUATERNION
+## The post-position floats are a rotation quaternion
 
 The decompile's names for this region — a "post-position move vector" plus the scalars `facingX` / `param6` — are
 what the client's reader calls its locals, and they hide what the field is. The floats are the entity's **orientation
@@ -98,8 +98,8 @@ Unit-length across every captured record in both forms is already decisive (a "m
 and the yaw it implies confirms the reading: over sustained straight runs (three consecutive collapsed records with a
 consistent travel direction, 1,634 samples), `2·atan2(qy, qw)` matches the direction of travel within **7.5° for 90%**
 of them, and within 22.5° for 97%. The factor of two is the tell — a heading pair would be `(sin θ, cos θ)`, giving
-the angle directly; a quaternion gives the HALF-angle, and reading it as a heading is off by θ/2, which is why an
-earlier attempt at `atan2(facingX, param6)` scattered with a 57° median error and looked unpinnable.
+the angle directly; a quaternion gives the half-angle, and reading it as a heading is off by θ/2 (`atan2(facingX, param6)` scatters with
+a 57° median error).
 [V2: Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json]
 [V3: DeadReckoningCodecTests.CharDCMove_RotationIsAUnitQuaternion]
 
@@ -107,10 +107,8 @@ The same four floats close **StopIIR** (below): unit-length for 100% of its 3,54
 rotation" is this same quaternion, not a heading embedded in four floats.
 
 This is what the move handler feeds the live entity (and, through it, the persisted facing and the spawn record other
-players get). Before it was decoded, the handler read three floats blindly and passed them to a Euler→quaternion
-conversion as DEGREES: in the collapsed form that mixed `qy` and `qw` with the `flag2` byte reinterpreted as a float
-(the captured jump reads 0.479 / 0.878 / 1.5e-36), so every character's facing was pinned within about a degree of
-identity.
+players get). Reading three fixed floats here is wrong in the collapsed form: it mixes `qy` and `qw` with the `flag2`
+byte reinterpreted as a float (the captured jump reads 0.479 / 0.878 / 1.5e-36).
 
 ## Semantic validation
 
@@ -148,10 +146,9 @@ both env bytes (37 pairs)**:
 Bit 0 is **never set** — every observed value is even. Bit 1 is set in all but the all-zero form, so the
 `param7..9` heading vector is almost never present.
 
-⚠️ This is why treating the u16 as an enum does not work. A `MovingType` enum with 11 observed pairs matched
-14,414 of the 19,034 records; the other **4,620 (24%)** fell through its `switch` and were logged and dropped -
-that player's movement silently ignored. The handler now reads `[env][flag1]` and processes every record
-(`MoveFlag` carries the bit names).
+This is why `[env][flag1]` cannot be treated as an enum: an enum of the 11 most common pairs matches only 14,414 of
+the 19,034 records, and the other **4,620 (24%)** would fall through its `switch`. The handler reads `[env][flag1]`
+as bits and processes every record (`MoveFlag` carries the bit names).
 
 ## Sibling: StopIIR_c (0xD751EBB4) — movement stop
 
@@ -162,20 +159,16 @@ Fixed length for all 2,181 captured samples:
 [u32 len=41][u32 0xD751EBB4][u32 0xC350][u32 handle][u8 env=0x00][float x7]
 ```
 
-The 7 floats are `position(x,y,z)` + the same rotation QUATERNION the move carries, here always in full: hoxxling
+The 7 floats are `position(x,y,z)` + the same rotation quaternion the move carries, here always in full: hoxxling
 stops at `(294.12, 145.14, 726.28)` facing `(0.0, -0.497, 0.0, 0.868)` — the `x = z = 0`, `qy² + qw² ≈ 1` shape of a
 yaw-only facing, written out unmasked. Unit length holds for 100% of its 3,540 captured records. Total wire size =
 45 bytes.
 
 ## Decode coverage
 
-Decoded + dissected (this doc + `CharDCMoveCodec`). **Construct DONE:** `CharDCMoveCodec`,
-`StopCodec` and `SetPosCodec` (one file each under `Faolan.Core.Network/Codecs/World/`) build/parse
-byte-exact, golden-tested in `DeadReckoningCodecTests`. **Wired (#190):** the sim emits a `StopIIR` (`StopCodec`)
-when an NPC arrives home and stops moving (`WorldTickEffectType.NpcStopped` → `BroadcastNpcStop`); the
-per-tick move still uses `MoveTaskCodec` (swapping it for `CharDCMove` is optional polish). All
-self-contained records are sent via `WorldIir.Send`, which writes the carrier's `[u32 len]` because that length
-belongs to the sender (#530 rule 2); the codecs emit a bare record. (This used to read "via `SendWorldRecord`,
-NOT `SendWorldIir`, which would double-prefix the codec's own length" — both senders and that hazard are gone:
-#530 moved every self-prefixing codec onto the bare-record shape and left exactly one sender.) The stop
-broadcast has not been verified against the retail client — open work tracked in Gitea #662.
+`CharDCMoveCodec`, `StopCodec` and `SetPosCodec` (one file each under `Faolan.Core.Network/Codecs/World/`)
+build/parse byte-exact, golden-tested in `DeadReckoningCodecTests`. The sim emits a `StopIIR` (`StopCodec`) when an
+NPC arrives home and stops moving (`WorldTickEffectType.NpcStopped` → `BroadcastNpcStop`); the per-tick NPC move
+uses `MoveTaskCodec`. All self-contained records are sent via `WorldIir.Send`, which writes the carrier's
+`[u32 len]` because that length belongs to the sender; the codecs emit a bare record. Open work tracked in Gitea
+#662.
