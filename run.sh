@@ -29,6 +29,7 @@ case "$command" in
     --client)
         shift
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
+            --dx10 \
             --console \
             --patch-universeaddr \
             --patch-cdn \

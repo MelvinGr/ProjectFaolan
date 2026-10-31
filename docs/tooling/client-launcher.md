@@ -59,7 +59,8 @@ other executable here), so **`--help` prints the authoritative list** — the on
 ```
 Faolan.ClientLauncher [options]
   --exe <path>        AgeOfConan.exe (default: auto-detected from the Steam install, app 217750)
-  --dx10              launch AgeOfConanDX10.exe instead
+  --dx10              launch AgeOfConanDX10.exe instead (an error when it is missing - never the DX9 exe); off
+                      Windows its d3d10.dll import is redirected through fao10.dll, see section 6
   -u, --username <s>  auto-login account
   -p, --password <s>  auto-login password
   -c, --charname <s>  auto-enter this character
@@ -82,7 +83,7 @@ Faolan.ClientLauncher [options]
                       addresses --patch-universeaddr / --patch-cdn write, for a launch that should not match the
                       faolan.json the server reads
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their
-                      .bak, then exit
+                      .bak (and remove fao10.dll once the DX10 exe is restored), then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
                       drops -noconsole
   --debug-channels [a,b]  enable the client's OWN debug channels by writing its logger config file dbDebug.conf
@@ -99,7 +100,9 @@ Behaviors:
 - **Kills any running client first** (clean repeated launches).
 - **Launches via Proton** off Windows — `proton run <exe> <args>` with the Steam compat env
   (`STEAM_COMPAT_DATA_PATH` from the auto-detected compat-data, `STEAM_COMPAT_CLIENT_INSTALL_PATH`,
-  `SteamAppId/SteamGameId=217750`, `PROTON_USE_WINED3D`/`PROTON_NO_ESYNC`/`PROTON_NO_FSYNC`).
+  `SteamAppId/SteamGameId=217750`). Renderer and sync are Proton's defaults (DXVK, esync/fsync), the same as a
+  Steam launch with no launch options; `PROTON_USE_WINED3D`, `PROTON_NO_ESYNC` and the like pass through from
+  the environment.
   `--wine` for a plain wine runner; direct on Windows. The exe, compat-data, and Proton build are all auto-detected
   from Steam (see `SteamPaths.cs`).
 - **Computes `-clienthash`** from the actual launched file (after any on-disk patch, so the hash matches).
@@ -201,10 +204,40 @@ needs interactive editor input, which the launcher flags can't provide — it'd 
 
 ---
 
+## 6. The DX10 client under Wine
+
+`AgeOfConanDX10.exe` runs under Proton on DXVK (D3D10 on DXVK's D3D11) with one gap: Wine's d3d10.dll declares
+`D3D10PreprocessShader` as a bare stub in its spec file, still so in Wine master and in Proton Experimental 11.0. It is
+the only one of the DX10 exe's 526 imports that Wine stubs, and calling it aborts the client with
+`wine: Call from ... to unimplemented function d3d10.dll.D3D10PreprocessShader, aborting`.
+
+The client calls it from its shader loader (`0x012565cb`, ShaderManager.dx10.cpp; reached from `0x012599bc` for a
+permutation with no compiled code), after defining the `DX10` and `DX9_COMPATIBILITY` macros: it preprocesses the
+source, hashes the text, and compiles a miss with `D3DX10CompileFromMemory` (Microsoft's d3dx10_43 and
+d3dcompiler_43, which the game's DirectX redistributable installs into the prefix). Everything `shader.cache.dx10`
+holds skips that path, so a fresh launch reaches the world. Applying a video setting whose permutation the cache
+lacks is enough to crash it. Newly compiled permutations go to `shader.cache.dx10.local`.
+
+Off Windows, the launcher therefore rewrites the import descriptor's DLL name in the exe from `d3d10.dll` to
+`fao10.dll` (the same length, in place; the exe's own full-path loads of d3d10.dll for `D3D10CreateDevice` are left
+alone) and writes `fao10.dll` beside it: an export table of forwarders and nothing else. `D3D10PreprocessShader`
+forwards to `d3dcompiler_43.D3DPreprocess`, which has the same seven stdcall arguments (Wine forwards
+`D3D10CreateBlob` and `D3D10GetInputSignatureBlob` to that DLL the same way). The other seven names forward to
+d3d10.dll unchanged. It is an exe patch like `--patch-login`: covered by the exe's `.bak`, applied before the md5, and
+a no-op on the DX9 exe, which imports no d3d10.dll. Windows's own d3d10.dll implements the function, so on Windows the
+exe is not touched. `D3d10ForwarderTests` pins both halves.
+
+Forcing the compile path for a test: move `shader.cache.dx10` aside, and every shader goes through
+`D3D10PreprocessShader`. The stock exe then aborts within seconds of launch, while the redirected exe loads the world,
+slowly, because it compiles every shader on first use. Put the file back afterwards.
+
+---
+
 ## File map
 - `Faolan.ClientLauncher/Program.cs`, `ClientExePatcher.cs` — the launcher.
 - `Faolan.ClientLauncher/LauncherCommand.cs` — its command line (System.CommandLine), and the `--help` text.
 - `Faolan.Core/Crypt/ClientLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
 - `Faolan.Core/Crypt/ClientLoginEncryption.cs` — server-side DH+TEA login decrypt.
-- `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.
+- `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`, and the d3d10 import redirect (section 6).
+- `Faolan.ClientLauncher/D3d10ForwarderDll.cs` — builds `fao10.dll`, the forwarder the redirected DX10 exe imports.
 - `Faolan.ClientLauncher/SteamPaths.cs` — Steam auto-detection of the exe / compat-data / Proton build; `run.sh --client` is the convenience wrapper.

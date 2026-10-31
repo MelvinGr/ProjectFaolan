@@ -42,7 +42,7 @@ namespace Faolan.ClientLauncher
 		};
 
 		private static readonly Option<bool> DryRun = new Option<bool>("--dry-run", "-n") { Description = "Print the computed clienthash/key/args without launching." };
-		private static readonly Option<bool> Dx10 = new Option<bool>("--dx10") { Description = "Launch AgeOfConanDX10.exe instead." };
+		private static readonly Option<bool> Dx10 = new Option<bool>("--dx10") { Description = "Launch AgeOfConanDX10.exe instead. Off Windows its d3d10.dll import is redirected through fao10.dll, because Wine leaves D3D10PreprocessShader unimplemented." };
 		private static readonly Option<string> Exe = new Option<string>("--exe") { Description = "Path to AgeOfConan.exe (default: auto-detected from your Steam install, app 217750)." };
 
 		private static readonly Option<string> LauncherNotes = new Option<string>("--launcher-notes")
@@ -74,7 +74,7 @@ namespace Faolan.ClientLauncher
 
 		private static readonly Option<bool> Restore = new Option<bool>("--restore")
 		{
-			Description = "Restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr redirects and the debug channels) and exit."
+			Description = "Restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their .bak (undoes the login/notes/d3d10 exe patches, the CDN/UniverseAddr redirects and the debug channels; removes fao10.dll once the DX10 exe is restored) and exit."
 		};
 
 		// The settings the launcher reads, named exactly as they are in faolan.json and the environment (the

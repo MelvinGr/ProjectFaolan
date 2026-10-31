@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 
 namespace Faolan.ClientLauncher
 {
@@ -92,6 +94,56 @@ namespace Faolan.ClientLauncher
 			return Result.Patched;
 		}
 
+		/// <summary>
+		///     Points the exe's d3d10.dll import at <see cref="D3d10ForwarderDll.FileName" /> by rewriting the import
+		///     descriptor's DLL name in place.
+		/// </summary>
+		/// <remarks>
+		///     Only the descriptor's own name string changes. The DX10 exe also names d3d10.dll and d3d10_1.dll in strings
+		///     it loads by full path for D3D10CreateDevice, and those loads keep reaching the real DLL, so the device and
+		///     the forwarded state-block and reflection calls share one d3d10.dll module.
+		/// </remarks>
+		/// <param name="exports">Every name the descriptor imports: the exports the forwarder has to provide.</param>
+		/// <returns>
+		///     NotFound when the exe does not import <see cref="D3d10ForwarderDll.StubbedExport" /> from d3d10.dll, as
+		///     the DX9 client does not, so there is nothing to redirect.
+		/// </returns>
+		public static Result RedirectD3d10Import(string exePath, out IReadOnlyList<string> exports)
+		{
+			exports = [];
+			var bytes = File.ReadAllBytes(exePath);
+			using var stream = new MemoryStream(bytes, false);
+			var headers = new PEHeaders(stream);
+			var importTable = headers.PEHeader?.ImportTableDirectory ?? default;
+			if (importTable.Size == 0)
+				return Result.NotFound;
+
+			// The descriptors run until one with no name; each is OriginalFirstThunk, TimeDateStamp, ForwarderChain, Name,
+			// FirstThunk.
+			for (var at = Offset(headers, (uint)importTable.RelativeVirtualAddress); bytes.ReadU32Le(at + 12) != 0; at += 20)
+			{
+				var nameAt = Offset(headers, bytes.ReadU32Le(at + 12));
+				var name = CString(bytes, nameAt);
+				var redirected = name.Equals(D3d10ForwarderDll.FileName, StringComparison.OrdinalIgnoreCase);
+				if (!redirected && !name.Equals(D3d10ForwarderDll.TargetDll, StringComparison.OrdinalIgnoreCase))
+					continue;
+
+				var names = ImportedNames(headers, bytes, at);
+				if (!names.Contains(D3d10ForwarderDll.StubbedExport))
+					return Result.NotFound;
+
+				exports = names;
+				if (redirected)
+					return Result.AlreadyDone;
+
+				Encoding.ASCII.GetBytes(D3d10ForwarderDll.FileName).CopyTo(bytes, nameAt);
+				File.WriteAllBytes(exePath, bytes);
+				return Result.Patched;
+			}
+
+			return Result.NotFound;
+		}
+
 		// Every offset holding a DH public key: a maximal run of exactly PublicHexLength ASCII hex characters, NUL on
 		// both sides, that is not the prime.
 		private static List<int> PublicKeySlots(byte[] bytes)
@@ -169,6 +221,41 @@ namespace Faolan.ClientLauncher
 			}
 
 			return -1;
+		}
+
+		private static string CString(byte[] bytes, int at)
+		{
+			return Encoding.ASCII.GetString(bytes, at, Array.IndexOf(bytes, (byte)0, at) - at);
+		}
+
+		// The names one import descriptor imports, read from its lookup table (or from the address table when a linker
+		// left the lookup table out; on disk the two hold the same entries).
+		private static List<string> ImportedNames(PEHeaders headers, byte[] bytes, int descriptor)
+		{
+			var table = bytes.ReadU32Le(descriptor);
+			if (table == 0)
+				table = bytes.ReadU32Le(descriptor + 16);
+
+			var names = new List<string>();
+			for (var at = Offset(headers, table); bytes.ReadU32Le(at) is var thunk and not 0; at += 4)
+			{
+				if ((thunk & 0x80000000) != 0)
+					throw new InvalidDataException($"{D3d10ForwarderDll.TargetDll} is imported by ordinal #{thunk & 0xFFFF}; the forwarder exports names only.");
+
+				names.Add(CString(bytes, Offset(headers, thunk) + 2)); // past the u16 hint
+			}
+
+			return names;
+		}
+
+		private static int Offset(PEHeaders headers, uint rva)
+		{
+			var index = headers.GetContainingSectionIndex((int)rva);
+			if (index < 0)
+				throw new InvalidDataException($"RVA 0x{rva:X} lies outside every section of the exe.");
+
+			var section = headers.SectionHeaders[index];
+			return (int)rva - section.VirtualAddress + section.PointerToRawData;
 		}
 	}
 }

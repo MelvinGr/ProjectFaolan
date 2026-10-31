@@ -167,12 +167,10 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
+			// --dx10 names the sibling exe outright; when it is missing the check below says so, rather than launching the
+			// DX9 client the caller did not ask for.
 			if (options.Dx10)
-			{
-				var dx10Exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", "AgeOfConanDX10.exe");
-				if (File.Exists(dx10Exe))
-					exe = dx10Exe;
-			}
+				exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", "AgeOfConanDX10.exe");
 
 			if (!File.Exists(exe))
 			{
@@ -187,11 +185,23 @@ namespace Faolan.ClientLauncher
 			{
 				// Both exe variants are restored regardless of --dx10, so whichever was patched is undone.
 				var dir = Path.GetDirectoryName(exe)!;
+				var dx10Restored = false;
 				foreach (var name in new[] { "AgeOfConan.exe", "AgeOfConanDX10.exe", "LocalConfig.xml", ClientDebugChannels.ConfName })
 				{
-					Console.WriteLine(RestoreFromBackup(Path.Combine(dir, name))
+					var restored = RestoreFromBackup(Path.Combine(dir, name));
+					dx10Restored |= restored && name == "AgeOfConanDX10.exe";
+					Console.WriteLine(restored
 						? $"restored {name} from .bak"
 						: $"no {name}.bak to restore");
+				}
+
+				// The d3d10 forwarder serves only the redirected DX10 exe, so it goes once that exe imports d3d10.dll again;
+				// with no DX10 backup to restore, an exe that still imports it keeps it.
+				var forwarder = Path.Combine(dir, D3d10ForwarderDll.FileName);
+				if (dx10Restored && File.Exists(forwarder))
+				{
+					File.Delete(forwarder);
+					Console.WriteLine($"removed {D3d10ForwarderDll.FileName}");
 				}
 
 				Console.WriteLine("restore done.");
@@ -291,6 +301,22 @@ namespace Faolan.ClientLauncher
 						Console.Error.WriteLine("notes-url : launcher-notes URL not found in the exe (or replacement too long); skipped.");
 						break;
 					}
+				}
+			}
+
+			// Under Wine, point the DX10 client's d3d10.dll import at the forwarder written next to it, which routes the
+			// D3D10PreprocessShader Wine leaves unimplemented to d3dcompiler_43 (D3d10ForwarderDll says why). It is an exe
+			// patch like the two above: covered by the .bak, run before the md5, and NotFound on the DX9 exe, which imports
+			// no d3d10.dll. Windows's own d3d10.dll implements the function, so the exe is left alone there.
+			if (!OperatingSystem.IsWindows() && !options.DryRun)
+			{
+				var redirect = ClientExePatcher.RedirectD3d10Import(exe, out var d3d10Exports);
+				if (redirect != ClientExePatcher.Result.NotFound)
+				{
+					File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(exe)!, D3d10ForwarderDll.FileName), D3d10ForwarderDll.Build(d3d10Exports));
+					Console.WriteLine(redirect == ClientExePatcher.Result.Patched
+						? $"d3d10     : import redirected to {D3d10ForwarderDll.FileName} ({D3d10ForwarderDll.StubbedExport} -> d3dcompiler_43)"
+						: $"d3d10     : import already redirected; {D3d10ForwarderDll.FileName} rewritten");
 				}
 			}
 
@@ -395,9 +421,8 @@ namespace Faolan.ClientLauncher
 				SetIfUnset(psi, "SteamAppId", SteamAppId);
 				SetIfUnset(psi, "SteamGameId", SteamAppId);
 
-				SetIfUnset(psi, "PROTON_USE_WINED3D", "1");
-				SetIfUnset(psi, "PROTON_NO_ESYNC", "1");
-				SetIfUnset(psi, "PROTON_NO_FSYNC", "1");
+				// The renderer and the sync primitives are Proton's defaults (DXVK, esync/fsync), the same as a Steam launch
+				// with no launch options. PROTON_USE_WINED3D, PROTON_NO_ESYNC and the like pass through from the environment.
 			}
 
 			foreach (var a in launchArgs)
