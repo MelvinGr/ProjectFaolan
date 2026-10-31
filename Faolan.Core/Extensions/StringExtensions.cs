@@ -7,18 +7,6 @@ namespace Faolan.Core.Extensions
 	{
 		extension(string str)
 		{
-			public byte[] Base64Decode()
-			{
-				return string.IsNullOrWhiteSpace(str)
-					? []
-					: Convert.FromBase64String(str);
-			}
-
-			public bool ContainsIgnoreCase(string find)
-			{
-				return str.Contains(find, StringComparison.InvariantCultureIgnoreCase);
-			}
-
 			public string PadBoth(int totalLength, char c = ' ')
 			{
 				var spaces = totalLength - str.Length;

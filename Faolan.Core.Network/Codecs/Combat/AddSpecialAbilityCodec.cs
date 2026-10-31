@@ -107,19 +107,4 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 	/// <summary>The DispatchAddSpecialAbility body.</summary>
 	public sealed record AddSpecialAbility(uint Slot, uint Id, uint Data0, ProtoDecryptionKey Key, uint TrailerKind, uint TrailerValue, bool Announce);
-
-	/// <summary>Maps a parsed <see cref="AddSpecialAbility" /> onto the <see cref="Ability" /> row it grants.</summary>
-	public static class AbilityColumns
-	{
-		public static Ability ToAbility(AddSpecialAbility v)
-		{
-			return new Ability
-			{
-				Slot = v.Slot,
-				Id = v.Id,
-				Data0 = v.Data0,
-				Key = v.Key
-			};
-		}
-	}
 }

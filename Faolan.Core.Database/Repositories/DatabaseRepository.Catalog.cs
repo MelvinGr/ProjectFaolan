@@ -10,7 +10,6 @@ namespace Faolan.Core.Database.Repositories
 {
 	public interface ICatalogRepository
 	{
-		Task<Ability[]> GetAbilities();
 		Task<Ability?> GetAbility(uint id);
 		Task<Ability[]> GetClassAbilities(uint level, ConanClass @class);
 		Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
@@ -33,9 +32,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
 		Task<IReadOnlyDictionary<string, MorphTarget>> GetMorphTargetRegistry();
 		Task<Mount?> GetMount(uint id);
-		Task<Mount[]> GetMounts();
 		Task<Item[]> GetRandomBuildableItems(int count);
-		Task<Item[]> GetRandomLootExcludedItems();
 		Task<Recipe?> GetRecipe(uint id);
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
@@ -50,25 +47,17 @@ namespace Faolan.Core.Database.Repositories
 		Task<SpellAreaEffectCriterion[]> GetSpellAreaEffectCriteria();
 		Task<SpellSpellStatModifier[]> GetSpellStatModifiers();
 		Task<(uint Line, uint SpellId)[]> GetSpellLineMembers();
-		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
 		Task<ILookup<(uint SpellId, uint Sequence), SpellStatEffectCriterion>> GetSpellStatEffectCriteria();
 		Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class);
 		Task<uint[]> GetStartingSpells(uint level, ConanClass @class);
 		Task<Dictionary<string, StockPhrase>> GetStockPhrases();
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
-		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
 	}
 
 	public partial class DatabaseRepository
 	{
 		private Task<IReadOnlyDictionary<string, MorphTarget>>? _morphTargetRegistry;
-
-		public async Task<Ability[]> GetAbilities()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Abilities.OrderBy(a => a.Id).ToArrayAsync();
-		}
 
 		public async Task<Ability?> GetAbility(uint id)
 		{
@@ -422,12 +411,6 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.Where(i => i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot).OrderBy(_ => EF.Functions.Random()).Take(count).ToArrayAsync();
 		}
 
-		public async Task<Item[]> GetRandomLootExcludedItems()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => i.ExcludeFromRandomLoot && i.Type == ItemType.Normal).OrderBy(i => i.Name).ToArrayAsync();
-		}
-
 		public async Task<Recipe[]> GetRecipes()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -456,22 +439,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Mounts.Include(m => m.Spell).FirstOrDefaultAsync(m => m.Id == id);
 		}
 
-		public async Task<Mount[]> GetMounts()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mounts.Include(m => m.Spell).OrderBy(m => m.Id).ToArrayAsync();
-		}
-
 		public async Task<Spell?> GetSpell(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.FirstOrDefaultAsync(s => s.Id == id);
-		}
-
-		public async Task<Spell[]> GetSpells()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
 		}
 
 		/// <summary>
@@ -731,10 +702,5 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.Where(i => i.Name.ToLower().Contains(lowered)).OrderBy(i => i.Name).Take(limit).ToArrayAsync();
 		}
 
-		public async Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => i.Id == itemId).ExecuteUpdateAsync(s => s.SetProperty(i => i.ExcludeFromRandomLoot, excluded)) == 1;
-		}
 	}
 }

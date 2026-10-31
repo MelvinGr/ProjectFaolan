@@ -58,16 +58,7 @@ namespace Faolan.Tests
 					new CapturedPacket(2, true, 0x2000, (uint)IirTypes.FullPlayerCharacterIIR, SnapshotPacket(dikketestHandle))
 				};
 
-				CaptureCharacterImporter.AccountId = 7;
-				(int, int, int, int, int) result;
-				try
-				{
-					result = await CaptureCharacterImporter.ImportAsync(db, [capture]);
-				}
-				finally
-				{
-					CaptureCharacterImporter.AccountId = 0;
-				}
+				var result = await CaptureCharacterImporter.ImportAsync(db, [capture], accountId: 7);
 
 				Assert.Equal((1, 1, 0, 0, 0), result);
 

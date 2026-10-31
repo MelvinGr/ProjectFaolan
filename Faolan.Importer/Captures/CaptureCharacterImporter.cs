@@ -39,13 +39,6 @@ namespace Faolan.Importer.Captures
 		private const uint InventorySnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
 		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
-
-		// The account imported characters are attached to. 0 = find-or-create ImportAccountName, which is the normal
-		// play account, so the reference characters are reachable from the same login as everything else. Login
-		// validation is stubbed, so any password works. A long character list does not break the client's auto-enter
-		// flow, so no separate account is needed.
-		public static uint AccountId = 0;
-
 		/// <summary>
 		///     The class of the character this capture was played on, or null when the capture never shows one (a
 		///     create-editor dump before class selection, or a trace that carries no player spawn).
@@ -113,8 +106,14 @@ namespace Faolan.Importer.Captures
 		///     Seen = own characters in the corpus; Kept = existing rows left alone; Filtered = rejected for an unset class
 		///     or a level at or below <paramref name="minLevel" />.
 		/// </returns>
+		/// <param name="accountId">
+		///     The account imported characters are attached to. Null finds or creates <c>ImportAccountName</c>, the normal
+		///     play account, so the reference characters are reachable from the same login as everything else (login
+		///     validation is stubbed, so any password works, and a long character list does not break the client's
+		///     auto-enter flow).
+		/// </param>
 		public static async Task<(int Seen, int Added, int Kept, int Filtered, int Refreshed)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0,
-			bool refresh = false)
+			bool refresh = false, uint? accountId = null)
 		{
 			// Best (largest) parseable player spawn body per character name, with the map active when it
 			// spawned and the capture's FullChar snapshot for the same instance (the carried inventory -
@@ -211,9 +210,7 @@ namespace Faolan.Importer.Captures
 			if (otherPlayers > 0)
 				Console.WriteLine($"Characters: skipped {otherPlayers} other player(s) visible in captures (not the played character).");
 
-			var accountId = AccountId != 0
-				? AccountId
-				: await FindOrCreateImportAccount(db);
+			var owner = accountId ?? await FindOrCreateImportAccount(db);
 			var realmId = await FindOrCreateRealm(db);
 
 			var added = 0;
@@ -282,7 +279,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold!, read.Message!, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
+				await AddCharacter(db, owner, realmId, name, mapId, classId, scaffold!, read.Message!, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
 				added++;
 			}
 

@@ -10,9 +10,6 @@ namespace Faolan.Core.Database.Repositories
 	// character's standing (play state).
 	public interface IFactionRepository
 	{
-		/// <summary>The whole faction catalog, by id. Sixteen rows; loaded once and cached by the caller.</summary>
-		Task<IReadOnlyDictionary<uint, Faction>> GetFactions();
-
 		/// <summary>
 		///     What killing one NPC of <paramref name="victimFactionId" /> at <paramref name="tier" /> is worth, per
 		///     faction it moves. Empty when the victim belongs to no faction, or to one with no entry at that tier.
@@ -31,13 +28,6 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		public async Task<IReadOnlyDictionary<uint, Faction>> GetFactions()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			return await ctx.Factions.AsNoTracking().ToDictionaryAsync(f => f.Id);
-		}
-
 		public async Task<IReadOnlyList<FactionKillAward>> GetFactionKillAwards(uint victimFactionId, int tier)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

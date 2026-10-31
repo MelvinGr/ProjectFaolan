@@ -68,11 +68,6 @@ namespace Faolan.Core.Constants
 			return All.FirstOrDefault(i => i.Type == type);
 		}
 
-		public static RpcInterface? ByEnum(Type methods)
-		{
-			return All.FirstOrDefault(i => i.Methods == methods);
-		}
-
 	}
 
 	// `Methods` is the `*Methods` enum type; `Members` walks it. A `Type` rather than a generic parameter because

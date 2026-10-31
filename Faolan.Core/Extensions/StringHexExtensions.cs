@@ -7,20 +7,6 @@ namespace Faolan.Core.Extensions
 {
 	public static class StringHexExtensions
 	{
-		/// <summary>
-		///     Parses a hex string into its bytes.
-		/// </summary>
-		/// <remarks>
-		///     Throws on malformed input rather than returning null: a silent null here surfaces later as an NRE or an
-		///     empty payload with nothing pointing back at the bad hex.
-		/// </remarks>
-		/// <exception cref="FormatException">The string is not valid hex.</exception>
-		public static byte[] HexToByteArray(this string hex)
-		{
-			ArgumentNullException.ThrowIfNull(hex);
-			return Enumerable.Range(0, hex.Length).Where(x => x % 2 == 0).Select(x => Convert.ToByte(hex.Substring(x, 2), 16)).ToArray();
-		}
-
 		public static string ToHex(this IEnumerable<byte> value, bool asArray = false)
 		{
 			return (asArray

@@ -15,7 +15,6 @@ namespace Faolan.Core.Database.Repositories
 	/// </remarks>
 	public interface IDatabaseRepository : IAccountRepository, ICharacterRepository, ICharacterInventoryRepository, ICharacterQuestRepository, ICharacterStatRepository, ICharacterProgressionRepository, ICatalogRepository, IEconomyRepository, IFactionRepository, IGuildRepository, INpcRepository, IRealmRepository, IWorldRepository
 	{
-		Task Execute(Func<IDatabaseContext, Task> work);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 	}
 
@@ -26,12 +25,6 @@ namespace Faolan.Core.Database.Repositories
 		public DatabaseRepository(IDbContextFactory<DatabaseContext> contextFactory)
 		{
 			_contextFactory = contextFactory;
-		}
-
-		public async Task Execute(Func<IDatabaseContext, Task> work)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await work(ctx);
 		}
 
 		public async Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work)

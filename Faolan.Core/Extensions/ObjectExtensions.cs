@@ -20,16 +20,5 @@ namespace Faolan.Core.Extensions
 
 			return JsonSerializer.Deserialize<T>(json);
 		}
-
-		public static string? ToJson(this object? source, bool indented = false)
-		{
-			if (source == null)
-				return null;
-
-			return JsonSerializer.Serialize(source, new JsonSerializerOptions
-			{
-				WriteIndented = indented
-			});
-		}
 	}
 }
