@@ -4,6 +4,9 @@ One authoritative reference for the protocol, in which **every stated fact carri
 citation** that a test resolves against the repo. The machine-derivable parts are *generated*, not hand-written.
 
 Read [`methodology.md`](methodology.md) for the method (the verification ladder, the anti-drift tests, the boundary rule).
+The analysis behind the decodes is in [`client-re-techniques.md`](../re/client-re-techniques.md) (naming a field
+from the client) and [`corpus-analysis-pitfalls.md`](../re/corpus-analysis-pitfalls.md) (measuring against the
+captures).
 
 ## Layer pages (hand-written, every fact tagged)
 

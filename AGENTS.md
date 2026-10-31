@@ -173,7 +173,8 @@ direction is "construct, don't replay": structured DB rows plus builders replace
 subsystem; remaining verbatim blobs are deliberate interims, marked as such, awaiting decode or in-client validation.
 Worked example: NPC spawns are built whole from typed columns (the three-tier `NpcTemplate` type / `NpcSpawn`
 placement / live `WorldEntity` model, `docs/subsystems/npc-three-tier-architecture.md`), and `TryBuildLive` is the only
-spawn-body path.
+spawn-body path. Before a census over the dumps read `docs/re/corpus-analysis-pitfalls.md`; before naming a field
+from the client, `docs/re/client-re-techniques.md`.
 
 **GM commands** (`Faolan/GameServer/Gm/GmCommandService.cs`, account type >= GameMaster, typed as `.cmd` in chat) are
 the standard test bootstrap for features whose retail trigger is not wired yet (`.additem`, `.teleport`, `.ah`,
