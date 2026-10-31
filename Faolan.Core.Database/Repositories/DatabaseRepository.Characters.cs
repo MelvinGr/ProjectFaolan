@@ -34,7 +34,12 @@ namespace Faolan.Core.Database.Repositories
 		///     when `rdb-name-filter` has not been run, which leaves `CharacterNameRules` enforcing length only.
 		/// </summary>
 		Task<NameFilterTerm[]> GetNameFilterTerms();
-		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
+		/// <summary>
+		///     The character a world, chat or CS handshake names, with its session navigations (its account included), when
+		///     <paramref name="cookie" /> is the one its account's current login was issued; null otherwise, which the
+		///     handshake must refuse. Those handshakes carry the character and the cookie and nothing else.
+		/// </summary>
+		Task<Character?> GetCharacterForLogin(uint characterId, uint cookie);
 		Task<uint[]> GetCharacterTags(uint characterId);
 
 		// Grant a tag (an achievement, or an item-shop "bundle shown" flag - one id space). False = already held.
@@ -262,10 +267,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.NameFilterTerms.AsNoTracking().ToArrayAsync();
 		}
 
-		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)
+		public async Task<Character?> GetCharacterForLogin(uint characterId, uint cookie)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
+			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.Id == characterId && c.Account.LoginCookie == cookie);
 		}
 
 		public async Task<uint[]> GetCharacterTags(uint characterId)

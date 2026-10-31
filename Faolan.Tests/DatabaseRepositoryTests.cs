@@ -243,7 +243,7 @@ namespace Faolan.Tests
 				var created = await repo.CreateCharacter(accountId, realmId);
 				Assert.True(created.MaxVitals(VitalAttributes.LevelOneBase).Health > 0);
 
-				var loaded = await repo.GetCharacterForAccount(accountId, created.Id);
+				var loaded = await repo.GetCharacter(created.Id);
 				Assert.Equal(created.MaxVitals(VitalAttributes.LevelOneBase).Health, loaded!.MaxVitals(VitalAttributes.LevelOneBase).Health);
 				Assert.True(loaded.MaxVitals(VitalAttributes.LevelOneBase).Stamina > 0);
 			}
@@ -508,14 +508,14 @@ namespace Faolan.Tests
 				var created = await repo.CreateCharacter(accountId, realmId);
 
 				// Simulate the editor: choose a mage class + level, regenerate, and commit (as CommitCharacterName does).
-				var character = await repo.GetCharacterForAccount(accountId, created.Id);
+				var character = await repo.GetCharacter(created.Id);
 				character!.Class = ConanClass.Necromancer;
 				character.Level = 20;
 				character.Name = "Mage";
 				await repo.SaveCharacter(character);
 
 				// Reload: vitals reflect the chosen class purely from the stored Class/Level.
-				var reloaded = await repo.GetCharacterForAccount(accountId, created.Id);
+				var reloaded = await repo.GetCharacter(created.Id);
 				var expected = CharacterMaxStats.For(ConanClass.Necromancer, 20, VitalAttributes.LevelOneBase);
 				Assert.Equal(expected.Mana, reloaded!.MaxVitals(VitalAttributes.LevelOneBase).Mana);
 				Assert.Equal(expected.Health, reloaded.MaxVitals(VitalAttributes.LevelOneBase).Health);

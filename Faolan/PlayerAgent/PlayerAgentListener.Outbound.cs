@@ -67,6 +67,15 @@ namespace Faolan.PlayerAgent
 			return true;
 		}
 
+		// The cookie each handoff carries (DispatchChatServerConnectReady(address, cookie, characterID) and its two
+		// siblings): the client presents it to that tier as its proof of this login, which is why it is the cookie and
+		// never the account id.
+		private static uint LoginCookie(INetworkClient client)
+		{
+			var account = client.Session.Account;
+			return account.LoginCookie ?? throw new InvalidOperationException($"Account {account.Id:X8} has no login cookie, so there is nothing to hand the next tier.");
+		}
+
 		private async Task SendCharacterList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
@@ -135,7 +144,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.ChatServerConnectReady,
-				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
+				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(LoginCookie(client)).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
 				RoutingContext = PlayerInterfaceRoutingContext
 			});
@@ -145,7 +154,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.CSServerConnectReady,
-				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
+				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(LoginCookie(client)).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
 				RoutingContext = PlayerInterfaceRoutingContext
 			});
@@ -157,7 +166,7 @@ namespace Faolan.PlayerAgent
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.LoginConnectReady,
 				b => b
 					.WriteString($"{realm.IpAddress}:{realm.Port}")
-					.WriteUInt32(client.Session.Account.Id)
+					.WriteUInt32(LoginCookie(client))
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Character.Id)
 					.WriteArray(0x62, 0x00, 0x00, 0xC7, 0x9C, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00)

@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core.Cli;
 using Faolan.Core.Constants;
@@ -18,16 +19,19 @@ namespace Faolan.UniverseAgent
 		// and it is client-specific, so it cannot be generated.
 		private Task SendPlayerAgentRealm(INetworkClient client, ProtoEndpoint receiver)
 		{
-			// The account rides this reply twice: a 64-bit universe-scoped form (0x2712 in the high word) and the raw
-			// id. That raw u32 is the same number the FullChar snapshot later carries as its PlayerId stat - equal in
-			// the 105 captures that contain both (tools/capture/scan_account_id_vs_playerid.py), with no base added. So
-			// the two must stay in step: if this ever sends something other than Account.Id, SnapshotStatSheet's
-			// PlayerId has to follow.
+			// DispatchAckAuthenticate(nAuthStatus, cPlayerID, cTerritoryManagerAddr, uCookie, eReason), the client's own
+			// signature (docs/re/aoc-client-rpc-methods.md). cPlayerID is the account in its universe-scoped form, 0x2712
+			// in the high word; its low word is the account id the FullChar snapshot carries as PlayerId (one value per
+			// account across the corpus). uCookie is this login's cookie, different on every one of the 139 captured
+			// logins, which the client presents to every later tier as its proof of this login (Account.LoginCookie).
+			var account = client.Session.Account;
+			var cookie = account.LoginCookie ?? throw new InvalidOperationException($"Account {account.Id:X8} has no login cookie to hand out; the login did not issue one.");
+
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceMethods.DispatchAckAuthenticate, b => b
-				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
-				.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
+				.WriteUInt32(account.AuthStatus) // authstatus 0x01
+				.WriteUInt64(0x0000271200000000u + account.Id)
 				.WriteString($"{Configuration.ServerPublicAddress}:{Configuration.ServerPlayerAgentPort}")
-				.WriteUInt32(client.Session.Account.Id)
+				.WriteUInt32(cookie)
 				.WriteUInt32(0x00000000)));
 		}
 

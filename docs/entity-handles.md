@@ -17,7 +17,7 @@ Rule (AGENTS.md): **session-volatile handles must never be persistence keys.** P
 ## Players: handle == ClientInstance == Character.Id (on purpose)
 
 For a player these are one value. The GameServer hello resolves the character *by* the client instance
-(`GetCharacterForAccount(accountId, clientInstance)` in `LoginHandshakeService`), and
+(`GetCharacterForLogin(clientInstance, cookie)` in `LoginHandshakeService`), and
 `WorldSimulation.RegisterPlayerInWorld` seeds `WorldEntity.Handle` from that character's `Id`. DB character ids are
 the **real AoC ids** (e.g. `20016753` = `0x01316E71`, `134407638` = `0x0802E5D6`), not small autoincrements, so the
 persistent id already sits in a client-tracked range. Retail unifies these too: the player's `FA015807` spawn

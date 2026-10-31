@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Cli;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -36,13 +37,19 @@ namespace Faolan.PlayerAgent
 			var body = packet.BodyReader();
 			switch (method)
 			{
+				// PlayerAgent.Authenticate(nAccount, nCookie, territoryVersion): the cookie is the one the UniverseAgent
+				// issued this login, and the only thing that ties this connection to it. An account id alone proves
+				// nothing - it is on the wire in every login reply.
 				case PlayerAgentMethods.Authenticate:
 				{
 					var accountId = body.ReadUInt32();
 					var cookie = body.ReadUInt32();
 
-					if (await Database.GetAccount(accountId) is not {} account)
-						throw new Exception("Account == null");
+					if (await Database.GetAccountForLogin(accountId, cookie) is not {} account)
+					{
+						RefuseLogin(client, nameof(PlayerAgentMethods.Authenticate), accountId, cookie);
+						break;
+					}
 
 					client.Session.Account = account;
 					client.Session.Account.AuthStatus = body.ReadUInt32();
@@ -61,9 +68,13 @@ namespace Faolan.PlayerAgent
 				{
 					var resume = AuthenticateLoggedInCodec.Parse(packet.Body.Span);
 
-					client.Session.Account = (await Database.GetAccount(resume.AccountId))!;
-					if (client.Session.Account == null)
-						throw new Exception($"AuthenticateLoggedIn for unknown account {resume.AccountId:X8}.");
+					if (await Database.GetAccountForLogin(resume.AccountId, resume.Cookie) is not {} resumed)
+					{
+						RefuseLogin(client, nameof(PlayerAgentMethods.AuthenticateLoggedIn), resume.AccountId, resume.Cookie);
+						break;
+					}
+
+					client.Session.Account = resumed;
 
 					Logger.LogDebug("AuthenticateLoggedIn: account {AccountId:X8} re-attaching a settings connection.", resume.AccountId);
 
@@ -93,6 +104,9 @@ namespace Faolan.PlayerAgent
 					var upload = UpdateCharacterSettingsCodec.Parse(packet.Body.Span);
 					WarnOnCheckSumMismatch(nameof(PlayerAgentMethods.UpdateCharacterSettings), upload.Buffer, upload.CheckSum);
 
+					if (await OwnedCharacter(client, upload.CharacterId, nameof(PlayerAgentMethods.UpdateCharacterSettings)) == null)
+						break;
+
 					await Database.SaveCharacterClientSettings(upload.CharacterId, upload.Buffer.Payload, null);
 
 					Logger.LogInformation("Stored character settings for {CharacterId:X8}: {Files} ({Bytes} bytes).", upload.CharacterId, string.Join(", ", upload.Buffer.Files.Select(f => f.Name)),
@@ -104,6 +118,9 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentMethods.UpdateCharacterPreview:
 				{
 					var upload = UpdateCharacterPreviewCodec.Parse(packet.Body.Span);
+
+					if (await OwnedCharacter(client, upload.CharacterId, nameof(PlayerAgentMethods.UpdateCharacterPreview)) == null)
+						break;
 
 					await Database.SaveCharacterClientSettings(upload.CharacterId, null, upload.Buffer.Payload);
 
@@ -202,9 +219,12 @@ namespace Faolan.PlayerAgent
 					Logger.LogDebug("LoginCharacter {CharacterId:X8}: language={Language}, region={Region}, age={Age}, gender={Gender}, igr={Igr}, userType={UserType}, serviceType={ServiceType}", characterId,
 						clientLanguage, regionCode, ageCode, genderCode, igrId, userType, serviceType);
 
+					if (await OwnedCharacter(client, characterId, nameof(PlayerAgentMethods.LoginCharacter)) is not {} selected)
+						break;
+
 					client.Session.Account.ClientInstance = characterId;
-					client.Session.Character = (await Database.GetCharacter(characterId))!;
-					await Database.UpdateLastInfo(client.Session.Character!.Id, client.IpAddress!);
+					client.Session.Character = selected;
+					await Database.UpdateLastInfo(selected.Id, client.IpAddress!);
 					await Database.SaveAccount(client.Session.Account);
 
 					await SendCharacterSettings(client, packet.Sender);
@@ -296,6 +316,9 @@ namespace Faolan.PlayerAgent
 					var characterId = body.ReadUInt32();
 					Logger.LogInformation("DeleteCharacter request: characterId={CharacterId:X8}.", characterId);
 
+					if (await OwnedCharacter(client, characterId, nameof(PlayerAgentMethods.RequestDeleteCharacter)) == null)
+						break;
+
 					var deleted = await Database.DeleteCharacter(characterId);
 					Logger.LogInformation("DeleteCharacter: characterId={CharacterId:X8} deleted={Deleted}.", characterId, deleted);
 
@@ -311,6 +334,30 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 			}
+		}
+
+		// A handshake whose cookie is not the account's current login: a client that skipped the UniverseAgent, or one
+		// whose login a later login on the same account replaced. No answer to it is captured, so it gets none.
+		private void RefuseLogin(INetworkClient client, string method, uint accountId, uint cookie)
+		{
+			Logger.LogWarning("PlayerAgent {Method} refused: cookie {Cookie:X8} is not account {AccountId:X8}'s current login - dropping the connection.", method, cookie, accountId);
+			client.Stop();
+		}
+
+		/// <summary>
+		///     The character <paramref name="characterId" /> names when it is one of this connection's account's;
+		///     otherwise null, with the connection dropped. Every character id this tier is sent comes from the client, and
+		///     nothing else stops it naming another account's character.
+		/// </summary>
+		private async Task<Character?> OwnedCharacter(INetworkClient client, uint characterId, string method)
+		{
+			var account = client.Session.Account;
+			if (await Database.GetCharacter(characterId) is {} character && character.AccountId == account.Id)
+				return character;
+
+			Logger.LogWarning("PlayerAgent {Method} refused: character {CharacterId:X8} is not one of account {AccountId:X8}'s - dropping the connection.", method, characterId, account.Id);
+			client.Stop();
+			return null;
 		}
 	}
 }

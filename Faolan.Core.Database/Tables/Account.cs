@@ -105,6 +105,21 @@ namespace Faolan.Core.Database.Tables
 		// chars ("N"), the shape retail uses.
 		public Guid AuthChallenge { get; set; }
 
+		/// <summary>
+		///     The login session's cookie, the client's <c>uCookie</c>: issued by the UniverseAgent once a login is
+		///     authenticated, and the only proof every later tier sees that it was. Null until the account's first login.
+		/// </summary>
+		/// <remarks>
+		///     The client presents it with each tier's handshake (PlayerAgent <c>Authenticate</c> and
+		///     <c>AuthenticateLoggedIn</c>, GameServer <c>Authenticate2</c>, the chat Hello, CsPlayerAgent
+		///     <c>Authenticate</c>), each a new connection on a port of its own, and those tiers may run in another
+		///     process; so it is a column, not process state. Retail issues a fresh value on every login, 31 bits wide
+		///     (139 captured logins, 139 different values, none with the top bit set). Rotating it means one login per account: a
+		///     second login leaves the first client's open connections alone, but that client's next handshake (a zone
+		///     change, a relog) is refused.
+		/// </remarks>
+		public uint? LoginCookie { get; set; }
+
 		[MaxLength(64)] // INET6_ADDRSTRLEN 46
 		public string? LastIpAddress { get; set; }
 

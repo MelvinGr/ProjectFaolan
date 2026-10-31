@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
@@ -119,6 +120,12 @@ namespace Faolan.UniverseAgent
 					}
 
 					await Database.SetAccountLastInfo(account.Id, client.IpAddress!);
+
+					// The proof of this login that every later tier checks (Account.LoginCookie). Issued only here, after
+					// every refusal above, so no other path can hold one.
+					var cookie = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
+					await Database.SetAccountLoginCookie(account.Id, cookie);
+					account.LoginCookie = cookie;
 
 					await SetRegionState(client, packet.Sender);
 					await SendPlayerAgentRealm(client, packet.Sender);

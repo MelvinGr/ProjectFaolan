@@ -28,7 +28,7 @@ namespace Faolan.GameServer.Session
 	{
 		public async Task<bool> HandleAuthenticate2(INetworkClient client, FaolanStream body)
 		{
-		// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
+		// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + login cookie + version).
 		// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route above, so
 		// here the body is always the >= 12-byte Authenticate2. Guarded anyway: a short body would over-read and drop
 		// the client.
@@ -38,20 +38,22 @@ namespace Faolan.GameServer.Session
 			return true;
 		}
 
+		// Authenticate2(nClientInst, nCookie, cGameClientVersionString): the character, and the cookie the UniverseAgent
+		// issued this login - the only proof that the connection belongs to an authenticated login.
 		var clientInstance = body.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
-		var accountId = body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
+		var cookie = body.ReadUInt32();
 		var clientVersion = body.ReadString();
 
-		if (await database.GetAccount(accountId) is not {} account)
-			throw new Exception("Account == null");
+		if (await database.GetCharacterForLogin(clientInstance, cookie) is not {} character)
+		{
+			logger.LogWarning("GameServer hello refused: cookie {Cookie:X8} is not the current login of character {CharacterId:X8}'s account - dropping the connection.", cookie, clientInstance);
+			client.Stop();
+			return false;
+		}
 
-		client.Session.Account = account;
+		client.Session.Character = character;
+		client.Session.Account = character.Account;
 		client.Session.Account.ClientInstance = clientInstance;
-
-		// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
-		// and forgiving that makes the check look like dead code someone will helpfully delete.
-		client.Session.Character = await database.GetCharacterForAccount(accountId, clientInstance)
-			?? throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
 
 		logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 
@@ -84,8 +86,8 @@ namespace Faolan.GameServer.Session
 		var isCreateWorldEntry = !isNewCharacter && createFlow.TryConsumePendingCreateWorldEntry(clientInstance);
 		// One live connection per character. A second login of a character already in the world gives two sessions
 		// writing one character's state - two world entities, two persistence writers, and a wallet and inventory that
-		// depend on which session saved last. The account may hold as many connections as it likes (that is how a
-		// second client on the same account works); the character is what must be exclusive.
+		// depend on which session saved last. The account's login is exclusive too, but through its cookie
+		// (Account.LoginCookie): a later login on the account stops this one's next handshake, not its open connections.
 		//
 		// The two legitimate re-connections are not duplicates and must pass: the post-creation world handoff and a
 		// changemap/teleport re-entry both open a fresh connection for a character whose old one may not have been
@@ -95,7 +97,7 @@ namespace Faolan.GameServer.Session
 		if (!reconnectHandoff && connections.ForCharacter(client.Session.Character.Id) is { } existingClient && !ReferenceEquals(existingClient, client))
 		{
 			logger.LogWarning("Duplicate login for character {CharacterId:X8} '{Name}' (account {AccountId:X8}): already in the world on another connection - dropping the new one.",
-				client.Session.Character.Id, client.Session.Character.Name, accountId);
+				client.Session.Character.Id, client.Session.Character.Name, client.Session.Account.Id);
 			client.Stop();
 			return false;
 		}

@@ -59,28 +59,26 @@ namespace Faolan.ChatServer
 					// Body = [u32 version][u32 clientInstance][u32 cookie][string language]. The three-field head is the
 					// same shape the client sends to the CSPlayerAgent as Authenticate(nCharacterInstance, nCookie,
 					// communityVersion) - capture-confirmed: in every trace the chat cookie is byte-identical to the
-					// CSPlayerAgent one, which is the `uCookie` the UniverseAgent handed out in DispatchAckAuthenticate.
-					// The account is looked up by that cookie, which only works because SendPlayerAgentRealm issues
-					// Account.Id as the cookie (Faolan/UniverseAgent/UniverseAgentListener.Outbound.cs). If the cookie
-					// ever becomes a real opaque token, this lookup has to go through a cookie->account map instead.
+					// CSPlayerAgent one, which is the `uCookie` the UniverseAgent handed out in DispatchAckAuthenticate:
+					// the proof that this connection belongs to an authenticated login (Account.LoginCookie).
 					// Version is 1 in all 5239 captured Hellos; language is the client's UI language ("English").
 					var protocolVersion = body.ReadUInt32();
 					var clientInstance = body.ReadUInt32();
-					var accountId = body.ReadUInt32();
+					var cookie = body.ReadUInt32();
 					var language = body.ReadString();
 
-					client.Session.Account = (await Database.GetAccount(accountId))!;
-					if (client.Session.Account == null)
-						throw new Exception($"Account not found: {accountId:X}");
+					if (await Database.GetCharacterForLogin(clientInstance, cookie) is not {} loggedIn)
+					{
+						Logger.LogWarning("ChatServer hello refused: cookie {Cookie:X8} is not the current login of character {CharacterId:X8}'s account - dropping the connection.", cookie, clientInstance);
+						client.Stop();
+						break;
+					}
 
+					client.Session.Character = loggedIn;
+					client.Session.Account = loggedIn.Account;
 					client.Session.Account.ClientInstance = clientInstance;
 
-					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
-					// and forgiving that makes the check look like dead code someone will helpfully delete.
-					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance)
-						?? throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
-
-					Logger.LogInformation("ChatServer hello decoded: version={Version}, clientInstance={ClientInstance:X8}, cookie/accountId={AccountId:X8}, language={Language}", protocolVersion, clientInstance, accountId, language);
+					Logger.LogInformation("ChatServer hello decoded: version={Version}, clientInstance={ClientInstance:X8}, account={AccountId:X8}, language={Language}", protocolVersion, clientInstance, loggedIn.AccountId, language);
 
 					// Retail sends the full chat-channel subscription list first (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from

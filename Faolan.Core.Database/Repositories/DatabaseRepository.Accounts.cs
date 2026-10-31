@@ -19,6 +19,15 @@ namespace Faolan.Core.Database.Repositories
 		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
 		Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge);
+
+		/// <summary>Stores the cookie a successful login was issued, replacing the previous login's.</summary>
+		Task<bool> SetAccountLoginCookie(uint accountId, uint cookie);
+
+		/// <summary>
+		///     The account, when <paramref name="cookie" /> is the one its current login was issued; null otherwise, which
+		///     a handshake must refuse.
+		/// </summary>
+		Task<Account?> GetAccountForLogin(uint accountId, uint cookie);
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 
@@ -118,6 +127,18 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.AuthChallenge, challenge)) == 1;
+		}
+
+		public async Task<bool> SetAccountLoginCookie(uint accountId, uint cookie)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.LoginCookie, cookie)) == 1;
+		}
+
+		public async Task<Account?> GetAccountForLogin(uint accountId, uint cookie)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == accountId && a.LoginCookie == cookie);
 		}
 
 		public async Task<bool> SetAccountLastInfo(uint accountId, string ipAddress)

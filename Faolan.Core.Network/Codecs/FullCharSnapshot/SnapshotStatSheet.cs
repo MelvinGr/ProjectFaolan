@@ -88,9 +88,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// different characters, the two two-client captures carry exactly two ids, and one character name appears under two
 			// ids in different sessions.
 			//
-			// It is the account id raw, with no base added: UniverseAgent's AckAuthenticate sends the account both as a
-			// 0x2712-prefixed u64 and as a raw u32, and it is the raw one this slot repeats - equal in all 105 captures that
-			// carry both. The login tier and this sheet must therefore send the same number.
+			// It is the account id raw, with no base added: the low word of the cPlayerID UniverseAgent's
+			// DispatchAckAuthenticate sends as a 0x2712-prefixed u64. The raw u32 in that reply is the login's cookie, a
+			// different value on every login, and never this one.
 			yield return (CharacterStatId.PlayerId, character.AccountId);
 
 			// The wallet. The slot is a u32 and Character.Money is a ulong, so a balance past uint.MaxValue saturates: the wire

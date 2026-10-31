@@ -231,22 +231,25 @@ namespace Faolan.CSPlayerAgent
 
 			switch (method)
 			{
+				// Authenticate(nCharacterInstance, nCookie, communityVersion): the character, and the cookie the
+				// UniverseAgent issued this login - the only proof that the connection belongs to an authenticated login.
 				case CSPlayerAgentMethods.Authenticate:
 				{
 					var characterId = body.ReadUInt32();
-					var accountId = body.ReadUInt32();
+					var cookie = body.ReadUInt32();
 					var authReply = body.ReadUInt32();
 
-					if (await Database.GetAccount(accountId) is not {} account)
-						throw new Exception("Account == null");
+					if (await Database.GetCharacterForLogin(characterId, cookie) is not {} loggedIn)
+					{
+						Logger.LogWarning("CsPlayerAgent Authenticate refused: cookie {Cookie:X8} is not the current login of character {CharacterId:X8}'s account - dropping the connection.", cookie,
+							characterId);
+						client.Stop();
+						break;
+					}
 
-					client.Session.Account = account;
+					client.Session.Character = loggedIn;
+					client.Session.Account = loggedIn.Account;
 					client.Session.Account.ClientInstance = characterId;
-
-					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
-					// and forgiving that makes the check below look like dead code someone will helpfully delete.
-					client.Session.Character = await Database.GetCharacterForAccount(accountId, characterId)
-						?? throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 
 					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchAuthenticateAck, b => b.WriteUInt32(authReply)));
 

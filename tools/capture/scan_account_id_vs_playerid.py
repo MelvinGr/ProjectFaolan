@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Does the snapshot's PlayerId equal the ACCOUNT ID the login tier already sent? (Gitea #478 follow-up)
 
-UniverseAgent's DispatchAckAuthenticate carries the account twice: a u64
-`0x0000271200000000 + accountId` and the raw `accountId` as a u32. The FullChar snapshot's PlayerId stat was
-shown to be account-scoped, so the question is whether it is that same number or that number plus a base.
+UniverseAgent's DispatchAckAuthenticate carries the account as its cPlayerID, a u64
+`0x0000271200000000 + accountId` (the u32 after the address is the login's cookie, a fresh value per login). The
+FullChar snapshot's PlayerId stat was shown to be account-scoped, so the question is whether it is that same number
+or that number plus a base.
 
 This scans the WHOLE capture corpus and, per capture, prints the login-tier account id beside the snapshot's
 PlayerId. Equal => no offset; a constant difference => a base to add.
