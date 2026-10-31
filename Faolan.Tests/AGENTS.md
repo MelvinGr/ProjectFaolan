@@ -47,25 +47,23 @@ played. `--report fixture-source --report-arg <id> --captures <data-repo>/Captur
 **Character names in the packet bytes** are replaced by equal-length pseudonyms that stay readable against the display
 names the source and docs use: `Assas23`, `Demo80`, `Necr80` (for `AssassinL23`/`DemoL80`/`NecroL80`, squeezed to the
 byte length the wire fixes). `--report fixture-names --report-arg <name>[,<name>]` reports which fixtures and IIRs still
-contain a name and the framing around each hit - feed it the list the commit hook blocks on
-(`.git/hooks/personal-names.json`); the residue is protobuf length-delimited fields, so an equal-length substitution
-ripples nowhere. `--report fixture-substitute --report-arg "<old>=<new>[,...]" [--dry-run]` performs the substitution
-(equal length enforced, framed occurrences only, verifies the old names are gone). Tests that carry the names in their
-own inline retail hex (`UnsentMethodCodecTests`, `ItemCreatorNameTests`, `MailMessageCodecTests`,
-`TradepostMailBodyTests`, `KnubotCodecTestData`) use the same pseudonyms, and `GuildPacketTests`' SHA-256 pin is derived
-from the substituted bytes (its remark explains why that is still a retail pin). If the substitution is ever re-run:
-the archive is Brotli-compressed, so an equal-length substitution still changes the file size while every body keeps
-its length; and the writer rewrites the whole file, so an interrupted run leaves a truncated archive - `git checkout`
-it and re-run. Capture file names in comments and docs are out of scope for this: `.githooks/personal-names.py --tree`
-accepts them, and they are how a dump is found in the data repo.
+contain a name and the framing around each hit - feed it the maintainer's retail account and character names; the
+residue is protobuf length-delimited fields, so an equal-length substitution ripples nowhere. `--report
+fixture-substitute --report-arg "<old>=<new>[,...]" [--dry-run]` performs the substitution (equal length enforced,
+framed occurrences only, verifies the old names are gone). Tests that carry the names in their own inline retail hex
+(`UnsentMethodCodecTests`, `ItemCreatorNameTests`, `MailMessageCodecTests`, `TradepostMailBodyTests`,
+`KnubotCodecTestData`) use the same pseudonyms, and `GuildPacketTests`' SHA-256 pin is derived from the substituted
+bytes (its remark explains why that is still a retail pin). If the substitution is ever re-run: the archive is
+Brotli-compressed, so an equal-length substitution still changes the file size while every body keeps its length; and
+the writer rewrites the whole file, so an interrupted run leaves a truncated archive - `git checkout` it and re-run.
+Capture file names in comments and docs are out of scope for this: they are how a dump is found in the data repo.
 
 ## Test traps
 
-- **The suite reads `faolan.sql`, never `faolan.db`.** `TestDb.GameDatabase` builds its fixture from the migrations
-  plus `faolan.sql`, and the pre-commit hook regenerates `faolan.sql` only when `faolan.db` is committed. A run after
-  an import and before that commit asserts against the data from before the import: regenerate the seed
-  (`--report sql-seed`) before testing one. A column rename must regenerate it in the same commit, or every test
-  fails at once on the seed's column lists.
+- **The suite reads `faolan.sql`, never `faolan.db`.** `TestDb.GameDatabase` builds its fixture from the migrations plus
+  `faolan.sql`, which changes only when someone regenerates it (`--report sql-seed`). A run after an import and before
+  that regeneration asserts against the data from before the import: regenerate the seed before testing one. A column
+  rename must regenerate it in the same commit, or every test fails at once on the seed's column lists.
 - **The seed excludes player state** (`Characters` and everything hanging off it, accounts, realms, guilds, mail,
   chat, tradepost listings, claims), so a gate over a captured character's spells, feats or items is vacuous here.
   `SeedVacuityGateTests` makes a test that names a seed-excluded `DbSet` declare why; such a comparison belongs in

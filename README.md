@@ -307,11 +307,10 @@ we've seen_, and names the gaps). Regenerate with
 dotnet build ProjectFaolan.slnx
 ```
 
-If you intend to commit changes to `faolan.db`, enable the repo's hooks **once per clone** (git does not share
-them, and without this the `faolan.sql` mirror below silently goes stale):
+If you commit changes to `faolan.db`, regenerate its `faolan.sql` mirror (below) and commit the two together:
 
 ```sh
-git config core.hooksPath .githooks
+dotnet run --project Faolan.Importer -- --report sql-seed
 ```
 
 ## Run the server
@@ -330,10 +329,9 @@ database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/
 ### `faolan.db` and `faolan.sql`
 
 The game data lives in **`faolan.db`** (SQLite, built by the importer, committed). Alongside it, **`faolan.sql`**
-is the same data as plain text, regenerated automatically by the `.githooks/pre-commit` hook whenever `faolan.db`
-is committed — so a data change is **reviewable in a diff** instead of showing up as `Bin 8839168 -> 8839168
-bytes`. It is generated: never hand-edit it, and don't bother regenerating it yourself (the hook dumps the
-*staged* blob, so it always matches the commit).
+is the same data as plain text, regenerated with `--report sql-seed` whenever `faolan.db` changes — so a data
+change is **reviewable in a diff** instead of showing up as `Bin 8839168 -> 8839168 bytes`. It is generated:
+never hand-edit it, and commit it together with the `faolan.db` it mirrors.
 
 It is written from the EF model rather than by `sqlite3 .dump`, so it loads into SQLite _and_ PostgreSQL, and it
 doubles as the **seed**: a database with no game content is filled from it at startup (delete `faolan.db` and the

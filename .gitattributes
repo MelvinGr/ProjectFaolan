@@ -65,11 +65,10 @@
 *.sh text eol=lf
 
 ###############################################################################
-# faolan.sql - the generated SQL mirror of faolan.db (#379). Byte-for-byte what
-# `sqlite3 faolan.db .dump` emits, so git must NOT rewrite its line endings:
-# EF baked CRLF into the schema text, and `* text=auto` above would normalise it
-# to LF on commit while the pre-commit hook regenerates it with CRLF - leaving the
-# file permanently "modified" and no longer a faithful mirror. Diffs still work;
+# faolan.sql - the generated mirror of faolan.db's data (`--report sql-seed`).
+# Some string values carry CRLF, and `* text=auto` above would normalise them to
+# LF on commit while every regeneration writes them back - leaving the file
+# permanently "modified" and no longer a faithful mirror. Diffs still work;
 # -text only disables EOL conversion, it does not mark the file binary.
 ###############################################################################
 faolan.sql -text

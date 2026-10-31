@@ -2,7 +2,6 @@
     <Folder Name="/Solution Files/">
         <File Path=".config/dotnet-ef.json" />
         <File Path=".gitattributes" />
-        <File Path=".githooks/pre-commit" />
         <File Path=".gitignore" />
         <File Path="AGENTS.md" />
         <File Path="Directory.Build.props" />

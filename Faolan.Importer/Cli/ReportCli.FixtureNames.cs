@@ -35,7 +35,7 @@ namespace Faolan.Importer.Cli
 			if (needles.Count == 0)
 			{
 				Console.Error.WriteLine("fixture-names: pass one or more names, e.g. --report-arg <name>,<name>");
-				Console.Error.WriteLine("               the blocked set is the one .git/hooks/personal-names.py carries.");
+				Console.Error.WriteLine("               the maintainer's retail account and character names.");
 				return 1;
 			}
 
@@ -154,10 +154,10 @@ namespace Faolan.Importer.Cli
 			return -1;
 		}
 
-		// The match is case-insensitive, and it has to be. The blocked list `.githooks/personal-names.py` enforces is
-		// kept lower-case - it is a substring rule over source text, where casing is arbitrary - while the wire
-		// carries the name capitalised, as the player typed it. A case-sensitive scan therefore answers clean against
-		// the very list the commit hook blocks on, which is the most misleading possible answer.
+		// The match is case-insensitive, and it has to be. A name list is usually kept lower-case - it is matched as a
+		// substring over source text, where casing is arbitrary - while the wire carries the name capitalised, as the
+		// player typed it. A case-sensitive scan would therefore answer clean against the very list it was given,
+		// which is the most misleading possible answer.
 		private static byte Fold(byte b)
 		{
 			return b >= (byte)'A' && b <= (byte)'Z' ? (byte)(b + 32) : b;

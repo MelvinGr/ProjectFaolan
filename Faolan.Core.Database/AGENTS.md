@@ -29,15 +29,9 @@ and `ICharacterStatRepository` (what it adds up to).
 
 **SQLite is interim.** The goal is a real database with the schema and seed as a `.sql` file, dropping the binary.
 - **`faolan.sql` is the reviewable mirror of `faolan.db`'s data, and a seed that loads into both SQLite and Postgres.**
-  The `.githooks/pre-commit` hook regenerates it whenever `faolan.db` is committed, dumping the staged blob so it
-  matches the commit exactly. Never hand-edit it; to regenerate by hand run
-  `dotnet run --project Faolan.Importer -- --report sql-seed`.
-  - **Run `git config core.hooksPath .githooks` once per clone.** Git does not share hooks; without it `faolan.sql`
-    silently goes stale and the personal-name guard does not run (`.githooks/pre-commit` chains
-    `.githooks/personal-names.py`, which blocks the maintainer's retail account and character names from entering a
-    repo meant to go public). The guard's logic is tracked; its identity list is not - it reads the untracked
-    `.git/hooks/personal-names.json` (or `$FAOLAN_PERSONAL_NAMES`). With no config it skips and says so; `--tree`
-    audits every tracked file.
+  Never hand-edit it. Regenerate it whenever `faolan.db` changes, with
+  `dotnet run --project Faolan.Importer -- --report sql-seed`, and commit the two together; nothing regenerates it
+  automatically.
   - **Restore:** create the schema (`dotnet ef database update`), then run `faolan.sql`. It is one file, verified at
     zero errors with full row parity into a fresh SQLite and a fresh Postgres. No game-content table has a
     store-generated key, so there are no sequence high-water marks to restore;

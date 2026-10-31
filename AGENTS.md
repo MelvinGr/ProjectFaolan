@@ -119,12 +119,11 @@ per-domain slices. Lazy loading is deliberately not used; load navigations expli
   before manual deletes or you orphan child rows.
 
 **SQLite is interim.** The goal is a real database with the schema and seed as a `.sql` file, dropping the binary.
-- `faolan.sql` is the reviewable mirror of `faolan.db`'s data and the seed that loads into SQLite and Postgres. The
-  `.githooks/pre-commit` hook regenerates it whenever `faolan.db` is committed. Never hand-edit it; to regenerate by
-  hand run `dotnet run --project Faolan.Importer -- --report sql-seed`. How it is generated and loaded:
+- `faolan.sql` is the reviewable mirror of `faolan.db`'s data and the seed that loads into SQLite and Postgres. Never
+  hand-edit it. **Whenever `faolan.db` changes, regenerate it** with
+  `dotnet run --project Faolan.Importer -- --report sql-seed` and commit the two together: nothing regenerates it
+  automatically, and the test suite reads the seed, not the db. How it is generated and loaded:
   `Faolan.Core.Database/AGENTS.md`.
-- **Run `git config core.hooksPath .githooks` once per clone.** Without it `faolan.sql` silently goes stale and the
-  personal-name guard does not run.
 - **`journal_mode=WAL`** is a persistent file-header flag on `faolan.db`. Without it a reader blocks a writer, so any
   concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process) makes a live world write fail
   and be lost. A busy timeout does not help (it is already 30 s by default): it only makes the writer wait while the
@@ -227,7 +226,7 @@ private corpus.
 ## Conventions
 
 - Commit each verified milestone immediately (conventional style, e.g. `feat(economy): ...`); `faolan.db` rides along
-  in the commit.
+  in the commit, with `faolan.sql` regenerated beside it.
 - **A task is done when the code, the tests and the record agree.** Update whatever the change made stale:
   - **Docs:** the relevant `docs/` pages. If you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
     (`FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`). Repoint any doc
@@ -268,6 +267,9 @@ private corpus.
     `--Content:RdbDir` / `--rdb-proxy` and the committed `faolan.json` stays machine-agnostic.
   - `run.sh` is the one deliberate exception (a personal dev launcher, kept local); its Windows twin `run.bat` takes
     `FAOLAN_CDN_STORE` / `AOC_EXE2` instead.
+- **Never commit the maintainer's retail account or character names** - in source, docs, `faolan.sql` or fixtures -
+  since the repo is meant to go public. Fixtures carry the pseudonyms listed in `Faolan.Tests/AGENTS.md`; nothing
+  checks this on commit.
 - **Docs carry confirmed information only; progress lives in Gitea.** No "Remaining / Next steps / Open items /
   In progress / status / handoff" sections and no `*-handoff.md` docs. Keep the verified facts (decoded grammar,
   shipped behaviour, code maps) and replace any open-work list with a one-line pointer to the Gitea issue.
