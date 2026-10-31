@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			var (buffs, _, output, _, _, mob) = Harness();
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-5), 30f, dotDelta: -7, dotIntervalMs: 1000));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			var tick = Assert.Single(output.DotTicks);
 			Assert.Equal(MobHandle, tick.NpcHandle);
@@ -49,8 +49,8 @@ namespace Faolan.Tests
 			var (buffs, _, output, _, _, mob) = Harness();
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 2000) with { LastDotTick = DateTimeOffset.UtcNow });
 
-			await buffs.TickNpcBuffs();
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
+			await TickNpcBuffs(buffs);
 
 			Assert.Empty(output.DotTicks);
 		}
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			var (buffs, _, output, _, _, mob) = Harness();
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-20), 9.5f));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			var removal = Assert.Single(output.Removals);
 			Assert.Equal(MobHandle, removal.ApplyTo); // mirrors the apply: applyTo = the affected entity...
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 			areas.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			var area = Assert.Single(output.Areas);
 			Assert.Equal(MobHandle, area.SourceHandle); // the emitter is the mob the debuff sits on
@@ -97,8 +97,8 @@ namespace Faolan.Tests
 			areas.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
 
-			await buffs.TickNpcBuffs();
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
+			await TickNpcBuffs(buffs);
 
 			Assert.Single(output.Areas);
 		}
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
 			Track(buffs, second, Buff(DateTimeOffset.UtcNow, 9.5f));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			Assert.Equal(2, output.Areas.Count);
 			Assert.Equal([MobHandle, MobHandle + 1], output.Areas.Select(a => a.SourceHandle).Order());
@@ -135,7 +135,7 @@ namespace Faolan.Tests
 			sim.Players.TryRemove(client, out _);
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			Assert.Empty(output.DotTicks);
 			Assert.Empty(output.Removals);
@@ -152,7 +152,7 @@ namespace Faolan.Tests
 			mob.Vitals.ApplyHealthDelta(-1000);
 			Track(buffs, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
 
-			await buffs.TickNpcBuffs();
+			await TickNpcBuffs(buffs);
 
 			Assert.True(mob.IsDead);
 			Assert.Empty(output.DotTicks);
@@ -186,6 +186,12 @@ namespace Faolan.Tests
 		{
 			mob.ActiveBuffs[buff.BuffId] = buff;
 			buffs.TrackBuffedEntity(mob);
+		}
+
+		// The mob's zone ticks its own buffed entities: every entity here sits in MapId's default instance.
+		private static Task TickNpcBuffs(BuffTickService buffs)
+		{
+			return buffs.TickNpcBuffs(new Zone(MapId));
 		}
 
 		private static (BuffTickService Buffs, WorldSimulation Sim, RecordingWorldOutbound Output, RecordingSpellAreaCatalog Areas, RecordingNetworkClient Client, WorldEntity Mob) Harness()

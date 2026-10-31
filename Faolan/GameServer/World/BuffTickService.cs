@@ -45,7 +45,9 @@ namespace Faolan.GameServer.World
 		// The last aura application per (holder, buff, area). See TickAuras for why it is not WorldEntity.LastDotTick;
 		// the holder is in the key because a mob can carry an area-emitting debuff, so two entities holding the same
 		// buff would otherwise share one stamp and each suppress the other's cadence.
-		private readonly Dictionary<(uint Holder, uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = [];
+		// Concurrent because every zone ticks its own players' auras on its own loop, and the stale-stamp sweep reads it
+		// across zones.
+		private readonly ConcurrentDictionary<(uint Holder, uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = [];
 
 		/// <summary>Converts a stored damage-over-time delta from wire units to the display units this layer works in.</summary>
 		/// <remarks>
@@ -116,10 +118,10 @@ namespace Faolan.GameServer.World
 			return effect;
 		}
 
-		public async Task TickBuffExpiry()
+		public async Task TickBuffExpiry(Zone zone)
 		{
 			var now = DateTimeOffset.UtcNow;
-			foreach (var pair in _players)
+			foreach (var pair in _players.In(zone))
 			{
 				// Decide and remove in one snapshot pass before sending anything. Removing inside a foreach over the
 				// live concurrent dictionary, with awaits in the body, can skip a buff whose bucket neighbour has just
@@ -175,10 +177,10 @@ namespace Faolan.GameServer.World
 		///         carry both a DoT and an aura, and sharing one stamp would make each suppress the other's cadence.
 		///     </para>
 		/// </remarks>
-		public async Task TickAuras()
+		public async Task TickAuras(Zone zone)
 		{
 			var now = DateTimeOffset.UtcNow;
-			foreach (var pair in _players)
+			foreach (var pair in _players.In(zone))
 			{
 				var entity = pair.Value;
 				var client = pair.Key;
@@ -196,7 +198,7 @@ namespace Faolan.GameServer.World
 			{
 				var live = _players.Values.Concat(_buffedEntities.Values).SelectMany(e => e.ActiveBuffs.Keys.Select(id => (e.Handle, id))).ToHashSet();
 				foreach (var key in _auraTicks.Keys.Where(k => !live.Contains((k.Holder, k.BuffId))).ToList())
-					_auraTicks.Remove(key);
+					_auraTicks.TryRemove(key, out _);
 			}
 		}
 
@@ -385,13 +387,13 @@ namespace Faolan.GameServer.World
 		///         its end or to be paid for a kill it lands.
 		///     </para>
 		/// </remarks>
-		public async Task TickNpcBuffs()
+		public async Task TickNpcBuffs(Zone zone)
 		{
 			if (_buffedEntities.IsEmpty)
 				return;
 
 			var now = DateTimeOffset.UtcNow;
-			foreach (var (handle, entity) in _buffedEntities.ToArray())
+			foreach (var (handle, entity) in _buffedEntities.ToArray().Where(b => b.Value.MapId == zone.MapId && b.Value.InstanceId == zone.InstanceId))
 			{
 				// Dead, despawned or clean: the entity leaves the registry. A corpse renders no icon, and a bleed that
 				// kept ticking into a kill lifecycle that has already run would pay the experience twice.
@@ -452,10 +454,10 @@ namespace Faolan.GameServer.World
 			return null;
 		}
 
-		public async Task TickDots()
+		public async Task TickDots(Zone zone)
 		{
 			var now = DateTimeOffset.UtcNow;
-			foreach (var pair in _players)
+			foreach (var pair in _players.In(zone))
 			{
 				var entity = pair.Value;
 				var client = pair.Key;

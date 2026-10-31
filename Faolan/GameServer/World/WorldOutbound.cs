@@ -35,6 +35,7 @@ namespace Faolan.GameServer.World
 		private readonly WorldObjectService _worldObjects;
 		private readonly BuffService _buffs;
 		private readonly CombatService _combat;
+		private readonly PlayerRegistry _players;
 		private readonly TradeskillService _tradeskill;
 
 		// The one op that genuinely stays on the listener: dismounting persists the mount and pushes both the stat and
@@ -42,9 +43,11 @@ namespace Faolan.GameServer.World
 		// this codebase uses for exactly that case.
 		private readonly Func<INetworkClient, Task> _sendDismount;
 
-		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster loot, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
+		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster loot, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, PlayerRegistry players,
+			Func<INetworkClient, Task> sendDismount)
 		{
 			_broadcaster = broadcaster;
+			_players = players;
 			_npcs = npcs;
 			_loot = loot;
 			_worldObjects = worldObjects;
@@ -140,9 +143,9 @@ namespace Faolan.GameServer.World
 			return _broadcaster.BroadcastShieldRose(entity);
 		}
 
-		public Task CompleteDueTradeskills()
+		public Task CompleteDueTradeskills(Zone zone)
 		{
-			return _tradeskill.CompleteDue(DateTimeOffset.UtcNow);
+			return _tradeskill.CompleteDue(DateTimeOffset.UtcNow, client => _players.IsIn(client, zone));
 		}
 
 		public Task DropCorpseLoot(WorldEntity npc)
@@ -150,9 +153,9 @@ namespace Faolan.GameServer.World
 			return _loot.DropCorpseLoot(npc);
 		}
 
-		public Task MaintainAmbientPools()
+		public Task MaintainAmbientPools(Zone zone)
 		{
-			return _npcs.MaintainAmbientPools();
+			return _npcs.MaintainAmbientPools(zone);
 		}
 
 		public Task PlayDynelVisualStep(DueDynelVisualStep step)

@@ -223,9 +223,9 @@ namespace Faolan.GameServer.World
 		///     Run at the regen cadence of 1 Hz to keep it cheap; always-known points need no discovery. A new find is
 		///     persisted and announced.
 		/// </remarks>
-		public async Task DiscoverNearbyRespawnPoints()
+		public async Task DiscoverNearbyRespawnPoints(Zone zone)
 		{
-			foreach (var pair in _players)
+			foreach (var pair in _players.In(zone))
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;
@@ -457,9 +457,9 @@ namespace Faolan.GameServer.World
 		///     before the release screen could be used. The respawn itself is driven inbound, by
 		///     <see cref="RespawnAtChosenPoint" /> or <see cref="TryRespawnNow" />.
 		/// </remarks>
-		public async Task TickPlayerDeaths()
+		public async Task TickPlayerDeaths(Zone zone)
 		{
-			foreach (var pair in _players)
+			foreach (var pair in _players.In(zone))
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;

@@ -5,7 +5,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
@@ -179,7 +181,7 @@ namespace Faolan.GameServer.World
 
 		// Ambient bystander chatter: on each check a friendly/neutral NPC has a small chance to bark, so barks stay
 		// sparse and staggered across NPCs rather than all firing at once. Cosmetic.
-		private const double ChatterCheckSeconds = 4.0;
+		internal const double ChatterCheckSeconds = 4.0;
 
 		// How close a player must come for a detection bark to fire. Matched to `WorldSimulation.SayRangeUnits` (50u),
 		// which is how far a bark carries: greeting someone who is too far to hear it would be worse than not greeting
@@ -218,7 +220,8 @@ namespace Faolan.GameServer.World
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight. Null = terrain unavailable (no
 		// client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService? _terrain;
-		private readonly TickAccumulator _chatter = new TickAccumulator(ChatterCheckSeconds);
+		// Handed to each zone's loop, for the work that fails there with nobody awaiting it.
+		private readonly ILogger? _logger;
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
 		// increasing per-instance id stamped into despawns; see protocol_despawn_n3toclientquit). Every Zone gets a
@@ -226,9 +229,19 @@ namespace Faolan.GameServer.World
 		// is recognisably ours in a capture.
 		private uint _nextPlayfieldToken = 0x00A00000;
 
-		public WorldState(TerrainService? terrain = null)
+		public WorldState(TerrainService? terrain = null, ILogger? logger = null)
 		{
 			_terrain = terrain;
+			_logger = logger;
+		}
+
+		/// <summary>Every live zone (every instance of every map).</summary>
+		public IEnumerable<Zone> Zones => _zones.Values;
+
+		/// <summary>Stops every zone's loop once the work already queued on it has run.</summary>
+		public Task StopAsync()
+		{
+			return Task.WhenAll(_zones.Values.Select(z => z.StopAsync()));
 		}
 
 		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).
@@ -381,396 +394,406 @@ namespace Faolan.GameServer.World
 		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
 			List<WorldTickEffect> effects = [];
-
-			var chatterDue = _chatter.Advance(deltaSeconds, out _);
-
 			foreach (var zone in _zones.Values)
+				effects.AddRange(Tick(zone, deltaSeconds));
+
+			return effects;
+		}
+
+		/// <summary>
+		///     <see cref="Tick(double)" /> for one zone: what that zone's loop runs each tick, since each zone owns its
+		///     state and advances on its own.
+		/// </summary>
+		public IReadOnlyList<WorldTickEffect> Tick(Zone zone, double deltaSeconds)
+		{
+			List<WorldTickEffect> effects = [];
+
+			var chatterDue = zone.Chatter.Advance(deltaSeconds, out _);
+
+			foreach (var entity in zone.Entities)
 			{
-				foreach (var entity in zone.Entities)
+				if (entity.IsLoot)
 				{
-					if (entity.IsLoot)
-					{
-						if (entity.TickExpiry(deltaSeconds))
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
-						continue;
-					}
+					if (entity.TickExpiry(deltaSeconds))
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
+					continue;
+				}
 
-					if (entity.IsPlayer)
-						continue;
+				if (entity.IsPlayer)
+					continue;
 
-					// A summon with a lifetime (the Frozen Hatred fatality pet). Checked before the dead/respawn logic so
-					// an expiring pet leaves cleanly rather than lingering as a corpse.
-					if (entity.DespawnAt is { } despawnAt && DateTimeOffset.UtcNow >= despawnAt)
-					{
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.TimedDespawn));
-						continue;
-					}
+				// A summon with a lifetime (the Frozen Hatred fatality pet). Checked before the dead/respawn logic so
+				// an expiring pet leaves cleanly rather than lingering as a corpse.
+				if (entity.DespawnAt is { } despawnAt && DateTimeOffset.UtcNow >= despawnAt)
+				{
+					effects.Add(new WorldTickEffect(entity, WorldTickEffectType.TimedDespawn));
+					continue;
+				}
 
-					// A dead NPC drops its loot bag at once, then lies there as a corpse for CorpseFadeSeconds before the
-					// body fades and its handle is quit - retail's sequence, and the bag outlives the body rather than
-					// replacing it. The corpse and respawn timers run independently off the same death; the corpse is
-					// long gone (~33s) before the respawn (~150s) puts the creature back.
-					if (entity.IsDead)
+				// A dead NPC drops its loot bag at once, then lies there as a corpse for CorpseFadeSeconds before the
+				// body fades and its handle is quit - retail's sequence, and the bag outlives the body rather than
+				// replacing it. The corpse and respawn timers run independently off the same death; the corpse is
+				// long gone (~33s) before the respawn (~150s) puts the creature back.
+				if (entity.IsDead)
+				{
+					switch (entity.TickCorpse(deltaSeconds))
 					{
-						switch (entity.TickCorpse(deltaSeconds))
-						{
-							case CorpseStage.Drop:
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootDropped));
-								break;
-							case CorpseStage.Fade:
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseFaded));
-								break;
-							case CorpseStage.Quit:
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseQuit));
-								// Summoned NPCs and ambient pool members do not revive: their corpse sequence is their
-								// whole afterlife, so once it has run they leave the world instead of waiting out a
-								// respawn timer they will never use.
-								if (entity.Route.NoRespawn)
+						case CorpseStage.Drop:
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootDropped));
+							break;
+						case CorpseStage.Fade:
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseFaded));
+							break;
+						case CorpseStage.Quit:
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseQuit));
+							// Summoned NPCs and ambient pool members do not revive: their corpse sequence is their
+							// whole afterlife, so once it has run they leave the world instead of waiting out a
+							// respawn timer they will never use.
+							if (entity.Route.NoRespawn)
+							{
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseRemoved));
+								// An encounter boss carries the lure it replaced. Once its corpse clears, put the
+								// lure back where it stood so the encounter can fire again. Guarded so a corpse
+								// cannot restore twice.
+								if (entity is { Presentation.EncounterLureTemplateId: not null, Presentation.EncounterResetDone: false })
 								{
-									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseRemoved));
-									// An encounter boss carries the lure it replaced. Once its corpse clears, put the
-									// lure back where it stood so the encounter can fire again. Guarded so a corpse
-									// cannot restore twice.
-									if (entity is { Presentation.EncounterLureTemplateId: not null, Presentation.EncounterResetDone: false })
-									{
-										entity.Presentation.EncounterResetDone = true;
-										effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
-									}
+									entity.Presentation.EncounterResetDone = true;
+									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
 								}
+							}
 
-								break;
-						}
+							break;
+					}
 
-						if (!entity.Route.NoRespawn && entity.TickRespawn(deltaSeconds))
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+					if (!entity.Route.NoRespawn && entity.TickRespawn(deltaSeconds))
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
 
+					continue;
+				}
+
+				// Past here the entity is a live NPC.
+				// The ambient idle animation - a citizen leaning on a wall, scratching, looking round. Per-entity and
+				// self-timed: the animation's own length plus the pause the creature stands for afterwards, because
+				// retail never starts one before the last has finished.
+				//
+				// Only while standing and out of combat. That is retail's own split: 24,432 of the 25,750
+				// attributable captured Emote records land on an actor with no MoveTask in the preceding 10s
+				// (`--report ambient-animation`). Playing an idle over a walk would fight the walk animation anyway.
+				// Never for a quest escortee: it is held in a scripted pose until its rescue (an idle played over
+				// Casilda's captive pose replaces it), and it is walking behind the player afterwards, which the
+				// standing gate already covers. Retail does animate her, but on combat events near the player rather
+				// than on this self-timed rotation.
+				if (!entity.IsQuestEscortee && entity.Presentation.TickAmbientAnimation(deltaSeconds))
+				{
+					if (!IsStanding(zone, entity))
+					{
+						entity.Presentation.ArmAmbientAnimation(AmbientAnimationPauseMedianSeconds); // busy - look again shortly
+					}
+					else if (AmbientAnimations.Pick(entity.Presentation.AmbientAnimations, Random.Shared) is { } picked)
+					{
+						entity.Presentation.AmbientAnimationPicked = picked;
+						entity.Presentation.ArmAmbientAnimation(picked.DurationCentiseconds / 100.0 + ExponentialPause(AmbientAnimationPauseMedianSeconds));
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAmbientAnimation));
+					}
+				}
+
+				// While engaged, the defender moves one shield to another arc every 5-12s (the captured cadence), so
+				// the attacker has to keep re-aiming at the weakest arc. Per-entity timer, not a shared accumulator -
+				// each captured NPC shifts on its own clock.
+				if (entity.TickShieldShift(deltaSeconds, Random.Shared))
+					effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcShieldRose));
+
+				// Ambient chatter: NPCs that have captured ambient bark lines occasionally speak, staggered by the
+				// per-NPC random roll so they do not all bark at once. The processor picks a random line and sends
+				// it to nearby players (cosmetic). NPCs without a captured ambient group stay silent.
+				if (chatterDue && entity.Presentation.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
+					effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcChatter));
+
+				// A detection bark is not on that clock. The crier greets a player he has noticed arrive, so the cue
+				// is the arrival itself - one line per player per approach, addressed at them by name.
+				if (entity.Presentation.GreetingLines is { Length: > 0 })
+					DetectGreetings(zone, entity);
+
+				// Companion follow: a "released" NPC (e.g. Casilda after her rescue) follows its leader - step toward
+				// them and broadcast a MoveTask each step (ungated; not combat), the server-driven incremental
+				// follow retail uses. Takes priority over patrol/aggro/leash. Clears when the leader leaves the zone
+				// or logs out.
+				if (entity.FollowTargetHandle is { } followTargetHandle)
+				{
+					// The leader may be an NPC: an ambient formation-follow is one creature bound to another
+					// creature's movement. A dead NPC leader does drop the binding - a formation has nothing to hold
+					// onto once its leader is a corpse.
+					if (!zone.TryGet(followTargetHandle, out var leader) || (!leader.IsPlayer && leader.IsDead))
+					{
+						entity.FollowTargetHandle = null;
+						EndMove(entity, true, WorldTickEffectType.NpcFollow);
 						continue;
 					}
 
-					// Past here the entity is a live NPC.
-					// The ambient idle animation - a citizen leaning on a wall, scratching, looking round. Per-entity and
-					// self-timed: the animation's own length plus the pause the creature stands for afterwards, because
-					// retail never starts one before the last has finished.
+					// A pet (OwnerHandle != 0) follows a per-pet formation slot around the leader, not the leader's
+					// exact spot, so multiple pets fan out instead of stacking. The slot is deterministic from the
+					// handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its place.
+					// Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path.
 					//
-					// Only while standing and out of combat. That is retail's own split: 24,432 of the 25,750
-					// attributable captured Emote records land on an actor with no MoveTask in the preceding 10s
-					// (`--report ambient-animation`). Playing an idle over a walk would fight the walk animation anyway.
-					// Never for a quest escortee: it is held in a scripted pose until its rescue (an idle played over
-					// Casilda's captive pose replaces it), and it is walking behind the player afterwards, which the
-					// standing gate already covers. Retail does animate her, but on combat events near the player rather
-					// than on this self-timed rotation.
-					if (!entity.IsQuestEscortee && entity.Presentation.TickAmbientAnimation(deltaSeconds))
-					{
-						if (!IsStanding(zone, entity))
-						{
-							entity.Presentation.ArmAmbientAnimation(AmbientAnimationPauseMedianSeconds); // busy - look again shortly
-						}
-						else if (AmbientAnimations.Pick(entity.Presentation.AmbientAnimations, Random.Shared) is { } picked)
-						{
-							entity.Presentation.AmbientAnimationPicked = picked;
-							entity.Presentation.ArmAmbientAnimation(picked.DurationCentiseconds / 100.0 + ExponentialPause(AmbientAnimationPauseMedianSeconds));
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAmbientAnimation));
-						}
-					}
-
-					// While engaged, the defender moves one shield to another arc every 5-12s (the captured cadence), so
-					// the attacker has to keep re-aiming at the weakest arc. Per-entity timer, not a shared accumulator -
-					// each captured NPC shifts on its own clock.
-					if (entity.TickShieldShift(deltaSeconds, Random.Shared))
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcShieldRose));
-
-					// Ambient chatter: NPCs that have captured ambient bark lines occasionally speak, staggered by the
-					// per-NPC random roll so they do not all bark at once. The processor picks a random line and sends
-					// it to nearby players (cosmetic). NPCs without a captured ambient group stay silent.
-					if (chatterDue && entity.Presentation.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcChatter));
-
-					// A detection bark is not on that clock. The crier greets a player he has noticed arrive, so the cue
-					// is the arrival itself - one line per player per approach, addressed at them by name.
-					if (entity.Presentation.GreetingLines is { Length: > 0 })
-						DetectGreetings(zone, entity);
-
-					// Companion follow: a "released" NPC (e.g. Casilda after her rescue) follows its leader - step toward
-					// them and broadcast a MoveTask each step (ungated; not combat), the server-driven incremental
-					// follow retail uses. Takes priority over patrol/aggro/leash. Clears when the leader leaves the zone
-					// or logs out.
-					if (entity.FollowTargetHandle is { } followTargetHandle)
-					{
-						// The leader may be an NPC: an ambient formation-follow is one creature bound to another
-						// creature's movement. A dead NPC leader does drop the binding - a formation has nothing to hold
-						// onto once its leader is a corpse.
-						if (!zone.TryGet(followTargetHandle, out var leader) || (!leader.IsPlayer && leader.IsDead))
-						{
-							entity.FollowTargetHandle = null;
-							EndMove(entity, true, WorldTickEffectType.NpcFollow);
-							continue;
-						}
-
-						// A pet (OwnerHandle != 0) follows a per-pet formation slot around the leader, not the leader's
-						// exact spot, so multiple pets fan out instead of stacking. The slot is deterministic from the
-						// handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its place.
-						// Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path.
+					// An ambient formation follower takes the same slot treatment, and for the same reason retail
+					// does: the four `Black Dragon Guard Patroller`s behind one captain each hold their own corner
+					// of a 3x3 grid rather than standing in his back.
+					var inFormation = entity.OwnerHandle != null || !leader.IsPlayer;
+					var (ox, oz) = inFormation
+						? FollowFormationOffset(entity.Handle)
+						: (0f, 0f);
+					var stop = inFormation
+						? PetFollowSlotStop
+						: FollowStopRange;
+					var fdx = leader.Position.X + ox - entity.Position.X;
+					var fdz = leader.Position.Z + oz - entity.Position.Z;
+					var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
+					if (fdist > stop)
+						StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader, speed: FollowStepSpeed);
+					else
+						// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
+						// points straight at her) but send no StopIIR.
 						//
-						// An ambient formation follower takes the same slot treatment, and for the same reason retail
-						// does: the four `Black Dragon Guard Patroller`s behind one captain each hold their own corner
-						// of a 3x3 grid rather than standing in his back.
-						var inFormation = entity.OwnerHandle != null || !leader.IsPlayer;
-						var (ox, oz) = inFormation
-							? FollowFormationOffset(entity.Handle)
-							: (0f, 0f);
-						var stop = inFormation
-							? PetFollowSlotStop
-							: FollowStopRange;
-						var fdx = leader.Position.X + ox - entity.Position.X;
-						var fdz = leader.Position.Z + oz - entity.Position.Z;
-						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
-						if (fdist > stop)
-							StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader, speed: FollowStepSpeed);
-						else
-							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
-							// points straight at her) but send no StopIIR.
-							//
-							// A follower oscillates around FollowStopRange for as long as the player is walking - out of
-							// range, step, back in range - so a Stop here would fire on every oscillation. Retail's
-							// stream is bursts of Moves with no Stop between them (52 moves to 7 stops across the whole
-							// capture, and none inside a burst); each Stop halts the client's walk and the next Move
-							// restarts it, which plays the halt animation over and over while the server keeps
-							// repositioning her.
-							//
-							// The Stop belongs to the follow ending - the leader-gone branch above still sends one - not
-							// to her briefly catching up. With the task bound to the leader (mode-08) the client holds
-							// its own position near them anyway.
-							EndMove(entity, false, WorldTickEffectType.NpcFollow);
-						continue;
-					}
+						// A follower oscillates around FollowStopRange for as long as the player is walking - out of
+						// range, step, back in range - so a Stop here would fire on every oscillation. Retail's
+						// stream is bursts of Moves with no Stop between them (52 moves to 7 stops across the whole
+						// capture, and none inside a burst); each Stop halts the client's walk and the next Move
+						// restarts it, which plays the halt animation over and over while the server keeps
+						// repositioning her.
+						//
+						// The Stop belongs to the follow ending - the leader-gone branch above still sends one - not
+						// to her briefly catching up. With the task bound to the leader (mode-08) the client holds
+						// its own position near them anyway.
+						EndMove(entity, false, WorldTickEffectType.NpcFollow);
+					continue;
+				}
 
-					if (entity.Vitals == null)
-						continue;
+				if (entity.Vitals == null)
+					continue;
 
-					// Scripted encounter: a lure is a harmless NPC that watches for an approaching player and, at two
-					// measured distances, cries out and then swaps itself for a boss. Checked before the aggro block
-					// because a lure is not hostile and would otherwise never look at players at all.
-					if (entity.Presentation.EncounterBossTemplateId != null)
+				// Scripted encounter: a lure is a harmless NPC that watches for an approaching player and, at two
+				// measured distances, cries out and then swaps itself for a boss. Checked before the aggro block
+				// because a lure is not hostile and would otherwise never look at players at all.
+				if (entity.Presentation.EncounterBossTemplateId != null)
+				{
+					var approaching = NearestPlayerInRange(zone, entity, MathF.Max(entity.Presentation.EncounterBarkRadius, entity.Presentation.EncounterTriggerRadius));
+					if (approaching != null)
 					{
-						var approaching = NearestPlayerInRange(zone, entity, MathF.Max(entity.Presentation.EncounterBarkRadius, entity.Presentation.EncounterTriggerRadius));
-						if (approaching != null)
+						var edx = approaching.Position.X - entity.Position.X;
+						var edz = approaching.Position.Z - entity.Position.Z;
+						var edist = MathF.Sqrt(edx * edx + edz * edz);
+
+						// The trigger wins when both are satisfied - a player who arrives inside the inner radius in
+						// one step should spring the trap, not merely be shouted at.
+						if (edist <= entity.Presentation.EncounterTriggerRadius)
 						{
-							var edx = approaching.Position.X - entity.Position.X;
-							var edz = approaching.Position.Z - entity.Position.Z;
-							var edist = MathF.Sqrt(edx * edx + edz * edz);
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterTrigger, approaching));
+							continue; // the lure is about to be replaced; skip the rest of its tick
+						}
 
-							// The trigger wins when both are satisfied - a player who arrives inside the inner radius in
-							// one step should spring the trap, not merely be shouted at.
-							if (edist <= entity.Presentation.EncounterTriggerRadius)
-							{
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterTrigger, approaching));
-								continue; // the lure is about to be replaced; skip the rest of its tick
-							}
-
-							if (!entity.Presentation.EncounterBarked && edist <= entity.Presentation.EncounterBarkRadius)
-							{
-								entity.Presentation.EncounterBarked = true;
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterBark, approaching));
-							}
+						if (!entity.Presentation.EncounterBarked && edist <= entity.Presentation.EncounterBarkRadius)
+						{
+							entity.Presentation.EncounterBarked = true;
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterBark, approaching));
 						}
 					}
+				}
 
-					// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
-					//
-					// Being hit aggros too, not just proximity: `NearestPlayerInRange` alone would engage only someone
-					// who walks inside NpcAggroRange, so a player attacking from further out - any ranged attack, and
-					// any spell - would hit a mob that never engages, and an unengaged mob takes the `target == null`
-					// branch below and revives to full.
-					// Initiation and retaliation are separately gated. `Aggressive` decides whether walking past is
-					// enough; `Hostile` alone is enough to fight back once hit, so a passive NPC (the Town Crier) is
-					// unprovoked rather than inert - attack him and he still defends himself.
-					var target = entity.Hostile
-						? (entity.Aggressive
-							? NearestPlayerInRange(zone, entity, NpcAggroRange)
-							: null) ?? RecentAttackerOf(zone, entity)
-						: null;
+				// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
+				//
+				// Being hit aggros too, not just proximity: `NearestPlayerInRange` alone would engage only someone
+				// who walks inside NpcAggroRange, so a player attacking from further out - any ranged attack, and
+				// any spell - would hit a mob that never engages, and an unengaged mob takes the `target == null`
+				// branch below and revives to full.
+				// Initiation and retaliation are separately gated. `Aggressive` decides whether walking past is
+				// enough; `Hostile` alone is enough to fight back once hit, so a passive NPC (the Town Crier) is
+				// unprovoked rather than inert - attack him and he still defends himself.
+				var target = entity.Hostile
+					? (entity.Aggressive
+						? NearestPlayerInRange(zone, entity, NpcAggroRange)
+						: null) ?? RecentAttackerOf(zone, entity)
+					: null;
 
-					var homeDx = entity.Route.SpawnPosition.X - entity.Position.X;
-					var homeDz = entity.Route.SpawnPosition.Z - entity.Position.Z;
-					var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
+				var homeDx = entity.Route.SpawnPosition.X - entity.Position.X;
+				var homeDz = entity.Route.SpawnPosition.Z - entity.Position.Z;
+				var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
 
-					// Leash: once led too far from its territory, disengage and keep returning home until arrived (ignoring
-					// re-aggro) so a player hovering at the edge cannot ping-pong it. A returning NPC walks back, then
-					// heals to full on arrival. Territory is spawn plus - for a patroller - its route; measured against
-					// spawn alone, the wander and this check would fight over every far anchor.
-					if (entity.Route.BeyondLeash(entity.Position, homeDist, NpcLeashRange))
+				// Leash: once led too far from its territory, disengage and keep returning home until arrived (ignoring
+				// re-aggro) so a player hovering at the edge cannot ping-pong it. A returning NPC walks back, then
+				// heals to full on arrival. Territory is spawn plus - for a patroller - its route; measured against
+				// spawn alone, the wander and this check would fight over every far anchor.
+				if (entity.Route.BeyondLeash(entity.Position, homeDist, NpcLeashRange))
+					entity.Route.Returning = true;
+
+				// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
+				// spawn, walk it back home instead of leaving it standing where the chase ended. Patrollers are
+				// exempt - their route drives them; everyone else returns to origin (then heals on arrival, below).
+				//
+				// After NpcChaseDeaggroDelaySeconds, not immediately - retail's own `AIDefaults_ChaseDeaggroDelayTime`.
+				// The mob holds its ground for the delay first, so a player who steps out of aggro range and straight
+				// back in is one engagement rather than a chase, a turn for home, and a fresh aggro. The stamp is
+				// cleared the moment it has a target again, so the delay only ever measures an uninterrupted absence.
+				if (target != null)
+					entity.Route.TargetLostAt = null;
+				else if (homeDist > NpcMeleeRange && !entity.Route.Patrols && !entity.Route.Returning)
+				{
+					entity.Route.TargetLostAt ??= DateTimeOffset.UtcNow;
+					if ((DateTimeOffset.UtcNow - entity.Route.TargetLostAt.Value).TotalSeconds >= NpcChaseDeaggroDelaySeconds)
 						entity.Route.Returning = true;
+				}
 
-					// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
-					// spawn, walk it back home instead of leaving it standing where the chase ended. Patrollers are
-					// exempt - their route drives them; everyone else returns to origin (then heals on arrival, below).
-					//
-					// After NpcChaseDeaggroDelaySeconds, not immediately - retail's own `AIDefaults_ChaseDeaggroDelayTime`.
-					// The mob holds its ground for the delay first, so a player who steps out of aggro range and straight
-					// back in is one engagement rather than a chase, a turn for home, and a fresh aggro. The stamp is
-					// cleared the moment it has a target again, so the delay only ever measures an uninterrupted absence.
-					if (target != null)
-						entity.Route.TargetLostAt = null;
-					else if (homeDist > NpcMeleeRange && !entity.Route.Patrols && !entity.Route.Returning)
+				if (entity.Route.Returning)
+				{
+					SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
+					entity.ArmAttackCooldown(NpcAttackInterval);
+					entity.Route.RouteInterrupted = true; // walked off its beat - rejoin at the nearest waypoint after
+					if (homeDist > NpcMeleeRange)
 					{
-						entity.Route.TargetLostAt ??= DateTimeOffset.UtcNow;
-						if ((DateTimeOffset.UtcNow - entity.Route.TargetLostAt.Value).TotalSeconds >= NpcChaseDeaggroDelaySeconds)
-							entity.Route.Returning = true;
-					}
-
-					if (entity.Route.Returning)
-					{
-						SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
-						entity.ArmAttackCooldown(NpcAttackInterval);
-						entity.Route.RouteInterrupted = true; // walked off its beat - rejoin at the nearest waypoint after
-						if (homeDist > NpcMeleeRange)
-						{
-							// The walk home also descends to the spawn's altitude. Movement otherwise keeps the entity's
-							// current Y ("keep terrain Y"), which is right for a chase (the ground under the path) but
-							// wrong here - the stray Y is whatever height it was led/wandered to, so the NPC would walk
-							// the whole way home at that altitude and arrive floating above its spawn.
-							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!, entity.Route.SpawnPosition.Y);
-							continue;
-						}
-
-						entity.Route.Returning = false;
-						// Home again - plant the spawn's altitude. The walk down closes the height gap in proportion to
-						// the horizontal one, but it stops NpcMeleeRange short of the spawn, so that same fraction of the
-						// gap would be left standing. Arriving is the point to be exact about it.
-						entity.Position = new Vector3(entity.Position.X, entity.Route.SpawnPosition.Y, entity.Position.Z);
-						entity.Vitals.ReviveToFull(); // home again
-						EndMove(entity, true, WorldTickEffectType.NpcMove); // arrived: flush + stop
+						// The walk home also descends to the spawn's altitude. Movement otherwise keeps the entity's
+						// current Y ("keep terrain Y"), which is right for a chase (the ground under the path) but
+						// wrong here - the stray Y is whatever height it was led/wandered to, so the NPC would walk
+						// the whole way home at that altitude and arrive floating above its spawn.
+						StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!, entity.Route.SpawnPosition.Y);
 						continue;
 					}
 
-					if (target == null)
+					entity.Route.Returning = false;
+					// Home again - plant the spawn's altitude. The walk down closes the height gap in proportion to
+					// the horizontal one, but it stops NpcMeleeRange short of the spawn, so that same fraction of the
+					// gap would be left standing. Arriving is the point to be exact about it.
+					entity.Position = new Vector3(entity.Position.X, entity.Route.SpawnPosition.Y, entity.Position.Z);
+					entity.Vitals.ReviveToFull(); // home again
+					EndMove(entity, true, WorldTickEffectType.NpcMove); // arrived: flush + stop
+					continue;
+				}
+
+				if (target == null)
+				{
+					SetCombat(entity, false); // no target in range: disengage and sheathe
+					entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro should not swing instantly
+
+					// A route walker resumes its beat here, and must not be stopped first - EndMove would close its
+					// move stream every idle tick. It keeps one continuous walk instead, so the flush/stop below is
+					// for the wander and the chase, which genuinely end.
+					if (entity.Route.WalksRoute)
 					{
-						SetCombat(entity, false); // no target in range: disengage and sheathe
-						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro should not swing instantly
-
-						// A route walker resumes its beat here, and must not be stopped first - EndMove would close its
-						// move stream every idle tick. It keeps one continuous walk instead, so the flush/stop below is
-						// for the wander and the chase, which genuinely end.
-						if (entity.Route.WalksRoute)
-						{
-							if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
-								entity.Vitals.ReviveToFull();
-
-							WalkRoute(entity);
-							continue;
-						}
-
-						EndMove(entity, true, WorldTickEffectType.NpcMove); // stop if mid-chase
-						// Disengaged with no one in range: heal back to full so it cannot be whittled from out of range.
-						//
-						// Only once the fight is genuinely over - "nobody stands next to me" is not the same as "nobody
-						// is fighting me", and a mob shot from range must not heal between hits. NpcAntiWhittleSeconds
-						// after the last hit is the test; keeping the mob chasing is a shorter, separate clock.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
 							entity.Vitals.ReviveToFull();
-						// Retail wander (capture-verified): a beach NPC drifts with a single short 2-point move to a
-						// nearby anchor every ~25-60s - not a continuous client-walked route. Server-driven: the model
-						// moves to the destination and the one MoveFrom->Position segment is broadcast, so every player
-						// sees the same spot and a later chase starts from where the NPC actually is.
-						if (entity.Route.Patrols && entity.Route.TickPatrolCycle(deltaSeconds))
-						{
-							entity.MoveFrom = entity.Position;
-							// Ambient anti-stacking: an area-managed pool member (SpawnAreaId set) avoids drifting onto a
-							// point another live entity already occupies (within ~2u, matching FreeAmbientPoint), so a pool
-							// spreads across its area instead of piling up. Captured patrols (no SpawnAreaId) keep their route.
-							Func<Vector3, bool>? occupied = entity.SpawnAreaId == null
-								? null
-								: pt =>
+
+						WalkRoute(entity);
+						continue;
+					}
+
+					EndMove(entity, true, WorldTickEffectType.NpcMove); // stop if mid-chase
+					// Disengaged with no one in range: heal back to full so it cannot be whittled from out of range.
+					//
+					// Only once the fight is genuinely over - "nobody stands next to me" is not the same as "nobody
+					// is fighting me", and a mob shot from range must not heal between hits. NpcAntiWhittleSeconds
+					// after the last hit is the test; keeping the mob chasing is a shorter, separate clock.
+					if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
+						entity.Vitals.ReviveToFull();
+					// Retail wander (capture-verified): a beach NPC drifts with a single short 2-point move to a
+					// nearby anchor every ~25-60s - not a continuous client-walked route. Server-driven: the model
+					// moves to the destination and the one MoveFrom->Position segment is broadcast, so every player
+					// sees the same spot and a later chase starts from where the NPC actually is.
+					if (entity.Route.Patrols && entity.Route.TickPatrolCycle(deltaSeconds))
+					{
+						entity.MoveFrom = entity.Position;
+						// Ambient anti-stacking: an area-managed pool member (SpawnAreaId set) avoids drifting onto a
+						// point another live entity already occupies (within ~2u, matching FreeAmbientPoint), so a pool
+						// spreads across its area instead of piling up. Captured patrols (no SpawnAreaId) keep their route.
+						Func<Vector3, bool>? occupied = entity.SpawnAreaId == null
+							? null
+							: pt =>
+							{
+								foreach (var other in zone.Entities)
 								{
-									foreach (var other in zone.Entities)
-									{
-										if (ReferenceEquals(other, entity) || other.IsDead || other.IsLoot)
-											continue;
+									if (ReferenceEquals(other, entity) || other.IsDead || other.IsLoot)
+										continue;
 
-										var odx = other.Position.X - pt.X;
-										var odz = other.Position.Z - pt.Z;
-										if (odx * odx + odz * odz < 4f)
-											return true;
-									}
+									var odx = other.Position.X - pt.X;
+									var odz = other.Position.Z - pt.Z;
+									if (odx * odx + odz * odz < 4f)
+										return true;
+								}
 
-									return false;
-								};
-							entity.Position = entity.Route.NextWanderPoint(entity.Position, occupied);
-							entity.Route.ArmPatrolCycle();
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
-						}
-
-						continue;
+								return false;
+							};
+						entity.Position = entity.Route.NextWanderPoint(entity.Position, occupied);
+						entity.Route.ArmPatrolCycle();
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 					}
 
-					// Engaged: a target is in aggro range and the mob is not leashing home. Draw the weapon on the
-					// transition (the captured combat-mode stat) before the chase/swing, mirroring retail - the stat-20
-					// update lands the tick the mob acquires its target, while it is still closing the distance. The
-					// target rides the effect so the broadcaster can also push the aggro (HateList/ThreatLevel).
-					SetCombat(entity, true, target);
-					entity.Route.RouteInterrupted = true; // a chase leaves the beat; the walk rejoins at the nearest waypoint
+					continue;
+				}
 
-					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
-					// is broadcast in retail-sized segments (StepAndStream throttle) so the client interpolates the run up
-					// to the player smoothly; it swings once it arrives in melee range.
-					// Each attacker chases its own slot on a ring around the target, not the target's exact point;
-					// without the offset every attacker solves for the same sphere and they settle inside one body's
-					// worth of space (five Tortage Pirates measured 0.03u-0.46u apart in-client, a distance retail
-					// produces in 0.9% of cases).
-					//
-					// The geometry is retail's, measured rather than designed (`--report melee-crowd`, 25,638 NPC-NPC
-					// pairs over 75 captures). Take each crowd's closest walking pair and divide it by the ring factor
-					// `2*R*sin(pi/N)`, and the radius it implies is the same for every crowd size - 1.05, 1.03, 1.06,
-					// 0.96, 1.08 for crowds of four to eight. That constancy is the finding: mobs packing in
-					// opportunistically would imply a radius that falls away with N, and a ring is what holds it flat.
-					var (slotX, slotZ) = AttackerSlotOffset(entity, target);
-					var dx = target.Position.X + slotX - entity.Position.X;
-					var dz = target.Position.Z + slotZ - entity.Position.Z;
-					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
+				// Engaged: a target is in aggro range and the mob is not leashing home. Draw the weapon on the
+				// transition (the captured combat-mode stat) before the chase/swing, mirroring retail - the stat-20
+				// update lands the tick the mob acquires its target, while it is still closing the distance. The
+				// target rides the effect so the broadcaster can also push the aggro (HateList/ThreatLevel).
+				SetCombat(entity, true, target);
+				entity.Route.RouteInterrupted = true; // a chase leaves the beat; the walk rejoins at the nearest waypoint
 
-					// The walk aims at the slot; the range check must still measure the target. They differ by up to
-					// the ring radius, so reusing the slot distance would let a mob swing from out of range on one side
-					// of the ring and refuse a legitimate swing on the other.
-					var toTargetX = target.Position.X - entity.Position.X;
-					var toTargetZ = target.Position.Z - entity.Position.Z;
-					var targetDistance = MathF.Sqrt(toTargetX * toTargetX + toTargetZ * toTargetZ);
+				// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
+				// is broadcast in retail-sized segments (StepAndStream throttle) so the client interpolates the run up
+				// to the player smoothly; it swings once it arrives in melee range.
+				// Each attacker chases its own slot on a ring around the target, not the target's exact point;
+				// without the offset every attacker solves for the same sphere and they settle inside one body's
+				// worth of space (five Tortage Pirates measured 0.03u-0.46u apart in-client, a distance retail
+				// produces in 0.9% of cases).
+				//
+				// The geometry is retail's, measured rather than designed (`--report melee-crowd`, 25,638 NPC-NPC
+				// pairs over 75 captures). Take each crowd's closest walking pair and divide it by the ring factor
+				// `2*R*sin(pi/N)`, and the radius it implies is the same for every crowd size - 1.05, 1.03, 1.06,
+				// 0.96, 1.08 for crowds of four to eight. That constancy is the finding: mobs packing in
+				// opportunistically would imply a radius that falls away with N, and a ring is what holds it flat.
+				var (slotX, slotZ) = AttackerSlotOffset(entity, target);
+				var dx = target.Position.X + slotX - entity.Position.X;
+				var dz = target.Position.Z + slotZ - entity.Position.Z;
+				var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 
-					// How close this creature needs to be to attack, and how close it therefore walks. A melee mob keeps
-					// the measured pair: swing range 3u, walk into contact at 1.5u so it visibly closes instead of
-					// stopping a swing away. An archer stops at its weapon's own `Attack Range` - 17.5u for every
-					// captured bow against a melee weapon's 2.0 - because a bow carrier walked into contact range fights
-					// like a melee mob.
-					//
-					// The stand-off is the weapon range less the client's own `TWK_RangeCheckSlack` (1.25), so the shot
-					// is inside range rather than exactly on the boundary, where a step of player movement would break
-					// it and restart the approach.
-					var attackRange = entity.RangedAttacker
-						? entity.AttackRange
-						: NpcMeleeRange;
-					var walkTo = entity.RangedAttacker
-						? MathF.Max(NpcContactRange, entity.AttackRange - RangeCheckSlack)
-						: NpcContactRange;
+				// The walk aims at the slot; the range check must still measure the target. They differ by up to
+				// the ring radius, so reusing the slot distance would let a mob swing from out of range on one side
+				// of the ring and refuse a legitimate swing on the other.
+				var toTargetX = target.Position.X - entity.Position.X;
+				var toTargetZ = target.Position.Z - entity.Position.Z;
+				var targetDistance = MathF.Sqrt(toTargetX * toTargetX + toTargetZ * toTargetZ);
 
-					if (horizontal > walkTo)
-						StepAndStream(entity, dx, dz, horizontal, walkTo, WorldTickEffectType.NpcMove, target);
-					else
-						// In position: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
-						// the swing/combat-mode draw plants it).
-						EndMove(entity, false, WorldTickEffectType.NpcMove);
+				// How close this creature needs to be to attack, and how close it therefore walks. A melee mob keeps
+				// the measured pair: swing range 3u, walk into contact at 1.5u so it visibly closes instead of
+				// stopping a swing away. An archer stops at its weapon's own `Attack Range` - 17.5u for every
+				// captured bow against a melee weapon's 2.0 - because a bow carrier walked into contact range fights
+				// like a melee mob.
+				//
+				// The stand-off is the weapon range less the client's own `TWK_RangeCheckSlack` (1.25), so the shot
+				// is inside range rather than exactly on the boundary, where a step of player movement would break
+				// it and restart the approach.
+				var attackRange = entity.RangedAttacker
+					? entity.AttackRange
+					: NpcMeleeRange;
+				var walkTo = entity.RangedAttacker
+					? MathF.Max(NpcContactRange, entity.AttackRange - RangeCheckSlack)
+					: NpcContactRange;
 
-					if (targetDistance > attackRange)
-					{
-						entity.ArmAttackCooldown(NpcAttackInterval); // still out of range: wind up for arrival
-						continue;
-					}
+				if (horizontal > walkTo)
+					StepAndStream(entity, dx, dz, horizontal, walkTo, WorldTickEffectType.NpcMove, target);
+				else
+					// In position: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
+					// the swing/combat-mode draw plants it).
+					EndMove(entity, false, WorldTickEffectType.NpcMove);
 
-					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
-						// A caster NPC casts a spell on the same cadence; everyone else swings.
-					{
-						effects.Add(new WorldTickEffect(entity, entity.IsCaster
-							? WorldTickEffectType.NpcCast
-							: WorldTickEffectType.NpcAttack, target));
-					}
+				if (targetDistance > attackRange)
+				{
+					entity.ArmAttackCooldown(NpcAttackInterval); // still out of range: wind up for arrival
+					continue;
+				}
+
+				if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
+					// A caster NPC casts a spell on the same cadence; everyone else swings.
+				{
+					effects.Add(new WorldTickEffect(entity, entity.IsCaster
+						? WorldTickEffectType.NpcCast
+						: WorldTickEffectType.NpcAttack, target));
 				}
 			}
 
@@ -983,7 +1006,7 @@ namespace Faolan.GameServer.World
 		// The (mapId, instanceId) zone, minting it (with a fresh wire token) if it does not exist yet.
 		public Zone ZoneFor(uint mapId, uint instanceId)
 		{
-			return _zones.GetOrAdd((mapId, instanceId), key => new Zone(key.MapId)
+			return _zones.GetOrAdd((mapId, instanceId), key => new Zone(key.MapId, _logger)
 			{
 				InstanceId = key.InstanceId,
 				PlayfieldToken = NextPlayfieldToken()

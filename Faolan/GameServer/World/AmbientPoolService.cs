@@ -125,11 +125,13 @@ namespace Faolan.GameServer.World
 		/// <summary>
 		///     Top every under-strength pool back up, yielding each member as it is spawned so the caller can stream it.
 		/// </summary>
-		public IEnumerable<(WorldEntity Entity, Zone Zone, Vector3 Position)> Replenish()
+		public IEnumerable<(WorldEntity Entity, Zone Zone, Vector3 Position)> Replenish(Zone zone)
 		{
 			foreach (var ((mapId, instanceId), pools) in _pools)
 			{
-				var zone = _sim.World.ZoneFor(mapId, instanceId);
+				if (mapId != zone.MapId || instanceId != zone.InstanceId)
+					continue;
+
 				foreach (var pool in pools)
 				{
 					var live = zone.Entities.Where(e => e.SpawnAreaId == pool.AreaId && !e.IsDead).ToList();

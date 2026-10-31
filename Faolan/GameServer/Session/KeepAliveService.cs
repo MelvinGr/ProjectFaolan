@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Constants;
@@ -14,7 +15,7 @@ namespace Faolan.GameServer.Session
 	//   LatencyCheck (c2s 0x2085) -> Pong (0x2082): echo the counter + the server's 64-bit uptime counter.
 	//   Ping         (c2s 0x2005) -> GameServerStats (0x2009): a server-load readout float.
 	// Both are fixed-shape replies with a little per-reply data (the echoed counter, the tick, the measured tick rate).
-	// The only dependency is the simulation's TickMetrics gauge.
+	// The only dependency is the TickMetrics gauge of the loop serving each client.
 	//
 	// Both build an Rpc and hand it to client.SendAsync(Rpc) rather than hand-framing a PacketStream; the wire output
 	// is byte-identical, locked by KeepAliveRpcPilotTests.
@@ -24,13 +25,14 @@ namespace Faolan.GameServer.Session
 		private static readonly ProtoEndpoint LatencySender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x08);
 		private static readonly ProtoEndpoint PingSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x08);
 
-		// The simulation loop's live health readout - the source of the frame rate the Ping reply reports. Taken as the
-		// narrow metric object rather than the WorldSimulation so this stays a keep-alive service that reads a gauge.
-		private readonly TickMetrics _metrics;
+		// The live health readout of the loop serving a client - its zone's, as retail reported its playfield's - and
+		// the source of the frame rate the Ping reply reports. Taken as a gauge lookup rather than the WorldSimulation so
+		// this stays a keep-alive service that reads a gauge.
+		private readonly Func<INetworkClient, TickMetrics> _metricsFor;
 
-		public KeepAliveService(TickMetrics metrics)
+		public KeepAliveService(Func<INetworkClient, TickMetrics> metricsFor)
 		{
-			_metrics = metrics;
+			_metricsFor = metricsFor;
 		}
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][uptime hi][uptime lo].
@@ -70,7 +72,7 @@ namespace Faolan.GameServer.Session
 		// (TickMetrics.Current) rather than invented onto the wire.
 		public Task HandlePing(INetworkClient client)
 		{
-			var frameRate = (float)_metrics.Current.TicksPerSecond;
+			var frameRate = (float)_metricsFor(client).Current.TicksPerSecond;
 
 			return client.SendAsync(new Rpc(PingSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchGameServerStats,
 				b => b.WriteFloat(frameRate).WriteUInt32(0).WriteUInt32(0)));

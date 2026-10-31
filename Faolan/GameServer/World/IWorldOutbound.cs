@@ -121,7 +121,7 @@ namespace Faolan.GameServer.World
 		///     Top up the ambient spawn-group pools of every loaded zone to their <c>MaxCount</c>, respawning killed
 		///     members. Called on a slow cadence from the simulation tick; a no-op unless the ambient spawner is enabled.
 		/// </summary>
-		Task MaintainAmbientPools();
+		Task MaintainAmbientPools(Zone zone);
 
 		/// <summary>
 		///     Run the tradeskills whose bar has finished: the craft's item grant, and the gem going into its socket.
@@ -130,7 +130,7 @@ namespace Faolan.GameServer.World
 		///     Retail paces both server-side, so the transaction is staged by the inbound handler and completed here.
 		///     The tick owns the cadence; <c>TradeskillService</c> owns the deadline and the work.
 		/// </remarks>
-		Task CompleteDueTradeskills();
+		Task CompleteDueTradeskills(Zone zone);
 
 		/// <summary>
 		///     Play one due step of a harvested world object's staged visual sequence - mesh swap, collision drop,

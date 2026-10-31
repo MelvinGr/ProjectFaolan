@@ -496,12 +496,12 @@ namespace Faolan.GameServer.World
 		///     One replacement per under-strength pool per pass is spawned at a free point and streamed to nearby
 		///     players, so the cadence is itself the respawn delay.
 		/// </remarks>
-		public async Task MaintainAmbientPools()
+		public async Task MaintainAmbientPools(Zone zone)
 		{
 			// The service spawns the deficit and yields each member as it goes; the streaming is this method's.
 			// Because Replenish is a lazy iterator, this keeps the spawn-then-send order rather than spawning every
 			// pool's deficit up front.
-			foreach (var (entity, zone, pos) in _ambient.Replenish())
+			foreach (var (entity, _, pos) in _ambient.Replenish(zone))
 			{
 				foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
 				{

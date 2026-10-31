@@ -1,9 +1,14 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
+using Faolan.Core.Helpers;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Faolan.GameServer.World
 {
@@ -18,6 +23,13 @@ namespace Faolan.GameServer.World
 	public sealed class Zone
 	{
 		private readonly ConcurrentDictionary<uint, WorldEntity> _entities = new ConcurrentDictionary<uint, WorldEntity>();
+
+		// Created on first use rather than with the zone: WorldState mints zones through ConcurrentDictionary.GetOrAdd,
+		// whose factory can run twice under contention, and the discarded copy must not leave a loop running.
+		private readonly Lazy<WorkLoop> _loop;
+
+		// 1 while a tick is queued or running on the loop, so a slow tick is not queued again behind itself.
+		private int _tickPending;
 
 		/// <summary>
 		///     Which copy (instance) of <see cref="MapId" /> this zone is. Together with <see cref="MapId" /> it is the
@@ -77,9 +89,38 @@ namespace Faolan.GameServer.World
 		// instead of interleaving two of them.
 		private readonly ConcurrentDictionary<uint, DynelVisualSequence> _visualSequences = new ConcurrentDictionary<uint, DynelVisualSequence>();
 
-		public Zone(uint mapId)
+		/// <summary>
+		///     The zone's owner: every handler, tick and timer that touches this zone's state runs here, one at a time
+		///     (see <see cref="WorkLoop" />).
+		/// </summary>
+		public WorkLoop Loop => _loop.Value;
+
+		/// <summary>The cadence of the ambient NPC chatter checks, advanced by this zone's own tick.</summary>
+		public TickAccumulator Chatter { get; } = new TickAccumulator(WorldState.ChatterCheckSeconds);
+
+		public Zone(uint mapId, ILogger? logger = null)
 		{
 			MapId = mapId;
+			_loop = new Lazy<WorkLoop>(() => new WorkLoop($"Zone {MapId}/{InstanceId}", logger ?? NullLogger.Instance));
+		}
+
+		/// <summary>Claims the next tick; false while the previous one is still queued or running.</summary>
+		public bool TryBeginTick()
+		{
+			return Interlocked.CompareExchange(ref _tickPending, 1, 0) == 0;
+		}
+
+		public void EndTick()
+		{
+			Volatile.Write(ref _tickPending, 0);
+		}
+
+		/// <summary>Stops the loop, if the zone ever started one, once its queued work has run.</summary>
+		public Task StopAsync()
+		{
+			return _loop.IsValueCreated
+				? _loop.Value.StopAsync()
+				: Task.CompletedTask;
 		}
 
 		/// <summary>

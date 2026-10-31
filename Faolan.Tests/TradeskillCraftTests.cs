@@ -146,11 +146,11 @@ namespace Faolan.Tests
 			var due = h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
 			Assert.Equal(now.AddSeconds(5), due);
 
-			await h.Service.CompleteDue(now.AddSeconds(4.9));
+			await h.Service.CompleteDue(now.AddSeconds(4.9), _ => true);
 			Assert.Empty(h.Outbound.Granted);
 			Assert.Empty(h.Outbound.Completed);
 
-			await h.Service.CompleteDue(now.AddSeconds(5));
+			await h.Service.CompleteDue(now.AddSeconds(5), _ => true);
 			Assert.Equal([(BloodsilverKhopesh, 1u, "NecroL80")], h.Outbound.Granted);
 			Assert.Equal([RecipeId], h.Outbound.Completed);
 		}
@@ -164,8 +164,8 @@ namespace Faolan.Tests
 			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
 
 			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
-			await h.Service.CompleteDue(now.AddSeconds(5));
-			await h.Service.CompleteDue(now.AddSeconds(5.1));
+			await h.Service.CompleteDue(now.AddSeconds(5), _ => true);
+			await h.Service.CompleteDue(now.AddSeconds(5.1), _ => true);
 
 			Assert.Single(h.Outbound.Completed);
 		}
@@ -179,7 +179,7 @@ namespace Faolan.Tests
 			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
 
 			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
-			await h.Service.CompleteDue(now.AddSeconds(5));
+			await h.Service.CompleteDue(now.AddSeconds(5), _ => true);
 
 			Assert.Empty(h.Outbound.Granted);
 			Assert.Empty(h.Outbound.Taken);
@@ -197,7 +197,7 @@ namespace Faolan.Tests
 			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
 			Assert.Equal(1, h.Service.Forget(h.Client));
 
-			await h.Service.CompleteDue(now.AddSeconds(5));
+			await h.Service.CompleteDue(now.AddSeconds(5), _ => true);
 			Assert.Empty(h.Outbound.Granted);
 			Assert.Empty(h.Outbound.Completed);
 		}

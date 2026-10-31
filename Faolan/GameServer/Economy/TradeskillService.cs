@@ -159,7 +159,9 @@ namespace Faolan.GameServer.Economy
 		///     100 ms of its deadline, against the roughly 70 ms of jitter the two captured retail transactions
 		///     themselves carry.
 		/// </remarks>
-		public async Task CompleteDue(DateTimeOffset now)
+		/// <param name="now">The moment to complete against.</param>
+		/// <param name="owned">Which connections' staged work this call completes: the ticking zone's players.</param>
+		public async Task CompleteDue(DateTimeOffset now, Func<INetworkClient, bool> owned)
 		{
 			List<StagedTradeskill> due;
 			lock (_staged)
@@ -167,7 +169,7 @@ namespace Faolan.GameServer.Economy
 				if (_staged.Count == 0)
 					return;
 
-				due = _staged.FindAll(s => s.DueAt <= now);
+				due = _staged.FindAll(s => s.DueAt <= now && owned(s.Client));
 				foreach (var entry in due)
 					_staged.Remove(entry);
 			}

@@ -142,12 +142,12 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
-		public Task MaintainAmbientPools()
+		public Task MaintainAmbientPools(Zone zone)
 		{
 			return Task.CompletedTask;
 		}
 
-		public Task CompleteDueTradeskills()
+		public Task CompleteDueTradeskills(Zone zone)
 		{
 			return Task.CompletedTask;
 		}

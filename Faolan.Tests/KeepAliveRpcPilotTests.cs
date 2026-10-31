@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			var metrics = new TickMetrics(10.0);
 			FillWindow(metrics, ticks: 20, overSeconds: 1.0);
 
-			await new KeepAliveService(metrics).HandlePing(client);
+			await new KeepAliveService(_ => metrics).HandlePing(client);
 
 			// The expected frame: GameAgent -> GameInterface, GameServerStats, body [frameRate BE float][0][0]. The two
 			// trailing words stay 0 - retail's are 0 in all 4243 captured GameServerStats.
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 
 			// A gauge that has never been fed: the tick loop has not started, or has died. That must read 0 rather than
 			// a plausible-looking number - the whole point of the field is to make a stalled world visible in-client.
-			await new KeepAliveService(new TickMetrics(10.0)).HandlePing(client);
+			await new KeepAliveService(_ => new TickMetrics(10.0)).HandlePing(client);
 
 			Assert.Equal(0f, Rpc.Parse(client.Sent!).BodyReader().ReadFloat());
 		}

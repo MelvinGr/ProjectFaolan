@@ -68,7 +68,7 @@ namespace Faolan.GameServer
 			// The world model and the player registry are registered in their own right because two collaborators share
 			// them: WorldSimulation, and PlayerDeathService - which must not hold the simulation, so what it is handed
 			// is the state rather than a reference back to its owner.
-			services.AddSingleton(sp => new WorldState(sp.GetService<TerrainService>()));
+			services.AddSingleton(sp => new WorldState(sp.GetService<TerrainService>(), sp.GetRequiredService<ILogger>()));
 			services.AddSingleton<PlayerRegistry>();
 			services.AddSingleton<PlayerDeathService>();
 			services.AddSingleton<BuffTickService>();
@@ -190,7 +190,7 @@ namespace Faolan.GameServer
 
 			// --- inventory + economy services -------------------------------------------------------------------
 			services.AddSingleton<LootService>();
-			services.AddSingleton(sp => new KeepAliveService(sp.GetRequiredService<WorldSimulation>().Metrics));
+			services.AddSingleton(sp => new KeepAliveService(sp.GetRequiredService<WorldSimulation>().MetricsFor));
 			services.AddSingleton<ShortcutBarService>();
 			services.AddSingleton<EquipmentService>();
 			services.AddSingleton<ShopService>();
@@ -214,7 +214,7 @@ namespace Faolan.GameServer
 			// --- the tick's whole outbound surface, composed once everything it reaches exists -------------------
 			services.AddSingleton(sp => new WorldOutbound(sp.GetRequiredService<WorldBroadcaster>(), sp.GetRequiredService<NpcBroadcaster>(),
 				sp.GetRequiredService<LootBroadcaster>(), sp.GetRequiredService<WorldObjectService>(), sp.GetRequiredService<BuffService>(),
-				sp.GetRequiredService<CombatService>(), sp.GetRequiredService<TradeskillService>(), sp.GetRequiredService<MountService>().Dismount));
+				sp.GetRequiredService<CombatService>(), sp.GetRequiredService<TradeskillService>(), sp.GetRequiredService<PlayerRegistry>(), sp.GetRequiredService<MountService>().Dismount));
 			services.AddSingleton<IWorldOutbound>(sp => sp.GetRequiredService<WorldOutbound>());
 
 			// The player stances, the achievement vistas and item use.

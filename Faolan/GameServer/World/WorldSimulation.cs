@@ -130,6 +130,9 @@ namespace Faolan.GameServer.World
 		}
 
 		private Task _tickTask = Task.CompletedTask;
+
+		// Each zone's tick clocks, failure count and measured rate. Touched only by that zone's own tick, on its loop.
+		private readonly ConcurrentDictionary<Zone, ZoneClocks> _zoneClocks = new ConcurrentDictionary<Zone, ZoneClocks>();
 		public PlayerRegistry Players { get; }
 
 		// Server-side terrain (RDB heightmap): ground-height snapping and terrain line-of-sight. Reached by the
@@ -445,9 +448,27 @@ namespace Faolan.GameServer.World
 
 		// Awaits the tick loop's (cancelled) exit. The loop swallows its own OperationCanceledException, so this
 		// completes normally once the lifetime token has been cancelled by the listener.
+		/// <summary>Completes once the tick beat has stopped (after the lifetime token is cancelled).</summary>
 		public Task StopAsync()
 		{
 			return _tickTask;
+		}
+
+		/// <summary>Stops every zone's loop once the work already queued on it has run; the last step of shutdown.</summary>
+		public Task StopZonesAsync()
+		{
+			return World.StopAsync();
+		}
+
+		/// <summary>
+		///     The measured tick rate of the loop serving <paramref name="client" />: its zone's, once it is in the world,
+		///     and the realm's beat before that (the loading screen pings too).
+		/// </summary>
+		public TickMetrics MetricsFor(INetworkClient client)
+		{
+			return PlayerWorldEntity(client) is { } entity && _zoneClocks.TryGetValue(World.ZoneForEntity(entity), out var clocks)
+				? clocks.Metrics
+				: Metrics;
 		}
 
 		private async Task<MapRegion[]> GetMapAreasCached(uint mapId)
@@ -463,9 +484,9 @@ namespace Faolan.GameServer.World
 		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when a
 		// pool actually rose, so a player at full health, stamina and mana costs nothing. The rates are attribute-driven
 		// and corpus-verified (RegenRates); retail does not use flat fractions of the pool max.
-		private async Task RegenerateConnectedPlayers(double elapsedSeconds)
+		private async Task RegenerateConnectedPlayers(Zone zone, double elapsedSeconds)
 		{
-			foreach (var pair in Players)
+			foreach (var pair in Players.In(zone))
 			{
 				var client = pair.Key;
 				var character = client.Session.Character;
@@ -527,12 +548,8 @@ namespace Faolan.GameServer.World
 		private async Task RunTickLoop(CancellationToken cancellationToken)
 		{
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
-			var regen = new TickAccumulator(RegenIntervalSeconds);
-			var ambientMaintain = new TickAccumulator(AmbientMaintainIntervalSeconds);
-			var interestSweep = new TickAccumulator(InterestSweepIntervalSeconds);
 			var healthReport = new TickAccumulator(SlowTickReportSeconds);
 			var lastTimestamp = Stopwatch.GetTimestamp();
-			var consecutiveFailures = 0;
 			try
 			{
 				while (await timer.WaitForNextTickAsync(cancellationToken))
@@ -541,324 +558,315 @@ namespace Faolan.GameServer.World
 					var dt = Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
 					lastTimestamp = now;
 
-					// One bad tick must not kill the world, so this try has to stay inside the loop: an exception that
-					// escapes it ends the tick for the process lifetime, and silently - the listeners keep accepting
-					// clients while nothing moves, regenerates, respawns, aggroes or discovers anything. A transient
-					// SQLite "database is locked" from a stray concurrent reader is enough to produce one.
-					try
+					// The beat only hands each zone its tick: the zone's own loop runs it, between that zone's packet
+					// handlers, so the tick and the handlers never touch the zone at once. A zone still busy with its
+					// previous tick is skipped this beat, and its next tick advances by the time that really passed.
+					foreach (var zone in World.Zones)
 					{
-						// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
-						// wire-visible effects - NPC respawns, loot expiry, NPC attacks - to broadcast.
-						foreach (var effect in World.Tick(dt))
-						{
-							// A dead NPC must emit no live broadcast - move, patrol, follow, heartbeat, chatter, attack or
-							// combat mode. A move effect generated the tick it died, or processed across an await after the
-							// player's kill ran OnNpcKilled and sent the death pose, would override that pose and walk or
-							// re-animate the corpse, so a patrolling NPC appears to walk off and vanish instead of dying in
-							// place. Only the corpse-lifecycle effects - linger to loot, respawn, fade - apply once dead.
-							if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootDropped or WorldTickEffectType.NpcCorpseFaded or WorldTickEffectType.NpcCorpseQuit
-								    or WorldTickEffectType.NpcCorpseRemoved or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
-								continue;
-
-							switch (effect.Type)
-							{
-								case WorldTickEffectType.NpcRespawned:
-								{
-									await _output.BroadcastNpcRespawn(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcCorpseLootDropped:
-								{
-									await _output.DropCorpseLoot(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcCorpseFaded:
-								{
-									await _output.BroadcastCorpseFade(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcCorpseQuit:
-								{
-									await _output.BroadcastEntityDespawn(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcCorpseRemoved:
-								{
-									// The fade and quit have already gone out in the two stages before this one, so the
-									// entity is off every client's screen; this only drops it from the model.
-									World.Remove(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.LootExpired:
-								case WorldTickEffectType.TimedDespawn: // a summon's lifetime ran out - same teardown
-								{
-									await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
-									World.Remove(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcAttack:
-								{
-									// Gated by NpcAutoAttackEnabled; the swing plays the decoded attack-animation ack (see
-									// ApplyNpcAttack).
-									if (NpcAutoAttackEnabled)
-										await _npcCombat.ApplyNpcAttack(effect.Entity, effect.Target!);
-									break;
-								}
-
-								case WorldTickEffectType.NpcCast:
-								{
-									if (NpcAutoAttackEnabled)
-										await _npcCombat.ApplyNpcCast(effect.Entity, effect.Target!);
-									break;
-								}
-
-								case WorldTickEffectType.NpcPatrol:
-								{
-									await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat simulation
-									break;
-								}
-
-								case WorldTickEffectType.NpcFollow:
-								{
-									// Bound to the leader, which is what makes the client walk the follower rather than
-									// interpolate a bare segment and be re-anchored. Falls back to the plain step if the
-									// leader is gone by the time the effect is drained.
-									if (effect.Target is { } leader)
-										await _output.BroadcastNpcFollow(effect.Entity, leader);
-									else
-										await _output.BroadcastNpcMove(effect.Entity);
-
-									break;
-								}
-
-								case WorldTickEffectType.NpcMove:
-								{
-									if (NpcAutoAttackEnabled)
-										await _output.BroadcastNpcMove(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcEnterCombat:
-								case WorldTickEffectType.NpcExitCombat:
-								{
-									// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers. Gated with the rest of
-									// the combat simulation, since combat mode only has meaning alongside the auto-attack swing.
-									if (NpcAutoAttackEnabled)
-									{
-										await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
-										// On engage, also push the aggro so the threat is visible.
-										if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
-											await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
-									}
-
-									break;
-								}
-
-								case WorldTickEffectType.NpcShieldRose:
-								{
-									// Directional combat: the defender's blue guard arcs. Gated with the combat simulation - the
-									// rose only means anything when the NPC is actually fighting back.
-									if (NpcAutoAttackEnabled)
-										await _output.BroadcastShieldRose(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcStopped:
-								{
-									// The NPC arrived home and stopped; close its move with a StopIIR.
-									if (NpcAutoAttackEnabled)
-										await _output.BroadcastNpcStop(effect.Entity);
-									break;
-								}
-
-									case WorldTickEffectType.NpcAmbientAnimation:
-								{
-									// The ambient idle animation - a citizen leaning on a wall rather than standing to
-									// attention. Cosmetic, so ungated like the heartbeat above; the tick has already picked
-									// which animation and how long it runs.
-									if (NpcAmbientAnimationEnabled)
-										await _output.BroadcastNpcAmbientAnimation(effect.Entity);
-									break;
-								}
-
-							case WorldTickEffectType.EncounterBark:
-								{
-									// The lure calls for help as a player closes. Cosmetic - the swap is what matters - but
-									// it is the tell that the encounter is armed, and it is a real captured line; its
-									// `event(2)` channel is what marks these apart from ambient chatter.
-									var lure = effect.Entity;
-									if (lure.Presentation.EncounterLines is not { Length: > 0 } barkLines)
-										break;
-
-									var heard = new HashSet<uint>();
-									foreach (var near in World.ZoneForEntity(lure).PlayersInRange(lure.Position, SayRangeUnits, lure.Handle))
-										heard.Add(near.Handle);
-									if (heard.Count > 0)
-										await _agents.NpcBark(lure.Handle, barkLines[Random.Shared.Next(barkLines.Length)], heard);
-									break;
-								}
-
-								case WorldTickEffectType.EncounterTrigger:
-								{
-									// The trap springs: the lure is replaced by its boss on the same spot.
-									await _output.SwapEncounterLureForBoss(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.EncounterReset:
-								{
-									// The boss's corpse has cleared - put the lure back so it can fire again.
-									await _output.RestoreEncounterLure(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcChatter:
-								{
-									// Ambient bark: the NPC local-says a random line from its own type's set (chat server
-									// CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the NPC
-									// handle so the client shows the bubble over it.
-									//
-									// The lines are per template, never a shared pool: six types carry any, each with the
-									// client's own group - `RenownCrier` is Tatianus the Crier alone, so his "consider joining
-									// a guild" line cannot come out of anyone else. (A group may span types where retail shares
-									// one: the Nobleman and one Noblewoman both bark `RenownBystanderLovers`. That is the
-									// client's grouping, not ours.)
-									var npc = effect.Entity;
-									if (npc.Presentation.ChatterLines is not { Length: > 0 } lines)
-										break;
-
-									var recipients = new HashSet<uint>();
-									foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
-										recipients.Add(near.Handle);
-									if (recipients.Count > 0)
-										await _agents.NpcBark(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
-									break;
-								}
-
-								case WorldTickEffectType.NpcGreeting:
-								{
-									// The crier noticed a player arrive and greets them. Not the ambient tier - the cue is
-									// the arrival, and the channel is `sendtell`, so it goes to that player alone rather than
-									// to everyone in earshot. That is also what makes the addressee slot coherent: the line
-									// is "..., {DetectedChar.name}!", and there is exactly one name it can carry.
-									var greeter = effect.Entity;
-									if (effect.Target is not { } greeted || greeter.Presentation.GreetingLines is not { Length: > 0 } greetings)
-										break;
-
-									await _agents.NpcBark(greeter.Handle, greetings[Random.Shared.Next(greetings.Length)], [greeted.Handle]);
-									break;
-								}
-							}
-						}
-
-						// The staged visual sequence a harvested world object plays - fade, mesh swap, collision drop,
-						// and the regrowth ten seconds later. Retail paces these against the client's own fade, so they
-						// are timed steps rather than one burst.
-						foreach (var step in World.TickVisualSequences(dt))
-							await _output.PlayDynelVisualStep(step);
-
-						// A harvest node shows the "being gathered" pin until 10 s after its last swing.
-						foreach (var (zone, node) in World.TickGatheringPins(dt))
-							await _output.RestoreNodeWaypointType(zone, node);
-
-						// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
-						await _playerDeaths.TickPlayerDeaths();
-						await TickKillChains();
-						await _buffTicks.TickBuffExpiry();
-						await _buffTicks.TickDots();
-						await _buffTicks.TickAuras();
-						await _buffTicks.TickNpcBuffs(); // the same three jobs - expire, bleed, emit - for buffs sitting on a mob
-						await _output.CompleteDueTradeskills(); // a craft or socket whose ~5 s retail bar has run out
-
-						// Boundary crossing tests, every base tick at 10 Hz. They must not hang off a slower accumulator: a
-						// walking player covers several units between 1 Hz samples, so both would fire late, well inside the
-						// boundary - in-client that reads as having to stand on top of a resurrection point before it
-						// registers. Cheap enough to run hot: the points, areas and per-player discovered set are all cached,
-						// so a tick is a handful of distance checks per player, and only an actual discovery touches the
-						// database.
-						await _playerDeaths.DiscoverNearbyRespawnPoints();
-						await TickAreaBanners();
-
-						// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
-						if (regen.Advance(dt, out var regenElapsed))
-							await RegenerateConnectedPlayers(regenElapsed);
-
-						// The interest pass nobody else drives: the one for a player standing still while the world walks
-						// past them. Every other pass is triggered by the player moving, entering or changing quests, so
-						// without this an NPC that walks out of range stays frozen on their screen and one that walks in
-						// never appears.
-						if (interestSweep.Advance(dt, out _))
-						{
-							foreach (var client in Players.Keys)
-								await _output.ResolveInterest(client);
-						}
-
-						// Keep the ambient spawn-group pools at strength by respawning killed members. A no-op when disabled.
-						if (ambientMaintain.Advance(dt, out _))
-							await _output.MaintainAmbientPools();
-
-						consecutiveFailures = 0;
-					}
-					catch (OperationCanceledException)
-					{
-						throw; // shutdown - let the outer handler end the loop
-					}
-					catch (Exception ex)
-					{
-						// Log the first failure and then back off geometrically: a systemic fault (a broken query, a
-						// permanently locked DB) would otherwise write a stack trace 10x a second, and the flood is
-						// what buries the first one - the only line that says what actually broke.
-						consecutiveFailures++;
-						if (consecutiveFailures == 1 || consecutiveFailures % 100 == 0)
-							_logger.LogError(ex, "Game tick failed ({Count} consecutive); the world keeps ticking.", consecutiveFailures);
+						if (zone.TryBeginTick())
+							zone.Loop.Post(() => TickZone(zone));
 					}
 
-					// Measure the tick's work (start-of-work -> here), not the period - the period is the timer's and
-					// says nothing about load. A failed tick is still a tick and is still measured: a loop that throws
-					// instantly would otherwise report a perfectly healthy rate while doing nothing.
 					Metrics.RecordTick(Stopwatch.GetElapsedTime(now).TotalSeconds);
 
-					// Surface a loop that is not keeping up instead of leaving it to be noticed as "the world feels
-					// laggy". Throttled to one line per SlowTickReportSeconds - the condition is by definition
-					// persistent, so logging it per tick would bury it.
 					if (healthReport.Advance(dt, out _))
-					{
-						var health = Metrics.Current;
-						if (health.TicksPerSecond > 0 && health.TicksPerSecond < Metrics.NominalTicksPerSecond * SlowTickThreshold)
-							_logger.LogWarning("World tick is behind: {Rate:F1} of a nominal {Nominal:F1} Hz ({Busy:P0} of the tick budget in use).",
-								health.TicksPerSecond, Metrics.NominalTicksPerSecond, health.BusyFraction);
-					}
+						ReportSlowZones();
 				}
 			}
 			catch (OperationCanceledException)
 			{
-				// server shutting down
 			}
 			catch (Exception ex)
 			{
-				// Only a failure of the timer itself reaches here - a per-tick fault is caught above.
 				_logger.LogError(ex, "Game tick loop terminated.");
 			}
 		}
 
-		// Floats the area banner when a player crosses into a named sub-area. A map has many - Old Tarantia fires
-		// seventeen - so this is a per-tick position test against the playfield's banner volumes rather than a
-		// per-playfield event; entering a playfield lands the player in an area, and that is simply the first crossing.
-		//
-		// The volumes are the client's own: exact concave polygons with a real height band, tested with no slack, so the
-		// server fires on the boundary the client draws.
-		//
-		// The smallest containing volume wins. The client's regions nest and overlap - a ward inside a district - and the
-		// tighter one is the more specific claim.
-		private async Task TickAreaBanners()
+		// One zone's tick, on that zone's loop.
+		private async Task TickZone(Zone zone)
 		{
-			foreach (var (client, entity) in Players)
+			var clocks = _zoneClocks.GetOrAdd(zone, _ => new ZoneClocks());
+			var now = Stopwatch.GetTimestamp();
+			var dt = clocks.LastTick == 0
+				? BaseTickSeconds
+				: Stopwatch.GetElapsedTime(clocks.LastTick, now).TotalSeconds;
+			clocks.LastTick = now;
+
+			// One bad tick must not kill the zone, so this catches everything: an exception that escaped would only fail
+			// this tick's work item, but the next beat must still find the zone's tick claim released.
+			try
+			{
+				// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the wire-visible
+				// effects - NPC respawns, loot expiry, NPC attacks - to broadcast.
+				foreach (var effect in World.Tick(zone, dt))
+				{
+					// A dead NPC must emit no live broadcast - move, patrol, follow, heartbeat, chatter, attack or
+					// combat mode. A move effect generated the tick it died, or processed across an await after the
+					// player's kill ran OnNpcKilled and sent the death pose, would override that pose and walk or
+					// re-animate the corpse, so a patrolling NPC appears to walk off and vanish instead of dying in
+					// place. Only the corpse-lifecycle effects - linger to loot, respawn, fade - apply once dead.
+					if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootDropped or WorldTickEffectType.NpcCorpseFaded or WorldTickEffectType.NpcCorpseQuit
+						    or WorldTickEffectType.NpcCorpseRemoved or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
+						continue;
+
+					switch (effect.Type)
+					{
+						case WorldTickEffectType.NpcRespawned:
+						{
+							await _output.BroadcastNpcRespawn(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcCorpseLootDropped:
+						{
+							await _output.DropCorpseLoot(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcCorpseFaded:
+						{
+							await _output.BroadcastCorpseFade(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcCorpseQuit:
+						{
+							await _output.BroadcastEntityDespawn(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcCorpseRemoved:
+						{
+							// The fade and quit have already gone out in the two stages before this one, so the
+							// entity is off every client's screen; this only drops it from the model.
+							World.Remove(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.LootExpired:
+						case WorldTickEffectType.TimedDespawn: // a summon's lifetime ran out - same teardown
+						{
+							await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
+							World.Remove(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcAttack:
+						{
+							// Gated by NpcAutoAttackEnabled; the swing plays the decoded attack-animation ack (see
+							// ApplyNpcAttack).
+							if (NpcAutoAttackEnabled)
+								await _npcCombat.ApplyNpcAttack(effect.Entity, effect.Target!);
+							break;
+						}
+
+						case WorldTickEffectType.NpcCast:
+						{
+							if (NpcAutoAttackEnabled)
+								await _npcCombat.ApplyNpcCast(effect.Entity, effect.Target!);
+							break;
+						}
+
+						case WorldTickEffectType.NpcPatrol:
+						{
+							await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat simulation
+							break;
+						}
+
+						case WorldTickEffectType.NpcFollow:
+						{
+							// Bound to the leader, which is what makes the client walk the follower rather than
+							// interpolate a bare segment and be re-anchored. Falls back to the plain step if the
+							// leader is gone by the time the effect is drained.
+							if (effect.Target is { } leader)
+								await _output.BroadcastNpcFollow(effect.Entity, leader);
+							else
+								await _output.BroadcastNpcMove(effect.Entity);
+
+							break;
+						}
+
+						case WorldTickEffectType.NpcMove:
+						{
+							if (NpcAutoAttackEnabled)
+								await _output.BroadcastNpcMove(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcEnterCombat:
+						case WorldTickEffectType.NpcExitCombat:
+						{
+							// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers. Gated with the rest of
+							// the combat simulation, since combat mode only has meaning alongside the auto-attack swing.
+							if (NpcAutoAttackEnabled)
+							{
+								await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
+								// On engage, also push the aggro so the threat is visible.
+								if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
+									await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
+							}
+
+							break;
+						}
+
+						case WorldTickEffectType.NpcShieldRose:
+						{
+							// Directional combat: the defender's blue guard arcs. Gated with the combat simulation - the
+							// rose only means anything when the NPC is actually fighting back.
+							if (NpcAutoAttackEnabled)
+								await _output.BroadcastShieldRose(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcStopped:
+						{
+							// The NPC arrived home and stopped; close its move with a StopIIR.
+							if (NpcAutoAttackEnabled)
+								await _output.BroadcastNpcStop(effect.Entity);
+							break;
+						}
+
+							case WorldTickEffectType.NpcAmbientAnimation:
+						{
+							// The ambient idle animation - a citizen leaning on a wall rather than standing to
+							// attention. Cosmetic, so ungated like the heartbeat above; the tick has already picked
+							// which animation and how long it runs.
+							if (NpcAmbientAnimationEnabled)
+								await _output.BroadcastNpcAmbientAnimation(effect.Entity);
+							break;
+						}
+
+					case WorldTickEffectType.EncounterBark:
+						{
+							// The lure calls for help as a player closes. Cosmetic - the swap is what matters - but
+							// it is the tell that the encounter is armed, and it is a real captured line; its
+							// `event(2)` channel is what marks these apart from ambient chatter.
+							var lure = effect.Entity;
+							if (lure.Presentation.EncounterLines is not { Length: > 0 } barkLines)
+								break;
+
+							var heard = new HashSet<uint>();
+							foreach (var near in World.ZoneForEntity(lure).PlayersInRange(lure.Position, SayRangeUnits, lure.Handle))
+								heard.Add(near.Handle);
+							if (heard.Count > 0)
+								await _agents.NpcBark(lure.Handle, barkLines[Random.Shared.Next(barkLines.Length)], heard);
+							break;
+						}
+
+						case WorldTickEffectType.EncounterTrigger:
+						{
+							// The trap springs: the lure is replaced by its boss on the same spot.
+							await _output.SwapEncounterLureForBoss(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.EncounterReset:
+						{
+							// The boss's corpse has cleared - put the lure back so it can fire again.
+							await _output.RestoreEncounterLure(effect.Entity);
+							break;
+						}
+
+						case WorldTickEffectType.NpcChatter:
+						{
+							// Ambient bark: the NPC local-says a random line from its own type's set (chat server
+							// CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the NPC
+							// handle so the client shows the bubble over it.
+							//
+							// The lines are per template, never a shared pool: six types carry any, each with the
+							// client's own group - `RenownCrier` is Tatianus the Crier alone, so his "consider joining
+							// a guild" line cannot come out of anyone else. (A group may span types where retail shares
+							// one: the Nobleman and one Noblewoman both bark `RenownBystanderLovers`. That is the
+							// client's grouping, not ours.)
+							var npc = effect.Entity;
+							if (npc.Presentation.ChatterLines is not { Length: > 0 } lines)
+								break;
+
+							var recipients = new HashSet<uint>();
+							foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
+								recipients.Add(near.Handle);
+							if (recipients.Count > 0)
+								await _agents.NpcBark(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
+							break;
+						}
+
+						case WorldTickEffectType.NpcGreeting:
+						{
+							// The crier noticed a player arrive and greets them. Not the ambient tier - the cue is
+							// the arrival, and the channel is `sendtell`, so it goes to that player alone rather than
+							// to everyone in earshot. That is also what makes the addressee slot coherent: the line
+							// is "..., {DetectedChar.name}!", and there is exactly one name it can carry.
+							var greeter = effect.Entity;
+							if (effect.Target is not { } greeted || greeter.Presentation.GreetingLines is not { Length: > 0 } greetings)
+								break;
+
+							await _agents.NpcBark(greeter.Handle, greetings[Random.Shared.Next(greetings.Length)], [greeted.Handle]);
+							break;
+						}
+					}
+				}
+
+				// The staged visual sequence a harvested world object plays - fade, mesh swap, collision drop,
+				// and the regrowth ten seconds later. Retail paces these against the client's own fade, so they
+				// are timed steps rather than one burst.
+				foreach (var step in zone.TickVisualSequences(dt))
+					await _output.PlayDynelVisualStep(step);
+
+				foreach (var node in zone.TickGatheringPins(dt))
+					await _output.RestoreNodeWaypointType(zone, node);
+
+				await _playerDeaths.TickPlayerDeaths(zone);
+				await TickKillChains(zone);
+				await _buffTicks.TickBuffExpiry(zone);
+				await _buffTicks.TickDots(zone);
+				await _buffTicks.TickAuras(zone);
+				await _buffTicks.TickNpcBuffs(zone); // the same three jobs - expire, bleed, emit - for buffs sitting on a mob
+				await _output.CompleteDueTradeskills(zone); // a craft or socket whose ~5 s retail bar has run out
+
+				await _playerDeaths.DiscoverNearbyRespawnPoints(zone);
+				await TickAreaBanners(zone);
+
+				if (clocks.Regen.Advance(dt, out var regenElapsed))
+					await RegenerateConnectedPlayers(zone, regenElapsed);
+
+				if (clocks.InterestSweep.Advance(dt, out _))
+				{
+					foreach (var client in Players.In(zone).Select(p => p.Key).ToList())
+						await _output.ResolveInterest(client);
+				}
+
+				if (clocks.AmbientMaintain.Advance(dt, out _))
+					await _output.MaintainAmbientPools(zone);
+
+				clocks.ConsecutiveFailures = 0;
+			}
+			catch (Exception ex)
+			{
+				clocks.ConsecutiveFailures++;
+				if (clocks.ConsecutiveFailures == 1 || clocks.ConsecutiveFailures % 100 == 0)
+					_logger.LogError(ex, "Tick of zone {Map}/{Instance} failed ({Count} consecutive); the zone keeps ticking.", zone.MapId, zone.InstanceId, clocks.ConsecutiveFailures);
+			}
+			finally
+			{
+				clocks.Metrics.RecordTick(Stopwatch.GetElapsedTime(now).TotalSeconds);
+				zone.EndTick();
+			}
+		}
+
+		private void ReportSlowZones()
+		{
+			foreach (var (zone, clocks) in _zoneClocks)
+			{
+				var health = clocks.Metrics.Current;
+				if (health.TicksPerSecond > 0 && health.TicksPerSecond < clocks.Metrics.NominalTicksPerSecond * SlowTickThreshold)
+					_logger.LogWarning("Zone {Map}/{Instance} tick is behind: {Rate:F1} of a nominal {Nominal:F1} Hz ({Busy:P0} of the tick budget in use).",
+						zone.MapId, zone.InstanceId, health.TicksPerSecond, clocks.Metrics.NominalTicksPerSecond, health.BusyFraction);
+			}
+		}
+
+		private async Task TickAreaBanners(Zone zone)
+		{
+			foreach (var (client, entity) in Players.In(zone))
 			{
 				var areas = await GetMapAreasCached(entity.MapId);
 				if (areas.Length == 0)
@@ -899,10 +907,10 @@ namespace Faolan.GameServer.World
 		// corpus - so the chain has a visible end, and without this the client keeps the last count on screen forever.
 		// The kill side is CombatService.AnnounceKillChain; the window is the measured
 		// WorldEntity.ChainKillWindowSeconds.
-		private async Task TickKillChains()
+		private async Task TickKillChains(Zone zone)
 		{
 			var now = DateTimeOffset.UtcNow;
-			foreach (var pair in Players)
+			foreach (var pair in Players.In(zone))
 			{
 				if (!pair.Value.TryLapseKillChain(now))
 					continue;
@@ -911,5 +919,15 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// The per-zone half of the tick's bookkeeping: what the global loop kept once, each zone now keeps for itself.
+		private sealed class ZoneClocks
+		{
+			public long LastTick { get; set; }
+			public int ConsecutiveFailures { get; set; }
+			public TickAccumulator Regen { get; } = new TickAccumulator(RegenIntervalSeconds);
+			public TickAccumulator InterestSweep { get; } = new TickAccumulator(InterestSweepIntervalSeconds);
+			public TickAccumulator AmbientMaintain { get; } = new TickAccumulator(AmbientMaintainIntervalSeconds);
+			public TickMetrics Metrics { get; } = new TickMetrics(1.0 / BaseTickSeconds);
+		}
 	}
 }
