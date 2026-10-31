@@ -29,10 +29,6 @@
         <File Path="Faolan.Wireshark/wireshark/plugin.c" />
         <File Path="Faolan.Wireshark\scripts\gen_opcode_names.py" />
     </Folder>
-    <Folder Name="/Solution Files/.gitea/" />
-    <Folder Name="/Solution Files/.gitea/workflows/">
-        <File Path=".gitea\workflows\docker.yml" />
-    </Folder>
     <Project Path="Faolan.ClientLauncher/Faolan.ClientLauncher.csproj" />
     <Project Path="Faolan.Core/Faolan.Core.csproj" />
     <Project Path="Faolan.Core.Database.Migrations.Postgres/Faolan.Core.Database.Migrations.Postgres.csproj" />
