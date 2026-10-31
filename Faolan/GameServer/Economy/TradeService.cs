@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -23,14 +24,16 @@ namespace Faolan.GameServer.Economy
 	{
 		private readonly ConcurrentDictionary<uint, TradeSession> _byCharacter = [];
 		private readonly ICharacterInventoryRepository _inventory;
-		private readonly ICharacterRepository _characters;
+		// The world connections, for the live characters whose wallets a trade moves. Both sides are connected for as
+		// long as the trade lasts, since a disconnect abandons it.
+		private readonly ConnectionRegistry _connections;
 		private readonly ILogger _logger;
 		private readonly ITradeOutbound _outbound;
 
-		public TradeService(ICharacterInventoryRepository inventory, ICharacterRepository characters, ILogger logger, ITradeOutbound outbound)
+		public TradeService(ICharacterInventoryRepository inventory, ConnectionRegistry connections, ILogger logger, ITradeOutbound outbound)
 		{
 			_inventory = inventory;
-			_characters = characters;
+			_connections = connections;
 			_logger = logger;
 			_outbound = outbound;
 		}
@@ -94,7 +97,7 @@ namespace Faolan.GameServer.Economy
 
 			// Clamp to what the player actually has, so the commit cannot be asked to move money that does not exist.
 			// The client presumably refuses first, but that cannot be relied on.
-			var character = await _characters.GetCharacter(characterId);
+			var character = _connections.ForCharacter(characterId)?.Session.Character;
 			side.Cash = character == null
 				? 0
 				: System.Math.Min(tin, character.Money);
@@ -204,19 +207,29 @@ namespace Faolan.GameServer.Economy
 		///     Both sides agreed: move everything, then tell both it is done.
 		/// </summary>
 		/// <remarks>
-		///     The database writes happen before the wire, so a failure cannot leave the clients believing in a trade
-		///     that did not happen.
+		///     <para>
+		///         The database writes happen before the wire, so a failure cannot leave the clients believing in a
+		///         trade that did not happen.
+		///     </para>
+		///     <para>
+		///         Taking the session out of the table is the claim, and it comes first. Each player's packets run on
+		///         their own connection, so two accepts that land together both see both flags set; only the one that
+		///         removes the session commits, and an offer change or an abandon arriving during the exchange finds no
+		///         trade to act on.
+		///     </para>
 		/// </remarks>
 		private async Task Commit(TradeSession session)
 		{
+			if (!_byCharacter.TryRemove(new KeyValuePair<uint, TradeSession>(session.Left.CharacterId, session)))
+				return;
+
+			_byCharacter.TryRemove(new KeyValuePair<uint, TradeSession>(session.Right.CharacterId, session));
+
 			await Exchange(session.Left, session.Right);
 			await Exchange(session.Right, session.Left);
 
 			foreach (var side in new[] { session.Left, session.Right })
-			{
-				_byCharacter.TryRemove(side.CharacterId, out _);
 				await _outbound.SendTradeCompleted(side.CharacterId);
-			}
 
 			_logger.LogInformation("Trade: {A:X8} <-> {B:X8} committed ({AItems} + {ATin} tin for {BItems} + {BTin} tin).", session.Left.CharacterId, session.Right.CharacterId,
 				session.Left.Items.Count, session.Left.Cash, session.Right.Items.Count, session.Right.Cash);
@@ -262,17 +275,26 @@ namespace Faolan.GameServer.Economy
 			if (from.Cash == 0)
 				return;
 
-			var giver = await _characters.GetCharacter(from.CharacterId);
-			var receiver = await _characters.GetCharacter(to.CharacterId);
+			// The live characters, not their rows: the session's wallet is the authoritative one, and every other money
+			// path (loot, shop, quest reward, mail) adds to it and writes the result. Moving only the rows would leave
+			// both wallets stale, and the next of those writes would put the pre-trade balance back - minting the money
+			// on the giver's side and losing it on the receiver's.
+			var giver = _connections.ForCharacter(from.CharacterId)?.Session.Character;
+			var receiver = _connections.ForCharacter(to.CharacterId)?.Session.Character;
 			if (giver == null || receiver == null)
+			{
+				_logger.LogWarning("Trade: {From:X8} -> {To:X8} cash not moved; one side is no longer connected.", from.CharacterId, to.CharacterId);
 				return;
+			}
 
 			// Re-clamp at commit time: the offer was clamped when it was made, but the giver may have spent since.
 			var moved = System.Math.Min(from.Cash, giver.Money);
-			await _inventory.SetCharacterMoney(from.CharacterId, giver.Money - moved);
-			await _inventory.SetCharacterMoney(to.CharacterId, receiver.Money + moved);
-			await _outbound.SendWalletUpdate(from.CharacterId, giver.Money - moved);
-			await _outbound.SendWalletUpdate(to.CharacterId, receiver.Money + moved);
+			giver.Money -= moved;
+			receiver.Money += moved;
+			await _inventory.SetCharacterMoney(giver.Id, giver.Money);
+			await _inventory.SetCharacterMoney(receiver.Id, receiver.Money);
+			await _outbound.SendWalletUpdate(giver.Id, giver.Money);
+			await _outbound.SendWalletUpdate(receiver.Id, receiver.Money);
 		}
 
 		/// <summary>
