@@ -29,9 +29,8 @@ Archive/Faolan-Private-Assembla.zip
     distributed under the GNU General Public License terms stated in the files they contain.
 
 faolan.sql
-Faolan.Tests/Assets/fixtures.bin
     Game data derived from the Age of Conan client files and from retail network traffic: item, NPC, quest, spell
-    and world records, client text, and captured packet bytes. This material is the property of Funcom and is not
+    and world records, and client text. This material is the property of Funcom and is not
     licensed by this project. It is included only for interoperability with the Age of Conan client.
 
 docs/rdb/quest-steps-wiki.json

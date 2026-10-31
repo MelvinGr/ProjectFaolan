@@ -32,7 +32,7 @@ namespace Faolan.Tests
 
 		private const uint TemplateInstance = 0x02165EFF;
 		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		// The template is Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the whole
 		// per-class stat block is authored for an Assassin at L1 it must reproduce that block exactly - i.e. the

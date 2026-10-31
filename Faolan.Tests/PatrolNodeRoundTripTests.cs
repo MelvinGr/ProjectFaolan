@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	// patrols from PatrolNode columns instead of replaying the captured Body: the mapping loses nothing.
 	public class PatrolNodeRoundTripTests
 	{
-		[Theory, MemberData(nameof(Bodies))]
+		[Theory(SkipTestWithoutData = true), MemberData(nameof(Bodies))]
 		public void EveryCommittedPatrol_ColumnarizesAndRebuildsByteExact(byte[] body, int index)
 		{
 			_ = index;
@@ -28,6 +28,9 @@ namespace Faolan.Tests
 
 		public static IEnumerable<object[]> Bodies()
 		{
+			if (!FixtureArchive.Present)
+				yield break;
+
 			var blob = Golden.Bytes("PatrolBodies");
 			var count = blob.ReadU32Be(0);
 			var offset = 4;

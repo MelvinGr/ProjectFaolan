@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		private const uint Hash = 1129664565;
 		private const uint SlaveManaclesId = 3361557;
 		private const ulong Slot = 18;
-		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
+		private static string InventoryCapture => TestPaths.Asset("strie-login-inventory.bin");
 
 		[Fact]
 		public async Task GeneratedSchema_Decodes_CapturedInventoryEntry_KeysMatchDataQuad()

@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		private const ulong ItemId = 2366689308843907890;
 		private const ulong RecordId = 865074;
 
-		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
+		private static string InventoryCapture => TestPaths.Asset("strie-login-inventory.bin");
 
 		[Fact]
 		public async Task AddItem_FromImportedItem_MatchesCapturedSlaveManacles()

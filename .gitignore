@@ -280,3 +280,5 @@ Faolan.ClientHook/*.lib
 /faolan.db-wal
 /faolan.log
 /Faolan/faolan.db
+# Retail packet bytes for the golden tests: game data, kept in the data repo (Fixtures/fixtures.bin), never here.
+/Faolan.Tests/Assets/fixtures.bin

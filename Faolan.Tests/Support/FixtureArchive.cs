@@ -5,13 +5,17 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core;
 using Faolan.Core.Extensions;
+using Xunit;
 
 namespace Faolan.Tests.Support
 {
-	// The fixture file: Faolan.Tests/Assets/fixtures.bin holds every byte of capture-derived data the suite reads -
-	// the whole-corpus slice and the hand-carved named fixtures (inputs under Assets/, expected outputs under
-	// Golden/). One file, so the repo carries one blob rather than 43.
+	// The fixture file holds every byte of capture-derived data the suite reads - the whole-corpus slice and the
+	// hand-carved named fixtures (inputs under Assets/, expected outputs under Golden/). It is retail game data, so the
+	// repository does not carry it: it sits git-ignored at Faolan.Tests/Assets/fixtures.bin, or wherever
+	// FAOLAN_FIXTURES points (Global.FixturesPath), and the data repo keeps the canonical copy. Without it every test
+	// that reads a fixture skips, so a clean clone passes.
 	//
 	// Written by `dotnet run --project Faolan.Importer -- --report fixtures` (FixtureArchiveWriter owns the format;
 	// `--report fixture-set` adds or replaces one named entry).
@@ -31,7 +35,11 @@ namespace Faolan.Tests.Support
 		private static readonly Lazy<Archive> Loaded = new Lazy<Archive>(Load);
 		private static readonly Lazy<Dictionary<string, string>> Materialized = new Lazy<Dictionary<string, string>>(Materialize);
 
-		public static string Path => TestPaths.Repo("Faolan.Tests", "Assets", "fixtures.bin");
+		public static string Path => Global.FixturesPath;
+
+		// Whether the archive is here at all - for theory data sources, which run at discovery and must yield nothing
+		// (with SkipTestWithoutData) rather than skip.
+		public static bool Present => File.Exists(Path);
 
 		// The corpus entries, in capture order - the order the gates that walk a session (e.g. "the spell book is
 		// absent only in the session's first snapshot") depend on. The container stores them grouped by shape instead,
@@ -96,9 +104,11 @@ namespace Faolan.Tests.Support
 		{
 			if (!File.Exists(Path))
 			{
-				throw new FileNotFoundException(
-					$"Fixture archive not found at {Path}. Regenerate it with the capture repo present: " +
-					"dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures", Path);
+				if (Global.FixturesPathOverride != null)
+					throw new FileNotFoundException($"FAOLAN_FIXTURES points at {Path}, which does not exist.", Path);
+
+				Assert.Skip($"No fixture archive at {Path}: it is game data and not in the repository. Copy the data " +
+				            "repo's Fixtures/fixtures.bin there, or point FAOLAN_FIXTURES at it.");
 			}
 
 			var raw = File.ReadAllBytes(Path);

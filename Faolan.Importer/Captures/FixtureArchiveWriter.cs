@@ -22,8 +22,8 @@ using Faolan.Core.Network.Codecs.World;
 namespace Faolan.Importer.Captures
 {
 	/// <summary>
-	///     Writes the fixture archive: every byte of capture-derived data the test suite reads, in one committed file
-	///     (Faolan.Tests/Assets/fixtures.bin).
+	///     Writes the fixture archive: every byte of capture-derived data the test suite reads, in one file
+	///     (Global.FixturesPath: git-ignored Faolan.Tests/Assets/fixtures.bin, or FAOLAN_FIXTURES).
 	/// </summary>
 	/// <remarks>
 	///     It holds two kinds of entry. The corpus half is the packet bodies the whole-corpus gates walk, pulled out

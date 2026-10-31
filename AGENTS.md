@@ -220,8 +220,10 @@ assuming. The importer's DB comes from the `Database` section of faolan.json (`D
   an extractor, a report, the CDN mirror, or the premise. A number seen in two forms is usually two id spaces, not
   two versions.
 
-**The test suite does not need the data repo.** Every test runs from a plain clone, off one committed file:
-`Faolan.Tests/Assets/fixtures.bin` (`FixtureArchive`). How it splits into named fixtures and the corpus slice, how to
+**Retail game data stays out of the repository, the fixture archive included.** The suite reads its capture-derived
+bytes from one git-ignored file, `Faolan.Tests/Assets/fixtures.bin` (`FixtureArchive`); the data repo keeps the
+canonical copy (`Fixtures/fixtures.bin`), copied in or named by `FAOLAN_FIXTURES`. Without it every fixture-reading
+test skips and the rest run, so a clean clone passes. How it splits into named fixtures and the corpus slice, how to
 add, rename or regenerate them, and whether a new check belongs in a test or a `--report`: `Faolan.Tests/AGENTS.md`.
 The archive and its fixture keys carry no capture file names and no character names; do not add a listing of the
 private corpus.

@@ -15,11 +15,12 @@ namespace Faolan.Tests
 	// proves a from-scratch prefix reproduces the capture; extracts the tails template asset.
 	public class BeachSnapshotConstructionTests
 	{
-		private static readonly string Cap = TestPaths.Asset("strie-login-inventory.bin");
+		private readonly ITestOutputHelper _o;
+
+		private static string Cap => TestPaths.Asset("strie-login-inventory.bin");
 
 		// Where the server-owned beach tails template asset lives in the source tree.
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
-		private readonly ITestOutputHelper _o;
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		public BeachSnapshotConstructionTests(ITestOutputHelper o)
 		{

@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		// (it comes from CharacterQuest live). Everything else now rides in QuestDefinition (seeded for 10238).
 		private const uint BeachState = 1;
 		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		// The @609 objective region generates from the DB per-goal model (QuestGoalDefinition rows seeded for the beach
 		// starter), reproducing the template's @609..1168 bytes exactly - so the whole quest region is DB-sourced.

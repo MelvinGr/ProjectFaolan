@@ -15,8 +15,9 @@ namespace Faolan.Tests
 		// region is part of the record (interleaved per quest), so the region does not end until past it.
 		// Cross-checked by tools/capture/decode_questc_progress.py, which reports the same boundary.
 		private const int RegionEnd = 1168;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 		private readonly ITestOutputHelper _o;
+
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		public QuestcRegionTests(ITestOutputHelper o)
 		{

@@ -5,7 +5,7 @@ entirely from DB character data — name, race, sex, level, vitals, full equipme
 scaffold frame. The verified per-message index is [`../protocol/gen/messages.md`](../protocol/gen/messages.md)
 (`SimpleCharFullUpdateIIR`); the executable spec is the codec (`SimpleCharFullUpdateCodec`), golden-tested.
 Captured bytes survive only as test oracles (e.g. the `golden/SpawnAssassinTemplate.bin` entry of
-`Faolan.Tests/Assets/fixtures.bin`). The wire grammar parses and regenerates every captured player-own spawn
+the fixture archive). The wire grammar parses and regenerates every captured player-own spawn
 byte-exact (`tools/capture/parse_spawn_scaffold.py`; C#: `SpawnFeatListTests`, `SimpleCharFullUpdateCodecTests`,
 `PlayerSpawnScaffoldRowsTests`).
 

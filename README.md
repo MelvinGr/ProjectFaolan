@@ -475,6 +475,11 @@ dotnet test --project Faolan.Tests
 dotnet test --project Faolan.Tests -- --filter-class '*GuildPacketTests'  # a single class
 ```
 
+The captured packets those gates compare against are retail game data, so they are not in the repository: they sit
+in one archive, `Faolan.Tests/Assets/fixtures.bin` (git-ignored), or wherever `FAOLAN_FIXTURES` points. Without it
+the tests that need it skip and the rest run, so a clean clone passes; the game data the server ships, `faolan.sql`,
+is in the repository and its tests always run.
+
 ## Connect a game client
 
 `Faolan.ClientLauncher` launches the game client unattended (it stands in for the patcher: computes the
@@ -555,7 +560,7 @@ reverse-engineering the client alone).
 **How a capture is used:** a `.pcapng` of a client↔server session is TCP-reassembled and dumped to the canonical
 `*.tshark.json` via `tools/capture/tshark_dump.sh`, which the importer and the Python dissectors read. The corpus
 is retail-only and lives in a separate, private data repo (the dumps are named after the characters played); the
-test suite does not need it, since every byte it reads is in `Faolan.Tests/Assets/fixtures.bin`. Loopback
+test suite reads only a derived fixture archive, which is kept out of the repository as well (see Test). Loopback
 captures against the local server (no root needed) are a debugging aid and never join the corpus. Full workflow
 in `AGENTS.md`.
 

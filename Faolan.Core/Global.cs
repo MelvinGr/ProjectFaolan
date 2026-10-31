@@ -56,6 +56,19 @@ namespace Faolan.Core
 		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? FindUpwards("faolan.sql");
 
 		/// <summary>
+		///     The test-fixture archive: the retail packet bodies the golden tests compare against. It is game data, so the
+		///     repository does not carry it: it sits git-ignored at <c>Faolan.Tests/Assets/fixtures.bin</c>, found the same
+		///     way as the config, or wherever <c>FAOLAN_FIXTURES</c> points. The data repo keeps the canonical copy.
+		/// </summary>
+		public static string FixturesPath => FixturesPathOverride ?? FindUpwards(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+
+		/// <summary>
+		///     <c>FAOLAN_FIXTURES</c>, or null when it is unset. A set path that does not exist is a configuration error,
+		///     never a reason to skip the tests that need the archive.
+		/// </summary>
+		public static string? FixturesPathOverride => Environment.GetEnvironmentVariable("FAOLAN_FIXTURES");
+
+		/// <summary>
 		///     The first <paramref name="name" /> at or above the working directory, else at or above the exe's own
 		///     directory, else the working-directory-relative path, so a genuinely missing file still reports the
 		///     place you would look first.

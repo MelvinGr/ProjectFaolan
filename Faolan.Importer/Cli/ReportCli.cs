@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
@@ -231,7 +232,7 @@ namespace Faolan.Importer.Cli
 			}),
 			new("fixture-repack", "Rewrites the fixture archive in the current container format, content unchanged. Reads no captures for the same reason `fixture-set` does not: the archive's content cannot be re-derived here (#555). It also replaces any capture NAME still stored as an entry's source by its opaque capture id (#465).", Needs.None, async ctx =>
 			{
-				FixtureArchiveWriter.Repack(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+				FixtureArchiveWriter.Repack(Global.FixturesPath);
 				return 0;
 			}),
 			new("fixture-rename", "Re-keys ONE named fixture without touching its bytes (#465). Above the corpus check for the same reason fixture-set is: it reads no captures.", Needs.None, async ctx =>
@@ -244,7 +245,7 @@ namespace Faolan.Importer.Cli
 					return 1;
 				}
 
-				FixtureArchiveWriter.RenameNamed(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), ctx.Arg![..split], ctx.Arg[(split + 1)..]);
+				FixtureArchiveWriter.RenameNamed(Global.FixturesPath, ctx.Arg![..split], ctx.Arg[(split + 1)..]);
 				return 0;
 			}),
 			new("fixture-substitute", "Substitutes personal character names inside the archive's packet bytes by EQUAL-LENGTH pseudonyms (#465 option B). Reads no captures - it edits the committed archive in place, verifying the old names are gone. `--dry-run` reports what it would change and writes nothing. The pseudonyms are the caller's call and must match the real name's byte length; the three golden test literals move in the same change (see FixtureArchiveWriter.Substitute).", Needs.None, async ctx =>
@@ -269,7 +270,7 @@ namespace Faolan.Importer.Cli
 					return 1;
 				}
 
-				return FixtureArchiveWriter.Substitute(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), pairs, ctx.Options.DryRun);
+				return FixtureArchiveWriter.Substitute(Global.FixturesPath, pairs, ctx.Options.DryRun);
 			}),
 			new("fixture-set", "Adds or replaces ONE named fixture in the archive. Reads no captures, so it sits above the corpus check: the hand-carved fixtures cannot be re-derived from the corpus, which is exactly why this exists.", Needs.None, async ctx =>
 			{
@@ -281,7 +282,7 @@ namespace Faolan.Importer.Cli
 					return 1;
 				}
 
-				var archive = Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
+				var archive = Global.FixturesPath;
 				var source = ctx.Arg![(split + 1)..];
 
 				// An empty source removes the fixture - the path by which retail bytes leave the archive once a gate's
@@ -299,7 +300,7 @@ namespace Faolan.Importer.Cli
 				// The single file holding every byte the test suite reads: the corpus slice (rebuilt here) plus the
 				// hand-carved named fixtures (carried over from the existing archive). See FixtureArchiveWriter.
 				// Default paths here are relative to the working directory: the importer runs from the repo root.
-				var target = ctx.Arg ?? Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
+				var target = ctx.Arg ?? Global.FixturesPath;
 				FixtureArchiveWriter.Write(ctx.CapturesDir, target);
 				return 0;
 			}),
@@ -309,7 +310,7 @@ namespace Faolan.Importer.Cli
 				// "<id>#<index>" to the dump, by hashing every dump's name. Comma-separated ids, or every archived id
 				// when none is given.
 				var ids = (ctx.Arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-				return FixtureArchiveWriter.ResolveCaptureIds(ctx.CapturesDir, Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), ids);
+				return FixtureArchiveWriter.ResolveCaptureIds(ctx.CapturesDir, Global.FixturesPath, ids);
 			}),
 			new("conversation-states", "", Needs.Captures, async ctx =>
 			{
@@ -564,11 +565,11 @@ namespace Faolan.Importer.Cli
 			}),
 			new("fixture-stats", "", Needs.Captures, async ctx =>
 			{
-				return FixtureStats(ctx.Arg ?? System.IO.Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+				return FixtureStats(ctx.Arg ?? Global.FixturesPath);
 			}),
 			new("fixture-names", "", Needs.Captures, async ctx =>
 			{
-				return FixtureNames(System.IO.Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), ctx.Arg);
+				return FixtureNames(Global.FixturesPath, ctx.Arg);
 			}),
 			new("rank-tables", "", Needs.Captures, async ctx =>
 			{

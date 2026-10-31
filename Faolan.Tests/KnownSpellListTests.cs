@@ -22,9 +22,9 @@ namespace Faolan.Tests
 		// The captured count word + 2 records from Faolanx's snapshot (pkt51 @0x25F6): the byte-exact target shape.
 		private static readonly byte[] FaolanxKnownListGolden = Convert.FromHexString("00000bd30042ca77ffffffff0000000200125d9bffffffff00000002");
 		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
-
 		private static readonly uint[] FaolanxSpellIds = [0x42CA77, 0x125D9B];
+
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		// Injecting an empty list must leave the from-scratch tails byte-identical to the captured beach template, so
 		// the existing golden (and a fresh character with no spells) is never disturbed.

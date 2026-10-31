@@ -19,9 +19,9 @@ namespace Faolan.Tests
 	public class WorldEntryRecordFramerTests
 	{
 		private const uint StriePlayerInstance = 0x02165EFF;
-		private static readonly string PlayerSpawnCap = TestPaths.Asset("assassin-login-playerspawn.bin");
-		private static readonly string SnapshotCap = TestPaths.Asset("strie-login-inventory.bin");
-		private static readonly string WorldObjectCap = TestPaths.Asset("strie-login-worldobject.bin");
+		private static string PlayerSpawnCap => TestPaths.Asset("assassin-login-playerspawn.bin");
+		private static string SnapshotCap => TestPaths.Asset("strie-login-inventory.bin");
+		private static string WorldObjectCap => TestPaths.Asset("strie-login-worldobject.bin");
 
 		// The 5-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
 		[Fact]

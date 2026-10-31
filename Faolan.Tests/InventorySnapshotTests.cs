@@ -15,8 +15,8 @@ namespace Faolan.Tests
 {
 	public class InventorySnapshotTests
 	{
-		private static readonly string BigboyPath = TestPaths.Asset("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
-		private static readonly string BurstInventoryPath = TestPaths.Asset("strie-login-inventory.bin");
+		private static string BigboyPath => TestPaths.Asset("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
+		private static string BurstInventoryPath => TestPaths.Asset("strie-login-inventory.bin");
 
 		// Reconstruct the full packet (header + body) the way BuildBeachInventoryPacket does and compare to the
 		// original - the inner-body round-trip passes, so if the no-op beach inventory stalls, the header/outer

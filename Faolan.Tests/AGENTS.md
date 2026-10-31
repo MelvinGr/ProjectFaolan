@@ -1,8 +1,18 @@
 # The fixture archive
 
-**The test suite does not need the data repo.** Every test runs from a plain clone, off one committed file:
-`Faolan.Tests/Assets/fixtures.bin` (~2.8 MB, `FixtureArchive`), which holds every byte of capture-derived data the suite
-reads. It has two halves, and the difference decides where a new gate belongs:
+**The fixture archive is retail data and is not in the repository.** `Faolan.Tests/Assets/fixtures.bin` (~2.8 MB,
+`FixtureArchive`) holds every byte of capture-derived data the suite reads. It is git-ignored; the data repo keeps the
+canonical copy at `Fixtures/fixtures.bin`: copy it in, or set `FAOLAN_FIXTURES` to it (`Global.FixturesPath`, which the
+importer's `--report fixture*` commands honour too). Without it every test that reads a fixture skips, so a clean clone
+passes; a `FAOLAN_FIXTURES` naming a missing file throws instead. After regenerating or editing the archive, copy it
+back to the data repo and commit it there.
+
+**A fixture-reading test skips, never fails, without the archive.** Read fixtures inside a test or through a property,
+never in a static field initializer: a skip thrown there surfaces as a `TypeInitializationException`, which is a
+failure. A theory over fixtures takes `SkipTestWithoutData = true` and a data source that yields nothing when
+`FixtureArchive.Present` is false (`PatrolNodeRoundTripTests`).
+
+The archive has two halves, and the difference decides where a new gate belongs:
 - **Named fixtures** (`assets/recipe-book-reply.bin`, `assets/mount-spawns.bin`, `golden/SpawnNpcCasilda.bin`, ...): a
   specific packet or one capture's worth, read via `CapturedFixture` (whole Conan packets concatenated; a packet
   self-frames), `TestPaths.AssetBytes`/`TestPaths.Asset` for inputs, or `Golden.Bytes` for expected outputs. Use these

@@ -25,7 +25,7 @@ namespace Faolan.Tests
 	{
 		private const int RegionStart = 609, IndexTag = 1168; // empirical boundaries (Quest_c end / quest index)
 		private static readonly string DbPath = TestPaths.FaolanDb;
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		private static byte[] Template => File.ReadAllBytes(TemplatePath);
 

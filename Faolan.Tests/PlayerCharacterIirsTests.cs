@@ -13,7 +13,7 @@ namespace Faolan.Tests
 	// character's own gear and therefore deliberately leaves empty.
 	public class PlayerCharacterIirsTests
 	{
-		private static readonly string TemplatePath = TestPaths.Asset("PlayerCharacterIirTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("PlayerCharacterIirTemplate.bin");
 
 		[Fact]
 		public void BuildBareTemplate_EqualsTheTemplate_ExceptWornGear()

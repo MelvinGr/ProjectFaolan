@@ -8,8 +8,8 @@ using Faolan.Core.Extensions;
 namespace Faolan.Tests.Support
 {
 	// The capture corpus' test slice: the packet bodies the whole-corpus gates read, extracted from the 349 MB
-	// capture repo so the suite runs from a plain clone. It is the corpus half of `Faolan.Tests/Assets/fixtures.bin`
-	// (FixtureArchive); the named fixtures in the same file are reached through Golden / TestPaths instead.
+	// capture repo so the suite needs one derived file rather than the corpus. It is the corpus half of the fixture
+	// archive (FixtureArchive); the named fixtures in the same file are reached through Golden / TestPaths instead.
 	//
 	// Bodies are byte-identical to the corpus' `BodyHex`, and each carries its provenance as "<capture id>#<packet
 	// index>" - the capture id being the opaque 8-hex-digit id `FixtureArchive.CorpusRecord.Source` describes, not

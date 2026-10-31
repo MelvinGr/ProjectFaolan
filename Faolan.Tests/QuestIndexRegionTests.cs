@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		// The index opens at its marker, not the 0x3F1 at 1168 - that word is the empty completed-journal frame (the
 		// beach char has no completed quests), not an "IndexTag". The index is 1172..1292.
 		private const int RegionStart = 1172, RegionEnd = 1288; // 1288, not 1292: the last four bytes are the access-window table's ListFrame word
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void Parse_DecodesTheIndexAndGoalTable()

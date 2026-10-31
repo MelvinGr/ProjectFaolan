@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	// carried in BeachTailsTemplate.bin, which is the oracle for that region.
 	public class AccessWindowCatalogTests
 	{
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void Catalog_HasTheExpectedShape()

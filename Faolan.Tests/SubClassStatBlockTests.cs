@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// byte-exact - so the stat region can be authored without BeachTailsTemplate.bin (decode_statblock.py).
 	public class SubClassStatBlockTests
 	{
-		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
+		private static string TemplatePath => TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
 		public void CreateFreshBlock_MatchesTheTemplateStatBlock()

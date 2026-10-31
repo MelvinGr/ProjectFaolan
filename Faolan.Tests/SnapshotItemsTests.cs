@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		// Per-instance state read from the captured Slave Manacles entry (these are not template data - they are
 		// the character's specific item instance: its GUID, inventory record id, stack count, and hash hash).
 		private const ulong Slot = 18;
-		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
+		private static string InventoryCapture => TestPaths.Asset("strie-login-inventory.bin");
 
 		[Fact]
 		public async Task BuildEntry_FromImportedItem_MatchesCapturedSlaveManacles()
