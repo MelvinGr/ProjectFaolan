@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Pvp;
 using Faolan.CSPlayerAgent;
@@ -66,7 +67,7 @@ namespace Faolan.Tests
 				connections.Add(client);
 
 			var teams = new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new RecordingChatServerDispatcher(), connections);
-			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, teams, connections, world, database);
+			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, teams, connections, world, database, new WorkLoop("CS tier", NullLogger.Instance));
 
 			var signup = new PvpMatchMakingSignup(MinigameMap, 4, false, 0);
 			var queued = members.Select(id => (CharacterId: id, Signup: signup)).ToList();
@@ -160,7 +161,7 @@ namespace Faolan.Tests
 			var (options, path) = TestDb.NewSeededDatabase(10);
 			_databases.Add(path);
 			var matches = new PvpMatchService(NullLogger<CsPlayerAgentListener>.Instance, new TeamService(NullLogger<CsPlayerAgentListener>.Instance, world, new RecordingChatServerDispatcher(), connections), connections, world,
-				new DatabaseRepository(new TestDb.ContextFactory(options)));
+				new DatabaseRepository(new TestDb.ContextFactory(options)), new WorkLoop("CS tier", NullLogger.Instance));
 
 			await matches.HandleCreateMatch(clients[10], new PvpMatchRules(4, MinigameMap, 2, 1, 1, "", TimeLimitSeconds: 1, ScoreLimit: 100, 0, false, false, 0));
 			await matches.HandleJoinMatch(clients[11], 1, bringTeam: false, password: null);

@@ -23,14 +23,16 @@ namespace Faolan.GameServer
 		// guild only if this returns true, so a payout that nobody could receive never happens rather than vanishing.
 		public async Task<bool> CreditCharacterCash(uint characterId, ulong amountTin)
 		{
-			var client = ClientForCharacter(characterId);
-			var character = client?.Session.Character;
-			if (character == null)
+			if (ClientForCharacter(characterId) is not { Session.Character: { } character } client)
 				return false;
 
-			character.Money += amountTin;
-			await Database.SetCharacterMoney(character.Id, character.Money);
-			await _economyOutbound.SendUpdateCash(client!, character.Money, UpdateCashReason.Gain);
+			// The wallet is the player's live state, so it moves on their zone's loop like any other change to them.
+			await _simulation.RunForPlayer(client, async () =>
+			{
+				character.Money += amountTin;
+				await Database.SetCharacterMoney(character.Id, character.Money);
+				await _economyOutbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
+			});
 			Logger.LogInformation("CreditCharacterCash: {Character} received {Amount} tin (wallet {Balance}).", character.Name, amountTin, character.Money);
 			return true;
 		}

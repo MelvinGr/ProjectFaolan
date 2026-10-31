@@ -47,6 +47,9 @@ namespace Faolan.Core.Helpers
 		/// <summary>True when the calling code is this loop's own work.</summary>
 		public bool IsCurrent => ReferenceEquals(Executing.Value, this);
 
+		/// <summary>What this loop owns (a zone, the CS tier), so a caller can tell which kind of loop it is running on.</summary>
+		public object? Owner { get; init; }
+
 		public WorkLoop(string name, ILogger logger)
 		{
 			_name = name;

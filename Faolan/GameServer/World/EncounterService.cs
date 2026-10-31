@@ -179,15 +179,15 @@ namespace Faolan.GameServer.World
 			var position = player.Position + forward * ambush.AnchorDistance;
 
 			var delayMs = (int)MathF.Max(0, ambush.DelaySeconds * 1000);
-			Task.RunAfter(delayMs, async () =>
+			// On the player's zone loop, and only if they are still in that zone: they may have logged out, zoned or died
+			// in the delay - an ambush with nobody to ambush is dropped rather than left standing in an empty quarry.
+			Task.RunAfter(delayMs, () => _sim.RunInZoneOf(client, async () =>
 			{
-				// The player may have logged out, zoned or died in the delay - an ambush with nobody to ambush is
-				// dropped rather than left standing in an empty quarry.
-				if (client.IsStopped || _sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
+				if (_sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
 					return;
 
 				await SpawnAmbusher(zone, ambush, position, facing);
-			}, _logger);
+			}), _logger);
 		}
 
 		/// <summary>

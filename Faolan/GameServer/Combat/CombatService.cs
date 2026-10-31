@@ -197,7 +197,9 @@ namespace Faolan.GameServer.Combat
 					if (client.Session.ActiveCastToken != castToken)
 						return; // interrupted (moved / cancelled) - stop ticking
 
-					await ApplyAoeTick(client, casterHandle, target, spellId, perTick);
+					// The channel runs off the zone (CastService spawns it), so each tick's damage is posted to the caster's
+					// zone loop, between that zone's handlers and its tick.
+					await _sim.RunInZoneOf(client, () => ApplyAoeTick(client, casterHandle, target, spellId, perTick));
 				}
 
 				_logger.LogInformation("Ground AoE channel spell 0x{Spell:X} at {Pos}: {Ticks} ticks of {Dmg} each.", spellId, target, tickCount, perTick);

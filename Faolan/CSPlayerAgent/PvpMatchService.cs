@@ -8,6 +8,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Pvp;
 using Faolan.Core.Network.Codecs.Team;
@@ -39,7 +40,7 @@ namespace Faolan.CSPlayerAgent
 	// GUI consumes them, and nothing server-side needs to know which number is which team. "Has a side" means the
 	// member has picked one at least once.
 	public sealed class PvpMatchService(ILogger<CsPlayerAgentListener> logger, TeamService teams, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections, IGameServerDispatcher gameServer,
-		ICharacterRepository database)
+		ICharacterRepository database, [FromKeyedServices(CsPlayerAgentServices.LoopKey)] WorkLoop loop)
 	{
 		// A member's side before they pick one. The client's own GUI starts a fresh member sideless (the
 		// CantStartMatch refusal exists exactly because of that state); 0 is what PlayerJoined announces for one.
@@ -344,11 +345,12 @@ namespace Faolan.CSPlayerAgent
 		// member who missed the move or re-enters.
 		private void ScheduleMatchTeleport(LiveMatch match)
 		{
-			_ = Task.Run(async () =>
+			// The countdown waits off the loop; the move itself is this tier's work, run on its loop.
+			WorkLoop.Spawn(async () =>
 			{
-				try
+				await Task.Delay(TimeSpan.FromSeconds(TeleportInSeconds));
+				await loop.Run(async () =>
 				{
-					await Task.Delay(TimeSpan.FromSeconds(TeleportInSeconds));
 					foreach (var member in match.Sides.Keys)
 					{
 						// Where to put them back when they leave: their live transform the moment the match takes
@@ -365,12 +367,8 @@ namespace Faolan.CSPlayerAgent
 						if (!await gameServer.TeleportCharacter(member, match.Rules.MapId))
 							logger.LogWarning("PvP match {MatchId}: the world tier could not move {CharacterId:X8} to map {MapId}.", match.Id, member, match.Rules.MapId);
 					}
-				}
-				catch (Exception e)
-				{
-					logger.LogError(e, "PvP match {MatchId}: the scheduled minigame teleport failed.", match.Id);
-				}
-			});
+				});
+			}, logger, $"PvP match {match.Id}: the scheduled minigame teleport");
 
 			ScheduleMatchEnd(match);
 		}
@@ -382,21 +380,15 @@ namespace Faolan.CSPlayerAgent
 		// which is why a match without this ran for ever with its members stranded on the minigame map.
 		private void ScheduleMatchEnd(LiveMatch match)
 		{
-			_ = Task.Run(async () =>
+			// The clock runs off the loop; the end itself is this tier's work, run on its loop.
+			WorkLoop.Spawn(async () =>
 			{
-				try
-				{
-					var due = match.StartedAtUtc.AddSeconds(match.Rules.TimeLimitSeconds) - DateTime.UtcNow;
-					if (due > TimeSpan.Zero)
-						await Task.Delay(due);
+				var due = match.StartedAtUtc.AddSeconds(match.Rules.TimeLimitSeconds) - DateTime.UtcNow;
+				if (due > TimeSpan.Zero)
+					await Task.Delay(due);
 
-					await EndMatch(match, forcedMessage: null);
-				}
-				catch (Exception e)
-				{
-					logger.LogError(e, "PvP match {MatchId}: the scheduled match end failed.", match.Id);
-				}
-			});
+				await loop.Run(() => EndMatch(match, forcedMessage: null));
+			}, logger, $"PvP match {match.Id}: the scheduled match end");
 		}
 
 		/// <summary>
@@ -519,21 +511,18 @@ namespace Faolan.CSPlayerAgent
 		// Done button takes. The grace length is a local choice; nothing recovered states retail's.
 		private void ScheduleMatchDissolve(LiveMatch match)
 		{
-			_ = Task.Run(async () =>
+			// The results page waits off the loop; the dissolve itself is this tier's work, run on its loop.
+			WorkLoop.Spawn(async () =>
 			{
-				try
+				await Task.Delay(TimeSpan.FromSeconds(ResultsPageSeconds));
+				await loop.Run(async () =>
 				{
-					await Task.Delay(TimeSpan.FromSeconds(ResultsPageSeconds));
 					foreach (var member in match.Sides.Keys.ToList())
 						await RemoveMember(member, kickedBy: null, banned: false, message: "");
 
 					_matches.TryRemove(match.Id, out _);
-				}
-				catch (Exception e)
-				{
-					logger.LogError(e, "PvP match {MatchId}: the post-match dissolve failed.", match.Id);
-				}
-			});
+				});
+			}, logger, $"PvP match {match.Id}: the post-match dissolve");
 		}
 
 		/// <summary>

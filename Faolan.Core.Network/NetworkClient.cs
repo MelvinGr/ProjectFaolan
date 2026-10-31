@@ -197,9 +197,15 @@ namespace Faolan.Core.Network
 
 			Socket.Close();
 			// Disconnect cleanup can be async (persistence, despawn broadcast). Stop() is a sync void called from sync
-			// paths too, so the returned Task is fire-and-forget: Server's Disconnected wrapper awaits
-			// ClientDisconnected internally and logs any fault.
-			_ = Disconnected?.Invoke(this);
+			// paths too, so the cleanup is fire-and-forget: Server's Disconnected wrapper awaits ClientDisconnected
+			// internally and logs any fault. It starts detached from the caller's flow, because Stop() is often called
+			// from a zone's own work (a GM kick): the cleanup posts to the zone, and inheriting that work's "running on
+			// this loop" mark would run it inline instead, unawaited, beside the work that is still going.
+			if (Disconnected is { } disconnected)
+			{
+				using (ExecutionContext.SuppressFlow())
+					_ = Task.Run(() => disconnected(this));
+			}
 		}
 
 		/// <summary>Turns one completed wire frame into the listener's dispatch.</summary>

@@ -9,6 +9,7 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
@@ -661,229 +662,243 @@ namespace Faolan.GameServer.Session
 			// custom PvP match likewise owns one copy of its minigame map - both sides land in it - so the entry asks
 			// the CS tier for the match the same way it asks for the team.
 			var pvpMatch = _csPlayerAgentDispatcher.PvpMatchEntryOf(client.Session.Character.Id, map.Id);
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
-				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry, pvpMatch?.MatchId, featProcs);
+			var teamId = _csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id);
 
-			// The buffs held over the zone-change handoff, onto the entity the registration just built. The entity is
-			// new on every map change (PlayerRegistry is keyed by connection), so anything the previous entity held
-			// that nothing persists - a live NPC debuff above all - would otherwise be dropped, leaving the client's
-			// icon stuck at 0s with no removal twin ever coming. Restoring them puts the tick back in charge of the
-			// expiry.
-			//
-			// TryAdd, not an assignment: the entry burst can re-apply a buff of its own before this runs, and the
-			// carried copy is the staler of the two - it was applied on the far side of the door.
-			var carried = _teleport.ConsumeCarriedBuffs(character.Id);
-			if (carried.Count > 0 && _simulation.PlayerWorldEntity(client) is { } entered)
+			// From the placement on, the entry is the zone's work: it adds the player to the zone, streams its NPCs and
+			// sends the burst, all state the zone's tick and its other players' handlers touch. The instance is resolved
+			// first so the entry can move onto that zone's loop, and handed to the registration so it is not resolved
+			// (for a Solo map, minted) twice.
+			var zone = _simulation.EntryZone(client, map.InstanceMode, teamId, epicEntry, pvpMatch?.MatchId);
+			return await zone.Loop.Run(async () =>
 			{
-				foreach (var (buffId, buff) in carried)
-					entered.ActiveBuffs.TryAdd(buffId, buff);
+				_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses, teamId, epicEntry,
+					pvpMatch?.MatchId, featProcs, zone.InstanceId);
 
-				_logger.LogInformation("World entry: carried {Count} live buff(s) across the zone change for {Name} (#907).", carried.Count, character.Name);
-			}
-			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
-
-			// The playfield-instance token is sourced per map (Map.PlayfieldToken), falling back to the beach default
-			// for maps with no captured token. Threaded identically through the map-change, snapshot, world objects,
-			// spawn transform and the zone, so they agree by construction: the client scopes the character to the
-			// playfield it loaded, so a token that disagrees across those packets hides the abilities tab, a spawn
-			// stamped with a disagreeing one is silently dropped, and a beach token in a mountable zone reads as the
-			// no-mount Tortage beach.
-			//
-			// Stamped here, on the line after the player is placed, and not further down where it is first used. The
-			// moment the player entity is in the zone the world tick can see it and stream spawns to them, and every
-			// one of those reads Zone.PlayfieldToken. This entry then spends time in DB work before it reaches its own
-			// burst, so a stamp any later ships the zone's minted fallback token to the client, which drops the lot.
-			// The zone must never be reachable with a stale token, which is a property of where this line is.
-			var mapToken = map.PlayfieldToken;
-			var playfieldToken = mapToken != 0
-				? mapToken
-				: WorldState.DefaultPlayfieldToken;
-			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
-
-			timing.Mark("place-in-world");
-			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
-			timing.Mark("zone-npcs");
-			// The map's static world objects, loaded into the zone once - the entry + interest passes read them from
-			// there instead of re-querying per entry.
-			await _broadcaster.EnsureZoneWorldObjects(mapId, instanceId);
-			timing.Mark("zone-objects");
-
-			// Warm this map's terrain heightmap + collision mesh off the tick so the first aggro/loot does not stall the
-			// game loop with the decompress + grid build: the first touch of a map's bake is 124-184 ms (Tortage Beach
-			// 116k triangles, Tortage 196k), once per map per process. Fire-and-forget; the caches are thread-safe.
-			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId));
-
-			// Mark this connection as having entered the world. The conversation system (ConversationService), the
-			// 0x2020 -> 0x2008 spawn-check and the dialogue-close fallback are all gated on this - without it NPC
-			// dialogue silently never opens.
-			client.Session.WorldEntered = true;
-
-			// Retail split (byte-exact in the *-create vs *-login captures): a create-world entry carries no quests in
-			// the snapshot (empty Quest_c region) and grants the starter quest live afterwards; a login entry carries
-			// the character's held quests in the snapshot.
-			var isCreateEntry = client.Session.EntryMode == WorldEntryMode.CreateWorld;
-			// A create entry carries no quests, so it also carries no progress - the resolver is only ever asked about
-			// a goal of a quest in `snapshotQuests`.
-			var (snapshotQuests, primaryQuest, solvedTimesOf) = isCreateEntry
-				? ([], (QuestDefinition?)null, static (QuestGoalDefinition _) => 0u)
-				: await LoadSnapshotQuests(character);
-			// The character's learned spells ride the snapshot's known-list so they survive relog and place on the
-			// action bar. Seeded at creation (CharacterLoadout), so this is a plain read.
-			timing.Mark("snapshot-quests");
-			var knownSpellIds = (await _database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
-			timing.Mark("spells");
-			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
-			// snapshot's stat block per character; empty for a freshly created character (skeleton + patches then).
-			// Filtered to the sheet's own 91 ids: CharacterStats also holds stats that are not part of the login
-			// snapshot - the daily-challenge counters (ids 1000066+) land there the first time a quest completes - and
-			// a sheet of any other size fails the guard in the builder. Retail pushes those on the live StatUpdate
-			// channel; every captured login sheet is exactly the 91.
-			var statSheet = (await _database.GetCharacterStats(character.Id))
-				.Where(s => SubClassStatBlock.SheetStatIds.Contains((uint)s.StatId))
-				.Select(s => (s.StatId, s.Value)).ToArray();
-			timing.Mark("stat-sheet");
-			// The Completed tab rides the snapshot too; a create-world entry has none.
-			var completedJournal = isCreateEntry
-				? []
-				: await LoadCompletedJournal(character);
-			timing.Mark("completed-journal");
-
-			// The quest index needs, per active quest, its line's 4CC and that line's full quest catalog ordered by
-			// JournalSequence - neither is per-quest data.
-			var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
-			// The journal records' reward lists carry each rewarded item's TEA key, read off its Item row.
-			var rewardItems = await _database.GetItemsByTemplate(snapshotQuests.SelectMany(q => q.Rewards.Select(r => r.ItemTemplateId))
-				.Concat(indexLines.Values.SelectMany(l => l.Rewards.Select(r => r.ItemTemplateId))).ToArray());
-			var instance = client.Session.Character.Id;
-			// Every item renders: the token is harvested when a capture carried one and minted otherwise
-			// (AcgHash.ForWire), so a `Hash: not 0` gate here would drop exactly the claim/AH items this is meant to
-			// deliver.
-			var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
-				FullCharacterRoots.Containers(instance, heldItems));
-			// The snapshot's current-side vitals are the live ceiling (gear included), the same value the vitals push
-			// after it carries - so the sheet does not flick from one max to the other on entry.
-			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
-			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
-				indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
-			timing.Mark("line-catalog+rewards");
-			var snapshot = GameWire.BuildWorldEntrySnapshot(client, typedRoot, tails);
-			timing.Mark("build-snapshot");
-
-			var toSend = new List<Rpc>
-			{
-				// If this copy of the playfield is a team's, the proxy names the team as its owner rather than the
-				// player. Asked of the zone, so every member is told the same owner.
-				GameWire.BuildMapChange(client, map!, playfieldToken,
-					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null, epicEntry)
-			};
-
-			// The MapChange is the one place a player is told which playfield they are in, so it is also where their
-			// ~Playfield chat channel has to follow - the channel's id is the map id, and chat routing is the client's
-			// job, so a stale subscription means hearing the playfield you left and not the one you are in. The call is
-			// idempotent, so re-entering the same map costs nothing.
-			if (client.Session.Character is { } chatCharacter)
-				await _agentServerDispatcher.RefreshPlayfieldChannel(chatCharacter.Id, chatCharacter.MapId);
-
-			// World objects are interest-streamed, not dumped: entry sends the ones within range and movement streams
-			// the rest, as retail does - in Hoxxling_..._gameplay2 only 58 of 158 object handles arrive at entry, the
-			// last one 687s later. They keep their retail position here (early in the stream, before the snapshot);
-			// BroadcastPlayerMove takes over from there.
-			var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
-			toSend.AddRange(worldObjectRecords);
-
-			// The worn half of the same read: the spawn shows what the character is wearing, and it must be the same set
-			// the snapshot's Equipped container carries or the avatar and the paper doll disagree.
-			var worn = heldItems
-				.Where(i => i.Container == ContainerKind.Equipped && Enum.IsDefined((CharacterEquipmentSlot)i.Slot))
-				.ToDictionary(i => (CharacterEquipmentSlot)i.Slot);
-			toSend.Add(BuildBurstlessPlayerSpawn(client, worn, playfieldToken, await _database.GetMorphTargetRegistry(), liveMax));
-
-			toSend.Add(snapshot);
-
-			// If the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the live
-			// grant trigger only fires on the talk itself, so without this a relog leaves her at the cage. Driven off
-			// the Escort goal + its escortee template id, not a hard-coded quest.
-			//
-			// Before the entry burst, and that ordering is load-bearing: the burst is where the escortee's spawn record
-			// is built, and a freed escortee is described by a different body (ordinary idle, walk mode) chosen on
-			// `Following`. Resumed after the burst, her record is built as still-captive and she comes back chained on
-			// every relog no matter what is sent afterwards.
-			foreach (var (_, qdef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
-			{
-				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+				// The buffs held over the zone-change handoff, onto the entity the registration just built. The entity is
+				// new on every map change (PlayerRegistry is keyed by connection), so anything the previous entity held
+				// that nothing persists - a live NPC debuff above all - would otherwise be dropped, leaving the client's
+				// icon stuck at 0s with no removal twin ever coming. Restoring them puts the tick back in charge of the
+				// expiry.
+				//
+				// TryAdd, not an assignment: the entry burst can re-apply a buff of its own before this runs, and the
+				// carried copy is the staler of the two - it was applied on the far side of the door.
+				var carried = _teleport.ConsumeCarriedBuffs(character.Id);
+				if (carried.Count > 0 && _simulation.PlayerWorldEntity(client) is { } entered)
 				{
-					_npcs.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
-					break;
+					foreach (var (buffId, buff) in carried)
+						entered.ActiveBuffs.TryAdd(buffId, buff);
+
+					_logger.LogInformation("World entry: carried {Count} live buff(s) across the zone change for {Name} (#907).", carried.Count, character.Name);
 				}
-			}
+				var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 
-			// The in-range NPCs ride the entry burst (before the client's first move), matching retail's shape (fr64-75
-			// in the Hoxxling beach login capture) rather than a post-load interest volley. BuildEntryNpcBurst seeds them
-			// into the player's Known set, so the interest layer (BroadcastPlayerMove) then streams only the delta as the
-			// player walks, and the initial set is never culled mid-load. The markers / captive pose for these NPCs are
-			// separate IIRs and ride SendEntryNpcFollowups after the flush.
-			timing.Mark("map-change+objects+player-spawn+quests");
-			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
-			timing.Mark("npc-burst");
-			toSend.AddRange(entryNpcRecords);
+				// The playfield-instance token is sourced per map (Map.PlayfieldToken), falling back to the beach default
+				// for maps with no captured token. Threaded identically through the map-change, snapshot, world objects,
+				// spawn transform and the zone, so they agree by construction: the client scopes the character to the
+				// playfield it loaded, so a token that disagrees across those packets hides the abilities tab, a spawn
+				// stamped with a disagreeing one is silently dropped, and a beach token in a mountable zone reads as the
+				// no-mount Tortage beach.
+				//
+				// Stamped here, on the line after the player is placed, and not further down where it is first used. The
+				// moment the player entity is in the zone the world tick can see it and stream spawns to them, and every
+				// one of those reads Zone.PlayfieldToken. This entry then spends time in DB work before it reaches its own
+				// burst, so a stamp any later ships the zone's minted fallback token to the client, which drops the lot.
+				// The zone must never be reachable with a stale token, which is a property of where this line is.
+				var mapToken = map.PlayfieldToken;
+				var playfieldToken = mapToken != 0
+					? mapToken
+					: WorldState.DefaultPlayfieldToken;
+				_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 
-			toSend.Add(GameWire.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
-			toSend.Add(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
+				timing.Mark("place-in-world");
+				await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
+				timing.Mark("zone-npcs");
+				// The map's static world objects, loaded into the zone once - the entry + interest passes read them from
+				// there instead of re-querying per entry.
+				await _broadcaster.EnsureZoneWorldObjects(mapId, instanceId);
+				timing.Mark("zone-objects");
 
-			foreach (var rpc in toSend)
-				await client.SendAsync(rpc);
-			timing.Mark("flush");
+				// Warm this map's terrain heightmap + collision mesh off the tick so the first aggro/loot does not stall the
+				// game loop with the decompress + grid build: the first touch of a map's bake is 124-184 ms (Tortage Beach
+				// 116k triangles, Tortage 196k), once per map per process. Fire-and-forget; the caches are thread-safe.
+				WorkLoop.Spawn(() =>
+				{
+					_simulation.Terrain?.Warm(mapId);
+					return Task.CompletedTask;
+				}, _logger, "Terrain warm-up");
 
-			// The client now has the world - MapChange first, then the objects/spawn/snapshot/NPC burst - so the tick's
-			// interest sweep may start streaming to it. Until this point the sweep would have been the first sender to
-			// reach the client, with a spawn for a playfield it had not loaded yet.
-			client.Session.WorldEntryDelivered = true;
+				// Mark this connection as having entered the world. The conversation system (ConversationService), the
+				// 0x2020 -> 0x2008 spawn-check and the dialogue-close fallback are all gated on this - without it NPC
+				// dialogue silently never opens.
+				client.Session.WorldEntered = true;
 
-			await RestoreEntryBuffs(client);
-			timing.Mark("restore-buffs");
+				// Retail split (byte-exact in the *-create vs *-login captures): a create-world entry carries no quests in
+				// the snapshot (empty Quest_c region) and grants the starter quest live afterwards; a login entry carries
+				// the character's held quests in the snapshot.
+				var isCreateEntry = client.Session.EntryMode == WorldEntryMode.CreateWorld;
+				// A create entry carries no quests, so it also carries no progress - the resolver is only ever asked about
+				// a goal of a quest in `snapshotQuests`.
+				var (snapshotQuests, primaryQuest, solvedTimesOf) = isCreateEntry
+					? ([], (QuestDefinition?)null, static (QuestGoalDefinition _) => 0u)
+					: await LoadSnapshotQuests(character);
+				// The character's learned spells ride the snapshot's known-list so they survive relog and place on the
+				// action bar. Seeded at creation (CharacterLoadout), so this is a plain read.
+				timing.Mark("snapshot-quests");
+				var knownSpellIds = (await _database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
+				timing.Mark("spells");
+				// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
+				// snapshot's stat block per character; empty for a freshly created character (skeleton + patches then).
+				// Filtered to the sheet's own 91 ids: CharacterStats also holds stats that are not part of the login
+				// snapshot - the daily-challenge counters (ids 1000066+) land there the first time a quest completes - and
+				// a sheet of any other size fails the guard in the builder. Retail pushes those on the live StatUpdate
+				// channel; every captured login sheet is exactly the 91.
+				var statSheet = (await _database.GetCharacterStats(character.Id))
+					.Where(s => SubClassStatBlock.SheetStatIds.Contains((uint)s.StatId))
+					.Select(s => (s.StatId, s.Value)).ToArray();
+				timing.Mark("stat-sheet");
+				// The Completed tab rides the snapshot too; a create-world entry has none.
+				var completedJournal = isCreateEntry
+					? []
+					: await LoadCompletedJournal(character);
+				timing.Mark("completed-journal");
 
-			// The step breakdown rides the line: every real entry in faolan.log is its own profile.
-			_logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects) - {Timing}.", mapId,
-				character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal, timing);
+				// The quest index needs, per active quest, its line's 4CC and that line's full quest catalog ordered by
+				// JournalSequence - neither is per-quest data.
+				var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
+				// The journal records' reward lists carry each rewarded item's TEA key, read off its Item row.
+				var rewardItems = await _database.GetItemsByTemplate(snapshotQuests.SelectMany(q => q.Rewards.Select(r => r.ItemTemplateId))
+					.Concat(indexLines.Values.SelectMany(l => l.Rewards.Select(r => r.ItemTemplateId))).ToArray());
+				var instance = client.Session.Character.Id;
+				// Every item renders: the token is harvested when a capture carried one and minted otherwise
+				// (AcgHash.ForWire), so a `Hash: not 0` gate here would drop exactly the claim/AH items this is meant to
+				// deliver.
+				var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
+					FullCharacterRoots.Containers(instance, heldItems));
+				// The snapshot's current-side vitals are the live ceiling (gear included), the same value the vitals push
+				// after it carries - so the sheet does not flick from one max to the other on entry.
+				var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
+				var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
+					indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
+				timing.Mark("line-catalog+rewards");
+				var snapshot = GameWire.BuildWorldEntrySnapshot(client, typedRoot, tails);
+				timing.Mark("build-snapshot");
 
-			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
-			await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
-			timing.Mark("npc-followups");
+				var toSend = new List<Rpc>
+				{
+					// If this copy of the playfield is a team's, the proxy names the team as its owner rather than the
+					// player. Asked of the zone, so every member is told the same owner.
+					GameWire.BuildMapChange(client, map!, playfieldToken,
+						_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null, epicEntry)
+				};
 
-			// Spawn this player to nearby other players (its NPC set already rode the burst above). The quest journal is
-			// not re-sent here: retail ships both tabs in the login snapshot and sends no quest packet at all until the
-			// first in-session accept, so a live "restore" burst would be a fabrication.
-			await _broadcaster.BroadcastPlayerEntry(client);
+				// The MapChange is the one place a player is told which playfield they are in, so it is also where their
+				// ~Playfield chat channel has to follow - the channel's id is the map id, and chat routing is the client's
+				// job, so a stale subscription means hearing the playfield you left and not the one you are in. The call is
+				// idempotent, so re-entering the same map costs nothing.
+				if (client.Session.Character is { } chatCharacter)
+					await _agentServerDispatcher.RefreshPlayfieldChannel(chatCharacter.Id, chatCharacter.MapId);
 
-			// Entering a started custom match's minigame map - tell the client the match clock. The Flash API's
-			// GetTimeLeft/GetMinigameStatus compute off the match start this sets (i_nSecondsSinceStarted, so a member
-			// zoning in late sees the running clock, not a fresh one). Client-recovered, uncaptured - like the whole
-			// match lifecycle (PvpMatchService).
-			if (pvpMatch is { } startedMatch)
-			{
-				await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
-					s => s.WriteUInt32(startedMatch.SecondsSinceStarted)));
-				_logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
-					startedMatch.SecondsSinceStarted);
-			}
+				// World objects are interest-streamed, not dumped: entry sends the ones within range and movement streams
+				// the rest, as retail does - in Hoxxling_..._gameplay2 only 58 of 158 object handles arrive at entry, the
+				// last one 687s later. They keep their retail position here (early in the stream, before the snapshot);
+				// BroadcastPlayerMove takes over from there.
+				var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
+				toSend.AddRange(worldObjectRecords);
 
-			// On a create-world entry the snapshot carried no quests (empty region above), so deliver the starter quest
-			// live exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
-			// character creation, so it rides the snapshot on every later login, and nothing re-sends it live there.
-			if (isCreateEntry)
-			{
-				// The starter quest is seed data every database carries; without it a new character enters the world with
-				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
-				var beachDef = await _database.GetQuestDefinition(QuestContent.BeachStarterQuestId)
-					?? throw new InvalidOperationException($"The beach starter quest {QuestContent.BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
-				await QuestBroadcaster.SendQuestLogList(client, beachDef, [QuestContent.BeachStarterQuestId]);
-				await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
-				_logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", QuestContent.BeachStarterQuestId, character.Name);
-			}
+				// The worn half of the same read: the spawn shows what the character is wearing, and it must be the same set
+				// the snapshot's Equipped container carries or the avatar and the paper doll disagree.
+				var worn = heldItems
+					.Where(i => i.Container == ContainerKind.Equipped && Enum.IsDefined((CharacterEquipmentSlot)i.Slot))
+					.ToDictionary(i => (CharacterEquipmentSlot)i.Slot);
+				toSend.Add(BuildBurstlessPlayerSpawn(client, worn, playfieldToken, await _database.GetMorphTargetRegistry(), liveMax));
 
-			timing.Mark("broadcast-entry");
+				toSend.Add(snapshot);
 
-			return timing;
+				// If the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the live
+				// grant trigger only fires on the talk itself, so without this a relog leaves her at the cage. Driven off
+				// the Escort goal + its escortee template id, not a hard-coded quest.
+				//
+				// Before the entry burst, and that ordering is load-bearing: the burst is where the escortee's spawn record
+				// is built, and a freed escortee is described by a different body (ordinary idle, walk mode) chosen on
+				// `Following`. Resumed after the burst, her record is built as still-captive and she comes back chained on
+				// every relog no matter what is sent afterwards.
+				foreach (var (_, qdef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
+				{
+					if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+					{
+						_npcs.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
+						break;
+					}
+				}
+
+				// The in-range NPCs ride the entry burst (before the client's first move), matching retail's shape (fr64-75
+				// in the Hoxxling beach login capture) rather than a post-load interest volley. BuildEntryNpcBurst seeds them
+				// into the player's Known set, so the interest layer (BroadcastPlayerMove) then streams only the delta as the
+				// player walks, and the initial set is never culled mid-load. The markers / captive pose for these NPCs are
+				// separate IIRs and ride SendEntryNpcFollowups after the flush.
+				timing.Mark("map-change+objects+player-spawn+quests");
+				var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
+				timing.Mark("npc-burst");
+				toSend.AddRange(entryNpcRecords);
+
+				toSend.Add(GameWire.BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
+				toSend.Add(GameWire.BuildGameTime(client, DateTimeOffset.UtcNow, _clock.OffsetGameSeconds, _clock.Rate));
+
+				foreach (var rpc in toSend)
+					await client.SendAsync(rpc);
+				timing.Mark("flush");
+
+				// The client now has the world - MapChange first, then the objects/spawn/snapshot/NPC burst - so the tick's
+				// interest sweep may start streaming to it. Until this point the sweep would have been the first sender to
+				// reach the client, with a spawn for a playfield it had not loaded yet.
+				client.Session.WorldEntryDelivered = true;
+
+				await RestoreEntryBuffs(client);
+				timing.Mark("restore-buffs");
+
+				// The step breakdown rides the line: every real entry in faolan.log is its own profile.
+				_logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects) - {Timing}.", mapId,
+					character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal, timing);
+
+				// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
+				await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
+				timing.Mark("npc-followups");
+
+				// Spawn this player to nearby other players (its NPC set already rode the burst above). The quest journal is
+				// not re-sent here: retail ships both tabs in the login snapshot and sends no quest packet at all until the
+				// first in-session accept, so a live "restore" burst would be a fabrication.
+				await _broadcaster.BroadcastPlayerEntry(client);
+
+				// Entering a started custom match's minigame map - tell the client the match clock. The Flash API's
+				// GetTimeLeft/GetMinigameStatus compute off the match start this sets (i_nSecondsSinceStarted, so a member
+				// zoning in late sees the running clock, not a fresh one). Client-recovered, uncaptured - like the whole
+				// match lifecycle (PvpMatchService).
+				if (pvpMatch is { } startedMatch)
+				{
+					await client.SendAsync(new Rpc(GameEndpoints.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
+						s => s.WriteUInt32(startedMatch.SecondsSinceStarted)));
+					_logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
+						startedMatch.SecondsSinceStarted);
+				}
+
+				// On a create-world entry the snapshot carried no quests (empty region above), so deliver the starter quest
+				// live exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
+				// character creation, so it rides the snapshot on every later login, and nothing re-sends it live there.
+				if (isCreateEntry)
+				{
+					// The starter quest is seed data every database carries; without it a new character enters the world with
+					// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
+					var beachDef = await _database.GetQuestDefinition(QuestContent.BeachStarterQuestId)
+						?? throw new InvalidOperationException($"The beach starter quest {QuestContent.BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
+					await QuestBroadcaster.SendQuestLogList(client, beachDef, [QuestContent.BeachStarterQuestId]);
+					await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
+					_logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", QuestContent.BeachStarterQuestId, character.Name);
+				}
+
+				timing.Mark("broadcast-entry");
+
+				return timing;
+			});
 		}
 
 		private async Task SendReadyForPlayScreen(INetworkClient client)

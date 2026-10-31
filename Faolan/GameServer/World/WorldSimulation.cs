@@ -11,6 +11,7 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
@@ -186,6 +187,66 @@ namespace Faolan.GameServer.World
 		}
 
 		/// <summary>
+		///     Runs <paramref name="work" /> for a player on the loop of the zone they are in: how anything that is not
+		///     already that zone's own work - a delayed action, a per-player loop, another listener - reaches a player's
+		///     world state. Nothing runs once the player has left the world: a delay that outlived its player is over.
+		/// </summary>
+		/// <remarks>
+		///     No loop waits on a zone's work, so that no two loops can each wait on the other: from inside another loop's
+		///     work (another zone, the CS tier) this queues rather than awaits. Off every loop - chat, MCP, a timer - it is
+		///     awaited.
+		/// </remarks>
+		public Task RunInZoneOf(INetworkClient client, Func<Task> work)
+		{
+			return client.IsStopped || PlayerWorldEntity(client) is not { } entity
+				? Task.CompletedTask
+				: RunOnLoop(World.ZoneForEntity(entity).Loop, work);
+		}
+
+		/// <summary>
+		///     Runs <paramref name="work" /> as the player's: on their zone's loop once they are in the world, and on the
+		///     caller's flow before that, when no zone owns them yet (the login handshake, the create flow). The packet
+		///     path and every other listener's call into a player go through here.
+		/// </summary>
+		/// <remarks>The same no-waiting rule as <see cref="RunInZoneOf(INetworkClient,Func{Task})" /> applies.</remarks>
+		public Task RunForPlayer(INetworkClient client, Func<Task> work)
+		{
+			return PlayerWorldEntity(client) is { } entity
+				? RunOnLoop(World.ZoneForEntity(entity).Loop, work)
+				: work();
+		}
+
+		/// <summary>
+		///     <see cref="RunInZoneOf(INetworkClient,Func{Task})" /> for an entity (an NPC's delayed action): runs on its
+		///     zone's loop, and not at all once it has left its zone.
+		/// </summary>
+		public Task RunInZoneOf(WorldEntity entity, Func<Task> work)
+		{
+			var zone = World.ZoneForEntity(entity);
+			return zone.TryGet(entity.Handle, out _)
+				? RunOnLoop(zone.Loop, work)
+				: Task.CompletedTask;
+		}
+
+		/// <summary>Runs <paramref name="work" /> on <paramref name="zone" />'s loop, under the same no-waiting rule.</summary>
+		public Task RunInZone(Zone zone, Func<Task> work)
+		{
+			return RunOnLoop(zone.Loop, work);
+		}
+
+		/// <summary>
+		///     The zone a player's world entry will place them in: the instance <see cref="RegisterPlayerInWorld" /> would
+		///     resolve, decided up front so the entry can run on that zone's loop. Pass its instance back as
+		///     <c>resolvedInstance</c>, since resolving twice would mint two copies of a Solo map.
+		/// </summary>
+		public Zone EntryZone(INetworkClient client, MapInstanceMode instanceMode, uint? teamId, bool epic, uint? pvpMatchId)
+		{
+			var character = client.Session.Character;
+			Players.TryGetValue(client, out var existing);
+			return World.ZoneFor(character.MapId, World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId, epic, pvpMatchId));
+		}
+
+		/// <summary>
 		///     The player's own live vitals. The world model is the single source of truth: they live on the player's
 		///     WorldEntity, as an NPC's do, seeded from CharacterMaxStats and never persisted - only CharacterMaxStats is.
 		/// </summary>
@@ -215,7 +276,7 @@ namespace Faolan.GameServer.World
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
 			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null, IReadOnlyDictionary<uint, ComboFeatBonus>? comboBonuses = null,
-			uint? teamId = null, bool epic = false, uint? pvpMatchId = null, IReadOnlyList<FeatProc>? featProcs = null)
+			uint? teamId = null, bool epic = false, uint? pvpMatchId = null, IReadOnlyList<FeatProc>? featProcs = null, uint? resolvedInstance = null)
 		{
 			var character = client.Session.Character;
 
@@ -285,7 +346,7 @@ namespace Faolan.GameServer.World
 			//
 			// An epic entry routes to an epic copy of the map - the same content, never the same zone as a normal one -
 			// and the zone remembers its difficulty so re-entry routing and stat tuning can ask it.
-			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId, epic, pvpMatchId);
+			var instanceId = resolvedInstance ?? World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId, epic, pvpMatchId);
 			World.ZoneFor(character.MapId, instanceId).IsEpic = epic;
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
 			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation);
@@ -917,6 +978,19 @@ namespace Faolan.GameServer.World
 
 				await _output.SendKillChain(pair.Key, pair.Value.Handle, 0);
 			}
+		}
+
+		// No loop waits on a zone's work: from another zone, or from the CS tier (which a zone may itself be waiting on),
+		// the call is queued. Off every loop - chat, MCP, a timer - it is awaited.
+		private static Task RunOnLoop(WorkLoop loop, Func<Task> work)
+		{
+			if (!loop.IsCurrent && WorkLoop.Current != null)
+			{
+				loop.Post(work);
+				return Task.CompletedTask;
+			}
+
+			return loop.Run(work);
 		}
 
 		// The per-zone half of the tick's bookkeeping: what the global loop kept once, each zone now keeps for itself.

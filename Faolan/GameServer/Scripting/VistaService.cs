@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
@@ -32,7 +33,7 @@ namespace Faolan.GameServer.Scripting
 	// scene ends when the client says it has left the cinematic, which is what handles a player who skips out early by
 	// construction. A client that never reports leaving simply never gets the tag, which is also retail - there is no
 	// server-side fallback in the capture.
-	public sealed class VistaService(TagService tags, ILogger logger)
+	public sealed class VistaService(TagService tags, WorldSimulation sim, ILogger logger)
 	{
 		// A player used a vista object. Returns false when it is not one, so the UseObject switch falls through to the
 		// harvest / door / loot paths exactly as before.
@@ -55,23 +56,15 @@ namespace Faolan.GameServer.Scripting
 				vista.PathDurationSeconds);
 
 			// The camera starts when the gesture ends - retail's own 5.04 s gap, which is that animation's blend.
-			// Fire-and-forget with a session check, the same shape as the ground-AoE channel: the client is not
-			// waiting on a reply, it is waiting on the animation.
-			_ = Task.Run(async () =>
+			// Fire-and-forget, the same shape as the ground-AoE channel: the client is not waiting on a reply, it is
+			// waiting on the animation. The start runs on the player's zone loop, and not at all once they have left.
+			Task.RunAfter(TimeSpan.FromSeconds(BehaviorAnimations.VistaGestureSeconds), () => sim.RunInZoneOf(client, async () =>
 			{
-				try
-				{
-					await Task.Delay(TimeSpan.FromSeconds(BehaviorAnimations.VistaGestureSeconds));
-					if (client.IsStopped || client.Session.ActiveVista is not { } scene || scene.ObjectHandle != live.Handle)
-						return; // disconnected, or the player used something else in the meantime
+				if (client.Session.ActiveVista is not { } scene || scene.ObjectHandle != live.Handle)
+					return; // the player used something else in the meantime
 
-					await SendVistaCameraStart(client, scene);
-				}
-				catch (Exception ex)
-				{
-					logger.LogWarning(ex, "Vista: starting the camera path for '{Vista}' failed.", vista.Name);
-				}
-			});
+				await SendVistaCameraStart(client, scene);
+			}), logger);
 
 			return true;
 		}

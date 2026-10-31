@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
@@ -66,9 +67,11 @@ namespace Faolan.GameServer.Combat
 		private const uint ExhaustedBuff = SpellweaveCatalog.ExhaustedBuff;
 		private readonly ILogger _logger;
 		private readonly ISpellweaveOutbound _out;
+		private readonly WorldSimulation _sim;
 
-		public SpellweaveService(ILogger logger, ISpellweaveOutbound outbound)
+		public SpellweaveService(ILogger logger, ISpellweaveOutbound outbound, WorldSimulation sim)
 		{
+			_sim = sim;
 			_logger = logger;
 			_out = outbound;
 		}
@@ -120,10 +123,10 @@ namespace Faolan.GameServer.Combat
 			// after the cooldown by re-sending the full list: pick, picker disappears, cooldown, reappears.
 			if (profile != null)
 			{
-				Task.RunAfter(ElementCooldownMs, async () =>
+				Task.RunAfter(ElementCooldownMs, () => _sim.RunInZoneOf(client, async () =>
 				{
 					var session = client.Session;
-					if (client.IsStopped || !session.IsSpellweaving)
+					if (!session.IsSpellweaving)
 						return;
 
 					// Advance the weave one rung - `Spellweaving (1)` to `(2)` and so on. The new buff overlaps the
@@ -139,7 +142,7 @@ namespace Faolan.GameServer.Combat
 					await RollBacklash(client, profile, caster, session.SpellweaveBuffStack);
 
 					await WorldIir.Send(client, CombatReactiveCodec.Build(caster, profile.WeaveElements));
-				}, _logger);
+				}), _logger);
 			}
 
 			await Feedback(client, $"Weave component added ({session.WeaveComponents.Count}).");
@@ -264,33 +267,41 @@ namespace Faolan.GameServer.Combat
 					if (client.IsStopped || !session.IsSpellweaving)
 						return; // trance closed, or the player is gone
 
-					if (session.Energy > 0)
+					// The pool and the gauge are the player's live state, so each step runs on their zone's loop; the loop
+					// itself only keeps time, off any zone. The trance can close between the check above and the step.
+					await _sim.RunInZoneOf(client, async () =>
 					{
-						// Phase 1: energy drains from the current tracked value (not always full), accelerating as the
-						// weave goes on. The 0x200E sprint-bar update moves the yellow bar; the 0x37E68C gauge is the
-						// parallel accounting (both carry the same token). session.Energy is the shared, tracked pool.
-						var drain = (uint)Math.Min(EnergyBaseDrain + tick * EnergyDrainAccelPerTick, EnergyDrainMax);
-						drain = Math.Min(drain, session.Energy);
-						session.Energy -= drain;
-						await _out.SendSprintBar(client, session.Energy);
-						await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, session.Energy, -(int)drain, StatDamages.SpellweaveStaminaGauge, StatDamages.SpellweaveStaminaScale)));
-					}
-					else
-					{
-						// Energy just hit 0: apply the Exhausted depletion debuff once.
-						if (!exhausted)
+						if (!session.IsSpellweaving)
+							return;
+
+						if (session.Energy > 0)
 						{
-							exhausted = true;
-							await _out.ApplyBuff(client, caster, caster, ExhaustedBuff);
+							// Phase 1: energy drains from the current tracked value (not always full), accelerating as the
+							// weave goes on. The 0x200E sprint-bar update moves the yellow bar; the 0x37E68C gauge is the
+							// parallel accounting (both carry the same token). session.Energy is the shared, tracked pool.
+							var drain = (uint)Math.Min(EnergyBaseDrain + tick * EnergyDrainAccelPerTick, EnergyDrainMax);
+							drain = Math.Min(drain, session.Energy);
+							session.Energy -= drain;
+							await _out.SendSprintBar(client, session.Energy);
+							await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, session.Energy, -(int)drain, StatDamages.SpellweaveStaminaGauge, StatDamages.SpellweaveStaminaScale)));
+						}
+						else
+						{
+							// Energy just hit 0: apply the Exhausted depletion debuff once.
+							if (!exhausted)
+							{
+								exhausted = true;
+								await _out.ApplyBuff(client, caster, caster, ExhaustedBuff);
+							}
+
+							// Phase 2: energy empty, so the health DoT runs - the damage for over-weaving.
+							var dmg = (uint)Math.Min(DotDrainPerTick, (int)health);
+							health -= dmg;
+							await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, health, -(int)dmg, StatDamages.SpellweaveDotGauge, StatDamages.SpellweaveDotScale)));
 						}
 
-						// Phase 2: energy empty, so the health DoT runs - the damage for over-weaving.
-						var dmg = (uint)Math.Min(DotDrainPerTick, (int)health);
-						health -= dmg;
-						await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, health, -(int)dmg, StatDamages.SpellweaveDotGauge, StatDamages.SpellweaveDotScale)));
-					}
-
-					tick++;
+						tick++;
+					});
 				}
 			}
 			catch (Exception ex)
@@ -370,7 +381,8 @@ namespace Faolan.GameServer.Combat
 			await WorldIir.Send(client, CombatReactiveCodec.Build(caster, profile.WeaveElements));
 
 			// The trance meter: stream the draining energy bar (then the health DoT) while the trance is open.
-			_ = RunTranceMeter(client, caster); // fire-and-forget; it logs its own exceptions and stops itself
+			// Started off the zone, which it posts each step back to; it logs its own exceptions and stops itself.
+			WorkLoop.Spawn(() => RunTranceMeter(client, caster), _logger, "Trance meter");
 
 			await Feedback(client, "Spellweave started.");
 			// The trance root is enforced in the CharDCMove handler: while IsSpellweaving it pins the caster's

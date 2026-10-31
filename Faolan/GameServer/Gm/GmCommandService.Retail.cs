@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -948,23 +949,17 @@ namespace Faolan.GameServer.Gm
 			if (repeats <= 0)
 				return;
 
-			// Fire-and-forget on purpose: the GM gets their prompt back immediately and the repeats run behind it.
-			// Failures are logged rather than thrown into nothing, and the loop is bounded above.
-			_ = Task.Run(async () =>
+			// Fire-and-forget on purpose, and off the GM's zone: the GM gets their prompt back immediately and the repeats
+			// run behind it. They only read the player list and send chat, so they need no zone. Failures are logged
+			// rather than thrown into nothing, and the loop is bounded above.
+			WorkLoop.Spawn(async () =>
 			{
-				try
+				for (var i = 0; i < repeats; i++)
 				{
-					for (var i = 0; i < repeats; i++)
-					{
-						await Task.Delay(TimeSpan.FromSeconds(pause));
-						await FanOutBroadcast(announcement, playfieldOnly ? client : null);
-					}
+					await Task.Delay(TimeSpan.FromSeconds(pause));
+					await FanOutBroadcast(announcement, playfieldOnly ? client : null);
 				}
-				catch (Exception e)
-				{
-					_logger.LogWarning(e, "GM .{Verb} repeat loop stopped early.", verb);
-				}
-			});
+			}, _logger, $"GM .{verb} repeat loop");
 		}
 
 		// `inPlayfieldOf` non-null narrows the fan-out to that client's own playfield, which is `/broadcast`'s scope.

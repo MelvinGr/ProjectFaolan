@@ -330,10 +330,10 @@ namespace Faolan.GameServer
 		// handoff + reconnect) is the only teleport shape this server has.
 		public async Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null)
 		{
-			if (ClientForCharacter(characterId) == null)
+			if (ClientForCharacter(characterId) is not { } client)
 				return false;
 
-			await _teleport.DoTeleport(characterId, mapId, position);
+			await _simulation.RunForPlayer(client, () => _teleport.DoTeleport(characterId, mapId, position));
 			return true;
 		}
 
@@ -347,7 +347,7 @@ namespace Faolan.GameServer
 			if (commandText.Length == 0 || char.IsLetterOrDigit(commandText[0]))
 				commandText = "." + commandText;
 
-			await _gmCommands.Handle(client, commandText);
+			await _simulation.RunForPlayer(client, () => _gmCommands.Handle(client, commandText));
 			return true;
 		}
 
@@ -379,6 +379,9 @@ namespace Faolan.GameServer
 			var saved = await _persistence.FlushAllAsync();
 			Logger.LogInformation("Shutdown: saved {Count} player(s)' live world state.", saved);
 
+			// Last, once nothing more is queued for them: the zones' loops finish what they hold and stop.
+			await _simulation.StopZonesAsync();
+
 			await base.StopAsync(cancellationToken);
 		}
 
@@ -387,41 +390,9 @@ namespace Faolan.GameServer
 			// A zone change closes this connection too, and the teardown below clears the flag, so it is read first.
 			var teleportingOut = client.Session.IsTeleportingOut;
 
-			var entity = _simulation.PlayerWorldEntity(client);
-			if (entity != null)
-			{
-				// Tell everyone who could see this player that it left (n3ToClientQuit) before removing it from the
-				// zone, so ResolveRemove still sees the leaver's viewers. Awaited, so the despawn lands before
-				// RemovePlayer rather than racing it. A failure here must not skip the rest: a player left registered
-				// is a ghost every tick sends to, and the save below is the only one a logout gets.
-				try
-				{
-					await _broadcaster.BroadcastPlayerDespawn(entity);
-				}
-				catch (Exception ex)
-				{
-					Logger.LogError(ex, "World: despawn broadcast for {Name} (0x{Handle:X8}) failed; removing the player anyway.", entity.Name, entity.Handle);
-				}
-				// A zone change tears this connection down and the re-entry builds a new entity (PlayerRegistry is
-				// keyed by connection), so the live buffs are held over the handoff. Without that, a debuff live at the
-				// moment of the teleport has nothing left to expire it and the client - which keeps its own icon list
-				// across a map change - shows it at 0 s for ever. Only on a teleport-out: on a real logout the buffs
-				// are meant to end, and the client rebuilds its icon list from the next login's snapshot.
-				if (client.Session.IsTeleportingOut)
-					_teleport.CarryBuffs(entity.Handle, entity.ActiveBuffs);
-
-				_simulation.RemovePlayer(client, out _);
-				// Persist the player's final live state - movement is not otherwise saved, so without this a logout
-				// loses where they were. Except on a teleport-out: DoTeleport has already saved the destination, and
-				// this connection's entity still holds the stale pre-teleport position, which would clobber it.
-				if (!client.Session.IsTeleportingOut)
-					await _persistence.SavePlayerState(client, entity);
-				else
-					Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
-
-				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
-				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
-			}
+			// The world half of the teardown is the zone's work, like any handler's.
+			if (_simulation.PlayerWorldEntity(client) is { } leaving)
+				await _simulation.World.ZoneForEntity(leaving).Loop.Run(() => LeaveWorld(client));
 
 			// A tradeskill mid-bar cannot outlive the connection either: it is staged and un-run, so dropping it takes
 			// nothing from the player, where letting it complete would grant an item to a session that has gone.
@@ -452,7 +423,57 @@ namespace Faolan.GameServer
 			await base.ClientDisconnected(client);
 		}
 
+		// The world half of a disconnect, on the player's zone loop: the despawn, the hand-over of live buffs on a zone
+		// change, the removal and the logout save.
+		private async Task LeaveWorld(INetworkClient client)
+		{
+			if (_simulation.PlayerWorldEntity(client) is not { } entity)
+				return;
+
+			// Tell everyone who could see this player that it left (n3ToClientQuit) before removing it from the zone, so
+			// ResolveRemove still sees the leaver's viewers. Awaited, so the despawn lands before RemovePlayer rather than
+			// racing it. A failure here must not skip the rest: a player left registered is a ghost every tick sends to,
+			// and the save below is the only one a logout gets.
+			try
+			{
+				await _broadcaster.BroadcastPlayerDespawn(entity);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, "World: despawn broadcast for {Name} (0x{Handle:X8}) failed; removing the player anyway.", entity.Name, entity.Handle);
+			}
+
+			// A zone change tears this connection down and the re-entry builds a new entity (PlayerRegistry is
+			// keyed by connection), so the live buffs are held over the handoff. Without that, a debuff live at the
+			// moment of the teleport has nothing left to expire it and the client - which keeps its own icon list
+			// across a map change - shows it at 0 s for ever. Only on a teleport-out: on a real logout the buffs
+			// are meant to end, and the client rebuilds its icon list from the next login's snapshot.
+			if (client.Session.IsTeleportingOut)
+				_teleport.CarryBuffs(entity.Handle, entity.ActiveBuffs);
+
+			_simulation.RemovePlayer(client, out _);
+			// Persist the player's final live state - movement is not otherwise saved, so without this a logout
+			// loses where they were. Except on a teleport-out: DoTeleport has already saved the destination, and
+			// this connection's entity still holds the stale pre-teleport position, which would clobber it.
+			if (!client.Session.IsTeleportingOut)
+				await _persistence.SavePlayerState(client, entity);
+			else
+				Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
+
+			client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
+			Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
+		}
+
+		// A player in the world has their packets run on their zone's loop, one at a time with every other player's in
+		// that zone and with its tick, so a handler owns the zone while it runs. Before world entry there is no zone yet:
+		// the login handshake and the create flow run on the connection, and world entry moves itself onto the zone it
+		// places the player in (WorldEntryService).
 		protected override Task ReceivedPacket(INetworkClient client, Rpc packet)
+		{
+			return _simulation.RunForPlayer(client, () => Dispatch(client, packet));
+		}
+
+		private Task Dispatch(INetworkClient client, Rpc packet)
 		{
 			// This connection multiplexes several RPC classes whose 0x20xx method ids collide with ordinary opcodes, so
 			// the RPC class is resolved first (by receiver; for Tradepost also by sender) and each class route consumes

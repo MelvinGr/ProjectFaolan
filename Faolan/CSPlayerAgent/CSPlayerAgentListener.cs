@@ -7,6 +7,7 @@ using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.GroupFinder;
@@ -56,6 +57,7 @@ namespace Faolan.CSPlayerAgent
 
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+		private readonly WorkLoop _loop;
 
 		// The port is the hosting realm's CsPlayerAgentPort (its Realm row is the single source of truth for the
 		// realm-local service ports), taken by injection rather than read from global config: `HostRealm` is a
@@ -65,11 +67,13 @@ namespace Faolan.CSPlayerAgent
 		// `ConnectionRegistry`, the same instance ServerBase fills as clients connect.
 		public CsPlayerAgentListener(HostRealm realm, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database,
 			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher, [FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)] ConnectionRegistry connections,
-			GuildService guild, TeamService teams, RaidService raids, GroupFinderService groupFinder, PvpMatchMakingService pvpMatchMaking, PvpMatchService pvpMatches)
+			[FromKeyedServices(CsPlayerAgentServices.LoopKey)] WorkLoop loop, GuildService guild, TeamService teams, RaidService raids, GroupFinderService groupFinder,
+			PvpMatchMakingService pvpMatchMaking, PvpMatchService pvpMatches)
 			: base(realm.CsPlayerAgentPort, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)), connections)
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
+			_loop = loop;
 
 			// The chat dispatcher is not held here: only the guild and team flows take it. A membership change moves
 			// that member's ~Guild / ~Team chat-channel subscription, which lives on their chat connection, not this
@@ -102,34 +106,42 @@ namespace Faolan.CSPlayerAgent
 		{
 			if (client.Session.Character is { } character)
 			{
-				_pvpMatchMaking.Forget(character.Id);
-				_pvpMatches.Forget(character.Id);
-				_groupFinder.Forget(character.Id);
+				await _loop.Run(() =>
+				{
+					_pvpMatchMaking.Forget(character.Id);
+					_pvpMatches.Forget(character.Id);
+					_groupFinder.Forget(character.Id);
 
-				// Same rule for the LFG advert: the team search answers from live sessions, so a flag left behind by a
-				// logged-off character is a row on somebody else's wire for a player who is not there. The team's own
-				// advert needs no cleanup - the team dissolves with its last member.
-				_teams.ForgetLookingForTeam(character.Id);
+					// Same rule for the LFG advert: the team search answers from live sessions, so a flag left behind
+					// by a logged-off character is a row on somebody else's wire for a player who is not there. The
+					// team's own advert needs no cleanup - the team dissolves with its last member.
+					_teams.ForgetLookingForTeam(character.Id);
+					return Task.CompletedTask;
+				});
 			}
 
 			await base.ClientDisconnected(client);
 		}
 
-		public override Task StopAsync(CancellationToken cancellationToken)
+		public override async Task StopAsync(CancellationToken cancellationToken)
 		{
 			_csPlayerAgentDispatcher.Unregister(this);
-			return base.StopAsync(cancellationToken);
+			await base.StopAsync(cancellationToken);
+			await _loop.StopAsync();
 		}
 
 		// --- ICsPlayerAgentProvider: the team ops that arrive on the player's world connection ------------------------
+		// The world's calls that change this tier's state run on its loop, which a zone may wait on (see
+		// CsPlayerAgentServices.LoopKey). The reads stay direct: they return a snapshot of state the loop replaces rather
+		// than edits in place.
 		public Task<bool> LeaveTeam(uint characterId)
 		{
-			return _teams.Leave(characterId);
+			return _loop.Run(() => _teams.Leave(characterId));
 		}
 
 		public Task<bool> KickFromTeam(uint leaderId, uint targetId)
 		{
-			return _teams.Kick(leaderId, targetId);
+			return _loop.Run(() => _teams.Kick(leaderId, targetId));
 		}
 
 		public IReadOnlyList<uint> TeamMembersOf(uint characterId)
@@ -155,13 +167,13 @@ namespace Faolan.CSPlayerAgent
 		// The GM `.matchstart` override: form a match from the queue as it stands, however few are in it.
 		public Task<string> ForcePvpMatchStart()
 		{
-			return _pvpMatches.ForceFormFromQueue(_pvpMatchMaking.Queued(), _pvpMatchMaking.Forget);
+			return _loop.Run(() => _pvpMatches.ForceFormFromQueue(_pvpMatchMaking.Queued(), _pvpMatchMaking.Forget));
 		}
 
 		// The GM `.matchstop` override: end the caller's started match now.
 		public Task<string> ForcePvpMatchStop(uint characterId, string message)
 		{
-			return _pvpMatches.ForceStopMatch(characterId, message);
+			return _loop.Run(() => _pvpMatches.ForceStopMatch(characterId, message));
 		}
 
 		// The PvP gate the world tier asks before letting a swing land on another player. The match state is here, so
@@ -174,13 +186,13 @@ namespace Faolan.CSPlayerAgent
 		// And the kill that follows from it: a point for the killer, and possibly the end of the match.
 		public Task CreditPvpMatchKill(uint killerId, uint victimId)
 		{
-			return _pvpMatches.CreditKill(killerId, victimId);
+			return _loop.Run(() => _pvpMatches.CreditKill(killerId, victimId));
 		}
 
 		// The guild bank's deposit half - the world tier has already taken the money out of the wallet.
 		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 		{
-			return _guild.DepositToGuildBank(characterId, amountTin);
+			return _loop.Run(() => _guild.DepositToGuildBank(characterId, amountTin));
 		}
 
 		// "You have mail". Rides CSPlayerInterface rather than the tradepost interface, which is what lets it reach a
@@ -200,7 +212,14 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
+		// Every packet runs on this tier's loop, one at a time with every other CS client's, its timers and the world's
+		// calls into it.
+		protected override Task ReceivedPacket(INetworkClient client, Rpc packet)
+		{
+			return _loop.Run(() => Dispatch(client, packet));
+		}
+
+		private async Task Dispatch(INetworkClient client, Rpc packet)
 		{
 			var method = (CSPlayerAgentMethods)packet.Method;
 			LogPacketReceived(packet);

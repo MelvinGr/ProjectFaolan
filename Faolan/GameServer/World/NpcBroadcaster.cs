@@ -160,27 +160,22 @@ namespace Faolan.GameServer.World
 			ArgumentNullException.ThrowIfNull(npc);
 			var zone = _sim.World.ZoneForEntity(npc);
 
-			Task.RunAfter(ScriptedExitMoveDelayMs, async () =>
+			// Each step runs on the NPC's zone loop, and only while the NPC is still in its zone: it may be gone by then -
+			// the player zoned, the zone reloaded, or a second trigger fired - and an exit for an entity that has left is
+			// dropped rather than broadcast against a stale handle.
+			Task.RunAfter(ScriptedExitMoveDelayMs, () => _sim.RunInZoneOf(npc, async () =>
 			{
-				// The NPC may already be gone - the player zoned, the zone reloaded, or a second trigger fired - and
-				// an exit for an entity that has left is dropped rather than broadcast against a stale handle.
-				if (!zone.TryGet(npc.Handle, out _))
-					return;
-
 				npc.MoveFrom = npc.Position;
 				npc.Position = exit;
 				await BroadcastNpcMove(npc);
 
-				Task.RunAfter(ScriptedExitDespawnDelayMs, async () =>
+				Task.RunAfter(ScriptedExitDespawnDelayMs, () => _sim.RunInZoneOf(npc, async () =>
 				{
-					if (!zone.TryGet(npc.Handle, out _))
-						return;
-
 					await _broadcaster.BroadcastEntityDespawn(npc);
 					zone.Remove(npc.Handle);
 					_logger.LogInformation("Script: {Npc} reached its exit and left the world.", npc.Name);
-				}, _logger);
-			}, _logger);
+				}), _logger);
+			}), _logger);
 		}
 
 		/// <summary>

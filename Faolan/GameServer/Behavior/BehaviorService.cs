@@ -399,29 +399,22 @@ namespace Faolan.GameServer.Behavior
 			if (dismounting)
 			{
 				await CombatService.SendBehaviorChannelCompleteAck(client, rawPayload, 3);
-				Task.RunAfter(MountCatalog.DismountChannelMs, async () => // horse runs away during the channel, then unseat
-				{
-					if (client.IsStopped)
-						return;
-
-					await _mounts.Dismount(client); // end-twin + StatUpd(Mount=0), frame 1449
-				}, _logger);
+				// The horse runs away during the channel, then the unseat runs on the rider's zone loop (end-twin +
+				// StatUpd(Mount=0), frame 1449) - not at all if they logged out meanwhile.
+				Task.RunAfter(MountCatalog.DismountChannelMs, () => _simulation.RunInZoneOf(client, () => _mounts.Dismount(client)), _logger);
 				return;
 			}
 
 			var mountCastPayload = (byte[])rawPayload.Clone();
-			Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
+			Task.RunAfter(MountCatalog.SummonChannelMs, () => _simulation.RunInZoneOf(client, async () => // horse runs up during the channel, then mount
 			{
-				if (client.IsStopped)
-					return;
-
 				await CombatService.SendBehaviorChannelCompleteAck(client, mountCastPayload, 3); // cast complete: mounts (form 0x0a closes the bar)
 
 				// The seat itself: the Ride buff + the Mount/MountSpeed pair, broadcast to viewers because the horse
 				// renders from those stats, then persisted so it survives a relog or a no-mount trip. Cleared only on a
 				// voluntary dismount above.
 				await _mounts.SeatAndPersist(client, mount);
-			}, _logger);
+			}), _logger);
 		}
 
 		private async Task HandleBccUseDynel(INetworkClient client, ushort behaviorType, uint target)

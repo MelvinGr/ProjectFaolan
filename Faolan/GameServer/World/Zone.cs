@@ -101,7 +101,10 @@ namespace Faolan.GameServer.World
 		public Zone(uint mapId, ILogger? logger = null)
 		{
 			MapId = mapId;
-			_loop = new Lazy<WorkLoop>(() => new WorkLoop($"Zone {MapId}/{InstanceId}", logger ?? NullLogger.Instance));
+			_loop = new Lazy<WorkLoop>(() => new WorkLoop($"Zone {MapId}/{InstanceId}", logger ?? NullLogger.Instance)
+			{
+				Owner = this
+			});
 		}
 
 		/// <summary>Claims the next tick; false while the previous one is still queued or running.</summary>

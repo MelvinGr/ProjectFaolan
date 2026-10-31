@@ -44,9 +44,11 @@ namespace Faolan.GameServer.World
 		private readonly IWorldRepository _world;
 		private readonly ILogger _logger;
 		private readonly ITravelOutbound _output;
+		private readonly WorldSimulation _sim;
 
-		public TravelService(ICharacterInventoryRepository inventory, IWorldRepository world, ITravelOutbound output, ILogger logger)
+		public TravelService(ICharacterInventoryRepository inventory, IWorldRepository world, ITravelOutbound output, WorldSimulation sim, ILogger logger)
 		{
+			_sim = sim;
 			_inventory = inventory;
 			_world = world;
 			_output = output;
@@ -159,11 +161,7 @@ namespace Faolan.GameServer.World
 			// must not be teleported into a session that no longer exists.
 			if (destination.DelaySeconds > 0)
 			{
-				Task.RunAfter((int)(destination.DelaySeconds * 1000), async () =>
-				{
-					if (!client.IsStopped)
-						await Depart(client, npcName, destination, arrival);
-				}, _logger);
+				Task.RunAfter((int)(destination.DelaySeconds * 1000), () => _sim.RunInZoneOf(client, () => Depart(client, npcName, destination, arrival)), _logger);
 
 				return;
 			}

@@ -6,6 +6,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
@@ -183,14 +184,11 @@ namespace Faolan.GameServer.Combat
 			// kick the tick loop now; it stops itself if the cast is interrupted, because the castToken it captured is
 			// bumped. The complete-ack and mana still fire from Resolve at the channel's end.
 			if (isGroundCast)
-				_ = _combat.ChannelGroundAoe(client, casterHandle, groundTarget, spellId, castMs, castToken);
+				WorkLoop.Spawn(() => _combat.ChannelGroundAoe(client, casterHandle, groundTarget, spellId, castMs, castToken), _logger, "Ground AoE channel");
 
-			Task.RunAfter(castMs, async () => // resolve the effect after the cast time
-			{
-				// A caster who logged out during the cast resolves nothing: no damage, XP or loot for a session that has gone.
-				if (!client.IsStopped)
-					await Resolve();
-			}, _logger);
+			// Resolve the effect after the cast time, on the caster's zone loop. A caster who logged out during the cast
+			// resolves nothing: no damage, XP or loot for a session that has gone.
+			Task.RunAfter(castMs, () => _sim.RunInZoneOf(client, Resolve), _logger);
 
 			return;
 

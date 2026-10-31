@@ -40,17 +40,27 @@ namespace Faolan.GameServer.World
 		}
 
 		/// <summary>
-		///     Flushes every connected player's live world state, for the autosave loop and the <c>.save</c> GM
-		///     command.
+		///     Flushes every connected player's live world state, for the autosave loop, the shutdown flush and the
+		///     <c>.save</c> GM command. Each zone's players are saved on that zone's loop, since the save reads their
+		///     live state.
 		/// </summary>
-		/// <returns>How many were saved.</returns>
+		/// <returns>
+		///     How many were saved. From inside a zone's own work (<c>.save</c>) the other zones' saves are queued rather
+		///     than awaited - a zone never waits on another loop - so the count covers that zone alone.
+		/// </returns>
 		public async Task<int> FlushAllAsync()
 		{
 			var saved = 0;
-			foreach (var pair in _simulation.Players)
+			foreach (var zone in _simulation.Players.Values.Select(p => _simulation.World.ZoneForEntity(p)).Distinct().ToList())
 			{
-				if (await SavePlayerState(pair.Key, pair.Value))
-					saved++;
+				await _simulation.RunInZone(zone, async () =>
+				{
+					foreach (var pair in _simulation.Players.In(zone).ToList())
+					{
+						if (await SavePlayerState(pair.Key, pair.Value))
+							Interlocked.Increment(ref saved);
+					}
+				});
 			}
 
 			return saved;

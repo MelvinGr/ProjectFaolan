@@ -3,12 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Constants;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Wire;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -41,10 +43,12 @@ namespace Faolan.GameServer.Combat
 
 		private readonly BuffService _buffs;
 		private readonly ILogger _logger;
+		private readonly WorldSimulation _sim;
 
-		public EnergyService(BuffService buffs, ILogger logger)
+		public EnergyService(BuffService buffs, WorldSimulation sim, ILogger logger)
 		{
 			_buffs = buffs;
+			_sim = sim;
 			_logger = logger;
 		}
 
@@ -64,8 +68,9 @@ namespace Faolan.GameServer.Combat
 				session.Energy = session.EnergyMax;
 			}
 
+			// Started off the zone, which it posts each step back to; it logs its own exceptions.
 			if (!session.EnergyLoopActive)
-				_ = RunEnergyMirror(client); // fire-and-forget; it logs its own exceptions
+				WorkLoop.Spawn(() => RunEnergyMirror(client), _logger, "Energy mirror");
 		}
 
 		/// <summary>
@@ -110,54 +115,59 @@ namespace Faolan.GameServer.Combat
 					if (client.IsStopped)
 						return; // disconnected
 
-					var session = client.Session;
-
-					if (session.IsSpellweaving)
-						continue; // the weave owns the energy this tick
-
-					if (session.IsSprinting)
-						session.Energy -= (uint)Math.Min(SprintEnergyDrainPerTick, (int)session.Energy);
-					else if (session.Energy < session.EnergyMax)
-						session.Energy = Math.Min(session.EnergyMax, session.Energy + EnergyRegenPerTick);
-
-					// Exhausted rides the pool, not the weave: retail applies it the instant Energy reaches 0 and sends
-					// the end twin on the first push that lifts it back above zero, sprint included
-					// (SpellweaveCatalog.ExhaustedBuff carries the capture). The weave has its own copy of this because
-					// it also owns a health DoT while empty; this is the plain-sprint half.
-					if (session.Character is { } self)
+					// The pool is the player's live state, so each tick's step runs on their zone's loop; the loop itself
+					// only keeps time, off any zone.
+					await _sim.RunInZoneOf(client, async () =>
 					{
-						if (session.Energy == 0 && !exhausted)
-						{
-							exhausted = true;
-							await _buffs.ApplyBuffById(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+						var session = client.Session;
 
-							// An empty pool ends the sprint, and the client has to be told, or it keeps rendering a
-							// sprint the server has stopped draining for. Both flags ride this same zero-crossing
-							// rather than a threshold of their own: `canSprint` is the refusal the client checks
-							// before it even asks (00 x151 in the corpus), `isSprinting` is the state.
-							if (session.IsSprinting)
+						if (session.IsSpellweaving)
+							return; // the weave owns the energy this tick
+
+						if (session.IsSprinting)
+							session.Energy -= (uint)Math.Min(SprintEnergyDrainPerTick, (int)session.Energy);
+						else if (session.Energy < session.EnergyMax)
+							session.Energy = Math.Min(session.EnergyMax, session.Energy + EnergyRegenPerTick);
+
+						// Exhausted rides the pool, not the weave: retail applies it the instant Energy reaches 0 and sends
+						// the end twin on the first push that lifts it back above zero, sprint included
+						// (SpellweaveCatalog.ExhaustedBuff carries the capture). The weave has its own copy of this because
+						// it also owns a health DoT while empty; this is the plain-sprint half.
+						if (session.Character is { } self)
+						{
+							if (session.Energy == 0 && !exhausted)
 							{
-								session.IsSprinting = false;
-								await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSetIsSprinting, false);
+								exhausted = true;
+								await _buffs.ApplyBuffById(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+
+								// An empty pool ends the sprint, and the client has to be told, or it keeps rendering a
+								// sprint the server has stopped draining for. Both flags ride this same zero-crossing
+								// rather than a threshold of their own: `canSprint` is the refusal the client checks
+								// before it even asks (00 x151 in the corpus), `isSprinting` is the state.
+								if (session.IsSprinting)
+								{
+									session.IsSprinting = false;
+									await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSetIsSprinting, false);
+								}
+
+								await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, false);
 							}
-
-							await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, false);
+							else if (session.Energy > 0 && exhausted)
+							{
+								exhausted = false;
+								await _buffs.SendBuffRemoval(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+								await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, true);
+							}
 						}
-						else if (session.Energy > 0 && exhausted)
+
+						if (++sinceMirror >= EnergyMirrorTicks && session.Energy != mirrored && session.Character != null)
 						{
-							exhausted = false;
-							await _buffs.SendBuffRemoval(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
-							await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, true);
+							sinceMirror = 0;
+							mirrored = session.Energy;
+							await GameWire.SendStatUpdate(client, new CharacterStatBlock { [CharacterStatId.Energy] = session.Energy },
+								session.Character.Id);
 						}
-					}
-
-					if (++sinceMirror >= EnergyMirrorTicks && session.Energy != mirrored && session.Character != null)
-					{
-						sinceMirror = 0;
-						mirrored = session.Energy;
-						await GameWire.SendStatUpdate(client, new CharacterStatBlock { [CharacterStatId.Energy] = session.Energy },
-							session.Character.Id);
-					}
+					});
 				}
 			}
 			catch (Exception ex)

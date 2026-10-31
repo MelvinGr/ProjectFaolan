@@ -67,6 +67,22 @@ the ones it routes to (`_shop`, `_bank`, ...) and forwards. Rules for the servic
   interface list), and a field read in a constructor before its own assignment line is silently null and captured
   forever (audit the constructor). See the agent memories `interface_removal_casts` and `ctor_use_before_assign`.
 
+**Each zone owns its state through a `WorkLoop`** (`Faolan.Core/Helpers/WorkLoop.cs`), the way retail gave each
+playfield its own server. Every client's packets arrive on its own connection thread, so without an owner two players'
+handlers would interleave inside one zone. The rules:
+- An in-world player's packets, the zone's tick (`WorldSimulation.TickZone`) and the world half of a disconnect run on
+  that zone's loop. Before world entry nothing owns the player; `WorldEntryService` moves the entry onto the zone it
+  resolves (`WorldSimulation.EntryZone`) before placing them.
+- Anything else that touches a player's or an NPC's world state goes through `WorldSimulation.RunForPlayer` (another
+  listener's call) or `RunInZoneOf` (a delayed action, a per-player loop; it does nothing once they have left).
+- Work that outlives its item starts detached: `Task.RunAfter` or `WorkLoop.Spawn`, never `_ = SomethingAsync()` or a
+  bare `Task.Run` from a handler. Started attached, it inherits the loop's "running here" mark, and its own `Run` calls
+  execute inline beside whatever the zone is doing by then.
+- **No loop waits on a zone's work**: from another zone or the CS tier, a call into a zone is queued, not awaited.
+  The CS tier has one loop of its own (`CsPlayerAgentServices.LoopKey`), which a zone may await; a call it makes into
+  a zone is queued. Two loops that could each wait on the other would deadlock both.
+- A sweep the tick runs takes the `Zone` it ticks and walks `PlayerRegistry.In(zone)`, not every player.
+
 Listeners derive from `RpcServer` or `ChatServerBase` (both `ServerBase`, in `Faolan.Core.Network/Server.cs`);
 per-connection state lives on `INetworkClient.Session`. Cross-listener actions go through dispatcher seams
 (`IChatServerDispatcher` for chat and system messages, `IGameServerDispatcher` for world actions), never direct
