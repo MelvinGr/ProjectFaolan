@@ -108,14 +108,32 @@ namespace Faolan.Web.Content
 					return Results.NotFound($"unknown tag '{tag}'");
 
 				var query = ctx.Request.QueryString.Value ?? "";
-				var localPath = Path.Combine(storeDir, tag, "upm", rest.Replace('/', Path.DirectorySeparatorChar));
+
+				// `rest` is the client's, and becomes a file path both read and written below, so it must resolve inside
+				// this tag's store. Kestrel removes literal dot segments, but a decoded `%5C` is a separator on Windows and
+				// a `..` it leaves behind would climb out.
+				var tagRoot = Path.Combine(storeDir, tag, "upm") + Path.DirectorySeparatorChar;
+				var localPath = Path.GetFullPath(Path.Combine(tagRoot, rest.Replace('/', Path.DirectorySeparatorChar)));
+				if (!localPath.StartsWith(tagRoot, StringComparison.Ordinal))
+				{
+					log.LogWarning("REFUSED {Tag} {Rest}: resolves outside the store", tag, rest);
+					return Results.BadRequest("path outside the store");
+				}
 
 				// The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and overwrites the local copy
 				// with it, which would revert the redirect to the real CDN. So for that file the real bytes are
 				// archived but the copy served has its three patch-addr keys pointing back at this mirror, keeping the
 				// redirect sticky across a patch run.
 				if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
+				{
+					if (!File.Exists(localPath))
+					{
+						log.LogWarning("MISSING {Tag} {Rest}: the store holds no LocalConfig.xml to rewrite", tag, rest);
+						return Results.NotFound($"{rest} is not in the store");
+					}
+
 					return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), publicBase), "application/octet-stream");
+				}
 
 				if (query.Length == 0 && File.Exists(localPath))
 				{

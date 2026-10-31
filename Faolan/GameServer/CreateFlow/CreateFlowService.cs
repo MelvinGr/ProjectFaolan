@@ -7,6 +7,7 @@ using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
@@ -457,24 +458,15 @@ namespace Faolan.GameServer.CreateFlow
 			// the trio once the client's customization batch is fully received, not after a wall-clock delay.
 			// This timer catches the rare case where that burst is split across receives, so the editor can
 			// never hang waiting for the trio.
-			_ = Task.Run((Func<Task>)(async () =>
+			Task.RunAfter(1500, async () =>
 			{
-				try
-				{
-					await Task.Delay(1500);
+				// A newer morph or Finish arrived, so the burst is still streaming and a later task or the batch drain
+				// will send it. TrySend also no-ops if it was already sent.
+				if (client.Session.MorphActivitySequence != sequence)
+					return;
 
-					// A newer morph or Finish arrived, so the burst is still streaming and a later task or the
-					// batch drain will send it. TrySend also no-ops if it was already sent.
-					if (client.Session.MorphActivitySequence != sequence)
-						return;
-
-					await TrySendPostMorphBurstOnce(client);
-				}
-				catch (Exception e)
-				{
-					_logger.LogWarning(e, "Character-editor: failed to send the post-morph burst (fallback timer).");
-				}
-			}));
+				await TrySendPostMorphBurstOnce(client);
+			}, _logger);
 		}
 
 		/// <summary>
@@ -589,19 +581,17 @@ namespace Faolan.GameServer.CreateFlow
 				return;
 			}
 
-			_ = Task.Run(async () =>
+			Task.RunAfter(delay, async () =>
 			{
+				// The other half of the same property: several tasks could still be in flight if arming ever becomes
+				// legitimate more than once, and reading the flag then clearing it is not single-shot - two readers can
+				// both pass before either writes. This compare-and-swap settles it and moves the connection to the
+				// terminal `Sent` state.
+				if (!client.Session.TryClaimEnterWorldHandoff())
+					return;
+
 				try
 				{
-					await Task.Delay(delay);
-
-					// The other half of the same property: several tasks could still be in flight if arming ever
-					// becomes legitimate more than once, and reading the flag then clearing it is not single-shot -
-					// two readers can both pass before either writes. This compare-and-swap settles it and moves the
-					// connection to the terminal `Sent` state.
-					if (!client.Session.TryClaimEnterWorldHandoff())
-						return;
-
 					await _sendEnterWorldHandoff(client);
 				}
 				catch (Exception e)
@@ -610,7 +600,7 @@ namespace Faolan.GameServer.CreateFlow
 					// so the reason has to be in the log.
 					_logger.LogError(e, "Create-editor: failed to send the enter-world handoff; the client will hang on the loading screen.");
 				}
-			});
+			}, _logger);
 		}
 		// Verbatim replay of the retail create-editor initial download from
 		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (GameServer port 7030), rows 30-65.
