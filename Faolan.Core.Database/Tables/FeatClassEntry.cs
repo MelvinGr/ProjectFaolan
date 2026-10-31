@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Tables
 	public class FeatClassEntry
 	{
 		// The client's own row id (106..738078). A natural key: it is assigned by the client's data, not by us, so a
-		// re-import does not renumber the table (see the model conventions in CLAUDE.md).
+		// re-import does not renumber the table (see the model conventions in AGENTS.md).
 		public uint Id { get; set; }
 
 		// The class the row is for. Null on the 188 rows whose class word is 0 - a real state (a feat that belongs to

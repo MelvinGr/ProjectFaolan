@@ -1,7 +1,7 @@
 """Where the capture corpus lives.
 
 The retail traces are NOT in this repo - they sit in the private ProjectFaolan-Data repo (see
-CLAUDE.md "Capture data"), because they are 349 MB and this repo stays small. The C# test suite
+AGENTS.md "Capture data"), because they are 349 MB and this repo stays small. The C# test suite
 does not need them at all: it reads the committed corpus extract. These dissectors do.
 
 Resolution order, first hit wins:

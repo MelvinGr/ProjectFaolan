@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// optional value decided by "does the next token start with '-'".
 	public class LauncherCommandTests
 	{
-		// The documented unattended launch (CLAUDE.md, docs/tooling/client-launcher.md) - short aliases and all.
+		// The documented unattended launch (root AGENTS.md, docs/tooling/client-launcher.md) - short aliases and all.
 		[Fact]
 		public void Parse_ReadsTheDocumentedTestLaunch()
 		{

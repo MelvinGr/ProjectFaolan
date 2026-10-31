@@ -1,13 +1,23 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents working in this repository.
 
 Project Faolan is an Age of Conan server protocol emulator (C#, .NET 10). **Packet captures are the primary truth
 source**: the code mirrors retail traffic byte-for-byte rather than abstracting it, and where local behavior diverges
-from a retail capture, local is fixed to match. This file plus `docs/` are the deep-dive (architecture, protocol notes,
-RE methodology); `README.md` is the regular repo readme (overview, build, run). Open work is tracked as **Gitea issues**
-in the `projectfaolan` repo on `git.groenendaal.io`, grouped by `area:*` labels, never in a TODO file. Create and close
-issues there as work lands (the agent memory `issue_tracking_in_gitea` has the API recipe).
+from a retail capture, local is fixed to match. This file, the nested `AGENTS.md` files and `docs/` are the deep-dive
+(architecture, protocol notes, RE methodology); `README.md` is the regular repo readme (overview, build, run). Open work
+is tracked as **Gitea issues** in the `projectfaolan` repo on `git.groenendaal.io`, grouped by `area:*` labels, never in
+a TODO file. Create and close issues there as work lands (the agent memory `issue_tracking_in_gitea` has the API
+recipe).
+
+Rules that concern one folder live in a nested `AGENTS.md` there, which loads when you work in that folder:
+- `Faolan/AGENTS.md` - the listeners and the container-registered service graph: partials by role, ports instead
+  of the listener, construction cycles, how a service takes repository slices.
+- `Faolan.Core.Database/AGENTS.md` - the model conventions (foreign keys, natural and derived keys), how
+  `faolan.sql` is generated and loaded, and the EF migration workflow.
+- `Faolan.Core.Network/Codecs/AGENTS.md` - the codec conventions the convention tests enforce.
+- `Faolan.Tests/AGENTS.md` - the fixture archive: named fixtures and the corpus slice, whether a new check is a test
+  or a `--report`, and the pseudonyms that replace character names in the bytes.
 
 ## Commands
 
@@ -58,27 +68,8 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # TCP-reassembled, one record per packet, including the compressed download packets.
 # Lossy captures in the Wireshark GUI: set the TCP pref analyze_sequence_numbers off (the script does).
 
-# EF migrations. The context lives in Faolan.Core.Database; migrations are per provider, in
-# Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations.
-# Scaffold the SQLite migration only (the maintainer's standing decision). Each chain is a single `InitialCreate`
-# (squashed 2026-09-11), so Postgres is level with the model as of that date and does not track later changes. The
-# Postgres provider code stays: Faolan.Core.Database is provider-agnostic and faolan.sql loads into both.
-# Bringing Postgres level again = delete its Migrations/ and scaffold one fresh initial migration from the current
-# model, never a chain.
-# A squash also rebuilds faolan.db on the fresh schema - create a fresh db from the new migration, copy every row
-# across, verify per-row parity - rather than only rewriting its `__EFMigrationsHistory` row: columns that incremental
-# migrations added via ALTER TABLE carry a DEFAULT the model does not declare, so a re-pointed db is not
-# schema-identical to a fresh one.
-# The Postgres `InitialCreate` is verified against a real postgres:17: it applies, and faolan.sql loads into it under
-# ON_ERROR_STOP at zero errors with full row parity. Hand-written SQL in the model must quote its identifiers: raw
-# CHECK SQL goes into CREATE TABLE verbatim, and Postgres folds an unquoted identifier to lower case while SQLite is
-# case-insensitive (`CK_ItemInstance_OneOwner` and `ConstrainToEnumValuesAttribute` both quote).
-# The EF tools run at design time with CWD = the project dir. Global.ConfigPath searches up from the CWD (then up from
-# the exe dir) for faolan.json, and a relative SQLite `Data Source` resolves against the directory that file was found
-# in, so both commands work from anywhere in the tree. FAOLAN_CONFIG wins if set.
-# The two --project flags are required: `.config/dotnet-ef.json` carries them as defaults, but that file is an EF 11
-# tooling feature and the installed tool (10.0.11) ignores it. It is committed so the bare commands work once the tool
-# is on 11.
+# EF migrations: scaffold the SQLite migration only (the maintainer's standing decision); the workflow and its
+# traps are in Faolan.Core.Database/AGENTS.md.
 dotnet ef migrations add <Name> \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
 # `database update` likewise (or just start the server: it migrates, loads faolan.sql into a database with no content,
@@ -108,161 +99,31 @@ realm. Realms are declared in the `Realms` section of faolan.json: that is the s
 deleted, because four tables reference it. A deployment that declares no realms gets the default realm inserted into
 an empty table.
 
-**Projects:**
-- `Faolan/` - the server host.
-- `Faolan.Core/` - the base layer: shared types, crypto, the `Protobuf/` schema, and the opcode/IIR catalogs in
-  `Faolan.Core/Enums/Opcodes.cs`.
-- `Faolan.Core.Database/` - EF Core: `DatabaseContext`, `Tables/`, `DatabaseRepository`.
-- `Faolan.Core.Network/` - networking and the byte-exact packet codecs (`Codecs/`, by domain: `Spawn/`, `World/`, ...).
-- `Faolan.Core.Rdb/` - client RDB extraction.
-- `Faolan.Importer/` - tshark dump + RDB -> DB command line.
-- `Faolan.ClientLauncher/` - the unattended retail client.
-- `Faolan.Mcp/` - the in-process MCP server (DB, live-session and GM-command tools).
-- `Faolan.Web/` + `Faolan.Web.Content/` - the Blazor armory, 3D viewer, GM tools and CDN proxy.
-- `Faolan.Tests/` - the test suite.
+**Projects:** one folder per project in `ProjectFaolan.slnx`. What the names do not say:
+- The opcode/IIR catalogs are in `Faolan.Core/Enums/Opcodes.cs`; the byte-exact packet codecs are in
+  `Faolan.Core.Network/Codecs/`, one folder per domain (`Spawn/`, `World/`, ...).
 - `Faolan.Wireshark/` - the Conan-protocol dissector plugin: framing, zlib, RpcHeader endpoints, named opcodes and IIR
   types (generated from `Opcodes.cs`) and handoff auto-follow. It is the ground truth for captures (TCP-reassembled; use
   `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures).
 - `tools/` - `capture/` Python dissectors and `tshark_dump.sh`, `ghidra/` RE scripts, `frida/` live-client scripts.
 - `Captures/` is not in this repo; it lives in the private ProjectFaolan-Data repo (see **Capture data**).
 
-**Listeners** are partial classes split across several files; inspect every partial before changing behavior.
-`GameServerListener`'s partials are named by role: `.Inbound` (the routing switch and thin `Handle*` handlers) and
-`.Outbound` (behavior-named senders such as `SendGuildTag`/`SendGroupMembership`, never opcode-named). Static senders
-several services share (`SendStatUpdate`, `BuildMapChange`, `SendLearnSpell`, ...) live in `Wire/GameWire.cs`, and the
-tier's sender endpoints in `Wire/GameEndpoints.cs`, so no service reaches back into the listener for them.
-`ChatServerListener` follows the same `<Listener>.<Role>.cs` naming. A partial-class file keeps
-`namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder is
-organizational only; that suppression is for partials only, and a non-partial type takes its folder's namespace.
+**Listeners and services:** the listeners route, and domain logic lives in composed, container-registered services
+beside them. The rules for that graph are in `Faolan/AGENTS.md`; read them before adding a service or a port.
 
-Domain logic lives in composed service folders beside the listener (`Apprentice/`, `Behavior/`, `Combat/`,
-`CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Gm/`, `Inventory/`, `Progression/`, `Quest/`, `Scripting/`,
-`Session/`, `World/`). Examples: `Session/WorldEntryService` (the ready bursts, the snapshot, the spawn poll),
-`Gm/GmCommandService` (+ its `.Retail` partial), `Behavior/BehaviorService` (the client's action switch - the whole
-`BehaviorControlCenterIIR` family: attack, use dynel, use character, equip, mount).
-
-**The GameServer's services are container-registered** (`Faolan/GameServer/GameServerRealmServices.cs`,
-`AddRealmGameServer`), not constructed by hand; the listener takes them by constructor injection.
-- **Register a service where its dependencies already are.** MS.DI resolves by type, so the file's order is
-  documentation only, but it is the one place the graph's layering is legible: keep it in dependency order.
-- **A missing registration is not a build error.** `GameServerCompositionTests` is the gate: `ValidateOnBuild` walks
-  every constructor and names every unsatisfied dependency without invoking a factory. Run it rather than booting.
-- Every composed service takes a bare, realm-tagged `ILogger` (`...GameServerListener-<realmId>`), registered by
-  `AddRealmGameServer` and therefore scoped to a process that hosts a realm. Any other container-resolved type asking
-  for a non-generic `ILogger` would silently inherit that category; the same test fails if a listener does.
-- **The CS tier is registered the same way** (`Faolan/CSPlayerAgent/CsPlayerAgentServices.cs`,
-  `AddRealmCsPlayerAgent`, gated by `CsPlayerAgentCompositionTests`), with two differences: its services take
-  `ILogger<CsPlayerAgentListener>` (a bare `ILogger` would inherit the GameServer's realm tag), and its
-  `ConnectionRegistry` is a keyed singleton (`[FromKeyedServices(CsPlayerAgentServices.ConnectionsKey)]`), because the
-  GameServer registers the unkeyed one for the world connections and the two are different sets.
-
-**Prefer composed collaborators over growing the listener.** Domain logic belongs in folder-namespaced service classes
-that take their dependencies by constructor and the client per call (`CombatService`, `WorldBroadcaster`,
-`WorldSimulation`, `EquipmentService`, `ConversationService`, `ShopService`, `TradepostService`, ...). The listener holds
-the ones it routes to (`_shop`, `_bank`, ...) and forwards. Rules for the service graph:
-- **Never pass the listener, and never hand out `this`.** A service that needs a cross-cutting outbound operation
-  reaches it through a narrow port. No port is implemented by the listener: each is its own container-registered class,
-  injected into the services that need it (`WorldOutbound`, `EconomyOutbound`, `TradeOutbound`,
-  `QuestShareOutbound`, `QuestOutbound`, `ApprenticeOutbound`, `LevelUpOutbound`, `EnvironmentOutbound`,
-  `TravelOutbound`, `SpellweaveOutbound`, `SpellEffectOutbound`). The listener implements one interface,
-  `IGameServerProvider` (the cross-listener dispatcher seam), and passes `this` only to `IGameServerDispatcher.Register`.
-  A single shared operation can be a `Func<...>` seam (`ClientForCharacter` into `GuildService`); once several services
-  share a cluster of operations, collapse them into one named interface.
-- **Check what an operation reads before calling it listener state.** Most wire code needs only "the client for this
-  character id", which `ConnectionRegistry` (`Faolan.Core.Network`) answers: `ServerBase` owns one and delegates
-  `NetworkClients`/`ClientForCharacter` to it, so a wire class can take the registry instead of the listener. Likewise
-  the energy loop's state is on `INetworkClientSession`, and a pet summon is broadcaster and simulation work
-  (`EnergyService`, `PetService`, `TeleportService` are their own collaborators).
-- **Construction cycles.** First look for a move: a cycle is usually between the class an operation sits in and its
-  answer, not between the operation and its answer, and moving the operation to its own class built after the other
-  side turns the seam into an ordinary constructor argument (`KnockbackService`, `WorldEntryService`). A cycle that
-  survives is cut by a single-operation bound seam (`EconomyOutbound.BindCollectGoals`, `LevelUpOutbound.BindReseed`,
-  `WorldSimulation.Start(token, output)`), never by a lazy `Func<>` closing over a not-yet-assigned field.
-- **Split a large class by the question each member answers**, not by state-versus-wire. `WorldBroadcaster` answers
-  *who can see what* and the spawn/despawn/move/entry-burst wire that follows; interacting with a world object
-  (`WorldObjectService`), what an NPC does (`NpcBroadcaster`), what dropped (`LootBroadcaster`), what the client is told
-  about quests (`QuestBroadcaster`, `QuestOutbound`) and the shove (`KnockbackService`) are separate classes.
-  `WorldSimulation` answers *what is in the world and what it is doing this tick*; `PlayerDeathService`,
-  `BuffTickService` and `NpcCombatService` are separate. Every cut must leave the dependency one-way. Prefer the cut
-  that lets a caller drop the big class entirely. Subject is the first approximation; the question is the test.
-- **Inject the state, not its owner.** Services that read the world take `WorldState` and `PlayerRegistry` (the
-  connection->entity map; it derives from `ConcurrentDictionary` so the container can name it) rather than the
-  simulation, which keeps the dependency one-way. Each binds `IWorldOutbound` at `Start`, as the simulation does.
-- Two traps neither the compiler nor the tests catch when moving a port: `((IFoo)this)` still compiles after `IFoo`
-  leaves a non-sealed class and throws `InvalidCastException` at runtime (grep every self-cast against the actual
-  interface list), and a field read in a constructor before its own assignment line is silently null and captured
-  forever (audit the constructor). See the agent memories `interface_removal_casts` and `ctor_use_before_assign`.
-
-Listeners derive from `RpcServer` or `ChatServerBase` (both `ServerBase`, in `Faolan.Core.Network/Server.cs`);
-per-connection state lives on `INetworkClient.Session`. Cross-listener actions go through dispatcher seams
-(`IChatServerDispatcher` for chat and system messages, `IGameServerDispatcher` for world actions), never direct
-references.
-
-**Database:** SQLite via EF Core (`Faolan.Core.Database`: `DatabaseContext` + `Tables/`), a pooled `DbContextFactory`,
-short-lived per-unit-of-work contexts. Lazy loading is deliberately not used; load navigations explicitly with
-`Include`. All access goes through `IDatabaseRepository`, which is the composite of 13 per-domain slices, each declared
-beside its implementation (`Repositories/DatabaseRepository.<Domain>.cs`). The character's five slices are split by the
-question a member answers: `ICharacterRepository` (the row and its 1:1 satellites), `ICharacterInventoryRepository`
-(what it carries), `ICharacterQuestRepository` (what it is on), `ICharacterProgressionRepository` (what it has learned)
-and `ICharacterStatRepository` (what it adds up to).
-- **A service takes the slices it calls, not the composite**: one to three slices as separate constructor parameters
-  (`_catalog`, `_inventory`, `_world`, ...). A consumer of four or more slices (`WorldEntryService`, `GmCommandService`,
-  `TradepostService`, ...), or one that hands the repository to a helper needing the composite, keeps
-  `IDatabaseRepository`.
-- Both realm containers forward every slice to the one singleton: a new slice must be added to both
-  `AddRealmGameServer` and `AddRealmCsPlayerAgent` (the composition tests catch a miss).
+**Database:** SQLite via EF Core in `Faolan.Core.Database`, all access through `IDatabaseRepository` and its
+per-domain slices. Lazy loading is deliberately not used; load navigations explicitly with `Include`.
 - `faolan.db` carries the game data (built by the importer, committed to git); the server only migrates and
   reads/writes at save/load points. The sqlite3 CLI has foreign keys off by default: run `PRAGMA foreign_keys=ON`
   before manual deletes or you orphan child rows.
 
-**Model conventions** (enforced by `Faolan.Tests/DatabaseConventionTests.cs`):
-- **A foreign key is declared with `[ForeignKey]` on the navigation property, never fluently.** Reading
-  `Tables/Foo.cs` must tell you what `Foo` points at. A composite key is no exception: `[ForeignKey]` takes a
-  comma-separated column list, kept rename-safe with `nameof`:
-  `[ForeignKey($"{nameof(ConversationNodeId)},{nameof(PacketSequence)}")]`. What legitimately stays fluent is
-  everything that is not the FK column mapping: `.OnDelete(...)` (no attribute exists), `.ValueGeneratedNever()`, and
-  the `HasMany`/`WithOne` pairing that names both ends.
-- **A table the importer deletes and reinserts has a natural or derived key, never an AUTOINCREMENT surrogate.** A
-  surrogate is reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql` lines for no semantic
-  change and cascades into every child FK. In order of preference:
-  1. **Natural composite** - `[PrimaryKey(...)]` on a plain class (not `BaseEntity`), e.g. `ShopItem` `(ShopId, Pos)`,
-     `NpcSpawnEquipment` `(NpcSpawnId, Pos)`. In a tree each child is keyed by its parent's key plus its own
-     `Sequence` (`ConversationPacket` -> `ConversationScreen` -> `ConversationScreenParameter`).
-  2. **Derived id** (`DerivedKey` / `IDerivedKey`) when the identity is too wide to carry down a tree, contains floats,
-     or is the target of a nullable FK (a composite cannot express `SetNull` when one of its columns is non-null). The
-     entity exposes `ComputeId()`, `DatabaseContext` stamps it on insert, and `DatabaseConventionTests` checks the
-     shipped rows satisfy `Id == ComputeId()`. Used by `ConversationNode`, `NpcSpawn`, `NpcSpawnArea`, `WorldObject`.
-  To check whether a table needs this: `sqlite_sequence.seq / COUNT(*)` is how many times it has been renumbered.
-
 **SQLite is interim.** The goal is a real database with the schema and seed as a `.sql` file, dropping the binary.
-- **`faolan.sql` is the reviewable mirror of `faolan.db`'s data, and a seed that loads into both SQLite and Postgres.**
-  The `.githooks/pre-commit` hook regenerates it whenever `faolan.db` is committed, dumping the staged blob so it
-  matches the commit exactly. Never hand-edit it; to regenerate by hand run
-  `dotnet run --project Faolan.Importer -- --report sql-seed`.
-  - **Run `git config core.hooksPath .githooks` once per clone.** Git does not share hooks; without it `faolan.sql`
-    silently goes stale and the personal-name guard does not run (`.githooks/pre-commit` chains
-    `.githooks/personal-names.py`, which blocks the maintainer's retail account and character names from entering a
-    repo meant to go public). The guard's logic is tracked; its identity list is not - it reads the untracked
-    `.git/hooks/personal-names.json` (or `$FAOLAN_PERSONAL_NAMES`). With no config it skips and says so; `--tree`
-    audits every tracked file.
-  - **Restore:** create the schema (`dotnet ef database update`), then run `faolan.sql`. It is one file, verified at
-    zero errors with full row parity into a fresh SQLite and a fresh Postgres. No game-content table has a
-    store-generated key, so there are no sequence high-water marks to restore;
-    `DatabaseConventionTests.NoGameContentTable_HasAStoreGeneratedKey` keeps it that way, and `SqlSeedWriter` throws,
-    naming the table, rather than emit a seed whose next INSERT would collide.
-  - It is generated from the EF model (`SqlSeedWriter`), not by `sqlite3 .dump`, because a dump is SQLite-only:
-    identifiers are quoted (Postgres folds unquoted `Items` to `items`), every row has an explicit column list (column
-    order is irrelevant), literals come from each property's CLR type rather than the value the reader returns (SQLite
-    returns 0/1 for booleans, which Postgres rejects), and tables are emitted in FK-dependency order so the file loads
-    with constraints enforced. It contains no `CREATE TABLE` (the migrations own the schema) and no
-    `__EFMigrationsHistory`. Characters and other player/deployment state are excluded; the excluded set is derived
-    from the model. Rows are batched into multi-row `INSERT ... VALUES (...),(...)`, one row per line, so the diff stays
-    reviewable.
-  - **A database with no game content gets the seed loaded automatically** (`DatabaseInitializer.EnsureGameDataAsync`):
-    delete `faolan.db` and the server rebuilds it from the migrations plus `faolan.sql`, on SQLite or Postgres. The probe
-    is `Items` being empty, so a populated database is never touched. If the seed is missing when needed, startup fails
-    with a clear error. `FAOLAN_SEED` overrides the path (`Global.SeedPath`). The importer opts out
-    (`InitializeAsync(db, seedGameData: false)`), since its job is to build that content.
+- `faolan.sql` is the reviewable mirror of `faolan.db`'s data and the seed that loads into SQLite and Postgres. The
+  `.githooks/pre-commit` hook regenerates it whenever `faolan.db` is committed. Never hand-edit it; to regenerate by
+  hand run `dotnet run --project Faolan.Importer -- --report sql-seed`. How it is generated and loaded:
+  `Faolan.Core.Database/AGENTS.md`.
+- **Run `git config core.hooksPath .githooks` once per clone.** Without it `faolan.sql` silently goes stale and the
+  personal-name guard does not run.
 - **`journal_mode=WAL`** is a persistent file-header flag on `faolan.db`. Without it a reader blocks a writer, so any
   concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process) makes a live world write fail
   and be lost. A busy timeout does not help (it is already 30 s by default): it only makes the writer wait while the
@@ -295,72 +156,14 @@ and `ICharacterStatRepository` (what it adds up to).
 - Session-volatile values (entity handles, shop ids, conversation ids) are never persistence keys; the stable key is the
   NPC/vendor name (conversations, shops) or the character id.
 
-**Codec conventions** (`Faolan.Core.Network/Codecs/`). These rules are binding: `Faolan.Tests/CodecConventionTests.cs`
-and the gates in `Faolan.Tests/CodecSurfaceConventionTests.cs` run over every folder under `Codecs/` with no skips, and
-every allowlist is empty - every codec with a standalone body parses and re-builds every captured body byte-exact. An
-allowlist is not a place to silence a gate; adding an entry means naming the decode issue that removes it.
-- **One codec shape: two public method names.** A codec is a `static class` exposing exactly `byte[] Build(...)` and
-  `T Parse(in ReadOnlySpan<byte> data)`, plus its `Opcode` / `HandledTypes` declaration. No
-  `Encode`/`Decode`/`TryParse`/`BuildBody`/`ToArray`/public `Read`/`Write`, and no `ICodec<T>`.
-  - **`Build(T value)` is canonical and is the only method that writes bytes.** `Build` may be overloaded in any shape
-    (loose scalars, a DB row - whatever the caller holds), but every other overload delegates to `Build(T)`. `Parse` is
-    never overloaded. One encoding path per codec is what makes the round-trip gate binding.
-  - **`Parse` is strict: it throws `CodecParseException`** on a short or overlong body, a wrong type word, or a field it
-    cannot account for - never a null, a `false` or a default. Callers scanning a mixed stream dispatch on the type
-    word at offset 0 first.
-  - **The value `T` is a plain record** named for the client IIR verbatim (`MagicBuffCodec.Parse` -> `MagicBuffIIR`).
-    It does not serialize itself.
-  - **Composition is `internal`:** `internal static T Read(ref SpanReader)` / `internal static void Write(FaolanStream,
-    T)`. `InternalsVisibleTo Faolan.Tests` is global, so these stay testable.
-- **String codecs follow the same rules with `string` in place of `byte[]`.** The `remoteformat` XML layer inside a
-  byte codec and the row<->XML mappers around it (`InnerElementCodec`, `RemoteFormatScreenCodec`, `NpcChatterCodec`,
-  `ConversationScreenCodec`, `AttributeChangedCodec`, ...) expose `string Build(T)` / `T Parse(string)`. The `byte[]`
-  form stays as a delegating overload wherever the text is the whole wire payload
-  (`=> Encoding.Latin1.GetBytes(Build(value))`; Latin1 is the wire's string encoding). A codec is one shape or the
-  other, never both `Parse` forms.
-- **Read sequentially through `SpanReader` (`Faolan.Core/Extensions`); no const offsets; `Parse` ends with
-  `EnsureAtEnd()`.** A `private const int FooOffset = 17` means the bytes before 17 were never decoded, so the codec
-  cannot tell a correct body from one that merely has the right word at 17. `SpanReader` owns the bounds checks. The
-  rule is about reading, so the gate covers files that declare a `Parse`: a build/patch-only neighbour
-  (`SpawnTransformPatch`, `SpawnPacketBuilder`) may address a fixed-width head by offset.
-- **`Build` returns the body without the length prefix.** The u32 length belongs to the framing sender.
-- **Dispose the stream:** `using var s = new FaolanStream(); ... return s.ToArray();`, never
-  `return new FaolanStream().Write(...).ToArray();` (`FaolanStream : MemoryStream` is `IDisposable`).
-- **Every codec with a standalone body declares its identity in one uniform place:**
-  `public const uint Opcode = (uint)IirTypes.<Type>;` (single type) or `public static readonly IirTypes[] HandledTypes`
-  (a genuine family). An IIR opcode never appears as a bare hex literal in `Codecs/`; the test fails on it. This is what
-  makes `grep IirTypes.<Type>` find every emitter, and what `docs/protocol/gen/coverage.md` reads to attribute each
-  type to its builder. One IIR, one codec: two codecs declaring the same opcode must be merged.
-  **RPC-message codecs** (whole method bodies: `GuildSearchResultCodec`, `MailMessageCodec`, ...) declare
-  `public const uint Method = (uint)<Interface>Methods.<Method>;` on every interface, hash-registered or not, and are
-  named for the client's RPC method. When several methods share one body (`DispatchTeamJoin` / `DispatchTeamLeave` /
-  `DispatchSetNewTeamLeader`), declare `public static readonly <Interface>Methods[] HandledMethods` instead. There is no
-  `*Opcodes` enum outside the two `ChatServer*Opcodes` (chat carries no RpcHeader, so its numbers really are opcodes).
-  **Sub-record codecs** (`CharacterStatBlock`, `StatList`, `MoveTaskNode`, ...) are composed inside a larger body,
-  never sent alone, and declare nothing.
-  A c2s IIR whose sub-opcode travels in the RPC frame has a body that starts at the entity class; such a codec declares
-  `public const bool OpcodeIsInTheFrame = true` (`DeleteItemCodec`, `MoveInventoryItemCodec`), which the surface gate
-  reads.
+**Codecs** (`Faolan.Core.Network/Codecs/`; the conventions are in its `AGENTS.md`, enforced by
+`CodecConventionTests` and `CodecSurfaceConventionTests`). Two of them bind code outside that folder:
 - **Wire encode/decode lives in `Codecs/`, nowhere else.** A service, listener or importer that needs a message calls
   its codec. An IIR opcode may only be named inside `Codecs/`, plus as a `case` label of the listener's routing switch.
   The frame layer is the exception (`Protocol/Rpc.cs`, `ChatServerMessage`, the framers), because it owns the length
   prefix and CRC, which a codec must not touch.
-- **Count-framed lists come from `ListFrame`, never a hand-written `0x3F1`.** A list is prefixed by a u32
-  `(count + 1) * 0x3F1` (guilds, AH, quests, spell book, shortcut bar, stat lists, spawn scaffold, resurrection spots).
-  A one-element list frames as `0x7E2` and an empty one as `0x3F1`; because single-element and empty lists dominate
-  the captures, both read as magic constants. They never are: of the 136 functions in `AgeOfConan.exe` that touch the
-  word, 77 divide by `0x3F1` to read a count and 59 multiply to write one, and none compares it to a constant
-  (`tools/ghidra/DumpListFraming.java`). A value equal to `n * 0x3F1` is a list count; distrust any grammar pinned only
-  by single-element or empty captures. `CodecConventionTests` enforces this across `Codecs/` and `Faolan/`.
-- **Convenience forms are value factories, not `Build` overloads,** where several semantic forms share a parameter
-  list (`MoveTaskCodec`'s path and patrol are both "a waypoint list plus a float", so they are `MoveTaskNodes.Path` /
-  `.Patrol`). Everything next to a codec that is not encode/decode is named for what it is and stays off the codec's
-  surface: row<->column mappers (`WorldObjectColumns`, `ConversationScreenColumns`), live-value policy
-  (`RemoteFormatSession`, `GameClock`), route/geometry math (`PatrolRoute`). A DB-typed `Build` overload is legal (it is
-  one of the shapes `Build` may take); it either delegates to a named mapper (`MailColumns.ToMessage`,
-  `NpcChatterColumns.ToBark`, `ConversationScreenColumns.ToScreen`) or is a single-expression value construction.
-- Files are one type per file, named after that type (a tightly cohesive group may share one file, e.g.
-  `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
+- **Count-framed lists come from `ListFrame`, never a hand-written `0x3F1`.** `CodecConventionTests` enforces this
+  across `Codecs/` and `Faolan/`; the codec `AGENTS.md` explains why a `0x3F1`/`0x7E2` is never a magic constant.
 
 **Capture workflow for protocol work:** decode first, implement second. Each decoded subsystem gets a Python dissector
 in `tools/capture/decode_*.py` that parses the relevant packets out of the capture JSONs and validates the grammar to
@@ -392,63 +195,10 @@ assuming. The importer's DB comes from the `Database` section of faolan.json (`D
 `--Database:ConnectionString "<conn string>"`.
 
 **The test suite does not need the data repo.** Every test runs from a plain clone, off one committed file:
-`Faolan.Tests/Assets/fixtures.bin` (~2.8 MB, `FixtureArchive`), which holds every byte of capture-derived data the suite
-reads. It has two halves, and the difference decides where a new gate belongs:
-- **Named fixtures** (`assets/recipe-book-reply.bin`, `assets/mount-spawns.bin`, `golden/SpawnNpcCasilda.bin`, ...): a
-  specific packet or one capture's worth, read via `CapturedFixture` (whole Conan packets concatenated; a packet
-  self-frames), `TestPaths.AssetBytes`/`TestPaths.Asset` for inputs, or `Golden.Bytes` for expected outputs. Use these
-  for a gate that only needs particular packets. They are hand-carved and cannot be re-derived from the captures, so a
-  regeneration carries them over untouched.
-  - Add or replace one with `--report fixture-set --report-arg <key>=<file>`; remove one with an empty source
-    (`<key>=`). Once a gate's expectation has become a SHA-256 pin, remove its retail bytes from the archive
-    (`EditorAvatarSnapshotTests` / `GuildPacketTests` are the pattern). A digest only substitutes for a golden the gate
-    never reads: a parse input or a partial-span compare still needs the bytes.
-  - Re-key one with `--report fixture-rename --report-arg <oldKey>=<newKey>`, in that single operation rather than
-    set+remove, so the archive never holds the fixture under both keys or neither. Fixture keys must not carry
-    character names.
-- **The corpus slice** (~45k packet bodies), read via `CorpusExtract`, is for gates whose assertion is breadth: the
-  snapshot round-trips, the protobuf re-encode oracle, the world-object column lift. They would be vacuous on a fixture.
-  It is derived: rebuild it with the data repo present (the named half is preserved):
-
-  ```zsh
-  dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures
-  ```
-
-  A regeneration against a partial corpus would silently weaken every whole-corpus gate while they all still pass, so
-  `CorpusExtract.ExpectedCounts` is a ratchet: a regeneration may only add packets, and a short archive throws.
-- **A gate comparing shipped data to the corpus belongs in a `--report`, not a test.** The slice is frozen while
-  `faolan.db` is built from whatever dumps exist, so the two diverge as captures are added and such a test fails on
-  data that is more correct than the evidence it demands. The `*-check` reports are those gates, run against the real
-  dumps where there is no second population: `npc-pose-check`, `item-level-check`, `buff-duration-check`,
-  `acg-token-check`. A test is the right home only for a property of the code (a round-trip, a field sweep), never of
-  the data. A check prints its populations rather than pinning them, and asserts only the direction that can only be a
-  defect (`buff-duration-check` fails on an apply that outlasts a row stating a real duration, and merely reports rows
-  still at the empty placeholder). `acg-token-check` shows why: its condition is a birthday problem in the item
-  population (~1.5 expected collisions per `AcgHash.Salt`, so any salt is clean ~22% of the time) that gets likelier
-  with every capture harvested, and its only fix - re-rolling the salt - is a coin flip; as a report it prints the
-  count, the expectation to compare against, and the next clean salt.
-
-**The archive carries no capture file names.** `ProtocolCitationTests.V2Citations_AreWellFormed` checks a `[V2:]`
-citation's form rather than resolving it, and `Captures/...` paths in docs are not linted, so no listing of the private
-corpus ships with a checkout; do not add one. Each corpus entry carries a failure-provenance `s` as an opaque capture id
-(the first 8 hex digits of the SHA-256 of the dump's file name), because the dumps are named after the characters
-played. `--report fixture-source --report-arg <id> --captures <data-repo>/Captures` maps an id back to its dump, and
-`FixtureArchiveTests` keeps a re-harvest from putting names back.
-
-**Character names in the packet bytes** are replaced by equal-length pseudonyms that stay readable against the display
-names the source and docs use: `Assas23`, `Demo80`, `Necr80` (for `AssassinL23`/`DemoL80`/`NecroL80`, squeezed to the
-byte length the wire fixes). `--report fixture-names --report-arg <name>[,<name>]` reports which fixtures and IIRs still
-contain a name and the framing around each hit - feed it the list the commit hook blocks on
-(`.git/hooks/personal-names.json`); the residue is protobuf length-delimited fields, so an equal-length substitution
-ripples nowhere. `--report fixture-substitute --report-arg "<old>=<new>[,...]" [--dry-run]` performs the substitution
-(equal length enforced, framed occurrences only, verifies the old names are gone). Tests that carry the names in their
-own inline retail hex (`UnsentMethodCodecTests`, `ItemCreatorNameTests`, `MailMessageCodecTests`,
-`TradepostMailBodyTests`, `KnubotCodecTestData`) use the same pseudonyms, and `GuildPacketTests`' SHA-256 pin is derived
-from the substituted bytes (its remark explains why that is still a retail pin). If the substitution is ever re-run:
-the archive is Brotli-compressed, so an equal-length substitution still changes the file size while every body keeps
-its length; and the writer rewrites the whole file, so an interrupted run leaves a truncated archive - `git checkout`
-it and re-run. Capture file names in comments and docs are out of scope for this: `.githooks/personal-names.py --tree`
-accepts them, and they are how a dump is found in the data repo.
+`Faolan.Tests/Assets/fixtures.bin` (`FixtureArchive`). How it splits into named fixtures and the corpus slice, how to
+add, rename or regenerate them, and whether a new check belongs in a test or a `--report`: `Faolan.Tests/AGENTS.md`.
+The archive and its fixture keys carry no capture file names and no character names; do not add a listing of the
+private corpus.
 
 ## Conventions
 

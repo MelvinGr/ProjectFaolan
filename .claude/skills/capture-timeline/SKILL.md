@@ -86,7 +86,7 @@ built from captures, so a branch nobody ever walked has no rows. Importing the c
 ## 4. Report it
 
 Lead with the narrative (what the player did, in order), then the coverage findings. State percentages
-you measured rather than impressions. Per CLAUDE.md, file a Gitea issue for each genuine gap; do not
+you measured rather than impressions. Per AGENTS.md, file a Gitea issue for each genuine gap; do not
 leave them only in the write-up.
 
 ## Resolving entity handles

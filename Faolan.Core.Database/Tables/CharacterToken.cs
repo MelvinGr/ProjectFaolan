@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Tables
 	///     one pool per message and only when it moves (ten pushes in the whole corpus, each a single pool), so an
 	///     absent row and a 0/0 row mean the same thing to the client.
 	///     <para />
-	///     The natural composite key is the point (see the model conventions in CLAUDE.md): a wallet is identified by
+	///     The natural composite key is the point (see the model conventions in AGENTS.md): a wallet is identified by
 	///     whose it is and which pool it is, and a surrogate would be renumbered by anything that rebuilt the table.
 	/// </remarks>
 	[PrimaryKey(nameof(CharacterId), nameof(Pool))]

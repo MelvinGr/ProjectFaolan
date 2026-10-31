@@ -119,7 +119,7 @@ namespace Faolan.Importer.Cli
 			{
 				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
 				await Console.Error.WriteLineAsync("  The corpus is NOT in this repo - it lives in the private ProjectFaolan-Data repo");
-				await Console.Error.WriteLineAsync("  (see CLAUDE.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
+				await Console.Error.WriteLineAsync("  (see AGENTS.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
 				return 1;
 			}
 

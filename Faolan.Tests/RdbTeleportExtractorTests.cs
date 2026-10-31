@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// from the client, so the grammar is gated in a plain clone - the shape below is copied from the real record.
 	//
 	// What the shipped data looks like is deliberately not asserted here: that is a fact about `faolan.db` against a
-	// client we may or may not hold, and it belongs in `--report teleport-match`, not in a test (CLAUDE.md).
+	// client we may or may not hold, and it belongs in `--report teleport-match`, not in a test (AGENTS.md).
 	public class RdbTeleportExtractorTests
 	{
 		private const string Sample = """

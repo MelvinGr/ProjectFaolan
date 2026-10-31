@@ -11,7 +11,7 @@ entity silently never renders.**
 | **persistent id** | `Character.Id` (DB key); for NPCs/vendors/conversations the stable key is the **name** | survives sessions | persistence, save/load, kill-quest target match |
 | **wire handle** | the value spawn/move/combat/despawn packets address an entity by (`WorldEntity.Handle`); for a player it is also the GameCharAgent endpoint instance | session / playfield | the live world model + the client's render/poll tables |
 
-Rule (CLAUDE.md): **session-volatile handles must never be persistence keys.** Persistence keys off
+Rule (AGENTS.md): **session-volatile handles must never be persistence keys.** Persistence keys off
 `Character.Id` (players) or the **name** (NPCs, vendors, conversations, shops).
 
 ## Players: handle == ClientInstance == Character.Id (on purpose)

@@ -15,7 +15,7 @@ fi
 
 if [[ ! -d "$captures" ]]; then
     echo "Capture corpus not found: $captures" >&2
-    echo "  Set FAOLAN_CAPTURES=<data-repo>/Captures (see CLAUDE.md \"Capture data\")." >&2
+    echo "  Set FAOLAN_CAPTURES=<data-repo>/Captures (see AGENTS.md \"Capture data\")." >&2
     exit 1
 fi
 

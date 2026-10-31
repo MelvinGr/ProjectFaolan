@@ -100,7 +100,7 @@ namespace Faolan.Core.Database.Repositories
 		// The named sub-areas of a playfield - the client's own trigger volumes that float the area banner when a
 		// player walks in. Every one carries its boundary polygon: containment is a point-in-polygon walk, so a volume
 		// without vertices would silently never fire. (Lazy loading is deliberately off, so the Include is required -
-		// see CLAUDE.md.)
+		// see AGENTS.md.)
 		public async Task<MapRegion[]> GetAreaBannerRegions(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -140,7 +140,7 @@ namespace Faolan.Core.Database.Repositories
 		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry. A hazard is the behaviour
 		// half, so its region comes with it, boundary polygon and all: containment is a point-in-polygon test, and a
 		// hazard without vertices is not a hazard. (Lazy loading is deliberately off, so the Includes are required -
-		// see CLAUDE.md.)
+		// see AGENTS.md.)
 		public async Task<MapHazard[]> GetMapHazards(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

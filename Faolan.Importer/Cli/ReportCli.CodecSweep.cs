@@ -21,9 +21,9 @@ namespace Faolan.Importer.Cli
 	// It generalises the `--report timeline` footer, which counts refusals in one capture where a single such line is
 	// invisible in ten thousand. It is deliberately a report, not a test:
 	// `CodecSurfaceConventionTests.BuildParseRoundTripsOverTheCorpus` does the same thing against `fixtures.bin`'s
-	// frozen slice, and a gate measured against the real dumps would fail the moment a capture is added (CLAUDE.md,
-	// "a gate comparing shipped data to the corpus belongs in a --report"). The test keeps the floor; this says where
-	// the corpus actually stands.
+	// frozen slice, and a gate measured against the real dumps would fail the moment a capture is added
+	// (Faolan.Tests/AGENTS.md, "a gate comparing shipped data to the corpus belongs in a --report"). The test keeps
+	// the floor; this says where the corpus actually stands.
 	//
 	// It sweeps IIR carriers only. An RPC-message codec is identified by its `Method`, and the dump records a lossy
 	// rendering of that field on the hash-registered classes (7 of its 32 bits), so dispatching on it would hand

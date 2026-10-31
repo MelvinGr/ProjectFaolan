@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// Key is the natural (SpellId, Sequence) - one row per element, in the order the record states them, so a
 	// re-harvest of the same record reproduces the same ids rather than churning a surrogate (the model conventions in
-	// CLAUDE.md). Amount is the raw template value at whatever scale that stat id / kind uses.
+	// AGENTS.md). Amount is the raw template value at whatever scale that stat id / kind uses.
 	//
 	// Keying on (SpellId, StatId, PeriodCentiseconds) instead would be lossy: a spell routinely states several
 	// elements on the same stat and period, and all but the last would be discarded. Two shapes, both shipped:

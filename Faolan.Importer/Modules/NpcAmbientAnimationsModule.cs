@@ -32,9 +32,10 @@ namespace Faolan.Importer.Modules
 			var harvested = NpcAmbientAnimationExtractor.Merge(ctx.Captures.SelectMany(c => NpcAmbientAnimationExtractor.Extract(c.Packets)));
 			var known = await ctx.Db.NpcTemplates.Select(t => t.TemplateId).ToHashSetAsync();
 
-			// Delete+reinsert the harvested types' rows, which is why the key is natural (CLAUDE.md's conventions): a
-			// re-harvest must not churn ids. Only the types this run harvested are cleared, so a narrower corpus does
-			// not silently drop a creature whose animations were captured previously.
+			// Delete+reinsert the harvested types' rows, which is why the key is natural (the model conventions in
+			// Faolan.Core.Database/AGENTS.md): a re-harvest must not churn ids. Only the types this run harvested
+			// are cleared, so a narrower corpus does not silently drop a creature whose animations were captured
+			// previously.
 			var touched = harvested.Select(e => e.TemplateId).Where(known.Contains).ToHashSet();
 			var stale = await ctx.Db.NpcAmbientAnimations.Where(a => touched.Contains(a.NpcTemplateId)).ToListAsync();
 			ctx.Db.NpcAmbientAnimations.RemoveRange(stale);

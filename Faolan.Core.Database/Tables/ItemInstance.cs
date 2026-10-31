@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Tables
 	// Three decisions, each of which will otherwise be "fixed" later:
 	//
 	//  1. **The identity key is correct here**, despite the model convention forbidding an autoincrement surrogate
-	//     (see CLAUDE.md "Model conventions"). That rule is about tables the importer delete+reinserts, where a
+	//     (see AGENTS.md "Model conventions"). That rule is about tables the importer delete+reinserts, where a
 	//     surrogate is reassigned on every re-harvest and churns faolan.sql. This is player state: it FKs Characters,
 	//     so SqlSeedWriter.PlayerStateTables excludes it from the seed exactly like the Characters row itself, and
 	//     DatabaseConventionTests only gates the content tables.

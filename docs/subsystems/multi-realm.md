@@ -184,7 +184,7 @@ to the base port rather than wrapping into a port that means something else. Set
 ## Database
 
 A shared database across N realm processes needs concurrent access: on SQLite that depends on `journal_mode=WAL`
-(see `CLAUDE.md`), and the Postgres provider is the server-database option. Tests stay on SQLite regardless — they
+(see `AGENTS.md`), and the Postgres provider is the server-database option. Tests stay on SQLite regardless — they
 validate code-builds-from-data, not the storage engine; `TestDb.ReadOnly` is the single seam for the real-data golden
 fixture.
 

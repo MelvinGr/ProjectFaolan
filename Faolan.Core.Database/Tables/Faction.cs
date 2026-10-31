@@ -12,7 +12,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// Key is the faction's own id (10, 20, … 330), which is what the wire carries and what the XML keys by - a
 	// natural key, so a re-harvest reproduces it rather than churning a surrogate (the model conventions in
-	// CLAUDE.md). `ValueGeneratedNever` on it, since 10 is a real id and not "please assign one".
+	// AGENTS.md). `ValueGeneratedNever` on it, since 10 is a real id and not "please assign one".
 	[PrimaryKey(nameof(Id))]
 	public class Faction
 	{

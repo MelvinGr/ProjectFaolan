@@ -139,15 +139,15 @@ namespace Faolan.Importer.Captures
 
 				// The seed inserts every id explicitly and there is no counter-resync file, so no game-content table
 				// may key on a store-generated column (every one is keyed by its identity - see the model conventions
-				// in CLAUDE.md). This is the generator's half of that invariant: if one reappears, throw naming the
-				// table rather than emit a seed whose next insert collides.
+				// in Faolan.Core.Database/AGENTS.md). This is the generator's half of that invariant: if one reappears,
+				// throw naming the table rather than emit a seed whose next insert collides.
 				var identity = entity.FindPrimaryKey()?.Properties.FirstOrDefault(p => p.ValueGenerated != ValueGenerated.Never);
 				if (identity != null && rows.Count > 0)
 				{
 					throw new InvalidOperationException(
 						$"Game-content table '{table}' keys on a store-generated column ('{identity.GetColumnName(storeObject)}', {identity.ValueGenerated}), which the seed cannot " +
 						"restore: it inserts ids explicitly and there is no counter-resync file any more. Give the table a natural or derived key " +
-						"(.ValueGeneratedNever() + a migration) - see the model conventions in CLAUDE.md.");
+						"(.ValueGeneratedNever() + a migration) - see the model conventions in Faolan.Core.Database/AGENTS.md.");
 				}
 			}
 

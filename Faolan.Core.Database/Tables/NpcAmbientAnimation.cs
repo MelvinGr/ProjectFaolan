@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 	// corpus by the `npc-ambient-animation` module (`--report ambient-animation` measures the same records), so an
 	// un-captured type simply has none and stands still - the honest gap, rather than a guessed animation.
 	//
-	// Natural composite key, no surrogate: the importer delete+reinserts these rows on every re-harvest (CLAUDE.md's
+	// Natural composite key, no surrogate: the importer delete+reinserts these rows on every re-harvest (AGENTS.md's
 	// model conventions).
 	[PrimaryKey(nameof(NpcTemplateId), nameof(AnimationId))]
 	public class NpcAmbientAnimation

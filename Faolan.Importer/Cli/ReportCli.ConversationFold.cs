@@ -23,7 +23,7 @@ namespace Faolan.Importer.Cli
 	// entries with it.
 	//
 	// It has to be a report and not a test: the answer is a property of the shipped corpus, which is not in this
-	// repo, and it changes whenever a capture is added - exactly the shipped-data-gate rule in CLAUDE.md.
+	// repo, and it changes whenever a capture is added - exactly the shipped-data-gate rule in Faolan.Tests/AGENTS.md.
 	public static partial class ReportCli
 	{
 		private static void ConversationFoldStability(IReadOnlyList<NamedCapture> captures)

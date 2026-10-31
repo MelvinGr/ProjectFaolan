@@ -521,8 +521,9 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 
 ## Documentation
 
-- **`CLAUDE.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
-  (the orientation guide for anyone, human or AI, working in the codebase).
+- **`AGENTS.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
+  (the orientation guide for anyone, human or AI, working in the codebase). The rules for one folder are in a
+  nested `AGENTS.md` there: `Faolan/`, `Faolan.Core.Database/`, `Faolan.Core.Network/Codecs/`, `Faolan.Tests/`.
 - **Gitea issues** (the `projectfaolan` repo) — the tracker of open work, grouped by `area:*` labels.
 - **[`docs/protocol/`](docs/protocol/README.md)** — the verified wire-protocol reference: framing, opcodes,
   message layouts and encodings, where every stated fact carries a verification tag a test resolves and the
@@ -547,7 +548,7 @@ reverse-engineering the client alone).
 **How a capture is used:** a `.pcapng` of a client↔server session is TCP-reassembled and dumped to the canonical
 `*.tshark.json` via `tools/capture/tshark_dump.sh`, which the importer and the Python dissectors read. Loopback
 captures against the local server (no root needed) and retail-session captures are both used. Full workflow in
-`CLAUDE.md`.
+`AGENTS.md`.
 
 **Captures that would directly unblock currently-blocked features:**
 

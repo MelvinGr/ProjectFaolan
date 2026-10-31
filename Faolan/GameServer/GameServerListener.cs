@@ -438,7 +438,7 @@ namespace Faolan.GameServer
 		{
 			// This connection multiplexes several RPC classes whose 0x20xx method ids collide with ordinary opcodes, so
 			// the RPC class is resolved first (by receiver; for Tradepost also by sender) and each class route consumes
-			// the packet. See CLAUDE.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md. The two
+			// the packet. See AGENTS.md (wire-protocol essentials) + docs/subsystems/tradepost-protocol.md. The two
 			// sub-0x2014 opcodes 0x2002/0x2003 are the only ones that also arrive on GameCharAgent (there they are
 			// RequestBindLocation / SetTutorialStats); the GameAgent case owns the opcode dispatch for the rest.
 			//

@@ -10,7 +10,7 @@ namespace Faolan.Core.Database.Tables
 	// Natural composite key (QuestLineId, Pos) on a plain class - no autoincrement surrogate. The importer
 	// delete+reinserts this whole set from the fixed client RDB, and a surrogate would be reassigned on every
 	// re-harvest, churning thousands of faolan.sql lines for zero semantic change (see the model conventions in
-	// CLAUDE.md). `Pos` is the reward's slot within its line, which is the only identity it has.
+	// AGENTS.md). `Pos` is the reward's slot within its line, which is the only identity it has.
 	[PrimaryKey(nameof(QuestLineId), nameof(Pos))]
 	public class QuestLineReward
 	{

@@ -34,7 +34,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// Key is the natural (SpellId, Sequence) - Sequence being the element's position in the record, so a re-harvest
 	// of the same record reproduces the same ids rather than churning a surrogate (see the model conventions in
-	// CLAUDE.md). `EffectSpellId` is deliberately not a foreign key, matching `Spell.EffectSpell`: it names a record
+	// AGENTS.md). `EffectSpellId` is deliberately not a foreign key, matching `Spell.EffectSpell`: it names a record
 	// in the client's catalog, and a spell whose effect we have not catalogued must still keep its area definition
 	// rather than fail the import.
 	[PrimaryKey(nameof(SpellId), nameof(Sequence))]
