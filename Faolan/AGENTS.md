@@ -97,6 +97,13 @@ references.
 - `ConfigureFaolanDatabase` forwards every slice to the one singleton (`AddRepositorySlices` reads them off the
   composite's interface list), so a new slice needs no registration of its own.
 
+**Every tier after the UniverseAgent trusts a connection only through the login cookie** (`Account.LoginCookie`,
+retail's `uCookie`). Each is a new connection on a port of its own, and an account or character id is on the wire in
+every login, so a handshake that looks the account up by the id the client sent lets anyone skip the password. The
+PlayerAgent resolves `GetAccountForLogin(accountId, cookie)`; the world, chat and CS hellos carry only the character
+and the cookie and resolve `GetCharacterForLogin`. Any other id the client names (a character to select, delete or
+upload settings for) is checked against the session's account.
+
 **World invariants** that compile and pass tests when broken:
 - **Never send a despawn (`n3ToClientQuit`) for a handle the recipient was never sent**: the client crashes on a null
   dynel. Every despawn path is gated on `viewer.Knowledge.Known.Remove(handle)`.
