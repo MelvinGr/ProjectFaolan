@@ -50,8 +50,9 @@ namespace Faolan.Tests
 				    + "The buy direction goes through GrantItemToBackpack."),
 
 			["Faolan/GameServer/Economy/TradepostService.cs"] =
-				(2, "ESCROW only - moving a listed item out of the seller's BANK on sell, and out of the sender's bank "
-				    + "once a mail is taken. The take itself routes through GrantItemToBackpack (#720)."),
+				(1, "ESCROW only - clearing the sender's bank cell once a mail is taken. A purchase's escrow moves the row "
+				    + "inside IEconomyRepository.CompleteTradepostPurchase. The take itself routes through "
+				    + "GrantItemToBackpack (#720)."),
 
 			// TradeService is deliberately absent: it mints nothing and clears nothing. A trade hands the item over
 			// (ITradeOutbound.TransferItemToCharacter -> the same choke point, moving the instance instead of minting), so

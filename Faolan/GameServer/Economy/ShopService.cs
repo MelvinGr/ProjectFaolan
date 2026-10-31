@@ -206,7 +206,12 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _inventory.SetCharacterItemSlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
+			if (await _inventory.SetCharacterItemSlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count) == null)
+			{
+				_logger.LogInformation("UndoLastSoldItem: {Character}'s slot {Slot} is occupied again; nothing restored, nothing debited.", character.Name, sale.Slot);
+				return;
+			}
+
 			character.Money = character.Money >= sale.PriceTin
 				? character.Money - sale.PriceTin
 				: 0;

@@ -26,7 +26,6 @@ namespace Faolan.GameServer.Progression
 	{
 		private readonly ICatalogRepository _catalog;
 		private readonly ICharacterProgressionRepository _progression;
-		private readonly ICharacterRepository _characters;
 		private readonly ILogger _logger;
 
 		// The wire ops the burst needs from the listener (vitals reseed, rating quad, ability grant, spell learn).
@@ -36,11 +35,10 @@ namespace Faolan.GameServer.Progression
 		// The live world model: a ding must move the player entity's level too, not just the row.
 		private readonly WorldSimulation _sim;
 
-		public LevelUpService(ICatalogRepository catalog, ICharacterProgressionRepository progression, ICharacterRepository characters, WorldSimulation sim, ILevelUpOutbound? outbound, ILogger logger)
+		public LevelUpService(ICatalogRepository catalog, ICharacterProgressionRepository progression, WorldSimulation sim, ILevelUpOutbound? outbound, ILogger logger)
 		{
 			_catalog = catalog;
 			_progression = progression;
-			_characters = characters;
 			_sim = sim;
 			_outbound = outbound;
 			_logger = logger;
@@ -94,8 +92,9 @@ namespace Faolan.GameServer.Progression
 			// on a level-down (its fill is Exp/MaxExp with Exp > MaxExp). A fresh level means an empty bar.
 			character.Experience = 0;
 			// No vitals row to refresh: the ceiling is derived from (Class, Level), so setting the level above is
-			// already the new max.
-			await _characters.SaveCharacter(character);
+			// already the new max. Only the two columns this changes are written: a whole-row SaveCharacter from the
+			// world session's copy wrote back fields other tiers own (the CS tier's GuildId and GuildRank).
+			await _progression.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
 			if (level > previousLevel)
 			{

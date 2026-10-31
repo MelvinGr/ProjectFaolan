@@ -468,14 +468,16 @@ namespace Faolan.Tests
 				Assert.Equal("A", items.Single(i => i.Slot == 2).Template.Name); // Template nav loaded
 				Assert.Equal(3u, items.Single(i => i.Slot == 7).Count);
 
-				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 2, 200); // minting over an occupied cell replaces it
+				// Minting over an occupied cell is refused, and the occupant survives: the caller picked the cell with a
+				// separate read, so an occupant means the inventory changed underneath it.
+				Assert.Null(await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 2, 200));
 				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 7, null); // clear removes
 				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 9, null); // clearing an empty cell is a no-op
 
 				items = await repo.GetCharacterItems(5);
 				var only = Assert.Single(items);
 				Assert.Equal(2, only.Slot);
-				Assert.Equal(200u, only.TemplateId);
+				Assert.Equal(100u, only.TemplateId);
 			}
 			finally
 			{

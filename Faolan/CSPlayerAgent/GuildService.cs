@@ -434,7 +434,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			guild.MessageOfTheDay = motd;
-			await _guilds.SaveGuild(guild);
+			await _guilds.SetGuildMessageOfTheDay(guild.Id, motd);
 			_logger.LogInformation("Guild \"{Guild}\" MOTD set by {Character} ({Length} chars).", guild.Name, character.Name, motd.Length);
 
 			foreach (var member in guild.Members)
@@ -468,8 +468,10 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return false;
 
-			guild.Cash += amountTin;
-			await _guilds.SaveGuild(guild);
+			if (await _guilds.DepositGuildCash(guild.Id, amountTin) is not { } balance)
+				return false;
+
+			guild.Cash = balance;
 			_logger.LogInformation("Guild \"{Guild}\": {Character} deposited {Amount} tin (bank {Balance}).", guild.Name, character.Name, amountTin, guild.Cash);
 
 			await BroadcastGuildCash(guild);
@@ -523,20 +525,26 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			if (request.AmountTin == 0 || request.AmountTin > guild.Cash)
+			// The balance check is the debit's own condition, so a concurrent withdrawal cannot take the bank below
+			// zero between a check and a write.
+			if (request.AmountTin == 0 || await _guilds.WithdrawGuildCash(guild.Id, request.AmountTin) is not { } balance)
 			{
 				_logger.LogInformation("GuildWithdrawMoney refused: {Character} asked for {Amount} tin of \"{Guild}\"'s {Balance}.", character.Name, request.AmountTin, guild.Name, guild.Cash);
 				return;
 			}
 
-			guild.Cash -= request.AmountTin;
-			await _guilds.SaveGuild(guild);
+			guild.Cash = balance;
 
 			if (!await _gameServerDispatcher.CreditCharacterCash(character.Id, request.AmountTin))
 			{
 				// Nobody could receive it - put it back rather than leave it nowhere.
-				guild.Cash += request.AmountTin;
-				await _guilds.SaveGuild(guild);
+				if (await _guilds.DepositGuildCash(guild.Id, request.AmountTin) is not { } refunded)
+				{
+					_logger.LogError("GuildWithdrawMoney: {Amount} tin taken from guild {Guild} could not be refunded; the guild row is gone.", request.AmountTin, guild.Id);
+					return;
+				}
+
+				guild.Cash = refunded;
 				_logger.LogWarning("GuildWithdrawMoney rolled back: {Character} is not on this realm's game host.", character.Name);
 				return;
 			}

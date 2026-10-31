@@ -34,11 +34,18 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 
 		/// <summary>
-		///     Mints a new item in a cell, or clears the cell when <paramref name="templateId" /> is null. Whatever was
-		///     there is deleted, sockets and all - so this is the right call for a grant, a purchase, a loot pickup or a
-		///     split's new half, and the wrong one for a move: use <see cref="MoveCharacterItem" />, which preserves the
-		///     instance. Returns the new instance (null when the cell was cleared).
+		///     Mints a new item in an empty cell, or clears the cell when <paramref name="templateId" /> is null (deleting
+		///     what was there, sockets and all). The right call for a grant, a purchase, a loot pickup or a split's new
+		///     half, and the wrong one for a move: use <see cref="MoveCharacterItem" />, which preserves the instance.
 		/// </summary>
+		/// <returns>
+		///     The new instance; null when the cell was cleared, or when a mint found the cell occupied and refused.
+		/// </returns>
+		/// <remarks>
+		///     A mint refuses an occupied cell rather than replacing what is there, like
+		///     <see cref="TransferCharacterItem" />: callers pick the cell with a separate read, so an occupant means the
+		///     inventory changed in between (two grants at once), and replacing it destroyed the first item.
+		/// </remarks>
 		Task<ItemInstance?> SetCharacterItemSlot(uint characterId, ContainerKind container, int slot, uint? templateId, uint count = 1, string? creatorName = null);
 
 		/// <summary>
@@ -169,16 +176,19 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var existing = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.OwnerCharacterId == characterId && i.Container == container && i.Slot == slot);
-			if (existing != null)
-				ctx.ItemInstances.Remove(existing);
-
 			if (templateId == null)
 			{
 				if (existing != null)
+				{
+					ctx.ItemInstances.Remove(existing);
 					await ctx.SaveChangesAsync();
+				}
 
 				return null;
 			}
+
+			if (existing != null)
+				return null;
 
 			var minted = new ItemInstance
 			{

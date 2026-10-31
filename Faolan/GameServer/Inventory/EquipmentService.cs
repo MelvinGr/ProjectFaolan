@@ -138,8 +138,14 @@ namespace Faolan.GameServer.Inventory
 				return;
 			}
 
+			// The new half first: a mint refuses an occupied cell, and the source keeps its count unless the half exists.
+			if (await _database.SetCharacterItemSlot(character.Id, ContainerKind.Bag, targetSlot, src.TemplateId, splitSize, src.CreatorName) == null)
+			{
+				_logger.LogWarning("Split not persisted: bag[{Slot}] is occupied.", targetSlot);
+				return;
+			}
+
 			await _database.SetCharacterItemCount(character.Id, ContainerKind.Bag, sourceSlot, src.Count - splitSize);
-			await _database.SetCharacterItemSlot(character.Id, ContainerKind.Bag, targetSlot, src.TemplateId, splitSize, src.CreatorName);
 			_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, sourceSlot,
 				src.Count - splitSize, targetSlot, splitSize, character.Id);
 		}

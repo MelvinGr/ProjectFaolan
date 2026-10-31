@@ -146,7 +146,10 @@ namespace Faolan.Core.Database.Repositories
 
 		public async Task<Character> CreateCharacter(uint accountId, uint realmId)
 		{
+			// One write transaction (IMMEDIATE on SQLite), so the max + 1 below is read under the write lock: two
+			// accounts creating a character at once drew the same id, and the second insert failed its primary key.
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await using var tx = await ctx.Database.BeginTransactionAsync();
 
 			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null && c.Id <= MaxCharacterId);
 			if (character == null)
@@ -184,6 +187,7 @@ namespace Faolan.Core.Database.Repositories
 				await ctx.SaveChangesAsync();
 			}
 
+			await tx.CommitAsync();
 			return character;
 		}
 

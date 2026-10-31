@@ -232,13 +232,17 @@ namespace Faolan.GameServer.Economy
 			if (mail == null || mail.Money == 0)
 				return;
 
+			// One transaction clears the mail and credits the wallet, so the money cannot be banked twice (a failure
+			// between two writes left it on the mail after crediting it), and the amount is the stored one, so a take
+			// racing another take of the same mail moves it once.
 			var character = client.Session.Character;
-			var credited = mail.Money;
-			character.Money += credited;
-			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
-			await _database.SetMailMoney(mail.MailId, 0);
+			var credited = await _database.ClaimMailMoney(mail.MailId, character.Id, character.Money);
 			mail.Money = 0;
+			if (credited == 0)
+				return;
+
+			character.Money += credited;
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 			_logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
 		}
 

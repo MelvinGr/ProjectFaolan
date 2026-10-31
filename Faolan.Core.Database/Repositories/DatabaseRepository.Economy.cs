@@ -39,7 +39,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId);
 		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
-		Task SetMailMoney(ulong mailId, ulong money);
+
+		/// <summary>
+		///     Moves a mail's money into the recipient's wallet in one transaction: clears it from the mail and writes
+		///     <paramref name="wallet" /> plus that amount as the character's money.
+		/// </summary>
+		/// <returns>The amount moved; 0, with nothing written, when the mail carries none (already taken, or never had any).</returns>
+		Task<ulong> ClaimMailMoney(ulong mailId, uint characterId, ulong wallet);
 		Task SetMailRead(ulong mailId, bool read);
 		Task SetTradepostListingPrice(ulong saleId, uint realmId, ulong price);
 	}
@@ -174,10 +180,18 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.MailAttachments.Where(a => a.MailId == mailId && a.ItemInstanceId == itemInstanceId).ExecuteDeleteAsync();
 		}
 
-		public async Task SetMailMoney(ulong mailId, ulong money)
+		public async Task<ulong> ClaimMailMoney(ulong mailId, uint characterId, ulong wallet)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.Mails.Where(m => m.MailId == mailId).ExecuteUpdateAsync(s => s.SetProperty(m => m.Money, money));
+			await using var tx = await ctx.Database.BeginTransactionAsync();
+			var amount = await ctx.Mails.Where(m => m.MailId == mailId).Select(m => m.Money).FirstOrDefaultAsync();
+			if (amount == 0)
+				return 0;
+
+			await ctx.Mails.Where(m => m.MailId == mailId).ExecuteUpdateAsync(s => s.SetProperty(m => m.Money, 0UL));
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, wallet + amount));
+			await tx.CommitAsync();
+			return amount;
 		}
 
 		public async Task SetMailRead(ulong mailId, bool read)
