@@ -5,6 +5,7 @@ using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
@@ -15,6 +16,10 @@ namespace Faolan.UniverseAgent
 {
 	public partial class UniverseAgentListener : RpcServer
 	{
+		// Failed logins per account name and per address (see LoginThrottle). This process's own: the UniverseAgent runs
+		// in the one login process of a deployment, so there is no second copy to keep in step.
+		private readonly LoginThrottle _throttle = new(TimeProvider.System);
+
 		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.ServerUniverseAgentPort, logger, configuration,
 			database, new ConanPacketTracer(logger, "UniverseAgent", typeof(UniverseInterfaceMethods)), new ConnectionRegistry())
 		{
@@ -39,6 +44,14 @@ namespace Faolan.UniverseAgent
 					if (gameId != 1)
 						Logger.LogWarning("UniverseAgent login: unexpected nGameID {GameId} for '{Account}' (retail always sends 1).", gameId, accountName);
 
+					// Refused before anything is looked up, with the same reply as a wrong password: retail shows no other
+					// refusal for a login, and a distinct one would tell a guesser which names exist.
+					if (Throttled(client, accountName))
+					{
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
+						break;
+					}
+
 					if (await Database.GetAccount(accountName) is {} account)
 					{
 						client.Session.Account = account;
@@ -50,6 +63,7 @@ namespace Faolan.UniverseAgent
 					else
 					{
 						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);
+						_throttle.RecordFailure(accountName, client.IpAddress);
 						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 					}
 
@@ -60,6 +74,14 @@ namespace Faolan.UniverseAgent
 				{
 					var loginKey = body.ReadString();
 					var account = client.Session.Account;
+
+					// Checked again here and not only at InitiateAuthentication: failures on other connections may have run
+					// the count up since the challenge went out, and this is where a guess costs a password hash.
+					if (Throttled(client, account.UserName))
+					{
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
+						break;
+					}
 
 					// Three outcomes, and Server:PrivateKey alone decides which two are reachable: with a key, the block
 					// either decrypted (validate the password) or it did not (refuse - the client is unpatched, and a
@@ -99,9 +121,12 @@ namespace Faolan.UniverseAgent
 
 					if (!authenticated)
 					{
+						_throttle.RecordFailure(account.UserName, client.IpAddress);
 						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 						break;
 					}
+
+					_throttle.RecordSuccess(account.UserName);
 
 					// A timed ban lifts itself here rather than on a background timer: the expiry is a column, so a
 					// restart inside the window still holds the ban and one that spanned the whole window releases it.
@@ -139,6 +164,16 @@ namespace Faolan.UniverseAgent
 					break;
 				}
 			}
+		}
+
+		// True, logged, when this name or address has failed too often lately (LoginThrottle).
+		private bool Throttled(INetworkClient client, string accountName)
+		{
+			if (!_throttle.IsBlocked(accountName, client.IpAddress))
+				return false;
+
+			Logger.LogWarning("UniverseAgent login: '{Account}' from {IpAddress} refused - too many failed logins recently.", accountName, client.IpAddress);
+			return true;
 		}
 	}
 }

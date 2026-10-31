@@ -13,6 +13,10 @@
 	{
 		<p class="err">That username is already taken.</p>
 	}
+	else if (Error == "throttled")
+	{
+		<p class="err">Too many accounts registered from here recently. Try again later.</p>
+	}
 	else if (Error != null)
 	{
 		<p class="err">Please enter a username and password.</p>

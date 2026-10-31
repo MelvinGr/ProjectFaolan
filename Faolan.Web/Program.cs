@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
+using System.Threading.RateLimiting;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Helpers;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Web.Auth;
 using Faolan.Web.Components;
@@ -16,6 +18,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +27,8 @@ namespace Faolan.Web
 {
 	public class Program
 	{
+		private const string RegisterRateLimit = "register";
+
 		public static int Main(string[] args)
 		{
 			var builder = WebApplication.CreateBuilder(args);
@@ -90,6 +95,28 @@ namespace Faolan.Web
 			builder.Services.AddScoped<IUserStore<Account>, AccountUserStore>();
 			builder.Services.AddScoped<IPasswordHasher<Account>, AccountPasswordHasher>();
 
+			// Failed sign-ins per account name and per address, the same rule the game's UniverseAgent applies
+			// (LoginThrottle). Counted by the address the connection comes from: nothing here reads forwarded headers,
+			// so behind a reverse proxy every visitor would share the proxy's count.
+			builder.Services.AddSingleton(new LoginThrottle(TimeProvider.System));
+
+			// Registration is limited by request rate instead: it has no failure to count, and unlimited it lets one
+			// address create accounts without end. A refusal goes back to the form with its reason, as a taken name does;
+			// a bare 429 would be re-executed by the status-code pages as a POST to /not-found, which antiforgery fails.
+			builder.Services.AddRateLimiter(o =>
+			{
+				o.OnRejected = (context, _) =>
+				{
+					context.HttpContext.Response.Redirect("/register?error=throttled");
+					return ValueTask.CompletedTask;
+				};
+				o.AddPolicy(RegisterRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "", _ => new FixedWindowRateLimiterOptions
+				{
+					PermitLimit = 5,
+					Window = TimeSpan.FromHours(1)
+				}));
+			});
+
 			// Cookie auth over the shared game Accounts table. The viewer is public; signing in scopes the roster to
 			// your own characters.
 			builder
@@ -120,6 +147,7 @@ namespace Faolan.Web
 			app.UseHttpsRedirection();
 			app.UseAuthentication();
 			app.UseAuthorization();
+			app.UseRateLimiter();
 			app.UseAntiforgery();
 			app.MapStaticAssets();
 
@@ -151,14 +179,25 @@ namespace Faolan.Web
 					await SignIn(ctx, account);
 					return Results.Redirect("/characters");
 				})
-				.DisableAntiforgery();
+				.DisableAntiforgery()
+				.RequireRateLimiting(RegisterRateLimit);
 
 			app
-				.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users, IAccountRepository accounts, [FromForm] string username, [FromForm] string password) =>
+				.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users, IAccountRepository accounts, LoginThrottle throttle, [FromForm] string username, [FromForm] string password) =>
 				{
+					// Decided before the password is checked, so a blocked guesser costs no hash either.
+					var address = ctx.Connection.RemoteIpAddress?.ToString();
+					if (throttle.IsBlocked(username, address))
+						return Results.Redirect("/login?error=throttled");
+
 					var account = await users.FindByNameAsync(username);
 					if (account == null || !await users.CheckPasswordAsync(account, password))
+					{
+						throttle.RecordFailure(username, address);
 						return Results.Redirect("/login?error=1");
+					}
+
+					throttle.RecordSuccess(username);
 
 					// The game's login rule: a lapsed timed ban lifts, then only an active account gets in.
 					account = await AccountPrincipal.SignInable(accounts, account.Id);
