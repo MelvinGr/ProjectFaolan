@@ -280,5 +280,9 @@ Faolan.ClientHook/*.lib
 /faolan.db-wal
 /faolan.log
 /Faolan/faolan.db
+# What a run from the repo root writes at the default Cdn:Store and Content:TerrainDir: the CDN mirror's blobs and
+# the baked terrain, both retail game data and both large.
+/cdn-store/
+/terrain/
 # Retail packet bytes for the golden tests: game data, kept in the data repo (Fixtures/fixtures.bin), never here.
 /Faolan.Tests/Assets/fixtures.bin

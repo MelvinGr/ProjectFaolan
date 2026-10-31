@@ -301,6 +301,135 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Behaviour commands fully decoded** — all 34 of the client's behaviour commands and every per-command
   trailer: 100% of the 67,299 captured records (#536, #549)
 
+## Getting started
+
+These steps run the server and a game client on one machine. A first run needs only this repository and an
+installed client. The private data repo (captures, terrain, Ghidra project) is for rebuilding content and for
+research, not for playing.
+
+### 1. Prerequisites
+
+- **The .NET 10 SDK.** To run the server alone without it, use Docker (see [Run it in Docker](#run-it-in-docker)).
+- **An installed Age of Conan client.** The protocol was decoded against build v5.01.0 (revision 602248,
+  `Content:ClientVersion`); another build gets a warning but is not refused. The launcher finds a Steam install
+  (app 217750) on its own. For any other install, pass it `--exe <path to AgeOfConan.exe>`.
+- **On Linux, Proton or Wine.** The launcher uses the Proton build Steam runs the game with, or a plain Wine runner
+  with `--wine wine`. On Windows the client runs directly.
+
+### 2. Build
+
+```sh
+dotnet build ProjectFaolan.slnx
+```
+
+### 3. Start the server
+
+Run it from the repo root, because it reads `faolan.json` and `faolan.db` from the working directory:
+
+```sh
+dotnet run --project Faolan
+```
+
+On the first start the server creates `faolan.db`. It applies the schema, loads the game data from `faolan.sql`,
+and adds the realm "Project Faolan" and an Administrator account named **`faolan`** with the password
+**`faolan`**. Look for these lines in its output:
+
+```text
+[db] Empty database - loaded the game data from <repo>/faolan.sql.
+[db] No account present - inserted the default account.
+[login] No Server:PrivateKey - passwords are NOT checked; every client is accepted on its account name alone. ...
+```
+
+`Terrain: no baked terrain dir` is expected as well: ground-snap and line-of-sight stay off until you generate the
+terrain (see [After the first run](#after-the-first-run)). Leave the server running. It listens on every interface,
+on ports 7010 (login), 7011, 7014, 7012 and 7001.
+
+### 4. Start the content mirror
+
+In a second terminal, also from the repo root:
+
+```sh
+dotnet run --project Faolan.Web.Content
+```
+
+While it loads, the client downloads part of its content on demand. The mirror serves those downloads on port
+7081. The first time it sees a file, it fetches it from Funcom's CDN and keeps a copy in `cdn-store/`. Without the
+mirror, the client fetches from the CDN directly, which has been seen to stall on the loading screen.
+
+### 5. Launch the client
+
+```sh
+dotnet run --project Faolan.ClientLauncher -- --patch-universeaddr --patch-cdn --console -u faolan -p faolan
+```
+
+- `--patch-universeaddr` points the client's login server at this server (`Server:PublicAddress`, 127.0.0.1 by
+  default). `--patch-cdn` points its content downloads at the mirror. Both flags edit the client's
+  `LocalConfig.xml` and keep the original as a `.bak` file. The change stays in place for later launches;
+  `--restore` puts the original back.
+- `-u` and `-p` log in automatically. Leave them off to type the name and password into the client instead. Until
+  you turn on password checking (see [After the first run](#after-the-first-run)), any password is accepted, but
+  the account must exist. The game has no sign-up of its own, so further accounts come from the web app.
+- `--console` shows the client's log in this terminal. Add `--dx10` to run the DX10 client. The launcher closes a
+  client that is already running before it starts a new one.
+
+### 6. Create a character
+
+The new account has no characters yet. Create one in the client's character screen; a new character starts in the
+Tortage intro. From then on, add `-c <name>` to the launch line to go straight into the world.
+
+GM commands are typed into chat with a leading dot, such as `.additem` or `.teleport`; the full set is in
+`GmCommandService`. They need an in-game GM mask, which is separate from the account's web role, and the `faolan`
+account starts without one. To give it one:
+1. Sign in to the web app (see [After the first run](#after-the-first-run)) and open the account from `/admin`.
+2. Apply a role preset. `all` grants every command, including the god-mode bit, which keeps your health bar from
+   dropping. `.godmode` turns that bit off.
+3. Log in again. The new mask takes effect at the next login.
+
+### After the first run
+
+- **Your own settings** go in `faolan.user.json` at the repo root, which git ignores (see
+  [Configuration](#configuration)). Most setups want the client's RDB folder there. The importer, the terrain export
+  and the web app's 3D viewer read it:
+
+  ```jsonc
+  { "Content": { "RdbDir": "/path/to/Age of Conan/RDB" } }
+  ```
+
+- **Terrain** turns on ground-snap and line-of-sight. Once `Content:RdbDir` is set, generate it with
+  `dotnet run --project Faolan.Importer -- --report terrain-export` (see
+  [World terrain files](#world-terrain-files-line-of-sight)).
+- **The web app** has the armory, the 3D character viewer and the GM tools. Start it from the repo root, open
+  `http://localhost:7080` and sign in as `faolan`. New game accounts are created at `/register`.
+
+  ```sh
+  dotnet run --project Faolan.Web
+  ```
+
+- **Password checking** works like this:
+  1. Generate a keypair with the command below.
+  2. Put the private half in `faolan.user.json` as `Server:PrivateKey`, then restart the server.
+  3. Add `--patch-login` to every launch.
+
+  From then on the server refuses any client that is not patched and checks every password. The `faolan` account's
+  password is `faolan`.
+
+  ```sh
+  dotnet run --project Faolan -- --generate-login-key
+  ```
+
+- **For a client on another machine,** change the addresses the server hands out, which default to 127.0.0.1. Set
+  them to the server's LAN IPv4 address in `faolan.user.json`, then restart the server and the mirror. The launcher
+  on the client machine needs the same `Server:PublicAddress` and `Cdn:PublicAddress`, either from its own
+  `faolan.user.json` or as `--Server:PublicAddress` and `--Cdn:PublicAddress`:
+
+  ```jsonc
+  {
+    "Server": { "PublicAddress": "192.168.1.10" },
+    "Realms": [ { "Id": 1, "IpAddress": "192.168.1.10" } ],
+    "Cdn": { "PublicAddress": "http://192.168.1.10:7081" }
+  }
+  ```
+
 ## Build
 
 ```sh

@@ -177,9 +177,10 @@ placement / live `WorldEntity` model, `docs/subsystems/npc-three-tier-architectu
 spawn-body path. Before a census over the dumps read `docs/re/corpus-analysis-pitfalls.md`; before naming a field
 from the client, `docs/re/client-re-techniques.md`.
 
-**GM commands** (`Faolan/GameServer/Gm/GmCommandService.cs`, account type >= GameMaster, typed as `.cmd` in chat) are
-the standard test bootstrap for features whose retail trigger is not wired yet (`.additem`, `.teleport`, `.ah`,
-`.setnpcgroup`, ...). The registered set is the table `BuildTable` builds in that file (one instance per realm); check it
+**GM commands** (`Faolan/GameServer/Gm/GmCommandService.cs`, typed as `.cmd` in chat) are the standard test bootstrap
+for features whose retail trigger is not wired yet (`.additem`, `.teleport`, `.ah`, `.setnpcgroup`, ...). They need an
+in-game GM mask (`Account.GmLevel`, set on Faolan.Web's account page; the web account type does not grant it) and
+each command's bit in `GmCommandMasks`; a fresh database's `faolan` account has no mask. The registered set is the table `BuildTable` builds in that file (one instance per realm); check it
 before assuming a command exists, since MCP tools wrapping a removed command are stale.
 
 **MCP server:** with `Mcp:Enabled` set (off by default) the server hosts an in-process MCP endpoint at
