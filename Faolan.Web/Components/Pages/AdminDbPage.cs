@@ -1,13 +1,15 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Web.Auth;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Components.Pages
 {
 	// An AdminPage that also owns a database context: the editor pages (DbEditor, QuestEditor, SpellEditor) add a
-	// page-lifetime DatabaseContext and the same save/status plumbing on top of the gate.
+	// page-lifetime DatabaseContext and the same save/status plumbing on top of the gate. Administrator only: the DB
+	// editor reads and writes any column of any table, the accounts' password hashes and types included.
 	public abstract class AdminDbPage : AdminPage, IDisposable
 	{
 		[Inject] protected IDbContextFactory<DatabaseContext> DbFactory { get; set; } = null!;
@@ -20,6 +22,8 @@ namespace Faolan.Web.Components.Pages
 		protected bool Error { get; private set; }
 		protected string Filter { get; set; } = "";
 		protected string? Status { get; private set; }
+
+		protected sealed override string RequiredRole => AccountPrincipal.AdministratorRole;
 
 		public virtual void Dispose()
 		{

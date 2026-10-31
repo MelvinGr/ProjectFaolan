@@ -1,4 +1,5 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using Faolan.Web.Auth
 
 <header class="topbar">
 	<a class="brand" href="/"><img class="brand-logo" src="logo-small.png" alt=""/>Project Faolan</a>
@@ -6,10 +7,12 @@
 		<a href="/characters">Characters</a>
 		<a href="/items">Armory</a>
 		<a href="/status">Status</a>
-		<AuthorizeView Roles="Admin">
+		<AuthorizeView Roles="@AccountPrincipal.StaffRole">
 			<a class="admin-link" href="/admin">Admin</a>
 			<a class="admin-link" href="/gm">GM</a>
 			<a class="admin-link" href="/admin/map">Map</a>
+		</AuthorizeView>
+		<AuthorizeView Roles="@AccountPrincipal.AdministratorRole">
 			<a class="admin-link" href="/admin/db">DB</a>
 			<a class="admin-link" href="/admin/quests">Quests</a>
 			<a class="admin-link" href="/admin/spells">Spells</a>

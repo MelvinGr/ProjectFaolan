@@ -525,7 +525,7 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # one <mapId>.
 | `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
 | `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
 | `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
-| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, and three content editors — a generic `faolan.db` one plus purpose-built quest and spell screens) gated to GameMaster accounts. |
+| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail) for GameMaster accounts, and for Administrators also account types, GM masks and three content editors — a generic `faolan.db` one plus purpose-built quest and spell screens. |
 | `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
 | `tools/`                 | The capture/RE toolchain: Python dissectors + the tshark dump script, Ghidra scripts, Frida scripts.                                                                                   |
 

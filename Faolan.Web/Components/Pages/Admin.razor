@@ -52,7 +52,7 @@
 						}
 					</td>
 					<td>
-						<select value="@a.Type" disabled="@isSelf"
+						<select value="@a.Type" disabled="@(isSelf || !IsAdministrator)"
 						        @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
 							@foreach (var t in Enum.GetValues<WebAccountType>())
 							{

@@ -19,9 +19,9 @@ namespace Faolan.Web.Components.Pages
 
 		private async Task ChangeType(uint id, string? value)
 		{
-			if (id == SelfId)
-				return; // An account cannot change its own privileges.
-			if (!Enum.TryParse<WebAccountType>(value, out var type))
+			if (!IsAdministrator || id == SelfId)
+				return; // Only an Administrator sets account types, and never its own.
+			if (!Enum.TryParse<WebAccountType>(value, out var type) || !Enum.IsDefined(type))
 				return;
 
 			var set = await AdminSvc.SetTypeAsync(id, type);

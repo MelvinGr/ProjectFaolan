@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
+using Faolan.Web.Auth;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -41,7 +42,7 @@ namespace Faolan.Web.Components.Pages
 				return;
 			}
 
-			_isAdmin = user.IsInRole("Admin");
+			_isAdmin = user.IsInRole(AccountPrincipal.StaffRole);
 
 			await using var db = await DbFactory.CreateDbContextAsync();
 			_characters = await db.Characters.Where(c => c.AccountId == accountId && c.Name != null && c.Name != "").OrderBy(c => c.Name).Select(c => c.Name!).ToListAsync();
@@ -80,6 +81,19 @@ namespace Faolan.Web.Components.Pages
 
 		private async Task Send()
 		{
+			// The role as it is now, not as it was when the page opened: the circuit of an account banned or demoted
+			// since turns anonymous (AccountAuthenticationStateProvider), and from then on sends nothing - money and
+			// items above all.
+			var user = AuthState == null
+				? null
+				: (await AuthState).User;
+			if (user?.Identity?.IsAuthenticated != true)
+			{
+				Nav.NavigateTo("/login", true);
+				return;
+			}
+
+			_isAdmin = user.IsInRole(AccountPrincipal.StaffRole);
 			_busy = true;
 			ulong money = 0;
 			uint itemId = 0, qty = 1;

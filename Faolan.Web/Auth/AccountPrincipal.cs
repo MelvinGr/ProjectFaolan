@@ -22,11 +22,22 @@ namespace Faolan.Web.Auth
 	/// </remarks>
 	public static class AccountPrincipal
 	{
-		public const string AdminRole = "Admin";
+		/// <summary>
+		///     Staff: a GameMaster or above. The /admin pages, the GM console, the map, bans, and mail carrying money or
+		///     items.
+		/// </summary>
+		public const string StaffRole = "Staff";
+
+		/// <summary>
+		///     An Administrator: staff plus the raw powers - the DB, quest and spell editors, account types and GM masks.
+		///     Held apart because the DB editor reads every account's password hash and writes any column, so a
+		///     GameMaster holding it could promote itself.
+		/// </summary>
+		public const string AdministratorRole = "Administrator";
 
 		public static readonly TimeSpan RecheckInterval = TimeSpan.FromMinutes(1);
 
-		/// <summary>The principal for <paramref name="account" />: its id, its name, and the admin role for a GM or above.</summary>
+		/// <summary>The principal for <paramref name="account" />: its id, its name, and the roles its type holds.</summary>
 		public static ClaimsPrincipal Create(Account account)
 		{
 			var claims = new List<Claim>
@@ -34,8 +45,10 @@ namespace Faolan.Web.Auth
 				new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
 				new Claim(ClaimTypes.Name, account.UserName)
 			};
-			if (IsAdmin(account))
-				claims.Add(new Claim(ClaimTypes.Role, AdminRole));
+			if (IsStaff(account))
+				claims.Add(new Claim(ClaimTypes.Role, StaffRole));
+			if (IsAdministrator(account))
+				claims.Add(new Claim(ClaimTypes.Role, AdministratorRole));
 
 			return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
 		}
@@ -58,7 +71,7 @@ namespace Faolan.Web.Auth
 
 		/// <summary>
 		///     Whether <paramref name="user" /> still describes its account: the account may still sign in and holds the
-		///     same role. An anonymous user has nothing to keep true.
+		///     same roles. An anonymous user has nothing to keep true.
 		/// </summary>
 		public static async Task<bool> StillHolds(IAccountRepository accounts, ClaimsPrincipal user)
 		{
@@ -69,7 +82,7 @@ namespace Faolan.Web.Auth
 				return false;
 
 			var account = await SignInable(accounts, accountId);
-			return account != null && IsAdmin(account) == user.IsInRole(AdminRole);
+			return account != null && IsStaff(account) == user.IsInRole(StaffRole) && IsAdministrator(account) == user.IsInRole(AdministratorRole);
 		}
 
 		/// <summary>
@@ -96,9 +109,14 @@ namespace Faolan.Web.Auth
 			context.ShouldRenew = true;
 		}
 
-		private static bool IsAdmin(Account account)
+		private static bool IsStaff(Account account)
 		{
 			return account.Type >= WebAccountType.GameMaster;
+		}
+
+		private static bool IsAdministrator(Account account)
+		{
+			return account.Type >= WebAccountType.Administrator;
 		}
 	}
 }

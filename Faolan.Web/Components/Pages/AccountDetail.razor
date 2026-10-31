@@ -38,7 +38,7 @@
 				<div class="row">
 					<span class="k">Account type</span>
 					<span class="v">
-						<select value="@_account.Type" disabled="@_isSelf" @onchange="ChangeType">
+						<select value="@_account.Type" disabled="@(_isSelf || !IsAdministrator)" @onchange="ChangeType">
 							@foreach (var t in Enum.GetValues<WebAccountType>())
 							{
 								<option value="@t" selected="@(t == _account.Type)">@t</option>
@@ -102,7 +102,7 @@
 					<p class="muted">
 						This account is not a GM. Any non-zero value flips the retail client into GM mode.
 					</p>
-					<button class="abtn preset" @onclick="GrantGm">Make a GM (support2)</button>
+					<button class="abtn preset" disabled="@(!IsAdministrator)" @onclick="GrantGm">Make a GM (support2)</button>
 				}
 				else
 				{
@@ -110,9 +110,9 @@
 						<span class="k">Preset</span>
 						@foreach (var (name, mask) in Roles)
 						{
-							<button class="abtn preset" @onclick="() => ApplyPreset(mask)">@name</button>
+							<button class="abtn preset" disabled="@(!IsAdministrator)" @onclick="() => ApplyPreset(mask)">@name</button>
 						}
-						<button class="abtn preset inherit" @onclick="RevokeGm">Revoke GM</button>
+						<button class="abtn preset inherit" disabled="@(!IsAdministrator)" @onclick="RevokeGm">Revoke GM</button>
 					</div>
 
 					<ul class="flags">
@@ -120,7 +120,7 @@
 						{
 							<li>
 								<label class="@(bit == GmPrivileges.GodMode ? "godmode" : null)">
-									<input type="checkbox" checked="@Has((uint)bit)" @onchange="e => ToggleBit((uint)bit, e)"/>
+									<input type="checkbox" checked="@Has((uint)bit)" disabled="@(!IsAdministrator)" @onchange="e => ToggleBit((uint)bit, e)"/>
 									<span class="n">@bit</span>
 									<span class="b">@($"0x{(uint)bit:X8}")</span>
 								</label>
@@ -154,7 +154,7 @@
 						{
 							<li>
 								<label>
-									<input type="checkbox" checked="@Has(bit)" @onchange="e => ToggleBit(bit, e)"/>
+									<input type="checkbox" checked="@Has(bit)" disabled="@(!IsAdministrator)" @onchange="e => ToggleBit(bit, e)"/>
 									<span class="b">@($"0x{bit:X8}")</span>
 								</label>
 							</li>

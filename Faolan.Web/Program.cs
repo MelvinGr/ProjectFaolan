@@ -301,7 +301,7 @@ namespace Faolan.Web
 			// Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
 			app.MapGet("/api/zone/{mapId:long}", async (long mapId, HttpContext ctx, LiveSessionService live, CharacterModelService models) =>
 			{
-				if (!(ctx.User?.IsInRole(AccountPrincipal.AdminRole) ?? false))
+				if (!(ctx.User?.IsInRole(AccountPrincipal.StaffRole) ?? false))
 					return Results.StatusCode(StatusCodes.Status403Forbidden);
 
 				var entities = await live.GetZoneEntitiesAsync((uint)mapId);
@@ -325,7 +325,7 @@ namespace Faolan.Web
 			// map has no local image.
 			app.MapGet("/api/zone/{mapId:long}/map.png", (long mapId, HttpContext ctx, CharacterModelService models) =>
 			{
-				if (!(ctx.User?.IsInRole(AccountPrincipal.AdminRole) ?? false))
+				if (!(ctx.User?.IsInRole(AccountPrincipal.StaffRole) ?? false))
 					return Results.StatusCode(StatusCodes.Status403Forbidden);
 
 				var png = models.MapImage((uint)mapId);

@@ -24,9 +24,9 @@ namespace Faolan.Web.Components.Pages
 
 		private async Task ChangeType(ChangeEventArgs e)
 		{
-			if (_isSelf)
-				return;
-			if (!Enum.TryParse<WebAccountType>(e.Value?.ToString(), out var type))
+			if (_isSelf || !IsAdministrator)
+				return; // Only an Administrator sets account types, and never its own.
+			if (!Enum.TryParse<WebAccountType>(e.Value?.ToString(), out var type) || !Enum.IsDefined(type))
 				return;
 
 			var set = await AdminSvc.SetTypeAsync((uint)Id, type);
@@ -100,8 +100,13 @@ namespace Faolan.Web.Components.Pages
 			return SetMask(GmRoles.Support2);
 		}
 
+		// Every GM-mask change lands here, and only an Administrator makes one: the mask is the account's whole in-game
+		// GM power, so a GameMaster able to set it could grant itself every bit.
 		private async Task SetMask(uint? mask)
 		{
+			if (!IsAdministrator)
+				return;
+
 			var stored = await AdminSvc.SetGmLevelAsync((uint)Id, mask);
 			_notice = stored == null
 				? "Account is no longer a GM."
