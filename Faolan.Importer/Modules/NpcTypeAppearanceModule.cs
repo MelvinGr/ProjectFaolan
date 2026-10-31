@@ -24,7 +24,7 @@ namespace Faolan.Importer.Modules
 	// wire: `NpcStatCore.HeadMesh` is type-level and always was. It is the hair and the clothes that were missing.)
 	//
 	// A separate module rather than a step of `npcs`, for the same reason `npc-placements` and `npc-disposition` are:
-	// it only DERIVES from rows that already exist, so it re-runs against the committed faolan.db without
+	// it only DERIVES from rows that already exist, so it re-runs against a seeded faolan.db without
 	// re-harvesting the spawn set. Registration order sequences it after `npcs`, which is required - it reads the
 	// spawn morph/equipment rows that module writes.
 	public sealed class NpcTypeAppearanceModule : IImportModule

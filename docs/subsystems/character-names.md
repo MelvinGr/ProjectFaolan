@@ -34,7 +34,7 @@ single byte 0x41..0xFE — a per-character table of some kind, unrelated to the 
 ## Why the terms are stored hashed
 
 `NameFilterTerm` holds `SHA-256(lowercased term)` and the term's length, never the term. This repo is meant to go
-public and `faolan.db` is committed with `faolan.sql` mirroring every row as reviewable text — a plaintext column
+public and `faolan.sql` carries every game-data row as reviewable text — a plaintext column
 would fill it with slurs. Hashing costs the check nothing, because the match runs the other way round from the
 obvious one: instead of scanning terms for a substring of the name, `CharacterNameRules` hashes each of the
 **name's** own substrings and asks the set. A 16-character name has 136 of them, and the stored `Length` narrows

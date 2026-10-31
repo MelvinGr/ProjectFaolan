@@ -79,7 +79,7 @@ The debuff that rides with it comes from a two-tier ladder, applied atomically w
 | **Bruised Body** | 3744225 | 5 s | none at all — a pure marker |
 | **Broken Bones** | 3745876 | 10 s | Evade Chance −5000, Casting Concentration −800 |
 
-Both ship in `faolan.db`, so applying them through the ordinary buff path gets their effects for free. The tier is chosen from the damage as a fraction of the pool, which separates the observations where raw
+Both ship in `faolan.sql`, so applying them through the ordinary buff path gets their effects for free. The tier is chosen from the damage as a fraction of the pool, which separates the observations where raw
 fall distance does not. [V3: FallDamageTests.DebuffTier_ReproducesEveryCorpusObservation_ExceptTheOneInversion]
 
 ## Hazard volumes

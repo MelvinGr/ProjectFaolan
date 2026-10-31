@@ -50,8 +50,8 @@ namespace Faolan.Importer.Cli
 			// An item pointing at a template that is not in `Items` at all has no identity to mint from, so the
 			// snapshot skips it and the item is invisible with nothing to explain it. The foreign key
 			// (`ItemInstance.TemplateId` -> `Items`, Restrict) enforces this, so it can only fail on a database whose
-			// constraints were bypassed - which `faolan.db` invites, being a committed artifact that a hand edit
-			// through the sqlite3 CLI reaches with foreign keys off by default.
+			// constraints were bypassed - which `faolan.db` invites, being a file that a hand edit through
+			// the sqlite3 CLI reaches with foreign keys off by default.
 			var orphans = held.Where(h => !items.ContainsKey(h.TemplateId)).ToList();
 			var malformed = held
 				.Where(h => items.ContainsKey(h.TemplateId) && !AcgHash.IsWellFormed(AcgHash.ForWire(h.TemplateId, items[h.TemplateId].Hash)))

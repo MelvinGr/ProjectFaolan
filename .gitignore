@@ -275,6 +275,7 @@ Faolan.ClientHook/*.lib
 # machine-agnostic, so anything true only of this checkout belongs here instead.
 /faolan.user.json
 
+/faolan.db
 /faolan.db-shm
 /faolan.db-wal
 /faolan.log

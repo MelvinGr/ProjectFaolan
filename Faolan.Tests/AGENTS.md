@@ -26,7 +26,7 @@ reads. It has two halves, and the difference decides where a new gate belongs:
   A regeneration against a partial corpus would silently weaken every whole-corpus gate while they all still pass, so
   `CorpusExtract.ExpectedCounts` is a ratchet: a regeneration may only add packets, and a short archive throws.
 - **A gate comparing shipped data to the corpus belongs in a `--report`, not a test.** The slice is frozen while
-  `faolan.db` is built from whatever dumps exist, so the two diverge as captures are added and such a test fails on
+  `faolan.sql` is built from whatever dumps exist, so the two diverge as captures are added and such a test fails on
   data that is more correct than the evidence it demands. The `*-check` reports are those gates, run against the real
   dumps where there is no second population: `npc-pose-check`, `item-level-check`, `buff-duration-check`,
   `acg-token-check`. A test is the right home only for a property of the code (a round-trip, a field sweep), never of

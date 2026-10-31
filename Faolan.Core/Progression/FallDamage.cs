@@ -104,7 +104,7 @@ namespace Faolan.Core.Progression
 	///         the exception. The Broken Bones boundary has a wide empty band (34.6% to 58.6%) and is set inside it.
 	///     </para>
 	///     <para>
-	///         Both debuffs already ship in <c>faolan.db</c> with their durations and stat effects, so applying them
+	///         Both debuffs already ship in <c>faolan.sql</c> with their durations and stat effects, so applying them
 	///         through the ordinary buff path gets the effects for free: Bruised Body (3744225, 5 s) has no stat
 	///         effects at all - it is a pure marker/animation - and Broken Bones (3745876, 10 s) carries Evade Chance
 	///         -5000 and Casting Concentration -800.

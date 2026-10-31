@@ -77,7 +77,8 @@ dotnet ef migrations add <Name> \
 # and seeds the default realm and account at startup):
 dotnet ef database update \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
-# For pure data changes (no schema change) update faolan.db directly and commit it - no migration.
+# For pure data changes (no schema change) update faolan.db, regenerate faolan.sql (--report sql-seed) and commit
+# that - no migration.
 ```
 
 ## Architecture
@@ -114,15 +115,16 @@ beside them. The rules for that graph are in `Faolan/AGENTS.md`; read them befor
 
 **Database:** SQLite via EF Core in `Faolan.Core.Database`, all access through `IDatabaseRepository` and its
 per-domain slices. Lazy loading is deliberately not used; load navigations explicitly with `Include`.
-- `faolan.db` carries the game data (built by the importer, committed to git); the server only migrates and
-  reads/writes at save/load points. The sqlite3 CLI has foreign keys off by default: run `PRAGMA foreign_keys=ON`
+- `faolan.sql` is the game data the repo ships. `faolan.db` (gitignored) is the local database built from it: the
+  server migrates it, loads the seed into it when it has no content, and reads/writes it at save/load points. The sqlite3 CLI has foreign keys off by default: run `PRAGMA foreign_keys=ON`
   before manual deletes or you orphan child rows.
 
-**SQLite is interim.** The goal is a real database with the schema and seed as a `.sql` file, dropping the binary.
-- `faolan.sql` is the reviewable mirror of `faolan.db`'s data and the seed that loads into SQLite and Postgres. Never
-  hand-edit it. **Whenever `faolan.db` changes, regenerate it** with
-  `dotnet run --project Faolan.Importer -- --report sql-seed` and commit the two together: nothing regenerates it
-  automatically, and the test suite reads the seed, not the db. How it is generated and loaded:
+**SQLite is interim.** The goal is a real database server; the repo already ships only the schema (the migrations)
+and the seed (`faolan.sql`), never the binary.
+- `faolan.sql` is the reviewable game data and the seed that loads into SQLite and Postgres. Never hand-edit it.
+  **Whenever game data in `faolan.db` changes, regenerate it** with
+  `dotnet run --project Faolan.Importer -- --report sql-seed` and commit it: nothing regenerates it automatically,
+  `faolan.db` is not tracked, and the test suite reads the seed, not the db. How it is generated and loaded:
   `Faolan.Core.Database/AGENTS.md`.
 - **`journal_mode=WAL`** is a persistent file-header flag on `faolan.db`. Without it a reader blocks a writer, so any
   concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process) makes a live world write fail
@@ -226,8 +228,8 @@ private corpus.
 
 ## Conventions
 
-- Commit each verified milestone immediately (conventional style, e.g. `feat(economy): ...`); `faolan.db` rides along
-  in the commit, with `faolan.sql` regenerated beside it.
+- Commit each verified milestone immediately (conventional style, e.g. `feat(economy): ...`); a game-data change
+  rides along as a regenerated `faolan.sql`.
 - **A task is done when the code, the tests and the record agree.** Update whatever the change made stale:
   - **Docs:** the relevant `docs/` pages. If you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
     (`FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`). Repoint any doc

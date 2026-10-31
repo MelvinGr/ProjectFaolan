@@ -14,8 +14,8 @@ namespace Faolan.Tests
 {
 	// Shared test-DB context options, so the many tests that each spun up their own SQLite context stop duplicating
 	// the `new DbContextOptionsBuilder<DatabaseContext>().UseSqlite(...)` boilerplate. Two shapes, matching how the
-	// suite uses a DB: a writable throwaway DB the test seeds (Options), and the committed faolan.db read read-only
-	// (ReadOnly - the real-data golden fixture: NPC spawns, quest journal, snapshots build from the committed rows).
+	// suite uses a DB: a writable throwaway DB the test seeds (Options), and the seeded game database read read-only
+	// (ReadOnly - the real-data golden fixture: NPC spawns, quest journal, snapshots build from the shipped rows).
 	//
 	// The test DB is independent of the production provider. The DatabaseContext is code-first / provider-agnostic,
 	// and the golden tests assert that our code builds the right bytes from the data - the storage engine underneath
@@ -186,8 +186,8 @@ namespace Faolan.Tests
 			return builder.Options;
 		}
 
-		// Read-only options for an existing SQLite database at `path` - the committed faolan.db golden fixture
-		// (TestPaths.FaolanDb); read-only so a test can't mutate the shared committed data.
+		// Read-only options for an existing SQLite database at `path` - the seeded game-database golden fixture
+		// (TestPaths.FaolanDb); read-only so a test can't mutate the shared data.
 		public static DbContextOptions<DatabaseContext> ReadOnly(string path)
 		{
 			return DatabaseExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");

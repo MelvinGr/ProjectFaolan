@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The two numbers a ground-targeted AoE needs - how wide it blasts and how often it ticks - read off the
-	// client instead of guessed. Both are shipped data, so this gates the committed faolan.db.
+	// client instead of guessed. Both are shipped data, so this gates the shipped faolan.sql.
 	//
 	// The radius is not a property field, which is why three sweeps of the field run found none: it is the `Radius`
 	// key (11) of the spell's area-targeting GameAction element, one region over. The interval is a property field

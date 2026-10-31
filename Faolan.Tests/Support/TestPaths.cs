@@ -9,8 +9,8 @@ namespace Faolan.Tests.Support
 	// test; go through here (or Golden).
 	public static class TestPaths
 	{
-		// The real-data game database for tests. Built from the migrations + faolan.sql rather than read from the
-		// committed faolan.db - see TestDb.GameDatabase, which is the single place that strategy lives.
+		// The real-data game database for tests. Built from the migrations + faolan.sql (the repository ships no
+		// faolan.db) - see TestDb.GameDatabase, which is the single place that strategy lives.
 		public static string FaolanDb => TestDb.GameDatabase;
 
 		// The named capture blobs + render templates used as test inputs. They live in the fixture archive's `assets/`

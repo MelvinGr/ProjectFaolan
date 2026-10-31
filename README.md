@@ -310,7 +310,7 @@ dotnet build ProjectFaolan.slnx
 Package versions are set once, in `Directory.Packages.props` (central package management); a project's
 `PackageReference` carries no version.
 
-If you commit changes to `faolan.db`, regenerate its `faolan.sql` mirror (below) and commit the two together:
+After changing game data in `faolan.db`, regenerate `faolan.sql` (below) and commit it:
 
 ```sh
 dotnet run --project Faolan.Importer -- --report sql-seed
@@ -332,18 +332,17 @@ database schema. With `Mcp:Enabled` set (off by default) it also hosts an in-pro
 
 ### `faolan.db` and `faolan.sql`
 
-The game data lives in **`faolan.db`** (SQLite, built by the importer, committed). Alongside it, **`faolan.sql`**
-is the same data as plain text, regenerated with `--report sql-seed` whenever `faolan.db` changes — so a data
-change is **reviewable in a diff** instead of showing up as `Bin 8839168 -> 8839168 bytes`. It is generated:
-never hand-edit it, and commit it together with the `faolan.db` it mirrors.
+The repository ships the game data as **`faolan.sql`**: plain-text SQL, so a data change is **reviewable in a
+diff**. **`faolan.db`** is the local SQLite database the server and the importer work on; it is gitignored. After
+a change to the game data in `faolan.db`, regenerate `faolan.sql` with `--report sql-seed` and commit it. It is
+generated: never hand-edit it.
 
 It is written from the EF model rather than by `sqlite3 .dump`, so it loads into SQLite _and_ PostgreSQL, and it
-doubles as the **seed**: a database with no game content is filled from it at startup (delete `faolan.db` and the
-server rebuilds it), while a populated one is never touched. Characters are excluded — per-developer play state.
+is the **seed**: a database with no game content is filled from it at startup (so a fresh clone builds its
+`faolan.db` on first start, and deleting it rebuilds it), while a populated one is never touched. Characters are
+excluded — per-developer play state.
 
-Both are deliberately interim. The end state (#379) is a real database with the schema + seed data kept as SQL in
-the repo and the binary dropped — running the two in parallel now means that migration is a deletion rather than
-a port.
+SQLite itself is interim: the end state (#379) is a real database server, fed by the same migrations and seed.
 
 For a **multi-realm** deployment (#324), split the process by role — one login/router tier and one game host
 per realm (each bound to its `Realm` row's `IpAddress`/ports), all against the shared DB:
@@ -489,8 +488,9 @@ See `docs/tooling/client-launcher.md` for the full flag set and the loopback-cap
 
 ## Rebuild the game database
 
-`faolan.db` (SQLite) is committed to the repo and is the single source of truth for game data; the server only
-migrates and reads it. To rebuild its content from the packet captures and client RDB:
+`faolan.sql` is the game data the repository ships; the server builds `faolan.db` from it on first start. To rebuild
+the content from the packet captures and client RDB, run the importer against `faolan.db`, then regenerate
+`faolan.sql`:
 
 ```sh
 dotnet run --project Faolan.Importer -- --skip characters    # module-based; --list to see modules, --dry-run to preview

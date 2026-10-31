@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// which playfield's region a recovered id belongs to.
 	//
 	// These run with no client RDB - the hash is arithmetic and the join is fed hand-built regions - which is the
-	// point: the shipped rows in faolan.db are gated by MapRegionGeometryTests, and this gates the rules that produced
+	// point: the shipped rows (faolan.sql) are gated by MapRegionGeometryTests, and this gates the rules that produced
 	// them, including the ones that must keep refusing to produce a row.
 	public class AreaBannerNamesTests
 	{

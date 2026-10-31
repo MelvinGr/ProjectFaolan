@@ -32,7 +32,7 @@ namespace Faolan.Importer.Modules
 			// captures say. Upsert cannot: it re-writes the live rows and leaves the dead ones, reporting a row-count
 			// delta of zero either way, which is how the divergence went unseen. Only a cleanup when the
 			// corpus you are importing is a SUPERSET of the one that built the table - read the warning on
-			// WorldObjectImportOps.ImportWorldObjects before pointing it at the shipped faolan.db.
+			// WorldObjectImportOps.ImportWorldObjects before pointing it at a faolan.db built from the seed.
 			await WorldObjectImportOps.ImportWorldObjects(ctx.Db, objects, ctx.ModeFor(Name) == WriteMode.Overwrite);
 
 			// Say when a door was captured in two different states, rather than resolving it silently. The

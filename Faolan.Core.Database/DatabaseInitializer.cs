@@ -41,7 +41,7 @@ namespace Faolan.Core.Database
 			return await db.SaveChangesAsync(cancellationToken) == 1;
 		}
 
-		// Ports/type mirror the committed faolan.db realm so a fresh DB matches the reference deployment. The realm's
+		// Ports/type mirror the reference deployment's realm so a fresh DB matches it. The realm's
 		// id is left DB-generated (1 on a fresh DB) - realm-scoped rows resolve it by lookup, not by a hard-coded id.
 		//
 		// This is the undeclared path only (see ReconcileRealmsAsync): it runs for a deployment that configures no
@@ -189,8 +189,8 @@ namespace Faolan.Core.Database
 			};
 		}
 
-		// Loads faolan.sql into a database that came up with no game content - what makes a fresh clone
-		// runnable without the committed faolan.db. Returns false when there was nothing to do.
+		// Loads faolan.sql into a database that came up with no game content - how a fresh clone, which
+		// ships no faolan.db, gets its game data. Returns false when there was nothing to do.
 		//
 		// "No content" is probed on Items rather than on the migration history: a database can be migrated but empty
 		// (someone deleted the binary, a container started on an empty volume, a test built a schema), and those are

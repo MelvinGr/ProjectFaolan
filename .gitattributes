@@ -65,7 +65,7 @@
 *.sh text eol=lf
 
 ###############################################################################
-# faolan.sql - the generated mirror of faolan.db's data (`--report sql-seed`).
+# faolan.sql - the game data, generated from a faolan.db (`--report sql-seed`).
 # Some string values carry CRLF, and `* text=auto` above would normalise them to
 # LF on commit while every regeneration writes them back - leaving the file
 # permanently "modified" and no longer a faithful mirror. Diffs still work;

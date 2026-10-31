@@ -28,8 +28,8 @@ namespace Faolan.Core.Database.Attributes
 		// `quoteColumns` delimits the column identifier in the check SQL. SQLite folds an unquoted identifier
 		// case-insensitively so the bare `State IN (...)` form has always worked there; PostgreSQL folds an unquoted
 		// identifier to lower-case (`state`), which does not exist, so on Npgsql the name must be double-quoted
-		// (`"State"`). Kept provider-conditional so the SQLite check text - baked into the committed faolan.db and its
-		// squashed migration - stays byte-for-byte unchanged.
+		// (`"State"`). Kept provider-conditional so the SQLite check text - baked into the squashed migration and
+		// every faolan.db built from it - stays byte-for-byte unchanged.
 		public static void ApplyEnumCheckConstraints(ModelBuilder modelBuilder, bool quoteColumns = false)
 		{
 			foreach (var entityType in modelBuilder.Model.GetEntityTypes())

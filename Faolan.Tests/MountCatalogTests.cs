@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80, 0x1560F9BB))); // the mount capture is a level-80 character
 		}
 
-		// (mount id -> name + creature id) straight out of the committed faolan.db.
+		// (mount id -> name + creature id) straight out of the shipped game data.
 		private static Dictionary<uint, (string Name, uint CreatureId)> ShippedMounts()
 		{
 			var rows = new Dictionary<uint, (string, uint)>();

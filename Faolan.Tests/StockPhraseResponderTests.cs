@@ -13,7 +13,7 @@ namespace Faolan.Tests
 {
 	// The create-cutscene speech: the s2c ReceivedStockPhraseText (0x205D) reply to the client's
 	// PlayStockphraseAsSubtitle request. Golden-gated against the retail create capture
-	// (Blablabla_soldier-guardian_create_*): each stock phrase lives in the committed faolan.db (StockPhrases,
+	// (Blablabla_soldier-guardian_create_*): each stock phrase lives in the shipped game data (StockPhrases,
 	// harvested by the importer's stock-phrases module), and building its 0x205D body with the captured threadCtx
 	// must be byte-identical to the captured response. Proves the DB-sourced phrase + the build reproduce retail.
 	public class StockPhraseResponderTests

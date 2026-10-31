@@ -147,7 +147,7 @@ there. `RealmStatusService` (realm role only) writes it at the two moments that 
 
 Writes go through `IDatabaseRepository.SetRealmOnlineStatus(realmId, status)`, by id, so hosts on a shared DB never
 touch each other's rows. A realm that is `kill -9`'d and restarted into an occupied port claims the row, fails the
-bind, and reads Offline with nothing listening. Gated by `RealmStatusServiceTests`. The committed `faolan.db` carries
+bind, and reads Offline with nothing listening. Gated by `RealmStatusServiceTests`. A fresh database's realm row carries
 the stopped-state default, Offline.
 
 **A crashed realm decays out of the list.** A hard crash skips `StopAsync`, and with no restart nothing reclaims the

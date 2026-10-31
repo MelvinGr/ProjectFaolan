@@ -27,11 +27,12 @@ and `ICharacterStatRepository` (what it adds up to).
      shipped rows satisfy `Id == ComputeId()`. Used by `ConversationNode`, `NpcSpawn`, `NpcSpawnArea`, `WorldObject`.
   To check whether a table needs this: `sqlite_sequence.seq / COUNT(*)` is how many times it has been renumbered.
 
-**SQLite is interim.** The goal is a real database with the schema and seed as a `.sql` file, dropping the binary.
-- **`faolan.sql` is the reviewable mirror of `faolan.db`'s data, and a seed that loads into both SQLite and Postgres.**
-  Never hand-edit it. Regenerate it whenever `faolan.db` changes, with
-  `dotnet run --project Faolan.Importer -- --report sql-seed`, and commit the two together; nothing regenerates it
-  automatically.
+**SQLite is interim.** The goal is a real database server; the repo already ships only the schema (the migrations)
+and the seed (`faolan.sql`), never the binary.
+- **`faolan.sql` is the game data the repo ships, and a seed that loads into both SQLite and Postgres.** `faolan.db`
+  is a local build of it and is not tracked. Never hand-edit the seed. Regenerate it whenever game data in
+  `faolan.db` changes, with `dotnet run --project Faolan.Importer -- --report sql-seed`, and commit it; nothing
+  regenerates it automatically.
   - **Restore:** create the schema (`dotnet ef database update`), then run `faolan.sql`. It is one file, verified at
     zero errors with full row parity into a fresh SQLite and a fresh Postgres. No game-content table has a
     store-generated key, so there are no sequence high-water marks to restore;
@@ -81,7 +82,8 @@ dotnet ef migrations add <Name> \
 # and seeds the default realm and account at startup):
 dotnet ef database update \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
-# For pure data changes (no schema change) update faolan.db directly and commit it - no migration.
+# For pure data changes (no schema change) update faolan.db, regenerate faolan.sql (--report sql-seed) and commit
+# that - no migration.
 ```
 
 **Read every scaffolded migration, and apply it to a copy first.** Each trap below yields a migration that runs
@@ -102,11 +104,11 @@ independent source: row counts and integrity checks pass on a crossed rename.
   old and new key ranges overlap.
 - A code-assigned integer key needs `[DatabaseGenerated(DatabaseGeneratedOption.None)]`, or the scaffold marks it
   `Sqlite:Autoincrement` and the store overwrites the id.
-- Reverting a migration that added a cascade parent deletes the child rows: restore `faolan.db` from git instead.
+- Reverting a migration that added a cascade parent deletes the child rows: rebuild `faolan.db` from the seed instead (delete it and start the server).
 - A snapshot diff much larger than the migration means the global `dotnet-ef` tool is behind the runtime; update the
   tool and re-scaffold.
-- `migrations remove` refuses an applied migration: `git checkout faolan.db`, delete `faolan.db-wal` and
-  `faolan.db-shm`, then remove. A later `git stash pop` can resurrect the removed file.
+- `migrations remove` refuses an applied migration: delete `faolan.db`, `faolan.db-wal` and `faolan.db-shm`
+  (the server rebuilds the database from the seed), then remove. A later `git stash pop` can resurrect the removed file.
 
 ## EF and SQLite traps
 

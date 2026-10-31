@@ -140,7 +140,7 @@ and neither is a defect on our side:
 
 ## Journal ordering is absent on most multi-step lines
 
-In the shipped `faolan.db` (lines by their `QuestDefinitions` members):
+In the shipped `faolan.sql` (lines by their `QuestDefinitions` members):
 
 | `JournalSequence` state | lines |
 |---|---:|

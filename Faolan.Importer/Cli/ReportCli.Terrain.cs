@@ -159,7 +159,7 @@ namespace Faolan.Importer.Cli
 
 		// Re-run the NpcSpawnArea creature resolver. The resolver resets its own machine assignments and
 		// re-derives every tier, so this is idempotent and is how a change to the resolution rules reaches the
-		// committed faolan.db without a full RDB spawn re-import. Manual assignments (`.setnpcgroup`) are never touched.
+		// shipped game data without a full RDB spawn re-import. Manual assignments (`.setnpcgroup`) are never touched.
 		//
 		// It needs the RDB only for the groups' wander polylines, which the containment tier uses as its membership
 		// test and which are deliberately not stored in the DB. Running without them would silently apply

@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Guards the shipped DB-source path: every populated world-object row in the committed faolan.db must be
+	// Guards the shipped DB-source path: every populated world-object row in the shipped game data must be
 	// fully buildable from its typed columns - it carries its geometry columns and its identity message
 	// round-trips (columns -> ProtoSimpleDynelIIR -> record -> re-parse == same columns). A captured Data blob is
 	// absent, and this is the standing gate that nothing comes to need one. The capture-grounded byte-exact

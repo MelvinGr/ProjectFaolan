@@ -28,7 +28,6 @@ Archive/Faolan-Private-Assembla.zip
     Source archives of earlier versions of this project, which include code by other contributors. They are
     distributed under the GNU General Public License terms stated in the files they contain.
 
-faolan.db
 faolan.sql
 Faolan.Tests/Assets/fixtures.bin
     Game data derived from the Age of Conan client files and from retail network traffic: item, NPC, quest, spell

@@ -12,7 +12,7 @@ namespace Faolan.Importer.Captures
 {
 	/// <summary>
 	///     Writes the game data as a dialect-neutral SQL seed: one file that loads into both SQLite and Postgres, so
-	///     the schema (EF migrations) plus this file can replace the committed binary faolan.db.
+	///     the schema (EF migrations) plus this file is all the game data the repository ships; faolan.db is built from it.
 	/// </summary>
 	/// <remarks>
 	///     The seed is generated from the EF model rather than by <c>sqlite3 &lt;db&gt;.dump</c>, because a dump is

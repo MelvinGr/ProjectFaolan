@@ -18,10 +18,11 @@ losing data:
 - A bootstrap-only rule (`QuestGoalWiring` skips a goal `IsWired` already set) is a no-op on a populated database,
   and `--only quests` also runs the seed under test, which restores its own values. To see what a rule produces,
   reset the columns it writes in a copy and run without the seed's own step; 0 divergent rows is the target.
-- The importer does not create its target database: copy `faolan.db` first, and confirm the run by a line it always
+- The importer does not create its target database: work on a copy of a seeded `faolan.db` (starting the server
+  once builds one from `faolan.sql`), and confirm the run by a line it always
   prints, not only by the value you are measuring. `sqlite3 <db> "SQL" < file` ignores the file.
 
-**Rows missing from a re-harvest are not stale.** `faolan.db` holds content harvested from captures that are no
+**Rows missing from a re-harvest are not stale.** `faolan.sql` holds content harvested from captures that are no
 longer in the corpus, so it is a superset of what the current dumps rebuild. Never delete a row because the current
 harvest does not produce it: check whether it is referenced, and whether another module wrote its columns.
 `--mode overwrite` on `world-objects` deletes what the harvest missed, so it is safe only over a corpus that is a

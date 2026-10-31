@@ -16,7 +16,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the create-editor scene props (the SimpleDynelFullUpdateIIR records the initial burst streams) are
-	// reconstructible from the committed faolan.db WorldObjects (map 4000) via WorldObjectCodec - the same
+	// reconstructible from the shipped WorldObjects rows (map 4000) via WorldObjectCodec - the same
 	// DB-source path the world-entry login replay uses. Each burst record is matched to its row
 	// by identity (display_name - not position: two props overlap at one spot) and rebuilt with the burst's own
 	// handle + the create session's playfield token; the rebuilt body must equal the captured record byte-for-byte.
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 			Assert.Equal(18, rebuilt);
 		}
 
-		// End-to-end: running the actual initial burst with a DB (the committed faolan.db) emits exactly the golden
+		// End-to-end: running the actual initial burst with a DB (the seeded game database) emits exactly the golden
 		// bytes - i.e. the live scene-prop loop (EditorSceneDynelHandles -> WorldObjectCodec build from the row keyed
 		// by captured handle) reproduces InitialBurst.bin. The dynels are spawned from the DB, not verbatim, so this
 		// locks the wired DB path, not just WorldObjectCodec in isolation.

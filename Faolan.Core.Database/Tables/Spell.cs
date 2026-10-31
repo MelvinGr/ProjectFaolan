@@ -13,7 +13,7 @@ namespace Faolan.Core.Database.Tables
 		/// <remarks>
 		///     Not every row is re-derivable from the client: 7,868 of the shipped 8,460 come back from the RDB alone
 		///     (7,378 from the spell record, 490 from the combo XML); the remaining 592 come from captures and survive
-		///     only because <c>faolan.db</c> is committed - a fresh import rebuilds those spells with <c>Level = 0</c>.
+		///     only because <c>faolan.sql</c> carries them - a fresh import rebuilds those spells with <c>Level = 0</c>.
 		///     They must not be cleared: this is the gate <c>GetClassSpellsUnlockedBetween</c> queries, so zeroing them
 		///     would grant those spells at level 0. No column marks which rows are which; the set is computable by
 		///     blanking the column and diffing a re-import. Open work tracked in Gitea #650.

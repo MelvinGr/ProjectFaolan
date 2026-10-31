@@ -51,7 +51,7 @@ namespace Faolan.Core
 		/// <summary>
 		///     The game-data seed, found the same way as the config: beside the exe, in the working directory, up the
 		///     tree, or wherever <c>FAOLAN_SEED</c> points. <c>DatabaseInitializer</c> loads it into a database that
-		///     comes up with no content, which is what lets a clone run without the committed faolan.db.
+		///     comes up with no content, which is how a clone gets its game data: the repository ships no faolan.db.
 		/// </summary>
 		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? FindUpwards("faolan.sql");
 

@@ -36,7 +36,7 @@ namespace Faolan.Tests
 	// point of running two.
 	//
 	// The database is copied to the temp dir first: the entry writes (the character's transform, the realm's
-	// status) and the committed faolan.db must not be dirtied by a measurement.
+	// status) and the shared game database must not be dirtied by a measurement.
 	public class WorldEntryProfileTests
 	{
 		[Fact]
