@@ -55,7 +55,7 @@ namespace Faolan.Tests.Support
 		//
 		// The count ratchet catches a regeneration that covers fewer bodies. It cannot catch one that keeps the
 		// bodies and loses a grammar path - 8,332 of one SimpleDynel shape plus one Wharf Door is the same count as
-		// 8,333 of the common one, and the Wharf Door is the row that found a lift failure (c015345a).
+		// 8,333 of the common one, and the Wharf Door is the row that found a lift failure (a156b3c0).
 		//
 		// Distinct body length is a proxy for that path, not a measure of it - two different grammars can share a
 		// length, so this is a floor on coverage rather than a proof of it. It is worth pinning anyway because it

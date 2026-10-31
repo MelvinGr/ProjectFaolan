@@ -286,7 +286,7 @@ namespace Faolan.Importer.Cli
 					// as a level-80 attacker dealing 8556.
 					//
 					// And "not a known spawn" is not "the player" - the same defect the spell table carried
-					// until b1b6b6be. An UNCAPTURED entity satisfies it too: a mob that streamed in without its spawn
+					// until 62f4221d. An UNCAPTURED entity satisfies it too: a mob that streamed in without its spawn
 					// packet, another player's pet, a passing guard. So both directions are gated on the player end
 					// being a real player - a handle that received a `FullPlayerCharacter` snapshot - exactly as the
 					// spell table is. Without it the high-level rows mixed mob-on-mob damage into "NPC -> player" and
