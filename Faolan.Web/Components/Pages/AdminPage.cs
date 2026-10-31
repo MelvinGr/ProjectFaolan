@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Faolan.Web.Auth;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -26,10 +27,8 @@ namespace Faolan.Web.Components.Pages
 
 		protected sealed override async Task OnInitializedAsync()
 		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
+			var user = await AdminUser();
+			if (user == null)
 			{
 				Nav.NavigateTo("/", true);
 				return;
@@ -41,7 +40,29 @@ namespace Faolan.Web.Components.Pages
 			await LoadAsync();
 		}
 
+		// The gate again whenever the cascading auth state changes under an open page: AccountAuthenticationStateProvider
+		// turns the circuit's user anonymous once the account is banned or its role changes, and the page must stop
+		// working for them then, not at their next reload.
+		protected sealed override async Task OnParametersSetAsync()
+		{
+			if (Authorized && await AdminUser() == null)
+			{
+				Authorized = false;
+				Nav.NavigateTo("/", true);
+			}
+		}
+
 		// The page's own load, run only after the gate has passed.
 		protected abstract Task LoadAsync();
+
+		private async Task<ClaimsPrincipal?> AdminUser()
+		{
+			var user = AuthState == null
+				? null
+				: (await AuthState).User;
+			return user != null && user.IsInRole(AccountPrincipal.AdminRole)
+				? user
+				: null;
+		}
 	}
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,11 +32,13 @@ namespace Faolan.Web.Services
 	// game server reads, so changes take effect on the player's next login (the server enforces State/Type at auth).
 	public sealed class AccountAdminService
 	{
+		private readonly IAccountRepository _accounts;
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 
-		public AccountAdminService(IDbContextFactory<DatabaseContext> dbFactory)
+		public AccountAdminService(IDbContextFactory<DatabaseContext> dbFactory, IAccountRepository accounts)
 		{
 			_dbFactory = dbFactory;
+			_accounts = accounts;
 		}
 
 		public async Task<AccountDetail?> GetAccountAsync(uint id)
@@ -67,18 +70,17 @@ namespace Faolan.Web.Services
 		}
 
 		// Ban / unban: Banned <-> Active. Returns the new state, or null if the account is gone.
+		//
+		// Through the repository's state change, which clears any timed ban's expiry with it: a ban set here is
+		// indefinite, and writing only the state left a `.kickban`'s expiry behind, so the next game login lifted it.
 		public async Task<AccountState?> SetBannedAsync(uint accountId, bool banned)
 		{
-			await using var db = await _dbFactory.CreateDbContextAsync();
-			var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
-			if (account == null)
-				return null;
-
-			account.State = banned
+			var state = banned
 				? AccountState.Banned
 				: AccountState.Active;
-			await db.SaveChangesAsync();
-			return account.State;
+			return await _accounts.SetAccountState(accountId, state)
+				? state
+				: null;
 		}
 
 		public async Task<WebAccountType?> SetTypeAsync(uint accountId, WebAccountType type)

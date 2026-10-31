@@ -9,7 +9,11 @@
 		<input name="password" type="password" placeholder="Password" autocomplete="current-password" required/>
 		<button class="btn primary" type="submit">Log in</button>
 	</form>
-	@if (Error != null)
+	@if (Error == "banned")
+	{
+		<p class="err">This account is suspended.</p>
+	}
+	else if (Error != null)
 	{
 		<p class="err">Invalid username or password.</p>
 	}

@@ -1,9 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Extensions;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb.Assets;
@@ -13,6 +12,7 @@ using Faolan.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -99,9 +99,14 @@ namespace Faolan.Web
 					o.LoginPath = "/login";
 					o.AccessDeniedPath = "/login";
 					o.ExpireTimeSpan = TimeSpan.FromDays(14);
+					// The cookie holds the account as it was at sign-in; this re-reads it, so a ban or a role change
+					// reaches a signed-in user within a minute rather than at the cookie's expiry.
+					o.Events.OnValidatePrincipal = AccountPrincipal.ValidateAsync;
 				});
 			builder.Services.AddAuthorization();
 			builder.Services.AddCascadingAuthenticationState();
+			// The same re-check for an open interactive circuit, which never sends the cookie again.
+			builder.Services.AddScoped<AuthenticationStateProvider, AccountAuthenticationStateProvider>();
 
 			var app = builder.Build();
 
@@ -149,11 +154,16 @@ namespace Faolan.Web
 				.DisableAntiforgery();
 
 			app
-				.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users, [FromForm] string username, [FromForm] string password) =>
+				.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users, IAccountRepository accounts, [FromForm] string username, [FromForm] string password) =>
 				{
 					var account = await users.FindByNameAsync(username);
 					if (account == null || !await users.CheckPasswordAsync(account, password))
 						return Results.Redirect("/login?error=1");
+
+					// The game's login rule: a lapsed timed ban lifts, then only an active account gets in.
+					account = await AccountPrincipal.SignInable(accounts, account.Id);
+					if (account == null)
+						return Results.Redirect("/login?error=banned");
 
 					await SignIn(ctx, account);
 					return Results.Redirect("/characters");
@@ -291,7 +301,7 @@ namespace Faolan.Web
 			// Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
 			app.MapGet("/api/zone/{mapId:long}", async (long mapId, HttpContext ctx, LiveSessionService live, CharacterModelService models) =>
 			{
-				if (!(ctx.User?.IsInRole("Admin") ?? false))
+				if (!(ctx.User?.IsInRole(AccountPrincipal.AdminRole) ?? false))
 					return Results.StatusCode(StatusCodes.Status403Forbidden);
 
 				var entities = await live.GetZoneEntitiesAsync((uint)mapId);
@@ -315,7 +325,7 @@ namespace Faolan.Web
 			// map has no local image.
 			app.MapGet("/api/zone/{mapId:long}/map.png", (long mapId, HttpContext ctx, CharacterModelService models) =>
 			{
-				if (!(ctx.User?.IsInRole("Admin") ?? false))
+				if (!(ctx.User?.IsInRole(AccountPrincipal.AdminRole) ?? false))
 					return Results.StatusCode(StatusCodes.Status403Forbidden);
 
 				var png = models.MapImage((uint)mapId);
@@ -373,20 +383,10 @@ namespace Faolan.Web
 			}
 		}
 
-		// Issue the auth cookie for an account (id + username claims, plus an "Admin" role for GM/Administrator
-		// accounts so the admin tools can gate on it).
+		// Issue the auth cookie for an account (see AccountPrincipal for its claims and the re-check that keeps them true).
 		private static Task SignIn(HttpContext ctx, Account account)
 		{
-			var claims = new List<Claim>
-			{
-				new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
-				new Claim(ClaimTypes.Name, account.UserName)
-			};
-			if (account.Type >= WebAccountType.GameMaster)
-				claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-
-			var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-			return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+			return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, AccountPrincipal.Create(account));
 		}
 	}
 }
