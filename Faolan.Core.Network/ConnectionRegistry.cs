@@ -12,7 +12,7 @@ namespace Faolan.Core.Network
 	///     registry rather than the listener, which is what keeps outbound ports (<c>ITradeOutbound</c>,
 	///     <c>IQuestShareOutbound</c>, <c>IApprenticeOutbound</c>, …) off <c>GameServerListener</c>.
 	///     <para>
-	///         <see cref="ServerBase" /> owns one and delegates its own connection members to it.
+	///         <see cref="ServerBase" /> is handed one and delegates its own connection members to it.
 	///     </para>
 	/// </remarks>
 	public sealed class ConnectionRegistry

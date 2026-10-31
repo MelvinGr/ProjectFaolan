@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
@@ -82,6 +83,7 @@ namespace Faolan.Tests
 			// them, so the graph is proved without a database, a socket or a config file.
 			services.AddSingleton<IConfiguration>(_ => throw new InvalidOperationException("not built"));
 			services.AddSingleton<IDatabaseRepository>(_ => throw new InvalidOperationException("not built"));
+			services.AddRepositorySlices();
 			services.AddSingleton<IChatServerDispatcher>(_ => throw new InvalidOperationException("not built"));
 			services.AddSingleton<IGameServerDispatcher>(_ => throw new InvalidOperationException("not built"));
 			services.AddSingleton<ICsPlayerAgentDispatcher>(_ => throw new InvalidOperationException("not built"));

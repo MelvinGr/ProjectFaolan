@@ -1,3 +1,4 @@
+using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
@@ -25,6 +26,7 @@ namespace Faolan.Tests
 			// Externals the tier takes but does not own: factories, so ValidateOnBuild sees a registration and never
 			// runs one.
 			services.AddSingleton<IDatabaseRepository>(_ => null!);
+			services.AddRepositorySlices();
 			services.AddSingleton<IGameServerDispatcher>(_ => null!);
 			services.AddSingleton<ICsPlayerAgentDispatcher>(_ => null!);
 			services.AddSingleton<IChatServerDispatcher>(_ => null!);

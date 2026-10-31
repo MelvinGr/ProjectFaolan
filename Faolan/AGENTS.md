@@ -43,7 +43,7 @@ the ones it routes to (`_shop`, `_bank`, ...) and forwards. Rules for the servic
   A single shared operation can be a `Func<...>` seam (`ClientForCharacter` into `GuildService`); once several services
   share a cluster of operations, collapse them into one named interface.
 - **Check what an operation reads before calling it listener state.** Most wire code needs only "the client for this
-  character id", which `ConnectionRegistry` (`Faolan.Core.Network`) answers: `ServerBase` owns one and delegates
+  character id", which `ConnectionRegistry` (`Faolan.Core.Network`) answers: `ServerBase` is handed one and delegates
   `NetworkClients`/`ClientForCharacter` to it, so a wire class can take the registry instead of the listener. Likewise
   the energy loop's state is on `INetworkClientSession`, and a pet summon is broadcaster and simulation work
   (`EnergyService`, `PetService`, `TeleportService` are their own collaborators).
@@ -78,8 +78,8 @@ references.
   (`_catalog`, `_inventory`, `_world`, ...). A consumer of four or more slices (`WorldEntryService`, `GmCommandService`,
   `TradepostService`, ...), or one that hands the repository to a helper needing the composite, keeps
   `IDatabaseRepository`.
-- Both realm containers forward every slice to the one singleton: a new slice must be added to both
-  `AddRealmGameServer` and `AddRealmCsPlayerAgent` (the composition tests catch a miss).
+- `ConfigureFaolanDatabase` forwards every slice to the one singleton (`AddRepositorySlices` reads them off the
+  composite's interface list), so a new slice needs no registration of its own.
 
 **World invariants** that compile and pass tests when broken:
 - **Never send a despawn (`n3ToClientQuit`) for a handle the recipient was never sent**: the client crashes on a null

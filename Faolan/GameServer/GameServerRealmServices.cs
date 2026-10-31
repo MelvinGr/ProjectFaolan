@@ -57,22 +57,8 @@ namespace Faolan.GameServer
 			services.AddSingleton<ConnectionRegistry>();
 			services.AddSingleton<TagService>();
 
-			// The narrower slices of IDatabaseRepository that individual services ask for, and the read half of the
-			// CS dispatcher. Both are interfaces the shared singleton already satisfies; MS.DI does not infer that,
-			// so each is forwarded explicitly rather than the services being widened to take the whole repository.
-			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICharacterInventoryRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICharacterQuestRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICharacterStatRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICharacterProgressionRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICatalogRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<INpcRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IEconomyRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IGuildRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IRealmRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IFactionRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			// The read half of the CS dispatcher, which the shared dispatcher already satisfies; MS.DI does not infer
+			// that. (The repository's slices are forwarded where the repository is registered, ConfigureFaolanDatabase.)
 			services.AddSingleton<ICsPlayerAgentProvider>(sp => sp.GetRequiredService<ICsPlayerAgentDispatcher>());
 
 			// --- the world model, and the leaves it reads -------------------------------------------------------

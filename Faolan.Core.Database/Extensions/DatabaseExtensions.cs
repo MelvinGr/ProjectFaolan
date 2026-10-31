@@ -36,17 +36,23 @@ namespace Faolan.Core.Database.Extensions
 
 			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
 
-			// Forward each cohesive per-domain port to the single DatabaseRepository instance, so a
-			// collaborator can depend on the narrow interface it actually uses (e.g. IGuildRepository) and still get the
-			// one shared singleton - no second instance, no context-factory duplication.
-			services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<ICatalogRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IEconomyRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IGuildRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<INpcRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IRealmRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
-			services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<IDatabaseRepository>());
+			return services.AddRepositorySlices();
+		}
+
+		/// <summary>
+		///     Forwards every per-domain slice of <see cref="IDatabaseRepository" /> (<see cref="IGuildRepository" />,
+		///     <see cref="ICatalogRepository" />, ...) to the one registered repository, so a collaborator can take the
+		///     narrow interface it calls and still get the shared singleton.
+		/// </summary>
+		/// <remarks>
+		///     MS.DI does not infer that one registration satisfies a base interface. The slices are read off the
+		///     composite's own interface list, so a new slice is forwarded without anyone having to remember to add it.
+		///     The composition tests call this after stubbing <see cref="IDatabaseRepository" />.
+		/// </remarks>
+		public static IServiceCollection AddRepositorySlices(this IServiceCollection services)
+		{
+			foreach (var slice in typeof(IDatabaseRepository).GetInterfaces())
+				services.AddSingleton(slice, sp => sp.GetRequiredService<IDatabaseRepository>());
 
 			return services;
 		}
