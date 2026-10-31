@@ -25,6 +25,7 @@ namespace Faolan.ClientLauncher
 	/// </remarks>
 	internal static class Program
 	{
+		private const string Dx10ExeName = "AgeOfConanDX10.exe";
 		private const string SteamAppId = "217750";
 
 		/// <summary>
@@ -170,7 +171,7 @@ namespace Faolan.ClientLauncher
 			// --dx10 names the sibling exe outright; when it is missing the check below says so, rather than launching the
 			// DX9 client the caller did not ask for.
 			if (options.Dx10)
-				exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", "AgeOfConanDX10.exe");
+				exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", Dx10ExeName);
 
 			if (!File.Exists(exe))
 			{
@@ -186,10 +187,10 @@ namespace Faolan.ClientLauncher
 				// Both exe variants are restored regardless of --dx10, so whichever was patched is undone.
 				var dir = Path.GetDirectoryName(exe)!;
 				var dx10Restored = false;
-				foreach (var name in new[] { "AgeOfConan.exe", "AgeOfConanDX10.exe", "LocalConfig.xml", ClientDebugChannels.ConfName })
+				foreach (var name in new[] { "AgeOfConan.exe", Dx10ExeName, "LocalConfig.xml", ClientDebugChannels.ConfName })
 				{
 					var restored = RestoreFromBackup(Path.Combine(dir, name));
-					dx10Restored |= restored && name == "AgeOfConanDX10.exe";
+					dx10Restored |= restored && name == Dx10ExeName;
 					Console.WriteLine(restored
 						? $"restored {name} from .bak"
 						: $"no {name}.bak to restore");
@@ -421,8 +422,12 @@ namespace Faolan.ClientLauncher
 				SetIfUnset(psi, "SteamAppId", SteamAppId);
 				SetIfUnset(psi, "SteamGameId", SteamAppId);
 
-				// The renderer and the sync primitives are Proton's defaults (DXVK, esync/fsync), the same as a Steam launch
-				// with no launch options. PROTON_USE_WINED3D, PROTON_NO_ESYNC and the like pass through from the environment.
+				// The DX9 client needs WineD3D: on Proton's default DXVK its d3d9 device dies at startup inside NVIDIA's
+				// 32-bit driver (an access violation in libnvidia-glcore 615.78.08 under vkAllocateMemory). The DX10 client
+				// runs on DXVK, so it keeps the default. Everything else, esync/fsync included, is Proton's default, and
+				// PROTON_USE_WINED3D, PROTON_NO_ESYNC and the like set in the environment pass through.
+				if (!Path.GetFileName(exe).Equals(Dx10ExeName, StringComparison.OrdinalIgnoreCase))
+					SetIfUnset(psi, "PROTON_USE_WINED3D", "1");
 			}
 
 			foreach (var a in launchArgs)

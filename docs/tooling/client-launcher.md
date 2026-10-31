@@ -100,9 +100,10 @@ Behaviors:
 - **Kills any running client first** (clean repeated launches).
 - **Launches via Proton** off Windows — `proton run <exe> <args>` with the Steam compat env
   (`STEAM_COMPAT_DATA_PATH` from the auto-detected compat-data, `STEAM_COMPAT_CLIENT_INSTALL_PATH`,
-  `SteamAppId/SteamGameId=217750`). Renderer and sync are Proton's defaults (DXVK, esync/fsync), the same as a
-  Steam launch with no launch options; `PROTON_USE_WINED3D`, `PROTON_NO_ESYNC` and the like pass through from
-  the environment.
+  `SteamAppId/SteamGameId=217750`). Sync is Proton's default (esync/fsync). The renderer is DXVK for the DX10 exe
+  and WineD3D (`PROTON_USE_WINED3D=1`) for the DX9 exe, whose D3D9 device dies at startup on DXVK inside NVIDIA's
+  32-bit driver (an access violation in libnvidia-glcore 615.78.08 under vkAllocateMemory). `PROTON_USE_WINED3D`,
+  `PROTON_NO_ESYNC` and the like set in the environment pass through.
   `--wine` for a plain wine runner; direct on Windows. The exe, compat-data, and Proton build are all auto-detected
   from Steam (see `SteamPaths.cs`).
 - **Computes `-clienthash`** from the actual launched file (after any on-disk patch, so the hash matches).
