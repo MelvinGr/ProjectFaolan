@@ -232,8 +232,17 @@ namespace Faolan.Core.Network
 			}
 		}
 
+		/// <remarks>
+		///     A send to a connection that has gone is dropped rather than thrown. Fan-outs (a despawn, the tick's regen,
+		///     a chat line) reach every viewer the world still lists, and one whose socket closed a moment ago would
+		///     otherwise throw into the sender: the rest of the fan-out would be skipped, and on a disconnect so would
+		///     the leaver's own teardown. The gone connection's own disconnect cleanup runs either way.
+		/// </remarks>
 		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
 		{
+			if (Volatile.Read(ref _stopped) == 1)
+				return;
+
 			await _sendLock.WaitAsync(cancellationToken);
 			try
 			{
@@ -249,6 +258,12 @@ namespace Faolan.Core.Network
 
 					sent += n;
 				}
+			}
+			catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
+			{
+				// The peer went away mid-send: stop the connection, which runs its disconnect cleanup.
+				Logger.LogDebug(ex, "Send failed for {PacketType}; closing client.", ProtocolName);
+				Stop();
 			}
 			finally
 			{

@@ -374,18 +374,34 @@ namespace Faolan.GameServer
 			await Task.WhenAll(_simulation.StopAsync(), _persistence.StopAsync());
 			_loopCts?.Dispose();
 
+			// The final save. Shutdown does not disconnect the clients, so no logout save runs for them, and without this
+			// every online player would lose whatever moved since the last autosave (up to its interval).
+			var saved = await _persistence.FlushAllAsync();
+			Logger.LogInformation("Shutdown: saved {Count} player(s)' live world state.", saved);
+
 			await base.StopAsync(cancellationToken);
 		}
 
 		protected override async Task ClientDisconnected(INetworkClient client)
 		{
+			// A zone change closes this connection too, and the teardown below clears the flag, so it is read first.
+			var teleportingOut = client.Session.IsTeleportingOut;
+
 			var entity = _simulation.PlayerWorldEntity(client);
 			if (entity != null)
 			{
 				// Tell everyone who could see this player that it left (n3ToClientQuit) before removing it from the
 				// zone, so ResolveRemove still sees the leaver's viewers. Awaited, so the despawn lands before
-				// RemovePlayer rather than racing it.
-				await _broadcaster.BroadcastPlayerDespawn(entity);
+				// RemovePlayer rather than racing it. A failure here must not skip the rest: a player left registered
+				// is a ghost every tick sends to, and the save below is the only one a logout gets.
+				try
+				{
+					await _broadcaster.BroadcastPlayerDespawn(entity);
+				}
+				catch (Exception ex)
+				{
+					Logger.LogError(ex, "World: despawn broadcast for {Name} (0x{Handle:X8}) failed; removing the player anyway.", entity.Name, entity.Handle);
+				}
 				// A zone change tears this connection down and the re-entry builds a new entity (PlayerRegistry is
 				// keyed by connection), so the live buffs are held over the handoff. Without that, a debuff live at the
 				// moment of the teleport has nothing left to expire it and the client - which keeps its own icon list
@@ -428,7 +444,9 @@ namespace Faolan.GameServer
 
 			// A logout also leaves the team - otherwise the roster keeps a member nobody can reach, and the next join
 			// broadcast pushes at a dead connection. Retail dissolves a one-member team, which TeamService does too.
-			if (client.Session.Character is { } character)
+			// A zone change does not: the team lives on the CS connection, which a map change keeps, and the group
+			// finder's instance routing reads the team right after the teleport it starts.
+			if (!teleportingOut && client.Session.Character is { } character)
 				await _csPlayerAgentDispatcher.LeaveTeam(character.Id);
 
 			await base.ClientDisconnected(client);
