@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
@@ -60,26 +61,43 @@ namespace Faolan.Core.Network
 	}
 
 	/// <summary>
-	///     The concrete socket client: owns the socket, the send lock, the message framer and the receive loop -
+	///     The concrete socket client: owns the socket, the outbound queue, the message framer and the receive loop -
 	///     everything except how a completed frame is turned into something the listener dispatches on.
 	/// </summary>
 	/// <remarks>
 	///     That one step is <see cref="DispatchFrame" />, which the two subclasses supply: a
 	///     <see cref="ChatServerMessage" /> for the chat tier or the structured <see cref="Rpc" /> for the Conan
 	///     protocol listeners, both parsed straight from the frame with no per-frame packet object.
+	///     <para>
+	///         A send queues the frame and returns; one loop per client writes the queue to the socket in order. So a
+	///         sender - a zone's loop above all - never waits on this client's socket: a client that stops reading
+	///         (its TCP window full, the socket still open) used to park whoever was sending to it, the world tick
+	///         included. Each frame is still its own socket write, so the per-segment framing the world-entry burst
+	///         needs (see <c>ServerBase</c>'s NoDelay) is unchanged.
+	///     </para>
 	/// </remarks>
 	public abstract class NetworkClient : INetworkClient
 	{
+		// Frames queued for the socket. A client that has not drained this many is not reading at all, and is
+		// stopped rather than left to grow the queue without bound.
+		private const int OutboundCapacity = 8192;
+
 		protected readonly ILogger Logger;
 		protected readonly Socket Socket;
 		private readonly IMessageFramer _messageFramer;
 		private readonly IPacketTracer _tracer;
-		private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
+
+		private readonly Channel<byte[]> _outbound = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(OutboundCapacity)
+		{
+			SingleReader = true,
+			FullMode = BoundedChannelFullMode.Wait
+		});
 
 		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
 
 		private CancellationTokenSource? _cancellationTokenSource;
-		private Task? _receiveTask;
+		// The receive and send loops together; each handles its own end, so this is only the "started" mark.
+		private Task? _loops;
 		private int _stopped;
 
 		// A short protocol name for the receive-loop error logs.
@@ -112,20 +130,23 @@ namespace Faolan.Core.Network
 		}
 
 		/// <summary>
-		///     The byte[] send path: trace the frame, which the tracer decodes, then put it on the wire. Used by the
+		///     The byte[] send path: trace the frame, which the tracer decodes, then queue it for the socket. Used by the
 		///     chat server, whose framing has no Rpc model, and by the <c>SendAsync(Rpc)</c> default for test doubles.
 		/// </summary>
+		/// <remarks>Completes once the frame is queued, not once it is on the wire (see the class remarks).</remarks>
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 		{
 			ArgumentNullException.ThrowIfNull(value);
 			_tracer.Transmitted(value);
-			return SendRawAsync(value, cancellationToken);
+			Enqueue(value);
+			return Task.CompletedTask;
 		}
 
 		/// <summary>
-		///     The structured send path: serialize once, trace directly from the Rpc model with no re-parse, then put
-		///     it on the wire.
+		///     The structured send path: serialize once, trace directly from the Rpc model with no re-parse, then queue
+		///     it for the socket.
 		/// </summary>
+		/// <remarks>Completes once the frame is queued, not once it is on the wire (see the class remarks).</remarks>
 		public virtual Task SendAsync(Rpc rpc, CancellationToken cancellationToken = default)
 		{
 			var bytes = rpc.Serialize();
@@ -135,22 +156,26 @@ namespace Faolan.Core.Network
 			{
 				FrameLength = bytes.Length
 			});
-			return SendRawAsync(bytes, cancellationToken);
+			Enqueue(bytes);
+			return Task.CompletedTask;
 		}
 
 		public void Start()
 		{
-			if (_receiveTask != null)
+			if (_loops != null)
 				return;
 
 			_cancellationTokenSource = new CancellationTokenSource();
-			_receiveTask = ReceiveLoopAsync(_cancellationTokenSource.Token);
+			_loops = Task.WhenAll(ReceiveLoopAsync(_cancellationTokenSource.Token), SendLoopAsync(_cancellationTokenSource.Token));
 		}
 
 		public void Stop()
 		{
 			if (Interlocked.Exchange(ref _stopped, 1) == 1)
 				return;
+
+			// Whatever is still queued is dropped with the connection, like any send made after this point.
+			_outbound.Writer.TryComplete();
 
 			try
 			{
@@ -248,36 +273,47 @@ namespace Faolan.Core.Network
 		///     otherwise throw into the sender: the rest of the fan-out would be skipped, and on a disconnect so would
 		///     the leaver's own teardown. The gone connection's own disconnect cleanup runs either way.
 		/// </remarks>
-		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
+		private void Enqueue(byte[] frame)
 		{
 			if (IsStopped)
 				return;
 
-			await _sendLock.WaitAsync(cancellationToken);
+			if (!_outbound.Writer.TryWrite(frame) && !IsStopped)
+			{
+				Logger.LogWarning("Dropping {PacketType} client: {Count} frames queued and none drained.", ProtocolName, OutboundCapacity);
+				Stop();
+			}
+		}
+
+		// The one writer: frames go out in the order they were queued, each as its own socket write, and a short write
+		// is continued rather than dropped - discarding the count would truncate a large frame mid-stream, and the
+		// client's framer would then read the following packets as its remainder.
+		private async Task SendLoopAsync(CancellationToken cancellationToken)
+		{
 			try
 			{
-				// Socket.SendAsync can complete having written fewer bytes than requested when the send buffer is full.
-				// Discarding the count would truncate a large frame mid-stream, and the client's framer would then
-				// consume the following packets as the truncated frame's remainder. Loop until fully sent.
-				var sent = 0;
-				while (sent < value.Length)
+				await foreach (var frame in _outbound.Reader.ReadAllAsync(cancellationToken))
 				{
-					var n = await Socket.SendAsync(value.AsMemory(sent), SocketFlags.None, cancellationToken);
-					if (n <= 0)
-						throw new SocketException((int)SocketError.ConnectionReset);
+					var sent = 0;
+					while (sent < frame.Length)
+					{
+						var n = await Socket.SendAsync(frame.AsMemory(sent), SocketFlags.None, cancellationToken);
+						if (n <= 0)
+							throw new SocketException((int)SocketError.ConnectionReset);
 
-					sent += n;
+						sent += n;
+					}
 				}
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				// Normal shutdown.
 			}
 			catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
 			{
 				// The peer went away mid-send: stop the connection, which runs its disconnect cleanup.
 				Logger.LogDebug(ex, "Send failed for {PacketType}; closing client.", ProtocolName);
 				Stop();
-			}
-			finally
-			{
-				_sendLock.Release();
 			}
 		}
 	}
