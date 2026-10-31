@@ -1,0 +1,50 @@
+<Project>
+	<!-- Central package management: every package version lives here; a project's PackageReference carries no Version. -->
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="JetBrains.Annotations" Version="2026.2.0" />
+		<PackageVersion Include="protobuf-net" Version="3.4.40" />
+		<PackageVersion Include="System.CommandLine" Version="3.0.0-preview.6.26359.118" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.14" />
+		<PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+		<PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="SkiaSharp" Version="4.154.0" />
+		<PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.154.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Server (Faolan.Mcp) and client (Faolan.Web, the status page's live presence) of the same SDK: keep them in step. -->
+		<PackageVersion Include="ModelContextProtocol" Version="2.3.0" />
+		<PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+		<PackageVersion Include="xunit.v3" Version="4.0.2" />
+	</ItemGroup>
+
+	<!--<ItemGroup>
+		<GlobalPackageReference Include="AsyncFixer" Version="1.6.0" />
+	</ItemGroup>-->
+</Project>

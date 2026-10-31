@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 	<PropertyGroup>
 		<!--<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>-->
 		<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
@@ -13,7 +13,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- MCP client: the status page queries the running game server's in-process MCP endpoint (list_sessions) for live presence. Same SDK version as Faolan.Mcp (the server side). -->
-		<PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+		<!-- MCP client: the status page queries the running game server's in-process MCP endpoint (list_sessions) for live presence. -->
+		<PackageReference Include="ModelContextProtocol" />
 	</ItemGroup>
 </Project>

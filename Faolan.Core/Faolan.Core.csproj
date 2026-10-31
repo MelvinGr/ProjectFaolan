@@ -1,13 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="protobuf-net" Version="3.4.30" />
-		<PackageReference Include="System.CommandLine" Version="3.0.0-preview.6.26359.118" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-		<PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
+		<PackageReference Include="protobuf-net" />
+		<PackageReference Include="System.CommandLine" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" />
+		<PackageReference Include="JetBrains.Annotations" />
 	</ItemGroup>
 </Project>

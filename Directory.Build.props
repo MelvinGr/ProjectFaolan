@@ -24,10 +24,6 @@
 		<InternalsVisibleTo Include="Faolan.Tests" />
 	</ItemGroup>
 
-	<!--<ItemGroup>
-		<PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" ExcludeAssets="runtime" />
-	</ItemGroup>-->
-
 	<!--<PropertyGroup>
         <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '_').ToLower())</ProjectNameSlug>
 
