@@ -307,6 +307,9 @@ we've seen_, and names the gaps). Regenerate with
 dotnet build ProjectFaolan.slnx
 ```
 
+Package versions are set once, in `Directory.Packages.props` (central package management); a project's
+`PackageReference` carries no version.
+
 If you commit changes to `faolan.db`, regenerate its `faolan.sql` mirror (below) and commit the two together:
 
 ```sh
@@ -323,8 +326,9 @@ dotnet run --project Faolan
 ```
 
 It starts every protocol service (UniverseAgent on the fixed port **7010**, plus the PlayerAgent,
-CsPlayerAgent, ChatServer and GameServer listeners the client is handed off to in turn), migrates the
-database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/mcp`.
+CsPlayerAgent, ChatServer and GameServer listeners the client is handed off to in turn) and migrates the
+database schema. With `Mcp:Enabled` set (off by default) it also hosts an in-process MCP endpoint on
+`http://127.0.0.1:7099/mcp`: database queries, live-session inspection and GM commands.
 
 ### `faolan.db` and `faolan.sql`
 
@@ -390,8 +394,8 @@ Two are worth knowing up front:
 
 ## Configuration
 
-Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,
-and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment variables > command line >
+Every server-side executable — the server, the importer, `Faolan.Web` and the `Faolan.Web.Content` CDN mirror —
+shares **one** config model: **environment variables > command line >
 `faolan.user.json` > `faolan.json` > built-in defaults**, with both files **optional** (a container can be
 configured entirely by env vars, with no file baked into the image, and the server runs with neither). They live
 at the repo root, and are found by searching up from the working directory — so a tool started from its own
@@ -442,10 +446,10 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | Key | Meaning |
 | --- | --- |
 | `Database` `{ Provider, ConnectionString }` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
-| `Server` `{ Address, UniverseAgentPort, PlayerAgentPort, WelcomeString }` | the address the login tier advertises to clients (must be reachable from the client - it may be a DNS name), its two listen ports (7010 is the fixed client entry point), and the login MOTD |
-| `Content` `{ TerrainDir, RdbDir, ClientVersion }` | where the game data lives: the baked-terrain dir for ground-snap and line-of-sight, the client's RDB folder (optional - part of the game INSTALL, so it has no committed default), and the client build the protocol was decoded against |
-| `Login` `{ PrivateKey, PublicKey }` | the login DH keypair. Unset (the default) means no password is ever checked and every client is accepted on its account name; setting `PrivateKey` requires every client to be patched (`Faolan.ClientLauncher --patch-login`), since a client the server cannot decrypt has proved only that name |
-| `Mcp` `{ Enabled, Port }` | the in-process MCP endpoint the game server hosts |
+| `Server` `{ ListenAddress, PublicAddress, UniverseAgentPort, PlayerAgentPort, WelcomeString, PrivateKey, PublicKey }` | the interface the server binds (`0.0.0.0`); the address the login tier advertises to clients (no port, must be reachable from the client - it may be a DNS name); its two listen ports (7010 is the fixed client entry point); the login MOTD; and the login DH keypair. An unset `PrivateKey` (the default) means no password is ever checked and every client is accepted on its account name; setting it requires every client to be patched (`Faolan.ClientLauncher --patch-login`), since a client the server cannot decrypt has proved only that name |
+| `Realms` | the realms this deployment serves: each one's static half (name, address, ports, type, language), reconciled into the `Realm` table at startup. A deployment that declares none gets the default realm |
+| `Content` `{ TerrainDir, RdbDir, ClientVersion, KillStreaks }` | where the game data lives: the baked-terrain dir for ground-snap and line-of-sight (default `./terrain`), the client's RDB folder (optional - part of the game INSTALL, so it has no committed default), and the client build the protocol was decoded against; plus whether a player's kill streak is announced (default on) |
+| `Mcp` `{ Enabled, Port }` | the in-process MCP endpoint the game server hosts: off by default, port 7099 |
 | `Cdn` `{ Store, ListenAddress, ListenPort, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
@@ -494,12 +498,14 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 
 ## World terrain files (line-of-sight)
 
-NPC line-of-sight + ground-snap (#284) read a baked per-map terrain file from `Terrain/` — the game server never
-touches the client RDB at runtime. These files are large (~555 MB) and **not committed**, so generate them once
-from the client RDB (they're optional: without them the server still runs and every terrain query degrades open):
+NPC line-of-sight + ground-snap (#284) read a baked per-map terrain file from the `Content:TerrainDir` folder
+(default `./terrain`) — the game server never touches the client RDB at runtime. These files are large (~555 MB)
+and **not committed** (the maintainer keeps them in the private data repo), so generate them once from the client
+RDB and point `Content:TerrainDir` at the result. They are optional: without them the server logs that
+ground-snap and line-of-sight are disabled, and carries on.
 
 ```sh
-dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terrain/<mapId>.terrain (one per map)
+dotnet run --project Faolan.Importer -- --report terrain-export --terrain-out terrain   # one <mapId>.terrain per map
 ```
 
 ## Project layout
@@ -507,9 +513,9 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 | Project                  | Purpose                                                                                                                                                                                |
 | ------------------------ |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
-| `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
+| `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database` (plus one migrations project per provider, `.Migrations.Sqlite` / `.Migrations.Postgres`), `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top. |
 | `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
-| `Faolan.Mcp/`            | In-process MCP server exposing DB queries + live-session inspection to Claude.                                                                                                         |
+| `Faolan.Mcp/`            | The in-process MCP endpoint the server hosts when `Mcp:Enabled` is set: DB queries, live-session inspection and GM commands for tooling. A library, not an executable. |
 | `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
 | `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
 | `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
@@ -521,14 +527,16 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 
 - **`AGENTS.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
   (the orientation guide for anyone, human or AI, working in the codebase). The rules for one folder are in a
-  nested `AGENTS.md` there: `Faolan/`, `Faolan.Core.Database/`, `Faolan.Core.Network/Codecs/`, `Faolan.Tests/`.
+  nested `AGENTS.md` there: `Faolan/`, `Faolan.Core.Database/`, `Faolan.Core.Network/Codecs/`, `Faolan.Importer/`,
+  `Faolan.Tests/`.
 - **Gitea issues** (the `projectfaolan` repo) — the tracker of open work, grouped by `area:*` labels.
 - **[`docs/protocol/`](docs/protocol/README.md)** — the verified wire-protocol reference: framing, opcodes,
   message layouts and encodings, where every stated fact carries a verification tag a test resolves and the
   machine-derivable pages are generated from the code. Start at its `README.md`.
 - **`docs/`** — the rest of the deep-dives, by kind: `subsystems/` (how the server implements each domain),
   `rdb/` (client asset formats), `tooling/` (launcher, capture workflow, importer), `re/` (reverse-engineering
-  methodology + raw decode artifacts).
+  methodology + raw decode artifacts; start with `docs/re/client-re-techniques.md` and
+  `docs/re/corpus-analysis-pitfalls.md`).
 - **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
 
 ## Network captures (the project's fuel)
@@ -544,9 +552,11 @@ That is especially true of **server-authored** records (the server writes them, 
 reverse-engineering the client alone).
 
 **How a capture is used:** a `.pcapng` of a client↔server session is TCP-reassembled and dumped to the canonical
-`*.tshark.json` via `tools/capture/tshark_dump.sh`, which the importer and the Python dissectors read. Loopback
-captures against the local server (no root needed) and retail-session captures are both used. Full workflow in
-`AGENTS.md`.
+`*.tshark.json` via `tools/capture/tshark_dump.sh`, which the importer and the Python dissectors read. The corpus
+is retail-only and lives in a separate, private data repo (the dumps are named after the characters played); the
+test suite does not need it, since every byte it reads is in `Faolan.Tests/Assets/fixtures.bin`. Loopback
+captures against the local server (no root needed) are a debugging aid and never join the corpus. Full workflow
+in `AGENTS.md`.
 
 **Captures that would directly unblock currently-blocked features:**
 

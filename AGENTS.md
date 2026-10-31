@@ -180,7 +180,8 @@ the standard test bootstrap for features whose retail trigger is not wired yet (
 `.setnpcgroup`, ...). The registered set is the table `BuildTable` builds in that file (one instance per realm); check it
 before assuming a command exists, since MCP tools wrapping a removed command are stale.
 
-**MCP server:** the running server hosts an in-process MCP endpoint at `http://127.0.0.1:7099/mcp` (DB queries,
+**MCP server:** with `Mcp:Enabled` set (off by default) the server hosts an in-process MCP endpoint at
+`http://127.0.0.1:7099/mcp` (DB queries,
 live-session inspection, GM-command routing).
 
 ## Capture data
