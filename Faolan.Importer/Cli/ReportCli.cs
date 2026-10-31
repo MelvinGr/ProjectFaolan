@@ -949,7 +949,7 @@ namespace Faolan.Importer.Cli
 			}),
 			new("terrain-export", "", Needs.Captures, async ctx =>
 			{
-				await TerrainExport(RdbDir(), _options.TerrainOut ?? "Terrain");
+				await TerrainExport(RdbDir(), TerrainDir());
 				return 0;
 			}),
 			new("resolve-spawn-areas", "", Needs.Captures, async ctx =>
@@ -1473,6 +1473,17 @@ namespace Faolan.Importer.Cli
 			return _options.Configuration[Keys.ContentRdbDir] ??
 				throw new InvalidOperationException(
 					"The client's RDB folder is not configured - set Content:RdbDir in faolan.json, the Content__RdbDir environment variable, or pass --Content:RdbDir <dir>.");
+		}
+
+		/// <summary>
+		///     The baked-terrain folder: <c>--terrain-out</c> when given, else <c>Content:TerrainDir</c>, the folder the game
+		///     server reads - so an export with no flag lands where the server looks.
+		/// </summary>
+		private static string TerrainDir()
+		{
+			return _options.TerrainOut ?? _options.Configuration.ContentTerrainDir ??
+				throw new InvalidOperationException(
+					"No terrain folder - pass --terrain-out <dir>, or set Content:TerrainDir in faolan.json, the Content__TerrainDir environment variable, or --Content:TerrainDir <dir>.");
 		}
 
 		/// <remarks>RDB 1040005 - the spell template type; feats, spells and items share one record layout.</remarks>

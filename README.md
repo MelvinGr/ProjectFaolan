@@ -501,11 +501,12 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 NPC line-of-sight + ground-snap (#284) read a baked per-map terrain file from the `Content:TerrainDir` folder
 (default `./terrain`) — the game server never touches the client RDB at runtime. These files are large (~555 MB)
 and **not committed** (the maintainer keeps them in the private data repo), so generate them once from the client
-RDB and point `Content:TerrainDir` at the result. They are optional: without them the server logs that
-ground-snap and line-of-sight are disabled, and carries on.
+RDB: the export writes them into `Content:TerrainDir`, where the server reads them (`--terrain-out <dir>` writes
+elsewhere). They are optional: without them the server logs that ground-snap and line-of-sight are disabled, and
+carries on.
 
 ```sh
-dotnet run --project Faolan.Importer -- --report terrain-export --terrain-out terrain   # one <mapId>.terrain per map
+dotnet run --project Faolan.Importer -- --report terrain-export   # one <mapId>.terrain per map
 ```
 
 ## Project layout

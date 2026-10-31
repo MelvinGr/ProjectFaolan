@@ -39,7 +39,7 @@ namespace Faolan.Importer.Cli
 		private static readonly Option<string> ReportArg = new Option<string>("--report-arg") { Description = "The report's argument (its meaning is per report)." };
 		private static readonly Option<string> Out = new Option<string>("--out") { Description = "Output directory for reports that write files." };
 		private static readonly Option<string> Skeleton = new Option<string>("--skeleton") { Description = "Skeleton id for the rdb-rig report." };
-		private static readonly Option<string> TerrainOut = new Option<string>("--terrain-out") { Description = "Output directory for the terrain-export report (default: ./Terrain)." };
+		private static readonly Option<string> TerrainOut = new Option<string>("--terrain-out") { Description = "The baked-terrain folder terrain-export writes and the terrain reports read (default: Content:TerrainDir, the folder the server reads)." };
 		private static readonly Option<bool> DumpMesh = new Option<bool>("--dump-mesh") { Description = "Dump mesh payloads in the rdb-assets report." };
 		private static readonly Option<string> DumpTemplates = new Option<string>("--dump-templates") { Description = "Dump decrypted item templates to this directory." };
 		private static readonly Option<string> RdbProxy = new Option<string>("--rdb-proxy") { Description = "Faolan.Web.Content mirror address for on-demand RDB fetches, e.g. http://127.0.0.1:7081 (the /gameupdate/upm/rdb route is appended)." };

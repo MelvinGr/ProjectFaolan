@@ -18,8 +18,9 @@ namespace Faolan.Importer.Cli
 	{
 		// bake a compact per-map terrain file (heightmap 1066611 + collision mesh 1000012, gzipped) for every map
 		// in the DB that has terrain, so the GAME server can serve ground-snap + line-of-sight from these small files
-		// instead of shipping the ~28 GB client RDB. Output: <out>/<mapId>.terrain (TerrainFile format). Run:
-		//   dotnet run --project Faolan.Importer -- --report terrain-export [--rdb <dir>] [--terrain-out <dir>]
+		// instead of shipping the ~28 GB client RDB. Output: <dir>/<mapId>.terrain (TerrainFile format), where <dir> is
+		// --terrain-out or else Content:TerrainDir, the folder the game server reads. Run:
+		//   dotnet run --project Faolan.Importer -- --report terrain-export [--Content:RdbDir <dir>] [--terrain-out <dir>]
 		private static async Task TerrainExport(string rdbDir, string outDir)
 		{
 			using var db = OpenDb();

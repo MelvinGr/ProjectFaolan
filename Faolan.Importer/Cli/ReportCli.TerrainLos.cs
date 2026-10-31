@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
@@ -49,11 +48,11 @@ namespace Faolan.Importer.Cli
 			var maxRange = spec.Length >= 2 && float.TryParse(spec[1], out var r) ? r : 20f;
 			var profile = spec.Length == 3 && spec[2] == "profile";
 
-			var terrainDir = _options.TerrainOut ?? _options.Configuration[Keys.ContentTerrainDir] ?? "Terrain";
+			var terrainDir = TerrainDir();
 			var terrain = new TerrainService(terrainDir, NullLogger.Instance);
 			if (!terrain.Available)
 			{
-				Console.WriteLine($"No baked terrain at '{terrainDir}'. Pass --terrain-out <dir> or set TerrainDir.");
+				Console.WriteLine($"No baked terrain at '{terrainDir}'. Generate it with --report terrain-export, or pass --terrain-out <dir> / set Content:TerrainDir.");
 				return;
 			}
 
@@ -259,7 +258,7 @@ namespace Faolan.Importer.Cli
 
 			// Is the hump a PROP (a rock, a hut) that the collision mesh also carries, or bare ground? Trace attributes
 			// to terrain first, so this is the only way to see whether the collision half would have caught it too.
-			var terrainDir = _options.TerrainOut ?? _options.Configuration[Keys.ContentTerrainDir] ?? "Terrain";
+			var terrainDir = TerrainDir();
 			using var fs = System.IO.File.OpenRead(System.IO.Path.Combine(terrainDir, $"{mapId}{Faolan.Core.Rdb.Assets.TerrainFile.Extension}"));
 			var data = Faolan.Core.Rdb.Assets.TerrainFile.Read(fs);
 			if (data != null && Faolan.Core.Rdb.Assets.RdbCollisionMesh.TryParse(data.Collision, out var col))
