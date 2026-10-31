@@ -149,5 +149,10 @@ namespace Faolan.Core.Network.Codecs.World
 		/// </summary>
 		public bool IsTravelAction => DynelHandle == TravelActionCodec.TypeId;
 
+		/// <summary>
+		///     Whether the tail is one of the achievement vista's camera pair - a start and a stop, two GameAction types with
+		///     two different tails, which is why this is a membership test rather than an equality.
+		/// </summary>
+		public bool IsVistaAction => DynelHandle is VistaScryActionCodec.StartTypeId or VistaScryActionCodec.StopTypeId;
 	}
 }
