@@ -107,9 +107,10 @@ namespace Faolan.GameServer.Combat
 				using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(EnergyTickMs));
 				while (await timer.WaitForNextTickAsync())
 				{
-					var session = client.Session;
-					if (session.Account == null)
+					if (client.IsStopped)
 						return; // disconnected
+
+					var session = client.Session;
 
 					if (session.IsSpellweaving)
 						continue; // the weave owns the energy this tick

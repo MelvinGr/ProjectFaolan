@@ -21,6 +21,14 @@ namespace Faolan.Core.Network
 		string? IpAddress { get; }
 
 		/// <summary>
+		///     True once the connection has stopped. A loop or a delayed action that outlives the packet that started it
+		///     (the energy mirror, the trance meter, a channel's ticks) checks this to end with the connection: a send
+		///     to a stopped connection is dropped rather than thrown, so a send failing is not how such a loop learns
+		///     the player has gone.
+		/// </summary>
+		bool IsStopped { get; }
+
+		/// <summary>
 		///     The structured send boundary: a handler builds an <see cref="Rpc" /> and hands it here instead of a
 		///     hand-framed packet buffer.
 		/// </summary>
@@ -92,6 +100,8 @@ namespace Faolan.Core.Network
 		public INetworkClientSession Session { get; } = new NetworkClientSession();
 
 		public string? IpAddress => field ??= (Socket.RemoteEndPoint as IPEndPoint)?.Address.ToString();
+
+		public bool IsStopped => Volatile.Read(ref _stopped) == 1;
 
 		protected NetworkClient(Socket socket, ILogger logger, IMessageFramer messageFramer, IPacketTracer tracer)
 		{
@@ -240,7 +250,7 @@ namespace Faolan.Core.Network
 		/// </remarks>
 		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
 		{
-			if (Volatile.Read(ref _stopped) == 1)
+			if (IsStopped)
 				return;
 
 			await _sendLock.WaitAsync(cancellationToken);

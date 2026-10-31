@@ -183,7 +183,7 @@ namespace Faolan.GameServer.World
 			{
 				// The player may have logged out, zoned or died in the delay - an ambush with nobody to ambush is
 				// dropped rather than left standing in an empty quarry.
-				if (client.Session.Account == null || _sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
+				if (client.IsStopped || _sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
 					return;
 
 				await SpawnAmbusher(zone, ambush, position, facing);

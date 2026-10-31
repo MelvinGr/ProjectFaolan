@@ -192,7 +192,7 @@ namespace Faolan.GameServer.Combat
 				for (var tick = 0; tick < tickCount; tick++)
 				{
 					await Task.Delay(intervalMs);
-					if (client.Session.Account == null)
+					if (client.IsStopped)
 						return; // disconnected
 					if (client.Session.ActiveCastToken != castToken)
 						return; // interrupted (moved / cancelled) - stop ticking

@@ -401,7 +401,7 @@ namespace Faolan.GameServer.Behavior
 				await CombatService.SendBehaviorChannelCompleteAck(client, rawPayload, 3);
 				Task.RunAfter(MountCatalog.DismountChannelMs, async () => // horse runs away during the channel, then unseat
 				{
-					if (client.Session.Account == null)
+					if (client.IsStopped)
 						return;
 
 					await _mounts.Dismount(client); // end-twin + StatUpd(Mount=0), frame 1449
@@ -412,7 +412,7 @@ namespace Faolan.GameServer.Behavior
 			var mountCastPayload = (byte[])rawPayload.Clone();
 			Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
 			{
-				if (client.Session.Account == null)
+				if (client.IsStopped)
 					return;
 
 				await CombatService.SendBehaviorChannelCompleteAck(client, mountCastPayload, 3); // cast complete: mounts (form 0x0a closes the bar)

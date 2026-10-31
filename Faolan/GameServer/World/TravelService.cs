@@ -161,7 +161,7 @@ namespace Faolan.GameServer.World
 			{
 				Task.RunAfter((int)(destination.DelaySeconds * 1000), async () =>
 				{
-					if (client.Session.Account != null)
+					if (!client.IsStopped)
 						await Depart(client, npcName, destination, arrival);
 				}, _logger);
 

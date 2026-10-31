@@ -62,7 +62,7 @@ namespace Faolan.GameServer.Scripting
 				try
 				{
 					await Task.Delay(TimeSpan.FromSeconds(BehaviorAnimations.VistaGestureSeconds));
-					if (client.Session.Account == null || client.Session.ActiveVista is not { } scene || scene.ObjectHandle != live.Handle)
+					if (client.IsStopped || client.Session.ActiveVista is not { } scene || scene.ObjectHandle != live.Handle)
 						return; // disconnected, or the player used something else in the meantime
 
 					await SendVistaCameraStart(client, scene);

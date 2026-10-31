@@ -148,6 +148,7 @@ namespace Faolan.Tests
 			public INetworkClientSession Session { get; } = new NetworkClientSession();
 			public byte[]? Sent { get; private set; }
 			public string? IpAddress => "127.0.0.1";
+			public bool IsStopped => false;
 
 			public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
 			{

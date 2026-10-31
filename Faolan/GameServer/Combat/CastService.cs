@@ -187,7 +187,8 @@ namespace Faolan.GameServer.Combat
 
 			Task.RunAfter(castMs, async () => // resolve the effect after the cast time
 			{
-				if (client.Session.Account != null)
+				// A caster who logged out during the cast resolves nothing: no damage, XP or loot for a session that has gone.
+				if (!client.IsStopped)
 					await Resolve();
 			}, _logger);
 

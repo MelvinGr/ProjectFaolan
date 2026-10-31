@@ -123,7 +123,7 @@ namespace Faolan.GameServer.Combat
 				Task.RunAfter(ElementCooldownMs, async () =>
 				{
 					var session = client.Session;
-					if (session.Account == null || !session.IsSpellweaving)
+					if (client.IsStopped || !session.IsSpellweaving)
 						return;
 
 					// Advance the weave one rung - `Spellweaving (1)` to `(2)` and so on. The new buff overlaps the
@@ -261,8 +261,8 @@ namespace Faolan.GameServer.Combat
 				while (await timer.WaitForNextTickAsync())
 				{
 					var session = client.Session;
-					if (session.Account == null || !session.IsSpellweaving)
-						return; // trance closed
+					if (client.IsStopped || !session.IsSpellweaving)
+						return; // trance closed, or the player is gone
 
 					if (session.Energy > 0)
 					{

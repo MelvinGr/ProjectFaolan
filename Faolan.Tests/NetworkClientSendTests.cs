@@ -32,7 +32,9 @@ namespace Faolan.Tests
 				}
 			};
 
+			Assert.False(client.IsStopped);
 			client.Stop();
+			Assert.True(client.IsStopped);
 			await client.SendAsync([0x00, 0x01, 0x00, 0x00], TestContext.Current.CancellationToken);
 			client.Stop();
 

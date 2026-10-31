@@ -17,6 +17,7 @@ namespace Faolan.Tests.Support
 		public INetworkClientSession Session { get; } = new NetworkClientSession();
 		public List<byte[]> Sent { get; } = [];
 		public string IpAddress => "127.0.0.1";
+		public bool IsStopped => false;
 
 		public RecordingNetworkClient(uint clientInstance)
 		{
