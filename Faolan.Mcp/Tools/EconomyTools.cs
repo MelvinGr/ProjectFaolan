@@ -62,9 +62,6 @@ namespace Faolan.Mcp.Tools
 			var listing = new TradepostListing
 			{
 				RealmId = realmId,
-				// The realm's next sale id, the same allocator the in-game listing path uses - NOT a random id. The
-				// unique key is (RealmId, SaleId), so a random value collides eventually and is unordered meanwhile.
-				SaleId = await _db.GetNextTradepostSaleId(realmId),
 				Handle = 0,
 				SellerName = sellerName ?? "Claude",
 				BankSlot = 0,
@@ -172,9 +169,6 @@ namespace Faolan.Mcp.Tools
 
 			var mail = new Mail
 			{
-				// MailId is the wire id and the primary key, so it comes from the repository's allocator - the same one
-				// the in-game mail path uses - rather than from a random draw.
-				MailId = await _db.GetNextMailId(),
 				// Mail is realm-scoped and RealmId is a foreign key to Realms, so leaving it at the default 0 fails the
 				// insert. It is the recipient's realm: the mailbox read path pairs the same two columns
 				// (GetMailsForRecipient(name, realmId)).
@@ -199,9 +193,6 @@ namespace Faolan.Mcp.Tools
 
 				mail.Attachments.Add(new MailAttachment
 				{
-					// Only has to be unique among this mail's attachments, so the mail id serves - the same choice the
-					// server's mail path makes (TradepostService).
-					ItemInstanceId = mail.MailId,
 					Quantity = count == 0
 						? 1u
 						: count,
@@ -214,7 +205,17 @@ namespace Faolan.Mcp.Tools
 				itemNote = $"{count}x \"{item.Name}\" (id {itemId})";
 			}
 
-			await _db.CreateMail(mail);
+			// MailId is the wire id and the primary key, so it comes from the repository's allocator - the same one the
+			// in-game mail path uses - rather than from a random draw. An attachment's instance id only has to be unique
+			// among this mail's attachments, so the mail id serves, the same choice the server's mail path makes.
+			await _db.CreateMail(mailId =>
+			{
+				mail.MailId = mailId;
+				foreach (var attachment in mail.Attachments)
+					attachment.ItemInstanceId = mailId;
+
+				return mail;
+			});
 			return $"Sent mail 0x{mail.MailId:X16} to {recipient.Name} from \"{mail.SenderName}\"" + (moneyTin > 0
 				? $", {moneyTin} tin"
 				: "") + (itemNote != null

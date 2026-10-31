@@ -76,8 +76,17 @@ namespace Faolan.Tests
 
 			// Sale ids are allocated per realm (`IX_TradepostListings_RealmId_SaleId`), so a realm's next id must not
 			// be pushed along by another realm's listings.
-			Assert.Equal(2ul, await repo.GetNextTradepostSaleId(RealmA));
-			Assert.Equal(2ul, await repo.GetNextTradepostSaleId(RealmB));
+			var next = new TradepostListing
+			{
+				RealmId = RealmA,
+				ItemId = Template,
+				Template = Template,
+				Price = 300,
+				SellerName = SharedName,
+				BankSlot = 1
+			};
+			await repo.CreateTradepostListing(next);
+			Assert.Equal(2ul, next.SaleId);
 		}
 
 		// The two writers, which is where a missing filter does damage rather than merely showing the wrong number:

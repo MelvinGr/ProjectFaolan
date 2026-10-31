@@ -99,6 +99,9 @@ references.
   record belongs in the player's registry is decided by whose bar it lands on, never by `applyTo == applyFrom`: that
   test reads as a correctness guard but excludes every effect a mob lands on the player, which would then get no
   dedup, no expiry and no end twin.
+- **A loop or delayed action that outlives its packet ends on `client.IsStopped`** (the energy mirror, a cast timer,
+  a `Task.RunAfter`). `Session.Account` stays set after a disconnect, and a send to a stopped connection is dropped
+  rather than thrown, so neither tells a loop its player has gone.
 - **When the live simulation mirrors a persisted value, check who writes it on every path** (world entry, level-up,
   GM commands, players and NPCs), not only how it is read: an unset mirror reads as 0 and resolves silently. A throw
   in a derived recompute is usually correct; trace the bad input instead of guarding the throw.

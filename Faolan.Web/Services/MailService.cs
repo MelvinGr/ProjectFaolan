@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 using Microsoft.EntityFrameworkCore;
@@ -19,10 +20,12 @@ namespace Faolan.Web.Services
 	public sealed class MailService
 	{
 		private readonly IDbContextFactory<DatabaseContext> _dbf;
+		private readonly IEconomyRepository _economy;
 
-		public MailService(IDbContextFactory<DatabaseContext> dbf)
+		public MailService(IDbContextFactory<DatabaseContext> dbf, IEconomyRepository economy)
 		{
 			_dbf = dbf;
+			_economy = economy;
 		}
 
 		public async Task<List<MailView>> GetMailboxAsync(string characterName)
@@ -70,7 +73,9 @@ namespace Faolan.Web.Services
 			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 			var mail = new Mail
 			{
-				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+				// Mail is realm-scoped and RealmId is a foreign key to Realms: the recipient's realm, as the mailbox
+				// read path pairs it (GetMailsForRecipient(name, realmId)).
+				RealmId = recipient.RealmId,
 				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = recipient.Name ?? "",
 				SenderClass = MailConstants.EndpointClass,
@@ -90,7 +95,6 @@ namespace Faolan.Web.Services
 
 				mail.Attachments.Add(new MailAttachment
 				{
-					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
 					Quantity = count == 0
 						? 1u
 						: count,
@@ -102,8 +106,16 @@ namespace Faolan.Web.Services
 				});
 			}
 
-			db.Mails.Add(mail);
-			await db.SaveChangesAsync();
+			// The game's allocator, not a random draw: MailId is the wire id and the primary key. An attachment's
+			// instance id only has to be unique among this mail's attachments, so the mail id serves (TradepostService).
+			await _economy.CreateMail(mailId =>
+			{
+				mail.MailId = mailId;
+				foreach (var attachment in mail.Attachments)
+					attachment.ItemInstanceId = mailId;
+
+				return mail;
+			});
 			return (true, $"Mail sent to {recipient.Name}.");
 		}
 

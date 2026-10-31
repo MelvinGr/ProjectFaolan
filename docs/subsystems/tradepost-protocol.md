@@ -147,8 +147,10 @@ attachment mail).
 
 `TradepostBuyItem(0x200E)` debits the buyer (`DispatchUpdateCash`), creates a system mail (recipient = buyer, sender
 empty), deletes the listing, and pushes the base `DispatchMailMessage`. The listed item moves out of the seller's bank
-into the buyer's Mail container (114) as the escrowed attachment — the row is handed over, so the crafter and every
-socketed gem travel with it. An importer-seeded listing has no seller character and no backing row; its mail keeps a
+into the buyer's Mail container (114), into its first free cell, as the escrowed attachment — the row is handed over,
+so the crafter and every socketed gem travel with it. The database half is one transaction
+(`IEconomyRepository.CompleteTradepostPurchase`): deleting the listing is the claim, so a second buyer of the same
+listing is refused before anything is charged. An importer-seeded listing has no seller character and no backing row; its mail keeps a
 null escrow and the take mints from the template.
 
 The mailbox ops work off the DB-backed mail: `GetAllMails` (poll → each mail base + `DispatchRetrieveMailResult`),

@@ -739,7 +739,7 @@ namespace Faolan.Tests
 					Quantity = 1,
 					Template = 0x3E0A97
 				});
-				await repo.CreateMail(mail);
+				await repo.CreateMail(_ => mail);
 
 				// Retrieve by recipient + by wire id (attachments eager-loaded).
 				var inbox = await repo.GetMailsForRecipient("AssassinL23", 1);

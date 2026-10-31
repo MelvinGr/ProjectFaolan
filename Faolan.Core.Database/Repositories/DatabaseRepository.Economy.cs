@@ -1,20 +1,40 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories
 {
 	public interface IEconomyRepository
 	{
-		Task CreateMail(Mail mail);
+		/// <summary>
+		///     Allocates the next wire MailId and stores the mail <paramref name="build" /> makes with it, in one write
+		///     transaction, so two mails sent at once cannot draw the same id.
+		/// </summary>
+		Task<Mail> CreateMail(Func<ulong, Mail> build);
+
+		/// <summary>
+		///     Stores the listing under its realm's next sale id, allocated in the same write transaction.
+		/// </summary>
 		Task CreateTradepostListing(TradepostListing listing);
+
+		/// <summary>
+		///     Completes an auction-house purchase as one unit of work: claims the listing, sets the buyer's wallet to
+		///     <paramref name="buyerMoney" />, moves the seller's listed row into the buyer's first free Mail cell, and
+		///     stores the purchase mail <paramref name="build" /> makes.
+		/// </summary>
+		/// <returns>The stored mail, or null with nothing written when the listing is already gone (another buyer got it).</returns>
+		/// <remarks>
+		///     A listing with no seller character or no row in the seller's bank (an importer-seeded one) escrows
+		///     nothing; its mail's take mints from the template.
+		/// </remarks>
+		Task<Mail?> CompleteTradepostPurchase(TradepostListing listing, uint buyerId, ulong buyerMoney, uint? sellerId, Func<ulong, Mail> build);
 		Task DeleteMail(ulong mailId);
 		Task DeleteTradepostListing(ulong saleId, uint realmId);
 		Task<Mail?> GetMailByWireId(ulong mailId);
 		Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId);
-		Task<ulong> GetNextMailId();
-		Task<ulong> GetNextTradepostSaleId(uint realmId);
 		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId);
 		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId);
@@ -26,18 +46,68 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		public async Task CreateMail(Mail mail)
+		// The allocations below are max + 1 read inside the transaction that inserts. On SQLite the transaction begins
+		// IMMEDIATE, taking the write lock up front, so a second writer waits rather than reading the same max.
+		public async Task<Mail> CreateMail(Func<ulong, Mail> build)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await using var tx = await ctx.Database.BeginTransactionAsync();
+			var mail = build(await NextMailId(ctx));
 			ctx.Mails.Add(mail);
 			await ctx.SaveChangesAsync();
+			await tx.CommitAsync();
+			return mail;
 		}
 
 		public async Task CreateTradepostListing(TradepostListing listing)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await using var tx = await ctx.Database.BeginTransactionAsync();
+			var saleIds = await ctx.TradepostListings.Where(l => l.RealmId == listing.RealmId).Select(l => l.SaleId).ToListAsync();
+			listing.SaleId = saleIds.Count == 0
+				? 1UL
+				: saleIds.Max() + 1UL;
 			ctx.TradepostListings.Add(listing);
 			await ctx.SaveChangesAsync();
+			await tx.CommitAsync();
+		}
+
+		public async Task<Mail?> CompleteTradepostPurchase(TradepostListing listing, uint buyerId, ulong buyerMoney, uint? sellerId, Func<ulong, Mail> build)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await using var tx = await ctx.Database.BeginTransactionAsync();
+
+			// The claim: whoever deletes the row bought it. A second buyer's delete finds nothing and writes nothing.
+			if (await ctx.TradepostListings.Where(l => l.RealmId == listing.RealmId && l.SaleId == listing.SaleId).ExecuteDeleteAsync() != 1)
+				return null;
+
+			await ctx.Characters.Where(c => c.Id == buyerId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, buyerMoney));
+
+			var mail = build(await NextMailId(ctx));
+
+			// The escrow moves the row, so the crafter and the socketed gems travel with it. The first free Mail cell,
+			// not a fixed one: a buyer can hold several untaken purchases, and a refused move used to fall through to
+			// deleting the seller's row and minting a bare copy at the take.
+			var listed = sellerId is { } seller
+				? await ctx.ItemInstances.FirstOrDefaultAsync(i => i.OwnerCharacterId == seller && i.Container == ContainerKind.Bank && i.Slot == (int)listing.BankSlot)
+				: null;
+			if (listed != null)
+			{
+				var taken = await ctx.ItemInstances.Where(i => i.OwnerCharacterId == buyerId && i.Container == ContainerKind.Mail).Select(i => i.Slot).ToListAsync();
+				var cell = 0;
+				while (taken.Contains(cell))
+					cell++;
+
+				listed.OwnerCharacterId = buyerId;
+				listed.Container = ContainerKind.Mail;
+				listed.Slot = cell;
+				mail.Attachments.First().EscrowedInstanceId = listed.Id;
+			}
+
+			ctx.Mails.Add(mail);
+			await ctx.SaveChangesAsync();
+			await tx.CommitAsync();
+			return mail;
 		}
 
 		public async Task DeleteMail(ulong mailId)
@@ -74,29 +144,6 @@ namespace Faolan.Core.Database.Repositories
 			// is free; the WHERE still runs in SQL.
 			var rows = await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).Where(m => m.RealmId == realmId && m.RecipientName == recipientName).ToListAsync();
 			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToArray();
-		}
-
-		// The next wire MailId: max + 1 (MailId is the global PK). A deterministic sequence, not a random id +
-		// collision retry. Computed in memory because SQLite cannot MAX a ulong (its integer is signed 64-bit).
-		public async Task<ulong> GetNextMailId()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var mailIds = await ctx.Mails.Select(m => m.MailId).ToListAsync();
-			return mailIds.Count == 0
-				? 1UL
-				: mailIds.Max() + 1UL;
-		}
-
-		// The next sale id for a new listing in this realm: max in the realm + 1 (SaleId is realm-unique). A
-		// deterministic sequence, not a random id + collision retry. Computed in memory because SQLite cannot MAX a
-		// ulong (its integer is signed 64-bit); a realm's listing set is small, so the load is cheap.
-		public async Task<ulong> GetNextTradepostSaleId(uint realmId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var saleIds = await ctx.TradepostListings.Where(l => l.RealmId == realmId).Select(l => l.SaleId).ToListAsync();
-			return saleIds.Count == 0
-				? 1UL
-				: saleIds.Max() + 1UL;
 		}
 
 		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId)
@@ -143,6 +190,16 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.TradepostListings.Where(l => l.RealmId == realmId && l.SaleId == saleId).ExecuteUpdateAsync(s => s.SetProperty(l => l.Price, price));
+		}
+
+		// The next wire MailId: max + 1 (MailId is the global PK), a deterministic sequence rather than a random id with
+		// collision retry. Computed in memory because SQLite cannot MAX a ulong (its integer is signed 64-bit).
+		private static async Task<ulong> NextMailId(DatabaseContext ctx)
+		{
+			var mailIds = await ctx.Mails.Select(m => m.MailId).ToListAsync();
+			return mailIds.Count == 0
+				? 1UL
+				: mailIds.Max() + 1UL;
 		}
 	}
 }

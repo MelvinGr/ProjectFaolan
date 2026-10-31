@@ -36,10 +36,6 @@ namespace Faolan.GameServer.Economy
 		// F376/F398/F500).
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 
-		// The cell an escrowed purchase waits in. Retail registers container 114 slot 0 for the buyer the instant the
-		// purchase completes, and a mail models one attachment (<c>Mail.SenderBankSlot</c> is singular), so a single
-		// cell is all that is addressed.
-		private const int MailEscrowSlot = 0;
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
 
@@ -180,12 +176,6 @@ namespace Faolan.GameServer.Economy
 			return true;
 		}
 
-		// The next wire MailId: a deterministic sequence (max + 1), rather than a random id with collision retry.
-		private async Task<ulong> AllocateMailId()
-		{
-			return await _database.GetNextMailId();
-		}
-
 		/// <summary>
 		///     Builds the system mail for a completed auction-house purchase: the buyer as recipient, an empty (system)
 		///     sender, the bought item escrowed as an attachment, and the TradePostGUI_MailItemBought remoteformat as
@@ -195,13 +185,14 @@ namespace Faolan.GameServer.Economy
 		///     The item-name fragment is left empty, because the per-item RDB name key cannot be synthesised - see
 		///     <c>MailColumns.ItemBoughtBody</c>. The item still delivers; only its name in the mail text degrades.
 		/// </remarks>
-		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
+		private static Mail BuildPurchaseMail(ulong mailId, string buyer, uint realmId, TradepostListing listing)
 		{
 			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
 			var mail = new Mail
 			{
-				MailId = await AllocateMailId(),
+				MailId = mailId,
+				RealmId = realmId, // #324: no cross-realm mail (recipient = buyer)
 				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = buyer,
 				SenderClass = MailConstants.EndpointClass,
@@ -276,34 +267,24 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			character.Money -= listing.Price;
-			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
-
-			var mail = await BuildPurchaseMail(character.Name!, listing);
-			mail.RealmId = character.RealmId; // #324: no cross-realm mail (recipient = buyer)
-			await _database.DeleteTradepostListing(saleId, character.RealmId);
-
 			// The listed item stays in the seller's bank, under a "listed" overlay, until now. The sale escrows it to
 			// the buyer: it moves out of the seller's bank into the buyer's Mail container (114), which is what retail
-			// registers the instant a purchase completes.
+			// registers the instant a purchase completes. The row is handed over rather than deleted and re-minted, so
+			// the crafter and every socketed gem travel with it.
 			//
-			// The row is handed over rather than deleted and re-minted, so the crafter and every socketed gem travel
-			// with it. Importer-seeded listings have no seller character and no backing row; their mail keeps a null
-			// escrow and the take mints from the template.
+			// One transaction claims the listing, charges the buyer, escrows the row and writes the mail, so a second
+			// buyer finds nothing to buy and a failure part-way leaves nothing half done.
 			var seller = await _database.GetCharacterByName(listing.SellerName, character.RealmId);
-			if (seller != null && seller.Id != character.Id)
+			var balance = character.Money - listing.Price;
+			var mail = await _database.CompleteTradepostPurchase(listing, character.Id, balance, seller?.Id, id => BuildPurchaseMail(id, character.Name!, character.RealmId, listing));
+			if (mail == null)
 			{
-				var listed = await _database.GetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot);
-				if (listed != null && await _database.TransferCharacterItem(listed.Id, character.Id, ContainerKind.Mail, MailEscrowSlot) is { } escrowed)
-					mail.Attachments.First().EscrowedInstanceId = escrowed.Id;
-				else
-					await _database.SetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
+				_logger.LogInformation("Tradepost BUY: {Char} lost listing 0x{Sale:X16} to another buyer.", character.Name, saleId);
+				return;
 			}
 
-			// Written after the escrow, so the attachment carries the instance it escrowed rather than being saved with
-			// a null and updated afterwards.
-			await _database.CreateMail(mail);
+			character.Money = balance;
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			// Push the mail with no attachment: it carries its own MailId, which the client then targets with the
 			// GetMail ops to preview and take the item. The inbound TradepostInterface instance is echoed.
@@ -497,7 +478,6 @@ namespace Faolan.GameServer.Economy
 
 			var listing = new TradepostListing
 			{
-				SaleId = await _database.GetNextTradepostSaleId(character.RealmId),
 				Handle = 0,
 				RealmId = character.RealmId, // #324: the AH is realm-local (the seller's realm)
 				SellerName = character.Name!,
@@ -588,51 +568,55 @@ namespace Faolan.GameServer.Economy
 
 			var now = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-			var mail = new Mail
-			{
-				MailId = await AllocateMailId(),
-				RealmId = recipient.RealmId, // #324: no cross-realm mail (recipient's realm)
-				RecipientClass = MailConstants.EndpointClass,
-				RecipientName = recipient.Name!,
-				SenderClass = MailConstants.EndpointClass,
-				SenderName = character.Name!, // a player mail, NOT a system mail (sender name is set)
-				BodyXml = bodyText,
-				FooterWord = MailConstants.FooterUnread,
-				Money = money,
-				Timestamp1 = now,
-				Timestamp2 = now + MailConstants.ExpirySeconds
-			};
-
 			// Attach the sender's bank item, when a slot was given and an item sits there. The item stays in the
 			// sender's bank under a "mail-pending" overlay rather than leaving on send: it leaves only when the
 			// recipient takes it (GetMailItem), and the overlay clears if the sender cancels the mail.
 			var attached = await _database.GetCharacterItemSlot(character.Id, ContainerKind.Bank, bankSlot);
-			if (attached != null)
+
+			var mail = await _database.CreateMail(mailId =>
 			{
-				mail.SenderBankSlot = (uint)bankSlot;
-				mail.Attachments.Add(new MailAttachment
+				var built = new Mail
 				{
-					// A deterministic per-mail instance id, mirroring the purchase mail's ItemInstanceId. It only needs
-					// to be unique within the mail's attachments, because the take resolves the item by template
-					// rather than by this id.
-					ItemInstanceId = mail.MailId,
+					MailId = mailId,
+					RealmId = recipient.RealmId, // #324: no cross-realm mail (recipient's realm)
+					RecipientClass = MailConstants.EndpointClass,
+					RecipientName = recipient.Name!,
+					SenderClass = MailConstants.EndpointClass,
+					SenderName = character.Name!, // a player mail, NOT a system mail (sender name is set)
+					BodyXml = bodyText,
+					FooterWord = MailConstants.FooterUnread,
+					Money = money,
+					Timestamp1 = now,
+					Timestamp2 = now + MailConstants.ExpirySeconds
+				};
 
-					// The sender's own bank row, which stays in their bank until the recipient takes it - the escrow
-					// here is the bank slot rather than a move. Recording it is what lets the take hand the row over
-					// instead of minting a copy and losing the crafter and gems.
-					EscrowedInstanceId = attached.Id,
-					Quantity = attached.Count == 0
-						? 1u
-						: attached.Count,
-					Template = attached.TemplateId, // the key lives in Items (FK on Template); no inline copy
-					ItemHash = attached.Template.Hash,
-					TrailerWord = MailConstants.AttachmentTrailerWord,
-					TrailerClass = MailConstants.EndpointClass,
-					TrailerTail = 0
-				});
-			}
+				if (attached != null)
+				{
+					built.SenderBankSlot = (uint)bankSlot;
+					built.Attachments.Add(new MailAttachment
+					{
+						// A deterministic per-mail instance id, mirroring the purchase mail's ItemInstanceId. It only
+						// needs to be unique within the mail's attachments, because the take resolves the item by
+						// template rather than by this id.
+						ItemInstanceId = mailId,
 
-			await _database.CreateMail(mail);
+						// The sender's own bank row, which stays in their bank until the recipient takes it - the escrow
+						// here is the bank slot rather than a move. Recording it is what lets the take hand the row over
+						// instead of minting a copy and losing the crafter and gems.
+						EscrowedInstanceId = attached.Id,
+						Quantity = attached.Count == 0
+							? 1u
+							: attached.Count,
+						Template = attached.TemplateId, // the key lives in Items (FK on Template); no inline copy
+						ItemHash = attached.Template.Hash,
+						TrailerWord = MailConstants.AttachmentTrailerWord,
+						TrailerClass = MailConstants.EndpointClass,
+						TrailerTail = 0
+					});
+				}
+
+				return built;
+			});
 			await TradepostResponses.SendMailSendResult(client, true, packet.Sender.Instance);
 
 			// Tell the recipient. Retail's notification rides CSPlayerInterface, so it reaches them wherever they are
