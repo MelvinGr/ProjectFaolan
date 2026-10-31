@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 #include "faolan_conan_stream.h"
 
 #include <stdlib.h>

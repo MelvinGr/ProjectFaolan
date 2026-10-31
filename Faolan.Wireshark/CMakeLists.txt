@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 cmake_minimum_required(VERSION 3.16)
 project(faolan_wireshark C)
 

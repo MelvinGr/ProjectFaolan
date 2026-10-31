@@ -271,6 +271,11 @@ private corpus.
 - **Never commit the maintainer's retail account or character names** - in source, docs, `faolan.sql` or fixtures -
   since the repo is meant to go public. Fixtures carry the pseudonyms listed in `Faolan.Tests/AGENTS.md`; nothing
   checks this on commit.
+- **Licensing:** the repo is AGPL-3.0-or-later (`LICENSE`). `Faolan.Wireshark/` is GPL-2.0-or-later, because it
+  links libwireshark: it has its own `LICENSE`, and every source file there starts with an SPDX line (the generated
+  method-name header too). `NOTICE` lists all material the AGPL does not cover (the Funcom-derived game data, the
+  CC BY-SA wiki scrape, the archived GPL sources); a new file of third-party code or data gets an entry there. C#
+  sources carry no per-file licence header.
 - **Docs carry confirmed information only; progress lives in Gitea.** No "Remaining / Next steps / Open items /
   In progress / status / handoff" sections and no `*-handoff.md` docs. Keep the verified facts (decoded grammar,
   shipped behaviour, code maps) and replace any open-work list with a one-line pointer to the Gitea issue.

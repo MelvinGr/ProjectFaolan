@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 #ifndef PACKET_FAOLAN_GAMESERVER_ZLIB_H
 #define PACKET_FAOLAN_GAMESERVER_ZLIB_H
 

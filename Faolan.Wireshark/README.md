@@ -198,3 +198,7 @@ wireshark/plugin.c              plugin registration
 - A capture hole inside a compressed stream cannot be fully recovered (the deflate stream has
   no flush points); the plugin decompresses across the hole on a best-effort basis.
 
+## License
+
+GPL-2.0-or-later ([LICENSE](LICENSE)), matching libwireshark, which the plugin links against. The rest of Project
+Faolan is AGPL-3.0-or-later; [NOTICE](../NOTICE) lists the licence of every part of the repository.

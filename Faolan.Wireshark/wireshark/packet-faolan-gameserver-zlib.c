@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /*
  * Wireshark dissector for the Faolan / Age of Conan TCP services.
  *

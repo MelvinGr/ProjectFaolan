@@ -1,0 +1,50 @@
+Project Faolan
+Copyright (C) 2010-2026 The Project Faolan contributors
+
+Project Faolan is free software: you can redistribute it and/or modify it under the terms of the GNU Affero
+General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. The full text is in LICENSE.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+details.
+
+Anyone who runs a modified version of this server for users over a network must offer those users the source code
+of that version (section 13 of the licence).
+
+
+Material not covered by the AGPL
+--------------------------------
+
+Faolan.Wireshark/
+    The Wireshark dissector plugin, including the method-name tables it generates at build time from
+    Faolan.Core/Enums/Opcodes.cs, is licensed under the GNU General Public License, version 2 or (at your option)
+    any later version, matching libwireshark, which it links against. The full text is in Faolan.Wireshark/LICENSE.
+
+Archive/Faolan-Pre-Assembla.rar
+Archive/Faolan-GoogleCode.zip
+Archive/Faolan-Assembla.zip
+Archive/Faolan-Private-Assembla.zip
+    Source archives of earlier versions of this project, which include code by other contributors. They are
+    distributed under the GNU General Public License terms stated in the files they contain.
+
+faolan.db
+faolan.sql
+Faolan.Tests/Assets/fixtures.bin
+    Game data derived from the Age of Conan client files and from retail network traffic: item, NPC, quest, spell
+    and world records, client text, and captured packet bytes. This material is the property of Funcom and is not
+    licensed by this project. It is included only for interoperability with the Age of Conan client.
+
+docs/rdb/quest-steps-wiki.json
+    Quest data collected from the Age of Conan Wiki (https://aoc.fandom.com), whose community content is available
+    under the Creative Commons Attribution-ShareAlike 3.0 Unported licence
+    (https://creativecommons.org/licenses/by-sa/3.0/). This file is distributed under that licence. Each record
+    names the wiki page it was read from (its "url" field) and that page's revision; the page history there credits
+    its authors.
+
+
+Trademarks
+----------
+
+Age of Conan and Funcom are trademarks of Funcom. This project is an independent, non-commercial research project
+for interoperability and game preservation; it is not affiliated with or endorsed by Funcom.

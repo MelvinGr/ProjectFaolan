@@ -575,3 +575,13 @@ in `AGENTS.md`.
 - A **dungeon run** and the **faction/reputation** UI → the roadmap features (#309, #310)
 
 Contributing such captures is the single highest-leverage way to move the blocked items.
+
+## License
+
+Project Faolan is free software under the [GNU Affero General Public License v3.0 or later](LICENSE): anyone who
+runs a modified version of the server for other players must offer those players the source of that version. The
+Wireshark plugin in `Faolan.Wireshark/` is GPL-2.0-or-later, to match Wireshark, which it links against.
+
+The game data in this repository (`faolan.db`, `faolan.sql` and the test fixtures, derived from the Age of Conan
+client and retail traffic) belongs to Funcom and is not covered by either licence. [NOTICE](NOTICE) lists every
+exception, including the CC BY-SA wiki data and the archived GPL sources of earlier versions.
