@@ -71,20 +71,6 @@ namespace Faolan.Core.Database.Tables
 		}
 
 		/// <summary>
-		///     Turns one privilege on or off. A no-op on a non-GM: flipping a bit must never promote an account, or
-		///     `.godmode` on someone who is not a GM would quietly make them one.
-		/// </summary>
-		public void SetGmPrivilege(GmPrivileges privilege, bool on)
-		{
-			if (GmLevel is not { } level)
-				return;
-
-			GmLevel = on
-				? level | (uint)privilege
-				: level & ~(uint)privilege;
-		}
-
-		/// <summary>
 		///     The value to put in character stat <c>0x0D7</c>. Zero for a non-GM, which is what stops the client
 		///     entering GM mode at all.
 		/// </summary>

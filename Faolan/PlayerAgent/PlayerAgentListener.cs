@@ -53,7 +53,7 @@ namespace Faolan.PlayerAgent
 
 					client.Session.Account = account;
 					client.Session.Account.AuthStatus = body.ReadUInt32();
-					await Database.SaveAccount(client.Session.Account);
+					await Database.SetAccountAuthStatus(account.Id, account.AuthStatus);
 
 					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
@@ -225,7 +225,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.ClientInstance = characterId;
 					client.Session.Character = selected;
 					await Database.UpdateLastInfo(selected.Id, client.IpAddress!);
-					await Database.SaveAccount(client.Session.Account);
+					await Database.SetAccountClientInstance(client.Session.Account.Id, characterId);
 
 					await SendCharacterSettings(client, packet.Sender);
 
@@ -304,7 +304,7 @@ namespace Faolan.PlayerAgent
 					// handing out the real id is safe.
 					client.Session.Account.ClientInstance = newCharacter.Id;
 					Logger.LogInformation("CreateCharacter: created character {CharacterId:X8}; using it as the create-flow client instance.", newCharacter.Id);
-					await Database.SaveAccount(client.Session.Account);
+					await Database.SetAccountClientInstance(client.Session.Account.Id, newCharacter.Id);
 
 					await SendCharacterSettings(client, packet.Sender);
 

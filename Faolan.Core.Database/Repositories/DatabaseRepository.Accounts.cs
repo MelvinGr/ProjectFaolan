@@ -15,7 +15,18 @@ namespace Faolan.Core.Database.Repositories
 		Task<Account?> GetAccount(string userName);
 		Task<AccountClaim?> GetAccountClaim(uint claimId);
 		Task<AccountClaim[]> GetAccountClaims(uint accountId);
-		Task SaveAccount(Account account);
+		Task<bool> SetAccountAuthStatus(uint accountId, uint authStatus);
+		Task<bool> SetAccountClientInstance(uint accountId, uint clientInstance);
+
+		/// <summary>
+		///     Turns one GM privilege on or off in place and returns the account's mask as stored afterwards (null: not a
+		///     GM, which a bit never changes). Every other bit is left as the database holds it.
+		/// </summary>
+		/// <remarks>
+		///     Not a write of the caller's whole mask: a session's copy of the account is as old as its login, so writing it
+		///     back would undo whatever changed the mask since, a revocation from the web above all.
+		/// </remarks>
+		Task<uint?> SetAccountGmPrivilege(uint accountId, GmPrivileges privilege, bool on);
 		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
 		Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge);
@@ -90,19 +101,33 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.AccountClaims.Include(c => c.Item).Where(c => c.AccountId == accountId).OrderBy(c => c.Id).ToArrayAsync();
 		}
 
-		public async Task SaveAccount(Account account)
+		public async Task<bool> SetAccountAuthStatus(uint accountId, uint authStatus)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx
-				.Accounts.Where(a => a.Id == account.Id)
-				.ExecuteUpdateAsync(s => s
-					.SetProperty(a => a.AuthStatus, account.AuthStatus)
-					.SetProperty(a => a.ClientInstance, account.ClientInstance)
-					.SetProperty(a => a.GmLevel, account.GmLevel));
+			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.AuthStatus, authStatus)) == 1;
 		}
 
-		// The account-wide client settings archive. Its own method rather than a field on SaveAccount: that one
-		// runs on nearly every login step, and rewriting a 1 KB blob each time would be pure churn.
+		public async Task<bool> SetAccountClientInstance(uint accountId, uint clientInstance)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClientInstance, clientInstance)) == 1;
+		}
+
+		public async Task<uint?> SetAccountGmPrivilege(uint accountId, GmPrivileges privilege, bool on)
+		{
+			var bit = (uint)privilege;
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var accounts = ctx.Accounts.Where(a => a.Id == accountId && a.GmLevel != null);
+			if (on)
+				await accounts.ExecuteUpdateAsync(s => s.SetProperty(a => a.GmLevel, a => a.GmLevel | bit));
+			else
+				await accounts.ExecuteUpdateAsync(s => s.SetProperty(a => a.GmLevel, a => a.GmLevel & ~bit));
+
+			return await ctx.Accounts.Where(a => a.Id == accountId).Select(a => a.GmLevel).FirstOrDefaultAsync();
+		}
+
+		// The account-wide client settings archive. Its own method, not a field on the login-step writes: those run on
+		// nearly every login step, and rewriting a 1 KB blob each time would be pure churn.
 		public async Task SetAccountSubscriptionSettings(uint accountId, byte[] settings)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

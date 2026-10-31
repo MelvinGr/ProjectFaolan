@@ -322,10 +322,8 @@ namespace Faolan.Tests
 				Assert.Equal((bagItem, inBag!.Id), (afterEquip[CharacterEquipmentSlot.LeftRing].TemplateId, afterEquip[CharacterEquipmentSlot.LeftRing].Id));
 				Assert.Null(await repo.GetCharacterItemSlot(characterId, ContainerKind.Bag, 1));
 
-				// 5) SaveAccount persists the on-wire ClientInstance (read back by a fresh load).
-				var account = await repo.GetAccount(accountId);
-				account!.ClientInstance = characterId;
-				await repo.SaveAccount(account);
+				// 5) The on-wire ClientInstance persists (read back by a fresh load).
+				Assert.True(await repo.SetAccountClientInstance(accountId, characterId));
 				Assert.Equal(characterId, (await repo.GetAccount(accountId))!.ClientInstance);
 			}
 			finally

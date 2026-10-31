@@ -1564,8 +1564,7 @@ namespace Faolan.GameServer.Gm
 			}
 
 			entity.GodMode = !entity.GodMode;
-			client.Session.Account.SetGmPrivilege(GmPrivileges.GodMode, entity.GodMode);
-			await _database.SaveAccount(client.Session.Account);
+			client.Session.Account.GmLevel = await _database.SetAccountGmPrivilege(client.Session.Account.Id, GmPrivileges.GodMode, entity.GodMode);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
 				? ChatMarkup.Raw($"God mode {ChatMarkup.Color("lime", "ON")} - you take no damage.")
 				: ChatMarkup.Raw($"God mode {ChatMarkup.Color("red", "OFF")}."));

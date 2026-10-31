@@ -1011,10 +1011,7 @@ namespace Faolan.GameServer.Gm
 			// Persisted on the account, so it survives relog and map changes.
 			var account = subject.Client.Session.Account;
 			if (account != null)
-			{
-				account.SetGmPrivilege(GmPrivileges.InvisibleToMonsters, wanted);
-				await _database.SaveAccount(account);
-			}
+				account.GmLevel = await _database.SetAccountGmPrivilege(account.Id, GmPrivileges.InvisibleToMonsters, wanted);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw(wanted
 				? $"'{subject.Name}' is now {ChatMarkup.Color("lime", "INVISIBLE")} to monsters - NPCs won't aggro."
