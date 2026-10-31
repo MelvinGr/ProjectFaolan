@@ -89,3 +89,45 @@ dotnet ef database update \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
 # For pure data changes (no schema change) update faolan.db directly and commit it - no migration.
 ```
+
+**Read every scaffolded migration, and apply it to a copy first.** Each trap below yields a migration that runs
+without an error and destroys or scrambles data. Apply to a copy (`--connection "Data Source=<copy>"`), run
+`PRAGMA foreign_key_check;` and `PRAGMA integrity_check;`, and spot-check a row whose values you know from an
+independent source: row counts and integrity checks pass on a crossed rename.
+- A class rename scaffolds as `DropTable` + `CreateTable`; hand-edit it to `RenameTable` + `RenameIndex`, in `Up` and
+  `Down`.
+- EF pairs old and new columns by type and ordinal, and SQLite's dynamic typing hides a crossed pair. Several
+  same-typed renames cross; one dropped column plus several added ones pairs with the first newcomer; a name present
+  on both sides but on a different column scrambles the others around it (free the name before reusing it). Read
+  every `RenameColumn` you did not ask for, and give a hand-edited migration a `<remarks>` saying not to re-scaffold.
+- Adding a foreign key rebuilds the table and re-checks every existing row, so one orphan aborts the migration; seed
+  the principals or delete the orphans first (the importer migrates before it harvests).
+- A raw `Sql()` is hoisted ahead of a pending table rebuild: put a data fix in its own migration after the schema
+  change. Turning a surrogate key into a natural one needs a hand-written child remap, run as
+  `Sql("PRAGMA foreign_keys = OFF; UPDATE ...", suppressTransaction: true)`, through a disjoint high range when the
+  old and new key ranges overlap.
+- A code-assigned integer key needs `[DatabaseGenerated(DatabaseGeneratedOption.None)]`, or the scaffold marks it
+  `Sqlite:Autoincrement` and the store overwrites the id.
+- Reverting a migration that added a cascade parent deletes the child rows: restore `faolan.db` from git instead.
+- A snapshot diff much larger than the migration means the global `dotnet-ef` tool is behind the runtime; update the
+  tool and re-scaffold.
+- `migrations remove` refuses an applied migration: `git checkout faolan.db`, delete `faolan.db-wal` and
+  `faolan.db-shm`, then remove. A later `git stash pop` can resurrect the removed file.
+
+## EF and SQLite traps
+
+- **EF turns a `Remove` + `Add` of the same key into an `UPDATE`**, so no `DELETE` reaches SQLite and
+  `ON DELETE CASCADE` never runs: a delete-then-reinsert of parents must remove their children explicitly. And
+  children added in the same `SaveChanges` as their parents' delete are wiped by that cascade: save the parents
+  first, then add the children. Count the child rows in SQL after such an import; the importer's own number is what
+  it intended.
+- **Two rows trading a unique key cannot be one `SaveChanges`.** EF reports a circular dependency, and SQLite checks
+  a unique index per statement, with no deferrable constraints. Park one row at a sentinel inside a transaction
+  (`ParkedSlot` in `DatabaseRepository.CharacterInventory.cs`); never drop the index instead.
+- **More than one collection `Include` off one root multiplies the rows**: use `AsSplitQuery()`. It changes the
+  result order from join order to root-key order, so check the callers of an unordered read.
+- **Two same-named id properties holding different numbers** (a wire id and a row key) compile when compared,
+  because `uint` widens to `ulong`, and match nothing. Make the mismatch unrepresentable: one id, one meaning, one
+  type (`Mail` is keyed by the wire `MailId` for this reason). SQLite cannot `ORDER BY` a `ulong`: sort in memory.
+- `TradepostListing.ItemHash` and `MailAttachment.ItemHash` stay columns: the wire carries the captured hash there,
+  which is not `Items.Hash`.

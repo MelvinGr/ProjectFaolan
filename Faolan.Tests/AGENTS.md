@@ -58,3 +58,35 @@ the archive is Brotli-compressed, so an equal-length substitution still changes 
 its length; and the writer rewrites the whole file, so an interrupted run leaves a truncated archive - `git checkout`
 it and re-run. Capture file names in comments and docs are out of scope for this: `.githooks/personal-names.py --tree`
 accepts them, and they are how a dump is found in the data repo.
+
+## Test traps
+
+- **The suite reads `faolan.sql`, never `faolan.db`.** `TestDb.GameDatabase` builds its fixture from the migrations
+  plus `faolan.sql`, and the pre-commit hook regenerates `faolan.sql` only when `faolan.db` is committed. A run after
+  an import and before that commit asserts against the data from before the import: regenerate the seed
+  (`--report sql-seed`) before testing one. A column rename must regenerate it in the same commit, or every test
+  fails at once on the seed's column lists.
+- **The seed excludes player state** (`Characters` and everything hanging off it, accounts, realms, guilds, mail,
+  chat, tradepost listings, claims), so a gate over a captured character's spells, feats or items is vacuous here.
+  `SeedVacuityGateTests` makes a test that names a seed-excluded `DbSet` declare why; such a comparison belongs in
+  a `--report` (`spell-grant-check`, `inventory-token-check`).
+- **A golden is a gate only if its expected bytes come from a capture.** A blob copied out of our own builder, or
+  captioned "captured" with no provenance, tests that the code equals itself and defends the bug; find the shape in
+  the dumps first, since a form no capture carries is not retail. And a golden cannot see a change in where a caller
+  got a value it passes in, or a reinterpretation of the same bytes: ask what would still pass if the value were
+  hardcoded, and assert the derivation (read the row back, load through the repository) where that matters.
+- **A byte-exact round trip cannot see a shifted record boundary**: a carve that groups real bytes with the wrong
+  neighbours parses and rebuilds identically. The tells are a "scalar + asserted constant" head before a list (often
+  the first element), a near-constant flag that goes odd on large characters, and a value that is a multiple of
+  `0x3F1` under some concatenation of its neighbours (a list frame straddling the split). Only the client's reader
+  pins the boundaries.
+- **A test never writes into `Faolan.Tests/Assets/`.** Classes run in parallel and share the assets, so a write tears
+  a read in another class and the failure surfaces in whatever that class was parsing. Regenerate behind an env var
+  (`FAOLAN_UPDATE_ASSETS=1`, `FAOLAN_UPDATE_DOCS=1`) or write a `.actual` sidecar on mismatch (`BurstGoldenTests`).
+  When a flake appears, keep the failing run's output before re-running.
+- **Build an extractor test's packet through its codec** (`PlayfieldFCodec.Build(...)`), with the sub-opcode taken
+  from `body[4:8]`; a fixture shaped like the parser only proves the file agrees with itself.
+- **A swap or reorder over a unique index needs a test with an occupied destination**
+  (`EquipmentPersistenceTests.Equip_IntoAnOccupiedSlot_SwapsBothInstances`); the move-onto-empty path is one UPDATE.
+- **`--no-build` runs the previous test DLL** when the test project failed to compile, and `dotnet ef migrations add`
+  builds only the migrations project: build the solution, and check it for errors, before trusting a run.

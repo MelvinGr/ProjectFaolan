@@ -80,3 +80,25 @@ references.
   `IDatabaseRepository`.
 - Both realm containers forward every slice to the one singleton: a new slice must be added to both
   `AddRealmGameServer` and `AddRealmCsPlayerAgent` (the composition tests catch a miss).
+
+**World invariants** that compile and pass tests when broken:
+- **Never send a despawn (`n3ToClientQuit`) for a handle the recipient was never sent**: the client crashes on a null
+  dynel. Every despawn path is gated on `viewer.Knowledge.Known.Remove(handle)`.
+- **A player's wire handle, `Account.ClientInstance` and `Character.Id` are one number** by construction. NPC
+  handles are spawn handles, unrelated to any character id.
+- **Resolve a zone with `ZoneForEntity`, never `WorldState.TryGetZone(mapId)`**, which returns only the default
+  instance. Tortage (4010), where most in-client testing happens, is one of the four `MapInstanceMode.Solo` maps, so
+  a `TryGetZone` lookup there resolves nothing, and a guard that passes on an unresolved lookup silently disables its
+  feature. A gameplay refusal logs at Information, so a play session read back from `faolan.log` shows it.
+  `MeleeReachTests` is the pattern for testing the instanced case.
+- **An entity spawned straight into a player's zone** (a pet, a GM spawn, any summon) takes `player.InstanceId` and
+  joins the viewer's `Known` set at spawn, or the client drops it: the zone token would name the default instance,
+  and the follow `MoveTask` is `Known`-gated.
+- **Buffs have two registries behind one send.** A buff on the player lives in the player entity's `ActiveBuffs`
+  (`BuffService`); a mob's registry is owned by the world tick (`BuffTickService.ApplyEffectToEntity`). Whether a
+  record belongs in the player's registry is decided by whose bar it lands on, never by `applyTo == applyFrom`: that
+  test reads as a correctness guard but excludes every effect a mob lands on the player, which would then get no
+  dedup, no expiry and no end twin.
+- **When the live simulation mirrors a persisted value, check who writes it on every path** (world entry, level-up,
+  GM commands, players and NPCs), not only how it is read: an unset mirror reads as 0 and resolves silently. A throw
+  in a derived recompute is usually correct; trace the bad input instead of guarding the throw.

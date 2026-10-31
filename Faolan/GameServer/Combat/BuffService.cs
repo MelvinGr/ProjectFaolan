@@ -461,7 +461,7 @@ namespace Faolan.GameServer.Combat
 			// The registry lives on the player's entity, so what decides whether a record belongs in it is whose bar it
 			// lands on - which the `entity.Handle != applyTo` check below asks. A buff landing on a mob falls out
 			// there, because the entity resolved is the client's player; the world tick owns a mob's registry
-			// (`WorldSimulation.ApplyEffectToEntity`).
+			// (`BuffTickService.ApplyEffectToEntity`).
 			//
 			// Measured with `--report npc-debuff`: across the corpus retail's mob-onto-player records are 87 distinct
 			// (player, mob, spell) pairings, a median of one apply each and never more than four, with the end twin

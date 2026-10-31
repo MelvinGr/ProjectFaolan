@@ -7,17 +7,18 @@ source**: the code mirrors retail traffic byte-for-byte rather than abstracting 
 from a retail capture, local is fixed to match. This file, the nested `AGENTS.md` files and `docs/` are the deep-dive
 (architecture, protocol notes, RE methodology); `README.md` is the regular repo readme (overview, build, run). Open work
 is tracked as **Gitea issues** in the `projectfaolan` repo on `git.groenendaal.io`, grouped by `area:*` labels, never in
-a TODO file. Create and close issues there as work lands (the agent memory `issue_tracking_in_gitea` has the API
-recipe).
+a TODO file. Create and close issues there as work lands (see **Conventions**).
 
 Rules that concern one folder live in a nested `AGENTS.md` there, which loads when you work in that folder:
 - `Faolan/AGENTS.md` - the listeners and the container-registered service graph: partials by role, ports instead
-  of the listener, construction cycles, how a service takes repository slices.
+  of the listener, construction cycles, how a service takes repository slices; and the world invariants.
 - `Faolan.Core.Database/AGENTS.md` - the model conventions (foreign keys, natural and derived keys), how
-  `faolan.sql` is generated and loaded, and the EF migration workflow.
+  `faolan.sql` is generated and loaded, the EF migration workflow, and the EF/SQLite traps.
 - `Faolan.Core.Network/Codecs/AGENTS.md` - the codec conventions the convention tests enforce.
+- `Faolan.Importer/AGENTS.md` - how an import loses data while reporting success, what a re-harvest may delete, and
+  `CapturedPacket.Record` versus `.Body`.
 - `Faolan.Tests/AGENTS.md` - the fixture archive: named fixtures and the corpus slice, whether a new check is a test
-  or a `--report`, and the pseudonyms that replace character names in the bytes.
+  or a `--report`, the pseudonyms that replace character names in the bytes; and the test traps.
 
 ## Commands
 
@@ -194,6 +195,28 @@ assuming. The importer's DB comes from the `Database` section of faolan.json (`D
 `Database:ConnectionString`), the same as the server; override it with
 `--Database:ConnectionString "<conn string>"`.
 
+**Measuring against captures:**
+- The corpus is retail-only: every dump is the client talking to the live official service. "Retail" always names
+  that service, never a client (there is one client). A loopback capture of this server is a debugging aid and never
+  joins `Captures/`, so nothing needs to defend against importing our own output.
+- Measure against the dumps (`<data-repo>/Captures/*.tshark.json`), never against `fixtures.bin`. The corpus slice
+  is IIR-only and sampled, so "not in the corpus" is never evidence that a message was never captured.
+  `tools/capture/captures.py` resolves the directory from `FAOLAN_CAPTURES`; stream the files one at a time, and
+  prove the parser consumes each body exactly before believing a negative result.
+- Read every fact off the wire. A capture's file name is a human label, often wrong about the character, class or
+  action it seems to state: never group, filter or derive anything from it. Identify a character by its id on the
+  wire (a character missing from `faolan.db` is unknown, not the one the file name suggests).
+- Never identify a service tier by port, since retail's ports differ from ours: use the dump's `Protocol` column and
+  the frame's endpoint class. Nothing in a dump names a packet's recipient (`CapturedPacket.Port` is the server
+  side's port, shared by every client of a multi-client dump), so a per-viewer hypothesis cannot be tested from it.
+- On a capture, `handle >= EntityHandles.CharacterInstanceBase` does not separate players from NPCs: that is our
+  allocator's boundary, and retail's character ids sit below it. A player's spawn carries `player_stats`.
+- The `Method` string in a dump is frozen at the Wireshark plugin's last build. Key on `(ReceiverClass, Opcode)` as
+  `ProtocolCatalog` resolves it, and re-dump after renaming a member of `Opcodes.cs`.
+- The client install is static (unpatched for years): when data seems to have changed, the change is on our side -
+  an extractor, a report, the CDN mirror, or the premise. A number seen in two forms is usually two id spaces, not
+  two versions.
+
 **The test suite does not need the data repo.** Every test runs from a plain clone, off one committed file:
 `Faolan.Tests/Assets/fixtures.bin` (`FixtureArchive`). How it splits into named fixtures and the corpus slice, how to
 add, rename or regenerate them, and whether a new check belongs in a test or a `--report`: `Faolan.Tests/AGENTS.md`.
@@ -208,11 +231,15 @@ private corpus.
   - **Docs:** the relevant `docs/` pages. If you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
     (`FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`). Repoint any doc
     or code pointer you moved or deleted; add `[Vn: ...]` tags for new protocol claims.
-  - **Gitea issue** (the `projectfaolan` repo): comment the outcome and close it when the work lands (or strip
-    `needs-testing` per its rule after an in-client check, pass or fail). Create an issue for any follow-up, gap, or
-    `[V0: ...]` unknown you surfaced, so it lives on the backlog.
-  - **Agent memory:** record anything non-obvious and durable (a gotcha, a decision and its reason, a stable pointer)
-    so the next session starts with it; do not record what the code or git history already shows.
+  - **Gitea issue** (the `projectfaolan` repo): comment the outcome and close it when the work lands. Behaviour that
+    is built but not yet run in-client stays **open** with the `needs-testing` label and a comment naming the
+    concrete check (which NPC, which quest, what should be seen); the label is only for built work. After the
+    in-client check, remove the label whatever the outcome: on a pass comment and close, on a failure comment the
+    repro and keep the issue open. Create an issue for any follow-up, gap, or `[V0: ...]` unknown you surfaced, so
+    it lives on the backlog. A pushed `fix(...)` commit whose subject names `(#NNN)` closes that issue; for a ticket
+    that must stay open, put `Refs #NNN` in the body instead.
+  - **Rules and gotchas** a contributor needs go into the `AGENTS.md` that covers the folder (or this file), never
+    only into one agent's private memory. Do not record what the code or git history already shows.
 - **Comments and docs describe the current system, not its history.** No "used to", "previously", issue or wave
   numbers as history, or dated narratives; git holds the history. When a past mistake taught a lasting lesson, state the
   current rule and its reason. The one exception is a present-tense pointer to open work: `Open work tracked in Gitea
