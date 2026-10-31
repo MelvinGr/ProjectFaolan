@@ -175,7 +175,8 @@ Rules and edge cases:
   either, because imported characters deliberately sit on the normal play account. Only the importer sets the
   marker, so a character created in-game cannot carry one and is exempt by construction; a level threshold is not
   a guard. The refresh still discards a player's own rearrangement of an *imported* character's items, so it is
-  guarded by `--force`.
+  guarded by `--force` once such a character exists; on a database with none (a fresh clone, seeded from
+  `faolan.sql`) there is nothing to discard and the first import runs without it.
 - **Scope of `overwrite` = the module's own tables only.** It must never touch another module's data. The NPC
   reseed models this (it wipes only `NpcSpawns`/morphs/equipment/patrol, leaving `NpcSpells` and the other
   modules' tables intact). The committed seeds (e.g. the beach burst 4010) stay exempt.
@@ -207,7 +208,8 @@ Modifiers
   --mode <m>           insert | upsert (default) | overwrite — global write strategy
                        per-module override: --mode npcs=overwrite,items=insert
   --force              permit overwrite on guarded modules — `characters` is the one that consumes it,
-                       because its overwrite rebuilds every capture-imported character
+                       because its overwrite rebuilds every capture-imported character (needed only
+                       once one exists)
   --rdb-proxy <url>    Faolan.Web.Content mirror ADDRESS for on-demand (le.idx file==0xFF) RDB resources —
                        just the host, e.g. http://127.0.0.1:7081; RdbReader owns the /gameupdate/upm/rdb route.
                        Defaults to the shared `Cdn` config (PublicAddress, else the local mirror on its

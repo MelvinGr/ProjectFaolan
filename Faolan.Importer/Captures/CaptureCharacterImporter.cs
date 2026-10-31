@@ -109,7 +109,11 @@ namespace Faolan.Importer.Captures
 		///     bag/worn set/stat sheet. Off by default, because it discards any rearrangement the player has made to that
 		///     character.
 		/// </param>
-		public static async Task<(int Seen, int Added, int Skipped, int Refreshed)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0,
+		/// <returns>
+		///     Seen = own characters in the corpus; Kept = existing rows left alone; Filtered = rejected for an unset class
+		///     or a level at or below <paramref name="minLevel" />.
+		/// </returns>
+		public static async Task<(int Seen, int Added, int Kept, int Filtered, int Refreshed)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0,
 			bool refresh = false)
 		{
 			// Best (largest) parseable player spawn body per character name, with the map active when it
@@ -213,7 +217,8 @@ namespace Faolan.Importer.Captures
 			var realmId = await FindOrCreateRealm(db);
 
 			var added = 0;
-			var skipped = 0;
+			var kept = 0;
+			var filtered = 0;
 			var refreshed = 0;
 			foreach (var (name, (body, mapId, handle)) in best.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
 			{
@@ -227,7 +232,7 @@ namespace Faolan.Importer.Captures
 				{
 					if (!refresh || !existing.ImportedFromCapture)
 					{
-						skipped++;
+						kept++;
 						if (refresh && !existing.ImportedFromCapture)
 							Console.WriteLine($"Characters: kept '{name}' - created in-game (no ImportedFromCapture marker), so a refresh must not touch it.");
 
@@ -262,7 +267,7 @@ namespace Faolan.Importer.Captures
 				if (!Enum.IsDefined((ConanClass)classId))
 				{
 					Console.WriteLine($"Characters: skipped '{name}' - invalid/unset class {classId} (captured pre-class-selection).");
-					skipped++;
+					filtered++;
 					continue;
 				}
 
@@ -273,7 +278,7 @@ namespace Faolan.Importer.Captures
 				if (minLevel > 0 && level <= minLevel)
 				{
 					Console.WriteLine($"Characters: skipped '{name}' - level {level} (<= {minLevel}, fresh/tutorial).");
-					skipped++;
+					filtered++;
 					continue;
 				}
 
@@ -281,7 +286,7 @@ namespace Faolan.Importer.Captures
 				added++;
 			}
 
-			return (best.Count, added, skipped, refreshed);
+			return (best.Count, added, kept, filtered, refreshed);
 		}
 
 		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, SimpleCharFullUpdateIIR scaffold, ProtoCoreCharacterIIR message,

@@ -59,7 +59,7 @@ namespace Faolan.Tests
 				};
 
 				CaptureCharacterImporter.AccountId = 7;
-				(int, int, int, int) result;
+				(int, int, int, int, int) result;
 				try
 				{
 					result = await CaptureCharacterImporter.ImportAsync(db, [capture]);
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 					CaptureCharacterImporter.AccountId = 0;
 				}
 
-				Assert.Equal((1, 1, 0, 0), result);
+				Assert.Equal((1, 1, 0, 0, 0), result);
 
 				var character = await db
 					.Characters.Include(c => c.Body)
@@ -123,14 +123,14 @@ namespace Faolan.Tests
 
 				// Re-run: nothing added, nothing changed.
 				var rerun = await CaptureCharacterImporter.ImportAsync(db, [capture]);
-				Assert.Equal((1, 0, 1, 0), rerun);
+				Assert.Equal((1, 0, 1, 0, 0), rerun);
 				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
 
 				// The row carries the marker that makes it refreshable, and a refresh run rebuilds it - one
 				// character still, but deleted and re-imported rather than skipped.
 				Assert.True(character.ImportedFromCapture);
 				var refreshed = await CaptureCharacterImporter.ImportAsync(db, [capture], refresh: true);
-				Assert.Equal((1, 1, 0, 1), refreshed);
+				Assert.Equal((1, 1, 0, 0, 1), refreshed);
 				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
 
 				// ...and a character created in-game is exempt by construction: no marker, so even a refresh keeps
@@ -151,7 +151,7 @@ namespace Faolan.Tests
 				await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 				var kept = await CaptureCharacterImporter.ImportAsync(db, [capture], refresh: true);
-				Assert.Equal((1, 0, 1, 0), kept);
+				Assert.Equal((1, 0, 1, 0, 0), kept);
 				var local = await db.Characters.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
 				Assert.False(local.ImportedFromCapture);
 				Assert.Equal(4, local.Level); // untouched - not rebuilt from the capture

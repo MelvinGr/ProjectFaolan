@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Modules
 {
@@ -42,15 +43,16 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var refresh = ctx.ModeFor(Name) == WriteMode.Overwrite;
-			// GUARDED, and this is what `--force` was parsed for (nothing consumed it until now). The marker
-			// makes the refresh safe for characters the importer did not build, but for the ones it did it still
-			// throws away whatever the player has since done with that character's bag - so it takes a second,
-			// explicit yes rather than riding in on a global `--mode overwrite` meant for some other module.
-			if (refresh && !ctx.Force)
+			// GUARDED, and this is what `--force` is for. The marker makes the refresh safe for characters the importer
+			// did not build, but for the ones it did it still throws away whatever the player has since done with that
+			// character's bag - so it takes a second, explicit yes rather than riding in on a global `--mode overwrite`
+			// meant for some other module. With no capture-imported character there is nothing to throw away (a fresh
+			// clone's database, seeded from faolan.sql, has no characters at all), so the first import needs no yes.
+			if (refresh && !ctx.Force && await ctx.Db.Characters.AnyAsync(c => c.ImportedFromCapture))
 				throw new InvalidOperationException("characters: overwrite REBUILDS every capture-imported character and discards any rearrangement of their items. Re-run with --force if that is what you want.");
 
-			var (seen, added, skipped, refreshed) = await CaptureCharacterImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => c.Packets), MinLevel, refresh);
-			return new ImportResult($"{seen} captured, {added} added, {refreshed} refreshed, {skipped} kept (already in DB{(refresh ? " and not capture-imported" : "")} or below level {MinLevel}).");
+			var (seen, added, kept, filtered, refreshed) = await CaptureCharacterImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => c.Packets), MinLevel, refresh);
+			return new ImportResult($"{seen} captured, {added} added, {refreshed} refreshed, {kept} kept (already in DB{(refresh ? " and not capture-imported" : "")}), {filtered} filtered (unset class, or level <= {MinLevel}).");
 		}
 	}
 }
