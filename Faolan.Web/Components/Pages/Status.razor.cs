@@ -31,7 +31,9 @@ namespace Faolan.Web.Components.Pages
 			_items = await db.Items.LongCountAsync();
 			_maps = await db.Maps.CountAsync();
 			_spells = await db.Spells.LongCountAsync();
-			_lastLogin = await db.Accounts.MaxAsync(a => a.LastConnection);
+			// SQLite cannot apply MAX to a DateTimeOffset column either (it stores one as text), so the non-null logins are
+			// read and the newest picked here.
+			_lastLogin = (await db.Accounts.Where(a => a.LastConnection != null).Select(a => a.LastConnection).ToListAsync()).Max();
 
 			// The roster is small and SQLite cannot translate DateTimeOffset comparisons or ordering, so the characters
 			// are pulled into memory and the recent list and class distribution computed here.
